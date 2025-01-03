@@ -6,10 +6,9 @@
         "actorNames": {
             "title": "Actors names to be exposed for an AI application (AI agent)",
             "type": "array",
-            "description": "Specify the names of actors that will be exposed to an AI application (AI agent) and communicate with Apify Actors via the MCP protocol.",
+            "description": "Specify the names of actors that will be exposed to an AI application (AI agent) and communicate with Apify Actors via the MCP protocol",
             "editor": "stringList",
             "prefill": [
-                "apify/website-content-crawler",
                 "compass/google-maps-extractor",
                 "apify/google-search-scraper",
                 "apify/instagram-scraper",
@@ -20,7 +19,7 @@
         "debugActorName": {
             "title": "Debug actor name",
             "type": "string",
-            "description": "Specify the name of the actor that will be used for debugging in normal mode.",
+            "description": "Specify the name of the actor that will be used for debugging in normal mode",
             "editor": "textfield",
             "prefill": "apify/rag-web-browser",
             "sectionCaption": "Debugging settings (normal mode)"
@@ -28,7 +27,7 @@
         "debugActorInput": {
             "title": "Debug actor input",
             "type": "object",
-            "description": "Specify the input for the actor that will be used for debugging in normal mode.",
+            "description": "Specify the input for the actor that will be used for debugging in normal mode",
             "editor": "json",
             "prefill": {
                 "query": "hello world"

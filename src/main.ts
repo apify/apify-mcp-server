@@ -50,7 +50,7 @@ app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
 
 // Catch-all for undefined routes
 app.use((req: Request, res: Response) => {
-    res.status(404).json({ message: `The is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` });
+    res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` });
 });
 
 if (STANDBY_MODE) {

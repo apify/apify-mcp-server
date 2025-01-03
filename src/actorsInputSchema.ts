@@ -15,7 +15,7 @@ interface ActorDefinitionWithDesc extends ActorDefinition {
  * @param actorFullName
  */
 async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinitionWithDesc | null> {
-    const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
+    const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const actorClient = client.actor(actorFullName);
 
     try {

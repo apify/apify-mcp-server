@@ -1,32 +1,24 @@
 #!/usr/bin/env node
-
 /**
  * Model Context Protocol (MCP) server for RAG Web Browser Actor
  */
-
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import { ApifyClient } from 'apify-client';
-import dotenv from 'dotenv';
 
 import { SERVER_NAME, SERVER_VERSION } from './const.js';
 import { log } from './logger.js';
 
-dotenv.config({ path: '../.env' });
-
-const argToken = process.argv.find((arg) => arg.startsWith('APIFY_API_TOKEN='))?.split('=')[1];
-const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN || argToken;
-
 export async function callActorGetDataset(actorName: string, input: unknown): Promise<object[]> {
-    if (!APIFY_API_TOKEN) {
-        throw new Error('APIFY_API_TOKEN is required but not set. '
-            + 'Please set it in your environment variables or pass it as a command-line argument.');
+    const apifyApiToken = process.env.APIFY_TOKEN;
+    if (!apifyApiToken) {
+        throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
     }
     try {
         log.info(`Calling actor ${actorName} with input: ${JSON.stringify(input)}`);
-        const client = new ApifyClient({ token: APIFY_API_TOKEN });
+        const client = new ApifyClient({ token: apifyApiToken });
         const actorClient = client.actor(actorName);
 
         const results = await actorClient.call(input);
