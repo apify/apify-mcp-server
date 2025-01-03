@@ -46,17 +46,10 @@ or as a **local server** running on your machine.
 The Actor runs in the [**Standby mode**](https://docs.apify.com/platform/actors/running/standby), where it runs an HTTP web server that receives requests.
 To use Apify MCP Server, send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
 
-```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>
-```
-This will start a server with predefined set of Actors and tools.
-
-To start a server with custom set of Actors, use the following URL:
+To start a server with a custom set of Actors (Google Maps Email Extractor, Facebook Posts Scraper), use the following URL:
 ```
 https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
 ```
-This will start MCP server with Google Maps Email Extractor and Facebook Posts Scraper Actors
-
 Now you can interact with the server using MCP protocol via Server Sent Events (SSE).
 
 1. Initiate SSE connection:
