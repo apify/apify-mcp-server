@@ -16,3 +16,4 @@ node_modules
 data
 src/storage
 dist
+.env

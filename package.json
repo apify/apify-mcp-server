@@ -1,0 +1,38 @@
+{
+  "name": "apify-mcp-server",
+  "version": "0.0.1",
+  "type": "module",
+  "description": "This is an example of an Apify actor.",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "ajv": "^8.17.1",
+    "apify": "^3.2.6",
+    "apify-client": "^2.11.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "@apify/eslint-config": "^0.5.0-beta.2",
+    "@apify/tsconfig": "^0.1.0",
+    "@types/express": "^5.0.0",
+    "eslint": "^9.17.0",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.18.2"
+  },
+  "scripts": {
+    "start": "npm run start:dev",
+    "start:prod": "node dist/main.js",
+    "start:dev": "tsx src/main.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "tsc",
+    "test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
+    "watch": "tsc --watch"
+  },
+  "author": "It's not you it's me",
+  "license": "ISC"
+}
