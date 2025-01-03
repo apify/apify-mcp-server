@@ -24,8 +24,10 @@ export async function callActorGetDataset(actorName: string, input: unknown): Pr
 
         const results = await actorClient.call(input);
         const dataset = await client.dataset(results.defaultDatasetId).listItems();
+        log.info(`Actor ${actorName} finished with ${dataset.items.length} items`);
         if (process.env.APIFY_IS_AT_HOME) {
             await Actor.pushData(dataset.items);
+            log.info(`Pushed ${dataset.items.length} items to the dataset`);
         }
         return dataset.items;
     } catch (error) {

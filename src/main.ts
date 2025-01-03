@@ -27,7 +27,7 @@ const mcpServer = new ApifyMcpServer(tools);
 let transport: SSEServerTransport;
 
 const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
-    + ` and then send POST requests to ${HOST}/messages.`;
+    + ` and then send POST requests to ${HOST}/message.`;
 
 app.route('/')
     .get(async (req: Request, res: Response) => {
