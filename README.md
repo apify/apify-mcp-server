@@ -1,80 +1,254 @@
 ## Apify Model Context Protocol (MCP) Server
 
-A template for scraping data from a single web page in TypeScript (Node.js). The URL of the web page is passed in via input, which is defined by the [input schema](https://docs.apify.com/platform/actors/development/input-schema). The template uses the [Axios client](https://axios-http.com/docs/intro) to get the HTML of the page and the [Cheerio library](https://cheerio.js.org/) to parse the data from it. The data are then stored in a [dataset](https://docs.apify.com/sdk/js/docs/guides/result-storage#dataset) where you can easily access them.
+Implementation of an MCP server for [Apify Actors](https://apify.com/store).
+This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
 
-The scraped data in this template are page headings but you can easily edit the code to scrape whatever you want from the page.
+The server can be used in two ways:
+- **MCP Server Actor** - Actor runs an HTTP server that supports the MCP protocol via SSE (Server-Sent Events).
+- **MCP Server CLI** - Command-line interface that supports the MCP protocol via stdio.
 
-## Included features
+## 🔄 What is model context protocol?
 
-- **[Apify SDK](https://docs.apify.com/sdk/js/)** - a toolkit for building [Actors](https://apify.com/actors)
-- **[Input schema](https://docs.apify.com/platform/actors/development/input-schema)** - define and easily validate a schema for your Actor's input
-- **[Dataset](https://docs.apify.com/sdk/js/docs/guides/result-storage#dataset)** - store structured data where each object stored has the same attributes
-- **[Axios client](https://axios-http.com/docs/intro)** - promise-based HTTP Client for Node.js and the browser
-- **[Cheerio](https://cheerio.js.org/)** - library for parsing and manipulating HTML and XML
+The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
+MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
-## How it works
+## 🎯 What does this MCP server do?
 
-1. `Actor.getInput()` gets the input where the page URL is defined
-2. `axios.get(url)` fetches the page
-3. `cheerio.load(response.data)` loads the page data and enables parsing the headings
-4. This parses the headings from the page and here you can edit the code to parse whatever you need from the page
+The MCP Server Actor allows an AI assistant to:
+- Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
+- For example:
+  - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) scrape websites of Google Maps places for contact details and get email addresses, website, location, address, zipcode, phone number, social media links.
+  - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from hundreds of Facebook posts from one or multiple Facebook pages and profiles
+  - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape and download Instagram posts, profiles, places, hashtags, photos, and comments
+  - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return their cleaned content as Markdown
 
-   ```javascript
-   $("h1, h2, h3, h4, h5, h6").each((_i, element) => {...});
-   ```
+## 🧱 Components
 
-5. `Actor.pushData(headings)` stores the headings in the dataset
+### Tools
 
-## Resources
+Any [Apify Actor](https://apify.com/store) can be used as a tool.
+The tool name must always be the full Actor name, such as `apify/google-maps-email-extractor`, and the arguments represent the input parameters for the Actor.
+Please see the examples below and refer to the specific Actor's documentation for a list of available arguments.
 
-- [Web scraping in Node.js with Axios and Cheerio](https://blog.apify.com/web-scraping-with-axios-and-cheerio/)
-- [Web scraping with Cheerio in 2023](https://blog.apify.com/web-scraping-with-cheerio/)
-- [Video tutorial](https://www.youtube.com/watch?v=yTRHomGg9uQ) on building a scraper using CheerioCrawler
-- [Written tutorial](https://docs.apify.com/academy/web-scraping-for-beginners/challenge) on building a scraper using CheerioCrawler
-- [Integration with Zapier](https://apify.com/integrations), Make, Google Drive, and others
-- [Video guide on getting scraped data using Apify API](https://www.youtube.com/watch?v=ViYYDHSBAKM)
-- A short guide on how to build web scrapers using code templates:
+### Prompt & Resources
 
-[web scraper template](https://www.youtube.com/watch?v=u-i-Korzf8w)
+The server does not provide any resources and prompts.
 
-## Getting started
+## ⚙️ Usage
 
-For complete information [see this article](https://docs.apify.com/platform/actors/development#build-actor-locally). To run the actor use the following command:
+The Apify MCP Server can be used in two ways: **as an Apify Actor** running at Apify platform
+or as a **local server** running on your machine.
 
-```bash
-apify run
+### MCP Server Actor
+
+#### Standby web server
+
+The Actor runs in the [**Standby mode**](https://docs.apify.com/platform/actors/running/standby), where it runs an HTTP web server that receives requests.
+To use Apify MCP Server, send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
+
+```
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>
+```
+This will start a server with predefined set of Actors and tools.
+
+To start a server with custom set of Actors, use the following URL:
+```
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
+```
+This will start MCP server with Google Maps Email Extractor and Facebook Posts Scraper Actors
+
+Now you can interact with the server using MCP protocol via Server Sent Events (SSE).
+
+1. Initiate SSE connection:
+```shell
+https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
+```
+On connection, you’ll receive a `sessionId`:
+```shell
+event: endpoint
+data: /message?sessionId=a1b
 ```
 
-## Deploy to Apify
+1. List available tools by making a POST request with the `sessionId`, `APIFY-API-TOKEN` and your query:
+```shell
+curl -X POST "https://mcp-server.apify.actor/message?session_id=a1b2&token=<APIFY-API-TOKEN>" -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/list"
+}'
+```
 
-### Connect Git repository to Apify
+## 🛠️ Configuration
 
-If you've created a Git repository for the project, you can easily connect to Apify:
+### Prerequisites
 
-1. Go to [Actor creation page](https://console.apify.com/actors/new)
-2. Click on **Link Git Repository** button
+- MacOS or Windows
+- The latest version of Claude Desktop must be installed (or another MCP client)
+- [Node.js](https://nodejs.org/en) (v18 or higher)
+- [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_API_TOKEN`)
 
-### Push project on your local machine to Apify
+### Install
 
-You can also deploy the project on your local machine to Apify without the need for the Git repository.
+Follow the steps below to set up and run the server on your local machine:
+First, clone the repository using the following command:
 
-1. Log in to Apify. You will need to provide your [Apify API Token](https://console.apify.com/account/integrations) to complete this action.
+```bash
+git clone git@github.com:apify/mcp-server-rag-web-browser.git
+```
 
-   ```bash
-   apify login
-   ```
+Navigate to the project directory and install the required dependencies:
 
-2. Deploy your Actor. This command will deploy and build the Actor on the Apify Platform. You can find your newly created Actor under [Actors -> My Actors](https://console.apify.com/actors?tab=my).
+```bash
+cd mcp-server-rag-web-browser
+npm install
+```
 
-   ```bash
-   apify push
-   ```
+Before running the server, you need to build the project:
 
-## Documentation reference
+```bash
+npm run build
+```
 
-To learn more about Apify and Actors, take a look at the following resources:
+#### Claude Desktop
 
-- [Apify SDK for JavaScript documentation](https://docs.apify.com/sdk/js)
-- [Apify SDK for Python documentation](https://docs.apify.com/sdk/python)
-- [Apify Platform documentation](https://docs.apify.com/platform)
-- [Join our developer community on Discord](https://discord.com/invite/jyEM2PRvMU)
+Configure Claude Desktop to recognize the MCP server.
+
+1. Open your Claude Desktop configuration and edit the following file:
+
+    - On macOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
+    - On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+
+    ```text
+    "mcpServers": {
+      "mcp-server-rag-web-browser": {
+        "command": "npx",
+        "args": [
+          "/path/to/mcp-server-rag-web-browser/build/index.js"
+        ]
+        "env": {
+           "APIFY-API-TOKEN": "your-apify-api-token"
+        }
+      }
+    }
+    ```
+
+2. Restart Claude Desktop
+
+    - Fully quit Claude Desktop (ensure it’s not just minimized or closed).
+    - Restart Claude Desktop.
+    - Look for the 🔌 icon to confirm that the Exa server is connected.
+
+3. Examples
+
+   You can ask Claude to perform web searches, such as:
+    ```text
+    What is an MCP server and how can it be used?
+    What is an LLM, and what are the recent news updates?
+    Find and analyze recent research papers about LLMs.
+    ```
+
+## 👷🏼 Development
+
+### Simple local client (stdio)
+
+To test the server locally, you can use `example_client_stdio.ts`:
+
+```bash
+node build/example_client_stdio.js
+```
+
+The script will start the MCP server, fetch available tools, and then call the `search` tool with a query.
+
+### Chat local client (stdio)
+
+To run simple chat client, you can use `example_chat_stdio.ts`:
+
+```bash
+node build/example_chat_stdio.js
+```
+Here you can interact with the server using the chat interface.
+
+### Test Server-Sent Events (SSE) Transport
+
+The SSE transport enables **server-to-client streaming** while using **HTTP POST requests** for client-to-server communication.
+
+#### Step 1: Start the Server
+
+Start the server with the following command:
+
+```bash
+node build/sse.js
+```
+
+The server will start and listen on `http://localhost:3001`.
+
+#### Step 2: Connect to the SSE Server (Client)
+
+To connect to the SSE server, use the following command (acting as the client):
+
+```bash
+curl -X GET http://localhost:3001/sse
+```
+
+Upon connection, you will receive a message containing the `sessionId`, for example:
+
+```text
+event: endpoint
+data: /message?sessionId=7bd075c8-bbd1-4854-884c-e6c837148b7b
+```
+
+#### Step 3: Send a Message to the Server
+
+You can send a message to the server by making a POST request with the `sessionId` and your query:
+
+```bash
+curl -X POST "http://localhost:3001/message?session_id=181c7a3d-01a9-498e-8e16-5d5878832cd7" -H "Content-Type: application/json" -d '{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "arguments": { "query": "recent news about LLMs" },
+    "name": "search"
+  }
+}'
+```
+
+#### Step 4: Receive the Response
+
+For the POST request, the server will respond with:
+
+```text
+Accepted
+```
+
+The server will then invoke the `search` tool using the provided query and stream the response back to the client via SSE:
+
+```text
+event: message
+data: {"result":{"content":[{"type":"text","text":"[{\"searchResult\":{\"title\":\"Language models recent news\",\"description\":\"Amazon Launches New Generation of LLM Foundation Model...\"}}
+```
+
+### Debugging
+
+Call the RAG Web Browser Actor to test it:
+
+```bash
+APIFY_API_TOKEN=your-apify-api-token node build/example_call_web_browser.js
+````
+
+Since MCP servers operate over standard input/output (stdio), debugging can be challenging.
+For the best debugging experience, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
+
+Build the mcp-server-rag-web-browser package:
+
+```bash
+npm run build
+```
+
+You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
+
+```bash
+npx @modelcontextprotocol/inspector node ~/apify/mcp-server-rag-web-browser/build/index.js APIFY_API_TOKEN=your-apify-api-token
+```
+
+Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.

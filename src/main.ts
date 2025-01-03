@@ -1,3 +1,6 @@
+import type { ParsedUrlQuery } from 'querystring';
+import { parse } from 'querystring';
+
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { Actor } from 'apify';
 import type { Request, Response } from 'express';
@@ -12,18 +15,13 @@ import type { Input } from './types.js';
 
 await Actor.init();
 
-const { input } = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
-log.info(`Loaded input: ${JSON.stringify(input)} `);
-
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL : 'http://localhost';
 const POST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_PORT : 3001;
 
 const app = express();
 
-// Set up MCP server with tools
-const tools = await getActorsAsTools(input.actorNames);
-const mcpServer = new ApifyMcpServer(tools);
+const mcpServer = new ApifyMcpServer();
 let transport: SSEServerTransport;
 
 const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
@@ -32,6 +30,14 @@ const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
 app.route('/')
     .get(async (req: Request, res: Response) => {
         log.info(`Received GET message at: ${req.url}`);
+        const params = parse(req.url.split('?')[1] || '') as ParsedUrlQuery;
+        delete params.token;
+        log.debug(`Received input parameters: ${JSON.stringify(params)}`);
+        const { input } = await processInput(params as Input);
+        if (input.actors) {
+            const tools = await getActorsAsTools(input.actors as string[]);
+            mcpServer.updateTools(tools);
+        }
         res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
     })
     .head(async (_req: Request, res: Response) => {
@@ -62,10 +68,12 @@ if (STANDBY_MODE) {
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
+    const { input } = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
+    log.info(`Loaded input: ${JSON.stringify(input)} `);
 
-    if (input && !input.debugActorName && !input.debugActorInput) {
-        await Actor.fail('If you need to debug a specific actor, please provide the debugActorName and debugActorInput fields in the input.');
+    if (input && !input.debugActor && !input.debugActorInput) {
+        await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input.');
     }
-    await callActorGetDataset(input.debugActorName!, input.debugActorInput!);
+    await callActorGetDataset(input.debugActor!, input.debugActorInput!);
     await Actor.exit();
 }

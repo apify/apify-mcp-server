@@ -52,10 +52,10 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
     }
 }
 
-export async function getActorsAsTools(actorNames: string[]) {
+export async function getActorsAsTools(actors: string[]) {
     // Fetch input schemas in parallel
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
-    const results = await Promise.all(actorNames.map(fetchActorDefinition));
+    const results = await Promise.all(actors.map(fetchActorDefinition));
     const tools = [];
     for (const result of results) {
         if (result) {

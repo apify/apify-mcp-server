@@ -1,0 +1,30 @@
+# This workflow runs for every pull request to lint and test the proposed changes.
+
+name: Check
+
+on:
+    pull_request:
+
+    # Push to master will trigger code checks
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+jobs:
+    lint:
+        name: Lint
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v4
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install Dependencies
+                run: npm ci
+            -   run: npm run lint

@@ -1,5 +1,5 @@
 export type Input = {
-    actorNames: string[];
-    debugActorName?: string;
+    actors: string[] | string;
+    debugActor?: string;
     debugActorInput?: unknown;
 };

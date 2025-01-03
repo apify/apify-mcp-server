@@ -41,10 +41,9 @@ export async function callActorGetDataset(actorName: string, input: unknown): Pr
  */
 export class ApifyMcpServer {
     private server: Server;
-    private readonly tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[];
-    private readonly availableTools: string[];
+    private tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[];
 
-    constructor(tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[]) {
+    constructor() {
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -56,10 +55,22 @@ export class ApifyMcpServer {
                 },
             },
         );
-        this.tools = tools;
-        this.availableTools = tools.map((tool) => tool.name);
+        this.tools = [];
         this.setupErrorHandling();
         this.setupToolHandlers();
+    }
+
+    public addToolIfNotExist(name: string, description: string, inputSchema: object, ajvValidate: ValidateFunction): void {
+        if (!this.tools.find((x) => x.name === name)) {
+            log.info(`Adding tool: ${name}`);
+            this.tools.push({ name, description, inputSchema, ajvValidate });
+        }
+    }
+
+    public updateTools(tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[]): void {
+        for (const tool of tools) {
+            this.addToolIfNotExist(tool.name, tool.description, tool.inputSchema, tool.ajvValidate);
+        }
     }
 
     private setupErrorHandling(): void {
@@ -88,7 +99,8 @@ export class ApifyMcpServer {
         });
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
-            if (!this.availableTools.includes(name)) {
+            const availableTools = this.tools.map((tool) => tool.name);
+            if (!availableTools.includes(name)) {
                 throw new Error(`Unknown tool: ${name}`);
             }
             try {
