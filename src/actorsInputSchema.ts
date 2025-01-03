@@ -1,34 +1,21 @@
 import { Ajv } from 'ajv';
-import { log } from 'apify';
-import type { BuildCollectionClientListItem, ActorDefinition } from 'apify-client';
+import type { ActorDefinition } from 'apify-client';
 import { ApifyClient } from 'apify-client';
-import dotenv from 'dotenv';
 
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+import { log } from './logger.js';
 
-dotenv.config({ path: '../.env' });
-
-const argToken = process.argv.find((arg) => arg.startsWith('APIFY_API_TOKEN='))?.split('=')[1];
-const APIFY_API_TOKEN = process.env.APIFY_API_TOKEN || argToken;
-const client = new ApifyClient({ token: APIFY_API_TOKEN });
-
-interface Build extends BuildCollectionClientListItem {
-    buildNumber: string;
-}
-log.setLevel(log.LEVELS.DEBUG);
-
-interface ActorDefinitionExtended extends ActorDefinition {
+interface ActorDefinitionWithDesc extends ActorDefinition {
     description: string;
 }
 
 /**
  * Get actor input schema by actor name.
- * First, fetch the actor details to get the default build tag and buildNumber
- * Then, fetch the build list and find the buildId by buildNumber
- * Finally, fetch the build details and return actorName, description, and input schema.
+ * First, fetch the actor details to get the default build tag and buildId.
+ * Then, fetch the build details and return actorName, description, and input schema.
  * @param actorFullName
  */
-async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinitionExtended | null> {
+async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinitionWithDesc | null> {
+    const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
     const actorClient = client.actor(actorFullName);
 
     try {
@@ -41,19 +28,9 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
 
         // Extract default build label
         const tag = actor.defaultRunOptions?.build || '';
-        const buildNumber = actor.taggedBuilds?.[tag]?.buildId || '';
+        const buildId = actor.taggedBuilds?.[tag]?.buildId || '';
         const description = actor.description || '';
-        if (!buildNumber) {
-            log.error(`Failed to fetch input schema for actor: ${actorFullName}. Build number not found.`);
-            return null;
-        }
 
-        // Fetch builds and find the matching build by number
-        const buildList = await actorClient.builds().list();
-        const { items } = buildList as unknown as { items: Build[] };
-        const build = items.find((b) => b.buildNumber === buildNumber);
-
-        const buildId = build?.id || '';
         if (!buildId) {
             log.error(`Failed to fetch input schema for actor: ${actorFullName}. Build ID not found.`);
             return null;
@@ -62,7 +39,7 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
         const buildDetails = await client.build(buildId).get();
         if (buildDetails && 'actorDefinition' in buildDetails) {
             // The buildDetails schema contains actorDefinitions but return type is ActorDefinition
-            const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionExtended;
+            const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             actorDefinitions.description = description;
             // Change the name to the actorFullName (we need to tools with a full name to call the actor)
             actorDefinitions.name = actorFullName;
@@ -77,6 +54,7 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
 
 export async function getActorsAsTools(actorNames: string[]) {
     // Fetch input schemas in parallel
+    const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     const results = await Promise.all(actorNames.map(fetchActorDefinition));
     const tools = [];
     for (const result of results) {
@@ -92,4 +70,4 @@ export async function getActorsAsTools(actorNames: string[]) {
     return tools;
 }
 
-getActorsAsTools(['apify/rag-web-browser', 'apify/google-search-scraper']).catch((error) => log.error('Global Error:', error));
+// getActorsAsTools(['apify/rag-web-browser', 'apify/google-search-scraper']).catch((error) => log.error('Global Error:', error));

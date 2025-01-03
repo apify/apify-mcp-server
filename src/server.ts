@@ -8,11 +8,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import { log } from 'apify';
 import { ApifyClient } from 'apify-client';
 import dotenv from 'dotenv';
 
 import { SERVER_NAME, SERVER_VERSION } from './const.js';
+import { log } from './logger.js';
 
 dotenv.config({ path: '../.env' });
 

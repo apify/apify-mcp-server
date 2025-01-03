@@ -1,15 +1,14 @@
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { Actor, log } from 'apify';
+import { Actor } from 'apify';
 import type { Request, Response } from 'express';
 import express from 'express';
 
 import { getActorsAsTools } from './actorsInputSchema.js';
 import { Routes } from './const.js';
 import { processInput } from './input.js';
+import { log } from './logger.js';
 import { ApifyMcpServer, callActorGetDataset } from './server.js';
 import type { Input } from './types.js';
-
-log.setLevel(log.LEVELS.DEBUG);
 
 await Actor.init();
 
