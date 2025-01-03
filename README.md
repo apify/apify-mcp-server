@@ -1,4 +1,4 @@
-## Scrape single-page in TypeScript template
+## Apify Model Context Protocol (MCP) Server
 
 A template for scraping data from a single web page in TypeScript (Node.js). The URL of the web page is passed in via input, which is defined by the [input schema](https://docs.apify.com/platform/actors/development/input-schema). The template uses the [Axios client](https://axios-http.com/docs/intro) to get the HTML of the page and the [Cheerio library](https://cheerio.js.org/) to parse the data from it. The data are then stored in a [dataset](https://docs.apify.com/sdk/js/docs/guides/result-storage#dataset) where you can easily access them.
 

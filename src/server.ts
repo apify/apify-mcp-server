@@ -6,6 +6,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
+import { Actor } from 'apify';
 import { ApifyClient } from 'apify-client';
 
 import { SERVER_NAME, SERVER_VERSION } from './const.js';
@@ -23,6 +24,9 @@ export async function callActorGetDataset(actorName: string, input: unknown): Pr
 
         const results = await actorClient.call(input);
         const dataset = await client.dataset(results.defaultDatasetId).listItems();
+        if (process.env.APIFY_IS_AT_HOME) {
+            await Actor.pushData(dataset.items);
+        }
         return dataset.items;
     } catch (error) {
         log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);

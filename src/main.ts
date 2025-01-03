@@ -65,6 +65,7 @@ if (STANDBY_MODE) {
     if (input && !input.debugActorName && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActorName and debugActorInput fields in the input.');
     }
-    await callActorGetDataset(input.debugActorName!, input.debugActorInput!);
+    const items = await callActorGetDataset(input.debugActorName!, input.debugActorInput!);
+    await Actor.pushData(items);
     await Actor.exit();
 }
