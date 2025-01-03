@@ -3,7 +3,7 @@ import { Actor } from 'apify';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { getActorsAsTools } from './actorsInputSchema.js';
+import { getActorsAsTools } from './actorDefinition.js';
 import { Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
@@ -26,15 +26,16 @@ const tools = await getActorsAsTools(input.actorNames);
 const mcpServer = new ApifyMcpServer(tools);
 let transport: SSEServerTransport;
 
-const HELP_MESSAGE = `Send POST requests to ${HOST}/messages to use Model context protocol.`;
+const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
+    + ` and then send POST requests to ${HOST}/messages.`;
 
 app.route('/')
     .get(async (req: Request, res: Response) => {
         log.info(`Received GET message at: ${req.url}`);
-        res.status(200).json({ message: `Actor is running in Standby mode. ${HELP_MESSAGE}` });
+        res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
     })
-    .head(async (res: Response) => {
-        res.status(200).json({ message: `Actor is running in Standby mode.` });
+    .head(async (_req: Request, res: Response) => {
+        res.status(200).end();
     });
 
 app.get(Routes.SSE, async (req: Request, res: Response) => {
@@ -50,7 +51,7 @@ app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
 
 // Catch-all for undefined routes
 app.use((req: Request, res: Response) => {
-    res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` });
+    res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` }).end();
 });
 
 if (STANDBY_MODE) {
@@ -65,7 +66,6 @@ if (STANDBY_MODE) {
     if (input && !input.debugActorName && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActorName and debugActorInput fields in the input.');
     }
-    const items = await callActorGetDataset(input.debugActorName!, input.debugActorInput!);
-    await Actor.pushData(items);
+    await callActorGetDataset(input.debugActorName!, input.debugActorInput!);
     await Actor.exit();
 }
