@@ -27,17 +27,25 @@ let transport: SSEServerTransport;
 const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
     + ` and then send POST requests to ${HOST}/message.`;
 
+/**
+ * Process input parameters and update tools
+ * @param url
+ */
+async function processParamsAndUpdateTools(url: string) {
+    const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
+    delete params.token;
+    log.debug(`Received input parameters: ${JSON.stringify(params)}`);
+    const { input } = await processInput(params as Input);
+    if (input.actors) {
+        const tools = await getActorsAsTools(input.actors as string[]);
+        mcpServer.updateTools(tools);
+    }
+}
+
 app.route('/')
     .get(async (req: Request, res: Response) => {
         log.info(`Received GET message at: ${req.url}`);
-        const params = parse(req.url.split('?')[1] || '') as ParsedUrlQuery;
-        delete params.token;
-        log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-        const { input } = await processInput(params as Input);
-        if (input.actors) {
-            const tools = await getActorsAsTools(input.actors as string[]);
-            mcpServer.updateTools(tools);
-        }
+        await processParamsAndUpdateTools(req.url);
         res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
     })
     .head(async (_req: Request, res: Response) => {
@@ -46,6 +54,7 @@ app.route('/')
 
 app.get(Routes.SSE, async (req: Request, res: Response) => {
     log.info(`Received GET message at: ${req.url}`);
+    await processParamsAndUpdateTools(req.url);
     transport = new SSEServerTransport(Routes.MESSAGE, res);
     await mcpServer.connect(transport);
 });

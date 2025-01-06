@@ -44,25 +44,22 @@ or as a **local server** running on your machine.
 #### Standby web server
 
 The Actor runs in the [**Standby mode**](https://docs.apify.com/platform/actors/running/standby), where it runs an HTTP web server that receives requests.
-To use Apify MCP Server, send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
 
-To start a server with a custom set of Actors (Google Maps Email Extractor, Facebook Posts Scraper), use the following URL:
+1. To use Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
+send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
 ```
 https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
 ```
-Now you can interact with the server using MCP protocol via Server Sent Events (SSE).
-
-1. Initiate SSE connection:
-```shell
-https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
+This will start an MCP server, then initiate Server Sent Events (SSE) connection and return a `sessionId`:
 ```
-On connection, you’ll receive a `sessionId`:
+https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
+```
 ```shell
 event: endpoint
 data: /message?sessionId=a1b
 ```
 
-1. List available tools by making a POST request with the `sessionId`, `APIFY-API-TOKEN` and your query:
+2. List available tools by making a POST request with the `sessionId`, `APIFY-API-TOKEN` and your query:
 ```shell
 curl -X POST "https://mcp-server.apify.actor/message?session_id=a1b2&token=<APIFY-API-TOKEN>" -H "Content-Type: application/json" -d '{
   "jsonrpc": "2.0",
