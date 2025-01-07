@@ -45,78 +45,71 @@ or as a **local server** running on your machine.
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-##### 1. Start server with selected Actors
+1. **Start server with selected Actors**. To use the Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
+    send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
+    Provide a comma-separated list of Actors in the `actors` query parameter:
+    ```
+    https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper
+    ```
 
-To use the Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
-send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
-Provide a comma-separated list of Actors in the `actors` query parameter:
-```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper
-```
-##### 2. Initiate Server-Sent-Events (SSE) connection
-Establish an SSE connection by sending a GET request to the following URL:
-```
-https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
-```
-The server will respond with a `sessionId`, which you can use to send messages to the server:
-```shell
-event: endpoint
-data: /message?sessionId=a1b
-```
+2. **Initiate Server-Sent-Events (SSE)** by sending a GET request to the following URL:
+    ```
+    https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
+    ```
+    The server will respond with a `sessionId`, which you can use to send messages to the server:
+    ```shell
+    event: endpoint
+    data: /message?sessionId=a1b
+    ```
 
-##### 3. Send a message to the server
+3. **Send a message to the server** by making a POST request with the `sessionId`:
+    ```shell
+    curl -X POST "https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "arguments": { "searchStringsArray": ["restaurants in San Francisco"], "maxCrawledPlacesPerSearch": 3 },
+        "name": "lukaskrivka/google-maps-with-contact-details"
+      }
+    }'
+    ```
+    The MCP server will start the Actor `lukaskrivka/google-maps-with-contact-details` with the provided arguments as input parameters.
+    For this POST request, the server will respond with:
 
-Send a message by making a POST request with the `sessionId`:
-```shell
-curl -X POST "https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "arguments": { "searchStringsArray": ["restaurants in San Francisco"], "maxCrawledPlacesPerSearch": 3 },
-    "name": "lukaskrivka/google-maps-with-contact-details"
-  }
-}'
-```
-The MCP server will start the Actor `lukaskrivka/google-maps-with-contact-details` with the provided arguments as input parameters.
-For this POST request, the server will respond with:
+    ```text
+    Accepted
+    ```
 
-```text
-Accepted
-```
+4. **Receive the response.** The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
+    The response will be returned as JSON text.
 
-##### 4: Receive the response
+    ```text
+    event: message
+    data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
+    ```
 
-The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
-The response will be returned as JSON text.
+### MCP Server at local host
 
-```text
-event: message
-data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
-```
-
-## 🛠️ Configuration
-
-### Prerequisites
+#### Prerequisites
 
 - MacOS or Windows
 - The latest version of Claude Desktop must be installed (or another MCP client)
 - [Node.js](https://nodejs.org/en) (v18 or higher)
 - [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_API_TOKEN`)
 
-### Install
+#### Install
 
 Follow the steps below to set up and run the server on your local machine:
 First, clone the repository using the following command:
 
 ```bash
-git clone git@github.com:apify/mcp-server-rag-web-browser.git
+git clone git@github.com:apify/actor-mcp-server.git
 ```
-
 Navigate to the project directory and install the required dependencies:
 
 ```bash
-cd mcp-server-rag-web-browser
+cd actor-mcp-server
 npm install
 ```
 
@@ -137,10 +130,10 @@ Configure Claude Desktop to recognize the MCP server.
 
     ```text
     "mcpServers": {
-      "mcp-server-rag-web-browser": {
+      "apify-mcp-server": {
         "command": "npx",
         "args": [
-          "/path/to/mcp-server-rag-web-browser/build/index.js"
+          "/path/to/actor-mcp-server/dist/index.js"
         ]
         "env": {
            "APIFY-API-TOKEN": "your-apify-api-token"
