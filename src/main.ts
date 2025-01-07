@@ -24,8 +24,8 @@ const app = express();
 const mcpServer = new ApifyMcpServer();
 let transport: SSEServerTransport;
 
-const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse`
-    + ` and then send POST requests to ${HOST}/message.`;
+const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse?token=YOUR-APIFY-API-TOKEN`
+    + ` and then send POST requests to ${HOST}/message?token=YOUR-APIFY-API-TOKEN.`;
 
 /**
  * Process input parameters and update tools

@@ -1,8 +1,7 @@
-import { defaults } from './const.js';
 import type { Input } from './types.js';
 
 export async function processInput(originalInput: Partial<Input>) {
-    const input = { ...defaults, ...originalInput } as Input;
+    const input = originalInput;
 
     // actors can be a string or an array of strings
     if (input.actors && typeof input.actors === 'string') {

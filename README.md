@@ -27,7 +27,7 @@ The MCP Server Actor allows an AI assistant to:
 ### Tools
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-The tool name must always be the full Actor name, such as `apify/google-maps-email-extractor`, and the arguments represent the input parameters for the Actor.
+The tool name must always be the full Actor name, such as `lukaskrivka/google-maps-with-contact-details`, and the arguments represent the input parameters for the Actor.
 Please see the examples below and refer to the specific Actor's documentation for a list of available arguments.
 
 ### Prompt & Resources
@@ -43,29 +43,56 @@ or as a **local server** running on your machine.
 
 #### Standby web server
 
-The Actor runs in the [**Standby mode**](https://docs.apify.com/platform/actors/running/standby), where it runs an HTTP web server that receives requests.
+The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-1. To use Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
-send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
+##### 1. Start server with selected Actors
+
+To use the Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
+send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
+Provide a comma-separated list of Actors in the `actors` query parameter:
 ```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper
 ```
-This will start an MCP server, then initiate Server Sent Events (SSE) connection and return a `sessionId`:
+##### 2. Initiate Server-Sent-Events (SSE) connection
+Establish an SSE connection by sending a GET request to the following URL:
 ```
-https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>&actors=apify/google-maps-email-extractor,apify/facebook-posts-scraper
+https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
 ```
+The server will respond with a `sessionId`, which you can use to send messages to the server:
 ```shell
 event: endpoint
 data: /message?sessionId=a1b
 ```
 
-2. List available tools by making a POST request with the `sessionId`, `APIFY-API-TOKEN` and your query:
+##### 3. Send a message to the server
+
+Send a message by making a POST request with the `sessionId`:
 ```shell
-curl -X POST "https://mcp-server.apify.actor/message?session_id=a1b2&token=<APIFY-API-TOKEN>" -H "Content-Type: application/json" -d '{
+curl -X POST "https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
   "jsonrpc": "2.0",
   "id": 1,
-  "method": "tools/list"
+  "method": "tools/call",
+  "params": {
+    "arguments": { "searchStringsArray": ["restaurants in San Francisco"], "maxCrawledPlacesPerSearch": 3 },
+    "name": "lukaskrivka/google-maps-with-contact-details"
+  }
 }'
+```
+The MCP server will start the Actor `lukaskrivka/google-maps-with-contact-details` with the provided arguments as input parameters.
+For this POST request, the server will respond with:
+
+```text
+Accepted
+```
+
+##### 4: Receive the response
+
+The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
+The response will be returned as JSON text.
+
+```text
+event: message
+data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
 ```
 
 ## 🛠️ Configuration

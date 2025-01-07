@@ -62,8 +62,10 @@ export class ApifyMcpServer {
 
     public addToolIfNotExist(name: string, description: string, inputSchema: object, ajvValidate: ValidateFunction): void {
         if (!this.tools.find((x) => x.name === name)) {
-            log.info(`Adding tool: ${name}`);
             this.tools.push({ name, description, inputSchema, ajvValidate });
+            log.info(`Added tool: ${name}`);
+        } else {
+            log.info(`Tool already exists: ${name}`);
         }
     }
 
