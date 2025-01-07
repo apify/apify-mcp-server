@@ -54,7 +54,6 @@ app.route('/')
 
 app.get(Routes.SSE, async (req: Request, res: Response) => {
     log.info(`Received GET message at: ${req.url}`);
-    await processParamsAndUpdateTools(req.url);
     transport = new SSEServerTransport(Routes.MESSAGE, res);
     await mcpServer.connect(transport);
 });

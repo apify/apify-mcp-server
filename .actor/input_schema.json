@@ -17,7 +17,7 @@
             ]
         },
         "debugActor": {
-            "title": "Debug actor name",
+            "title": "Debug actor",
             "type": "string",
             "description": "Specify the name of the actor that will be used for debugging in normal mode",
             "editor": "textfield",
