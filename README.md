@@ -44,6 +44,7 @@ Please see the examples below and refer to the specific Actor's documentation fo
 ### Prompt & Resources
 
 The server does not provide any resources and prompts.
+We plan to add Apify's dataset and key-value store as resources in the future.
 
 ## ⚙️ Usage
 
@@ -158,8 +159,7 @@ Configure Claude Desktop to recognize the MCP server.
       }
     }
     ```
-
-    Alternatively, you can use the following command to select one or more Apify Actors as tools:
+    Alternatively, you can use the following command to select one or more Apify Actors:
     ```text
     "mcpServers": {
       "apify-mcp-server": {
@@ -193,7 +193,17 @@ Configure Claude Desktop to recognize the MCP server.
 
 ## 👷🏼 Development
 
-### Simple local client (stdio)
+### Prerequisites
+
+- [Node.js](https://nodejs.org/en) (v18 or higher)
+- Python 3.6 or higher
+
+Create environment file `.env` with the following content:
+```text
+APIFY_API_TOKEN=your-apify-api-token
+```
+
+### Local client (stdio)
 
 To test the server locally, you can use `examples/clientStdio.ts`:
 
@@ -201,7 +211,8 @@ To test the server locally, you can use `examples/clientStdio.ts`:
 node dist/clientStdio.js
 ```
 
-The script will start the MCP server with default Actors and then call the `apify/rag-web-browser` tool with a query.
+The script will start the MCP server with two Actors (`lukaskrivka/google-maps-with-contact-details` and `apify/rag-web-browser`).
+Then it will call `apify/rag-web-browser` tool with a query and will print the result.
 
 ### Chat local client (stdio)
 
@@ -212,78 +223,21 @@ node dist/example_chat_stdio.js
 ```
 Here you can interact with the server using the chat interface.
 
-### Server-Sent Events (SSE) Transport
+### Local client (SSE)
 
-The SSE transport enables **server-to-client streaming** while using **HTTP POST requests** for client-to-server communication.
-
-#### Step 1: Start the Server
-
-Start the server with the following command:
+To test the server with the SSE transport, you can use python script `examples/client_sse.py`:
+Currently, the node.js client does not support to establish a connection to remote server witch custom headers.
 
 ```bash
-node dist/sse.js
-```
-
-The server will start and listen on `http://localhost:3001`.
-
-#### Step 2: Connect to the SSE Server (Client)
-
-To connect to the SSE server, use the following command (acting as the client):
-
-```bash
-curl -X GET http://localhost:3001/sse
-```
-
-Upon connection, you will receive a message containing the `sessionId`, for example:
-
-```text
-event: endpoint
-data: /message?sessionId=7bd075c8-bbd1-4854-884c-e6c837148b7b
-```
-
-#### Step 3: Send a Message to the Server
-
-You can send a message to the server by making a POST request with the `sessionId` and your query:
-
-```bash
-curl -X POST "http://localhost:3001/message?session_id=181c7a3d-01a9-498e-8e16-5d5878832cd7" -H "Content-Type: application/json" -d '{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "method": "tools/call",
-  "params": {
-    "arguments": { "query": "recent news about LLMs" },
-    "name": "search"
-  }
-}'
-```
-
-#### Step 4: Receive the Response
-
-For the POST request, the server will respond with:
-
-```text
-Accepted
-```
-
-The server will then invoke the `search` tool using the provided query and stream the response back to the client via SSE:
-
-```text
-event: message
-data: {"result":{"content":[{"type":"text","text":"[{\"searchResult\":{\"title\":\"Language models recent news\",\"description\":\"Amazon Launches New Generation of LLM Foundation Model...\"}}
+node dist/clientSse.js
 ```
 
 ### Debugging
 
-Call the RAG Web Browser Actor to test it:
-
-```bash
-APIFY_API_TOKEN=your-apify-api-token node dist/example_call_web_browser.js
-````
-
 Since MCP servers operate over standard input/output (stdio), debugging can be challenging.
 For the best debugging experience, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
 
-Build the mcp-server-rag-web-browser package:
+Build the actor-mcp-server package:
 
 ```bash
 npm run build
@@ -292,7 +246,7 @@ npm run build
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-npx @modelcontextprotocol/inspector node ~/apify/mcp-server-rag-web-browser/build/index.js APIFY_API_TOKEN=your-apify-api-token
+npx @modelcontextprotocol/inspector node /path/to/actor-mcp-server/dist/index.js --env APIFY_API_TOKEN=your-apify-api-token
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
