@@ -52,6 +52,9 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
     }
 }
 
+/**
+ * Get actor input schemas by actor full names and create MCP tools.
+ */
 export async function getActorsAsTools(actors: string[]) {
     // Fetch input schemas in parallel
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -71,3 +74,10 @@ export async function getActorsAsTools(actors: string[]) {
 }
 
 // getActorsAsTools(['apify/rag-web-browser', 'apify/google-search-scraper']).catch((error) => log.error('Global Error:', error));
+
+// export async function getListOfActors() {
+//     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+//     const results = await client.store().list({ limit: 20, offset: 0, sortBy: 'popularity' });
+//     return results.items.filter((x) => !x.categories.includes('DEVELOPER_TOOLS')).map((x) => `${x.username}/${x.name}`);
+//     // return v.items.map((x) => `${x.username}/${x.name}`);
+// }

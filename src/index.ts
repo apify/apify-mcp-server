@@ -1,20 +1,16 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import minimist from 'minimist';
 
 import { ApifyMcpServer } from './server.js';
 
-const argActors = process.argv.find((arg) => arg.startsWith('ACTORS='))?.split('=')[1];
+const argv = minimist(process.argv.slice(2));
+const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];
 
 async function main() {
     const server = new ApifyMcpServer();
-
-    if (argActors) {
-        if (argActors && typeof argActors === 'string') {
-            const actors = argActors.split(',').map((format: string) => format.trim()) as string[];
-            await server.addToolsFromActors(actors);
-        }
-    } else {
-        await server.addToolsFromDefaultActors();
-    }
+    await (argActors
+        ? server.addToolsFromActors(argActors)
+        : server.addToolsFromDefaultActors());
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

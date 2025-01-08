@@ -11,12 +11,14 @@
     "ajv": "^8.17.1",
     "apify": "^3.2.6",
     "apify-client": "^2.11.0",
-    "express": "^4.21.2"
+    "express": "^4.21.2",
+    "minimist": "^1.2.8"
   },
   "devDependencies": {
     "@apify/eslint-config": "^0.5.0-beta.2",
     "@apify/tsconfig": "^0.1.0",
     "@types/express": "^5.0.0",
+    "@types/minimist": "^1.2.5",
     "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
     "eventsource": "^3.0.2",

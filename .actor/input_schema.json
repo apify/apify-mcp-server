@@ -3,19 +3,6 @@
     "type": "object",
     "schemaVersion": 1,
     "properties": {
-        "actors": {
-            "title": "Actors names to be exposed for an AI application (AI agent)",
-            "type": "array",
-            "description": "Specify the names of actors that will be exposed to an AI application (AI agent) and communicate with Apify Actors via the MCP protocol",
-            "editor": "stringList",
-            "prefill": [
-                "apify/facebook-posts-scraper",
-                "apify/google-search-scraper",
-                "apify/instagram-scraper",
-                "apify/rag-web-browser",
-                "compass/google-maps-extractor"
-            ]
-        },
         "debugActor": {
             "title": "Debug actor",
             "type": "string",
@@ -33,8 +20,5 @@
                 "query": "hello world"
             }
         }
-    },
-    "required": [
-        "actors"
-    ]
+    }
 }

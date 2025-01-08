@@ -15,10 +15,10 @@ MCP is an open protocol that enables secure, controlled interactions between AI 
 ## 🎯 What does this MCP server do?
 
 The MCP Server Actor allows an AI assistant to:
-- Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
-- For example:
-  - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) scrape websites of Google Maps places for contact details and get email addresses, website, location, address, zipcode, phone number, social media links.
+- Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
   - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from hundreds of Facebook posts from one or multiple Facebook pages and profiles
+  - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) Extract Google Maps contact details
+  - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) Scrape Google Search Engine Results Pages (SERPs)
   - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape and download Instagram posts, profiles, places, hashtags, photos, and comments
   - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return their cleaned content as Markdown
 
@@ -27,7 +27,18 @@ The MCP Server Actor allows an AI assistant to:
 ### Tools
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-The tool name must always be the full Actor name, such as `lukaskrivka/google-maps-with-contact-details`, and the arguments represent the input parameters for the Actor.
+By default, the server is pre-configured with the tools specified above, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
+
+The tool name must always be the full Actor name, such as `lukaskrivka/google-maps-with-contact-details`
+
+```text
+'apify/facebook-posts-scraper'
+'apify/google-search-scraper'
+'apify/instagram-scraper'
+'apify/rag-web-browser'
+'lukaskrivka/google-maps-with-contact-details'
+```
+The arguments for MCP tool represent input parameters for the Actor.
 Please see the examples below and refer to the specific Actor's documentation for a list of available arguments.
 
 ### Prompt & Resources
@@ -89,6 +100,12 @@ The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/runn
     data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
     ```
 
+You can also start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
+```
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,junglee/free-amazon-product-scraper
+```
+You can find list of all available Actors in the [Apify Store](https://apify.com/store).
+
 ### MCP Server at local host
 
 #### Prerequisites
@@ -142,6 +159,23 @@ Configure Claude Desktop to recognize the MCP server.
     }
     ```
 
+    Alternatively, you can use the following command to select one or more Apify Actors as tools:
+    ```text
+    "mcpServers": {
+      "apify-mcp-server": {
+        "command": "npx",
+        "args": [
+          "/path/to/actor-mcp-server/dist/index.js",
+          "--actors",
+          "lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper"
+        ]
+        "env": {
+           "APIFY-API-TOKEN": "your-apify-api-token"
+        }
+      }
+    }
+    ```
+
 2. Restart Claude Desktop
 
     - Fully quit Claude Desktop (ensure it’s not just minimized or closed).
@@ -152,33 +186,33 @@ Configure Claude Desktop to recognize the MCP server.
 
    You can ask Claude to perform web searches, such as:
     ```text
-    What is an MCP server and how can it be used?
-    What is an LLM, and what are the recent news updates?
     Find and analyze recent research papers about LLMs.
+    Find best restaurants in San Francisco.
+    Find and analyze comments about the latest iPhone.
     ```
 
 ## 👷🏼 Development
 
 ### Simple local client (stdio)
 
-To test the server locally, you can use `example_client_stdio.ts`:
+To test the server locally, you can use `examples/clientStdio.ts`:
 
 ```bash
-node build/example_client_stdio.js
+node dist/clientStdio.js
 ```
 
-The script will start the MCP server, fetch available tools, and then call the `search` tool with a query.
+The script will start the MCP server with default Actors and then call the `apify/rag-web-browser` tool with a query.
 
 ### Chat local client (stdio)
 
 To run simple chat client, you can use `example_chat_stdio.ts`:
 
 ```bash
-node build/example_chat_stdio.js
+node dist/example_chat_stdio.js
 ```
 Here you can interact with the server using the chat interface.
 
-### Test Server-Sent Events (SSE) Transport
+### Server-Sent Events (SSE) Transport
 
 The SSE transport enables **server-to-client streaming** while using **HTTP POST requests** for client-to-server communication.
 
@@ -187,7 +221,7 @@ The SSE transport enables **server-to-client streaming** while using **HTTP POST
 Start the server with the following command:
 
 ```bash
-node build/sse.js
+node dist/sse.js
 ```
 
 The server will start and listen on `http://localhost:3001`.
@@ -243,7 +277,7 @@ data: {"result":{"content":[{"type":"text","text":"[{\"searchResult\":{\"title\"
 Call the RAG Web Browser Actor to test it:
 
 ```bash
-APIFY_API_TOKEN=your-apify-api-token node build/example_call_web_browser.js
+APIFY_API_TOKEN=your-apify-api-token node dist/example_call_web_browser.js
 ````
 
 Since MCP servers operate over standard input/output (stdio), debugging can be challenging.

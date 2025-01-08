@@ -6,11 +6,10 @@ import { Actor } from 'apify';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { getActorsAsTools } from './actorDefinition.js';
 import { Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
-import { ApifyMcpServer, callActorGetDataset } from './server.js';
+import { ApifyMcpServer } from './server.js';
 import type { Input } from './types.js';
 
 await Actor.init();
@@ -36,10 +35,7 @@ async function processParamsAndUpdateTools(url: string) {
     delete params.token;
     log.debug(`Received input parameters: ${JSON.stringify(params)}`);
     const { input } = await processInput(params as Input);
-    if (input.actors) {
-        const tools = await getActorsAsTools(input.actors as string[]);
-        mcpServer.updateTools(tools);
-    }
+    await (input.actors ? mcpServer.addToolsFromActors(input.actors as string[]) : mcpServer.addToolsFromDefaultActors());
 }
 
 app.route('/')
@@ -82,6 +78,6 @@ if (STANDBY_MODE) {
     if (input && !input.debugActor && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input.');
     }
-    await callActorGetDataset(input.debugActor!, input.debugActorInput!);
+    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!);
     await Actor.exit();
 }
