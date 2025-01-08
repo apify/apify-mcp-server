@@ -11,14 +11,15 @@
     "ajv": "^8.17.1",
     "apify": "^3.2.6",
     "apify-client": "^2.11.0",
-    "eventsource": "^3.0.2",
     "express": "^4.21.2"
   },
   "devDependencies": {
     "@apify/eslint-config": "^0.5.0-beta.2",
     "@apify/tsconfig": "^0.1.0",
     "@types/express": "^5.0.0",
+    "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
+    "eventsource": "^3.0.2",
     "tsx": "^4.6.2",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.18.2"

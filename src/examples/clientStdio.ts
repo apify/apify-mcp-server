@@ -1,0 +1,62 @@
+/* eslint-disable no-console */
+/**
+ * Connect to the MCP server using stdio transport and call a tool.
+ * You need provide a path to MCP server and APIFY_TOKEN in .env file.
+ *
+ * Also, you need to choose ACTORS to run in the server, for example: apify/rag-web-browser
+ */
+
+import { execSync } from 'child_process';
+
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import dotenv from 'dotenv';
+
+dotenv.config({ path: '../../.env' });
+
+const SERVER_PATH = '../../dist/index.js';
+const NODE_PATH = execSync('which node').toString().trim();
+const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
+
+// Create server parameters for stdio connection
+const transport = new StdioClientTransport({
+    command: NODE_PATH,
+    args: [SERVER_PATH, '--actors', TOOLS],
+    env: { APIFY_TOKEN: process.env.APIFY_TOKEN || '' },
+});
+
+// Create a new client instance
+const client = new Client(
+    { name: 'example-client', version: '0.1.0' },
+    { capabilities: {} },
+);
+
+// Main function to run the example client
+async function run() {
+    try {
+        // Connect to the MCP server
+        await client.connect(transport);
+
+        // List available tools
+        const tools = await client.listTools();
+        console.log('Available tools:', tools);
+
+        if (tools.tools.length === 0) {
+            console.log('No tools available');
+            return;
+        }
+
+        // Call a tool
+        console.log('Calling actor ...');
+        const result = await client.callTool(
+            { name: 'apify/rag-web-browser', arguments: { query: 'web browser for Anthropic' } },
+            CallToolResultSchema,
+        );
+        console.log('Tool result:', JSON.stringify(result));
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+await run();
