@@ -208,7 +208,7 @@ APIFY_API_TOKEN=your-apify-api-token
 To test the server locally, you can use `examples/clientStdio.ts`:
 
 ```bash
-node dist/clientStdio.js
+node dist/examples/clientStdio.js
 ```
 
 The script will start the MCP server with two Actors (`lukaskrivka/google-maps-with-contact-details` and `apify/rag-web-browser`).
@@ -216,10 +216,10 @@ Then it will call `apify/rag-web-browser` tool with a query and will print the r
 
 ### Chat local client (stdio)
 
-To run simple chat client, you can use `example_chat_stdio.ts`:
+To run simple chat client, you can use `examples/clientSdioChat.ts`:
 
 ```bash
-node dist/example_chat_stdio.js
+node dist/examples/clientStdioChat.js
 ```
 Here you can interact with the server using the chat interface.
 

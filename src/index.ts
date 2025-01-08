@@ -8,7 +8,7 @@ const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) |
 
 async function main() {
     const server = new ApifyMcpServer();
-    await (argActors
+    await (argActors.length !== 0
         ? server.addToolsFromActors(argActors)
         : server.addToolsFromDefaultActors());
     const transport = new StdioServerTransport();

@@ -77,7 +77,8 @@ export async function getActorsAsTools(actors: string[]) {
 
 // export async function getListOfActors() {
 //     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
-//     const results = await client.store().list({ limit: 20, offset: 0, sortBy: 'popularity' });
+//     const results = await client.store().list({ limit: 20, offset: 0, sortBy: 'relevance', search: 'instagram' });
 //     return results.items.filter((x) => !x.categories.includes('DEVELOPER_TOOLS')).map((x) => `${x.username}/${x.name}`);
 //     // return v.items.map((x) => `${x.username}/${x.name}`);
 // }
+// console.log('Actors:', await getListOfActors());

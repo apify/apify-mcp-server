@@ -15,6 +15,8 @@
     "minimist": "^1.2.8"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.33.1",
+    "@anthropic-ai/tokenizer": "^0.0.4",
     "@apify/eslint-config": "^0.5.0-beta.2",
     "@apify/tsconfig": "^0.1.0",
     "@types/express": "^5.0.0",
