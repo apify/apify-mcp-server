@@ -7,7 +7,7 @@
  *
  * MCP Client Started!
  * Type your queries or 'quit|q|exit' to exit.
- * You: Search information about AI agents and provide brief summary
+ * You: Find to articles about AI agent and return URLs
  * [INTERNAL] Received response from Claude: [{"type":"text","text":"I'll search for information about AI agents
  *   and provide you with a summary."},{"type":"tool_use","id":"toolu_01He9TkzQfh2979bbeuxWVqM","name":"search",
  *   "input":{"query":"what are AI agents definition capabilities applications","maxResults":2}}]
@@ -28,6 +28,8 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
 dotenv.config({ path: '../../.env' });
+
+const REQUEST_TIMEOUT = 120_000; // 2 minutes
 
 const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022';
 const DEBUG = true;
@@ -76,7 +78,7 @@ class MCPClient {
         const response = await this.client.listTools();
 
         this.tools = response.tools.map((x) => ({
-            name: x.name.replace('/', '-'),
+            name: x.name,
             description: x.description,
             input_schema: x.inputSchema,
         }));
@@ -110,13 +112,12 @@ class MCPClient {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const params = { name: content.name, arguments: content.input as any };
         // put back correct tool name
-        params.name = params.name.replace('-', '/');
         console.log(`[INTERNAL] Calling tool: ${JSON.stringify(params)}`);
         let results;
 
         try {
             finalText.push(`[Calling tool: ${params.name} with arguments ${JSON.stringify(params.arguments)}]`);
-            results = await this.client.callTool(params, CallToolResultSchema);
+            results = await this.client.callTool(params, CallToolResultSchema, { timeout: REQUEST_TIMEOUT });
         } catch (error) {
             finalText.push(`Error calling tool: ${error}`);
             return finalText.join('\n');

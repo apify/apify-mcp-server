@@ -16,7 +16,7 @@ await Actor.init();
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL : 'http://localhost';
-const POST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_PORT : 3001;
+const PORT = Actor.isAtHome() ? process.env.ACTOR_STANDBY_PORT : 3001;
 
 const app = express();
 
@@ -28,7 +28,6 @@ const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse?toke
 
 /**
  * Process input parameters and update tools
- * @param url
  */
 async function processParamsAndUpdateTools(url: string) {
     const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
@@ -38,25 +37,40 @@ async function processParamsAndUpdateTools(url: string) {
     await (input.actors ? mcpServer.addToolsFromActors(input.actors as string[]) : mcpServer.addToolsFromDefaultActors());
 }
 
-app.route('/')
-    .get(async (req: Request, res: Response) => {
+app.get(Routes.ROOT, async (req: Request, res: Response) => {
+    try {
         log.info(`Received GET message at: ${req.url}`);
         await processParamsAndUpdateTools(req.url);
         res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
-    })
-    .head(async (_req: Request, res: Response) => {
-        res.status(200).end();
-    });
+    } catch (error) {
+        log.error(`Error in GET ${Routes.ROOT} ${error}`);
+        res.status(500).json({ message: 'Internal Server Error' }).end();
+    }
+});
+
+app.head(Routes.ROOT, (_req: Request, res: Response) => {
+    res.status(200).end();
+});
 
 app.get(Routes.SSE, async (req: Request, res: Response) => {
-    log.info(`Received GET message at: ${req.url}`);
-    transport = new SSEServerTransport(Routes.MESSAGE, res);
-    await mcpServer.connect(transport);
+    try {
+        log.info(`Received GET message at: ${req.url}`);
+        transport = new SSEServerTransport(Routes.MESSAGE, res);
+        await mcpServer.connect(transport);
+    } catch (error) {
+        log.error(`Error in GET ${Routes.SSE}: ${error}`);
+        res.status(500).json({ message: 'Internal Server Error' }).end();
+    }
 });
 
 app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
-    log.info(`Received POST message at: ${req.url}`);
-    await transport.handlePostMessage(req, res);
+    try {
+        log.info(`Received POST message at: ${req.url}`);
+        await transport.handlePostMessage(req, res);
+    } catch (error) {
+        log.error(`Error in POST ${Routes.MESSAGE}: ${error}`);
+        res.status(500).json({ message: 'Internal Server Error' }).end();
+    }
 });
 
 // Catch-all for undefined routes
@@ -67,7 +81,7 @@ app.use((req: Request, res: Response) => {
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
 
-    app.listen(POST, () => {
+    app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}.`);
     });
 } else {

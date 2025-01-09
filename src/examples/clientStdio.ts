@@ -18,6 +18,12 @@ dotenv.config({ path: '../../.env' });
 const SERVER_PATH = '../../dist/index.js';
 const NODE_PATH = execSync('which node').toString().trim();
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
+const SELECTED_TOOL = 'apify/rag-web-browser';
+
+if (!process.env.APIFY_TOKEN) {
+    console.error('APIFY_TOKEN is required but not set in the environment variables.');
+    process.exit(1);
+}
 
 // Create server parameters for stdio connection
 const transport = new StdioClientTransport({
@@ -47,6 +53,14 @@ async function run() {
             return;
         }
 
+        // Example: Call the first available tool
+        const selectedTool = tools.tools.find((tool) => tool.name === SELECTED_TOOL);
+
+        if (!selectedTool) {
+            console.error(`The specified tool: ${selectedTool} is not available. Exiting.`);
+            return;
+        }
+
         // Call a tool
         console.log('Calling actor ...');
         const result = await client.callTool(
@@ -59,4 +73,7 @@ async function run() {
     }
 }
 
-await run();
+run().catch((error) => {
+    console.error('Unhandled error:', error);
+    process.exit(1);
+});

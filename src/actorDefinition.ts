@@ -15,6 +15,10 @@ interface ActorDefinitionWithDesc extends ActorDefinition {
  * @param actorFullName
  */
 async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinitionWithDesc | null> {
+    if (!process.env.APIFY_TOKEN) {
+        log.error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
+        return null;
+    }
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const actorClient = client.actor(actorFullName);
 
@@ -38,10 +42,10 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
         // Fetch build details and return the input schema
         const buildDetails = await client.build(buildId).get();
         if (buildDetails && 'actorDefinition' in buildDetails) {
-            // The buildDetails schema contains actorDefinitions but return type is ActorDefinition
+            // The buildDetails schema contains actorDefinitions but return type is actorDefinition
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             actorDefinitions.description = description;
-            // Change the name to the actorFullName (we need to tools with a full name to call the actor)
+            // Change the name to the actorFullName (we need to have tools with a full name to call the actor)
             actorDefinitions.name = actorFullName;
             return actorDefinitions;
         }
@@ -54,6 +58,7 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
 
 /**
  * Get actor input schemas by actor full names and create MCP tools.
+ * @param actors - Array of actor full names
  */
 export async function getActorsAsTools(actors: string[]) {
     // Fetch input schemas in parallel
@@ -62,23 +67,17 @@ export async function getActorsAsTools(actors: string[]) {
     const tools = [];
     for (const result of results) {
         if (result) {
-            tools.push({
-                name: result.name,
-                description: result.description,
-                inputSchema: result.input || {},
-                ajvValidate: ajv.compile(result.input || {}),
-            });
+            try {
+                tools.push({
+                    name: result.name.replace('/', '_'),
+                    description: result.description,
+                    inputSchema: result.input || {},
+                    ajvValidate: ajv.compile(result.input || {}),
+                });
+            } catch (validationError) {
+                log.error(`Failed to compile AJV schema for actor: ${result.name}. Error: ${validationError}`);
+            }
         }
     }
     return tools;
 }
-
-// getActorsAsTools(['apify/rag-web-browser', 'apify/google-search-scraper']).catch((error) => log.error('Global Error:', error));
-
-// export async function getListOfActors() {
-//     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
-//     const results = await client.store().list({ limit: 20, offset: 0, sortBy: 'relevance', search: 'instagram' });
-//     return results.items.filter((x) => !x.categories.includes('DEVELOPER_TOOLS')).map((x) => `${x.username}/${x.name}`);
-//     // return v.items.map((x) => `${x.username}/${x.name}`);
-// }
-// console.log('Actors:', await getListOfActors());

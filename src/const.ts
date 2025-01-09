@@ -12,6 +12,7 @@ export const defaults = {
 };
 
 export enum Routes {
+    ROOT = '/',
     SSE = '/sse',
     MESSAGE = '/message',
 }
