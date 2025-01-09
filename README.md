@@ -187,8 +187,8 @@ Configure Claude Desktop to recognize the MCP server.
    You can ask Claude to perform web searches, such as:
     ```text
     Find and analyze recent research papers about LLMs.
-    Find best restaurants in San Francisco.
-    Find and analyze comments about the latest iPhone.
+    Find top 10 best Italian restaurants in San Francisco.
+    Find and analyze instagram profile of the Rock.
     ```
 
 ## 👷🏼 Development
@@ -231,6 +231,8 @@ Currently, the node.js client does not support to establish a connection to remo
 ```bash
 node dist/clientSse.js
 ```
+
+The script will start the MCP server with default Actors.
 
 ### Debugging
 
