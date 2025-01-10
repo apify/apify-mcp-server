@@ -7,7 +7,7 @@ The server can be used in two ways:
 - **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
 - **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
-# 🎯 What does this MCP server do?
+# 🎯 What does Apify MCP server do?
 
 The MCP Server Actor allows an AI assistant to:
 - Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
