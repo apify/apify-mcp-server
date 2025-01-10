@@ -4,18 +4,18 @@ Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
 
 The server can be used in two ways:
-- **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
-- **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
+- 🇦 **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
+- ⾕ **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
 # 🎯 What does Apify MCP server do?
 
 The MCP Server Actor allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
 For example it can:
-- [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from Facebook posts from multiple pages/profiles
-- [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) extract Google Maps contact details
-- [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) scrape Google Search Engine Results Pages (SERPs)
-- [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape Instagram posts, profiles, places, hashtags, photos, and comments
-- [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return content
+- [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extracts data from Facebook posts from multiple pages/profiles
+- [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) extracts Google Maps contact details
+- [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) scrapes Google Search Engine Results Pages (SERPs)
+- [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrapes Instagram posts, profiles, places, hashtags, photos, and comments
+- [RAG Web Browser](https://apify.com/apify/web-scraper) performs web search, scrape the top N URLs from the results, and return content
 
 To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [Superinference.ai](https://superinterface.ai/), or [LibreChat](https://www.librechat.ai/).
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
