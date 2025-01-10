@@ -154,7 +154,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
     data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
     ```
 
-## MCP Server at a local host
+## ⾕ MCP Server at a local host
 
 ### Prerequisites
 
@@ -248,7 +248,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
 In the `examples` directory, you can find two clients that interact with the server via
 standard input/output (stdio):
-1. [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts):
+1. [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts)
     This client script starts the MCP server with two specified Actors.
     It then calls the `apify/rag-web-browser` tool with a query and prints the result.
     It demonstrates how to connect to the MCP server, list available tools, and call a specific tool using stdio transport.
@@ -256,7 +256,7 @@ standard input/output (stdio):
     node dist/examples/clientStdio.js
     ```
 
-2. [`clientStdioChat.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdioChat.ts):
+2. [`clientStdioChat.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdioChat.ts)
     This client script also starts the MCP server but provides an interactive command-line chat interface.
     It prompts the user to interact with the server, allowing for dynamic tool calls and responses.
     This example is useful for testing and debugging interactions with the MCP server in conversational manner.

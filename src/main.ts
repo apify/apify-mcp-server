@@ -28,12 +28,14 @@ const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse?toke
 
 /**
  * Process input parameters and update tools
+ * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
+ * @param url
  */
 async function processParamsAndUpdateTools(url: string) {
     const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
     delete params.token;
     log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-    const { input } = await processInput(params as Input);
+    const input = await processInput(params as Input);
     await (input.actors ? mcpServer.addToolsFromActors(input.actors as string[]) : mcpServer.addToolsFromDefaultActors());
 }
 
@@ -55,6 +57,7 @@ app.head(Routes.ROOT, (_req: Request, res: Response) => {
 app.get(Routes.SSE, async (req: Request, res: Response) => {
     try {
         log.info(`Received GET message at: ${req.url}`);
+        await processParamsAndUpdateTools(req.url);
         transport = new SSEServerTransport(Routes.MESSAGE, res);
         await mcpServer.connect(transport);
     } catch (error) {
@@ -86,7 +89,7 @@ if (STANDBY_MODE) {
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
-    const { input } = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
+    const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
     log.info(`Loaded input: ${JSON.stringify(input)} `);
 
     if (input && !input.debugActor && !input.debugActorInput) {

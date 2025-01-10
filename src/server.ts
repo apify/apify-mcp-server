@@ -5,20 +5,20 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { ValidateFunction } from 'ajv';
 import { Actor } from 'apify';
 import { ApifyClient } from 'apify-client';
 
 import { getActorsAsTools } from './actorDefinition.js';
 import { defaults, SERVER_NAME, SERVER_VERSION } from './const.js';
 import { log } from './logger.js';
+import type { Tool } from './types';
 
 /**
  * Create Apify MCP server
  */
 export class ApifyMcpServer {
     private server: Server;
-    private tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[];
+    private tools: Map<string, Tool>;
 
     constructor() {
         this.server = new Server(
@@ -32,11 +32,22 @@ export class ApifyMcpServer {
                 },
             },
         );
-        this.tools = [];
+        this.tools = new Map();
         this.setupErrorHandling();
         this.setupToolHandlers();
     }
 
+    /**
+     * Calls an Apify actor and retrieves the dataset items.
+     *
+     * It requires the `APIFY_API_TOKEN` environment variable to be set.
+     * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
+     *
+     * @param {string} actorName - The name of the actor to call.
+     * @param {unknown} input - The input to pass to the actor.
+     * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
+     * @throws {Error} - Throws an error if the `APIFY_API_TOKEN` is not set
+     */
     public async callActorGetDataset(actorName: string, input: unknown): Promise<object[]> {
         if (!process.env.APIFY_API_TOKEN) {
             throw new Error('APIFY_API_TOKEN is required but not set. Please set it as an environment variable');
@@ -71,18 +82,10 @@ export class ApifyMcpServer {
         await this.addToolsFromActors(defaults.actors);
     }
 
-    public addToolIfNotExist(name: string, description: string, inputSchema: object, ajvValidate: ValidateFunction): void {
-        if (!this.tools.find((x) => x.name === name)) {
-            this.tools.push({ name, description, inputSchema, ajvValidate });
-            log.info(`Added tool: ${name}`);
-        } else {
-            log.info(`Tool already exists: ${name}`);
-        }
-    }
-
-    public updateTools(tools: { name: string; description: string; inputSchema: object, ajvValidate: ValidateFunction}[]): void {
+    public updateTools(tools: Tool[]): void {
         for (const tool of tools) {
-            this.addToolIfNotExist(tool.name, tool.description, tool.inputSchema, tool.ajvValidate);
+            this.tools.set(tool.name, tool);
+            log.info(`Added/Updated tool: ${tool.name}`);
         }
     }
 
@@ -98,13 +101,18 @@ export class ApifyMcpServer {
 
     private setupToolHandlers(): void {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            return { tools: this.tools };
+            return { tools: this.tools.values() };
         });
 
+        /**
+         * Handles the request to call a tool.
+         * @param {object} request - The request object containing tool name and arguments.
+         * @throws {Error} - Throws an error if the tool is unknown or arguments are invalid.
+         */
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
 
-            const tool = this.tools.find((t) => t.name === name);
+            const tool = this.tools.get(name);
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }

@@ -9,27 +9,27 @@
   "main": "dist/index.js",
   "bin": {
     "apify-mcp-server": "dist/index.js"
-   },
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/apify/actor-mcp-server.git"
-    },
-    "bugs": {
-        "url": "https://github.com/apify/actor-mcp-server/issues"
-    },
-    "homepage": "https://apify.com/apify/mcp-server",
-    "keywords": [
-        "apify",
-        "mcp",
-        "server",
-        "actors",
-        "model context protocol"
-    ],
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/apify/actor-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/apify/actor-mcp-server/issues"
+  },
+  "homepage": "https://apify.com/apify/mcp-server",
+  "keywords": [
+    "apify",
+    "mcp",
+    "server",
+    "actors",
+    "model context protocol"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.1.0",
     "ajv": "^8.17.1",
     "apify": "^3.2.6",
-    "apify-client": "^2.11.0",
+    "apify-client": "^2.11.1",
     "express": "^4.21.2",
     "minimist": "^1.2.8"
   },

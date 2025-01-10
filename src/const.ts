@@ -11,7 +11,7 @@ export const defaults = {
         'clockworks/free-tiktok-scraper',
         'compass/crawler-google-places',
         'lukaskrivka/google-maps-with-contact-details',
-        'voyager/booking-scraper'
+        'voyager/booking-scraper',
     ],
 };
 

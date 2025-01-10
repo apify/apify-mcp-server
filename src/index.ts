@@ -1,3 +1,16 @@
+/**
+ * This script initializes and starts the Apify MCP server using the Stdio transport.
+ *
+ * Usage:
+ *   node <script_name> --actors=<actor1,actor2,...>
+ *
+ * Command-line arguments:
+ *   --actors - A comma-separated list of actor full names to add to the server.
+ *
+ * Example:
+ *   node index.js --actors=apify/google-search-scraper,apify/instagram-scraper
+ */
+
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import minimist from 'minimist';
 
