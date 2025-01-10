@@ -1,11 +1,30 @@
 {
-  "name": "apify-mcp-server",
-  "version": "0.0.1",
+  "name": "@apify/mcp-server",
+  "version": "0.1.0",
   "type": "module",
   "description": "Model Context Protocol Server for Apify Actors",
   "engines": {
     "node": ">=18.0.0"
   },
+  "main": "dist/index.js",
+  "bin": {
+    "apify-mcp-server": "dist/index.js"
+   },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/apify/actor-mcp-server.git"
+    },
+    "bugs": {
+        "url": "https://github.com/apify/actor-mcp-server/issues"
+    },
+    "homepage": "https://apify.com/apify/mcp-server",
+    "keywords": [
+        "apify",
+        "mcp",
+        "server",
+        "actors",
+        "model context protocol"
+    ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.1.0",
     "ajv": "^8.17.1",
@@ -38,6 +57,6 @@
     "test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
     "watch": "tsc --watch"
   },
-  "author": "It's not you it's me",
-  "license": "ISC"
+  "author": "Apify",
+  "license": "MIT"
 }

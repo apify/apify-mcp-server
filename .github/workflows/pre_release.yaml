@@ -1,0 +1,103 @@
+name: Create a pre-release
+
+on:
+    # Push to master will deploy a beta version
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    release_metadata:
+        if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
+        name: Prepare release metadata
+        runs-on: ubuntu-latest
+        outputs:
+            version_number: ${{ steps.release_metadata.outputs.version_number }}
+            changelog: ${{ steps.release_metadata.outputs.changelog }}
+        steps:
+            -   uses: apify/workflows/git-cliff-release@main
+                name: Prepare release metadata
+                id: release_metadata
+                with:
+                    release_type: prerelease
+                    existing_changelog_path: CHANGELOG.md
+
+    wait_for_checks:
+        name: Wait for code checks to pass
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: lewagon/wait-on-check-action@v1.3.4
+                with:
+                    ref: ${{ github.ref }}
+                    repo-token: ${{ secrets.GITHUB_TOKEN }}
+                    check-name: 'Lint'
+                    wait-interval: 5
+
+    update_changelog:
+        needs: [ release_metadata ]
+        name: Update changelog
+        runs-on: ubuntu-latest
+        outputs:
+            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+                with:
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+
+            -   name: Update package version in package.json
+                run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
+
+            -   name: Update CHANGELOG.md
+                uses: DamianReeves/write-file-action@master
+                with:
+                    path: CHANGELOG.md
+                    write-mode: overwrite
+                    contents: ${{ needs.release_metadata.outputs.changelog }}
+
+            -   name: Commit changes
+                id: commit
+                uses: EndBug/add-and-commit@v9
+                with:
+                    author_name: Apify Release Bot
+                    author_email: noreply@apify.com
+                    message: "chore(release): Update changelog and package version [skip ci]"
+
+    publish_to_npm:
+        name: Publish to NPM
+        needs: [ release_metadata ]
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.update_changelog.changelog_commitish }}
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+            -   name: Install dependencies
+                run: |
+                    echo "access=public" >> .npmrc
+                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+                    npm install
+            - # Check version consistency and increment pre-release version number for beta only.
+                name: Bump pre-release version
+                run: node ./.github/scripts/before-beta-release.js
+            -   name: Publish to NPM
+                run: npm publish --tag beta
+
+env:
+    NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
+    NPM_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
