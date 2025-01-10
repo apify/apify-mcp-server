@@ -1,26 +1,29 @@
 ## Apify Model Context Protocol (MCP) Server
 
-Implementation of an MCP server for [Apify Actors](https://apify.com/store).
+Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
 
 The server can be used in two ways:
 - **MCP Server Actor** - Actor runs an HTTP server that supports the MCP protocol via SSE (Server-Sent Events).
 - **MCP Server CLI** - Command-line interface that supports the MCP protocol via stdio.
 
-## 🔄 What is model context protocol?
-
-The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
-MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
-
 ## 🎯 What does this MCP server do?
 
 The MCP Server Actor allows an AI assistant to:
 - Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
-  - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from hundreds of Facebook posts from one or multiple Facebook pages and profiles
-  - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) Extract Google Maps contact details
-  - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) Scrape Google Search Engine Results Pages (SERPs)
-  - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape and download Instagram posts, profiles, places, hashtags, photos, and comments
-  - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return their cleaned content as Markdown
+    - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from hundreds of Facebook posts from one or multiple Facebook pages and profiles
+    - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) Extract Google Maps contact details
+    - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) Scrape Google Search Engine Results Pages (SERPs)
+    - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape and download Instagram posts, profiles, places, hashtags, photos, and comments
+    - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return their cleaned content as Markdown
+
+Once the server is started, you can use MCP clients, such as [Claude Desktop](
+
+
+## 🔄 What is model context protocol?
+
+The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
+MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
 ## 🧱 Components
 

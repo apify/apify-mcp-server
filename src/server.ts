@@ -38,13 +38,13 @@ export class ApifyMcpServer {
     }
 
     public async callActorGetDataset(actorName: string, input: unknown): Promise<object[]> {
-        if (!process.env.APIFY_TOKEN) {
-            throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
+        if (!process.env.APIFY_API_TOKEN) {
+            throw new Error('APIFY_API_TOKEN is required but not set. Please set it as an environment variable');
         }
         const name = actorName.replace('_', '/');
         try {
             log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
-            const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+            const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
             const actorClient = client.actor(name);
 
             const results = await actorClient.call(input);

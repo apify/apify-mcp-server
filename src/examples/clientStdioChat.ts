@@ -74,7 +74,7 @@ class MCPClient {
         const transport = new StdioClientTransport({
             command: NODE_PATH,
             args: serverArgs,
-            env: { APIFY_TOKEN: process.env.APIFY_TOKEN || '' },
+            env: { APIFY_API_TOKEN: process.env.APIFY_API_TOKEN || '' },
         });
 
         await this.client.connect(transport);

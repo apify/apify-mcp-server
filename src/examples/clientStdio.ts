@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 /**
  * Connect to the MCP server using stdio transport and call a tool.
- * You need provide a path to MCP server and APIFY_TOKEN in .env file.
+ * You need provide a path to MCP server and APIFY_API_TOKEN in .env file.
  *
  * Also, you need to choose ACTORS to run in the server, for example: apify/rag-web-browser
  */
@@ -20,8 +20,8 @@ const NODE_PATH = execSync('which node').toString().trim();
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
 const SELECTED_TOOL = 'apify/rag-web-browser';
 
-if (!process.env.APIFY_TOKEN) {
-    console.error('APIFY_TOKEN is required but not set in the environment variables.');
+if (!process.env.APIFY_API_TOKEN) {
+    console.error('APIFY_API_TOKEN is required but not set in the environment variables.');
     process.exit(1);
 }
 
@@ -29,7 +29,7 @@ if (!process.env.APIFY_TOKEN) {
 const transport = new StdioClientTransport({
     command: NODE_PATH,
     args: [SERVER_PATH, '--actors', TOOLS],
-    env: { APIFY_TOKEN: process.env.APIFY_TOKEN || '' },
+    env: { APIFY_API_TOKEN: process.env.APIFY_API_TOKEN || '' },
 });
 
 // Create a new client instance
