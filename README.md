@@ -9,8 +9,8 @@ The server can be used in two ways:
 
 # 🎯 What does Apify MCP server do?
 
-The MCP Server Actor allows an AI assistant to:
-- Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
+The MCP Server Actor allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
+For example it can:
     - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from Facebook posts from multiple pages/profiles
     - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) extract Google Maps contact details
     - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) scrape Google Search Engine Results Pages (SERPs)
