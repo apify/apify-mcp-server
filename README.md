@@ -50,13 +50,21 @@ By default, the server is pre-configured with the Actors specified below, but it
    'lukaskrivka/google-maps-with-contact-details',
    'voyager/booking-scraper'
 ```
+The MCP server loads the Actor input schema (input parameters) and creates MCP tools corresponding to the Actors.
+See this example of input parameters for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
 
-Under the hood, the MCP server load Actor input schema (input parameter) and creates MCP tools corresponding to the Actors.
-See this example of input parameters for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema)
 The tool name must always be the full Actor name, such as `apify/rag-web-browser`.
+The arguments for an MCP tool represent the input parameters of the Actor.
+For example, for the `apify/rag-web-browser` tool, the arguments are:
 
-The arguments for MCP tool represent input parameters of the Actor.
-Please see the examples below and refer to the specific Actor's documentation for a list of available arguments.
+```json
+{
+  "query": "restaurants in San Francisco",
+  "maxResults": 3
+}
+```
+When a tool is called, the arguments are automatically passed to the Actor by the LLM.
+Please refer to the specific Actor's documentation for a list of available arguments.
 
 ### Prompt & Resources
 
