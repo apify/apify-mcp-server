@@ -11,9 +11,9 @@ The server can be used in two ways:
 
 The MCP Server Actor allows an AI assistant to:
 - Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
-    - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from Facebook posts from one or multiple Facebook pages/profiles
-    - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) Extract Google Maps contact details
-    - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) Scrape Google Search Engine Results Pages (SERPs)
+    - [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) extract data from Facebook posts from multiple pages/profiles
+    - [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) extract Google Maps contact details
+    - [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) scrape Google Search Engine Results Pages (SERPs)
     - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape Instagram posts, profiles, places, hashtags, photos, and comments
     - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return content
 
@@ -24,7 +24,7 @@ When you have Actors integrated with the MCP server, you can ask:
 - Search web and summarize recent trends about AI Agents
 - Find top 10 best Italian restaurants in San Francisco
 - Find and analyze Instagram profile of The Rock
-- Provide a step-by-step guide on how to use the Model Context Protocol. Provide source URLs with the answers
+- Provide a step-by-step guide on using the Model Context Protocol with source URLs.
 - What Apify Actors I can use?
 
 ## 🔄 What is model context protocol?
@@ -50,12 +50,12 @@ By default, the server is pre-configured with the Actors specified below, but it
    'lukaskrivka/google-maps-with-contact-details',
    'voyager/booking-scraper'
 ```
-The MCP server loads the Actor input schema (input parameters) and creates MCP tools corresponding to the Actors.
-See this example of input parameters for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
+The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
+See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
 
 The tool name must always be the full Actor name, such as `apify/rag-web-browser`.
 The arguments for an MCP tool represent the input parameters of the Actor.
-For example, for the `apify/rag-web-browser` tool, the arguments are:
+For example, for the `apify/rag-web-browser` Actor, the arguments are:
 
 ```json
 {
@@ -63,8 +63,9 @@ For example, for the `apify/rag-web-browser` tool, the arguments are:
   "maxResults": 3
 }
 ```
+You don't need to specify the input parameters or which Actor to call, everything is managed by an LLM.
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
-Please refer to the specific Actor's documentation for a list of available arguments.
+You can refer to the specific Actor's documentation for a list of available arguments.
 
 ### Prompt & Resources
 
@@ -82,9 +83,11 @@ or as a **local server** running on your machine.
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-1. **Start server with default Actors**. To use the Apify MCP Server ith set of default Actors,
+1. **Start server with default Actors**. To use the Apify MCP Server with set of default Actors,
     send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
-
+    ```
+    https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,junglee/free-amazon-product-scraper
+    ```
 2. **Initiate Server-Sent-Events (SSE)** by sending a GET request to the following URL:
     ```
     https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
