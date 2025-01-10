@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Model Context Protocol (MCP) server for RAG Web Browser Actor
+ * Model Context Protocol (MCP) server for Apify Actors
  */
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';

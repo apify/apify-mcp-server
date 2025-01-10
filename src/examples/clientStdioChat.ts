@@ -9,7 +9,7 @@
  * Type your queries or 'quit|q|exit' to exit.
  * You: Find to articles about AI agent and return URLs
  * [internal] Received response from Claude: [{"type":"text","text":"I'll search for information about AI agents
- *   and provide you with a summary."},{"type":"tool_use","id":"toolu_01He9TkzQfh2979bbeuxWVqM","name":"search",
+ *   and provide you with a summary."},{"type":"tool_use","id":"tool_01He9TkzQfh2979bbeuxWVqM","name":"search",
  *   "input":{"query":"what are AI agents definition capabilities applications","maxResults":2}}]
  * [internal] Calling tool: {"name":"search","arguments":{"query":"what are AI agents definition ...
  * I can help analyze the provided content about AI agents.
@@ -140,26 +140,6 @@ class MCPClient {
         }
 
         return messages;
-
-        // const lastContent = nextResponse.content[nextResponse.content.length - 1];
-        // if (lastContent.type !== 'tool_use' && toolCallCount < 3) {
-        //     return this.handleToolCall(lastContent, messages, toolCallCount + 1);
-        // }
-        //
-        // const lastContent = nextResponse.content[nextResponse.content.length - 1];
-        // if (lastContent.type !== 'tool_use' && toolCallCount < 3) {
-        //     return this.handleToolCall(lastContent, messages, toolCallCount + 1);
-        // }
-        //
-        // if (nextResponse.content typeof ToolUseBlock) {
-        //     if (nextResponse.content.slice(-1).type !== 'tool_use' && toolCallCount < 3) {
-        //         return this.handleToolCall(nextResponse.content.slice(-1), messages, toolCallCount + 1);
-        //     }
-        // }
-        //
-        // messages.push({ role: nextResponse.role, content: nextResponse.content.map((x: TextBlockParam) => x.text || '').join('\n') });
-        //
-        // return messages;
     }
 
     /**
