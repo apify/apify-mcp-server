@@ -1,4 +1,4 @@
-## Apify Model Context Protocol (MCP) Server
+# Apify Model Context Protocol (MCP) Server
 
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
@@ -7,7 +7,7 @@ The server can be used in two ways:
 - **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
 - **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
-## 🎯 What does this MCP server do?
+# 🎯 What does this MCP server do?
 
 The MCP Server Actor allows an AI assistant to:
 - Use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.For example it can:
@@ -27,14 +27,14 @@ When you have Actors integrated with the MCP server, you can ask:
 - Provide a step-by-step guide on using the Model Context Protocol with source URLs.
 - What Apify Actors I can use?
 
-## 🔄 What is model context protocol?
+# 🔄 What is model context protocol?
 
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
 MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
-## 🧱 Components
+# 🧱 Components
 
-### Tools
+## Tools
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
@@ -67,19 +67,19 @@ You don't need to specify the input parameters or which Actor to call, everythin
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
 
-### Prompt & Resources
+## Prompt & Resources
 
 The server does not provide any resources and prompts.
 We plan to add Apify's dataset and key-value store as resources in the future.
 
-## ⚙️ Usage
+# ⚙️ Usage
 
 The Apify MCP Server can be used in two ways: **as an Apify Actor** running at Apify platform
 or as a **local server** running on your machine.
 
-### MCP Server Actor
+## MCP Server Actor
 
-#### Standby web server
+### Standby web server
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
@@ -95,10 +95,9 @@ https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazo
 ```
 Find list of all available Actors in the [Apify Store](https://apify.com/store).
 
-##### Interact with the MCP Server
+#### Interact with the MCP Server
 
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
-
 You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
 ([Claude Desktop](https://claude.ai/download) does not support SSE transport yet)
 
@@ -116,11 +115,7 @@ In the client settings you need to provide server configuration:
     }
 }
 ```
-Alternatively, you can use simple python [client_see.py](https://github.com/apify/actor-mcp-server/tree/main/src/examples/client_sse.py).
-
-##### Test the server using curl
-
-You can test the server using `curl`:
+Alternatively, you can use simple python [client_see.py](https://github.com/apify/actor-mcp-server/tree/main/src/examples/client_sse.py) or test the server using curl commands.
 
 1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
     ```
@@ -159,16 +154,16 @@ You can test the server using `curl`:
     data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
     ```
 
-### MCP Server at local host
+## MCP Server at local host
 
-#### Prerequisites
+### Prerequisites
 
 - MacOS or Windows
 - The latest version of Claude Desktop must be installed (or another MCP client)
 - [Node.js](https://nodejs.org/en) (v18 or higher)
 - [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_API_TOKEN`)
 
-#### Install
+### Install
 
 Follow the steps below to set up and run the server on your local machine:
 First, clone the repository using the following command:
@@ -243,9 +238,9 @@ Configure Claude Desktop to recognize the MCP server.
     Find and analyze instagram profile of the Rock.
     ```
 
-## 👷🏼 Development
+# 👷🏼 Development
 
-### Prerequisites
+## Prerequisites
 
 - [Node.js](https://nodejs.org/en) (v18 or higher)
 - Python 3.6 or higher
@@ -255,7 +250,7 @@ Create environment file `.env` with the following content:
 APIFY_API_TOKEN=your-apify-api-token
 ```
 
-### Local client (stdio)
+## Local client (stdio)
 
 To test the server locally, you can use `examples/clientStdio.ts`:
 
@@ -266,7 +261,7 @@ node dist/examples/clientStdio.js
 The script will start the MCP server with two Actors (`lukaskrivka/google-maps-with-contact-details` and `apify/rag-web-browser`).
 Then it will call `apify/rag-web-browser` tool with a query and will print the result.
 
-### Chat local client (stdio)
+## Chat local client (stdio)
 
 To run simple chat client, you can use `examples/clientSdioChat.ts`:
 
@@ -275,7 +270,7 @@ node dist/examples/clientStdioChat.js
 ```
 Here you can interact with the server using the chat interface.
 
-### Local client (SSE)
+## Local client (SSE)
 
 To test the server with the SSE transport, you can use python script `examples/client_sse.py`:
 Currently, the node.js client does not support to establish a connection to remote server witch custom headers.
@@ -286,7 +281,7 @@ node dist/clientSse.js
 
 The script will start the MCP server with default Actors.
 
-### Debugging
+## Debugging
 
 Since MCP servers operate over standard input/output (stdio), debugging can be challenging.
 For the best debugging experience, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
