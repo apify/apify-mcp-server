@@ -77,7 +77,7 @@ We plan to add Apify's dataset and key-value store as resources in the future.
 The Apify MCP Server can be used in two ways: **as an Apify Actor** running at Apify platform
 or as a **local server** running on your machine.
 
-## MCP Server Actor
+## 🇦 MCP Server Actor
 
 ### Standby web server
 
@@ -95,7 +95,7 @@ https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazo
 ```
 Find list of all available Actors in the [Apify Store](https://apify.com/store).
 
-#### Interact with the MCP Server
+#### 💬 Interact with the MCP Server
 
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
 You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
@@ -115,7 +115,7 @@ In the client settings you need to provide server configuration:
     }
 }
 ```
-Alternatively, you can use simple python [client_see.py](https://github.com/apify/actor-mcp-server/tree/main/src/examples/client_sse.py) or test the server using curl commands.
+Alternatively, you can use simple python [client_see.py](https://github.com/apify/actor-mcp-server/tree/main/src/examples/client_sse.py) or test the server using `curl` </> commands.
 
 1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
     ```
@@ -154,7 +154,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
     data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
     ```
 
-## MCP Server at local host
+## MCP Server at a local host
 
 ### Prerequisites
 
@@ -195,7 +195,7 @@ Configure Claude Desktop to recognize the MCP server.
 
     ```text
     "mcpServers": {
-      "apify-mcp-server": {
+      "apify": {
         "command": "npx",
         "args": [
           "/path/to/actor-mcp-server/dist/index.js"
@@ -214,7 +214,7 @@ Configure Claude Desktop to recognize the MCP server.
         "args": [
           "/path/to/actor-mcp-server/dist/index.js",
           "--actors",
-          "lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper"
+          "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ]
         "env": {
            "APIFY-API-TOKEN": "your-apify-api-token"
@@ -238,6 +238,33 @@ Configure Claude Desktop to recognize the MCP server.
     Find and analyze instagram profile of the Rock.
     ```
 
+#### Stdio clients
+
+Create environment file `.env` with the following content:
+```text
+APIFY_API_TOKEN=your-apify-api-token
+# ANTHROPIC_API_KEY is only required when you want to run examples/clientStdioChat.js
+ANTHROPIC_API_KEY=your-anthropic-api-token
+```
+In the `examples` directory, you can find two clients that interact with the server via
+standard input/output (stdio):
+1. [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts):
+    This client script starts the MCP server with two specified Actors.
+    It then calls the `apify/rag-web-browser` tool with a query and prints the result.
+    It demonstrates how to connect to the MCP server, list available tools, and call a specific tool using stdio transport.
+    ```bash
+    node dist/examples/clientStdio.js
+    ```
+
+2. [`clientStdioChat.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdioChat.ts):
+    This client script also starts the MCP server but provides an interactive command-line chat interface.
+    It prompts the user to interact with the server, allowing for dynamic tool calls and responses.
+    This example is useful for testing and debugging interactions with the MCP server in conversational manner.
+
+    ```bash
+    node dist/examples/clientStdioChat.js
+    ```
+
 # 👷🏼 Development
 
 ## Prerequisites
@@ -248,38 +275,18 @@ Configure Claude Desktop to recognize the MCP server.
 Create environment file `.env` with the following content:
 ```text
 APIFY_API_TOKEN=your-apify-api-token
+# ANTHROPIC_API_KEY is only required when you want to run examples/clientStdioChat.js
+ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
-
-## Local client (stdio)
-
-To test the server locally, you can use `examples/clientStdio.ts`:
-
-```bash
-node dist/examples/clientStdio.js
-```
-
-The script will start the MCP server with two Actors (`lukaskrivka/google-maps-with-contact-details` and `apify/rag-web-browser`).
-Then it will call `apify/rag-web-browser` tool with a query and will print the result.
-
-## Chat local client (stdio)
-
-To run simple chat client, you can use `examples/clientSdioChat.ts`:
-
-```bash
-node dist/examples/clientStdioChat.js
-```
-Here you can interact with the server using the chat interface.
-
 ## Local client (SSE)
 
 To test the server with the SSE transport, you can use python script `examples/client_sse.py`:
 Currently, the node.js client does not support to establish a connection to remote server witch custom headers.
+You need to change URL to your local server URL in the script.
 
 ```bash
-node dist/clientSse.js
+python src/examples/client_sse.py
 ```
-
-The script will start the MCP server with default Actors.
 
 ## Debugging
 
