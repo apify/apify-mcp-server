@@ -83,14 +83,48 @@ or as a **local server** running on your machine.
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-1. **Start server with default Actors**. To use the Apify MCP Server with set of default Actors,
-    send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
+Start server with default Actors. To use the Apify MCP Server with set of default Actors,
+send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
+```
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>
+```
+It is also possible to start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
+Provide a comma-separated list of Actors in the `actors` query parameter:
+```
+https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,lukaskrivka/google-maps-with-contact-details
+```
+Find list of all available Actors in the [Apify Store](https://apify.com/store).
+
+##### Interact with the MCP Server
+
+Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
+
+You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
+([Claude Desktop](https://claude.ai/download) does not support SSE transport yet)
+
+In the client settings you need to provide server configuration:
+```json
+{
+    "mcpServers": {
+        "apify": {
+            "type": "sse",
+            "url": "https://mcp-server.apify.actor/sse",
+            "env": {
+                "APIFY-API-TOKEN": "your-apify-api-token"
+            }
+        }
+    }
+}
+```
+Alternatively, you can use simple python [client_see.py](https://github.com/apify/actor-mcp-server/tree/main/src/examples/client_sse.py).
+
+##### Test the server using curl
+
+You can test the server using `curl`:
+
+1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
     ```
-    https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,junglee/free-amazon-product-scraper
-    ```
-2. **Initiate Server-Sent-Events (SSE)** by sending a GET request to the following URL:
-    ```
-    https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
+    curl https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
     ```
     The server will respond with a `sessionId`, which you can use to send messages to the server:
     ```shell
@@ -98,7 +132,7 @@ The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/runn
     data: /message?sessionId=a1b
     ```
 
-3. **Send a message to the server** by making a POST request with the `sessionId`:
+2. Send a message to the server by making a POST request with the `sessionId`:
     ```shell
     curl -X POST "https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
       "jsonrpc": "2.0",
@@ -117,20 +151,13 @@ The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/runn
     Accepted
     ```
 
-4. **Receive the response.** The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
+3. Receive the response. The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
     The response will be returned as JSON text.
 
     ```text
     event: message
     data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
     ```
-
-You can also start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
-Provide a comma-separated list of Actors in the `actors` query parameter:
-```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,junglee/free-amazon-product-scraper
-```
-You can find list of all available Actors in the [Apify Store](https://apify.com/store).
 
 ### MCP Server at local host
 

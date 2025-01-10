@@ -1,11 +1,10 @@
 """
-Test MCP Server with Actors using SSE client
+Test Apify MCP Server using SSE client
 
-This script demonstrates how to test the MCP Server with Actors using the SSE client.
 It is using python client as the typescript one does not support custom headers when connecting to the SSE server.
 
-Install dependencies:
-pip install requests python-dotenv mcp
+Install python dependencies (assumes you have python installed):
+> pip install requests python-dotenv mcp
 """
 
 import asyncio
