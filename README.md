@@ -4,8 +4,8 @@ Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
 
 The server can be used in two ways:
-- **MCP Server Actor**, which runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
-- **MCP Server CLI** supports the MCP protocol via stdio.
+- **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events (SSE).
+- **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
 ## 🎯 What does this MCP server do?
 
@@ -17,8 +17,15 @@ The MCP Server Actor allows an AI assistant to:
     - [Instagram Scraper](https://apify.com/apify/instagram-scraper) scrape Instagram posts, profiles, places, hashtags, photos, and comments
     - [RAG Web Browser](https://apify.com/apify/web-scraper) perform web search, scrape the top N URLs from the results, and return content
 
-Once the server is started, you can use MCP clients, such as [Claude Desktop](https://claude.ai/download) or
+To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [Superinference.ai](https://superinterface.ai/), or [LibreChat](https://www.librechat.ai/).
+Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
 
+When you have Actors integrated with the MCP server, you can ask:
+- Search web and summarize recent trends about AI Agents
+- Find top 10 best Italian restaurants in San Francisco
+- Find and analyze Instagram profile of The Rock
+- Provide a step-by-step guide on how to use the Model Context Protocol. Provide source URLs with the answers
+- What Apify Actors I can use?
 
 ## 🔄 What is model context protocol?
 
@@ -30,18 +37,25 @@ MCP is an open protocol that enables secure, controlled interactions between AI 
 ### Tools
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with the tools specified above, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
-
-The tool name must always be the full Actor name, such as `lukaskrivka/google-maps-with-contact-details`
+By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
 
 ```text
-'apify/facebook-posts-scraper'
-'apify/google-search-scraper'
-'apify/instagram-scraper'
-'apify/rag-web-browser'
-'lukaskrivka/google-maps-with-contact-details'
+   'apidojo/tweet-scraper',
+   'apify/facebook-posts-scraper',
+   'apify/google-search-scraper',
+   'apify/instagram-scraper',
+   'apify/rag-web-browser',
+   'clockworks/free-tiktok-scraper',
+   'compass/crawler-google-places',
+   'lukaskrivka/google-maps-with-contact-details',
+   'voyager/booking-scraper'
 ```
-The arguments for MCP tool represent input parameters for the Actor.
+
+Under the hood, the MCP server load Actor input schema (input parameter) and creates MCP tools corresponding to the Actors.
+See this example of input parameters for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema)
+The tool name must always be the full Actor name, such as `apify/rag-web-browser`.
+
+The arguments for MCP tool represent input parameters of the Actor.
 Please see the examples below and refer to the specific Actor's documentation for a list of available arguments.
 
 ### Prompt & Resources
@@ -60,12 +74,8 @@ or as a **local server** running on your machine.
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-1. **Start server with selected Actors**. To use the Apify MCP Server with a custom set of Actors (e.g. Google Maps Email Extractor, Facebook Posts Scraper),
+1. **Start server with default Actors**. To use the Apify MCP Server ith set of default Actors,
     send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
-    Provide a comma-separated list of Actors in the `actors` query parameter:
-    ```
-    https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=lukaskrivka/google-maps-with-contact-details,apify/facebook-posts-scraper
-    ```
 
 2. **Initiate Server-Sent-Events (SSE)** by sending a GET request to the following URL:
     ```
@@ -105,6 +115,7 @@ The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/runn
     ```
 
 You can also start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
+Provide a comma-separated list of Actors in the `actors` query parameter:
 ```
 https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,junglee/free-amazon-product-scraper
 ```
