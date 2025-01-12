@@ -101,7 +101,7 @@ export class ApifyMcpServer {
 
     private setupToolHandlers(): void {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            return { tools: this.tools.values() };
+            return { tools: Array.from(this.tools.values()) };
         });
 
         /**
