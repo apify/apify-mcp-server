@@ -109,7 +109,7 @@ In the client settings you need to provide server configuration:
             "type": "sse",
             "url": "https://mcp-server.apify.actor/sse",
             "env": {
-                "APIFY-API-TOKEN": "your-apify-api-token"
+                "APIFY_API_TOKEN": "your-apify-api-token"
             }
         }
     }
