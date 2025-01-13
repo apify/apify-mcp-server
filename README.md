@@ -21,11 +21,11 @@ To interact with the Apify MCP server, you can use MCP clients such as [Claude D
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
 
 When you have Actors integrated with the MCP server, you can ask:
-- Search web and summarize recent trends about AI Agents
-- Find top 10 best Italian restaurants in San Francisco
-- Find and analyze Instagram profile of The Rock
-- Provide a step-by-step guide on using the Model Context Protocol with source URLs.
-- What Apify Actors I can use?
+- "Search web and summarize recent trends about AI Agents"
+- "Find top 10 best Italian restaurants in San Francisco"
+- "Find and analyze Instagram profile of The Rock"
+- "Provide a step-by-step guide on using the Model Context Protocol with source URLs."
+- "What Apify Actors I can use?"
 
 # 🔄 What is model context protocol?
 
