@@ -27,7 +27,7 @@ When you have Actors integrated with the MCP server, you can ask:
 - "Provide a step-by-step guide on using the Model Context Protocol with source URLs."
 - "What Apify Actors I can use?"
 
-# 🔄 What is model context protocol?
+# 🔄 What is the Model Context Protocol?
 
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
 MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
