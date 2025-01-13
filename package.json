@@ -38,7 +38,7 @@
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@apify/eslint-config": "^0.5.0-beta.2",
     "@apify/tsconfig": "^0.1.0",
-    "@types/express": "^5.0.0",
+    "@types/express": "^4.0.0",
     "@types/minimist": "^1.2.5",
     "dotenv": "^16.4.7",
     "eslint": "^9.17.0",
