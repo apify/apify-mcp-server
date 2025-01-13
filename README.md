@@ -201,7 +201,7 @@ Configure Claude Desktop to recognize the MCP server.
           "/path/to/actor-mcp-server/dist/index.js"
         ]
         "env": {
-           "APIFY-API-TOKEN": "your-apify-api-token"
+           "APIFY_API_TOKEN": "your-apify-api-token"
         }
       }
     }
@@ -217,7 +217,7 @@ Configure Claude Desktop to recognize the MCP server.
           "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ]
         "env": {
-           "APIFY-API-TOKEN": "your-apify-api-token"
+           "APIFY_API_TOKEN": "your-apify-api-token"
         }
       }
     }
