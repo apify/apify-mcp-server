@@ -310,3 +310,4 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 - Provide tools to search for Actors and load them as needed.
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
+- Prune Actors input schema to reduce context size.
