@@ -6,20 +6,24 @@
  */
 
 import { execSync } from 'child_process';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Resolve dirname equivalent in ES module
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
 
-const SERVER_PATH = path.resolve(__dirname, '../../dist/index.js');
+dotenv.config({ path: path.resolve(dirname, '../../.env') });
+const SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
 const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which node').toString().trim();
 
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
-const SELECTED_TOOL = 'apify/rag-web-browser';
+const SELECTED_TOOL = 'apify_rag-web-browser'; // We need to change / to _ in the tool name
 
 if (!process.env.APIFY_API_TOKEN) {
     console.error('APIFY_API_TOKEN is required but not set in the environment variables.');
@@ -65,7 +69,7 @@ async function run() {
         // Call a tool
         console.log('Calling actor ...');
         const result = await client.callTool(
-            { name: 'apify/rag-web-browser', arguments: { query: 'web browser for Anthropic' } },
+            { name: SELECTED_TOOL, arguments: { query: 'web browser for Anthropic' } },
             CallToolResultSchema,
         );
         console.log('Tool result:', JSON.stringify(result));
