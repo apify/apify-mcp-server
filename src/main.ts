@@ -36,7 +36,9 @@ async function processParamsAndUpdateTools(url: string) {
     delete params.token;
     log.debug(`Received input parameters: ${JSON.stringify(params)}`);
     const input = await processInput(params as Input);
-    await (input.actors ? mcpServer.addToolsFromActors(input.actors as string[]) : mcpServer.addToolsFromDefaultActors());
+    if (input.actors) {
+        await mcpServer.addToolsFromActors(input.actors as string[]);
+    }
 }
 
 app.get(Routes.ROOT, async (req: Request, res: Response) => {
@@ -81,16 +83,20 @@ app.use((req: Request, res: Response) => {
     res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` }).end();
 });
 
+const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
+log.info(`Loaded input: ${JSON.stringify(input)} `);
+
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
+    if (input.actors && input.actors.length > 0) {
+        await mcpServer.addToolsFromActors(input.actors as string[]);
+    }
 
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}.`);
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
-    const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
-    log.info(`Loaded input: ${JSON.stringify(input)} `);
 
     if (input && !input.debugActor && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input.');

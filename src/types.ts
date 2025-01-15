@@ -13,6 +13,7 @@ export interface ActorDefinitionWithDesc extends ActorDefinition {
 
 export interface Tool {
     name: string;
+    actorName: string;
     description: string;
     inputSchema: object;
     ajvValidate: ValidateFunction;

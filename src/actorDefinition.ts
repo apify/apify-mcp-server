@@ -56,6 +56,8 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
  * This function retrieves the input schemas for the specified actors and compiles them into MCP tools.
  * It uses the AJV library to validate the input schemas.
  *
+ * Tool name can't contain /, so it is replaced with _
+ *
  * @param {string[]} actors - An array of actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
@@ -69,6 +71,7 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
             try {
                 tools.push({
                     name: result.name.replace('/', '_'),
+                    actorName: result.name,
                     description: result.description,
                     inputSchema: result.input || {},
                     ajvValidate: ajv.compile(result.input || {}),

@@ -19,6 +19,7 @@
 
 import { execSync } from 'child_process';
 import * as readline from 'readline';
+import { fileURLToPath } from "url";
 
 import { Anthropic } from '@anthropic-ai/sdk';
 import type { Message, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources/messages';
@@ -26,8 +27,12 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
+import path from "path";
 
-dotenv.config({ path: '../../.env' });
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
+
+dotenv.config({ path: path.resolve(dirname, '../../.env') });
 
 const REQUEST_TIMEOUT = 120_000; // 2 minutes
 const MAX_TOKENS = 2048; // Maximum tokens for Claude response
@@ -36,7 +41,7 @@ const MAX_TOKENS = 2048; // Maximum tokens for Claude response
 // const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // a fastest model
 const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact model for near-instant responsiveness
 const DEBUG = true;
-const DEBUG_SERVER_PATH = '../../dist/index.js';
+const DEBUG_SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
 
 const NODE_PATH = execSync('which node').toString().trim();
 
