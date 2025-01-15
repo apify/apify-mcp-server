@@ -6,17 +6,12 @@
         "actors": {
             "title": "Actors names to be exposed for an AI application (AI agent)",
             "type": "array",
-            "description": "Specify the names of actors that will be exposed to an AI application (AI agent) and communicate with Apify Actors via the MCP protocol",
+            "description": "List the names of Actors to be exposed to an AI application (AI agent) for communication via the MCP protocol. \n\n Ensure the Actor definitions fit within the LLM context by limiting the number of used Actors.",
             "editor": "stringList",
             "prefill": [
-                "apidojo/tweet-scraper",
-                "apify/facebook-posts-scraper",
-                "apify/google-search-scraper",
                 "apify/instagram-scraper",
                 "apify/rag-web-browser",
-                "clockworks/free-tiktok-scraper",
-                "lukaskrivka/google-maps-with-contact-details",
-                "voyager/booking-scraper"
+                "lukaskrivka/google-maps-with-contact-details"
             ]
         },
         "debugActor": {
