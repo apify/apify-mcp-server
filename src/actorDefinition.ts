@@ -27,7 +27,9 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
             return null;
         }
 
-        // Extract default build label
+        // fnesveda: The default build is not necessarily tagged, you can specify any build number as default build.
+        // There will be a new API endpoint to fetch a default build.
+        // For now, we'll use the tagged build, it will work for 90% of Actors. Later, we can update this.
         const tag = actor.defaultRunOptions?.build || '';
         const buildId = actor.taggedBuilds?.[tag]?.buildId || '';
 
@@ -83,3 +85,5 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     }
     return tools;
 }
+
+fetchActorDefinition('apify/rag-web-browser');
