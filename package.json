@@ -26,7 +26,7 @@
     "model context protocol"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.1.0",
+    "@modelcontextprotocol/sdk": "^1.1.1",
     "ajv": "^8.17.1",
     "apify": "^3.2.6",
     "apify-client": "^2.11.1",
