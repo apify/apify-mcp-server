@@ -10,12 +10,14 @@ import { execSync } from 'child_process';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
+import path from 'path';
 import dotenv from 'dotenv';
 
-dotenv.config({ path: '../../.env' });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
-const SERVER_PATH = '../../dist/index.js';
-const NODE_PATH = execSync('which node').toString().trim();
+const SERVER_PATH = path.resolve(__dirname, '../../dist/index.js');
+const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which node').toString().trim();
+
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
 const SELECTED_TOOL = 'apify/rag-web-browser';
 
