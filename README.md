@@ -27,6 +27,9 @@ When you have Actors integrated with the MCP server, you can ask:
 - "Provide a step-by-step guide on using the Model Context Protocol with source URLs."
 - "What Apify Actors I can use?"
 
+In the future, we plan to load Actors dynamically and provide Apify's dataset and key-value store as resources.
+See the [Roadmap](#-roadmap-january-2025) for more details.
+
 # 🔄 What is the Model Context Protocol?
 
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
@@ -46,7 +49,6 @@ By default, the server is pre-configured with the Actors specified below, but it
    'apify/instagram-scraper',
    'apify/rag-web-browser',
    'clockworks/free-tiktok-scraper',
-   'compass/crawler-google-places',
    'lukaskrivka/google-maps-with-contact-details',
    'voyager/booking-scraper'
 ```
@@ -306,3 +308,10 @@ npx @modelcontextprotocol/inspector node /path/to/actor-mcp-server/dist/index.js
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
+
+# 🚀 Roadmap (January 2025)
+
+- Document examples for [Superinference.ai](https://superinterface.ai/) and [LibreChat](https://www.librechat.ai/).
+- Provide tools to search for Actors and load them as needed.
+- Add Apify's dataset and key-value store as resources.
+- Add tools such as Actor logs and Actor runs for debugging.
