@@ -9,7 +9,13 @@ import { Actor } from 'apify';
 import { ApifyClient } from 'apify-client';
 
 import { getActorsAsTools } from './actorDefinition.js';
-import { defaults, SERVER_NAME, SERVER_VERSION } from './const.js';
+import {
+    ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
+    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
+    defaults,
+    SERVER_NAME,
+    SERVER_VERSION
+} from './const.js';
 import { log } from './logger.js';
 import type { Tool } from './types';
 
@@ -123,14 +129,20 @@ export class ApifyMcpServer {
 
             try {
                 const items = await this.callActorGetDataset(tool.actorName, args);
-                return { content: items.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
+                const content = items.map(item => {
+                    let text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
+                    return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
+                        ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
+                        : { type: 'text', text };
+                });
+                return { content: content };
+
             } catch (error) {
                 log.error(`Error calling tool: ${error}`);
                 throw new Error(`Error calling tool: ${error}`);
             }
         });
     }
-
     async connect(transport: Transport): Promise<void> {
         await this.server.connect(transport);
     }

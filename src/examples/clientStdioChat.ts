@@ -121,7 +121,7 @@ class MCPClient {
             results = await this.client.callTool(params, CallToolResultSchema, { timeout: REQUEST_TIMEOUT });
             if (results.content instanceof Array && results.content.length !== 0) {
                 const text = results.content.map((x) => x.text);
-                messages.push({ role: 'user', content: text.join('\n\n') });
+                messages.push({ role: 'user', content: `Tool result: ${text.join('\n\n')}` });
             } else {
                 messages.push({ role: 'user', content: `No results retrieved from ${params.name}` });
             }

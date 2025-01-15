@@ -43,14 +43,9 @@ Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
 
 ```text
-   'apidojo/tweet-scraper',
-   'apify/facebook-posts-scraper',
-   'apify/google-search-scraper',
    'apify/instagram-scraper',
    'apify/rag-web-browser',
-   'clockworks/free-tiktok-scraper',
    'lukaskrivka/google-maps-with-contact-details',
-   'voyager/booking-scraper'
 ```
 The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
 See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
