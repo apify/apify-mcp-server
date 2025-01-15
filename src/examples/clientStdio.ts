@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
 /**
  * Connect to the MCP server using stdio transport and call a tool.
- * You need provide a path to MCP server and APIFY_API_TOKEN in .env file.
- * You can choose ACTORS to run in the server, for example: apify/rag-web-browser
+ * This script uses a selected tool without LLM involvement.
+ * You need to provide the path to the MCP server and `APIFY_API_TOKEN` in the `.env` file.
+ * You can choose actors to run in the server, for example: `apify/rag-web-browser`.
  */
 
 import { execSync } from 'child_process';
