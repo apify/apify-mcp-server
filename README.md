@@ -40,7 +40,7 @@ MCP is an open protocol that enables secure, controlled interactions between AI 
 ## Tools
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing a list of Actor names in the `actors` query parameter.
+By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing Actor input.
 
 ```text
    'apify/instagram-scraper',
@@ -85,12 +85,15 @@ send an HTTP GET request with your [Apify API token](https://console.apify.com/s
 ```
 https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>
 ```
-It is also possible to start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
-Provide a comma-separated list of Actors in the `actors` query parameter:
+It is also possible to start the MCP server with a different set of Actors.
+To do this, create a [task](https://docs.apify.com/platform/actors/running/tasks) and specify the list of Actors you want to use.
+
+Then, run task in Standby mode with the selected Actors using your Apify API token.
+```shell
+https://actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
 ```
-https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>&actors=junglee/free-amazon-product-scraper,lukaskrivka/google-maps-with-contact-details
-```
-Find list of all available Actors in the [Apify Store](https://apify.com/store).
+
+You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
 
 #### 💬 Interact with the MCP Server
 
