@@ -12,11 +12,11 @@ import type { ActorDefinitionWithDesc, Tool } from './types';
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinitionWithDesc | null> {
-    if (!process.env.APIFY_API_TOKEN) {
-        log.error('APIFY_API_TOKEN is required but not set. Please set it as an environment variable');
+    if (!process.env.APIFY_TOKEN) {
+        log.error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         return null;
     }
-    const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
+    const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const actorClient = client.actor(actorFullName);
 
     try {

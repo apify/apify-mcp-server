@@ -18,8 +18,9 @@
  */
 
 import { execSync } from 'child_process';
+import path from 'path';
 import * as readline from 'readline';
-import { fileURLToPath } from "url";
+import { fileURLToPath } from 'url';
 
 import { Anthropic } from '@anthropic-ai/sdk';
 import type { Message, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources/messages';
@@ -27,7 +28,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
-import path from "path";
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -79,7 +79,7 @@ class MCPClient {
         const transport = new StdioClientTransport({
             command: NODE_PATH,
             args: serverArgs,
-            env: { APIFY_API_TOKEN: process.env.APIFY_API_TOKEN || '' },
+            env: { APIFY_TOKEN: process.env.APIFY_TOKEN || '' },
         });
 
         await this.client.connect(transport);

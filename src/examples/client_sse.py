@@ -20,7 +20,7 @@ load_dotenv(dotenv_path="../../.env")
 MCP_SERVER_URL = "https://mcp-server.apify.actor"
 ACTORS = "apify/rag-web-browser"
 
-HEADERS = {"Authorization": f"Bearer {os.getenv('APIFY_API_TOKEN')}"}
+HEADERS = {"Authorization": f"Bearer {os.getenv('APIFY_TOKEN')}"}
 
 async def run() -> None:
 

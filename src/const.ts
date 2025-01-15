@@ -10,8 +10,8 @@ export const defaults = {
 };
 
 export const ACTOR_OUTPUT_MAX_CHARS_PER_ITEM = 1_000;
-export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it will not fit into context.` +
-    `There is no reason to call this tool again!`;
+export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it will not fit into context.`
+    + `There is no reason to call this tool again!`;
 
 export enum Routes {
     ROOT = '/',

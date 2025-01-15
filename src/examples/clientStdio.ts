@@ -2,7 +2,7 @@
 /**
  * Connect to the MCP server using stdio transport and call a tool.
  * This script uses a selected tool without LLM involvement.
- * You need to provide the path to the MCP server and `APIFY_API_TOKEN` in the `.env` file.
+ * You need to provide the path to the MCP server and `APIFY_TOKEN` in the `.env` file.
  * You can choose actors to run in the server, for example: `apify/rag-web-browser`.
  */
 
@@ -26,8 +26,8 @@ const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which 
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
 const SELECTED_TOOL = 'apify_rag-web-browser'; // We need to change / to _ in the tool name
 
-if (!process.env.APIFY_API_TOKEN) {
-    console.error('APIFY_API_TOKEN is required but not set in the environment variables.');
+if (!process.env.APIFY_TOKEN) {
+    console.error('APIFY_TOKEN is required but not set in the environment variables.');
     process.exit(1);
 }
 
@@ -35,7 +35,7 @@ if (!process.env.APIFY_API_TOKEN) {
 const transport = new StdioClientTransport({
     command: NODE_PATH,
     args: [SERVER_PATH, '--actors', TOOLS],
-    env: { APIFY_API_TOKEN: process.env.APIFY_API_TOKEN || '' },
+    env: { APIFY_TOKEN: process.env.APIFY_TOKEN || '' },
 });
 
 // Create a new client instance

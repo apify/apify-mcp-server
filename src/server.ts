@@ -14,7 +14,7 @@ import {
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     defaults,
     SERVER_NAME,
-    SERVER_VERSION
+    SERVER_VERSION,
 } from './const.js';
 import { log } from './logger.js';
 import type { Tool } from './types';
@@ -46,21 +46,21 @@ export class ApifyMcpServer {
     /**
      * Calls an Apify actor and retrieves the dataset items.
      *
-     * It requires the `APIFY_API_TOKEN` environment variable to be set.
+     * It requires the `APIFY_TOKEN` environment variable to be set.
      * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
      *
      * @param {string} actorName - The name of the actor to call.
      * @param {unknown} input - The input to pass to the actor.
      * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
-     * @throws {Error} - Throws an error if the `APIFY_API_TOKEN` is not set
+     * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
      */
     public async callActorGetDataset(actorName: string, input: unknown): Promise<object[]> {
-        if (!process.env.APIFY_API_TOKEN) {
-            throw new Error('APIFY_API_TOKEN is required but not set. Please set it as an environment variable');
+        if (!process.env.APIFY_TOKEN) {
+            throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         }
         try {
             log.info(`Calling actor ${actorName} with input: ${JSON.stringify(input)}`);
-            const client = new ApifyClient({ token: process.env.APIFY_API_TOKEN });
+            const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
             const actorClient = client.actor(actorName);
 
             const results = await actorClient.call(input);
@@ -129,20 +129,20 @@ export class ApifyMcpServer {
 
             try {
                 const items = await this.callActorGetDataset(tool.actorName, args);
-                const content = items.map(item => {
-                    let text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
+                const content = items.map((item) => {
+                    const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                     return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
                         ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
                         : { type: 'text', text };
                 });
-                return { content: content };
-
+                return { content };
             } catch (error) {
                 log.error(`Error calling tool: ${error}`);
                 throw new Error(`Error calling tool: ${error}`);
             }
         });
     }
+
     async connect(transport: Transport): Promise<void> {
         await this.server.connect(transport);
     }

@@ -83,12 +83,12 @@ The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/runn
 Start server with default Actors. To use the Apify MCP Server with set of default Actors,
 send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL.
 ```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>
+https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>
 ```
 It is also possible to start MCP server with a different set of tools by providing a list of Actor names in the `actors` query parameter.
 Provide a comma-separated list of Actors in the `actors` query parameter:
 ```
-https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&actors=junglee/free-amazon-product-scraper,lukaskrivka/google-maps-with-contact-details
+https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>&actors=junglee/free-amazon-product-scraper,lukaskrivka/google-maps-with-contact-details
 ```
 Find list of all available Actors in the [Apify Store](https://apify.com/store).
 
@@ -104,9 +104,9 @@ In the client settings you need to provide server configuration:
     "mcpServers": {
         "apify": {
             "type": "sse",
-            "url": "https://mcp-server.apify.actor/sse",
+            "url": "https://actors-mcp-server.apify.actor/sse",
             "env": {
-                "APIFY_API_TOKEN": "your-apify-api-token"
+                "APIFY_TOKEN": "your-apify-token"
             }
         }
     }
@@ -116,7 +116,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
 
 1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
     ```
-    curl https://mcp-server.apify.actor/sse?token=<APIFY_API_TOKEN>
+    curl https://actors-mcp-server.apify.actor/sse?token=<APIFY_TOKEN>
     ```
     The server will respond with a `sessionId`, which you can use to send messages to the server:
     ```shell
@@ -126,7 +126,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
 
 2. Send a message to the server by making a POST request with the `sessionId`:
     ```shell
-    curl -X POST "https://mcp-server.apify.actor?token=<APIFY_API_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
+    curl -X POST "https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
       "jsonrpc": "2.0",
       "id": 1,
       "method": "tools/call",
@@ -158,7 +158,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
 - MacOS or Windows
 - The latest version of Claude Desktop must be installed (or another MCP client)
 - [Node.js](https://nodejs.org/en) (v18 or higher)
-- [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_API_TOKEN`)
+- [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_TOKEN`)
 
 ### Install
 
@@ -198,7 +198,7 @@ Configure Claude Desktop to recognize the MCP server.
           "/path/to/actor-mcp-server/dist/index.js"
         ]
         "env": {
-           "APIFY_API_TOKEN": "your-apify-api-token"
+           "APIFY_TOKEN": "your-apify-token"
         }
       }
     }
@@ -214,7 +214,7 @@ Configure Claude Desktop to recognize the MCP server.
           "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ]
         "env": {
-           "APIFY_API_TOKEN": "your-apify-api-token"
+           "APIFY_TOKEN": "your-apify-token"
         }
       }
     }
@@ -239,7 +239,7 @@ Configure Claude Desktop to recognize the MCP server.
 
 Create environment file `.env` with the following content:
 ```text
-APIFY_API_TOKEN=your-apify-api-token
+APIFY_TOKEN=your-apify-token
 # ANTHROPIC_API_KEY is only required when you want to run examples/clientStdioChat.js
 ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
@@ -271,7 +271,7 @@ standard input/output (stdio):
 
 Create environment file `.env` with the following content:
 ```text
-APIFY_API_TOKEN=your-apify-api-token
+APIFY_TOKEN=your-apify-token
 # ANTHROPIC_API_KEY is only required when you want to run examples/clientStdioChat.js
 ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
@@ -299,7 +299,7 @@ npm run build
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-npx @modelcontextprotocol/inspector node /path/to/actor-mcp-server/dist/index.js --env APIFY_API_TOKEN=your-apify-api-token
+npx @modelcontextprotocol/inspector node /path/to/actor-mcp-server/dist/index.js --env APIFY_TOKEN=your-apify-token
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
