@@ -85,5 +85,3 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     }
     return tools;
 }
-
-fetchActorDefinition('apify/rag-web-browser');
