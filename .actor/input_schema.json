@@ -4,7 +4,7 @@
     "schemaVersion": 1,
     "properties": {
         "actors": {
-            "title": "Actors names to be exposed for an AI application (AI agent)",
+            "title": "Actors to be exposed for an AI application (AI agent)",
             "type": "array",
             "description": "List the names of Actors to be exposed to an AI application (AI agent) for communication via the MCP protocol. \n\n Ensure the Actor definitions fit within the LLM context by limiting the number of used Actors.",
             "editor": "stringList",
