@@ -40,7 +40,7 @@ jobs:
                     wait-interval: 5
 
     update_changelog:
-        needs: [ release_metadata ]
+        needs: [ release_metadata, wait_for_checks ]
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:

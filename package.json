@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "apify-mcp-server": "dist/index.js"
+    "actors-mcp-server": "dist/index.js"
   },
   "repository": {
     "type": "git",

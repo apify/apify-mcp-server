@@ -78,7 +78,7 @@ jobs:
 
     publish_to_npm:
         name: Publish to NPM
-        needs: [ release_metadata ]
+        needs: [ release_metadata, wait_for_checks ]
         runs-on: ubuntu-latest
         steps:
             -   uses: actions/checkout@v4
