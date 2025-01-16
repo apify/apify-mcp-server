@@ -94,6 +94,10 @@ export class ApifyMcpServer {
         }
     }
 
+    public getToolNames(): string[] {
+        return Array.from(this.tools.keys());
+    }
+
     private setupErrorHandling(): void {
         this.server.onerror = (error) => {
             console.error('[MCP Error]', error); // eslint-disable-line no-console

@@ -38,6 +38,9 @@ async function processParamsAndUpdateTools(url: string) {
     const input = await processInput(params as Input);
     if (input.actors) {
         await mcpServer.addToolsFromActors(input.actors as string[]);
+    } else {
+        log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
+        To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
     }
 }
 
@@ -88,10 +91,7 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
-    if (input.actors && input.actors.length > 0) {
-        await mcpServer.addToolsFromActors(input.actors as string[]);
-    }
-
+    await mcpServer.addToolsFromDefaultActors();
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}.`);
     });

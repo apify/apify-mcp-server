@@ -24,7 +24,7 @@ HEADERS = {"Authorization": f"Bearer {os.getenv('APIFY_TOKEN')}"}
 
 async def run() -> None:
 
-    print("Start MCP Server with Actors",)
+    print("Start MCP Server with Actors")
     r = requests.get(MCP_SERVER_URL, headers=HEADERS)
     print("MCP Server Response:", r.json(), end="\n\n")
 

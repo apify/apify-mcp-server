@@ -6,7 +6,7 @@
         "actors": {
             "title": "Actors to be exposed for an AI application (AI agent)",
             "type": "array",
-            "description": "List the names of Actors to be exposed to an AI application (AI agent) for communication via the MCP protocol. \n\n Ensure the Actor definitions fit within the LLM context by limiting the number of used Actors.",
+            "description": "List Actors to be exposed to an AI application (AI agent) for communication via the MCP protocol. \n\n Ensure the Actor definitions fit within the LLM context by limiting the number of used Actors.",
             "editor": "stringList",
             "prefill": [
                 "apify/instagram-scraper",
@@ -15,17 +15,17 @@
             ]
         },
         "debugActor": {
-            "title": "Debug actor",
+            "title": "Debug Actor",
             "type": "string",
-            "description": "Specify the name of the actor that will be used for debugging in normal mode",
+            "description": "Specify the name of the Actor that will be used for debugging in normal mode",
             "editor": "textfield",
             "prefill": "apify/rag-web-browser",
             "sectionCaption": "Debugging settings (normal mode)"
         },
         "debugActorInput": {
-            "title": "Debug actor input",
+            "title": "Debug Actor input",
             "type": "object",
-            "description": "Specify the input for the actor that will be used for debugging in normal mode",
+            "description": "Specify the input for the Actor that will be used for debugging in normal mode",
             "editor": "json",
             "prefill": {
                 "query": "hello world"
