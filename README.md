@@ -1,10 +1,10 @@
 # Apify Model Context Protocol (MCP) Server
 
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
-This server enables interaction with one or more Apify Actors that can be defined in the MCP server configuration.
+This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
 The server can be used in two ways:
-- 🇦 **Apify MCP Server Actor**: runs an HTTP server supporting the MCP protocol via Server-Sent Events.
+- 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP protocol via Server-Sent Events.
 - ⾕ **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
 # 🎯 What does Apify MCP server do?
@@ -14,8 +14,8 @@ For example it can:
 - use [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) to extract data from Facebook posts from multiple pages/profiles
 - use [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) to extract Google Maps contact details
 - use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs)
-- use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, hashtags, photos, and comments
-- use [RAG Web Browser](https://apify.com/apify/web-scraper) to perform a web search, scrape the top N URLs from the results, and return content
+- use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments
+- use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content
 
 To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [Superinference.ai](https://superinterface.ai/), or [LibreChat](https://www.librechat.ai/).
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.

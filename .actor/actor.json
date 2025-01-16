@@ -3,7 +3,7 @@
   "name": "apify-mcp-server",
   "title": "Model Context Protocol Server for Apify Actors",
   "description": "Implementation of a Model Context Protocol (MCP) Server for Apify Actors that enables AI applications (and AI agents) to interact with Apify Actors",
-  "version": "0.0",
+  "version": "0.1",
   "input": "./input_schema.json",
   "dockerfile": "./Dockerfile"
 }
