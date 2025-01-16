@@ -93,11 +93,8 @@ jobs:
                     echo "access=public" >> .npmrc
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
                     npm install
-            - # Check version consistency and increment pre-release version number for beta only.
-                name: Bump pre-release version
-                run: node ./.github/scripts/before-beta-release.cjs
             -   name: Publish to NPM
-                run: npm publish --tag beta
+                run: npm publish --access public
 
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
