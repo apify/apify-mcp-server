@@ -24,7 +24,7 @@ const mcpServer = new ApifyMcpServer();
 let transport: SSEServerTransport;
 
 const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse?token=YOUR-APIFY-TOKEN`
-    + ` and then send POST requests to ${HOST}/message?token=YOUR-APIFY-TOKEN.`;
+    + ` and then send POST requests to ${HOST}/message?token=YOUR-APIFY-TOKEN`;
 
 /**
  * Process input parameters and update tools
@@ -102,13 +102,13 @@ if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
     app.listen(PORT, () => {
-        log.info(`The Actor web server is listening for user requests at ${HOST}.`);
+        log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
 
     if (input && !input.debugActor && !input.debugActorInput) {
-        await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input.');
+        await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
     }
     await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!);
     await Actor.exit();

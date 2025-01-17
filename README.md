@@ -129,7 +129,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
 
 2. Send a message to the server by making a POST request with the `sessionId`:
     ```shell
-    curl -X POST "https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
+    curl -X POST "https://actors-mcp-server.apify.actor/message?token=<APIFY_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
       "jsonrpc": "2.0",
       "id": 1,
       "method": "tools/call",
