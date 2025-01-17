@@ -96,6 +96,8 @@ jobs:
             - # Check version consistency and increment pre-release version number for beta only.
                 name: Bump pre-release version
                 run: node ./.github/scripts/before-beta-release.cjs
+            -   name: Build module
+                run: npm run build
             -   name: Publish to NPM
                 run: npm publish --tag beta
 

@@ -11,8 +11,8 @@
     "actors-mcp-server": "dist/index.js"
   },
   "files": [
-    "dist/**",
-    "src/**",
+    "dist",
+    "!dist/*.tsbuildinfo",
     "LICENSE"
   ],
   "repository": {
