@@ -1,0 +1,8 @@
+# .npmignore
+# Exclude everything by default
+*
+
+# Include specific files and folders
+!dist/
+!README.md
+!LICENSE
