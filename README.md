@@ -99,7 +99,7 @@ You can find a list of all available Actors in the [Apify Store](https://apify.c
 
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
 You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
-([Claude Desktop](https://claude.ai/download) does not support SSE transport yet)
+([Claude Desktop](https://claude.ai/download) does not support SSE transport yet, see [Claude Desktop Configuration](#claude-desktop) section for more details).
 
 In the client settings you need to provide server configuration:
 ```json

@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Model Context Protocol Server for Apify Actors",
   "engines": {
@@ -10,6 +10,9 @@
   "bin": {
     "actors-mcp-server": "dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/apify/actors-mcp-server.git"
@@ -55,7 +58,8 @@
     "lint:fix": "eslint . --fix",
     "build": "tsc",
     "test": "echo \"Error: oops, the actor has no tests yet, sad!\" && exit 1",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "inspector": "npx @modelcontextprotocol/inspector dist/index.js"
   },
   "author": "Apify",
   "license": "MIT"
