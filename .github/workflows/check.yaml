@@ -9,7 +9,6 @@ on:
     push:
         branches:
             - master
-            - 'fix/ci' # TODO remove this branch after CI is fixed
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
