@@ -11,7 +11,8 @@
     "actors-mcp-server": "dist/index.js"
   },
   "files": [
-    "dist"
+      "dist/**",
+      "LICENSE"
   ],
   "repository": {
     "type": "git",
