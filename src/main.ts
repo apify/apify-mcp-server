@@ -44,42 +44,51 @@ async function processParamsAndUpdateTools(url: string) {
     }
 }
 
-app.get(Routes.ROOT, async (req: Request, res: Response) => {
-    try {
-        log.info(`Received GET message at: ${req.url}`);
-        await processParamsAndUpdateTools(req.url);
-        res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
-    } catch (error) {
-        log.error(`Error in GET ${Routes.ROOT} ${error}`);
-        res.status(500).json({ message: 'Internal Server Error' }).end();
-    }
-});
+app.route(Routes.ROOT)
+    .get(async (req: Request, res: Response) => {
+        try {
+            log.info(`Received GET message at: ${req.url}`);
+            await processParamsAndUpdateTools(req.url);
+            res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
+        } catch (error) {
+            log.error(`Error in GET ${Routes.ROOT} ${error}`);
+            res.status(500).json({ message: 'Internal Server Error' }).end();
+        }
+    })
+    .head((_req: Request, res: Response) => {
+        res.status(200).end();
+    });
 
-app.head(Routes.ROOT, (_req: Request, res: Response) => {
-    res.status(200).end();
-});
+app.route(Routes.SSE)
+    .get(async (req: Request, res: Response) => {
+        try {
+            log.info(`Received GET message at: ${req.url}`);
+            await processParamsAndUpdateTools(req.url);
+            transport = new SSEServerTransport(Routes.MESSAGE, res);
+            await mcpServer.connect(transport);
+        } catch (error) {
+            log.error(`Error in GET ${Routes.SSE}: ${error}`);
+            res.status(500).json({ message: 'Internal Server Error' }).end();
+        }
+    });
 
-app.get(Routes.SSE, async (req: Request, res: Response) => {
-    try {
-        log.info(`Received GET message at: ${req.url}`);
-        await processParamsAndUpdateTools(req.url);
-        transport = new SSEServerTransport(Routes.MESSAGE, res);
-        await mcpServer.connect(transport);
-    } catch (error) {
-        log.error(`Error in GET ${Routes.SSE}: ${error}`);
-        res.status(500).json({ message: 'Internal Server Error' }).end();
-    }
-});
-
-app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
-    try {
-        log.info(`Received POST message at: ${req.url}`);
-        await transport.handlePostMessage(req, res);
-    } catch (error) {
-        log.error(`Error in POST ${Routes.MESSAGE}: ${error}`);
-        res.status(500).json({ message: 'Internal Server Error' }).end();
-    }
-});
+app.route(Routes.MESSAGE)
+    .post(async (req: Request, res: Response) => {
+        try {
+            log.info(`Received POST message at: ${req.url}`);
+            if (transport) {
+                await transport.handlePostMessage(req, res);
+            } else {
+                res.status(400).json({
+                    message: 'Server is not connected to the client. '
+                        + 'Connect to the server with GET request to /sse endpoint',
+                });
+            }
+        } catch (error) {
+            log.error(`Error in POST ${Routes.MESSAGE}: ${error}`);
+            res.status(500).json({ message: 'Internal Server Error' }).end();
+        }
+    });
 
 // Catch-all for undefined routes
 app.use((req: Request, res: Response) => {
