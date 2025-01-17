@@ -15,7 +15,10 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import minimist from 'minimist';
 
+import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
+
+log.setLevel(log.LEVELS.ERROR);
 
 const argv = minimist(process.argv.slice(2));
 const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];

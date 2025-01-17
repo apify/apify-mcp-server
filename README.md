@@ -197,10 +197,10 @@ Configure Claude Desktop to recognize the MCP server.
 
     ```text
     "mcpServers": {
-      "apify": {
+      "actors-mcp-server": {
         "command": "npx",
         "args": [
-          "/path/to/actor-mcp-server/dist/index.js"
+          "@apify/actors-mcp-server"
         ]
         "env": {
            "APIFY_TOKEN": "your-apify-token"
@@ -211,10 +211,10 @@ Configure Claude Desktop to recognize the MCP server.
     Alternatively, you can use the following command to select one or more Apify Actors:
     ```text
     "mcpServers": {
-      "apify-mcp-server": {
+      "actors-mcp-server": {
         "command": "npx",
         "args": [
-          "/path/to/actor-mcp-server/dist/index.js",
+          "@apify/actors-mcp-serve",
           "--actors",
           "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ]

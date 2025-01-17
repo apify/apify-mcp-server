@@ -122,6 +122,8 @@ jobs:
                     echo "access=public" >> .npmrc
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
                     npm install
+            -   name: Build module
+                run: npm run build
             -   name: Publish to NPM
                 run: npm publish --tag latest
 
