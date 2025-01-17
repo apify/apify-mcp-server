@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * This script initializes and starts the Apify MCP server using the Stdio transport.
  *

@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Model Context Protocol Server for Apify Actors",
   "engines": {
@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "actors-mcp-server": "dist/index.js"
+    "actors-mcp-server": "./dist/index.js"
   },
   "files": [
     "dist",
