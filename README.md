@@ -199,9 +199,7 @@ Configure Claude Desktop to recognize the MCP server.
     "mcpServers": {
       "actors-mcp-server": {
         "command": "npx",
-        "args": [
-          "@apify/actors-mcp-server"
-        ]
+        "args": ["-y", "@apify/actors-mcp-server"]
         "env": {
            "APIFY_TOKEN": "your-apify-token"
         }
@@ -214,9 +212,8 @@ Configure Claude Desktop to recognize the MCP server.
       "actors-mcp-server": {
         "command": "npx",
         "args": [
-          "@apify/actors-mcp-serve",
-          "--actors",
-          "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
+          "-y", "@apify/actors-mcp-serves",
+          "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ]
         "env": {
            "APIFY_TOKEN": "your-apify-token"
