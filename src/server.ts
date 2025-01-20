@@ -5,8 +5,10 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { ApifyClientOptions } from 'apify';
 import { Actor } from 'apify';
 import { ApifyClient } from 'apify-client';
+import type { AxiosRequestConfig } from 'axios';
 
 import { getActorsAsTools } from './actorDefinition.js';
 import {
@@ -15,6 +17,7 @@ import {
     defaults,
     SERVER_NAME,
     SERVER_VERSION,
+    USER_AGENT_ORIGIN,
 } from './const.js';
 import { log } from './logger.js';
 import type { Tool } from './types';
@@ -44,6 +47,18 @@ export class ApifyMcpServer {
     }
 
     /**
+     * Adds a User-Agent header to the request config.
+     * @param config
+     * @private
+     */
+    private addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
+        const updatedConfig = { ...config };
+        updatedConfig.headers = updatedConfig.headers ?? {};
+        updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
+        return updatedConfig;
+    }
+
+    /**
      * Calls an Apify actor and retrieves the dataset items.
      *
      * It requires the `APIFY_TOKEN` environment variable to be set.
@@ -60,7 +75,9 @@ export class ApifyMcpServer {
         }
         try {
             log.info(`Calling actor ${actorName} with input: ${JSON.stringify(input)}`);
-            const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+
+            const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
+            const client = new ApifyClient({ ...options, token: process.env.APIFY_TOKEN });
             const actorClient = client.actor(actorName);
 
             const results = await actorClient.call(input);

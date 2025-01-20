@@ -1,8 +1,9 @@
 import { Ajv } from 'ajv';
 import { ApifyClient } from 'apify-client';
 
+import { MAX_DESCRIPTION_LENGTH, MAX_ENUM_LENGTH } from './const.js';
 import { log } from './logger.js';
-import type { ActorDefinitionWithDesc, Tool } from './types';
+import type { ActorDefinitionWithDesc, Tool, SchemaProperties } from './types.js';
 
 /**
  * Get actor input schema by actor name.
@@ -53,6 +54,38 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
 }
 
 /**
+ * Shortens the description and enum values of schema properties.
+ * @param properties
+ */
+function shortenProperties(properties: { [key: string]: SchemaProperties}): { [key: string]: SchemaProperties } {
+    for (const property of Object.values(properties)) {
+        if (property.description.length > MAX_DESCRIPTION_LENGTH) {
+            property.description = `${property.description.slice(0, MAX_DESCRIPTION_LENGTH)}...`;
+        }
+        if (property.enum) {
+            property.enum = property.enum.slice(0, MAX_ENUM_LENGTH);
+        }
+        if (property.enumTitles) {
+            property.enumTitles = property.enumTitles.slice(0, MAX_ENUM_LENGTH);
+        }
+    }
+    return properties;
+}
+
+/**
+ * Filters schema properties to include only the necessary fields.
+ * @param properties
+ */
+function filterSchemaProperties(properties: { [key: string]: SchemaProperties }): { [key: string]: SchemaProperties } {
+    const filteredProperties: { [key: string]: SchemaProperties } = {};
+    for (const [key, property] of Object.entries(properties)) {
+        const { title, description, enum: enumValues, enumTitles, type, default: defaultValue, prefill } = property;
+        filteredProperties[key] = { title, description, enum: enumValues, enumTitles, type, default: defaultValue, prefill };
+    }
+    return filteredProperties;
+}
+
+/**
  * Fetches actor input schemas by actor full names and creates MCP tools.
  *
  * This function retrieves the input schemas for the specified actors and compiles them into MCP tools.
@@ -70,6 +103,10 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     const tools = [];
     for (const result of results) {
         if (result) {
+            if (result.input && 'properties' in result.input && result.input) {
+                const properties = filterSchemaProperties(result.input.properties as { [key: string]: SchemaProperties });
+                result.input.properties = shortenProperties(properties);
+            }
             try {
                 tools.push({
                     name: result.name.replace('/', '_'),

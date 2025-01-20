@@ -301,10 +301,17 @@ npm run build
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-npx @modelcontextprotocol/inspector node /path/to/actor-mcp-server/dist/index.js --env APIFY_TOKEN=your-apify-token
+npx @modelcontextprotocol/inspector node @apify/actors-mcp-server --env APIFY_TOKEN=your-apify-token
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
+
+## ⓘ Limitations and feedback
+
+To limit the context size the properties in the `input schema` are pruned and description is truncated to 200 characters.
+Enum fields and titles are truncated to max 50 options.
+
+If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
 
 # 🚀 Roadmap (January 2025)
 
@@ -312,4 +319,3 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 - Provide tools to search for Actors and load them as needed.
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
-- Prune Actors input schema to reduce context size.
