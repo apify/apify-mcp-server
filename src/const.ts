@@ -1,6 +1,8 @@
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_VERSION = '0.1.0';
 
+export const HEADER_READINESS_PROBE = 'x-apify-container-server-readiness-probe';
+
 export const defaults = {
     actors: [
         'apify/instagram-scraper',

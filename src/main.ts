@@ -6,7 +6,7 @@ import { Actor } from 'apify';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { Routes } from './const.js';
+import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
@@ -46,6 +46,11 @@ async function processParamsAndUpdateTools(url: string) {
 
 app.route(Routes.ROOT)
     .get(async (req: Request, res: Response) => {
+        if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
+            log.debug('Received readiness probe');
+            res.status(200).json({ message: 'Server is ready' }).end();
+            return;
+        }
         try {
             log.info(`Received GET message at: ${req.url}`);
             await processParamsAndUpdateTools(req.url);
