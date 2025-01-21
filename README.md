@@ -42,6 +42,20 @@ See the [Roadmap](#-roadmap-january-2025) for more details.
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
 MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
+For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website.
+
+# 🤖 How is the Actors MCP server related to AI Agents?
+
+The Apify MCP server exposes Apify's Actors via MCP protocol. An AI Agent or framework (such as Langchain) can readily use all Apify Actors as tool to extract data, search the web, or perform other tasks.
+To learn more, read blog post [What are AI agents?](https://blog.apify.com/what-are-ai-agents/).
+
+# 🤖 How is the Actors MCP Server related to AI Agents?
+
+The Apify MCP Server exposes Apify's Actors through the MCP protocol.
+This allows AI Agents or Agents frameworks use all Apify Actors as tools to extract data, search the web, or perform other tasks.
+
+To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/).
+
 # 🧱 Components
 
 ## Tools
@@ -320,9 +334,6 @@ Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
 
 If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
-
-Are you interested in AI Agents and AI applications?
-Visit the [Model Context Protocol](https://modelcontextprotocol.org/) website and read blog post [What are AI agents?](https://blog.apify.com/what-are-ai-agents/).
 
 # 🚀 Roadmap (January 2025)
 
