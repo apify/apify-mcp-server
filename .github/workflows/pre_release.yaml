@@ -87,11 +87,13 @@ jobs:
                 uses: actions/setup-node@v4
                 with:
                     node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
                 run: |
                     echo "access=public" >> .npmrc
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm install
+                    npm ci
             - # Check version consistency and increment pre-release version number for beta only.
                 name: Bump pre-release version
                 run: node ./.github/scripts/before-beta-release.cjs

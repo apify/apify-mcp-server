@@ -43,8 +43,19 @@ jobs:
                     custom_version: ${{ inputs.custom_version }}
                     existing_changelog_path: CHANGELOG.md
 
+    wait_for_checks:
+        name: Wait for code checks to pass
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: lewagon/wait-on-check-action@v1.3.4
+                with:
+                    ref: ${{ github.ref }}
+                    repo-token: ${{ secrets.GITHUB_TOKEN }}
+                    check-regexp: (Build & Test .*|Lint|Docs build)
+                    wait-interval: 5
+
     update_changelog:
-        needs: [ release_metadata ]
+        needs: [ release_metadata, wait_for_checks ]
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:
@@ -106,6 +117,8 @@ jobs:
                 uses: actions/setup-node@v4
                 with:
                     node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
                 run: |
                     echo "access=public" >> .npmrc
