@@ -82,7 +82,7 @@ You can refer to the specific Actor's documentation for a list of available argu
 ## Prompt & Resources
 
 The server does not provide any resources and prompts.
-We plan to add Apify's dataset and key-value store as resources in the future.
+We plan to add [Apify's dataset](https://docs.apify.com/platform/storage/dataset) and [key-value store](https://docs.apify.com/platform/storage/key-value-store) as resources in the future.
 
 # ⚙️ Usage
 
