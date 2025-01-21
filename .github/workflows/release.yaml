@@ -81,7 +81,7 @@ jobs:
 
     create_github_release:
         name: Create github release
-        needs: [ update_changelog ]
+        needs: [release_metadata, update_changelog]
         runs-on: ubuntu-latest
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -110,7 +110,7 @@ jobs:
                 run: |
                     echo "access=public" >> .npmrc
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm install
+                    npm ci
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
