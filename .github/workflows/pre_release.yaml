@@ -37,7 +37,7 @@ jobs:
                 with:
                     ref: ${{ github.ref }}
                     repo-token: ${{ secrets.GITHUB_TOKEN }}
-                    check-name: 'Lint'
+                    check-regexp: (Build & Test .*|Lint|Docs build)
                     wait-interval: 5
 
     update_changelog:
