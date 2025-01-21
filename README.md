@@ -9,6 +9,8 @@ The server can be used in two ways:
 - 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP protocol via Server-Sent Events.
 - ⾕ **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
 
+<a href="https://glama.ai/mcp/servers/0sr3j8xoat"><img width="380" height="200" src="https://glama.ai/mcp/servers/0sr3j8xoat/badge" alt="actors-mcp-server MCP server" /></a>
+
 # 🎯 What does Apify MCP server do?
 
 The MCP Server Actor allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
