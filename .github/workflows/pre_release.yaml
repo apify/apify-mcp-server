@@ -5,6 +5,7 @@ on:
     push:
         branches:
             - master
+            - fix/ci
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
@@ -100,7 +101,7 @@ jobs:
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
-                run: npm publish --tag beta
+                run: npm publish
 
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
