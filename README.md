@@ -321,6 +321,9 @@ Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MC
 
 If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
 
+Are you interested in AI Agents and AI applications?
+Visit the [Model Context Protocol](https://modelcontextprotocol.org/) website and read blog post [What are AI agents?](https://blog.apify.com/what-are-ai-agents/).
+
 # 🚀 Roadmap (January 2025)
 
 - Document examples for [LibreChat](https://www.librechat.ai/).
