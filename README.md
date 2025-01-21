@@ -44,17 +44,11 @@ MCP is an open protocol that enables secure, controlled interactions between AI 
 
 For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website.
 
-# 🤖 How is the Actors MCP server related to AI Agents?
+# 🤖 How is Actors MCP Server related to AI Agents?
 
-The Apify MCP server exposes Apify's Actors via MCP protocol. An AI Agent or framework (such as Langchain) can readily use all Apify Actors as tool to extract data, search the web, or perform other tasks.
-To learn more, read blog post [What are AI agents?](https://blog.apify.com/what-are-ai-agents/).
+The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
 
-# 🤖 How is the Actors MCP Server related to AI Agents?
-
-The Apify MCP Server exposes Apify's Actors through the MCP protocol.
-This allows AI Agents or Agents frameworks use all Apify Actors as tools to extract data, search the web, or perform other tasks.
-
-To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/).
+To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
 
 # 🧱 Components
 
