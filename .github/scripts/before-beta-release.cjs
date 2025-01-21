@@ -27,5 +27,6 @@ function getNextVersion(version) {
     const prereleaseNumbers = versions
         .filter((v) => (v.startsWith(VERSION) && v.includes('-')))
         .map((v) => Number(v.match(/\.(\d+)$/)[1]));
-    return `${version}`;
+    const lastPrereleaseNumber = Math.max(-1, ...prereleaseNumbers);
+    return `${version}-beta.${lastPrereleaseNumber + 1}`;
 }
