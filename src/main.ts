@@ -3,10 +3,11 @@ import { parse } from 'querystring';
 
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { Actor } from 'apify';
+import type { ActorCallOptions } from 'apify-client';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { HEADER_READINESS_PROBE, Routes } from './const.js';
+import { HEADER_READINESS_PROBE, MAX_MEMORY_MBYTES, Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
@@ -115,6 +116,7 @@ if (STANDBY_MODE) {
     if (input && !input.debugActor && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
     }
-    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!);
+    const options = { memory: MAX_MEMORY_MBYTES } as ActorCallOptions;
+    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, options);
     await Actor.exit();
 }

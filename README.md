@@ -19,7 +19,8 @@ For example it can:
 - use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments
 - use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content
 
-To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [Superinference.ai](https://superinterface.ai/), or [LibreChat](https://www.librechat.ai/).
+
+To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [LibreChat](https://www.librechat.ai/), or other [MCP clients](https://glama.ai/mcp/clients).
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
 
 When you have Actors integrated with the MCP server, you can ask:
@@ -28,6 +29,10 @@ When you have Actors integrated with the MCP server, you can ask:
 - "Find and analyze Instagram profile of The Rock"
 - "Provide a step-by-step guide on using the Model Context Protocol with source URLs."
 - "What Apify Actors I can use?"
+
+The following image shows how the Apify MCP server interacts with the Apify platform and AI clients:
+
+![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
 In the future, we plan to load Actors dynamically and provide Apify's dataset and key-value store as resources.
 See the [Roadmap](#-roadmap-january-2025) for more details.
@@ -311,11 +316,14 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 To limit the context size the properties in the `input schema` are pruned and description is truncated to 200 characters.
 Enum fields and titles are truncated to max 50 options.
 
+Memory for each Actor is limited to 4GB.
+Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
+
 If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
 
 # 🚀 Roadmap (January 2025)
 
-- Document examples for [Superinference.ai](https://superinterface.ai/) and [LibreChat](https://www.librechat.ai/).
+- Document examples for [LibreChat](https://www.librechat.ai/).
 - Provide tools to search for Actors and load them as needed.
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.

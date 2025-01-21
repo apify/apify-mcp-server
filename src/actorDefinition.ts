@@ -1,9 +1,9 @@
 import { Ajv } from 'ajv';
 import { ApifyClient } from 'apify-client';
 
-import { MAX_DESCRIPTION_LENGTH, MAX_ENUM_LENGTH } from './const.js';
+import { MAX_DESCRIPTION_LENGTH, MAX_ENUM_LENGTH, MAX_MEMORY_MBYTES } from './const.js';
 import { log } from './logger.js';
-import type { ActorDefinitionWithDesc, Tool, SchemaProperties } from './types.js';
+import type { ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
 
 /**
  * Get actor input schema by actor name.
@@ -44,6 +44,7 @@ async function fetchActorDefinition(actorFullName: string): Promise<ActorDefinit
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             actorDefinitions.description = actor.description || '';
             actorDefinitions.name = actorFullName;
+            actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
             return actorDefinitions;
         }
         return null;
@@ -108,12 +109,14 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
                 result.input.properties = shortenProperties(properties);
             }
             try {
+                const memoryMbytes = result.defaultRunOptions?.memoryMbytes || MAX_MEMORY_MBYTES;
                 tools.push({
                     name: result.name.replace('/', '_'),
                     actorName: result.name,
                     description: result.description,
                     inputSchema: result.input || {},
                     ajvValidate: ajv.compile(result.input || {}),
+                    memoryMbytes: memoryMbytes > MAX_MEMORY_MBYTES ? MAX_MEMORY_MBYTES : memoryMbytes,
                 });
             } catch (validationError) {
                 log.error(`Failed to compile AJV schema for actor: ${result.name}. Error: ${validationError}`);

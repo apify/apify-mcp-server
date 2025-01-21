@@ -43,8 +43,9 @@ async def run() -> None:
                 print("No tools available!")
                 return
 
+            print("\n\nCall tool")
             result = await session.call_tool("apify/rag-web-browser", { "query": "example.com", "maxResults": 3 })
-            print("Tools Call Result:")
+            print("Tools call result:")
 
             for content in result.content:
                 print(content)

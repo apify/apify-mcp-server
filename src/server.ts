@@ -7,6 +7,7 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClientOptions } from 'apify';
 import { Actor } from 'apify';
+import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
@@ -65,11 +66,16 @@ export class ApifyMcpServer {
      * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
      *
      * @param {string} actorName - The name of the actor to call.
+     * @param {ActorCallOptions} callOptions - The options to pass to the actor.
      * @param {unknown} input - The input to pass to the actor.
      * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
      * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
      */
-    public async callActorGetDataset(actorName: string, input: unknown): Promise<object[]> {
+    public async callActorGetDataset(
+        actorName: string,
+        input: unknown,
+        callOptions: ActorCallOptions | undefined = undefined,
+    ): Promise<object[]> {
         if (!process.env.APIFY_TOKEN) {
             throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         }
@@ -80,7 +86,7 @@ export class ApifyMcpServer {
             const client = new ApifyClient({ ...options, token: process.env.APIFY_TOKEN });
             const actorClient = client.actor(actorName);
 
-            const results = await actorClient.call(input);
+            const results = await actorClient.call(input, callOptions);
             const dataset = await client.dataset(results.defaultDatasetId).listItems();
             log.info(`Actor ${actorName} finished with ${dataset.items.length} items`);
 
@@ -149,7 +155,7 @@ export class ApifyMcpServer {
             }
 
             try {
-                const items = await this.callActorGetDataset(tool.actorName, args);
+                const items = await this.callActorGetDataset(tool.actorName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
                 const content = items.map((item) => {
                     const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                     return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM

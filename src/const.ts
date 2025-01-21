@@ -5,6 +5,8 @@ export const HEADER_READINESS_PROBE = 'x-apify-container-server-readiness-probe'
 
 export const MAX_ENUM_LENGTH = 50;
 export const MAX_DESCRIPTION_LENGTH = 200;
+// Limit memory to 4GB for Actors. Free users have 8 GB limit, but we need to reserve some memory for Actors-MCP-Server too
+export const MAX_MEMORY_MBYTES = 4096;
 
 export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
