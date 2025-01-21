@@ -2,11 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.3](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.2) (2025-01-21)
+## [0.1.3](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.3) (2025-01-21)
 
 ### 🚀 Features
 
-- Update README.md with missing image, and a section on how is MCP related to AI Agents ([#10](https://github.com/apify/actors-mcp-server/pull/11)) ([a194765](https://github.com/apify/actors-mcp-server/commit/e9220332d9ccfbd2efdfb95f07f7c7a52fffc92b)) by [@jirispilka](https://github.com/jirispilka)
+- Update README.md with missing image, and a section on how is MCP related to AI Agents ([#11](https://github.com/apify/actors-mcp-server/pull/11)) ([e922033](https://github.com/apify/actors-mcp-server/commit/e9220332d9ccfbd2efdfb95f07f7c7a52fffc92b)) by [@jirispilka](https://github.com/jirispilka)
 
 
 ## [0.1.2](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.2) (2025-01-21)
