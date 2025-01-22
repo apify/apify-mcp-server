@@ -3,7 +3,7 @@
  * Connect to the MCP server using SSE transport and call a tool.
  * The Actors MCP Server will load default Actors.
  *
- * !!! This example needs to be fixed as it does not work !!!
+ * !!! NOT WORKING - This example needs to be fixed as it does not work !!!
  */
 
 import path from 'path';
