@@ -208,31 +208,35 @@ Configure Claude Desktop to recognize the MCP server.
     - On macOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
     - On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
 
-    ```text
-    "mcpServers": {
-      "actors-mcp-server": {
-        "command": "npx",
-        "args": ["-y", "@apify/actors-mcp-server"]
-        "env": {
-           "APIFY_TOKEN": "your-apify-token"
-        }
-      }
+    ```json
+    {
+     "mcpServers": {
+       "actors-mcp-server": {
+         "command": "npx",
+         "args": ["-y", "@apify/actors-mcp-server"],
+         "env": {
+            "APIFY_TOKEN": "your-apify-token"
+         }
+       }
+     }
     }
     ```
     Alternatively, you can use the following command to select one or more Apify Actors:
-    ```text
+    ```json
+   {
     "mcpServers": {
       "actors-mcp-server": {
         "command": "npx",
         "args": [
           "-y", "@apify/actors-mcp-serves",
           "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
-        ]
+        ],
         "env": {
            "APIFY_TOKEN": "your-apify-token"
         }
       }
     }
+   }
     ```
 
 2. Restart Claude Desktop
@@ -314,7 +318,7 @@ npm run build
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-npx @modelcontextprotocol/inspector node @apify/actors-mcp-server --env APIFY_TOKEN=your-apify-token
+npx @modelcontextprotocol/inspector node ./dist/index.js
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
