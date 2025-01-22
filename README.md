@@ -292,7 +292,7 @@ Create environment file `.env` with the following content:
 ```text
 APIFY_TOKEN=your-apify-token
 # ANTHROPIC_API_KEY is only required when you want to run examples/clientStdioChat.js
-ANTHROPIC_API_KEY=your-anthropic-api-token
+ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 ## Local client (SSE)
 
