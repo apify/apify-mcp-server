@@ -202,6 +202,7 @@ npm run build
 #### Claude Desktop
 
 Configure Claude Desktop to recognize the MCP server.
+Make sure that you enable developer mode in Claude Desktop to access the configuration settings.
 
 1. Open your Claude Desktop configuration and edit the following file:
 
