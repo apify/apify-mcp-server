@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.1.5 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Add log to stdio ([99a3e9e](https://github.com/apify/actors-mcp-server/commit/99a3e9e8a4fbf52806dd900b9543431d6a1bc083))
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.1.4](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.4) (2025-01-22)
 
 ### 🐛 Bug Fixes
