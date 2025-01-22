@@ -286,7 +286,7 @@ standard input/output (stdio):
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/en) (v18 or higher)
-- Python 3.6 or higher
+- Python 3.9 or higher
 
 Create environment file `.env` with the following content:
 ```text
