@@ -201,13 +201,18 @@ npm run build
 
 #### Claude Desktop
 
-Configure Claude Desktop to recognize the MCP server.
-Make sure that you enable developer mode in Claude Desktop to access the configuration settings.
+To configure Claude Desktop to work with the MCP server, follow these steps. For a detailed guide, refer to the [Claude Desktop Users Guide](https://modelcontextprotocol.io/quickstart/user).
 
-1. Open your Claude Desktop configuration and edit the following file:
+1. Download Claude for desktop
+   - Available for Windows and macOS.
+   - For Linux users, you can build a Debian package using this [unofficial build script](https://github.com/aaddrick/claude-desktop-debian).
+2. Open the Claude Desktop app and enable **Developer Mode** from the top-left menu bar.
+3. Once enabled, open **Settings** (also from the top-left menu bar) and navigate to the **Developer Option**, where you'll find the **Edit Config** button
+4. Open configuration file and edit the following file:
 
     - On macOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
     - On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+    - On Linux: `~/.config/Claude/claude_desktop_config.json`
 
     ```json
     {
@@ -222,14 +227,14 @@ Make sure that you enable developer mode in Claude Desktop to access the configu
      }
     }
     ```
-    Alternatively, you can use the following command to select one or more Apify Actors:
+    Alternatively, you can use `actors` argument to select one or more Apify Actors:
     ```json
    {
     "mcpServers": {
       "actors-mcp-server": {
         "command": "npx",
         "args": [
-          "-y", "@apify/actors-mcp-serves",
+          "-y", "@apify/actors-mcp-server",
           "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
         ],
         "env": {
@@ -239,16 +244,18 @@ Make sure that you enable developer mode in Claude Desktop to access the configu
     }
    }
     ```
-
-2. Restart Claude Desktop
+5. Restart Claude Desktop
 
     - Fully quit Claude Desktop (ensure it’s not just minimized or closed).
     - Restart Claude Desktop.
     - Look for the 🔌 icon to confirm that the Exa server is connected.
 
-3. Examples
+6. Open the Claude Desktop chat and ask "What Apify Actors I can use?"
+   ![Claude-desktop-with-Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/claude-dekstop.png)
 
-   You can ask Claude to perform web searches, such as:
+7. Examples
+
+   You can ask Claude to perform tasks, such as:
     ```text
     Find and analyze recent research papers about LLMs.
     Find top 10 best Italian restaurants in San Francisco.
