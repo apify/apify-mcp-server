@@ -251,7 +251,7 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     - Look for the 🔌 icon to confirm that the Exa server is connected.
 
 6. Open the Claude Desktop chat and ask "What Apify Actors I can use?"
-   ![Claude-desktop-with-Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/claude-dekstop.png)
+   ![Claude-desktop-with-Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/claude-desktop.png)
 
 7. Examples
 
