@@ -30,7 +30,7 @@ async function main() {
         : server.addToolsFromDefaultActors());
     const transport = new StdioServerTransport();
     await server.connect(transport);
-    console.error("Actors MCP Server running on stdio"); // eslint-disable-line no-console
+    console.error('Actors MCP Server running on stdio'); // eslint-disable-line no-console
 }
 
 main().catch((error) => {
