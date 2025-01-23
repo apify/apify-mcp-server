@@ -2,9 +2,10 @@
 const chatLog = document.getElementById('chatLog');
 const queryInput = document.getElementById('queryInput');
 const sendBtn = document.getElementById('sendBtn');
+const spinner = document.getElementById('spinner');
 
 // Keep track of all messages
-let messages = [];
+const messages = [];
 
 /**
  * Convert basic Markdown-like syntax to HTML.
@@ -17,9 +18,9 @@ let messages = [];
 function formatMessageContent(text) {
     // Escape HTML special chars to avoid injection
     let safe = text
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
     // Then apply some naive markdown transforms:
     // 1) Fenced code blocks: ```...```
@@ -31,7 +32,9 @@ function formatMessageContent(text) {
     // 4) Italics: *text*
     safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
     // 5) Replace newlines with <br>
-    safe = safe.replace(/\n/g, "<br>");
+    safe = safe.replace(/\n/g, '<br>');
+    // 6) Replace markdown links [text](url) with <a href="url">text</a>
+    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
 
     return safe;
 }
@@ -40,7 +43,9 @@ function formatMessageContent(text) {
  * Append a message to the chat log
  */
 function appendMessage(role, content) {
-    // Create row container
+
+    console.log('role:', role);
+    console.log('content:', content);
     const row = document.createElement('div');
     row.className = 'message-row';
 
@@ -70,26 +75,28 @@ function appendMessage(role, content) {
  * Send a message to the server
  */
 async function sendQuery(query) {
+    spinner.style.display = 'inline-block';
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, messages })
+            body: JSON.stringify({ query, messages }),
         });
         const data = await response.json();
         if (data && data.newMessages) {
-            data.newMessages.forEach(msg => {
+            data.newMessages.forEach((msg) => {
                 messages.push(msg);
                 appendMessage(msg.role, msg.content);
             });
         }
     } catch (err) {
-        console.error('Error calling server:', err);
-        appendMessage('internal', 'Error calling server: ' + err.message);
+        console.error('Error calling server:', err); // eslint-disable-line no-console
+        appendMessage('internal', `Error calling server: ${err.message}`);
     }
+    spinner.style.display = 'none';
 }
 
-/** EVENT HANDLERS **/
+/** EVENT HANDLERS * */
 
 // Click the "Send" button
 sendBtn.addEventListener('click', () => {
@@ -101,7 +108,7 @@ sendBtn.addEventListener('click', () => {
 });
 
 // Press Enter to send
-queryInput.addEventListener('keydown', e => {
+queryInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
         sendBtn.click();
     }

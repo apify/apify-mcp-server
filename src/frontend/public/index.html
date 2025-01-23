@@ -20,23 +20,23 @@
             text-align: center;
         }
 
-        /* Chat wrapper container */
+        /* Chat wrapper */
         .chat-wrapper {
             width: 90%;
             max-width: 800px;
             display: flex;
             flex-direction: column;
-            background: #ffffff;
+            background: #fff;
             border: 1px solid #ccc;
             border-radius: 4px;
             box-shadow: 0 0 5px rgba(0,0,0,0.1);
             margin-bottom: 40px;
         }
 
-        /* Chat window (message display area) */
+        /* Chat window */
         #chatLog {
             flex: 1;
-            height: 600px; /* chat area height */
+            height: 600px;
             padding: 10px;
             overflow-y: auto;
             background: #fafafa;
@@ -49,8 +49,7 @@
             display: flex;
             margin: 8px 0;
         }
-
-        /* Align user messages on the right, assistant on the left, internal centered */
+        /* Align user messages right, assistant left, internal center */
         .user-message {
             justify-content: flex-end;
         }
@@ -71,7 +70,7 @@
             position: relative;
             margin: 0 10px;
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            white-space: pre-wrap;  /* preserve line breaks */
+            white-space: pre-wrap;
         }
 
         /* Different background colors for each role */
@@ -88,13 +87,15 @@
             color: #666;
         }
 
-        /* Input row at the bottom */
+        /* Input row at bottom */
         .input-row {
             display: flex;
+            align-items: center;
             padding: 10px;
-            border-radius: 0 0 4px 4px;
             background: #fff;
+            border-radius: 0 0 4px 4px;
         }
+
         #queryInput {
             flex: 1;
             padding: 10px;
@@ -103,6 +104,7 @@
             border: 1px solid #ccc;
             border-radius: 4px;
         }
+
         #sendBtn {
             font-size: 1rem;
             padding: 10px 20px;
@@ -111,25 +113,27 @@
             color: #fff;
             background: #007BFF;
             cursor: pointer;
+            margin-right: 10px;
         }
         #sendBtn:hover {
             background: #0069d9;
         }
 
-        /* Code styling */
-        pre {
-            background: #f5f2f0;
-            padding: 10px;
-            border-radius: 4px;
-            overflow-x: auto;
-            margin: 8px 0;
+        /* Spinner styling */
+        .spinner {
+            display: none; /* hidden by default */
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;   /* Light gray */
+            border-top: 3px solid #007BFF; /* Blue top */
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
         }
-        code {
-            font-family: Consolas, Monaco, 'Courier New', monospace;
-            background: #f0f0f0;
-            padding: 0.2rem 0.4rem;
-            border-radius: 3px;
+        @keyframes spin {
+            0%   { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
+
     </style>
 </head>
 <body>
@@ -139,14 +143,15 @@
     <!-- Chat messages container -->
     <div id="chatLog"></div>
 
-    <!-- Input area -->
+    <!-- Input area with spinner -->
     <div class="input-row">
         <input type="text" id="queryInput" placeholder="Type your query..." />
         <button id="sendBtn">Send</button>
+        <div id="spinner" class="spinner"></div>
     </div>
 </div>
 
-<!-- The client-side script that handles sending messages and updating the UI -->
+<!-- Client script -->
 <script src="client.js"></script>
 </body>
 </html>
