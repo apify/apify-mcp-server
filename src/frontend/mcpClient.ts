@@ -132,14 +132,13 @@ export class MCPClient {
      * Call the tool and return the response.
      */
     private async handleToolCall(content: ToolUseBlock, messages: MessageParam[], toolCallCount = 0): Promise<MessageParam[]> {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-
         messages.push({
             role: 'assistant',
             content: [
                 { id: content.id, input: content.input, name: content.name, type: 'tool_use' },
             ],
         });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const params = { name: content.name, arguments: content.input as any };
         console.log(`[internal] Calling tool (count: ${toolCallCount}): ${JSON.stringify(params)}`);
         let results;
