@@ -3,7 +3,6 @@
  * Connect to the MCP server using SSE transport and call a tool.
  * The Actors MCP Server will load default Actors.
  *
- * !!! NOT WORKING - This example needs to be fixed as it does not work !!!
  */
 
 import path from 'path';
@@ -15,15 +14,17 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import { EventSource } from 'eventsource';
 
+const REQUEST_TIMEOUT = 120_000; // 2 minutes
 // Resolve dirname equivalent in ES module
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 dotenv.config({ path: path.resolve(dirname, '../../.env') });
 
-const SERVER_URL = 'https://actors-mcp-server/sse';
+const SERVER_URL = 'https://actors-mcp-server.apify.actor/sse';
 // We need to change forward slash / to underscore _ in the tool name as Anthropic does not allow forward slashes in the tool name
 const SELECTED_TOOL = 'apify_rag-web-browser';
+const QUERY = 'web browser for Anthropic';
 
 if (!process.env.APIFY_TOKEN) {
     console.error('APIFY_TOKEN is required but not set in the environment variables.');
@@ -81,10 +82,10 @@ async function main(): Promise<void> {
         }
 
         // Call a tool
-        console.log('Calling actor ...');
+        console.log(`Calling actor ... ${SELECTED_TOOL}`);
         const result = await client.callTool(
-            { name: SELECTED_TOOL, arguments: { query: 'web browser for Anthropic' } },
-            CallToolResultSchema,
+            { name: SELECTED_TOOL, arguments: { query: QUERY } },
+            CallToolResultSchema,{ timeout: REQUEST_TIMEOUT }
         );
         console.log('Tool result:', JSON.stringify(result, null, 2));
     } catch (error: unknown) {
