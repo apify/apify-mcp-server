@@ -85,7 +85,8 @@ async function main(): Promise<void> {
         console.log(`Calling actor ... ${SELECTED_TOOL}`);
         const result = await client.callTool(
             { name: SELECTED_TOOL, arguments: { query: QUERY } },
-            CallToolResultSchema,{ timeout: REQUEST_TIMEOUT }
+            CallToolResultSchema,
+            { timeout: REQUEST_TIMEOUT },
         );
         console.log('Tool result:', JSON.stringify(result, null, 2));
     } catch (error: unknown) {
