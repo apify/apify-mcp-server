@@ -1,0 +1,72 @@
+.chat-container {
+    width: 400px;
+    height: 500px;
+    border: none;
+    margin: 20px auto;
+    font-family: sans-serif;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1); /* Add a subtle shadow */
+    border-radius: 5px; /* Add rounded corners */
+}
+
+.chat-header {
+    background-color: #E6F2FF;
+    padding: 15px;
+    text-align: center;
+    border-bottom: 1px solid #eee; /* Add a separator */
+}
+
+.chat-header h2 {
+    margin: 0; /* Remove default margin */
+    font-size: 1.2em;
+}
+
+.chat-output {
+    height: 350px;
+    overflow-y: scroll;
+    padding: 15px;
+    background-color: #F8F8FF;
+}
+
+.chat-output div {
+    margin-bottom: 10px;
+    padding: 8px 12px;
+    border-radius: 5px;
+}
+
+.chat-output .user {
+    background-color: #DCF8C6; /* Light green for user messages */
+    text-align: right;
+}
+
+.chat-output .assistant {
+    background-color: #fff; /* White for assistant messages */
+}
+
+.chat-input {
+    padding: 15px;
+    display: flex;
+    background-color: #F0FFFF;
+    border-top: 1px solid #eee; /* Add a separator */
+}
+
+#userInput {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ccc;
+    margin-right: 8px;
+    border-radius: 5px;
+}
+
+#sendButton {
+    background-color: #90EE90;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: background-color 0.3s; /* Add a smooth transition */
+}
+
+#sendButton:hover {
+    background-color: #7CCD7C; /* Slightly darker green on hover */
+}
