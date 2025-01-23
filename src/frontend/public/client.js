@@ -8,6 +8,102 @@ const spinner = document.getElementById('spinner');
 const messages = [];
 
 /**
+ * formatAnyContent(content):
+ *   - If content is a string -> run your normal markdown/HTML formatting.
+ *   - If it's an array -> check for tool-related messages, collapse them, etc.
+ *   - If it's an object -> show a JSON-encoded <pre> block.
+ */
+function formatAnyContent(content) {
+    // If you have a separate function that does markdown → HTML, keep it:
+    function formatMarkdown(text) {
+        let safe = text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+        // Then apply some naive markdown transforms:
+        // 1) Fenced code blocks: ```...```
+        safe = safe.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        // 2) Inline code: `...`
+        safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+        // 3) Bold: **text**
+        safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+        // 4) Italics: *text*
+        safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+        // 5) Replace newlines with <br>
+        safe = safe.replace(/\n/g, '<br>');
+        // 6) Replace markdown links [text](url) with <a href="url">text</a>
+        safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+
+        return safe;
+    }
+
+    // 1) If content is a simple string, just format it
+    if (typeof content === 'string') {
+        return formatMarkdown(content);
+    }
+
+    // 2) If content is an array, loop through each item
+    if (Array.isArray(content)) {
+        return content.map((item) => {
+            // e.g. detect "tool_use", "tool_result"
+            if (item.type === 'tool_use') {
+                // Display it collapsed
+                return `
+<details class="tool-block">
+  <summary>Tool use: <strong>${item.name}</strong></summary>
+  <div style="font-size: 0.9rem; margin: 6px 0;">
+    <strong>ID:</strong> ${item.id || 'unknown'}
+  </div>
+  <pre>${escapeHTML(JSON.stringify(item.input, null, 2))}</pre>
+</details>
+`;
+            } if (item.type === 'tool_result') {
+                // Try to parse the content as JSON, pretty-print
+                let parsed = null;
+                let pretty = '';
+                try {
+                    parsed = JSON.parse(item.content);
+                    pretty = JSON.stringify(parsed, null, 2);
+                } catch {
+                    // Fallback if not valid JSON
+                    pretty = item.content;
+                }
+
+                const summary = item.is_error ? 'Tool Result (Error)' : 'Tool Result';
+                return `
+<details class="tool-block">
+  <summary>${summary}</summary>
+  <pre>${escapeHTML(pretty)}</pre>
+</details>
+`;
+            }
+            // Otherwise, fallback to raw JSON
+            return `<pre>${JSON.stringify(item, null, 2)}</pre>`;
+        }).join('\n');
+    }
+
+    // 3) If content is a plain object, show JSON
+    if (typeof content === 'object' && content !== null) {
+        return `<pre>${JSON.stringify(content, null, 2)}</pre>`;
+    }
+
+    // 4) If all else fails, just coerce to string
+    return String(content);
+}
+
+/**
+ * A simple function to escape HTML special chars (used inside <pre> if needed).
+ */
+function escapeHTML(str) {
+    if (typeof str !== 'string') return String(str);
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+/**
  * Convert basic Markdown-like syntax to HTML.
  * - Replaces triple backticks ```...``` with <pre><code>...</code></pre>
  * - Replaces single backticks `...` with <code>...</code>
@@ -15,37 +111,11 @@ const messages = [];
  * - Replaces *italics* text
  * - Replaces newlines with <br> for better multiline display
  */
-function formatMessageContent(text) {
-    // Escape HTML special chars to avoid injection
-    let safe = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
-
-    // Then apply some naive markdown transforms:
-    // 1) Fenced code blocks: ```...```
-    safe = safe.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-    // 2) Inline code: `...`
-    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
-    // 3) Bold: **text**
-    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    // 4) Italics: *text*
-    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-    // 5) Replace newlines with <br>
-    safe = safe.replace(/\n/g, '<br>');
-    // 6) Replace markdown links [text](url) with <a href="url">text</a>
-    safe = safe.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-
-    return safe;
-}
 
 /**
  * Append a message to the chat log
  */
 function appendMessage(role, content) {
-
-    console.log('role:', role);
-    console.log('content:', content);
     const row = document.createElement('div');
     row.className = 'message-row';
 
@@ -62,7 +132,7 @@ function appendMessage(role, content) {
     bubble.className = `bubble ${role}`;
 
     // Transform markdown in the message text
-    bubble.innerHTML = formatMessageContent(content);
+    bubble.innerHTML = formatAnyContent(content);
 
     row.appendChild(bubble);
     chatLog.appendChild(row);

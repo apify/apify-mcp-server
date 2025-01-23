@@ -24,8 +24,8 @@ const REQUEST_TIMEOUT = 120_000; // 2 minutes
 const MAX_TOKENS = 2048; // Maximum tokens for Claude response
 
 // const CLAUDE_MODEL = 'claude-3-5-sonnet-20241022'; // the most intelligent model
-const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // a fastest model
-// const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact model for near-instant responsiveness
+// const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // a fastest model
+const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact model for near-instant responsiveness
 
 const SERVER_URL = 'http://localhost:3001/sse';
 
@@ -45,8 +45,7 @@ const SYSTEM_PROMPT = 'You are a helpful assistant with to tools called Actors\n
     + '5. Avoid simply repeating the raw data\n'
     + '\n'
     + 'Always use Actor not actor'
-    + 'Always replace underscore in Actor name by forward slash, i.e. apify/rag-web-browser not apify_rag-web-browser'
-    + 'Provide an URL to Actor whenever possible such as [apify/rag-web-browser](https://apify.com/apify/rag-web-browser)'
+    + 'Provide an URL to Actor whenever possible such as [apify_rag-web-browser](https://apify.com/apify/rag-web-browser)'
     + '\n'
     + 'REMEMBER Always limit number of results returned from Actors/tools. '
     + 'There is always parameter such as maxResults=1, maxPage=1, maxCrawledPlacesPerSearch=1, keep it to minimal value.'
@@ -123,11 +122,6 @@ export class MCPClient {
             if (content.type === 'text') {
                 messages.push({ role: 'assistant', content: content.text });
             } else if (content.type === 'tool_use') {
-                messages.push({
-                    role: 'assistant', content: [
-                        {id: content.id, input: content.input, name: content.name, type: 'tool_use', }
-                    ]
-                })
                 await this.handleToolCall(content, messages);
             }
         }
@@ -139,6 +133,13 @@ export class MCPClient {
      */
     private async handleToolCall(content: ToolUseBlock, messages: MessageParam[], toolCallCount = 0): Promise<MessageParam[]> {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
+        messages.push({
+            role: 'assistant',
+            content: [
+                { id: content.id, input: content.input, name: content.name, type: 'tool_use' },
+            ],
+        });
         const params = { name: content.name, arguments: content.input as any };
         console.log(`[internal] Calling tool (count: ${toolCallCount}): ${JSON.stringify(params)}`);
         let results;
