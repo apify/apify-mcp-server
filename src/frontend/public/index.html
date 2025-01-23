@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8" />
-    <title>MCP Simple UI</title>
+    <title>MCP Client for Apify Actors</title>
     <style>
         /* General layout */
         body {
@@ -36,7 +36,7 @@
         /* Chat window (message display area) */
         #chatLog {
             flex: 1;
-            height: 600px; /* Increased height */
+            height: 600px; /* chat area height */
             padding: 10px;
             overflow-y: auto;
             background: #fafafa;
@@ -115,10 +115,25 @@
         #sendBtn:hover {
             background: #0069d9;
         }
+
+        /* Code styling */
+        pre {
+            background: #f5f2f0;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        code {
+            font-family: Consolas, Monaco, 'Courier New', monospace;
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
-<h1>Simple MCP UI</h1>
+<h1>MCP Client for Apify Actors</h1>
 
 <div class="chat-wrapper">
     <!-- Chat messages container -->

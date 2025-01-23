@@ -1,58 +1,97 @@
+// client.js
 const chatLog = document.getElementById('chatLog');
 const queryInput = document.getElementById('queryInput');
 const sendBtn = document.getElementById('sendBtn');
 
-// Keep track of all messages (system, user, assistant).
-const messages = [];
+// Keep track of all messages
+let messages = [];
 
-// Helper function to append a message to the chat log
+/**
+ * Convert basic Markdown-like syntax to HTML.
+ * - Replaces triple backticks ```...``` with <pre><code>...</code></pre>
+ * - Replaces single backticks `...` with <code>...</code>
+ * - Replaces **bold** text
+ * - Replaces *italics* text
+ * - Replaces newlines with <br> for better multiline display
+ */
+function formatMessageContent(text) {
+    // Escape HTML special chars to avoid injection
+    let safe = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Then apply some naive markdown transforms:
+    // 1) Fenced code blocks: ```...```
+    safe = safe.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+    // 2) Inline code: `...`
+    safe = safe.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // 3) Bold: **text**
+    safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // 4) Italics: *text*
+    safe = safe.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    // 5) Replace newlines with <br>
+    safe = safe.replace(/\n/g, "<br>");
+
+    return safe;
+}
+
+/**
+ * Append a message to the chat log
+ */
 function appendMessage(role, content) {
+    // Create row container
     const row = document.createElement('div');
     row.className = 'message-row';
-    let roleClass;
-    if (role === 'assistant') {
-        roleClass = 'assistant';
-    } else if (role === 'user') {
-        roleClass = 'user';
+
+    if (role === 'user') {
+        row.classList.add('user-message');
+    } else if (role === 'assistant') {
+        row.classList.add('assistant-message');
     } else {
-        roleClass = 'internal';
+        row.classList.add('internal-message');
     }
-    row.innerHTML = `<strong class="${roleClass}">${role}:</strong> ${content}`;
+
+    // Create the bubble
+    const bubble = document.createElement('div');
+    bubble.className = `bubble ${role}`;
+
+    // Transform markdown in the message text
+    bubble.innerHTML = formatMessageContent(content);
+
+    row.appendChild(bubble);
     chatLog.appendChild(row);
+
+    // Scroll to the bottom
     chatLog.scrollTop = chatLog.scrollHeight;
 }
 
-// Handle sending the user’s query to the server
+/**
+ * Send a message to the server
+ */
 async function sendQuery(query) {
-    // 1. Add to our in-memory "messages"
-    messages.push({ role: 'user', content: query });
-    appendMessage('user', query);
-    console.log('Messages:', messages); // eslint-disable-line no-console
-
-    // 2. Send to server
     try {
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query, messages }),
+            body: JSON.stringify({ query, messages })
         });
         const data = await response.json();
-        console.log('Data:', data); // eslint-disable-line no-console
         if (data && data.newMessages) {
-            // newMessages are the newly generated messages from server (assistant or "internal" placeholders, etc.)
-            data.newMessages.forEach((msg) => {
+            data.newMessages.forEach(msg => {
                 messages.push(msg);
-                // Show them in UI
                 appendMessage(msg.role, msg.content);
             });
         }
     } catch (err) {
-        console.error('Error:', err); // eslint-disable-line no-console
-        appendMessage('internal', `Error calling server: ${err.message}`);
+        console.error('Error calling server:', err);
+        appendMessage('internal', 'Error calling server: ' + err.message);
     }
 }
 
-// Click/Enter handlers
+/** EVENT HANDLERS **/
+
+// Click the "Send" button
 sendBtn.addEventListener('click', () => {
     const query = queryInput.value.trim();
     if (query) {
@@ -60,7 +99,9 @@ sendBtn.addEventListener('click', () => {
         queryInput.value = '';
     }
 });
-queryInput.addEventListener('keydown', (e) => {
+
+// Press Enter to send
+queryInput.addEventListener('keydown', e => {
     if (e.key === 'Enter') {
         sendBtn.click();
     }

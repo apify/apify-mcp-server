@@ -29,6 +29,28 @@ const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact mo
 
 const SERVER_URL = 'http://localhost:3001/sse';
 
+const SYSTEM_PROMPT = 'You are a helpful assistant with to tools called Actors\n' +
+    '\n' +
+    'Choose the appropriate tool based on the user\'s question. If no tool is needed, reply directly.\n' +
+    '\n' +
+    'IMPORTANT: When you need to use a tool, explain how the tools was used and with which parameters\n' +
+    'IMPORTANT: When a tool was called, the message starts with [internal] and is submitted by user' +
+    '\n' +
+    'After receiving a tool\'s response:\n' +
+    '1. Transform the raw data into a natural, conversational response\n' +
+    '2. Keep responses concise but informative\n' +
+    '3. Focus on the most relevant information\n' +
+    '4. Use appropriate context from the user\'s question\n' +
+    '5. Avoid simply repeating the raw data\n' +
+    '\n' +
+    'Always use Actor not actor' +
+    'Always replace underscore in Actor name by forward slash, i.e. apify/rag-web-browser not apify_rag-web-browser' +
+    'Provide an URL to Actor whenever possible such as [apify/rag-web-browser](https://apify.com/apify/rag-web-browser)' +
+    '\n' +
+    'REMEMBER Always limit number of results returned from Actors/tools. ' +
+    'There is always parameter such as maxResults=1, maxPage=1, maxCrawledPlacesPerSearch=1, keep it to minimal value.' +
+    'Otherwise tool execution takes long and result is huge!'
+
 if (typeof globalThis.EventSource === 'undefined') {
     globalThis.EventSource = EventSource as unknown as typeof globalThis.EventSource;
 }
@@ -118,7 +140,8 @@ export class MCPClient {
             results = await this.client.callTool(params, CallToolResultSchema, { timeout: REQUEST_TIMEOUT });
             if (results.content instanceof Array && results.content.length !== 0) {
                 const text = results.content.map((x) => x.text);
-                messages.push({ role: 'user', content: `Tool result: ${text.join('\n\n')}` });
+                messages.push({ role: 'user', content: `[internal] Calling tool ${JSON.stringify(params)}`});
+                messages.push({ role: 'user', content: `[internal] Tool result: ${text.join('\n\n')}` });
             } else {
                 messages.push({ role: 'user', content: `No results retrieved from ${params.name}` });
             }
@@ -154,6 +177,7 @@ export class MCPClient {
             model: CLAUDE_MODEL,
             max_tokens: MAX_TOKENS,
             messages,
+            system: SYSTEM_PROMPT,
             tools: this.tools as any[], // eslint-disable-line @typescript-eslint/no-explicit-any
         });
         console.log('[internal] Received response from Claude:', JSON.stringify(response.content));
