@@ -1,9 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <title>MCP Client for Apify Actors</title>
     <style>
+        /* -- Apify-inspired Colors -- */
+        /* The main brand color: */
+        :root {
+            --apify-brand: #FF9011;
+            --apify-brand-hover: #e57f0d; /* slightly darker for hover */
+            --assistant-bg: #f1ecec;      /* neutral gray for assistant bubble */
+            --user-bg: #ffe2c4;          /* a lighter orange for user bubble */
+            --internal-bg: #f0f0f0;      /* general internal bubble color */
+        }
+
         /* General layout */
         body {
             font-family: sans-serif;
@@ -18,6 +28,7 @@
         h1 {
             margin: 20px;
             text-align: center;
+            color: #333;
         }
 
         /* Chat wrapper */
@@ -72,18 +83,17 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.1);
             white-space: pre-wrap;
         }
-
         /* Different background colors for each role */
         .bubble.user {
-            background: #d2ebff;
+            background: var(--user-bg);
             color: #333;
         }
         .bubble.assistant {
-            background: #d2ffd6;
+            background: var(--assistant-bg);
             color: #333;
         }
         .bubble.internal {
-            background: #f0f0f0;
+            background: var(--internal-bg);
             color: #666;
         }
 
@@ -111,28 +121,13 @@
             border: none;
             border-radius: 4px;
             color: #fff;
-            background: #007BFF;
+            background: var(--apify-brand);
             cursor: pointer;
             margin-right: 10px;
+            transition: background 0.2s ease;
         }
         #sendBtn:hover {
-            background: #0069d9;
-        }
-
-        .tool-block {
-            margin: 8px 0;
-        }
-        .tool-block summary {
-            cursor: pointer;
-            font-size: 0.95rem;
-            color: #333;
-            outline: none;
-        }
-        .tool-block pre {
-            background: #f5f2f0;
-            padding: 8px;
-            border-radius: 4px;
-            overflow-x: auto;
+            background: var(--apify-brand-hover);
         }
 
         /* Spinner styling */
@@ -140,8 +135,8 @@
             display: none; /* hidden by default */
             width: 20px;
             height: 20px;
-            border: 3px solid #f3f3f3;   /* Light gray */
-            border-top: 3px solid #007BFF; /* Blue top */
+            border: 3px solid #f3f3f3;       /* Light gray */
+            border-top: 3px solid var(--apify-brand); /* Apify brand color for top */
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
@@ -150,6 +145,37 @@
             100% { transform: rotate(360deg); }
         }
 
+        /* Code styling (if you use markdown code blocks) */
+        pre {
+            background: #f5f2f0;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 8px 0;
+        }
+        code {
+            font-family: Consolas, Monaco, 'Courier New', monospace;
+            background: #f0f0f0;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+        }
+
+        /* Optional: details styling if you have collapsible blocks for tool results */
+        details.tool-block {
+            margin: 8px 0;
+        }
+        details.tool-block summary {
+            cursor: pointer;
+            font-size: 0.95rem;
+            color: #333;
+            outline: none;
+        }
+        details.tool-block pre {
+            background: #f5f2f0;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
     </style>
 </head>
 <body>
@@ -161,7 +187,7 @@
 
     <!-- Input area with spinner -->
     <div class="input-row">
-        <input type="text" id="queryInput" placeholder="Type your query..." />
+        <input type="text" id="queryInput" placeholder=" your query such as What Actors I can use?" />
         <button id="sendBtn">Send</button>
         <div id="spinner" class="spinner"></div>
     </div>
