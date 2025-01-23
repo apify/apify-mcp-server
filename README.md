@@ -273,6 +273,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
 In the `examples` directory, you can find two clients that interact with the server via
 standard input/output (stdio):
+
 1. [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts)
     This client script starts the MCP server with two specified Actors.
     It then calls the `apify/rag-web-browser` tool with a query and prints the result.
@@ -305,12 +306,12 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 ## Local client (SSE)
 
-To test the server with the SSE transport, you can use python script `examples/client_sse.py`:
+To test the server with the SSE transport, you can use python script `examples/clientSse.ts`:
 Currently, the node.js client does not support to establish a connection to remote server witch custom headers.
 You need to change URL to your local server URL in the script.
 
 ```bash
-python src/examples/client_sse.py
+node dist/examples/clientSse.js
 ```
 
 ## Debugging
