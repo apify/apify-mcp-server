@@ -35,7 +35,9 @@
     "apify": "^3.2.6",
     "apify-client": "^2.11.1",
     "express": "^4.21.2",
-    "minimist": "^1.2.8"
+    "minimist": "^1.2.8",
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.33.1",

@@ -14,6 +14,20 @@
                 "lukaskrivka/google-maps-with-contact-details"
             ]
         },
+        "enableActorDiscovery": {
+            "title": "Enable Actor discovery based on your use-case (experimental)",
+            "type": "boolean",
+            "description": "If enabled, the server will automatically discover available Actors for your use case.\n\nThis feature is experimental and may not work as expected.",
+            "default": false
+        },
+        "maxActorMemoryBytes": {
+            "title": "Limit the maximum memory used by an Actor",
+            "type": "string",
+            "description": "Limit the maximum memory used by an Actor in bytes. This is important setting for Free plan users to avoid exceeding the memory limit.",
+            "editor": "integer",
+            "prefill": 4096,
+            "default": 4096
+        },
         "debugActor": {
             "title": "Debug Actor",
             "type": "string",

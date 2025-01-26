@@ -7,8 +7,9 @@ import type { ActorCallOptions } from 'apify-client';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { HEADER_READINESS_PROBE, MAX_MEMORY_MBYTES, Routes } from './const.js';
+import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
+import { getInternalTools } from './internalActorTools.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
 import type { Input } from './types.js';
@@ -36,7 +37,7 @@ async function processParamsAndUpdateTools(url: string) {
     const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
     delete params.token;
     log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-    const input = await processInput(params as Input);
+    const input = await processInput(params as unknown as Input);
     if (input.actors) {
         await mcpServer.addToolsFromActors(input.actors as string[]);
     } else {
@@ -107,6 +108,9 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
+    if (input.enableActorDiscovery) {
+        mcpServer.updateTools(getInternalTools());
+    }
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });
@@ -116,7 +120,7 @@ if (STANDBY_MODE) {
     if (input && !input.debugActor && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
     }
-    const options = { memory: MAX_MEMORY_MBYTES } as ActorCallOptions;
+    const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
     await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, options);
     await Actor.exit();
 }

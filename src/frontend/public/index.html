@@ -106,8 +106,10 @@
             border-radius: 0 0 4px 4px;
         }
 
+        /* The textarea now takes place of the previous input */
         #queryInput {
             flex: 1;
+            resize: vertical; /* allow user to manually resize if desired */
             padding: 10px;
             margin-right: 8px;
             font-size: 1rem;
@@ -187,7 +189,8 @@
 
     <!-- Input area with spinner -->
     <div class="input-row">
-        <input type="text" id="queryInput" placeholder=" your query such as What Actors I can use?" />
+        <!-- Use a textarea for multiline input -->
+        <textarea id="queryInput" rows="2" placeholder="Type your query..."></textarea>
         <button id="sendBtn">Send</button>
         <div id="spinner" class="spinner"></div>
     </div>

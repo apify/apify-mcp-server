@@ -11,17 +11,25 @@ import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { getActorsAsTools } from './actorDefinition.js';
+import { filterSchemaProperties, getActorDefinition, getActorsAsTools, shortenProperties } from './actorDefinition.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     defaults,
+    InternalTools,
     SERVER_NAME,
     SERVER_VERSION,
     USER_AGENT_ORIGIN,
 } from './const.js';
+import {
+    RemoveActorToolArgsSchema,
+    AddActorToToolsArgsSchema,
+    DiscoverActorsArgsSchema,
+    searchActorsByKeywords,
+    GetActorDefinition,
+} from './internalActorTools.js';
 import { log } from './logger.js';
-import type { Tool } from './types';
+import type { SchemaProperties, Tool } from './types.js';
 
 /**
  * Create Apify MCP server
@@ -29,8 +37,9 @@ import type { Tool } from './types';
 export class ApifyMcpServer {
     private server: Server;
     private tools: Map<string, Tool>;
+    private maxMemoryMbytes: number;
 
-    constructor() {
+    constructor(memoryMbytes: number = defaults.maxMemoryMbytes) {
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -43,6 +52,7 @@ export class ApifyMcpServer {
             },
         );
         this.tools = new Map();
+        this.maxMemoryMbytes = memoryMbytes;
         this.setupErrorHandling();
         this.setupToolHandlers();
     }
@@ -79,16 +89,17 @@ export class ApifyMcpServer {
         if (!process.env.APIFY_TOKEN) {
             throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         }
+        const name = actorName.replace('_', '/');
         try {
-            log.info(`Calling actor ${actorName} with input: ${JSON.stringify(input)}`);
+            log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
 
             const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
             const client = new ApifyClient({ ...options, token: process.env.APIFY_TOKEN });
-            const actorClient = client.actor(actorName);
+            const actorClient = client.actor(name);
 
             const results = await actorClient.call(input, callOptions);
             const dataset = await client.dataset(results.defaultDatasetId).listItems();
-            log.info(`Actor ${actorName} finished with ${dataset.items.length} items`);
+            log.info(`Actor ${name} finished with ${dataset.items.length} items`);
 
             if (process.env.APIFY_IS_AT_HOME) {
                 await Actor.pushData(dataset.items);
@@ -96,7 +107,7 @@ export class ApifyMcpServer {
             }
             return dataset.items;
         } catch (error) {
-            log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
+            log.error(`Error calling actor: ${error}. Actor: ${name}, input: ${JSON.stringify(input)}`);
             throw new Error(`Error calling actor: ${error}`);
         }
     }
@@ -149,20 +160,56 @@ export class ApifyMcpServer {
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }
+            if (!args) {
+                throw new Error(`Missing arguments for tool: ${name}`);
+            }
             log.info(`Validate arguments for tool: ${tool.name} with arguments: ${JSON.stringify(args)}`);
             if (!tool.ajvValidate(args)) {
                 throw new Error(`Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`);
             }
 
             try {
-                const items = await this.callActorGetDataset(tool.actorName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
-                const content = items.map((item) => {
-                    const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
-                    return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
-                        ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
-                        : { type: 'text', text };
-                });
-                return { content };
+                switch (name) {
+                    case InternalTools.ADD_ACTOR_TO_TOOLS: {
+                        const parsed = AddActorToToolsArgsSchema.parse(args);
+                        await this.addToolsFromActors([parsed.name.replace('_', '/')]);
+                        return { content: [{ type: 'text', text: `Actor ${args.name} was added to tools` }] };
+                    }
+                    case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
+                        const parsed = RemoveActorToolArgsSchema.parse(args);
+                        this.tools.delete(parsed.name.replace('/', '_'));
+                        return { content: [{ type: 'text', text: `Actor ${args.name} was removed from tools` }] };
+                    }
+                    case InternalTools.DISCOVER_ACTORS: {
+                        const parsed = DiscoverActorsArgsSchema.parse(args);
+                        const actors = await searchActorsByKeywords(
+                            parsed.search,
+                            parsed.limit,
+                            parsed.offset,
+                        );
+                        return { content: actors?.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
+                    }
+                    case InternalTools.GET_ACTOR_DETAILS: {
+                        const parsed = GetActorDefinition.parse(args);
+                        const v = await getActorDefinition(parsed.name.replace('_', '/'));
+                        if (v && v.input && 'properties' in v.input && v.input) {
+                            const properties = filterSchemaProperties(v.input.properties as { [key: string]: SchemaProperties });
+                            v.input.properties = shortenProperties(properties);
+                        }
+                        const actorDefinitionShort = { description: v?.description, readme: v?.readme, input: v?.input };
+                        return { content: [{ type: 'text', text: JSON.stringify(actorDefinitionShort) }] };
+                    }
+                    default: {
+                        const items = await this.callActorGetDataset(tool.actorName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
+                        const content = items.map((item) => {
+                            const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
+                            return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
+                                ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
+                                : { type: 'text', text };
+                        });
+                        return { content };
+                    }
+                }
             } catch (error) {
                 log.error(`Error calling tool: ${error}`);
                 throw new Error(`Error calling tool: ${error}`);

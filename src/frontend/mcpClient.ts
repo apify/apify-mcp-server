@@ -15,6 +15,8 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import { EventSource } from 'eventsource';
 
+import { MAX_TOOL_CALL_COUNT } from '../const.js';
+
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
@@ -29,13 +31,16 @@ const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact mo
 
 const SERVER_URL = 'http://localhost:3001/sse';
 
-const SYSTEM_PROMPT = 'You are a helpful assistant with to tools called Actors\n'
+const SYSTEM_PROMPT = 'You are a helpful Apify assistant with to tools called Actors\n'
+    + '\n'
+    + 'Your goal is to help users discover the best Actors for their needs\n'
+    + 'You have access to a list of tools that can help you to discover Actor, find details and include them among tools for later execution\n'
     + '\n'
     + 'Choose the appropriate tool based on the user\'s question. If no tool is needed, reply directly.\n'
+    + 'Prefer tools from Apify as they are generally more reliable and have better support\n'
     + '\n'
     + 'When you need to use a tool, explain how the tools was used and with which parameters\n'
     + 'Never call a tool unless it is required by user!\n'
-    + 'IMPORTANT: When a tool was called, the message starts with [internal] and its role is user but it was actually submitted by a tool\n'
     + '\n'
     + 'After receiving a tool\'s response:\n'
     + '1. Transform the raw data into a natural, conversational response\n'
@@ -101,9 +106,11 @@ export class MCPClient {
             },
         );
         await this.client.connect(transport);
+        await this.updateTools();
+    }
 
+    async updateTools() {
         const response = await this.client.listTools();
-
         this.tools = response.tools.map((x) => ({
             name: x.name,
             description: x.description,
@@ -178,6 +185,8 @@ export class MCPClient {
             });
         }
         console.log(`[internal] Received response`);
+        console.log(`[internal] Send response`);
+        await this.updateTools(); // update tools in the case a new tool was added
         // Get next response from Claude
         const nextResponse: Message = await this.anthropic.messages.create({
             model: CLAUDE_MODEL,
@@ -190,11 +199,11 @@ export class MCPClient {
         for (const c of nextResponse.content) {
             if (c.type === 'text') {
                 messages.push({ role: 'assistant', content: c.text });
-            } else if (c.type === 'tool_use' && toolCallCount < 3) {
+            } else if (c.type === 'tool_use' && toolCallCount < MAX_TOOL_CALL_COUNT) {
                 return await this.handleToolCall(c, messages, toolCallCount + 1);
             }
         }
-
+        console.log(`[internal] Return messages`);
         return messages;
     }
 

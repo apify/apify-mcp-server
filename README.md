@@ -335,7 +335,7 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 
 ## ⓘ Limitations and feedback
 
-To limit the context size the properties in the `input schema` are pruned and description is truncated to 200 characters.
+To limit the context size the properties in the `input schema` are pruned and description is truncated to 500 characters.
 Enum fields and titles are truncated to max 50 options.
 
 Memory for each Actor is limited to 4GB.
@@ -346,6 +346,5 @@ If you need other features or have any feedback, please [submit an issue](https:
 # 🚀 Roadmap (January 2025)
 
 - Document examples for [LibreChat](https://www.librechat.ai/).
-- Provide tools to search for Actors and load them as needed.
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.

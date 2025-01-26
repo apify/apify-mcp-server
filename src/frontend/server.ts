@@ -31,7 +31,7 @@ let isConnected = false;
  */
 app.post('/api/chat', async (req: Request, res: Response) : Promise<Response> => {
     try {
-        console.log('Received POST /api/chat:', req.body); // eslint-disable-line no-console
+        console.log('Received POST /api/chat:'); // eslint-disable-line no-console
         const { query, messages } = req.body;
         if (!isConnected) {
             // Connect to server once, the same way your original code does
