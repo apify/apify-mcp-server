@@ -66,7 +66,7 @@ export function getActorAutoLoadingTools(): Tool[] {
             inputSchema: zodToJsonSchema(RemoveActorToolArgsSchema),
             ajvValidate: ajv.compile(zodToJsonSchema(RemoveActorToolArgsSchema)),
         },
-        ]
+    ];
 }
 
 export function getActorDiscoveryTools(): Tool[] {

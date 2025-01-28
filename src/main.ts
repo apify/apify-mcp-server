@@ -11,7 +11,7 @@ import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
-import {getActorDiscoveryTools, getActorAutoLoadingTools} from './tools.js';
+import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
 import type { Input } from './types.js';
 
 await Actor.init();
