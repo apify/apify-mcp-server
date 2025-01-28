@@ -9,9 +9,9 @@ import express from 'express';
 
 import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
-import { getInternalTools } from './internalActorTools.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
+import {getActorDiscoveryTools, getActorAutoLoadingTools} from './tools.js';
 import type { Input } from './types.js';
 
 await Actor.init();
@@ -108,8 +108,9 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
-    if (input.enableActorDiscovery) {
-        mcpServer.updateTools(getInternalTools());
+    mcpServer.updateTools(getActorDiscoveryTools());
+    if (input.enableActorAutoLoading) {
+        mcpServer.updateTools(getActorAutoLoadingTools());
     }
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);

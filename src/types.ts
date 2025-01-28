@@ -3,7 +3,7 @@ import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
 export type Input = {
     actors: string[] | string;
-    enableActorDiscovery?: boolean;
+    enableActorAutoLoading?: boolean;
     maxActorMemoryBytes?: number;
     debugActor?: string;
     debugActorInput?: unknown;
@@ -20,7 +20,7 @@ export interface Tool {
     description: string;
     inputSchema: object;
     ajvValidate: ValidateFunction;
-    memoryMbytes: number;
+    memoryMbytes?: number;
 }
 
 export interface SchemaProperties {

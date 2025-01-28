@@ -14,10 +14,10 @@
                 "lukaskrivka/google-maps-with-contact-details"
             ]
         },
-        "enableActorDiscovery": {
-            "title": "Enable Actor discovery based on your use-case (experimental)",
+        "enableActorAutoLoading": {
+            "title": "Enable automatic loading of Actors based on context and use-case (experimental, check if it supported by your client)",
             "type": "boolean",
-            "description": "If enabled, the server will automatically discover available Actors for your use case.\n\nThis feature is experimental and may not work as expected.",
+             "description": "When enabled, the server can dynamically add Actors as tools based on user requests and context. \n\nNote: Not all MCP clients support this feature. To try it, you can use the [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client). This is an experimental feature and may require client-specific support.",
             "default": false
         },
         "maxActorMemoryBytes": {
@@ -42,7 +42,7 @@
             "description": "Specify the input for the Actor that will be used for debugging in normal mode",
             "editor": "json",
             "prefill": {
-                "query": "hello world"
+            "query": "hello world"
             }
         }
     }

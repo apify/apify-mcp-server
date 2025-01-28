@@ -11,7 +11,7 @@ import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { filterSchemaProperties, getActorDefinition, getActorsAsTools, shortenProperties } from './actorDefinition.js';
+import { filterSchemaProperties, getActorDefinition, getActorsAsTools, shortenProperties } from './actors.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
@@ -21,14 +21,14 @@ import {
     SERVER_VERSION,
     USER_AGENT_ORIGIN,
 } from './const.js';
+import { log } from './logger.js';
 import {
     RemoveActorToolArgsSchema,
     AddActorToToolsArgsSchema,
     DiscoverActorsArgsSchema,
     searchActorsByKeywords,
     GetActorDefinition,
-} from './internalActorTools.js';
-import { log } from './logger.js';
+} from './tools.js';
 import type { SchemaProperties, Tool } from './types.js';
 
 /**
@@ -37,9 +37,8 @@ import type { SchemaProperties, Tool } from './types.js';
 export class ApifyMcpServer {
     private server: Server;
     private tools: Map<string, Tool>;
-    private maxMemoryMbytes: number;
 
-    constructor(memoryMbytes: number = defaults.maxMemoryMbytes) {
+    constructor() {
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -52,7 +51,6 @@ export class ApifyMcpServer {
             },
         );
         this.tools = new Map();
-        this.maxMemoryMbytes = memoryMbytes;
         this.setupErrorHandling();
         this.setupToolHandlers();
     }

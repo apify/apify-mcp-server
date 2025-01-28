@@ -1,7 +1,7 @@
 import { Ajv } from 'ajv';
 import { ApifyClient } from 'apify-client';
 
-import { defaults, MAX_DESCRIPTION_LENGTH } from './const.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH } from './const.js';
 import { log } from './logger.js';
 import type { ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
 
@@ -106,7 +106,7 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
                 tools.push({
                     name: result.name.replace('/', '_'),
                     actorName: result.name,
-                    description: result.description,
+                    description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                     inputSchema: result.input || {},
                     ajvValidate: ajv.compile(result.input || {}),
                     memoryMbytes: memoryMbytes > defaults.maxMemoryMbytes ? defaults.maxMemoryMbytes : memoryMbytes,

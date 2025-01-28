@@ -6,8 +6,8 @@ Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
 The server can be used in two ways:
-- 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP protocol via Server-Sent Events.
-- ⾕ **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
+- 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP and can be accessed via Server-Sent Events (SSE).
+- ⾕ **Apify MCP Server Stdio**: runs the server locally with MCP via standard input/output (stdio).
 
 # 🎯 What does Apify MCP server do?
 
@@ -19,8 +19,15 @@ For example it can:
 - use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments
 - use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content
 
+# MCP Clients
 
-To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [LibreChat](https://www.librechat.ai/), or other [MCP clients](https://glama.ai/mcp/clients).
+To interact with the Apify MCP server, you can use MCP clients such as:
+- [Claude Desktop](https://claude.ai/download) (only Stdio support)
+- [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yeah without Authorization header))
+- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
+- other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
+- more clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
+
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
 
 When you have Actors integrated with the MCP server, you can ask:
@@ -54,6 +61,8 @@ To learn more, check out the blog post: [What are AI Agents?](https://blog.apify
 
 ## Tools
 
+### Actors
+
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing Actor input.
 
@@ -78,6 +87,19 @@ For example, for the `apify/rag-web-browser` Actor, the arguments are:
 You don't need to specify the input parameters or which Actor to call, everything is managed by an LLM.
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
+
+### Helper tools
+
+The server provides a set of helper tools to discover available Actors and retrieve their details:
+- `get-actor-details`: Retrieves documentation, input schema, and other details about a specific Actor.
+- `discover-actors`: Searches for relevant Actors using keywords and returns their details.
+
+There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to manage the tools list, which is typically not supported.
+
+You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor. To enable it, set the `enableActorAutoLoading` parameter.
+
+- `add-actor-as-tool`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
+- `remove-actor-from-tool`: Removes an Actor by name from the available tools list when it's no longer needed.
 
 ## Prompt & Resources
 

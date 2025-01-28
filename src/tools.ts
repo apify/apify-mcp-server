@@ -46,20 +46,9 @@ export const GetActorDefinition = z.object({
         + 'For example, username, name that leads to username_name. Never use name or username only'),
 });
 
-export function getInternalTools(): Tool[] {
+export function getActorAutoLoadingTools(): Tool[] {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     return [
-        {
-            name: InternalTools.DISCOVER_ACTORS,
-            actorName: InternalTools.DISCOVER_ACTORS,
-            description: `Discover available Actors using full text search using keywords.`
-                + `Users try to discover Actors using free form query in this case search query needs to be converted to full text search. `
-                + `Prefer Actors from Apify as they are generally more reliable and have better support. `
-                + `Returns a list of Actors with name, description, statistics, and URL. `
-                + `Always limit number of results returned but ensure that the most relevant results are returned. `,
-            inputSchema: zodToJsonSchema(DiscoverActorsArgsSchema),
-            ajvValidate: ajv.compile(zodToJsonSchema(DiscoverActorsArgsSchema)),
-        },
         {
             name: InternalTools.ADD_ACTOR_TO_TOOLS,
             actorName: InternalTools.ADD_ACTOR_TO_TOOLS,
@@ -76,6 +65,23 @@ export function getInternalTools(): Tool[] {
                 + 'For example, when user says, I do not need a tool username_name anymore',
             inputSchema: zodToJsonSchema(RemoveActorToolArgsSchema),
             ajvValidate: ajv.compile(zodToJsonSchema(RemoveActorToolArgsSchema)),
+        },
+        ]
+}
+
+export function getActorDiscoveryTools(): Tool[] {
+    const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+    return [
+        {
+            name: InternalTools.DISCOVER_ACTORS,
+            actorName: InternalTools.DISCOVER_ACTORS,
+            description: `Discover available Actors using full text search using keywords.`
+                + `Users try to discover Actors using free form query in this case search query needs to be converted to full text search. `
+                + `Prefer Actors from Apify as they are generally more reliable and have better support. `
+                + `Returns a list of Actors with name, description, statistics, and URL. `
+                + `Always limit number of results returned but ensure that the most relevant results are returned. `,
+            inputSchema: zodToJsonSchema(DiscoverActorsArgsSchema),
+            ajvValidate: ajv.compile(zodToJsonSchema(DiscoverActorsArgsSchema)),
         },
         {
             name: InternalTools.GET_ACTOR_DETAILS,
