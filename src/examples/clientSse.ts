@@ -3,6 +3,7 @@
  * Connect to the MCP server using SSE transport and call a tool.
  * The Actors MCP Server will load default Actors.
  *
+ * It requires the `APIFY_TOKEN` in the `.env` file.
  */
 
 import path from 'path';
@@ -15,7 +16,6 @@ import dotenv from 'dotenv';
 import { EventSource } from 'eventsource';
 
 const REQUEST_TIMEOUT = 120_000; // 2 minutes
-// Resolve dirname equivalent in ES module
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 

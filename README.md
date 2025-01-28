@@ -9,7 +9,7 @@ The server can be used in two ways:
 - 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP and can be accessed via Server-Sent Events (SSE).
 - ⾕ **Apify MCP Server Stdio**: runs the server locally with MCP via standard input/output (stdio).
 
-You can test the MCP server using [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+You can test the MCP server using [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 
 # 🎯 What does Apify MCP server do?
 
@@ -134,10 +134,13 @@ https://actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
 
 You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
 
-#### 💬 Interact with the MCP Server
+#### 💬 Interact with the MCP Server over SSE
 
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
-You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
+The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
+
+Other clients do not support SSE yet, but this will likely change.
+Please verify if MCP clients such ass [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/) support SSE with custom headers.
 ([Claude Desktop](https://claude.ai/download) does not support SSE transport yet, see [Claude Desktop Configuration](#claude-desktop) section for more details).
 
 In the client settings you need to provide server configuration:
@@ -365,10 +368,9 @@ Enum fields and titles are truncated to max 50 options.
 Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
 
-If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
+If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
 
 # 🚀 Roadmap (January 2025)
 
-- Document examples for [LibreChat](https://www.librechat.ai/).
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
