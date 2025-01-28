@@ -17,14 +17,13 @@
         "enableActorAutoLoading": {
             "title": "Enable automatic loading of Actors based on context and use-case (experimental, check if it supported by your client)",
             "type": "boolean",
-             "description": "When enabled, the server can dynamically add Actors as tools based on user requests and context. \n\nNote: Not all MCP clients support this feature. To try it, you can use the [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client). This is an experimental feature and may require client-specific support.",
+            "description": "When enabled, the server can dynamically add Actors as tools based on user requests and context. \n\nNote: Not all MCP clients support this feature. To try it, you can use the [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client). This is an experimental feature and may require client-specific support.",
             "default": false
         },
         "maxActorMemoryBytes": {
             "title": "Limit the maximum memory used by an Actor",
-            "type": "string",
+            "type": "integer",
             "description": "Limit the maximum memory used by an Actor in bytes. This is important setting for Free plan users to avoid exceeding the memory limit.",
-            "editor": "integer",
             "prefill": 4096,
             "default": 4096
         },
