@@ -23,6 +23,11 @@ log.setLevel(log.LEVELS.ERROR);
 const argv = minimist(process.argv.slice(2));
 const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];
 
+if (!process.env.APIFY_TOKEN) {
+    console.error('APIFY_TOKEN is required but not set in the environment variables.');
+    process.exit(1);
+}
+
 async function main() {
     const server = new ApifyMcpServer();
     await (argActors.length !== 0

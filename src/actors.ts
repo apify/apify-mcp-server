@@ -26,10 +26,6 @@ export function toolNameToActorName(toolName: string): string {
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 export async function getActorDefinition(actorFullName: string): Promise<ActorDefinitionPruned | null> {
-    if (!process.env.APIFY_TOKEN) {
-        log.error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
-        return null;
-    }
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const actorClient = client.actor(actorFullName);
 

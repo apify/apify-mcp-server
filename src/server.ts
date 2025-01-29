@@ -91,9 +91,6 @@ export class ApifyMcpServer {
         input: unknown,
         callOptions: ActorCallOptions | undefined = undefined,
     ): Promise<object[]> {
-        if (!process.env.APIFY_TOKEN) {
-            throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
-        }
         const name = toolNameToActorName(actorName);
         try {
             log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);

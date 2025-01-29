@@ -133,10 +133,6 @@ export async function searchActorsByKeywords(
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
 ): Promise<ActorStorePruned[] | null> {
-    if (!process.env.APIFY_TOKEN) {
-        log.error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
-        return null;
-    }
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const results = await client.store().list({ search, limit, offset });
     return results.items.map((x) => pruneActorStoreInfo(x));
