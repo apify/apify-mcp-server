@@ -21,7 +21,7 @@ const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL : 'http://localhos
 const PORT = Actor.isAtHome() ? process.env.ACTOR_STANDBY_PORT : 3001;
 
 if (!process.env.APIFY_TOKEN) {
-    console.error('APIFY_TOKEN is required but not set in the environment variables.');
+    log.error('APIFY_TOKEN is required but not set in the environment variables.');
     process.exit(1);
 }
 

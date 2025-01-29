@@ -6,7 +6,6 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 
 import { actorNameToToolName, toolNameToActorName } from './actors.js';
 import { InternalTools } from './const.js';
-import { log } from './logger.js';
 import type { ActorStorePruned, PricingInfo, Tool } from './types.js';
 
 export const DiscoverActorsArgsSchema = z.object({
