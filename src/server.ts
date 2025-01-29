@@ -11,7 +11,14 @@ import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { filterSchemaProperties, getActorDefinition, getActorsAsTools, shortenProperties } from './actors.js';
+import {
+    actorNameToToolName,
+    filterSchemaProperties,
+    getActorDefinition,
+    getActorsAsTools,
+    shortenProperties,
+    toolNameToActorName,
+} from './actors.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
@@ -87,7 +94,7 @@ export class ApifyMcpServer {
         if (!process.env.APIFY_TOKEN) {
             throw new Error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         }
-        const name = actorName.replace('_', '/');
+        const name = toolNameToActorName(actorName);
         try {
             log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
 
@@ -154,7 +161,7 @@ export class ApifyMcpServer {
             const { name, arguments: args } = request.params;
 
             // Anthropic can't handle '/' in tool names. The replace is only necessary when calling the tool from stdio clients.
-            const tool = this.tools.get(name) || this.tools.get(name.replace('/', '_'));
+            const tool = this.tools.get(name) || this.tools.get(actorNameToToolName(name));
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }
@@ -170,12 +177,12 @@ export class ApifyMcpServer {
                 switch (name) {
                     case InternalTools.ADD_ACTOR_TO_TOOLS: {
                         const parsed = AddActorToToolsArgsSchema.parse(args);
-                        await this.addToolsFromActors([parsed.name.replace('_', '/')]);
+                        await this.addToolsFromActors([parsed.actorFullName]);
                         return { content: [{ type: 'text', text: `Actor ${args.name} was added to tools` }] };
                     }
                     case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
                         const parsed = RemoveActorToolArgsSchema.parse(args);
-                        this.tools.delete(parsed.name.replace('/', '_'));
+                        this.tools.delete(parsed.toolName);
                         return { content: [{ type: 'text', text: `Actor ${args.name} was removed from tools` }] };
                     }
                     case InternalTools.DISCOVER_ACTORS: {
@@ -189,16 +196,15 @@ export class ApifyMcpServer {
                     }
                     case InternalTools.GET_ACTOR_DETAILS: {
                         const parsed = GetActorDefinition.parse(args);
-                        const v = await getActorDefinition(parsed.name.replace('_', '/'));
+                        const v = await getActorDefinition(parsed.actorFullName);
                         if (v && v.input && 'properties' in v.input && v.input) {
                             const properties = filterSchemaProperties(v.input.properties as { [key: string]: SchemaProperties });
                             v.input.properties = shortenProperties(properties);
                         }
-                        const actorDefinitionShort = { description: v?.description, readme: v?.readme, input: v?.input };
-                        return { content: [{ type: 'text', text: JSON.stringify(actorDefinitionShort) }] };
+                        return { content: [{ type: 'text', text: JSON.stringify(v) }] };
                     }
                     default: {
-                        const items = await this.callActorGetDataset(tool.actorName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
+                        const items = await this.callActorGetDataset(tool.actorFullName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
                         const content = items.map((item) => {
                             const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                             return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM

@@ -3,7 +3,20 @@ import { ApifyClient } from 'apify-client';
 
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH } from './const.js';
 import { log } from './logger.js';
-import type { ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
+import type {
+    ActorDefinitionPruned,
+    ActorDefinitionWithDesc,
+    SchemaProperties,
+    Tool,
+} from './types.js';
+
+export function actorNameToToolName(actorName: string): string {
+    return actorName.replace('/', '--');
+}
+
+export function toolNameToActorName(toolName: string): string {
+    return toolName.replace('--', '/');
+}
 
 /**
  * Get actor input schema by actor name.
@@ -12,7 +25,7 @@ import type { ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js
  * @param {string} actorFullName - The full name of the actor.
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
-export async function getActorDefinition(actorFullName: string): Promise<ActorDefinitionWithDesc | null> {
+export async function getActorDefinition(actorFullName: string): Promise<ActorDefinitionPruned | null> {
     if (!process.env.APIFY_TOKEN) {
         log.error('APIFY_TOKEN is required but not set. Please set it as an environment variable');
         return null;
@@ -43,15 +56,26 @@ export async function getActorDefinition(actorFullName: string): Promise<ActorDe
         if (buildDetails?.actorDefinition) {
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             actorDefinitions.description = actor.description || '';
-            actorDefinitions.name = actorFullName;
+            actorDefinitions.actorFullName = actorFullName;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
-            return actorDefinitions;
+            return pruneActorDefinition(actorDefinitions);
         }
         return null;
     } catch (error) {
         log.error(`Failed to fetch input schema for actor: ${actorFullName} with error ${error}.`);
         return null;
     }
+}
+
+function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
+    return {
+        actorFullName: response.actorFullName || '',
+        buildTag: response?.buildTag || '',
+        readme: response?.readme || '',
+        input: response?.input || null,
+        description: response.description,
+        defaultRunOptions: response.defaultRunOptions,
+    };
 }
 
 /**
@@ -104,15 +128,15 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
                 tools.push({
-                    name: result.name.replace('/', '_'),
-                    actorName: result.name,
+                    name: actorNameToToolName(result.actorFullName),
+                    actorFullName: result.actorFullName,
                     description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                     inputSchema: result.input || {},
                     ajvValidate: ajv.compile(result.input || {}),
                     memoryMbytes: memoryMbytes > defaults.maxMemoryMbytes ? defaults.maxMemoryMbytes : memoryMbytes,
                 });
             } catch (validationError) {
-                log.error(`Failed to compile AJV schema for actor: ${result.name}. Error: ${validationError}`);
+                log.error(`Failed to compile AJV schema for actor: ${result.actorFullName}. Error: ${validationError}`);
             }
         }
     }

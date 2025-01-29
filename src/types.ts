@@ -9,14 +9,24 @@ export type Input = {
     debugActorInput?: unknown;
 };
 
+export interface ActorDefinitionPruned {
+    actorFullName: string;
+    buildTag?: string;
+    readme?: string | null;
+    input?: object | null;
+    description: string;
+    defaultRunOptions: ActorDefaultRunOptions;
+}
+
 export interface ActorDefinitionWithDesc extends ActorDefinition {
+    actorFullName: string;
     description: string;
     defaultRunOptions: ActorDefaultRunOptions
 }
 
 export interface Tool {
     name: string;
-    actorName: string;
+    actorFullName: string;
     description: string;
     inputSchema: object;
     ajvValidate: ValidateFunction;
@@ -36,9 +46,8 @@ export interface SchemaProperties {
 //  ActorStoreList for actor-search tool
 export interface ActorStats {
     totalRuns: number;
-    totalUsers: number;
-    totalUsers7Days: number;
     totalUsers30Days: number;
+    publicActorRunStats30Days: unknown;
 }
 
 export interface PricingInfo {
@@ -47,9 +56,10 @@ export interface PricingInfo {
     trialMinutes?: number
 }
 
-export interface ActorStoreTruncated {
+export interface ActorStorePruned {
     name: string;
     username: string;
+    actorFullName?: string;
     title?: string;
     description?: string;
     stats: ActorStats;
