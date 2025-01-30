@@ -5,11 +5,10 @@
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
-The server can be used in two ways:
-- 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP and can be accessed via Server-Sent Events (SSE).
-- ⾕ **Apify MCP Server Stdio**: runs the server locally with MCP via standard input/output (stdio).
-
-You can test the MCP server using [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+The server can be used in several ways:
+- **🇦 MCP Server Actor** – HTTP server accessible via Server-Sent Events (SSE).
+- **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
+- **💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)** – Chat-like UI for interacting with the MCP server.
 
 # 🎯 What does Apify MCP server do?
 
