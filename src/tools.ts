@@ -84,7 +84,7 @@ export function getActorDiscoveryTools(): Tool[] {
             description: `Discover available Actors using full text search using keywords.`
                 + `Users try to discover Actors using free form query in this case search query needs to be converted to full text search. `
                 + `Prefer Actors from Apify as they are generally more reliable and have better support. `
-                + `Returns a list of Actors with name, description, statistics, and URL. `
+                + `Returns a list of Actors with name, description, run statistics, pricing, starts, and URL. `
                 + `You perhaps need to use this tool several times to find the right Actor. `
                 + `Limit number of results returned but ensure that relevant results are returned. `,
             inputSchema: zodToJsonSchema(DiscoverActorsArgsSchema),
