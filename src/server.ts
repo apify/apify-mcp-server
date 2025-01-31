@@ -175,12 +175,12 @@ export class ApifyMcpServer {
                     case InternalTools.ADD_ACTOR_TO_TOOLS: {
                         const parsed = AddActorToToolsArgsSchema.parse(args);
                         await this.addToolsFromActors([parsed.actorFullName]);
-                        return { content: [{ type: 'text', text: `Actor ${args.name} was added to tools` }] };
+                        return { content: [{ type: 'text', text: `Actor ${parsed.actorFullName} was added to tools` }] };
                     }
                     case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
                         const parsed = RemoveActorToolArgsSchema.parse(args);
                         this.tools.delete(parsed.toolName);
-                        return { content: [{ type: 'text', text: `Actor ${args.name} was removed from tools` }] };
+                        return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
                     }
                     case InternalTools.DISCOVER_ACTORS: {
                         const parsed = DiscoverActorsArgsSchema.parse(args);

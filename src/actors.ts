@@ -3,12 +3,7 @@ import { ApifyClient } from 'apify-client';
 
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH } from './const.js';
 import { log } from './logger.js';
-import type {
-    ActorDefinitionPruned,
-    ActorDefinitionWithDesc,
-    SchemaProperties,
-    Tool,
-} from './types.js';
+import type { ActorDefinitionPruned, ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
 
 export function actorNameToToolName(actorName: string): string {
     return actorName.replace('/', '--');
@@ -59,7 +54,7 @@ export async function getActorDefinition(actorFullName: string): Promise<ActorDe
         return null;
     } catch (error) {
         log.error(`Failed to fetch input schema for actor: ${actorFullName} with error ${error}.`);
-        return null;
+        throw new Error(`Failed to fetch input schema for actor: ${actorFullName} with error ${error}.`);
     }
 }
 

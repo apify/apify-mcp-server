@@ -4,7 +4,7 @@ import { ApifyClient } from 'apify-client';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { actorNameToToolName, toolNameToActorName } from './actors.js';
+import { toolNameToActorName } from './actors.js';
 import { InternalTools } from './const.js';
 import type { ActorStorePruned, PricingInfo, Tool } from './types.js';
 
@@ -35,14 +35,14 @@ export const RemoveActorToolArgsSchema = z.object({
     toolName: z.string()
         .describe('Full name of the Actor to remove. Actor full name is always composed from `username--name`'
             + 'Never use name or username only')
-        .transform((val) => actorNameToToolName(val)),
+        .transform((val) => toolNameToActorName(val)),
 });
 
 export const AddActorToToolsArgsSchema = z.object({
     actorFullName: z.string()
         .describe('Full name of the Actor to add as tool. Tool name is always composed from `username--name`'
             + 'Never use name or username only')
-        .transform((val) => actorNameToToolName(val)),
+        .transform((val) => toolNameToActorName(val)),
 });
 
 export const GetActorDefinition = z.object({
