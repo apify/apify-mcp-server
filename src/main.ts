@@ -45,10 +45,12 @@ async function processParamsAndUpdateTools(url: string) {
     const input = await processInput(params as unknown as Input);
     if (input.actors) {
         await mcpServer.addToolsFromActors(input.actors as string[]);
-    } else {
-        log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
-        To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
     }
+    if (input.enableActorAutoLoading) {
+        mcpServer.updateTools(getActorAutoLoadingTools());
+    }
+    log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
+    To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
 }
 
 app.route(Routes.ROOT)

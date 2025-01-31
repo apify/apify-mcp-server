@@ -97,7 +97,8 @@ The server provides a set of helper tools to discover available Actors and retri
 
 There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to manage the tools list, which is typically not supported.
 
-You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor. To enable it, set the `enableActorAutoLoading` parameter.
+You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor.
+To enable it, set the `enableActorAutoLoading` parameter.
 
 - `add-actor-as-tool`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
 - `remove-actor-from-tool`: Removes an Actor by name from the available tools list when it's no longer needed.
@@ -206,7 +207,6 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
 
 ### Install
 
-Follow the steps below to set up and run the server on your local machine:
 First, clone the repository using the following command:
 
 ```bash
