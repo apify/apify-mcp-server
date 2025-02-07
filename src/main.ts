@@ -89,7 +89,7 @@ app.route(Routes.SSE)
 app.route(Routes.MESSAGE)
     .post(async (req: Request, res: Response) => {
         try {
-            log.info(`Received POST message at: ${req.url}`);
+            log.info(`Received POST message at: ${Routes.MESSAGE}`);
             if (transport) {
                 await transport.handlePostMessage(req, res);
             } else {
