@@ -140,7 +140,7 @@ Once the server is running, you can interact with Server-Sent Events (SSE) to se
 The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
 
 Other clients do not support SSE yet, but this will likely change.
-Please verify if MCP clients such ass [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/) support SSE with custom headers.
+Please verify if MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/) support SSE with custom headers.
 ([Claude Desktop](https://claude.ai/download) does not support SSE transport yet, see [Claude Desktop Configuration](#claude-desktop) section for more details).
 
 In the client settings you need to provide server configuration:
