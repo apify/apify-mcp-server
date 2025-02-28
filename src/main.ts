@@ -7,10 +7,11 @@ import type { ActorCallOptions } from 'apify-client';
 import type { Request, Response } from 'express';
 import express from 'express';
 
-import { HEADER_READINESS_PROBE, MAX_MEMORY_MBYTES, Routes } from './const.js';
+import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
+import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
 import type { Input } from './types.js';
 
 await Actor.init();
@@ -18,6 +19,11 @@ await Actor.init();
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL : 'http://localhost';
 const PORT = Actor.isAtHome() ? process.env.ACTOR_STANDBY_PORT : 3001;
+
+if (!process.env.APIFY_TOKEN) {
+    log.error('APIFY_TOKEN is required but not set in the environment variables.');
+    process.exit(1);
+}
 
 const app = express();
 
@@ -36,13 +42,15 @@ async function processParamsAndUpdateTools(url: string) {
     const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
     delete params.token;
     log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-    const input = await processInput(params as Input);
+    const input = await processInput(params as unknown as Input);
     if (input.actors) {
         await mcpServer.addToolsFromActors(input.actors as string[]);
-    } else {
-        log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
-        To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
     }
+    if (input.enableActorAutoLoading) {
+        mcpServer.updateTools(getActorAutoLoadingTools());
+    }
+    log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
+    To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
 }
 
 app.route(Routes.ROOT)
@@ -53,7 +61,7 @@ app.route(Routes.ROOT)
             return;
         }
         try {
-            log.info(`Received GET message at: ${req.url}`);
+            log.info(`Received GET message at: ${Routes.ROOT}`);
             await processParamsAndUpdateTools(req.url);
             res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
         } catch (error) {
@@ -68,7 +76,7 @@ app.route(Routes.ROOT)
 app.route(Routes.SSE)
     .get(async (req: Request, res: Response) => {
         try {
-            log.info(`Received GET message at: ${req.url}`);
+            log.info(`Received GET message at: ${Routes.SSE}`);
             await processParamsAndUpdateTools(req.url);
             transport = new SSEServerTransport(Routes.MESSAGE, res);
             await mcpServer.connect(transport);
@@ -81,7 +89,7 @@ app.route(Routes.SSE)
 app.route(Routes.MESSAGE)
     .post(async (req: Request, res: Response) => {
         try {
-            log.info(`Received POST message at: ${req.url}`);
+            log.info(`Received POST message at: ${Routes.MESSAGE}`);
             if (transport) {
                 await transport.handlePostMessage(req, res);
             } else {
@@ -107,6 +115,10 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
+    mcpServer.updateTools(getActorDiscoveryTools());
+    if (input.enableActorAutoLoading) {
+        mcpServer.updateTools(getActorAutoLoadingTools());
+    }
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });
@@ -116,7 +128,7 @@ if (STANDBY_MODE) {
     if (input && !input.debugActor && !input.debugActorInput) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
     }
-    const options = { memory: MAX_MEMORY_MBYTES } as ActorCallOptions;
+    const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
     await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, options);
     await Actor.exit();
 }

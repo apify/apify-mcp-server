@@ -12,5 +12,8 @@ export async function processInput(originalInput: Partial<Input>): Promise<Input
     if (input.actors && typeof input.actors === 'string') {
         input.actors = input.actors.split(',').map((format: string) => format.trim()) as string[];
     }
+    if (!input.enableActorAutoLoading) {
+        input.enableActorAutoLoading = false;
+    }
     return input;
 }

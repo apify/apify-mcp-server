@@ -6,9 +6,10 @@
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
-The server can be used in two ways:
-- 🇦 **Apify MCP Server Actor**: runs an HTTP server with MCP protocol via Server-Sent Events.
-- ⾕ **Apify MCP Server Stdio**: provides support for the MCP protocol via standard input/output stdio.
+The server can be used in several ways:
+- **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE).
+- **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
+- **💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)** – Chat-like UI for interacting with the MCP server.
 
 # 🎯 What does Apify MCP server do?
 
@@ -20,8 +21,15 @@ For example it can:
 - use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments
 - use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content
 
+# MCP Clients
 
-To interact with the Apify MCP server, you can use MCP clients such as [Claude Desktop](https://claude.ai/download), [LibreChat](https://www.librechat.ai/), or other [MCP clients](https://glama.ai/mcp/clients).
+To interact with the Apify MCP server, you can use MCP clients such as:
+- [Claude Desktop](https://claude.ai/download) (only Stdio support)
+- [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yeah without Authorization header))
+- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
+- other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
+- more clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
+
 Additionally, you can use simple example clients found in the [examples](https://github.com/apify/actor-mcp-server/tree/main/src/examples) directory.
 
 When you have Actors integrated with the MCP server, you can ask:
@@ -36,24 +44,26 @@ The following image shows how the Apify MCP server interacts with the Apify plat
 ![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
 In the future, we plan to load Actors dynamically and provide Apify's dataset and key-value store as resources.
-See the [Roadmap](#-roadmap-january-2025) for more details.
+See the [Roadmap](#-roadmap-march-2025) for more details.
 
 # 🔄 What is the Model Context Protocol?
 
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
 MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
-For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website.
+For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website or blogpost [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/).
 
 # 🤖 How is Actors MCP Server related to AI Agents?
 
 The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
 
-To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
+To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and Apify's [AI Agent collection](https://apify.com/store/collections/ai_agents).
 
 # 🧱 Components
 
 ## Tools
+
+### Actors
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with the Actors specified below, but it can be overridden by providing Actor input.
@@ -79,6 +89,20 @@ For example, for the `apify/rag-web-browser` Actor, the arguments are:
 You don't need to specify the input parameters or which Actor to call, everything is managed by an LLM.
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
+
+### Helper tools
+
+The server provides a set of helper tools to discover available Actors and retrieve their details:
+- `get-actor-details`: Retrieves documentation, input schema, and other details about a specific Actor.
+- `discover-actors`: Searches for relevant Actors using keywords and returns their details.
+
+There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to manage the tools list, which is typically not supported.
+
+You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor.
+To enable it, set the `enableActorAutoLoading` parameter.
+
+- `add-actor-as-tool`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
+- `remove-actor-from-tool`: Removes an Actor by name from the available tools list when it's no longer needed.
 
 ## Prompt & Resources
 
@@ -111,10 +135,13 @@ https://actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
 
 You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
 
-#### 💬 Interact with the MCP Server
+#### 💬 Interact with the MCP Server over SSE
 
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
-You can use MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/).
+The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
+
+Other clients do not support SSE yet, but this will likely change.
+Please verify if MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/) support SSE with custom headers.
 ([Claude Desktop](https://claude.ai/download) does not support SSE transport yet, see [Claude Desktop Configuration](#claude-desktop) section for more details).
 
 In the client settings you need to provide server configuration:
@@ -171,14 +198,9 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
     ```
 
 ## ⾕ MCP Server at a local host
-
-### Installing via Smithery
-
-To install Apify Actors MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@apify/actors-mcp-server):
-
-```bash
-npx -y @smithery/cli install @apify/actors-mcp-server --client claude
-```
+``
+You can run the Apify MCP Server on your local machine by configuring it with Claude Desktop or any other [MCP clients](https://modelcontextprotocol.io/clients).
+You can also use [Smithery](https://smithery.ai/server/@apify/actors-mcp-server) to install the server automatically.
 
 ### Prerequisites
 
@@ -189,7 +211,6 @@ npx -y @smithery/cli install @apify/actors-mcp-server --client claude
 
 ### Install
 
-Follow the steps below to set up and run the server on your local machine:
 First, clone the repository using the following command:
 
 ```bash
@@ -272,6 +293,14 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     Find and analyze instagram profile of the Rock.
     ```
 
+### Installing via Smithery
+
+To install Apify Actors MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@apify/actors-mcp-server):
+
+```bash
+npx -y @smithery/cli install @apify/actors-mcp-server --client claude
+```
+
 #### Stdio clients
 
 Create environment file `.env` with the following content:
@@ -282,6 +311,7 @@ ANTHROPIC_API_KEY=your-anthropic-api-token
 ```
 In the `examples` directory, you can find two clients that interact with the server via
 standard input/output (stdio):
+
 1. [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts)
     This client script starts the MCP server with two specified Actors.
     It then calls the `apify/rag-web-browser` tool with a query and prints the result.
@@ -314,12 +344,12 @@ ANTHROPIC_API_KEY=your-anthropic-api-key
 ```
 ## Local client (SSE)
 
-To test the server with the SSE transport, you can use python script `examples/client_sse.py`:
+To test the server with the SSE transport, you can use python script `examples/clientSse.ts`:
 Currently, the node.js client does not support to establish a connection to remote server witch custom headers.
 You need to change URL to your local server URL in the script.
 
 ```bash
-python src/examples/client_sse.py
+node dist/examples/clientSse.js
 ```
 
 ## Debugging
@@ -343,17 +373,22 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 
 ## ⓘ Limitations and feedback
 
-To limit the context size the properties in the `input schema` are pruned and description is truncated to 200 characters.
+To limit the context size the properties in the `input schema` are pruned and description is truncated to 500 characters.
 Enum fields and titles are truncated to max 50 options.
 
 Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
 
-If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/3ox4R101TgZz67sLr/issues) in Apify Console to let us know.
+If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
 
-# 🚀 Roadmap (January 2025)
+# 🚀 Roadmap (March 2025)
 
-- Document examples for [LibreChat](https://www.librechat.ai/).
-- Provide tools to search for Actors and load them as needed.
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
+
+# References
+
+- [Model Context Protocol](https://modelcontextprotocol.org/)
+- [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
+- [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
+- [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)

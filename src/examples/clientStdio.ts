@@ -24,7 +24,7 @@ const SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
 const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which node').toString().trim();
 
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
-const SELECTED_TOOL = 'apify_rag-web-browser'; // We need to change / to _ in the tool name
+const SELECTED_TOOL = 'apify--rag-web-browser'; // We need to change / to _ in the tool name
 
 if (!process.env.APIFY_TOKEN) {
     console.error('APIFY_TOKEN is required but not set in the environment variables.');
