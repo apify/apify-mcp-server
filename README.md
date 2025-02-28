@@ -6,7 +6,7 @@ Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
 The server can be used in several ways:
-- **🇦 MCP Server Actor** – HTTP server accessible via Server-Sent Events (SSE).
+- **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE).
 - **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
 - **💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)** – Chat-like UI for interacting with the MCP server.
 
@@ -43,20 +43,20 @@ The following image shows how the Apify MCP server interacts with the Apify plat
 ![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
 In the future, we plan to load Actors dynamically and provide Apify's dataset and key-value store as resources.
-See the [Roadmap](#-roadmap-january-2025) for more details.
+See the [Roadmap](#-roadmap-march-2025) for more details.
 
 # 🔄 What is the Model Context Protocol?
 
 The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
 MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
 
-For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website.
+For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website or blogpost [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/).
 
 # 🤖 How is Actors MCP Server related to AI Agents?
 
 The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
 
-To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
+To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and Apify's [AI Agent collection](https://apify.com/store/collections/ai_agents).
 
 # 🧱 Components
 
@@ -197,6 +197,8 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
     ```
 
 ## ⾕ MCP Server at a local host
+
+You can run the Apify MCP Server on your local machine by configuring it with Claude Desktop or any other [MCP clients](https://modelcontextprotocol.io/clients).
 
 ### Prerequisites
 
@@ -369,7 +371,14 @@ Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MC
 
 If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
 
-# 🚀 Roadmap (January 2025)
+# 🚀 Roadmap (March 2025)
 
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
+
+# References
+
+- [Model Context Protocol](https://modelcontextprotocol.org/)
+- [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
+- [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
+- [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
