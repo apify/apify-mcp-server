@@ -10,6 +10,7 @@ export type Input = {
 };
 
 export interface ActorDefinitionPruned {
+    id: string;
     actorFullName: string;
     buildTag?: string;
     readme?: string | null;
@@ -19,6 +20,7 @@ export interface ActorDefinitionPruned {
 }
 
 export interface ActorDefinitionWithDesc extends ActorDefinition {
+    id: string;
     actorFullName: string;
     description: string;
     defaultRunOptions: ActorDefaultRunOptions
@@ -57,6 +59,7 @@ export interface PricingInfo {
 }
 
 export interface ActorStorePruned {
+    id: string;
     name: string;
     username: string;
     actorFullName?: string;

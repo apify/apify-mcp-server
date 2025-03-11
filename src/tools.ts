@@ -4,8 +4,8 @@ import { ApifyClient } from 'apify-client';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { toolNameToActorName } from './actors.js';
-import { InternalTools } from './const.js';
+import { actorNameToToolName, toolNameToActorName } from './actors.js';
+import { ACTOR_README_MAX_LENGTH, InternalTools } from './const.js';
 import type { ActorStorePruned, PricingInfo, Tool } from './types.js';
 
 export const DiscoverActorsArgsSchema = z.object({
@@ -24,8 +24,8 @@ export const DiscoverActorsArgsSchema = z.object({
         .default('')
         .describe('String of key words to search by. '
             + 'Searches the title, name, description, username, and readme of an Actor.'
-            + 'Only key word search is supported, no advanced search.',
-        ),
+            + 'Only key word search is supported, no advanced search.'
+            + 'Always prefer simple keywords over complex queries.'),
     category: z.string()
         .default('')
         .describe('Filters the results by the specified category.'),
@@ -33,23 +33,25 @@ export const DiscoverActorsArgsSchema = z.object({
 
 export const RemoveActorToolArgsSchema = z.object({
     toolName: z.string()
-        .describe('Full name of the Actor to remove. Actor full name is always composed from `username--name`'
-            + 'Never use name or username only')
-        .transform((val) => toolNameToActorName(val)),
+        .describe('Tool name to remove from available tools.')
+        .transform((val) => actorNameToToolName(val)),
 });
 
 export const AddActorToToolsArgsSchema = z.object({
-    actorFullName: z.string()
-        .describe('Full name of the Actor to add as tool. Tool name is always composed from `username--name`'
-            + 'Never use name or username only')
+    actorName: z.string()
+        .describe('Add an Actor to available tools by Actor ID or Actor name.')
         .transform((val) => toolNameToActorName(val)),
 });
 
 export const GetActorDefinition = z.object({
-    actorFullName: z.string()
-        .describe('Full name of the Actor to retrieve documentation. Actor full name is always composed from `username--name`.'
-            + 'Never use name or username only')
+    actorName: z.string()
+        .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
+            + 'Actor name is always composed from `username/name`')
         .transform((val) => toolNameToActorName(val)),
+    limit: z.number()
+        .int()
+        .default(ACTOR_README_MAX_LENGTH)
+        .describe(`Truncate the README to this limit. Default value is ${ACTOR_README_MAX_LENGTH}.`),
 });
 
 export function getActorAutoLoadingTools(): Tool[] {
@@ -58,17 +60,18 @@ export function getActorAutoLoadingTools(): Tool[] {
         {
             name: InternalTools.ADD_ACTOR_TO_TOOLS,
             actorFullName: InternalTools.ADD_ACTOR_TO_TOOLS,
-            description: 'Add an Actor tool by name to available tools. Do not execute the actor, only add it and list it in available tools. '
+            description: 'Add an Actor to available tools by Actor ID or Actor name. '
+                + 'Do not execute the Actor, only add it and list it in available tools. '
                 + 'Never run the tool without user consent! '
-                + 'For example, add a tool with username--name when user wants to scrape/extract data',
+                + 'For example, add a tool with username/name when user wants to scrape data from a website.',
             inputSchema: zodToJsonSchema(AddActorToToolsArgsSchema),
             ajvValidate: ajv.compile(zodToJsonSchema(AddActorToToolsArgsSchema)),
         },
         {
             name: InternalTools.REMOVE_ACTOR_FROM_TOOLS,
-            actorFullName: InternalTools.ADD_ACTOR_TO_TOOLS,
-            description: 'Remove an actor tool by name from available toos. '
-                + 'For example, when user says, I do not need a tool username--name anymore',
+            actorFullName: InternalTools.REMOVE_ACTOR_FROM_TOOLS,
+            description: 'Remove tool by name from available tools. '
+                + 'For example, when user says, I do not need a tool username/name anymore',
             inputSchema: zodToJsonSchema(RemoveActorToolArgsSchema),
             ajvValidate: ajv.compile(zodToJsonSchema(RemoveActorToolArgsSchema)),
         },
@@ -93,9 +96,10 @@ export function getActorDiscoveryTools(): Tool[] {
         {
             name: InternalTools.GET_ACTOR_DETAILS,
             actorFullName: InternalTools.GET_ACTOR_DETAILS,
-            description: 'Get documentation, readme, input schema and other details about Actor. '
+            description: 'Get documentation, readme, input schema and other details about an Actor. '
                 + 'For example, when user says, I need to know more about web crawler Actor.'
-                + 'Get details for Actors with username--name.',
+                + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
+                + `Limit the length of the README if needed.`,
             inputSchema: zodToJsonSchema(GetActorDefinition),
             ajvValidate: ajv.compile(zodToJsonSchema(GetActorDefinition)),
         },
@@ -106,6 +110,7 @@ function pruneActorStoreInfo(response: ActorStoreList): ActorStorePruned {
     const stats = response.stats || {};
     const pricingInfo = (response.currentPricingInfo || {}) as PricingInfo;
     return {
+        id: response.id,
         name: response.name?.toString() || '',
         username: response.username?.toString() || '',
         actorFullName: `${response.username}/${response.name}`,

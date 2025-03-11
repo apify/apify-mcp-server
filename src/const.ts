@@ -11,10 +11,11 @@ export const defaults = {
         'apify/rag-web-browser',
         'lukaskrivka/google-maps-with-contact-details',
     ],
-    enableActorAutoLoading: false,
+    enableActorAutoLoading: true,
     maxMemoryMbytes: 4096,
 };
 
+export const ACTOR_README_MAX_LENGTH = 5000;
 export const ACTOR_OUTPUT_MAX_CHARS_PER_ITEM = 5_000;
 export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it will not fit into context.`
     + `There is no reason to call this tool again!`;

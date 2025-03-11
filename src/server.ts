@@ -53,7 +53,7 @@ export class ApifyMcpServer {
             },
             {
                 capabilities: {
-                    tools: {},
+                    tools: { listChanged: true },
                 },
             },
         );
@@ -117,6 +117,7 @@ export class ApifyMcpServer {
     public async addToolsFromActors(actors: string[]) {
         const tools = await getActorsAsTools(actors);
         this.updateTools(tools);
+        return tools;
     }
 
     public async addToolsFromDefaultActors() {
@@ -126,10 +127,14 @@ export class ApifyMcpServer {
     public updateTools(tools: Tool[]): void {
         for (const tool of tools) {
             this.tools.set(tool.name, tool);
-            log.info(`Added/Updated tool: ${tool.name}`);
+            log.info(`Added/Updated tool: ${tool.actorFullName} (tool: ${tool.name})`);
         }
     }
 
+    /**
+     * Returns an array of tool names.
+     * @returns {string[]} - An array of tool names.
+     */
     public getToolNames(): string[] {
         return Array.from(this.tools.keys());
     }
@@ -174,12 +179,14 @@ export class ApifyMcpServer {
                 switch (name) {
                     case InternalTools.ADD_ACTOR_TO_TOOLS: {
                         const parsed = AddActorToToolsArgsSchema.parse(args);
-                        await this.addToolsFromActors([parsed.actorFullName]);
-                        return { content: [{ type: 'text', text: `Actor ${parsed.actorFullName} was added to tools` }] };
+                        const toolsAdded = await this.addToolsFromActors([parsed.actorName]);
+                        await this.server.notification({ method: 'notifications/tools/list_changed' });
+                        return { content: [{ type: 'text', text: `Actor added: ${toolsAdded.map((t) => `${t.actorFullName} (${t.name})`).join(', ')}` }] };
                     }
                     case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
                         const parsed = RemoveActorToolArgsSchema.parse(args);
                         this.tools.delete(parsed.toolName);
+                        await this.server.notification({ method: 'notifications/tools/list_changed' });
                         return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
                     }
                     case InternalTools.DISCOVER_ACTORS: {
@@ -193,7 +200,7 @@ export class ApifyMcpServer {
                     }
                     case InternalTools.GET_ACTOR_DETAILS: {
                         const parsed = GetActorDefinition.parse(args);
-                        const v = await getActorDefinition(parsed.actorFullName);
+                        const v = await getActorDefinition(parsed.actorName, parsed.limit);
                         if (v && v.input && 'properties' in v.input && v.input) {
                             const properties = filterSchemaProperties(v.input.properties as { [key: string]: SchemaProperties });
                             v.input.properties = shortenProperties(properties);
