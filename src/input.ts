@@ -13,7 +13,7 @@ export async function processInput(originalInput: Partial<Input>): Promise<Input
         input.actors = input.actors.split(',').map((format: string) => format.trim()) as string[];
     }
     if (!input.enableActorAutoLoading) {
-        input.enableActorAutoLoading = true;
+        input.enableActorAutoLoading = false;
     }
     return input;
 }

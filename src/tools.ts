@@ -4,7 +4,7 @@ import { ApifyClient } from 'apify-client';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { actorNameToToolName, toolNameToActorName } from './actors.js';
+import { actorNameToToolName } from './actors.js';
 import { ACTOR_README_MAX_LENGTH, InternalTools } from './const.js';
 import type { ActorStorePruned, PricingInfo, Tool } from './types.js';
 
@@ -39,15 +39,14 @@ export const RemoveActorToolArgsSchema = z.object({
 
 export const AddActorToToolsArgsSchema = z.object({
     actorName: z.string()
-        .describe('Add an Actor to available tools by Actor ID or Actor name.')
-        .transform((val) => toolNameToActorName(val)),
+        .describe('Add an Actor to available tools by Actor ID or Actor full name.'
+            + 'Actor name is always composed from `username/name`'),
 });
 
 export const GetActorDefinition = z.object({
     actorName: z.string()
         .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
-            + 'Actor name is always composed from `username/name`')
-        .transform((val) => toolNameToActorName(val)),
+            + 'Actor name is always composed from `username/name`'),
     limit: z.number()
         .int()
         .default(ACTOR_README_MAX_LENGTH)

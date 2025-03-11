@@ -12,12 +12,10 @@ import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
 import {
-    actorNameToToolName,
     filterSchemaProperties,
     getActorDefinition,
     getActorsAsTools,
     shortenProperties,
-    toolNameToActorName,
 } from './actors.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
@@ -91,7 +89,7 @@ export class ApifyMcpServer {
         input: unknown,
         callOptions: ActorCallOptions | undefined = undefined,
     ): Promise<object[]> {
-        const name = toolNameToActorName(actorName);
+        const name = actorName;
         try {
             log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
 
@@ -162,8 +160,7 @@ export class ApifyMcpServer {
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
 
-            // Anthropic can't handle '/' in tool names. The replace is only necessary when calling the tool from stdio clients.
-            const tool = this.tools.get(name) || this.tools.get(actorNameToToolName(name));
+            const tool = Array.from(this.tools.values()).find((t) => t.name === name || t.actorFullName === name);
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }

@@ -8,13 +8,8 @@ import type { ActorDefinitionPruned, ActorDefinitionWithDesc, SchemaProperties, 
 export function actorNameToToolName(actorName: string): string {
     return actorName
         .replace(/\//g, '-slash-')
-        .replace(/\./g, '-dot-');
-}
-
-export function toolNameToActorName(toolName: string): string {
-    return toolName
-        .replace(/-slash-/g, '/')
-        .replace(/-dot-/g, '.');
+        .replace(/\./g, '-dot-')
+        .slice(0, 64);
 }
 
 /**

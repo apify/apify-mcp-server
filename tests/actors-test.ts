@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { actorNameToToolName, toolNameToActorName } from '../src/actors.js';
+import { actorNameToToolName } from '../src/actors.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -20,24 +20,11 @@ describe('actors', () => {
         it('should handle strings with multiple slashes and dots', () => {
             expect(actorNameToToolName('actor/name.with/multiple.parts')).toBe('actor-slash-name-dot-with-slash-multiple-dot-parts');
         });
-    });
 
-    describe('toolNameToActorName', () => {
-        it('should convert dash notation back to slashes and dots', () => {
-            expect(toolNameToActorName('apify-slash-web-scraper')).toBe('apify/web-scraper');
-            expect(toolNameToActorName('my-dot-actor-dot-name')).toBe('my.actor.name');
-        });
-
-        it('should handle empty strings', () => {
-            expect(toolNameToActorName('')).toBe('');
-        });
-
-        it('should handle strings without dash notation', () => {
-            expect(toolNameToActorName('actorname')).toBe('actorname');
-        });
-
-        it('should handle strings with multiple dash notations', () => {
-            expect(toolNameToActorName('actor-slash-name-dot-with-slash-multiple-dot-parts')).toBe('actor/name.with/multiple.parts');
+        it('should handle tool names longer than 64 characters', () => {
+            const longName = 'a'.repeat(70);
+            const expected = 'a'.repeat(64);
+            expect(actorNameToToolName(longName)).toBe(expected);
         });
     });
 });
