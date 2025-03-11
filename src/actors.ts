@@ -6,11 +6,15 @@ import { log } from './logger.js';
 import type { ActorDefinitionPruned, ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
 
 export function actorNameToToolName(actorName: string): string {
-    return actorName.replace('/', '-slash-').replace('.', '-dot-');
+    return actorName
+        .replace(/\//g, '-slash-')
+        .replace(/\./g, '-dot-');
 }
 
 export function toolNameToActorName(toolName: string): string {
-    return toolName.replace('-slash-', '/').replace('-dot-', '.');
+    return toolName
+        .replace(/-slash-/g, '/')
+        .replace(/-dot-/g, '.');
 }
 
 /**

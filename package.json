@@ -63,7 +63,7 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector dist/index.js",
-    "test": "vitest"
+    "test": "vitest run"
   },
   "author": "Apify",
   "license": "MIT"
