@@ -13,8 +13,8 @@ on:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
 jobs:
-    lint:
-        name: Lint
+    lint_and_test:
+        name: Build & Test
         runs-on: ubuntu-latest
 
         steps:
@@ -27,4 +27,12 @@ jobs:
                     cache-dependency-path: 'package-lock.json'
             -   name: Install Dependencies
                 run: npm ci
-            -   run: npm run lint
+
+            -   name: Lint
+                run: npm run lint
+
+            -   name: Build
+                run: npm run build
+
+            -   name: Test
+                run: npm run test
