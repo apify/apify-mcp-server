@@ -11,7 +11,7 @@ export const defaults = {
         'apify/rag-web-browser',
         'lukaskrivka/google-maps-with-contact-details',
     ],
-    enableActorAutoLoading: true,
+    enableActorAutoLoading: false,
     maxMemoryMbytes: 4096,
 };
 

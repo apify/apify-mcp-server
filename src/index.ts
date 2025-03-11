@@ -17,11 +17,13 @@ import minimist from 'minimist';
 
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
+import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
 
 log.setLevel(log.LEVELS.ERROR);
 
 const argv = minimist(process.argv.slice(2));
 const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];
+const argEnableActorAutoLoading = argv.enableActorAutoLoading || false;
 
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
@@ -33,6 +35,10 @@ async function main() {
     await (argActors.length !== 0
         ? server.addToolsFromActors(argActors)
         : server.addToolsFromDefaultActors());
+    server.updateTools(getActorDiscoveryTools());
+    if (argEnableActorAutoLoading) {
+        server.updateTools(getActorAutoLoadingTools());
+    }
     const transport = new StdioServerTransport();
     await server.connect(transport);
 }

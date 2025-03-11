@@ -181,7 +181,7 @@ export class ApifyMcpServer {
                         const parsed = AddActorToToolsArgsSchema.parse(args);
                         const toolsAdded = await this.addToolsFromActors([parsed.actorName]);
                         await this.server.notification({ method: 'notifications/tools/list_changed' });
-                        return { content: [{ type: 'text', text: `Actor added: ${toolsAdded.map((t) => `${t.actorFullName} (${t.name})`).join(', ')}` }] };
+                        return { content: [{ type: 'text', text: `Actor added: ${toolsAdded.map((t) => `${t.actorFullName} (tool name: ${t.name})`).join(', ')}` }] };
                     }
                     case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
                         const parsed = RemoveActorToolArgsSchema.parse(args);
