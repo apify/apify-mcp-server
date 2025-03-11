@@ -15,6 +15,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
+import { actorNameToToolName } from '../actors.js';
+
 // Resolve dirname equivalent in ES module
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
@@ -24,7 +26,7 @@ const SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
 const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which node').toString().trim();
 
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';
-const SELECTED_TOOL = 'apify-slash-rag-web-browser';
+const SELECTED_TOOL = actorNameToToolName('apify/rag-web-browser');
 
 if (!process.env.APIFY_TOKEN) {
     console.error('APIFY_TOKEN is required but not set in the environment variables.');
