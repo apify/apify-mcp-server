@@ -53,11 +53,11 @@ MCP is an open protocol that enables secure, controlled interactions between AI 
 
 For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website or blogpost [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/).
 
-# 🤖 How is Actors MCP Server related to AI Agents?
+# 🤖 How is MCP Server related to AI Agents?
 
 The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
 
-To learn more, check out the blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and Apify's [AI Agent collection](https://apify.com/store/collections/ai_agents).
+To learn more about AI Agents, explore our blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and browse Apify's curated [AI Agent collection](https://apify.com/store/collections/ai_agents). Wondering if AI Agents are suitable for your specific needs? Our guide [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/) walks you through practical implementation considerations and use cases.
 
 # 🧱 Components
 
@@ -93,7 +93,7 @@ You can refer to the specific Actor's documentation for a list of available argu
 ### Helper tools
 
 The server provides a set of helper tools to discover available Actors and retrieve their details:
-- `get-actor-details`: Retrieves documentation, input schema, and other details about a specific Actor.
+- `get-actor-details`: Retrieves documentation, input schema, and details about a specific Actor.
 - `discover-actors`: Searches for relevant Actors using keywords and returns their details.
 
 There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to update tools list (handle `ToolListChangedNotificationSchema`), which is typically not supported.
@@ -198,7 +198,7 @@ Alternatively, you can use simple python [client_see.py](https://github.com/apif
     ```
 
 ## ⾕ MCP Server at a local host
-``
+
 You can run the Apify MCP Server on your local machine by configuring it with Claude Desktop or any other [MCP clients](https://modelcontextprotocol.io/clients).
 You can also use [Smithery](https://smithery.ai/server/@apify/actors-mcp-server) to install the server automatically.
 
@@ -276,7 +276,7 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     ```
 5. Restart Claude Desktop
 
-    - Fully quit Claude Desktop (ensure it’s not just minimized or closed).
+    - Fully quit Claude Desktop (ensure it's not just minimized or closed).
     - Restart Claude Desktop.
     - Look for the 🔌 icon to confirm that the Exa server is connected.
 
@@ -379,7 +379,7 @@ Enum fields and titles are truncated to max 50 options.
 Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
 
-If you need other features or have any feedback, please [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
+If you need other features or have any feedback, [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
 
 # 🚀 Roadmap (March 2025)
 
@@ -392,4 +392,5 @@ If you need other features or have any feedback, please [submit an issue](https:
 - [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
 - [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+- [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/)
 - [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)

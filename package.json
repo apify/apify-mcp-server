@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "type": "module",
   "description": "Model Context Protocol Server for Apify Actors",
   "engines": {
