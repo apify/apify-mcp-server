@@ -293,6 +293,15 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     Find and analyze instagram profile of the Rock.
     ```
 
+#### Debugging NPM package @apify/actors-mcp-server with modelcontextprotocol/inspector
+
+To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
+
+```shell
+export APIFY_TOKEN=your-apify-token
+npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
+```
+
 ### Installing via Smithery
 
 To install Apify Actors MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@apify/actors-mcp-server):
@@ -366,6 +375,7 @@ npm run build
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
+export APIFY_TOKEN=your-apify-token
 npx @modelcontextprotocol/inspector node ./dist/index.js
 ```
 
