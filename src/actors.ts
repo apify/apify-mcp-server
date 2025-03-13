@@ -111,6 +111,27 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
     for (const [key, property] of Object.entries(properties)) {
         const { title, description, enum: enumValues, type, default: defaultValue, prefill } = property;
         filteredProperties[key] = { title, description, enum: enumValues, type, default: defaultValue, prefill };
+        if (type === 'array') {
+            const itemsType: string | null = property.items?.type
+                || (property.prefill && typeof property.prefill)
+                || (property.default && typeof property.default)
+                || (property.editor && getEditorItemType(property.editor))
+                || null;
+
+            if (itemsType) {
+                filteredProperties[key].items = {
+                    type: itemsType,
+                };
+            }
+
+            function getEditorItemType(editor: string): string | null {
+                const editorTypeMap: Record<string, string> = {
+                    requestListSources: 'object',
+                    stringList: 'string'
+                };
+                return editorTypeMap[editor] || null;
+            }
+        }
     }
     return filteredProperties;
 }

@@ -43,6 +43,8 @@ export interface SchemaProperties {
     type: string; // Data type (e.g., "string")
     default: string;
     prefill: string;
+    items?: { type: string; }
+    editor?: string;
 }
 
 //  ActorStoreList for actor-search tool
