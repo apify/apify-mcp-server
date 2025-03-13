@@ -103,6 +103,26 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
     return `${readmeFirst}\n\nREADME was truncated because it was too long. Remaining headers:\n${prunedReadme.join(', ')}`;
 }
 /**
+ * Helps determine the type of items in an array schema property.
+ * Priority order: explicit type in items > prefill type > default value type > editor type.
+ */
+export function inferArrayItemType(property: SchemaProperties): string | null {
+    return property.items?.type
+        || (property.prefill && typeof property.prefill)
+        || (property.default && typeof property.default)
+        || (property.editor && getEditorItemType(property.editor))
+        || null;
+
+    function getEditorItemType(editor: string): string | null {
+        const editorTypeMap: Record<string, string> = {
+            requestListSources: 'object',
+            stringList: 'string',
+        };
+        return editorTypeMap[editor] || null;
+    }
+}
+
+/**
  * Filters schema properties to include only the necessary fields.
  * @param properties
  */
@@ -112,24 +132,9 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
         const { title, description, enum: enumValues, type, default: defaultValue, prefill } = property;
         filteredProperties[key] = { title, description, enum: enumValues, type, default: defaultValue, prefill };
         if (type === 'array') {
-            const itemsType: string | null = property.items?.type
-                || (property.prefill && typeof property.prefill)
-                || (property.default && typeof property.default)
-                || (property.editor && getEditorItemType(property.editor))
-                || null;
-
+            const itemsType = inferArrayItemType(property);
             if (itemsType) {
-                filteredProperties[key].items = {
-                    type: itemsType,
-                };
-            }
-
-            function getEditorItemType(editor: string): string | null {
-                const editorTypeMap: Record<string, string> = {
-                    requestListSources: 'object',
-                    stringList: 'string',
-                };
-                return editorTypeMap[editor] || null;
+                filteredProperties[key].items = { type: itemsType };
             }
         }
     }

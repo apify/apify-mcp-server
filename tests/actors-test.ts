@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { actorNameToToolName } from '../src/actors.js';
+import { actorNameToToolName, inferArrayItemType } from '../src/actors.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -25,6 +25,19 @@ describe('actors', () => {
             const longName = 'a'.repeat(70);
             const expected = 'a'.repeat(64);
             expect(actorNameToToolName(longName)).toBe(expected);
+        });
+
+        it('infers array item type from editor', () => {
+            const property = {
+                type: 'array',
+                editor: 'stringList',
+                title: '',
+                description: '',
+                enum: [],
+                default: '',
+                prefill: '',
+            };
+            expect(inferArrayItemType(property)).toBe('string');
         });
     });
 });
