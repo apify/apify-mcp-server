@@ -108,8 +108,8 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
  */
 export function inferArrayItemType(property: SchemaProperties): string | null {
     return property.items?.type
-        || (property.prefill && typeof property.prefill)
-        || (property.default && typeof property.default)
+        || (property.prefill && typeof property.prefill[0])
+        || (property.default && typeof property.default[0])
         || (property.editor && getEditorItemType(property.editor))
         || null;
 
