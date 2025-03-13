@@ -127,7 +127,7 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
             function getEditorItemType(editor: string): string | null {
                 const editorTypeMap: Record<string, string> = {
                     requestListSources: 'object',
-                    stringList: 'string'
+                    stringList: 'string',
                 };
                 return editorTypeMap[editor] || null;
             }
