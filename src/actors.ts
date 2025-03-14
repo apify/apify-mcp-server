@@ -123,6 +123,23 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
 }
 
 /**
+ * Add enum values as string to property descriptions.
+ * @param properties
+ */
+export function addEnumsToDescriptionsWithExamples(properties: { [key: string]: SchemaProperties }): { [key: string]: SchemaProperties } {
+    for (const property of Object.values(properties)) {
+        if (property.enum && property.enum.length > 0) {
+            property.description = `${property.description}\nPossible values: ${property.enum.join(',')}`;
+        }
+        const value = property.prefill ?? property.default;
+        if (value && !(Array.isArray(value) && value.length === 0)) {
+            property.examples = Array.isArray(value) ? value : [value];
+        }
+    }
+    return properties;
+}
+
+/**
  * Filters schema properties to include only the necessary fields.
  * @param properties
  */
@@ -160,7 +177,8 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
                 const properties = filterSchemaProperties(result.input.properties as { [key: string]: SchemaProperties });
-                result.input.properties = shortenProperties(properties);
+                const propertiesShortened = shortenProperties(properties);
+                result.input.properties = addEnumsToDescriptionsWithExamples(propertiesShortened);
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;

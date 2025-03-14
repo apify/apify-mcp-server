@@ -45,6 +45,7 @@ export interface SchemaProperties {
     prefill: string;
     items?: { type: string; }
     editor?: string;
+    examples?: unknown[];
 }
 
 //  ActorStoreList for actor-search tool
