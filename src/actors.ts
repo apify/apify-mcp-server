@@ -108,8 +108,8 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
  */
 export function inferArrayItemType(property: SchemaProperties): string | null {
     return property.items?.type
-        || (property.prefill && typeof property.prefill[0])
-        || (property.default && typeof property.default[0])
+        || (property.prefill?.length > 0 && typeof property.prefill[0])
+        || (property.default?.length > 0 && typeof property.default[0])
         || (property.editor && getEditorItemType(property.editor))
         || null;
 
@@ -117,6 +117,8 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
         const editorTypeMap: Record<string, string> = {
             requestListSources: 'object',
             stringList: 'string',
+            json: 'object',
+            globs: 'object',
         };
         return editorTypeMap[editor] || null;
     }
@@ -134,6 +136,7 @@ export function addEnumsToDescriptionsWithExamples(properties: { [key: string]: 
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
             property.examples = Array.isArray(value) ? value : [value];
+            property.description = `${property.description}\nExample values: ${JSON.stringify(value)}`;
         }
     }
     return properties;
