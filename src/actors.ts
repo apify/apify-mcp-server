@@ -110,7 +110,7 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
  * Helps determine the type of items in an array schema property.
  * Priority order: explicit type in items > prefill type > default value type > editor type.
  */
-function inferArrayItemType(property: ISchemaProperties): string | null {
+export function inferArrayItemType(property: ISchemaProperties): string | null {
     return property.items?.type
         || (Array.isArray(property.prefill) && property.prefill.length > 0 && typeof property.prefill[0])
         || (Array.isArray(property.default) && property.default.length > 0 && typeof property.default[0])
@@ -241,7 +241,6 @@ function buildNestedProperties(properties: Record<string, ISchemaProperties>): R
                         },
                     },
                 },
-                required: ['useApifyProxy'],
             };
         }
     }
