@@ -109,6 +109,9 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
 /**
  * Helps determine the type of items in an array schema property.
  * Priority order: explicit type in items > prefill type > default value type > editor type.
+ * 
+ * Based on JSON schema, the array needs a type, and most of the time Actor input schema does not have this, so we need to infer that.
+ * 
  */
 export function inferArrayItemType(property: ISchemaProperties): string | null {
     return property.items?.type
@@ -130,6 +133,13 @@ export function inferArrayItemType(property: ISchemaProperties): string | null {
 
 /**
  * Add enum values as string to property descriptions.
+ * 
+ * This is done as a preventive measure to prevent cases where library or agent framework
+ * does not handle enums or examples based on JSON schema definition.
+ * 
+ * https://json-schema.org/understanding-json-schema/reference/enum
+ * https://json-schema.org/understanding-json-schema/reference/annotations
+ * 
  * @param properties
  */
 function addEnumsToDescriptionsWithExamples(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
@@ -148,24 +158,26 @@ function addEnumsToDescriptionsWithExamples(properties: { [key: string]: ISchema
 
 /**
  * Filters schema properties to include only the necessary fields.
+ * 
+ * This is done to reduce the size of the input schema and to make it more readable.
+ * 
  * @param properties
  */
 export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
     const filteredProperties: { [key: string]: ISchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
-        const { title, description, enum: enumValues, type,
-            default: defaultValue, prefill, properties: subProperties,
-            items, required } = property;
-        filteredProperties[key] = { title,
-            description,
-            enum: enumValues,
-            type,
-            default: defaultValue,
-            prefill,
-            properties: subProperties,
-            items,
-            required };
-        if (type === 'array' && !items?.type) {
+        filteredProperties[key] = {
+            title: property.title,
+            description: property.description,
+            enum: property.enum,
+            type: property.type,
+            default: property.default,
+            prefill: property.prefill,
+            properties: property.properties,
+            items: property.items,
+            required: property.required,
+        };
+        if (property.type === 'array' && !property.items?.type) {
             const itemsType = inferArrayItemType(property);
             if (itemsType) {
                 filteredProperties[key].items = {
@@ -183,6 +195,10 @@ export function filterSchemaProperties(properties: { [key: string]: ISchemaPrope
 /**
  * Marks input properties as required by adding a "REQUIRED" prefix to their descriptions.
  * Takes an IActorInput object and returns a modified Record of SchemaProperties.
+ * 
+ * This is done for maximum compatibility in case where library or agent framework does not consider
+ * required fields and does not handle the JSON schema properly: we are prepending this to the description
+ * as a preventive measure.
  * @param {IActorInputSchema} input - Actor input object containing properties and required fields
  * @returns {Record<string, ISchemaProperties>} - Modified properties with required fields marked
  */
@@ -203,6 +219,15 @@ function markInputPropertiesAsRequired(input: IActorInputSchema): Record<string,
 
 /**
  * Builds nested properties for object types in the schema.
+ * 
+ * Specifically handles special cases like proxy configuration and request list sources
+ * by adding predefined nested properties to these object types.
+ * This is necessary for the agent to correctly infer how to structure object inputs
+ * when passing arguments to the Actor.
+ * 
+ * For proxy objects (type='object', editor='proxy'), adds 'useApifyProxy' property.
+ * For request list sources (type='array', editor='requestListSources'), adds URL structure to items.
+ * 
  * @param {Record<string, ISchemaProperties>} properties - The input schema properties
  * @returns {Record<string, ISchemaProperties>} Modified properties with nested properties
  */
@@ -255,6 +280,13 @@ function buildNestedProperties(properties: Record<string, ISchemaProperties>): R
  * It uses the AJV library to validate the input schemas.
  *
  * Tool name can't contain /, so it is replaced with _
+ * 
+ * The input schema processing workflow:
+ * 1. Properties are marked as required using markInputPropertiesAsRequired()
+ * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
+ * 3. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
+ * 4. Properties are filtered using filterSchemaProperties()
+ * 5. Properties are shortened using shortenProperties()
  *
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
@@ -268,9 +300,9 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
             if (result.input && 'properties' in result.input && result.input) {
                 const propertiesMarkedAsRequired = markInputPropertiesAsRequired(result.input);
                 const propertiesObjectsBuilt = buildNestedProperties(propertiesMarkedAsRequired);
-                const propertiesFiltered = filterSchemaProperties(propertiesObjectsBuilt);
-                const propertiesShortened = shortenProperties(propertiesFiltered);
-                result.input.properties = addEnumsToDescriptionsWithExamples(propertiesShortened);
+                const propertiesWithExamples = addEnumsToDescriptionsWithExamples(propertiesObjectsBuilt);
+                const propertiesFiltered = filterSchemaProperties(propertiesWithExamples);
+                result.input.properties = shortenProperties(propertiesFiltered);
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
