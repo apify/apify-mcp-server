@@ -3,7 +3,7 @@ import { ApifyClient } from 'apify-client';
 
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH, ACTOR_README_MAX_LENGTH } from './const.js';
 import { log } from './logger.js';
-import type { ActorDefinitionPruned, ActorDefinitionWithDesc, SchemaProperties, Tool } from './types.js';
+import type { ActorDefinitionPruned, ActorDefinitionWithDesc, IActorInputSchema, ISchemaProperties, Tool } from './types.js';
 
 export function actorNameToToolName(actorName: string): string {
     return actorName
@@ -67,7 +67,11 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         actorFullName: response.actorFullName || '',
         buildTag: response?.buildTag || '',
         readme: response?.readme || '',
-        input: response?.input || null,
+        input: response?.input && 'type' in response.input && 'properties' in response.input
+            ? { ...response.input,
+                type: response.input.type as string,
+                properties: response.input.properties as Record<string, ISchemaProperties> }
+            : undefined,
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
     };
@@ -77,7 +81,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
  * Shortens the description and enum values of schema properties.
  * @param properties
  */
-export function shortenProperties(properties: { [key: string]: SchemaProperties}): { [key: string]: SchemaProperties } {
+export function shortenProperties(properties: { [key: string]: ISchemaProperties}): { [key: string]: ISchemaProperties } {
     for (const property of Object.values(properties)) {
         if (property.description.length > MAX_DESCRIPTION_LENGTH) {
             property.description = `${property.description.slice(0, MAX_DESCRIPTION_LENGTH)}...`;
@@ -106,10 +110,10 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
  * Helps determine the type of items in an array schema property.
  * Priority order: explicit type in items > prefill type > default value type > editor type.
  */
-export function inferArrayItemType(property: SchemaProperties): string | null {
+function inferArrayItemType(property: ISchemaProperties): string | null {
     return property.items?.type
-        || (property.prefill?.length > 0 && typeof property.prefill[0])
-        || (property.default?.length > 0 && typeof property.default[0])
+        || (Array.isArray(property.prefill) && property.prefill.length > 0 && typeof property.prefill[0])
+        || (Array.isArray(property.default) && property.default.length > 0 && typeof property.default[0])
         || (property.editor && getEditorItemType(property.editor))
         || null;
 
@@ -128,7 +132,7 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
  * Add enum values as string to property descriptions.
  * @param properties
  */
-export function addEnumsToDescriptionsWithExamples(properties: { [key: string]: SchemaProperties }): { [key: string]: SchemaProperties } {
+function addEnumsToDescriptionsWithExamples(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
     for (const property of Object.values(properties)) {
         if (property.enum && property.enum.length > 0) {
             property.description = `${property.description}\nPossible values: ${property.enum.join(',')}`;
@@ -146,19 +150,103 @@ export function addEnumsToDescriptionsWithExamples(properties: { [key: string]: 
  * Filters schema properties to include only the necessary fields.
  * @param properties
  */
-export function filterSchemaProperties(properties: { [key: string]: SchemaProperties }): { [key: string]: SchemaProperties } {
-    const filteredProperties: { [key: string]: SchemaProperties } = {};
+export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
+    const filteredProperties: { [key: string]: ISchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
-        const { title, description, enum: enumValues, type, default: defaultValue, prefill } = property;
-        filteredProperties[key] = { title, description, enum: enumValues, type, default: defaultValue, prefill };
-        if (type === 'array') {
+        const { title, description, enum: enumValues, type,
+            default: defaultValue, prefill, properties: subProperties,
+            items, required } = property;
+        filteredProperties[key] = { title,
+            description,
+            enum: enumValues,
+            type,
+            default: defaultValue,
+            prefill,
+            properties: subProperties,
+            items,
+            required };
+        if (type === 'array' && !items?.type) {
             const itemsType = inferArrayItemType(property);
             if (itemsType) {
-                filteredProperties[key].items = { type: itemsType };
+                filteredProperties[key].items = {
+                    ...filteredProperties[key].items,
+                    title: filteredProperties[key].title ?? 'Item',
+                    description: filteredProperties[key].description ?? 'Item',
+                    type: itemsType,
+                };
             }
         }
     }
     return filteredProperties;
+}
+
+/**
+ * Marks input properties as required by adding a "REQUIRED" prefix to their descriptions.
+ * Takes an IActorInput object and returns a modified Record of SchemaProperties.
+ * @param {IActorInputSchema} input - Actor input object containing properties and required fields
+ * @returns {Record<string, ISchemaProperties>} - Modified properties with required fields marked
+ */
+function markInputPropertiesAsRequired(input: IActorInputSchema): Record<string, ISchemaProperties> {
+    const { required = [], properties } = input;
+
+    for (const property of Object.keys(properties)) {
+        if (required.includes(property)) {
+            properties[property] = {
+                ...properties[property],
+                description: `**REQUIRED** ${properties[property].description}`,
+            };
+        }
+    }
+
+    return properties;
+}
+
+/**
+ * Builds nested properties for object types in the schema.
+ * @param {Record<string, ISchemaProperties>} properties - The input schema properties
+ * @returns {Record<string, ISchemaProperties>} Modified properties with nested properties
+ */
+function buildNestedProperties(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
+    const clonedProperties = { ...properties };
+
+    for (const [propertyName, property] of Object.entries(clonedProperties)) {
+        if (property.type === 'object' && property.editor === 'proxy') {
+            clonedProperties[propertyName] = {
+                ...property,
+                properties: {
+                    ...property.properties,
+                    useApifyProxy: {
+                        title: 'Use Apify Proxy',
+                        type: 'boolean',
+                        description: 'Whether to use Apify Proxy - ALWAYS SET TO TRUE.',
+                        default: true,
+                        examples: [true],
+                    },
+                },
+                required: ['useApifyProxy'],
+            };
+        } else if (property.type === 'array' && property.editor === 'requestListSources') {
+            clonedProperties[propertyName] = {
+                ...property,
+                items: {
+                    ...property.items,
+                    type: 'object',
+                    title: 'Request list source',
+                    description: 'Request list source',
+                    properties: {
+                        url: {
+                            title: 'URL',
+                            type: 'string',
+                            description: 'URL of the request list source',
+                        },
+                    },
+                },
+                required: ['useApifyProxy'],
+            };
+        }
+    }
+
+    return clonedProperties;
 }
 
 /**
@@ -179,8 +267,10 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     for (const result of results) {
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
-                const properties = filterSchemaProperties(result.input.properties as { [key: string]: SchemaProperties });
-                const propertiesShortened = shortenProperties(properties);
+                const propertiesMarkedAsRequired = markInputPropertiesAsRequired(result.input);
+                const propertiesObjectsBuilt = buildNestedProperties(propertiesMarkedAsRequired);
+                const propertiesFiltered = filterSchemaProperties(propertiesObjectsBuilt);
+                const propertiesShortened = shortenProperties(propertiesFiltered);
                 result.input.properties = addEnumsToDescriptionsWithExamples(propertiesShortened);
             }
             try {

@@ -9,22 +9,47 @@ export type Input = {
     debugActorInput?: unknown;
 };
 
-export interface ActorDefinitionPruned {
-    id: string;
-    actorFullName: string;
-    buildTag?: string;
-    readme?: string | null;
-    input?: object | null;
+export interface ISchemaProperties {
+    type: string;
+
+    title: string;
     description: string;
-    defaultRunOptions: ActorDefaultRunOptions;
+
+    enum?: string[]; // Array of string options for the enum
+    enumTitles?: string[]; // Array of string titles for the enum
+    default?: unknown;
+    prefill?: unknown;
+
+    items?: ISchemaProperties;
+    editor?: string;
+    examples?: unknown[];
+
+    properties?: Record<string, ISchemaProperties>;
+    required?: string[];
 }
 
-export interface ActorDefinitionWithDesc extends ActorDefinition {
+export interface IActorInputSchema {
+    title?: string;
+    description?: string;
+
+    type: string;
+
+    properties: Record<string, ISchemaProperties>;
+
+    required?: string[];
+    schemaVersion?: number;
+}
+
+export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
-    defaultRunOptions: ActorDefaultRunOptions
+    defaultRunOptions: ActorDefaultRunOptions;
+    input?: IActorInputSchema;
 }
+
+export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
+    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'>
 
 export interface Tool {
     name: string;
@@ -33,19 +58,6 @@ export interface Tool {
     inputSchema: object;
     ajvValidate: ValidateFunction;
     memoryMbytes?: number;
-}
-
-export interface SchemaProperties {
-    title: string;
-    description: string;
-    enum: string[]; // Array of string options for the enum
-    enumTitles?: string[]; // Array of string titles for the enum
-    type: string; // Data type (e.g., "string")
-    default: string;
-    prefill: string;
-    items?: { type: string; }
-    editor?: string;
-    examples?: unknown[];
 }
 
 //  ActorStoreList for actor-search tool

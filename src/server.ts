@@ -34,7 +34,7 @@ import {
     searchActorsByKeywords,
     GetActorDefinition,
 } from './tools.js';
-import type { SchemaProperties, Tool } from './types.js';
+import type { ISchemaProperties, Tool } from './types.js';
 
 /**
  * Create Apify MCP server
@@ -199,7 +199,7 @@ export class ApifyMcpServer {
                         const parsed = GetActorDefinition.parse(args);
                         const v = await getActorDefinition(parsed.actorName, parsed.limit);
                         if (v && v.input && 'properties' in v.input && v.input) {
-                            const properties = filterSchemaProperties(v.input.properties as { [key: string]: SchemaProperties });
+                            const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                             v.input.properties = shortenProperties(properties);
                         }
                         return { content: [{ type: 'text', text: JSON.stringify(v) }] };
