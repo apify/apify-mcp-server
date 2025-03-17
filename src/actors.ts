@@ -142,10 +142,10 @@ export function inferArrayItemType(property: ISchemaProperties): string | null {
  * 
  * @param properties
  */
-function addEnumsToDescriptionsWithExamples(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
+function addEnumsToDescriptionsWithExamples(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
     for (const property of Object.values(properties)) {
         if (property.enum && property.enum.length > 0) {
-            property.description = `${property.description}\nPossible values: ${property.enum.join(',')}`;
+            property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
         }
         const value = property.prefill ?? property.default;
         if (value && !(Array.isArray(value) && value.length === 0)) {
@@ -284,9 +284,9 @@ function buildNestedProperties(properties: Record<string, ISchemaProperties>): R
  * The input schema processing workflow:
  * 1. Properties are marked as required using markInputPropertiesAsRequired()
  * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
- * 3. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
- * 4. Properties are filtered using filterSchemaProperties()
- * 5. Properties are shortened using shortenProperties()
+ * 3. Properties are filtered using filterSchemaProperties()
+ * 4. Properties are shortened using shortenProperties()
+ * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
@@ -300,9 +300,9 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
             if (result.input && 'properties' in result.input && result.input) {
                 const propertiesMarkedAsRequired = markInputPropertiesAsRequired(result.input);
                 const propertiesObjectsBuilt = buildNestedProperties(propertiesMarkedAsRequired);
-                const propertiesWithExamples = addEnumsToDescriptionsWithExamples(propertiesObjectsBuilt);
-                const propertiesFiltered = filterSchemaProperties(propertiesWithExamples);
-                result.input.properties = shortenProperties(propertiesFiltered);
+                const propertiesFiltered = filterSchemaProperties(propertiesObjectsBuilt);
+                const propertiesShortened = shortenProperties(propertiesFiltered);
+                result.input.properties = addEnumsToDescriptionsWithExamples(propertiesShortened);
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
