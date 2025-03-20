@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { actorNameToToolName, inferArrayItemType } from '../src/actors.js';
+import { actorNameToToolName, inferArrayItemType, shortenEnum } from '../src/actors.js';
+import { ACTOR_ENUM_MAX_LENGTH } from '../src/const.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -38,6 +39,20 @@ describe('actors', () => {
                 prefill: '',
             };
             expect(inferArrayItemType(property)).toBe('string');
+        });
+
+        it('shorten enum list', () => {
+            const enumList: string[] = [];
+            const wordLength = 10;
+            const wordCount = 30;
+
+            for (let i = 0; i < wordCount; i++) {
+                enumList.push('a'.repeat(wordLength));
+            }
+
+            const shortenedList = shortenEnum(enumList);
+
+            expect(shortenedList?.length || 0).toBe(ACTOR_ENUM_MAX_LENGTH / wordLength);
         });
     });
 });
