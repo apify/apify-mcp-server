@@ -78,7 +78,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
 }
 
 /**
- * Shortens the description and enum values of schema properties.
+ * Shortens the description
  * @param properties
  */
 export function shortenProperties(properties: { [key: string]: ISchemaProperties}): { [key: string]: ISchemaProperties } {
@@ -282,7 +282,7 @@ function buildNestedProperties(properties: Record<string, ISchemaProperties>): R
  * Tool name can't contain /, so it is replaced with _
  *
  * The input schema processing workflow:
- * 1. Properties are marked as required using markInputPropertiesAsRequired()
+ * 1. Properties are marked as required using markInputPropertiesAsRequired() to add "REQUIRED" prefix to descriptions
  * 2. Nested properties are built by analyzing editor type (proxy, requestListSources) using buildNestedProperties()
  * 3. Properties are filtered using filterSchemaProperties()
  * 4. Properties are shortened using shortenProperties()
@@ -298,6 +298,8 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     for (const result of results) {
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
+                // TODO let us also refactor this to use properties only
+                // We should be able to comment/uncomment any of the following lines and it should work
                 const propertiesMarkedAsRequired = markInputPropertiesAsRequired(result.input);
                 const propertiesObjectsBuilt = buildNestedProperties(propertiesMarkedAsRequired);
                 const propertiesFiltered = filterSchemaProperties(propertiesObjectsBuilt);
