@@ -77,33 +77,56 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
     };
 }
 
+
 /**
- * Shortens the description
+ * Helper function to shorten the enum list if it is too long.
+ *
+ * @param {string[]} enumList - The list of enum values to be shortened.
+ * @returns {string[] | undefined} - The shortened enum list or undefined if the list is too long.
+ */
+export function shortenEnum(enumList: string[]): string[] | undefined {
+    let charCount = 0;
+    let maxEnumCount = 0;
+    let resultEnumList: string[] | undefined = [];
+    for (let i = 0; i < enumList.length; i++) {
+        maxEnumCount = i + 1;
+        charCount += enumList[i].length;
+        if (charCount > ACTOR_ENUM_MAX_LENGTH) {
+            break;
+        }
+    }
+
+    if (maxEnumCount > 0) {
+        resultEnumList = enumList.slice(0, maxEnumCount);
+    } else {
+        // If the enum is too long, we remove it
+        resultEnumList = undefined;
+    }
+
+    return resultEnumList;
+}
+
+/**
+ * Shortens the description, enum, and items.enum properties of the schema properties.
  * @param properties
  */
 export function shortenProperties(properties: { [key: string]: ISchemaProperties}): { [key: string]: ISchemaProperties } {
-    for (const property of Object.values(properties)) {
+    //for (const property of Object.values(properties)) {
+    for (const [key, property] of Object.entries(properties)) {
+        console.log('property.enum', key, property.enum?.length || 0);
+        console.log('property.items.enum', key, property.items?.enum?.length || 0);
         if (property.description.length > MAX_DESCRIPTION_LENGTH) {
             property.description = `${property.description.slice(0, MAX_DESCRIPTION_LENGTH)}...`;
         }
 
         if (property.enum && property.enum?.length > 0) {
-            let charCount = 0;
-            let maxEnumCount = 0;
-            for (let i = 0; i < property.enum.length; i++) {
-                charCount += property.enum[i].length;
-                if (charCount > ACTOR_ENUM_MAX_LENGTH) {
-                    maxEnumCount = i;
-                    break;
-                }
-            }
+            property.enum = shortenEnum(property.enum);
+            console.log('after shortening property.enum.length:', property.enum?.length);
+        }
 
-            if (maxEnumCount > 0) {
-                property.enum = property.enum.slice(0, maxEnumCount);
-            } else {
-                // If the enum is too long, we remove it
-                property.enum = undefined;
-            }
+        if (property.items?.enum && property.items.enum.length > 0) {
+            property.items.enum = shortenEnum(property.items.enum);
+            console.log('after shortening property.items.enum.length:', property.items.enum?.length);
         }
     }
 
@@ -317,6 +340,7 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     const tools = [];
     for (const result of results) {
         if (result) {
+            console.log('actor as tool', result.actorFullName);
             if (result.input && 'properties' in result.input && result.input) {
                 result.input.properties = markInputPropertiesAsRequired(result.input);
                 result.input.properties = buildNestedProperties(result.input.properties);
