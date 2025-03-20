@@ -1,7 +1,7 @@
 import { Ajv } from 'ajv';
 import { ApifyClient } from 'apify-client';
 
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH, ACTOR_README_MAX_LENGTH } from './const.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH, ACTOR_README_MAX_LENGTH, ACTOR_ENUM_MAX_LENGTH } from './const.js';
 import { log } from './logger.js';
 import type { ActorDefinitionPruned, ActorDefinitionWithDesc, IActorInputSchema, ISchemaProperties, Tool } from './types.js';
 
@@ -86,7 +86,27 @@ export function shortenProperties(properties: { [key: string]: ISchemaProperties
         if (property.description.length > MAX_DESCRIPTION_LENGTH) {
             property.description = `${property.description.slice(0, MAX_DESCRIPTION_LENGTH)}...`;
         }
+
+        if (property.enum && property.enum?.length > 0) {
+            let charCount = 0;
+            let maxEnumCount = 0;
+            for (let i = 0; i < property.enum.length; i++) {
+                charCount += property.enum[i].length;
+                if (charCount > ACTOR_ENUM_MAX_LENGTH) {
+                    maxEnumCount = i;
+                    break;
+                }
+            }
+
+            if (maxEnumCount > 0) {
+                property.enum = property.enum.slice(0, maxEnumCount);
+            } else {
+                // If the enum is too long, we remove it
+                property.enum = undefined;
+            }
+        }
     }
+
     return properties;
 }
 
@@ -298,13 +318,11 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
     for (const result of results) {
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
-                // TODO let us also refactor this to use properties only
-                // We should be able to comment/uncomment any of the following lines and it should work
-                const propertiesMarkedAsRequired = markInputPropertiesAsRequired(result.input);
-                const propertiesObjectsBuilt = buildNestedProperties(propertiesMarkedAsRequired);
-                const propertiesFiltered = filterSchemaProperties(propertiesObjectsBuilt);
-                const propertiesShortened = shortenProperties(propertiesFiltered);
-                result.input.properties = addEnumsToDescriptionsWithExamples(propertiesShortened);
+                result.input.properties = markInputPropertiesAsRequired(result.input);
+                result.input.properties = buildNestedProperties(result.input.properties);
+                result.input.properties = filterSchemaProperties(result.input.properties);
+                result.input.properties = shortenProperties(result.input.properties);
+                result.input.properties = addEnumsToDescriptionsWithExamples(result.input.properties);
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
