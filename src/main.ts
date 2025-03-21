@@ -33,6 +33,31 @@ let transport: SSEServerTransport;
 const HELP_MESSAGE = `Connect to the server with GET request to ${HOST}/sse?token=YOUR-APIFY-TOKEN`
     + ` and then send POST requests to ${HOST}/message?token=YOUR-APIFY-TOKEN`;
 
+const actorRun = Actor.isAtHome() ? {
+    data: {
+        id: process.env.ACTOR_RUN_ID,
+        actId: process.env.ACTOR_ID,
+        userId: process.env.APIFY_USER_ID,
+        startedAt: process.env.ACTOR_STARTED_AT,
+        finishedAt: null,
+        status: 'RUNNING',
+        meta: {
+            origin: process.env.APIFY_META_ORIGIN,
+        },
+        options: {
+            build: process.env.ACTOR_BUILD_NUMBER,
+            memoryMbytes: process.env.ACTOR_MEMORY_MBYTES,
+        },
+        buildId: process.env.ACTOR_BUILD_ID,
+        defaultKeyValueStoreId: process.env.ACTOR_DEFAULT_KEY_VALUE_STORE_ID,
+        defaultDatasetId: process.env.ACTOR_DEFAULT_DATASET_ID,
+        defaultRequestQueueId: process.env.ACTOR_DEFAULT_REQUEST_QUEUE_ID,
+        buildNumber: process.env.ACTOR_BUILD_NUMBER,
+        containerUrl: process.env.ACTOR_WEB_SERVER_URL,
+        standbyUrl: process.env.ACTOR_STANDBY_URL,
+    },
+} : {};
+
 /**
  * Process input parameters and update tools
  * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
@@ -63,7 +88,7 @@ app.route(Routes.ROOT)
         try {
             log.info(`Received GET message at: ${Routes.ROOT}`);
             await processParamsAndUpdateTools(req.url);
-            res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}` }).end();
+            res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}`, data: actorRun }).end();
         } catch (error) {
             log.error(`Error in GET ${Routes.ROOT} ${error}`);
             res.status(500).json({ message: 'Internal Server Error' }).end();

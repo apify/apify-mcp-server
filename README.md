@@ -6,10 +6,12 @@
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
-The server can be used in several ways:
+The server can be used in two ways:
 - **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE).
 - **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
-- **💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)** – Chat-like UI for interacting with the MCP server.
+
+
+If can also interact with the MCP server using chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 
 # 🎯 What does Apify MCP server do?
 
@@ -25,7 +27,7 @@ For example it can:
 
 To interact with the Apify MCP server, you can use MCP clients such as:
 - [Claude Desktop](https://claude.ai/download) (only Stdio support)
-- [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yeah without Authorization header))
+- [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yet without Authorization header))
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
 - other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
 - more clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
@@ -43,8 +45,8 @@ The following image shows how the Apify MCP server interacts with the Apify plat
 
 ![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
-In the future, we plan to load Actors dynamically and provide Apify's dataset and key-value store as resources.
-See the [Roadmap](#-roadmap-march-2025) for more details.
+With the MCP Tester client you can load Actors dynamically but this is not yet supported by other MCP clients.
+We also plan to add more features, see [Roadmap](#-roadmap-march-2025) for more details.
 
 # 🔄 What is the Model Context Protocol?
 
@@ -129,9 +131,9 @@ https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>
 It is also possible to start the MCP server with a different set of Actors.
 To do this, create a [task](https://docs.apify.com/platform/actors/running/tasks) and specify the list of Actors you want to use.
 
-Then, run task in Standby mode with the selected Actors using your Apify API token.
+Then, run task in Standby mode with the selected Actors.
 ```shell
-https://actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
+https://USERNAME--actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
 ```
 
 You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
@@ -141,9 +143,8 @@ You can find a list of all available Actors in the [Apify Store](https://apify.c
 Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
 The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
 
-Other clients do not support SSE yet, but this will likely change.
-Please verify if MCP clients such as [Superinference.ai](https://superinterface.ai/) or [LibreChat](https://www.librechat.ai/) support SSE with custom headers.
-([Claude Desktop](https://claude.ai/download) does not support SSE transport yet, see [Claude Desktop Configuration](#claude-desktop) section for more details).
+Most of the MCP clients do not support SSE yet (as of March 2025), but this will likely change.
+[Claude Desktop](https://claude.ai/download) does not support SEE yet, but you can use it with Stdio transport, see [MCP Sever at a local host](#-mcp-server-at-a-local-host) for more details.
 
 In the client settings you need to provide server configuration:
 ```json
