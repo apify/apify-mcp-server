@@ -57,7 +57,8 @@ For more information, see the [Model Context Protocol](https://modelcontextproto
 
 The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
 
-To learn more about AI Agents, explore our blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and browse Apify's curated [AI Agent collection](https://apify.com/store/collections/ai_agents). Wondering if AI Agents are suitable for your specific needs? Our guide [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/) walks you through practical implementation considerations and use cases.
+To learn more about AI Agents, explore our blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and browse Apify's curated [AI Agent collection](https://apify.com/store/collections/ai_agents).
+Interested in building and monetizing your own AI agent on Apify? Check out our [step-by-step guide](https://blog.apify.com/how-to-build-an-ai-agent/) for creating, publishing, and monetizing AI agents on the Apify platform.
 
 # 🧱 Components
 
@@ -396,7 +397,7 @@ If you need other features or have any feedback, [submit an issue](https://conso
 - Add Apify's dataset and key-value store as resources.
 - Add tools such as Actor logs and Actor runs for debugging.
 
-# References
+# 📚 Learn more
 
 - [Model Context Protocol](https://modelcontextprotocol.org/)
 - [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
@@ -404,3 +405,4 @@ If you need other features or have any feedback, [submit an issue](https://conso
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/)
 - [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)
+- [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
