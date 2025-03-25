@@ -11,7 +11,7 @@ The server can be used in two ways:
 - **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
 
 
-If can also interact with the MCP server using chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+It can also interact with the MCP server using chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 
 # 🎯 What does Apify MCP server do?
 
