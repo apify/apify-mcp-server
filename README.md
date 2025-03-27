@@ -7,8 +7,8 @@ Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
 
 The server can be used in two ways:
-- **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE).
-- **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio).
+- **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE). See the guide for [MCP Server Actor](#-mcp-server-actor)
+- **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio). See the guide for [MCP Server at local host](#-mcp-server-at-a-local-host)
 
 
 If can also interact with the MCP server using chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
@@ -211,26 +211,6 @@ You can also use [Smithery](https://smithery.ai/server/@apify/actors-mcp-server)
 - [Node.js](https://nodejs.org/en) (v18 or higher)
 - [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_TOKEN`)
 
-### Install
-
-First, clone the repository using the following command:
-
-```bash
-git clone git@github.com:apify/actor-mcp-server.git
-```
-Navigate to the project directory and install the required dependencies:
-
-```bash
-cd actor-mcp-server
-npm install
-```
-
-Before running the server, you need to build the project:
-
-```bash
-npm run build
-```
-
 #### Claude Desktop
 
 To configure Claude Desktop to work with the MCP server, follow these steps. For a detailed guide, refer to the [Claude Desktop Users Guide](https://modelcontextprotocol.io/quickstart/user).
@@ -295,7 +275,7 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     Find and analyze instagram profile of the Rock.
     ```
 
-#### Debugging NPM package @apify/actors-mcp-server with modelcontextprotocol/inspector
+#### Debugging NPM package @apify/actors-mcp-server with @modelcontextprotocol/inspector
 
 To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
 
