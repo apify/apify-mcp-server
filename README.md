@@ -365,8 +365,13 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 
 ## ⓘ Limitations and feedback
 
-To limit the context size the properties in the `input schema` are pruned and description is truncated to 500 characters.
-Enum fields and titles are truncated to max 50 options.
+The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
+- **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
+- **Enum fields** are truncated to a maximum combined length of 200 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
+- **Required fields** are explicitly marked with a "REQUIRED" prefix in their descriptions for compatibility with frameworks that may not handle JSON schema properly.
+- **Nested properties** are built for special cases like proxy configuration and request list sources to ensure correct input structure.
+- **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
+- **Enum values and examples** are added to property descriptions to ensure visibility even if the client doesn't fully support JSON schema.
 
 Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
