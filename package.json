@@ -8,7 +8,7 @@
   },
   "main": "dist/index.js",
   "bin": {
-    "actors-mcp-server": "./dist/index.js"
+    "actors-mcp-server": "./dist/stdio.js"
   },
   "files": [
     "dist",

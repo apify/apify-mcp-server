@@ -9,7 +9,8 @@
     "lib": ["ES2022"],
     "skipLibCheck": true,
     "typeRoots": ["./types", "./node_modules/@types"],
-    "strict": true
+    "strict": true,
+    "rootDir": "src/"
   },
   "include": ["./src/**/*"],
   "exclude": ["node_modules"]

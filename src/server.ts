@@ -1,228 +1,80 @@
-#!/usr/bin/env node
-/**
- * Model Context Protocol (MCP) server for Apify Actors
- */
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { ApifyClientOptions } from 'apify';
-import { Actor } from 'apify';
-import type { ActorCallOptions } from 'apify-client';
-import { ApifyClient } from 'apify-client';
-import type { AxiosRequestConfig } from 'axios';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import type { Request, Response } from 'express';
+import express from 'express';
 
-import {
-    filterSchemaProperties,
-    getActorDefinition,
-    getActorsAsTools,
-    shortenProperties,
-} from './actors.js';
-import {
-    ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
-    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
-    defaults,
-    InternalTools,
-    SERVER_NAME,
-    SERVER_VERSION,
-    USER_AGENT_ORIGIN,
-} from './const.js';
+import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { log } from './logger.js';
-import {
-    RemoveActorToolArgsSchema,
-    AddActorToToolsArgsSchema,
-    DiscoverActorsArgsSchema,
-    searchActorsByKeywords,
-    GetActorDefinition,
-} from './tools.js';
-import type { ISchemaProperties, Tool } from './types.js';
+import { type ApifyMcpServer, processParamsAndUpdateTools } from './mcp-server.js';
 
-/**
- * Create Apify MCP server
- */
-export class ApifyMcpServer {
-    private server: Server;
-    private tools: Map<string, Tool>;
+export function createServerApp(host: string,
+    mcpServer: ApifyMcpServer,
+    additionalData?: object): express.Express {
+    const HELP_MESSAGE = `Connect to the server with GET request to ${host}/sse?token=YOUR-APIFY-TOKEN`
+        + ` and then send POST requests to ${host}/message?token=YOUR-APIFY-TOKEN`;
 
-    constructor() {
-        this.server = new Server(
-            {
-                name: SERVER_NAME,
-                version: SERVER_VERSION,
-            },
-            {
-                capabilities: {
-                    tools: { listChanged: true },
-                },
-            },
-        );
-        this.tools = new Map();
-        this.setupErrorHandling();
-        this.setupToolHandlers();
-    }
+    const app = express();
 
-    /**
-     * Adds a User-Agent header to the request config.
-     * @param config
-     * @private
-     */
-    private addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
-        const updatedConfig = { ...config };
-        updatedConfig.headers = updatedConfig.headers ?? {};
-        updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
-        return updatedConfig;
-    }
 
-    /**
-     * Calls an Apify actor and retrieves the dataset items.
-     *
-     * It requires the `APIFY_TOKEN` environment variable to be set.
-     * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
-     *
-     * @param {string} actorName - The name of the actor to call.
-     * @param {ActorCallOptions} callOptions - The options to pass to the actor.
-     * @param {unknown} input - The input to pass to the actor.
-     * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
-     * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
-     */
-    public async callActorGetDataset(
-        actorName: string,
-        input: unknown,
-        callOptions: ActorCallOptions | undefined = undefined,
-    ): Promise<object[]> {
-        const name = actorName;
-        try {
-            log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
+    let transport: SSEServerTransport;
 
-            const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
-            const client = new ApifyClient({ ...options, token: process.env.APIFY_TOKEN });
-            const actorClient = client.actor(name);
-
-            const results = await actorClient.call(input, callOptions);
-            const dataset = await client.dataset(results.defaultDatasetId).listItems();
-            log.info(`Actor ${name} finished with ${dataset.items.length} items`);
-
-            if (process.env.APIFY_IS_AT_HOME) {
-                await Actor.pushData(dataset.items);
-                log.info(`Pushed ${dataset.items.length} items to the dataset`);
+    app.route(Routes.ROOT)
+        .get(async (req: Request, res: Response) => {
+            if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
+                log.debug('Received readiness probe');
+                res.status(200).json({ message: 'Server is ready' }).end();
+                return;
             }
-            return dataset.items;
-        } catch (error) {
-            log.error(`Error calling actor: ${error}. Actor: ${name}, input: ${JSON.stringify(input)}`);
-            throw new Error(`Error calling actor: ${error}`);
-        }
-    }
-
-    public async addToolsFromActors(actors: string[]) {
-        const tools = await getActorsAsTools(actors);
-        this.updateTools(tools);
-        return tools;
-    }
-
-    public async addToolsFromDefaultActors() {
-        await this.addToolsFromActors(defaults.actors);
-    }
-
-    public updateTools(tools: Tool[]): void {
-        for (const tool of tools) {
-            this.tools.set(tool.name, tool);
-            log.info(`Added/Updated tool: ${tool.actorFullName} (tool: ${tool.name})`);
-        }
-    }
-
-    /**
-     * Returns an array of tool names.
-     * @returns {string[]} - An array of tool names.
-     */
-    public getToolNames(): string[] {
-        return Array.from(this.tools.keys());
-    }
-
-    private setupErrorHandling(): void {
-        this.server.onerror = (error) => {
-            console.error('[MCP Error]', error); // eslint-disable-line no-console
-        };
-        process.on('SIGINT', async () => {
-            await this.server.close();
-            process.exit(0);
-        });
-    }
-
-    private setupToolHandlers(): void {
-        this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            return { tools: Array.from(this.tools.values()) };
-        });
-
-        /**
-         * Handles the request to call a tool.
-         * @param {object} request - The request object containing tool name and arguments.
-         * @throws {Error} - Throws an error if the tool is unknown or arguments are invalid.
-         */
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            const { name, arguments: args } = request.params;
-
-            const tool = Array.from(this.tools.values()).find((t) => t.name === name || t.actorFullName === name);
-            if (!tool) {
-                throw new Error(`Unknown tool: ${name}`);
-            }
-            if (!args) {
-                throw new Error(`Missing arguments for tool: ${name}`);
-            }
-            log.info(`Validate arguments for tool: ${tool.name} with arguments: ${JSON.stringify(args)}`);
-            if (!tool.ajvValidate(args)) {
-                throw new Error(`Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`);
-            }
-
             try {
-                switch (name) {
-                    case InternalTools.ADD_ACTOR_TO_TOOLS: {
-                        const parsed = AddActorToToolsArgsSchema.parse(args);
-                        const toolsAdded = await this.addToolsFromActors([parsed.actorName]);
-                        await this.server.notification({ method: 'notifications/tools/list_changed' });
-                        return { content: [{ type: 'text', text: `Actor added: ${toolsAdded.map((t) => `${t.actorFullName} (tool name: ${t.name})`).join(', ')}` }] };
-                    }
-                    case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
-                        const parsed = RemoveActorToolArgsSchema.parse(args);
-                        this.tools.delete(parsed.toolName);
-                        await this.server.notification({ method: 'notifications/tools/list_changed' });
-                        return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
-                    }
-                    case InternalTools.DISCOVER_ACTORS: {
-                        const parsed = DiscoverActorsArgsSchema.parse(args);
-                        const actors = await searchActorsByKeywords(
-                            parsed.search,
-                            parsed.limit,
-                            parsed.offset,
-                        );
-                        return { content: actors?.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
-                    }
-                    case InternalTools.GET_ACTOR_DETAILS: {
-                        const parsed = GetActorDefinition.parse(args);
-                        const v = await getActorDefinition(parsed.actorName, parsed.limit);
-                        if (v && v.input && 'properties' in v.input && v.input) {
-                            const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
-                            v.input.properties = shortenProperties(properties);
-                        }
-                        return { content: [{ type: 'text', text: JSON.stringify(v) }] };
-                    }
-                    default: {
-                        const items = await this.callActorGetDataset(tool.actorFullName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
-                        const content = items.map((item) => {
-                            const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
-                            return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
-                                ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
-                                : { type: 'text', text };
-                        });
-                        return { content };
-                    }
+                log.info(`Received GET message at: ${Routes.ROOT}`);
+                await processParamsAndUpdateTools(req.url, mcpServer);
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.setHeader('Cache-Control', 'no-cache');
+                res.setHeader('Connection', 'keep-alive');
+                res.status(200).json({ message: `Actor is using Model Context Protocol. ${HELP_MESSAGE}`, data: additionalData }).end();
+            } catch (error) {
+                log.error(`Error in GET ${Routes.ROOT} ${error}`);
+                res.status(500).json({ message: 'Internal Server Error' }).end();
+            }
+        })
+        .head((_req: Request, res: Response) => {
+            res.status(200).end();
+        });
+
+    app.route(Routes.SSE)
+        .get(async (req: Request, res: Response) => {
+            try {
+                log.info(`Received GET message at: ${Routes.SSE}`);
+                await processParamsAndUpdateTools(req.url, mcpServer);
+                transport = new SSEServerTransport(Routes.MESSAGE, res);
+                await mcpServer.connect(transport);
+            } catch (error) {
+                log.error(`Error in GET ${Routes.SSE}: ${error}`);
+                res.status(500).json({ message: 'Internal Server Error' }).end();
+            }
+        });
+
+    app.route(Routes.MESSAGE)
+        .post(async (req: Request, res: Response) => {
+            try {
+                log.info(`Received POST message at: ${Routes.MESSAGE}`);
+                if (transport) {
+                    await transport.handlePostMessage(req, res);
+                } else {
+                    res.status(400).json({
+                        message: 'Server is not connected to the client. '
+                            + 'Connect to the server with GET request to /sse endpoint',
+                    });
                 }
             } catch (error) {
-                log.error(`Error calling tool: ${error}`);
-                throw new Error(`Error calling tool: ${error}`);
+                log.error(`Error in POST ${Routes.MESSAGE}: ${error}`);
+                res.status(500).json({ message: 'Internal Server Error' }).end();
             }
         });
-    }
 
-    async connect(transport: Transport): Promise<void> {
-        await this.server.connect(transport);
-    }
+    // Catch-all for undefined routes
+    app.use((req: Request, res: Response) => {
+        res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${HELP_MESSAGE}` }).end();
+    });
+
+    return app;
 }
