@@ -1,5 +1,8 @@
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
+
+import type { ApifyMcpServer } from './mcp-server';
 
 export type Input = {
     actors: string[] | string;
@@ -51,13 +54,72 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'>
 
-export interface Tool {
+/**
+ * Base interface for all tools in the MCP server.
+ * Contains common properties shared by all tool types.
+ */
+export interface ToolBase {
+    /** Unique name/identifier for the tool */
     name: string;
-    actorFullName: string;
+    /** Description of what the tool does */
     description: string;
+    /** JSON schema defining the tool's input parameters */
     inputSchema: object;
+    /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
+}
+
+/**
+ * Interface for Actor-based tools - tools that wrap Apify Actors.
+ * Extends ToolBase with Actor-specific properties.
+ */
+export interface ActorTool extends ToolBase {
+    /** Full name of the Apify Actor (username/name) */
+    actorFullName: string;
+    /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
+}
+
+/**
+ * Arguments passed to internal tool calls.
+ * Contains both the tool arguments and server references.
+ */
+export type InternalToolArgs = {
+    /** Arguments passed to the tool */
+    args: Record<string, unknown>;
+    /** Reference to the Apify MCP server instance */
+    apifyMcpServer: ApifyMcpServer;
+    /** Reference to the MCP server instance */
+    mcpServer: Server;
+}
+
+/**
+ * Interface for internal tools - tools implemented directly in the MCP server.
+ * Extends ToolBase with a call function implementation.
+ */
+export interface InternalTool extends ToolBase {
+    /**
+     * Executes the tool with the given arguments
+     * @param toolArgs - Arguments and server references
+     * @returns Promise resolving to the tool's output
+     */
+    call: (toolArgs: InternalToolArgs) => Promise<object>;
+}
+
+/**
+ * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
+ */
+export type ToolType = 'internal' | 'actor';
+
+/**
+ * Wrapper interface that combines a tool with its type discriminator.
+ * Used to store and manage tools of different types uniformly.
+ */
+export interface ToolWrap {
+    /** Type of the tool (internal or actor) */
+    type: ToolType;
+    /** The tool instance */
+    tool: ActorTool | InternalTool;
 }
 
 //  ActorStoreList for actor-search tool

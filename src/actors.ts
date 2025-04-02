@@ -3,7 +3,7 @@ import { ApifyClient } from 'apify-client';
 
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults, MAX_DESCRIPTION_LENGTH, ACTOR_README_MAX_LENGTH, ACTOR_ENUM_MAX_LENGTH } from './const.js';
 import { log } from './logger.js';
-import type { ActorDefinitionPruned, ActorDefinitionWithDesc, IActorInputSchema, ISchemaProperties, Tool } from './types.js';
+import type { ActorDefinitionPruned, ActorDefinitionWithDesc, IActorInputSchema, ISchemaProperties, ToolWrap } from './types.js';
 
 export function actorNameToToolName(actorName: string): string {
     return actorName
@@ -316,10 +316,10 @@ function buildNestedProperties(properties: Record<string, ISchemaProperties>): R
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
-export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
+export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     const results = await Promise.all(actors.map(getActorDefinition));
-    const tools = [];
+    const tools: ToolWrap[] = [];
     for (const result of results) {
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
@@ -332,12 +332,15 @@ export async function getActorsAsTools(actors: string[]): Promise<Tool[]> {
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
                 tools.push({
-                    name: actorNameToToolName(result.actorFullName),
-                    actorFullName: result.actorFullName,
-                    description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
-                    inputSchema: result.input || {},
-                    ajvValidate: ajv.compile(result.input || {}),
-                    memoryMbytes: memoryMbytes > defaults.maxMemoryMbytes ? defaults.maxMemoryMbytes : memoryMbytes,
+                    type: 'actor',
+                    tool: {
+                        name: actorNameToToolName(result.actorFullName),
+                        actorFullName: result.actorFullName,
+                        description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
+                        inputSchema: result.input || {},
+                        ajvValidate: ajv.compile(result.input || {}),
+                        memoryMbytes: memoryMbytes > defaults.maxMemoryMbytes ? defaults.maxMemoryMbytes : memoryMbytes,
+                    },
                 });
             } catch (validationError) {
                 log.error(`Failed to compile AJV schema for Actor: ${result.actorFullName}. Error: ${validationError}`);

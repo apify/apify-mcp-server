@@ -14,36 +14,27 @@ import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
 import {
-    filterSchemaProperties,
-    getActorDefinition,
     getActorsAsTools,
-    shortenProperties,
 } from './actors.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     defaults,
-    InternalTools,
     SERVER_NAME,
     SERVER_VERSION,
     USER_AGENT_ORIGIN,
 } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
-import { getActorAutoLoadingTools,
-    RemoveActorToolArgsSchema,
-    AddActorToToolsArgsSchema,
-    DiscoverActorsArgsSchema,
-    searchActorsByKeywords,
-    GetActorDefinition } from './tools.js';
-import type { Input, ISchemaProperties, Tool } from './types.js';
+import { getActorAutoLoadingTools } from './tools.js';
+import type { Input, ActorTool, ToolWrap, InternalTool } from './types.js';
 
 /**
  * Create Apify MCP server
  */
 export class ApifyMcpServer {
     private server: Server;
-    private tools: Map<string, Tool>;
+    public tools: Map<string, ToolWrap>;
 
     constructor() {
         this.server = new Server(
@@ -124,10 +115,10 @@ export class ApifyMcpServer {
         await this.addToolsFromActors(defaults.actors);
     }
 
-    public updateTools(tools: Tool[]): void {
-        for (const tool of tools) {
-            this.tools.set(tool.name, tool);
-            log.info(`Added/Updated tool: ${tool.actorFullName} (tool: ${tool.name})`);
+    public updateTools(tools: ToolWrap[]): void {
+        for (const wrap of tools) {
+            this.tools.set(wrap.tool.name, wrap);
+            log.info(`Added/Updated tool: ${wrap.tool.name}`);
         }
     }
 
@@ -171,7 +162,8 @@ export class ApifyMcpServer {
 
     private setupToolHandlers(): void {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            return { tools: Array.from(this.tools.values()) };
+            const tools = Array.from(this.tools.values()).map((tool) => (tool.tool));
+            return { tools };
         });
 
         /**
@@ -182,65 +174,50 @@ export class ApifyMcpServer {
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
 
-            const tool = Array.from(this.tools.values()).find((t) => t.name === name || t.actorFullName === name);
+            const tool = Array.from(this.tools.values())
+                .find((t) => t.tool.name === name || (t.type === 'internal' && (t.tool as ActorTool).actorFullName === name));
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }
             if (!args) {
                 throw new Error(`Missing arguments for tool: ${name}`);
             }
-            log.info(`Validate arguments for tool: ${tool.name} with arguments: ${JSON.stringify(args)}`);
-            if (!tool.ajvValidate(args)) {
-                throw new Error(`Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`);
+            log.info(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
+            if (!tool.tool.ajvValidate(args)) {
+                throw new Error(`Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`);
             }
 
             try {
-                switch (name) {
-                    case InternalTools.ADD_ACTOR_TO_TOOLS: {
-                        const parsed = AddActorToToolsArgsSchema.parse(args);
-                        const toolsAdded = await this.addToolsFromActors([parsed.actorName]);
-                        await this.server.notification({ method: 'notifications/tools/list_changed' });
-                        return { content: [{ type: 'text', text: `Actor added: ${toolsAdded.map((t) => `${t.actorFullName} (tool name: ${t.name})`).join(', ')}` }] };
-                    }
-                    case InternalTools.REMOVE_ACTOR_FROM_TOOLS: {
-                        const parsed = RemoveActorToolArgsSchema.parse(args);
-                        this.tools.delete(parsed.toolName);
-                        await this.server.notification({ method: 'notifications/tools/list_changed' });
-                        return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
-                    }
-                    case InternalTools.DISCOVER_ACTORS: {
-                        const parsed = DiscoverActorsArgsSchema.parse(args);
-                        const actors = await searchActorsByKeywords(
-                            parsed.search,
-                            parsed.limit,
-                            parsed.offset,
-                        );
-                        return { content: actors?.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
-                    }
-                    case InternalTools.GET_ACTOR_DETAILS: {
-                        const parsed = GetActorDefinition.parse(args);
-                        const v = await getActorDefinition(parsed.actorName, parsed.limit);
-                        if (v && v.input && 'properties' in v.input && v.input) {
-                            const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
-                            v.input.properties = shortenProperties(properties);
-                        }
-                        return { content: [{ type: 'text', text: JSON.stringify(v) }] };
-                    }
-                    default: {
-                        const items = await this.callActorGetDataset(tool.actorFullName, args, { memory: tool.memoryMbytes } as ActorCallOptions);
-                        const content = items.map((item) => {
-                            const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
-                            return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
-                                ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
-                                : { type: 'text', text };
-                        });
-                        return { content };
-                    }
+                if (tool.type === 'internal') {
+                    const internalTool = tool.tool as InternalTool;
+                    const res = await internalTool.call({
+                        args,
+                        apifyMcpServer: this,
+                        mcpServer: this.server,
+                    }) as object;
+                    return {
+                        ...res,
+                    };
+                }
+
+                if (tool.type === 'actor') {
+                    const actorTool = tool.tool as ActorTool;
+
+                    const items = await this.callActorGetDataset(actorTool.actorFullName, args, { memory: actorTool.memoryMbytes } as ActorCallOptions);
+                    const content = items.map((item) => {
+                        const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
+                        return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
+                            ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
+                            : { type: 'text', text };
+                    });
+                    return { content };
                 }
             } catch (error) {
                 log.error(`Error calling tool: ${error}`);
                 throw new Error(`Error calling tool: ${error}`);
             }
+
+            throw new Error(`Tool ${name} is not implemented`);
         });
     }
 
