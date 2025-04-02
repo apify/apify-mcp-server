@@ -8,7 +8,7 @@ import type { ActorCallOptions } from 'apify-client';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';
-import { createServerApp } from './server.js';
+import { createExpressApp } from './server.js';
 import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
 import type { Input } from './types.js';
 import { isActorStandby } from './utils.js';
@@ -52,7 +52,7 @@ const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({}
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (isActorStandby()) {
-    const app = createServerApp(HOST, mcpServer, actorRunData);
+    const app = createExpressApp(HOST, mcpServer, actorRunData);
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
     mcpServer.updateTools(getActorDiscoveryTools());

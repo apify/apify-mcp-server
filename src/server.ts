@@ -4,9 +4,9 @@ import express from 'express';
 
 import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { log } from './logger.js';
-import { type ApifyMcpServer, processParamsAndUpdateTools } from './mcp-server.js';
+import { type ApifyMcpServer } from './mcp-server.js';
 
-export function createServerApp(host: string,
+export function createExpressApp(host: string,
     mcpServer: ApifyMcpServer,
     additionalData?: object): express.Express {
     const HELP_MESSAGE = `Connect to the server with GET request to ${host}/sse?token=YOUR-APIFY-TOKEN`
@@ -25,7 +25,7 @@ export function createServerApp(host: string,
             }
             try {
                 log.info(`Received GET message at: ${Routes.ROOT}`);
-                await processParamsAndUpdateTools(req.url, mcpServer);
+                await mcpServer.processParamsAndUpdateTools(req.url);
                 res.setHeader('Content-Type', 'text/event-stream');
                 res.setHeader('Cache-Control', 'no-cache');
                 res.setHeader('Connection', 'keep-alive');
@@ -43,7 +43,7 @@ export function createServerApp(host: string,
         .get(async (req: Request, res: Response) => {
             try {
                 log.info(`Received GET message at: ${Routes.SSE}`);
-                await processParamsAndUpdateTools(req.url, mcpServer);
+                await mcpServer.processParamsAndUpdateTools(req.url);
                 transport = new SSEServerTransport(Routes.MESSAGE, res);
                 await mcpServer.connect(transport);
             } catch (error) {

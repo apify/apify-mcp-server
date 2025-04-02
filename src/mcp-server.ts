@@ -149,6 +149,26 @@ export class ApifyMcpServer {
         });
     }
 
+    /**
+     * Process input parameters and update tools
+     * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
+     * @param url
+     */
+    public async processParamsAndUpdateTools(url: string) {
+        const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
+        delete params.token;
+        log.debug(`Received input parameters: ${JSON.stringify(params)}`);
+        const input = await processInput(params as unknown as Input);
+        if (input.actors) {
+            await this.addToolsFromActors(input.actors as string[]);
+        }
+        if (input.enableActorAutoLoading) {
+            this.updateTools(getActorAutoLoadingTools());
+        }
+        log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${this.getToolNames()}.
+        To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
+    }
+
     private setupToolHandlers(): void {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             return { tools: Array.from(this.tools.values()) };
@@ -227,24 +247,4 @@ export class ApifyMcpServer {
     async connect(transport: Transport): Promise<void> {
         await this.server.connect(transport);
     }
-}
-
-/**
- * Process input parameters and update tools
- * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
- * @param url
- */
-export async function processParamsAndUpdateTools(url: string, mcpServer: ApifyMcpServer) {
-    const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
-    delete params.token;
-    log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-    const input = await processInput(params as unknown as Input);
-    if (input.actors) {
-        await mcpServer.addToolsFromActors(input.actors as string[]);
-    }
-    if (input.enableActorAutoLoading) {
-        mcpServer.updateTools(getActorAutoLoadingTools());
-    }
-    log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
-    To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
 }
