@@ -2,16 +2,9 @@
 This file serves as an Actor MCP SSE server entry point.
 */
 
-import type { ParsedUrlQuery } from 'node:querystring';
-import { parse } from 'node:querystring';
-
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
-import type { Request, Response } from 'express';
-import express from 'express';
 
-import { HEADER_READINESS_PROBE, Routes } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';

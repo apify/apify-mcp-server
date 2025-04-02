@@ -1,7 +1,9 @@
-#!/usr/bin/env node
 /**
  * Model Context Protocol (MCP) server for Apify Actors
  */
+import type { ParsedUrlQuery } from 'node:querystring';
+import { parse } from 'node:querystring';
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -10,11 +12,6 @@ import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
-import { processInput } from './input.js';
-import type { ParsedUrlQuery } from 'node:querystring';
-import { parse } from 'node:querystring';
-import { getActorAutoLoadingTools } from './tools.js';
-import type { Input } from './types.js';
 
 import {
     filterSchemaProperties,
@@ -31,15 +28,15 @@ import {
     SERVER_VERSION,
     USER_AGENT_ORIGIN,
 } from './const.js';
+import { processInput } from './input.js';
 import { log } from './logger.js';
-import {
+import { getActorAutoLoadingTools,
     RemoveActorToolArgsSchema,
     AddActorToToolsArgsSchema,
     DiscoverActorsArgsSchema,
     searchActorsByKeywords,
-    GetActorDefinition,
-} from './tools.js';
-import type { ISchemaProperties, Tool } from './types.js';
+    GetActorDefinition } from './tools.js';
+import type { Input, ISchemaProperties, Tool } from './types.js';
 
 /**
  * Create Apify MCP server

@@ -26,7 +26,7 @@ dotenv.config({ path: path.resolve(dirname, '../../.env') });
 const SERVER_URL = process.env.MCP_SERVER_URL_BASE || 'https://actors-mcp-server.apify.actor/sse';
 // We need to change forward slash / to underscore -- in the tool name as Anthropic does not allow forward slashes in the tool name
 const SELECTED_TOOL = actorNameToToolName('apify/rag-web-browser');
-//const QUERY = 'web browser for Anthropic';
+// const QUERY = 'web browser for Anthropic';
 const QUERY = 'apify';
 
 if (!process.env.APIFY_TOKEN) {

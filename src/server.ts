@@ -14,7 +14,6 @@ export function createServerApp(host: string,
 
     const app = express();
 
-
     let transport: SSEServerTransport;
 
     app.route(Routes.ROOT)
