@@ -1,8 +1,8 @@
 /*
- This file provides essential functions for constructing HTTP and MCP servers, effectively serving as a library.
- Acts as a library entrypoint.
+ This file provides essential functions and tools for MCP servers, serving as a library.
 */
 
 export { createExpressApp } from './server.js';
 export { ApifyMcpServer } from './mcp-server.js';
-export { getActorDiscoveryTools } from './toolkits/discovery-tools.js';
+export { getActorAutoLoadingTools, getActorDiscoveryTools } from './toolkits/index.js';
+export { addActorToTools, discoverActorsTool, getActorsDetailsTool, removeActorFromTools } from './tools/index.js';
