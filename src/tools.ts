@@ -1,25 +1,7 @@
 import type { ActorStoreList } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 
-import { addActorToTools } from './tools/add-actors-to-tools.js';
-import { discoverActorsTool } from './tools/discover-actors.js';
-import { getActorsDetailsTool } from './tools/get-actors-details.js';
-import { removeActorFromTools } from './tools/remove-actors-from-tools.js';
-import type { ActorStorePruned, PricingInfo, ToolWrap } from './types.js';
-
-export function getActorAutoLoadingTools(): ToolWrap[] {
-    return [
-        addActorToTools,
-        removeActorFromTools,
-    ];
-}
-
-export function getActorDiscoveryTools(): ToolWrap[] {
-    return [
-        discoverActorsTool,
-        getActorsDetailsTool,
-    ];
-}
+import type { ActorStorePruned, PricingInfo } from './types.js';
 
 function pruneActorStoreInfo(response: ActorStoreList): ActorStorePruned {
     const stats = response.stats || {};

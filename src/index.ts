@@ -5,4 +5,4 @@
 
 export { createExpressApp } from './server.js';
 export { ApifyMcpServer } from './mcp-server.js';
-export { getActorDiscoveryTools } from './tools.js';
+export { getActorDiscoveryTools } from './toolkits/discovery-tools.js';

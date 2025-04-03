@@ -26,7 +26,7 @@ import {
 } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
-import { getActorAutoLoadingTools } from './tools.js';
+import { getActorAutoLoadingTools } from './toolkits/actor-auto-loading-tools.js';
 import type { Input, ActorTool, ToolWrap, InternalTool } from './types.js';
 
 /**
@@ -175,7 +175,7 @@ export class ApifyMcpServer {
             const { name, arguments: args } = request.params;
 
             const tool = Array.from(this.tools.values())
-                .find((t) => t.tool.name === name || (t.type === 'internal' && (t.tool as ActorTool).actorFullName === name));
+                .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
             if (!tool) {
                 throw new Error(`Unknown tool: ${name}`);
             }

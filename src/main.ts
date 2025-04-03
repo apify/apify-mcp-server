@@ -9,7 +9,8 @@ import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';
 import { createExpressApp } from './server.js';
-import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
+import { getActorDiscoveryTools } from './toolkits/discovery-tools.js';
+import { getActorAutoLoadingTools } from './toolkits/actor-auto-loading-tools.js';
 import type { Input } from './types.js';
 import { isActorStandby } from './utils.js';
 
