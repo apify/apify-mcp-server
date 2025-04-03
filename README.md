@@ -27,7 +27,7 @@ For example it can:
 
 To interact with the Apify MCP server, you can use MCP clients such as:
 - [Claude Desktop](https://claude.ai/download) (only Stdio support)
-- [Visual Studio Code](https://code.visualstudio.com/)
+- [Visual Studio Code](https://code.visualstudio.com/) (Stdio and SSE support)
 - [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yet without Authorization header))
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
 - other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
