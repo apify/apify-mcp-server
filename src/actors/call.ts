@@ -1,4 +1,4 @@
-import { Actor, type ApifyClientOptions } from 'apify';
+import { type ApifyClientOptions } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
