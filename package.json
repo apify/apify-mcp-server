@@ -62,7 +62,7 @@
     "lint:fix": "eslint . --fix",
     "build": "tsc",
     "watch": "tsc --watch",
-    "inspector": "npx @modelcontextprotocol/inspector dist/index.js",
+    "inspector": "npx @modelcontextprotocol/inspector dist/stdio.js",
     "test": "vitest run"
   },
   "author": "Apify",

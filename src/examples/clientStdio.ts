@@ -22,7 +22,7 @@ const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);
 
 dotenv.config({ path: path.resolve(dirname, '../../.env') });
-const SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
+const SERVER_PATH = path.resolve(dirname, '../../dist/stdio.js');
 const NODE_PATH = execSync(process.platform === 'win32' ? 'where node' : 'which node').toString().trim();
 
 const TOOLS = 'apify/rag-web-browser,lukaskrivka/google-maps-with-contact-details';

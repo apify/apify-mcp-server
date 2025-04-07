@@ -41,7 +41,7 @@ const MAX_TOKENS = 2048; // Maximum tokens for Claude response
 // const CLAUDE_MODEL = 'claude-3-5-haiku-20241022'; // a fastest model
 const CLAUDE_MODEL = 'claude-3-haiku-20240307'; // a fastest and most compact model for near-instant responsiveness
 const DEBUG = true;
-const DEBUG_SERVER_PATH = path.resolve(dirname, '../../dist/index.js');
+const DEBUG_SERVER_PATH = path.resolve(dirname, '../../dist/stdio.js');
 
 const NODE_PATH = execSync('which node').toString().trim();
 

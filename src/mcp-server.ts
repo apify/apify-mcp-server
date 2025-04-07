@@ -173,7 +173,11 @@ export class ApifyMcpServer {
          * @throws {Error} - Throws an error if the tool is unknown or arguments are invalid.
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            const { name, arguments: args, apifyToken } = request.params;
+            const { name, arguments: args } = request.params;
+            const apifyToken = request.params.apifyToken || process.env.APIFY_TOKEN;
+            if (!apifyToken) {
+                throw new Error('APIFY_TOKEN is required but not set in the environment variables or passed as a parameter.');
+            }
 
             const tool = Array.from(this.tools.values())
                 .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));

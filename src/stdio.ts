@@ -9,7 +9,7 @@
  *   --actors - A comma-separated list of actor full names to add to the server.
  *
  * Example:
- *   node index.js --actors=apify/google-search-scraper,apify/instagram-scraper
+ *   node stdio.js --actors=apify/google-search-scraper,apify/instagram-scraper
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';

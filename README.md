@@ -358,7 +358,7 @@ You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-
 
 ```bash
 export APIFY_TOKEN=your-apify-token
-npx @modelcontextprotocol/inspector node ./dist/index.js
+npx @modelcontextprotocol/inspector node ./dist/stdio.js
 ```
 
 Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
