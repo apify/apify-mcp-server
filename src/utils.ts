@@ -1,6 +1,15 @@
+import { parse } from 'node:querystring';
+
 import { Actor } from 'apify';
 
-import type { ActorRunData } from './types';
+import { processInput } from './input.js';
+import type { ActorRunData, Input } from './types';
+
+export function parseInputParamsFromUrl(url: string): Input {
+    const query = url.split('?')[1] || '';
+    const params = parse(query) as unknown as Input;
+    return processInput(params);
+}
 
 export function isActorStandby(): boolean {
     return Actor.getEnv().metaOrigin === 'STANDBY';

@@ -1,8 +1,6 @@
 /**
  * Model Context Protocol (MCP) server for Apify Actors
  */
-import type { ParsedUrlQuery } from 'node:querystring';
-import { parse } from 'node:querystring';
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -20,10 +18,10 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from './const.js';
-import { processInput } from './input.js';
 import { log } from './logger.js';
 import { getActorAutoLoadingTools } from './tools/index.js';
-import type { Input, ActorTool, ToolWrap, InternalTool } from './types.js';
+import type { ActorTool, ToolWrap, InternalTool } from './types.js';
+import { parseInputParamsFromUrl } from './utils.js';
 
 /**
  * Create Apify MCP server
@@ -84,24 +82,27 @@ export class ApifyMcpServer {
         });
     }
 
+    public enableActorAutoLoading() {
+        this.updateTools(getActorAutoLoadingTools());
+        log.debug('Enabled Actor auto-loading tools');
+    }
+
     /**
      * Process input parameters and update tools
      * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
      * @param url
      */
     public async processParamsAndUpdateTools(url: string) {
-        const params = parse(url.split('?')[1] || '') as ParsedUrlQuery;
-        delete params.token;
-        log.debug(`Received input parameters: ${JSON.stringify(params)}`);
-        const input = await processInput(params as unknown as Input);
+        const input = parseInputParamsFromUrl(url);
         if (input.actors) {
             await this.addToolsFromActors(input.actors as string[]);
         }
         if (input.enableActorAutoLoading) {
-            this.updateTools(getActorAutoLoadingTools());
+            this.enableActorAutoLoading();
         }
-        log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${this.getToolNames()}.
-        To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
+
+        log.debug(`Server is running in STANDBY mode with Actors: ${this.getToolNames()}. `
+            + 'To use different Actors, provide them in "actors" query param or Actor Task input.');
     }
 
     private setupToolHandlers(): void {

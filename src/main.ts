@@ -26,7 +26,7 @@ if (!process.env.APIFY_TOKEN) {
 
 const mcpServer = new ApifyMcpServer();
 
-const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
+const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (isActorStandby()) {

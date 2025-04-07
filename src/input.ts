@@ -5,12 +5,16 @@ import type { Input } from './types.js';
  * @param originalInput
  * @returns input
  */
-export async function processInput(originalInput: Partial<Input>): Promise<Input> {
+export function processInput(originalInput: Partial<Input>): Input {
     const input = originalInput as Input;
 
     // actors can be a string or an array of strings
     if (input.actors && typeof input.actors === 'string') {
         input.actors = input.actors.split(',').map((format: string) => format.trim()) as string[];
+    }
+    // Convert string boolean to actual boolean
+    if (input.enableActorAutoLoading && typeof input.enableActorAutoLoading === 'string') {
+        input.enableActorAutoLoading = input.enableActorAutoLoading === 'true';
     }
     if (!input.enableActorAutoLoading) {
         input.enableActorAutoLoading = false;
