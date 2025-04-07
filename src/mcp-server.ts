@@ -14,7 +14,7 @@ import type { AxiosRequestConfig } from 'axios';
 
 import {
     getActorsAsTools,
-} from './actors.js';
+} from './actors/tools.js';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,

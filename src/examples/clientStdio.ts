@@ -15,7 +15,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 
-import { actorNameToToolName } from '../actors.js';
+import { actorNameToToolName } from '../actors/utils.js';
 
 // Resolve dirname equivalent in ES module
 const filename = fileURLToPath(import.meta.url);

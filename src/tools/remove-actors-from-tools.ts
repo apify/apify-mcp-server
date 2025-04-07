@@ -2,7 +2,7 @@ import { Ajv } from 'ajv';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-import { actorNameToToolName } from '../actors.js';
+import { actorNameToToolName } from '../actors/utils.js';
 import { InternalTools } from '../const.js';
 import type { InternalTool, ToolWrap } from '../types.js';
 

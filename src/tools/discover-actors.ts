@@ -2,7 +2,7 @@ import { Ajv } from 'ajv';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { searchActorsByKeywords } from '../actors.js';
+import { searchActorsByKeywords } from '../actors/search.js';
 import { InternalTools } from '../const.js';
 import type { InternalTool, ToolWrap } from '../types.js';
 

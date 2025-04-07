@@ -2,7 +2,8 @@ import { Ajv } from 'ajv';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { filterSchemaProperties, getActorDefinition, shortenProperties } from '../actors.js';
+import { getActorDefinition } from '../actors/details.js';
+import { filterSchemaProperties, shortenProperties } from '../actors/schema.js';
 import { ACTOR_README_MAX_LENGTH, InternalTools } from '../const.js';
 import type { InternalTool, ISchemaProperties, ToolWrap } from '../types.js';
 
