@@ -14,8 +14,8 @@ export function actorNameToToolName(actorName: string): string {
 }
 
 /**
- * Get actor input schema by actor name.
- * First, fetch the actor details to get the default build tag and buildId.
+ * Get Actor input schema by Actor name.
+ * First, fetch the Actor details to get the default build tag and buildId.
  * Then, fetch the build details and return actorName, description, and input schema.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {number} limit - Truncate the README to this limit.

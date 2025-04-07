@@ -1,6 +1,6 @@
-/*
-This file serves as an Actor MCP SSE server entry point.
-*/
+/**
+ * This file serves as an Actor MCP SSE server entry point.
+ */
 
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
@@ -66,7 +66,7 @@ if (isActorStandby()) {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
 
     if (input && !input.debugActor && !input.debugActorInput) {
-        await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
+        await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
     await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);

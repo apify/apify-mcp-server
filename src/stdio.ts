@@ -6,7 +6,7 @@
  *   node <script_name> --actors=<actor1,actor2,...>
  *
  * Command-line arguments:
- *   --actors - A comma-separated list of actor full names to add to the server.
+ *   --actors - A comma-separated list of Actor full names to add to the server.
  *
  * Example:
  *   node stdio.js --actors=apify/google-search-scraper,apify/instagram-scraper

@@ -7,8 +7,7 @@ import { parse } from 'node:querystring';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import type { ApifyClientOptions } from 'apify';
-import { Actor } from 'apify';
+import { Actor, type ApifyClientOptions } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
 import { ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
@@ -85,7 +84,7 @@ export class ApifyMcpServer {
     ): Promise<object[]> {
         const name = actorName;
         try {
-            log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
+            log.info(`Calling Actor ${name} with input: ${JSON.stringify(input)}`);
 
             const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
             const client = new ApifyClient({ ...options, token: apifyToken });
@@ -102,7 +101,7 @@ export class ApifyMcpServer {
             return dataset.items;
         } catch (error) {
             log.error(`Error calling actor: ${error}. Actor: ${name}, input: ${JSON.stringify(input)}`);
-            throw new Error(`Error calling actor: ${error}`);
+            throw new Error(`Error calling Actor: ${error}`);
         }
     }
 
