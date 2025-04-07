@@ -89,7 +89,8 @@ export class ApifyMcpServer {
 
     /**
      * Process input parameters and update tools
-     * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
+     * If URL contains query parameter `actors`, add tools from Actors.
+     * If URL contains query parameter `enableActorAutoLoading`, enable auto-loading of Actors.
      * @param url
      */
     public async processParamsAndUpdateTools(url: string) {
