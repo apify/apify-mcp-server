@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { actorNameToToolName, inferArrayItemType, shortenEnum } from '../src/actors.js';
+import { shortenEnum, inferArrayItemType } from '../src/actors/schema.js';
+import { actorNameToToolName } from '../src/actors/utils.js';
 import { ACTOR_ENUM_MAX_LENGTH } from '../src/const.js';
 
 describe('actors', () => {
