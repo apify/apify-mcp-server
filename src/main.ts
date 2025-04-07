@@ -5,6 +5,7 @@
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
 
+import { callActorGetDataset } from './actors/call.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';
@@ -46,6 +47,6 @@ if (isActorStandby()) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
+    await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
     await Actor.exit();
 }

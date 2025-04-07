@@ -7,11 +7,9 @@ import { parse } from 'node:querystring';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { Actor, type ApifyClientOptions } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
-import { ApifyClient } from 'apify-client';
-import type { AxiosRequestConfig } from 'axios';
 
+import { callActorGetDataset } from './actors/call.js';
 import {
     getActorsAsTools,
 } from './actors/tools.js';
@@ -21,7 +19,6 @@ import {
     defaults,
     SERVER_NAME,
     SERVER_VERSION,
-    USER_AGENT_ORIGIN,
 } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
@@ -50,59 +47,6 @@ export class ApifyMcpServer {
         this.tools = new Map();
         this.setupErrorHandling();
         this.setupToolHandlers();
-    }
-
-    /**
-     * Adds a User-Agent header to the request config.
-     * @param config
-     * @private
-     */
-    private addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
-        const updatedConfig = { ...config };
-        updatedConfig.headers = updatedConfig.headers ?? {};
-        updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
-        return updatedConfig;
-    }
-
-    /**
-     * Calls an Apify actor and retrieves the dataset items.
-     *
-     * It requires the `APIFY_TOKEN` environment variable to be set.
-     * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
-     *
-     * @param {string} actorName - The name of the actor to call.
-     * @param {ActorCallOptions} callOptions - The options to pass to the actor.
-     * @param {unknown} input - The input to pass to the actor.
-     * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
-     * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
-     */
-    public async callActorGetDataset(
-        actorName: string,
-        input: unknown,
-        apifyToken: string,
-        callOptions: ActorCallOptions | undefined = undefined,
-    ): Promise<object[]> {
-        const name = actorName;
-        try {
-            log.info(`Calling Actor ${name} with input: ${JSON.stringify(input)}`);
-
-            const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
-            const client = new ApifyClient({ ...options, token: apifyToken });
-            const actorClient = client.actor(name);
-
-            const results = await actorClient.call(input, callOptions);
-            const dataset = await client.dataset(results.defaultDatasetId).listItems();
-            log.info(`Actor ${name} finished with ${dataset.items.length} items`);
-
-            if (process.env.APIFY_IS_AT_HOME) {
-                await Actor.pushData(dataset.items);
-                log.info(`Pushed ${dataset.items.length} items to the dataset`);
-            }
-            return dataset.items;
-        } catch (error) {
-            log.error(`Error calling actor: ${error}. Actor: ${name}, input: ${JSON.stringify(input)}`);
-            throw new Error(`Error calling Actor: ${error}`);
-        }
     }
 
     public async addToolsFromActors(actors: string[]) {
@@ -207,7 +151,7 @@ export class ApifyMcpServer {
                 if (tool.type === 'actor') {
                     const actorTool = tool.tool as ActorTool;
 
-                    const items = await this.callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, {
+                    const items = await callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, {
                         memory: actorTool.memoryMbytes,
                     } as ActorCallOptions);
                     const content = items.map((item) => {
