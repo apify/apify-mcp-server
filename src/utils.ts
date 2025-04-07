@@ -1,10 +1,12 @@
 import { Actor } from 'apify';
 
+import type { ActorRunData } from './types';
+
 export function isActorStandby(): boolean {
     return Actor.getEnv().metaOrigin === 'STANDBY';
 }
 
-export function getActorRunData(): unknown {
+export function getActorRunData(): ActorRunData | null {
     return Actor.isAtHome() ? {
         id: process.env.ACTOR_RUN_ID,
         actId: process.env.ACTOR_ID,
@@ -26,5 +28,5 @@ export function getActorRunData(): unknown {
         buildNumber: process.env.ACTOR_BUILD_NUMBER,
         containerUrl: process.env.ACTOR_WEB_SERVER_URL,
         standbyUrl: process.env.ACTOR_STANDBY_URL,
-    } : {};
+    } : null;
 }

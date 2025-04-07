@@ -11,7 +11,7 @@ import { ApifyMcpServer } from './mcp-server.js';
 import { createExpressApp } from './server.js';
 import { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
 import type { Input } from './types.js';
-import { isActorStandby } from './utils.js';
+import { getActorRunData, isActorStandby } from './utils.js';
 
 await Actor.init();
 
@@ -25,34 +25,11 @@ if (!process.env.APIFY_TOKEN) {
 
 const mcpServer = new ApifyMcpServer();
 
-const actorRunData = Actor.isAtHome() ? {
-    id: process.env.ACTOR_RUN_ID,
-    actId: process.env.ACTOR_ID,
-    userId: process.env.APIFY_USER_ID,
-    startedAt: process.env.ACTOR_STARTED_AT,
-    finishedAt: null,
-    status: 'RUNNING',
-    meta: {
-        origin: process.env.APIFY_META_ORIGIN,
-    },
-    options: {
-        build: process.env.ACTOR_BUILD_NUMBER,
-        memoryMbytes: process.env.ACTOR_MEMORY_MBYTES,
-    },
-    buildId: process.env.ACTOR_BUILD_ID,
-    defaultKeyValueStoreId: process.env.ACTOR_DEFAULT_KEY_VALUE_STORE_ID,
-    defaultDatasetId: process.env.ACTOR_DEFAULT_DATASET_ID,
-    defaultRequestQueueId: process.env.ACTOR_DEFAULT_REQUEST_QUEUE_ID,
-    buildNumber: process.env.ACTOR_BUILD_NUMBER,
-    containerUrl: process.env.ACTOR_WEB_SERVER_URL,
-    standbyUrl: process.env.ACTOR_STANDBY_URL,
-} : {};
-
 const input = await processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (isActorStandby()) {
-    const app = createExpressApp(HOST, mcpServer, actorRunData);
+    const app = createExpressApp(HOST, mcpServer, getActorRunData() || {});
     log.info('Actor is running in the STANDBY mode.');
     await mcpServer.addToolsFromDefaultActors();
     mcpServer.updateTools(getActorDiscoveryTools());
