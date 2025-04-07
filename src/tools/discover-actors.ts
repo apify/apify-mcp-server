@@ -2,8 +2,8 @@ import { Ajv } from 'ajv';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
+import { searchActorsByKeywords } from '../actors.js';
 import { InternalTools } from '../const.js';
-import { searchActorsByKeywords } from '../tools.js';
 import type { InternalTool, ToolWrap } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });

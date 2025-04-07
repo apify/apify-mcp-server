@@ -17,8 +17,7 @@ import minimist from 'minimist';
 
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';
-import { getActorAutoLoadingTools } from './toolkits/actor-auto-loading-tools.js';
-import { getActorDiscoveryTools } from './toolkits/discovery-tools.js';
+import { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
 
 log.setLevel(log.LEVELS.ERROR);
 

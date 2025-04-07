@@ -1,3 +1,7 @@
+/*
+ * This file contains the express server implementation used for standby Actor mode.
+ */
+
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import type { Request, Response } from 'express';
 import express from 'express';

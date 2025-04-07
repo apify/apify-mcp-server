@@ -9,8 +9,7 @@ import { processInput } from './input.js';
 import { log } from './logger.js';
 import { ApifyMcpServer } from './mcp-server.js';
 import { createExpressApp } from './server.js';
-import { getActorAutoLoadingTools } from './toolkits/actor-auto-loading-tools.js';
-import { getActorDiscoveryTools } from './toolkits/discovery-tools.js';
+import { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
 import type { Input } from './types.js';
 import { isActorStandby } from './utils.js';
 
@@ -70,6 +69,6 @@ if (isActorStandby()) {
         await Actor.fail('If you need to debug a specific actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, options);
+    await mcpServer.callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
     await Actor.exit();
 }

@@ -4,5 +4,5 @@
 
 export { createExpressApp } from './server.js';
 export { ApifyMcpServer } from './mcp-server.js';
-export { getActorAutoLoadingTools, getActorDiscoveryTools } from './toolkits/index.js';
+export { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
 export { addActorToTools, discoverActorsTool, getActorsDetailsTool, removeActorFromTools } from './tools/index.js';

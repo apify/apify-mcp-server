@@ -26,7 +26,7 @@ import {
 } from './const.js';
 import { processInput } from './input.js';
 import { log } from './logger.js';
-import { getActorAutoLoadingTools } from './toolkits/actor-auto-loading-tools.js';
+import { getActorAutoLoadingTools } from './tools/index.js';
 import type { Input, ActorTool, ToolWrap, InternalTool } from './types.js';
 
 /**
@@ -80,6 +80,7 @@ export class ApifyMcpServer {
     public async callActorGetDataset(
         actorName: string,
         input: unknown,
+        apifyToken: string,
         callOptions: ActorCallOptions | undefined = undefined,
     ): Promise<object[]> {
         const name = actorName;
@@ -87,7 +88,7 @@ export class ApifyMcpServer {
             log.info(`Calling actor ${name} with input: ${JSON.stringify(input)}`);
 
             const options: ApifyClientOptions = { requestInterceptors: [this.addUserAgent] };
-            const client = new ApifyClient({ ...options, token: process.env.APIFY_TOKEN });
+            const client = new ApifyClient({ ...options, token: apifyToken });
             const actorClient = client.actor(name);
 
             const results = await actorClient.call(input, callOptions);
@@ -172,7 +173,7 @@ export class ApifyMcpServer {
          * @throws {Error} - Throws an error if the tool is unknown or arguments are invalid.
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            const { name, arguments: args } = request.params;
+            const { name, arguments: args, apifyToken } = request.params;
 
             const tool = Array.from(this.tools.values())
                 .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
@@ -203,7 +204,9 @@ export class ApifyMcpServer {
                 if (tool.type === 'actor') {
                     const actorTool = tool.tool as ActorTool;
 
-                    const items = await this.callActorGetDataset(actorTool.actorFullName, args, { memory: actorTool.memoryMbytes } as ActorCallOptions);
+                    const items = await this.callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, {
+                        memory: actorTool.memoryMbytes,
+                    } as ActorCallOptions);
                     const content = items.map((item) => {
                         const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                         return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
