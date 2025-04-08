@@ -13,7 +13,7 @@
  */
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import minimist from 'minimist';
+import parser from 'yargs-parser';
 
 import { log } from './logger.js';
 import { ApifyMcpServer } from './server.js';
@@ -21,9 +21,19 @@ import { getActorDiscoveryTools, getActorAutoLoadingTools } from './tools.js';
 
 log.setLevel(log.LEVELS.ERROR);
 
-const argv = minimist(process.argv.slice(2));
+const argv = parser(process.argv.slice(2), {
+    boolean: [
+        'enable-adding-actors',
+        'enableActorAutoLoading', // deprecated
+    ],
+    string: ['actors'],
+    default: {
+        'enable-adding-actors': false,
+    },
+});
+
+const argEnableAddingActors = argv['enable-adding-actors'] || argv.enableActorAutoLoading || false;
 const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];
-const argEnableActorAutoLoading = argv.enableActorAutoLoading || false;
 
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
@@ -36,7 +46,7 @@ async function main() {
         ? server.addToolsFromActors(argActors)
         : server.addToolsFromDefaultActors());
     server.updateTools(getActorDiscoveryTools());
-    if (argEnableActorAutoLoading) {
+    if (argEnableAddingActors) {
         server.updateTools(getActorAutoLoadingTools());
     }
     const transport = new StdioServerTransport();

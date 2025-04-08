@@ -57,8 +57,9 @@ const actorRun = Actor.isAtHome() ? {
 } : {};
 
 /**
- * Process input parameters and update tools
- * If URL contains query parameter actors, add tools from actors, otherwise add tools from default actors
+ * Process input parameters and update tools.
+ * If URL contains query parameter `actors`, add Actors as tools.
+ * Otherwise, add default Actors but only if there are no tools added yet.
  * @param url
  */
 async function processParamsAndUpdateTools(url: string) {
@@ -68,9 +69,8 @@ async function processParamsAndUpdateTools(url: string) {
     const input = await processInput(params as unknown as Input);
     if (input.actors) {
         await mcpServer.addToolsFromActors(input.actors as string[]);
-    }
-    if (input.enableActorAutoLoading) {
-        mcpServer.updateTools(getActorAutoLoadingTools());
+    } else if (mcpServer.getToolNames().length === 0) {
+        await mcpServer.addToolsFromDefaultActors();
     }
     log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
     To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
@@ -137,9 +137,8 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
-    await mcpServer.addToolsFromDefaultActors();
     mcpServer.updateTools(getActorDiscoveryTools());
-    if (input.enableActorAutoLoading) {
+    if (input.enableAddingActors) {
         mcpServer.updateTools(getActorAutoLoadingTools());
     }
     app.listen(PORT, () => {

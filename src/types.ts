@@ -3,6 +3,7 @@ import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
 export type Input = {
     actors: string[] | string;
+    enableAddingActors?: boolean;
     enableActorAutoLoading?: boolean;
     maxActorMemoryBytes?: number;
     debugActor?: string;
