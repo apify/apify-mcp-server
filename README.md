@@ -264,7 +264,7 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
 
     - Fully quit Claude Desktop (ensure it's not just minimized or closed).
     - Restart Claude Desktop.
-    - Look for the 🔌 icon to confirm that the Exa server is connected.
+    - Look for the 🔌 icon to confirm that the Actors MCP server is connected.
 
 6. Open the Claude Desktop chat and ask "What Apify Actors can I use?"
 
