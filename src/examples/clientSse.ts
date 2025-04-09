@@ -13,7 +13,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
-import { EventSource } from 'eventsource';
+import { EventSource, EventSourceInit } from 'eventsource';
 
 import { actorNameToToolName } from '../tools/utils.js';
 
@@ -34,8 +34,19 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
+// Declare EventSource on globalThis if not available (needed for Node.js environment)
+declare global {
+    var EventSource: {
+        new(url: string, eventSourceInitDict?: EventSourceInit): EventSource;
+        prototype: EventSource;
+        CONNECTING: 0;
+        OPEN: 1;
+        CLOSED: 2;
+    }; // eslint-disable-line no-var
+}
+
 if (typeof globalThis.EventSource === 'undefined') {
-    globalThis.EventSource = EventSource as unknown as typeof globalThis.EventSource;
+    globalThis.EventSource = EventSource;
 }
 
 async function main(): Promise<void> {
