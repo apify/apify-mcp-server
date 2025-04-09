@@ -312,29 +312,7 @@ Alternatively, add the following JSON block to your User Settings (JSON) file in
 }
 ```
 
-Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace. This will allow you to share the configuration with others.
-
-```json
-{
-  "inputs": [
-    {
-      "type": "promptString",
-      "id": "apify_token",
-      "description": "Apify API Token",
-      "password": true
-    }
-  ],
-  "servers": {
-    "actors-mcp-server": {
-      "command": "npx",
-      "args": ["-y", "@apify/actors-mcp-server"],
-      "env": {
-        "APIFY_TOKEN": "${input:apify_token}"
-      }
-    }
-  }
-}
-```
+Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace - just omit the top-level `mcp {}` key. This will allow you to share the configuration with others.
 
 If you want to specify which Actors to load, you can add the `--actors` argument:
 
