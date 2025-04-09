@@ -1,17 +1,73 @@
 import { Ajv } from 'ajv';
+import type { ApifyClientOptions } from 'apify';
+import type { ActorCallOptions } from 'apify-client';
+import { ApifyClient } from 'apify-client';
+import type { AxiosRequestConfig } from 'axios';
 
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, defaults } from '../const.js';
-import { log } from '../logger.js';
+import log from '@apify/log';
+
 import type { ToolWrap } from '../types.js';
-import { getActorDefinition } from './details.js';
+import { getActorDefinition } from './build.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES, USER_AGENT_ORIGIN } from '../const.js';
 import {
+    actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
     buildNestedProperties,
     filterSchemaProperties,
     markInputPropertiesAsRequired,
     shortenProperties,
-} from './schema.js';
-import { actorNameToToolName } from './utils.js';
+} from './utils.js';
+
+/**
+ * Adds a User-Agent header to the request config.
+ * @param config
+ * @private
+ */
+export function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
+    const updatedConfig = { ...config };
+    updatedConfig.headers = updatedConfig.headers ?? {};
+    updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
+    return updatedConfig;
+}
+
+/**
+ * Calls an Apify actor and retrieves the dataset items.
+ *
+ *
+ * It requires the `APIFY_TOKEN` environment variable to be set.
+ * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
+ *
+ * @param {string} actorName - The name of the actor to call.
+ * @param {ActorCallOptions} callOptions - The options to pass to the actor.
+ * @param {unknown} input - The input to pass to the actor.
+ * @param {string} apifyToken - The Apify token to use for authentication.
+ * @returns {Promise<object[]>} - A promise that resolves to an array of dataset items.
+ * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
+ */
+export async function callActorGetDataset(
+    actorName: string,
+    input: unknown,
+    apifyToken: string,
+    callOptions: ActorCallOptions | undefined = undefined,
+): Promise<object[]> {
+    const name = actorName;
+    try {
+        log.info(`Calling Actor ${name} with input: ${JSON.stringify(input)}`);
+
+        const options: ApifyClientOptions = { requestInterceptors: [addUserAgent] };
+        const client = new ApifyClient({ ...options, token: apifyToken });
+        const actorClient = client.actor(name);
+
+        const results = await actorClient.call(input, callOptions);
+        const dataset = await client.dataset(results.defaultDatasetId).listItems();
+        log.info(`Actor ${name} finished with ${dataset.items.length} items`);
+
+        return dataset.items;
+    } catch (error) {
+        log.error(`Error calling actor: ${error}. Actor: ${name}, input: ${JSON.stringify(input)}`);
+        throw new Error(`Error calling Actor: ${error}`);
+    }
+}
 
 /**
  * Fetches actor input schemas by Actor IDs or Actor full names and creates MCP tools.
@@ -45,7 +101,7 @@ export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
                 result.input.properties = addEnumsToDescriptionsWithExamples(result.input.properties);
             }
             try {
-                const memoryMbytes = result.defaultRunOptions?.memoryMbytes || defaults.maxMemoryMbytes;
+                const memoryMbytes = result.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
                 tools.push({
                     type: 'actor',
                     tool: {
@@ -54,7 +110,7 @@ export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
                         description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                         inputSchema: result.input || {},
                         ajvValidate: ajv.compile(result.input || {}),
-                        memoryMbytes: memoryMbytes > defaults.maxMemoryMbytes ? defaults.maxMemoryMbytes : memoryMbytes,
+                        memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },
                 });
             } catch (validationError) {

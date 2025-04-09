@@ -1,45 +1,47 @@
-import type { Server } from '@modelcontextprotocol/sdk/server.js';
-import express from 'express';
+import type { Server as HttpServer } from 'http';
+
+import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { log } from '../src/logger.js';
+import log from '@apify/log';
+
+import { createExpressApp } from '../src/actor/server.js';
+import { HelperTools } from '../src/const.js';
 import { ApifyMcpServer } from '../src/mcp-server.js';
 
 describe('ApifyMcpServer initialization', () => {
-    let app: express.Express;
+    let app: Express;
     let server: ApifyMcpServer;
-    let mcpServer: Server;
+    let httpServer: HttpServer;
     const testPort = 7357;
+    const testHost = `http://localhost:${testPort}`;
 
     beforeEach(async () => {
-        app = express();
         server = new ApifyMcpServer();
         log.setLevel(log.LEVELS.OFF);
 
-        // Setup basic express route to trigger server initialization
-        app.get('/', async (req, res) => {
-            await server.processParamsAndUpdateTools(req.url);
-            res.sendStatus(200);
-        });
+        // Create express app using the proper server setup
+        app = createExpressApp(testHost, server);
 
         // Start test server
         await new Promise<void>((resolve) => {
-            mcpServer = app.listen(testPort, () => resolve());
+            httpServer = app.listen(testPort, () => resolve());
         });
     });
 
     afterEach(async () => {
         await new Promise<void>((resolve) => {
-            mcpServer.close(() => resolve());
+            httpServer.close(() => resolve());
         });
     });
 
     it('should load actors from query parameters', async () => {
         // Test with multiple actors including different username cases
         const testActors = ['apify/rag-web-browser', 'apify/instagram-scraper'];
+        const numberOfHelperTools = 2;
 
         // Make request to trigger server initialization
-        const response = await fetch(`http://localhost:${testPort}/?actors=${testActors.join(',')}`);
+        const response = await fetch(`${testHost}/?actors=${testActors.join(',')}`);
         expect(response.status).toBe(200);
 
         // Verify loaded tools
@@ -48,17 +50,19 @@ describe('ApifyMcpServer initialization', () => {
             'apify-slash-rag-web-browser',
             'apify-slash-instagram-scraper',
         ]));
-        expect(toolNames.length).toBe(testActors.length);
+        expect(toolNames.length).toBe(testActors.length + numberOfHelperTools);
     });
 
     it('should enable auto-loading tools when flag is set', async () => {
-        const response = await fetch(`http://localhost:${testPort}/?enableActorAutoLoading=true`);
+        const response = await fetch(`${testHost}/?enableActorAutoLoading=true`);
         expect(response.status).toBe(200);
 
         const toolNames = server.getToolNames();
         expect(toolNames).toEqual([
-            'add-actor-to-tools',
-            'remove-actor-from-tools',
+            HelperTools.SEARCH,
+            HelperTools.GET_TOOL_DETAILS,
+            HelperTools.ADD_TOOL,
+            HelperTools.REMOVE_TOOL,
         ]);
     });
 });

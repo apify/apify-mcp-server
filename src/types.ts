@@ -2,15 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
-import type { ApifyMcpServer } from './mcp-server';
-
-export type Input = {
-    actors: string[] | string;
-    enableActorAutoLoading?: boolean;
-    maxActorMemoryBytes?: number;
-    debugActor?: string;
-    debugActorInput?: unknown;
-};
+import type { ApifyMcpServer } from './mcp-server.js';
 
 export interface ISchemaProperties {
     type: string;
@@ -97,7 +89,7 @@ export type InternalToolArgs = {
  * Interface for internal tools - tools implemented directly in the MCP server.
  * Extends ToolBase with a call function implementation.
  */
-export interface InternalTool extends ToolBase {
+export interface HelperTool extends ToolBase {
     /**
      * Executes the tool with the given arguments
      * @param toolArgs - Arguments and server references
@@ -109,7 +101,7 @@ export interface InternalTool extends ToolBase {
 /**
  * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
  */
-export type ToolType = 'internal' | 'actor';
+export type ToolType = 'internal' | 'actor' | 'actor-mcp';
 
 /**
  * Wrapper interface that combines a tool with its type discriminator.
@@ -119,7 +111,7 @@ export interface ToolWrap {
     /** Type of the tool (internal or actor) */
     type: ToolType;
     /** The tool instance */
-    tool: ActorTool | InternalTool;
+    tool: ActorTool | HelperTool;
 }
 
 //  ActorStoreList for actor-search tool
@@ -148,25 +140,15 @@ export interface ActorStorePruned {
     totalStars?: number | null;
 }
 
-export interface ActorRunData {
-    id?: string;
-    actId?: string;
-    userId?: string;
-    startedAt?: string;
-    finishedAt: null;
-    status: 'RUNNING';
-    meta: {
-        origin?: string;
-    };
-    options: {
-        build?: string;
-        memoryMbytes?: string;
-    };
-    buildId?: string;
-    defaultKeyValueStoreId?: string;
-    defaultDatasetId?: string;
-    defaultRequestQueueId?: string;
-    buildNumber?: string;
-    containerUrl?: string;
-    standbyUrl?: string;
+/**
+ * Interface for internal tools - tools implemented directly in the MCP server.
+ * Extends ToolBase with a call function implementation.
+ */
+export interface InternalTool extends ToolBase {
+    /**
+     * Executes the tool with the given arguments
+     * @param toolArgs - Arguments and server references
+     * @returns Promise resolving to the tool's output
+     */
+    call: (toolArgs: InternalToolArgs) => Promise<object>;
 }

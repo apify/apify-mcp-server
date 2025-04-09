@@ -2,11 +2,11 @@
   "name": "@apify/actors-mcp-server",
   "version": "0.1.21",
   "type": "module",
-  "description": "Model Context Protocol Server for Apify Actors",
+  "description": "Model Context Protocol Server for Apify",
   "engines": {
     "node": ">=18.0.0"
   },
-  "main": "dist/index.js",
+  "main": "dist/stdio.js",
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
   },
@@ -30,10 +30,11 @@
     "model context protocol"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.3.1",
+    "@apify/log": "^2.5.16",
+    "@modelcontextprotocol/sdk": "^1.9.0",
     "ajv": "^8.17.1",
-    "apify": "^3.2.6",
-    "apify-client": "^2.11.2",
+    "apify": "^3.4.0",
+    "apify-client": "^2.12.1",
     "express": "^4.21.2",
     "minimist": "^1.2.8",
     "zod": "^3.24.1",

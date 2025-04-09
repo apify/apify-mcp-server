@@ -1,5 +1,12 @@
-import { MAX_DESCRIPTION_LENGTH, ACTOR_ENUM_MAX_LENGTH } from '../const.js';
+import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import type { IActorInputSchema, ISchemaProperties } from '../types.js';
+
+export function actorNameToToolName(actorName: string): string {
+    return actorName
+        .replace(/\//g, '-slash-')
+        .replace(/\./g, '-dot-')
+        .slice(0, 64);
+}
 
 /**
  * Builds nested properties for object types in the schema.
@@ -64,7 +71,9 @@ export function buildNestedProperties(properties: Record<string, ISchemaProperti
  *
  * @param properties
  */
-export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): { [key: string]: ISchemaProperties } {
+export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): {
+    [key: string]: ISchemaProperties
+} {
     const filteredProperties: { [key: string]: ISchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
         filteredProperties[key] = {
@@ -188,10 +197,12 @@ export function shortenEnum(enumList: string[]): string[] | undefined {
  * Shortens the description, enum, and items.enum properties of the schema properties.
  * @param properties
  */
-export function shortenProperties(properties: { [key: string]: ISchemaProperties}): { [key: string]: ISchemaProperties } {
+export function shortenProperties(properties: { [key: string]: ISchemaProperties }): {
+    [key: string]: ISchemaProperties
+} {
     for (const property of Object.values(properties)) {
-        if (property.description.length > MAX_DESCRIPTION_LENGTH) {
-            property.description = `${property.description.slice(0, MAX_DESCRIPTION_LENGTH)}...`;
+        if (property.description.length > ACTOR_MAX_DESCRIPTION_LENGTH) {
+            property.description = `${property.description.slice(0, ACTOR_MAX_DESCRIPTION_LENGTH)}...`;
         }
 
         if (property.enum && property.enum?.length > 0) {

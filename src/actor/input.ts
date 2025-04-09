@@ -1,3 +1,6 @@
+/*
+ * Actor input processing.
+ */
 import type { Input } from './types.js';
 
 /**

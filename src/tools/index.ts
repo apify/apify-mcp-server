@@ -1,21 +1,8 @@
-import type { ToolWrap } from '../types.js';
-import { addActorToTools } from './add-actors-to-tools.js';
-import { discoverActorsTool } from './discover-actors.js';
-import { getActorsDetailsTool } from './get-actors-details.js';
-import { removeActorFromTools } from './remove-actors-from-tools.js';
+// Import specific tools that are being used
+import { callActorGetDataset, getActorsAsTools } from './actor.js';
+import { actorDefinitionTool } from './build.js';
+import { addTool, removeTool } from './helpers.js';
+import { searchTool } from './store_collection.js';
 
-export { addActorToTools, removeActorFromTools, discoverActorsTool, getActorsDetailsTool };
-
-export function getActorAutoLoadingTools(): ToolWrap[] {
-    return [
-        addActorToTools,
-        removeActorFromTools,
-    ];
-}
-
-export function getActorDiscoveryTools(): ToolWrap[] {
-    return [
-        discoverActorsTool,
-        getActorsDetailsTool,
-    ];
-}
+// Export only the tools that are being used
+export { addTool, removeTool, actorDefinitionTool, searchTool, getActorsAsTools, callActorGetDataset };

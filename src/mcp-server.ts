@@ -7,27 +7,22 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ActorCallOptions } from 'apify-client';
 
-import { callActorGetDataset } from './actors/call.js';
-import {
-    getActorsAsTools,
-} from './actors/tools.js';
+import log from '@apify/log';
+
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
-    defaults,
     SERVER_NAME,
     SERVER_VERSION,
 } from './const.js';
-import { log } from './logger.js';
-import { getActorAutoLoadingTools } from './tools/index.js';
-import type { ActorTool, ToolWrap, InternalTool } from './types.js';
-import { parseInputParamsFromUrl } from './utils.js';
+import { actorDefinitionTool, callActorGetDataset, searchTool } from './tools/index.js';
+import type { ActorTool, HelperTool, ToolWrap } from './types.js';
 
 /**
  * Create Apify MCP server
  */
 export class ApifyMcpServer {
-    private server: Server;
+    public server: Server;
     public tools: Map<string, ToolWrap>;
 
     constructor() {
@@ -45,23 +40,22 @@ export class ApifyMcpServer {
         this.tools = new Map();
         this.setupErrorHandling();
         this.setupToolHandlers();
+
+        // Add default tools
+        this.updateTools([searchTool, actorDefinitionTool]);
     }
 
-    public async addToolsFromActors(actors: string[]) {
-        const tools = await getActorsAsTools(actors);
-        this.updateTools(tools);
-        return tools;
-    }
-
-    public async addToolsFromDefaultActors() {
-        await this.addToolsFromActors(defaults.actors);
-    }
-
-    public updateTools(tools: ToolWrap[]): void {
+    /**
+     * Upsert new tools.
+     * @param tools - Array of tool wrappers.
+     * @returns Array of tool wrappers.
+     */
+    public updateTools(tools: ToolWrap[]) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
-            log.info(`Added/Updated tool: ${wrap.tool.name}`);
+            log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
+        return tools;
     }
 
     /**
@@ -82,31 +76,12 @@ export class ApifyMcpServer {
         });
     }
 
-    public enableActorAutoLoading() {
-        this.updateTools(getActorAutoLoadingTools());
-        log.debug('Enabled Actor auto-loading tools');
-    }
-
-    /**
-     * Process input parameters and update tools
-     * If URL contains query parameter `actors`, add tools from Actors.
-     * If URL contains query parameter `enableActorAutoLoading`, enable auto-loading of Actors.
-     * @param url
-     */
-    public async processParamsAndUpdateTools(url: string) {
-        const input = parseInputParamsFromUrl(url);
-        if (input.actors) {
-            await this.addToolsFromActors(input.actors as string[]);
-        }
-        if (input.enableActorAutoLoading) {
-            this.enableActorAutoLoading();
-        }
-
-        log.debug(`Server is running in STANDBY mode with Actors: ${this.getToolNames()}. `
-            + 'To use different Actors, provide them in "actors" query param or Actor Task input.');
-    }
-
     private setupToolHandlers(): void {
+        /**
+         * Handles the request to list tools.
+         * @param {object} request - The request object.
+         * @returns {object} - The response object containing the tools.
+         */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) => (tool.tool));
             return { tools };
@@ -139,7 +114,7 @@ export class ApifyMcpServer {
 
             try {
                 if (tool.type === 'internal') {
-                    const internalTool = tool.tool as InternalTool;
+                    const internalTool = tool.tool as HelperTool;
                     const res = await internalTool.call({
                         args,
                         apifyMcpServer: this,

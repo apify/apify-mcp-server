@@ -1,8 +1,15 @@
+import { Ajv } from 'ajv';
 import { ApifyClient } from 'apify-client';
+import { z } from 'zod';
+import zodToJsonSchema from 'zod-to-json-schema';
 
-import { ACTOR_README_MAX_LENGTH } from '../const.js';
-import { log } from '../logger.js';
-import type { ActorDefinitionPruned, ActorDefinitionWithDesc, ISchemaProperties } from '../types.js';
+import log from '@apify/log';
+
+import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
+import type { ActorDefinitionPruned, ActorDefinitionWithDesc, InternalTool, ISchemaProperties, ToolWrap } from '../types.js';
+import { filterSchemaProperties, shortenProperties } from './utils.js';
+
+const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 /**
  * Get Actor input schema by Actor name.
@@ -15,7 +22,6 @@ import type { ActorDefinitionPruned, ActorDefinitionWithDesc, ISchemaProperties 
 export async function getActorDefinition(actorIdOrName: string, limit: number = ACTOR_README_MAX_LENGTH): Promise<ActorDefinitionPruned | null> {
     const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const actorClient = client.actor(actorIdOrName);
-
     try {
         // Fetch actor details
         const actor = await actorClient.get();
@@ -52,7 +58,6 @@ export async function getActorDefinition(actorIdOrName: string, limit: number = 
         throw new Error(errorMessage);
     }
 }
-
 function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
     return {
         id: response.id,
@@ -60,22 +65,23 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         buildTag: response?.buildTag || '',
         readme: response?.readme || '',
         input: response?.input && 'type' in response.input && 'properties' in response.input
-            ? { ...response.input,
+            ? {
+                ...response.input,
                 type: response.input.type as string,
-                properties: response.input.properties as Record<string, ISchemaProperties> }
+                properties: response.input.properties as Record<string, ISchemaProperties>,
+            }
             : undefined,
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
     };
 }
-
 /** Prune Actor README if it is too long
  * If the README is too long
  * - We keep the README as it is up to the limit.
  * - After the limit, we keep heading only
  * - We add a note that the README was truncated because it was too long.
  */
-export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): string {
+function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): string {
     if (readme.length <= limit) {
         return readme;
     }
@@ -85,3 +91,38 @@ export function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LEN
     const prunedReadme = lines.filter((line) => line.startsWith('#'));
     return `${readmeFirst}\n\nREADME was truncated because it was too long. Remaining headers:\n${prunedReadme.join(', ')}`;
 }
+
+const GetActorDefinitionArgsSchema = z.object({
+    actorName: z.string()
+        .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
+            + 'Actor name is always composed from `username/name`'),
+    limit: z.number()
+        .int()
+        .default(ACTOR_README_MAX_LENGTH)
+        .describe(`Truncate the README to this limit. Default value is ${ACTOR_README_MAX_LENGTH}.`),
+});
+
+export const actorDefinitionTool: ToolWrap = {
+    type: 'internal',
+    tool: {
+        name: HelperTools.GET_TOOL_DETAILS,
+        actorFullName: HelperTools.GET_TOOL_DETAILS,
+        description: 'Get documentation, readme, input schema and other details about an Actor. '
+            + 'For example, when user says, I need to know more about web crawler Actor.'
+            + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
+            + `Limit the length of the README if needed.`,
+        inputSchema: zodToJsonSchema(GetActorDefinitionArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(GetActorDefinitionArgsSchema)),
+        call: async (toolArgs) => {
+            const { args } = toolArgs;
+
+            const parsed = GetActorDefinitionArgsSchema.parse(args);
+            const v = await getActorDefinition(parsed.actorName, parsed.limit);
+            if (v && v.input && 'properties' in v.input && v.input) {
+                const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
+                v.input.properties = shortenProperties(properties);
+            }
+            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+        },
+    } as InternalTool,
+};

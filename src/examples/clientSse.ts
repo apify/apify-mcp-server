@@ -15,7 +15,7 @@ import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 import dotenv from 'dotenv';
 import { EventSource } from 'eventsource';
 
-import { actorNameToToolName } from '../actors/utils.js';
+import { actorNameToToolName } from '../tools/utils.js';
 
 const REQUEST_TIMEOUT = 120_000; // 2 minutes
 const filename = fileURLToPath(import.meta.url);

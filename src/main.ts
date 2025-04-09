@@ -1,18 +1,20 @@
 /**
- * This file serves as an Actor MCP SSE server entry point.
+ * Serves as an Actor MCP SSE server entry point.
+ * This file needs to be named `main.ts` to be recognized by the Apify platform.
  */
 
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
 
-import { callActorGetDataset } from './actors/call.js';
-import { processInput } from './input.js';
-import { log } from './logger.js';
+import log from '@apify/log';
+
+import { processInput } from './actor/input.js';
+import { createExpressApp } from './actor/server.js';
+import type { Input } from './actor/types';
 import { ApifyMcpServer } from './mcp-server.js';
-import { createExpressApp } from './server.js';
-import { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
-import type { Input } from './types.js';
-import { getActorRunData, isActorStandby } from './utils.js';
+import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
+
+const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
 await Actor.init();
 
@@ -29,14 +31,15 @@ const mcpServer = new ApifyMcpServer();
 const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
-if (isActorStandby()) {
-    const app = createExpressApp(HOST, mcpServer, getActorRunData() || {});
+if (STANDBY_MODE) {
+    const app = createExpressApp(HOST, mcpServer);
     log.info('Actor is running in the STANDBY mode.');
-    await mcpServer.addToolsFromDefaultActors();
-    mcpServer.updateTools(getActorDiscoveryTools());
+    const tools = [searchTool, actorDefinitionTool];
+    mcpServer.updateTools([searchTool, actorDefinitionTool]);
     if (input.enableActorAutoLoading) {
-        mcpServer.updateTools(getActorAutoLoadingTools());
+        tools.push(addTool, removeTool);
     }
+    mcpServer.updateTools(tools);
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });

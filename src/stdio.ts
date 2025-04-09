@@ -15,35 +15,40 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import minimist from 'minimist';
 
-import { log } from './logger.js';
-import { ApifyMcpServer } from './mcp-server.js';
-import { getActorAutoLoadingTools, getActorDiscoveryTools } from './tools/index.js';
+import log from '@apify/log';
 
+import { defaults } from './actor/const.js';
+import { ApifyMcpServer } from './mcp-server.js';
+import { addTool, removeTool, getActorsAsTools } from './tools/index.js';
+
+// Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
 
-const argv = minimist(process.argv.slice(2));
-const argActors = argv.actors?.split(',').map((actor: string) => actor.trim()) || [];
-const argEnableActorAutoLoading = argv.enableActorAutoLoading || false;
+// Parse command line arguments
+const { actors = '', enableActorAutoLoading = false } = minimist(process.argv.slice(2));
+const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
 
+// Validate environment
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
     process.exit(1);
 }
 
 async function main() {
-    const server = new ApifyMcpServer();
-    await (argActors.length !== 0
-        ? server.addToolsFromActors(argActors)
-        : server.addToolsFromDefaultActors());
-    server.updateTools(getActorDiscoveryTools());
-    if (argEnableActorAutoLoading) {
-        server.updateTools(getActorAutoLoadingTools());
+    const mcpServer = new ApifyMcpServer();
+    // Initialize tools
+    const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors);
+    if (enableActorAutoLoading) {
+        tools.push(addTool, removeTool);
     }
+    mcpServer.updateTools(tools);
+
+    // Start server
     const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await mcpServer.connect(transport);
 }
 
 main().catch((error) => {
-    console.error('Server error:', error); // eslint-disable-line no-console
+    log.error('Server error:', error);
     process.exit(1);
 });
