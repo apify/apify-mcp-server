@@ -43,28 +43,30 @@
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.33.1",
     "@anthropic-ai/tokenizer": "^0.0.4",
-    "@apify/eslint-config": "^0.5.0-beta.2",
+    "@apify/eslint-config": "^1.0.0",
     "@apify/tsconfig": "^0.1.0",
     "@types/express": "^4.0.0",
     "@types/minimist": "^1.2.5",
     "dotenv": "^16.4.7",
-    "eslint": "^9.17.0",
+    "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
     "tsx": "^4.6.2",
     "typescript": "^5.3.3",
-    "typescript-eslint": "^8.18.2",
+    "typescript-eslint": "^8.23.0",
     "vitest": "^3.0.8"
   },
   "scripts": {
     "start": "npm run start:dev",
     "start:prod": "node dist/main.js",
     "start:dev": "tsx src/main.ts",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "build": "tsc",
-    "watch": "tsc --watch",
+    "lint": "./node_modules/.bin/eslint .",
+    "lint:fix": "./node_modules/.bin/eslint . --fix",
+    "build": "tsc -b src",
+    "build:watch": "tsc -b src -w",
     "inspector": "npx @modelcontextprotocol/inspector dist/stdio.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "type-check": "tsc --noEmit",
+    "clean": "tsc -b src --clean"
   },
   "author": "Apify",
   "license": "MIT"

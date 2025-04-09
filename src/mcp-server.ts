@@ -95,13 +95,17 @@ export class ApifyMcpServer {
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
             const apifyToken = request.params.apifyToken || process.env.APIFY_TOKEN;
+
+            // Validate token
             if (!apifyToken) {
                 throw new Error('APIFY_TOKEN is required but not set in the environment variables or passed as a parameter.');
             }
 
+            // Find tool by name or actor full name
             const tool = Array.from(this.tools.values())
                 .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
             if (!tool) {
+                // TODO: handle errors better, server.sendLoggingMessage (   )
                 throw new Error(`Unknown tool: ${name}`);
             }
             if (!args) {
@@ -113,6 +117,7 @@ export class ApifyMcpServer {
             }
 
             try {
+                // Handle internal tool
                 if (tool.type === 'internal') {
                     const internalTool = tool.tool as HelperTool;
                     const res = await internalTool.call({
@@ -120,17 +125,20 @@ export class ApifyMcpServer {
                         apifyMcpServer: this,
                         mcpServer: this.server,
                     }) as object;
-                    return {
-                        ...res,
-                    };
+
+                    return { ...res };
                 }
 
+                // Handle actor tool
                 if (tool.type === 'actor') {
                     const actorTool = tool.tool as ActorTool;
 
-                    const items = await callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, {
+                    const callOptions: ActorCallOptions = {
                         memory: actorTool.memoryMbytes,
-                    } as ActorCallOptions);
+                    };
+
+                    const items = await callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, callOptions);
+
                     const content = items.map((item) => {
                         const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                         return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM

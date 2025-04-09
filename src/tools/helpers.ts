@@ -17,12 +17,13 @@ export const addTool: ToolWrap = {
     type: 'internal',
     tool: {
         name: HelperTools.ADD_TOOL,
-        description: 'Add an Actor to available tools by Actor ID or Actor name. '
-            + 'Do not execute the Actor, only add it and list it in available tools. '
+        description: 'Add a tool to available tools by Actor ID or Actor name. '
+            + 'Do not execute the tool, only add it and list it in available tools. '
             + 'Never run the tool without user consent! '
             + 'For example, add a tool with username/name when user wants to scrape data from a website.',
         inputSchema: zodToJsonSchema(AddToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(AddToolArgsSchema)),
+        // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, args } = toolArgs;
             const parsed = AddToolArgsSchema.parse(args);
@@ -52,6 +53,7 @@ export const removeTool: ToolWrap = {
             + 'For example, when user says, I do not need a tool username/name anymore',
         inputSchema: zodToJsonSchema(RemoveToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(RemoveToolArgsSchema)),
+        // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, args } = toolArgs;
 
