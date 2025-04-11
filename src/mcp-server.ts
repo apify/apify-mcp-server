@@ -83,6 +83,7 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+            // TODO if there is actor-mcp as a tool, also list the tools from that Actor 
             const tools = Array.from(this.tools.values()).map((tool) => (tool.tool));
             return { tools };
         });
