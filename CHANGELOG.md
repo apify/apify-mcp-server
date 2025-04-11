@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.1.22 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Clearly separate Actor related code and rest of the codebase. Only export ApifyMcpServer from the package ([ce711e9](https://github.com/apify/actors-mcp-server/commit/ce711e9096ce2f51f6c3f78c0966a27ef73ad945))
+- Update packages, add TODOs ([b78fb6b](https://github.com/apify/actors-mcp-server/commit/b78fb6b1caadb2ec886eb0b11702bda10b151fdb))
+- Lint issue ([8735e8f](https://github.com/apify/actors-mcp-server/commit/8735e8f99ba2d71db732978a1a5ffaae5dc3f898))
+- Rename server to ActorsMcpServer ([6879923](https://github.com/apify/actors-mcp-server/commit/6879923a946536b8ea422e2bed943f1ed021a458))
+- Deploy to npm ([90b87f8](https://github.com/apify/actors-mcp-server/commit/90b87f8edc59a4d3c375ba6344073bafe49a9454))
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.1.21](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.21) (2025-03-27)
 
 ### 🐛 Bug Fixes
