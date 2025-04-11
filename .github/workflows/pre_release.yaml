@@ -3,11 +3,6 @@ name: Create a pre-release
 on:
     # Push to master will deploy a beta version
     push:
-        branches:
-            - master
-            - 'fix/*'
-        tags-ignore:
-            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
 concurrency:
     group: release
