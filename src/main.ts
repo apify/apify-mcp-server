@@ -35,7 +35,6 @@ if (STANDBY_MODE) {
     const app = createExpressApp(HOST, mcpServer);
     log.info('Actor is running in the STANDBY mode.');
     const tools = [searchTool, actorDefinitionTool];
-    mcpServer.updateTools([searchTool, actorDefinitionTool]);
     if (input.enableActorAutoLoading) {
         tools.push(addTool, removeTool);
     }

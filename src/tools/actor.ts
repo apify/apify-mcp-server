@@ -1,14 +1,12 @@
 import { Ajv } from 'ajv';
-import type { ApifyClientOptions } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
-import { ApifyClient } from 'apify-client';
-import type { AxiosRequestConfig } from 'axios';
 
 import log from '@apify/log';
 
 import type { ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES, USER_AGENT_ORIGIN } from '../const.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
+import { ApifyClient } from './mcp-apify-client.js';
 import {
     actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
@@ -17,18 +15,6 @@ import {
     markInputPropertiesAsRequired,
     shortenProperties,
 } from './utils.js';
-
-/**
- * Adds a User-Agent header to the request config.
- * @param config
- * @private
- */
-export function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
-    const updatedConfig = { ...config };
-    updatedConfig.headers = updatedConfig.headers ?? {};
-    updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
-    return updatedConfig;
-}
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
@@ -54,8 +40,7 @@ export async function callActorGetDataset(
     try {
         log.info(`Calling Actor ${name} with input: ${JSON.stringify(input)}`);
 
-        const options: ApifyClientOptions = { requestInterceptors: [addUserAgent] };
-        const client = new ApifyClient({ ...options, token: apifyToken });
+        const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(name);
 
         const results = await actorClient.call(input, callOptions);
