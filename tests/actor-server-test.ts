@@ -7,17 +7,17 @@ import log from '@apify/log';
 
 import { createExpressApp } from '../src/actor/server.js';
 import { HelperTools } from '../src/const.js';
-import { ApifyMcpServer } from '../src/mcp-server.js';
+import { ActorsMcpServer } from '../src/mcp-server.js';
 
 describe('ApifyMcpServer initialization', () => {
     let app: Express;
-    let server: ApifyMcpServer;
+    let server: ActorsMcpServer;
     let httpServer: HttpServer;
     const testPort = 7357;
     const testHost = `http://localhost:${testPort}`;
 
     beforeEach(async () => {
-        server = new ApifyMcpServer();
+        server = new ActorsMcpServer();
         log.setLevel(log.LEVELS.OFF);
 
         // Create express app using the proper server setup

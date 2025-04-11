@@ -106,7 +106,6 @@ async function main(): Promise<void> {
     } catch (error: unknown) {
         if (error instanceof Error) {
             console.error('Error:', error.message);
-            console.error(error.stack);
         } else {
             console.error('An unknown error occurred:', error);
         }

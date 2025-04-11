@@ -6,7 +6,7 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "main": "dist/stdio.js",
+  "main": "dist/index.js",
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
   },

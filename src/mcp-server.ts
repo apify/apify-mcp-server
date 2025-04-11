@@ -21,7 +21,7 @@ import type { ActorTool, HelperTool, ToolWrap } from './types.js';
 /**
  * Create Apify MCP server
  */
-export class ApifyMcpServer {
+export class ActorsMcpServer {
     public server: Server;
     public tools: Map<string, ToolWrap>;
 

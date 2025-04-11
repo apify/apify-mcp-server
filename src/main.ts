@@ -11,7 +11,7 @@ import log from '@apify/log';
 import { processInput } from './actor/input.js';
 import { createExpressApp } from './actor/server.js';
 import type { Input } from './actor/types';
-import { ApifyMcpServer } from './mcp-server.js';
+import { ActorsMcpServer } from './mcp-server.js';
 import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
@@ -26,7 +26,7 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
-const mcpServer = new ApifyMcpServer();
+const mcpServer = new ActorsMcpServer();
 
 const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info(`Loaded input: ${JSON.stringify(input)} `);

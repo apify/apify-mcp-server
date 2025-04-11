@@ -9,12 +9,12 @@ import express from 'express';
 import log from '@apify/log';
 
 import { HEADER_READINESS_PROBE, Routes } from './const.js';
-import { type ApifyMcpServer } from '../mcp-server.js';
+import { type ActorsMcpServer } from '../mcp-server.js';
 import { getActorRunData, processParamsGetTools } from './utils.js';
 
 export function createExpressApp(
     host: string,
-    mcpServer: ApifyMcpServer,
+    mcpServer: ActorsMcpServer,
 ): express.Express {
     const HELP_MESSAGE = `Connect to the server with GET request to ${host}/sse?token=YOUR-APIFY-TOKEN`
         + ` and then send POST requests to ${host}/message?token=YOUR-APIFY-TOKEN`;

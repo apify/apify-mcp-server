@@ -2,7 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
-import type { ApifyMcpServer } from './mcp-server.js';
+import type { ActorsMcpServer } from './mcp-server.js';
 
 export interface ISchemaProperties {
     type: string;
@@ -80,7 +80,7 @@ export type InternalToolArgs = {
     /** Arguments passed to the tool */
     args: Record<string, unknown>;
     /** Reference to the Apify MCP server instance */
-    apifyMcpServer: ApifyMcpServer;
+    apifyMcpServer: ActorsMcpServer;
     /** Reference to the MCP server instance */
     mcpServer: Server;
 }
