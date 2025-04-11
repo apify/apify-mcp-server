@@ -5,7 +5,7 @@ on:
     push:
         branches:
             - master
-            - 'feat/decouple'
+            - 'feat*'
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
