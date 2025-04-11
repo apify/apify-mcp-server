@@ -15,8 +15,11 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from './const.js';
-import { actorDefinitionTool, callActorGetDataset, searchTool } from './tools/index.js';
+import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
 import type { ActorTool, HelperTool, ToolWrap } from './types.js';
+import { defaults } from './actor/const.js';
+import { actorNameToToolName } from './tools/utils.js';
+import { processParamsGetTools } from './actor/utils.js';
 
 /**
  * Create Apify MCP server
@@ -43,6 +46,25 @@ export class ActorsMcpServer {
 
         // Add default tools
         this.updateTools([searchTool, actorDefinitionTool]);
+    }
+
+    /**
+     * Loads missing default tools.
+     */
+    public async loadDefaultTools() {
+        const missingDefaultTools = defaults.actors.filter(name => !this.tools.has(actorNameToToolName(name)));
+        const tools = await getActorsAsTools(missingDefaultTools);
+        if (tools.length > 0) this.updateTools(tools);
+    }
+
+    /**
+     * Loads tools from URL params.
+     *
+     * Used primarily for SSE.
+     */
+    public async loadToolsFromUrl(url: string) {
+        const tools = await processParamsGetTools(url);
+        if (tools.length > 0) this.updateTools(tools);
     }
 
     /**
@@ -83,7 +105,7 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            // TODO if there is actor-mcp as a tool, also list the tools from that Actor 
+            // TODO if there is actor-mcp as a tool, also list the tools from that Actor
             const tools = Array.from(this.tools.values()).map((tool) => (tool.tool));
             return { tools };
         });
