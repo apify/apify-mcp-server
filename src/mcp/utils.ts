@@ -8,9 +8,6 @@ import type { ToolWrap } from '../types.js';
 
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
 import { Input } from "../types.js";
-import { getActorsMCPServerURL, isActorMCPServer } from "./actors";
-import { getMCPServerTools } from "./proxy";
-import { createMCPClient } from "./client";
 
 /**
  * Generates a unique server ID based on the provided URL.
@@ -32,7 +29,7 @@ export function getMCPServerID(url: string): string {
  * @param toolName The tool name to generate the tool name from.
  * @returns A unique tool name.
  */
-export function getServerToolName(url: string, toolName: string): string {
+export function getProxyMCPServerToolName(url: string, toolName: string): string {
     const prefix = getMCPServerID(url);
 
     const fullName = `${prefix}-${toolName}`;

@@ -106,10 +106,16 @@ export interface HelperTool extends ToolBase {
 * Extends ToolBase with tool associated MCP server.
 */
 export interface ActorMCPTool extends ToolBase {
+    // Origin MCP server tool name, is needed for the tool call
+    originToolName: string;
     // ID of the Actorized MCP server
     actorID: string;
-    // Name of the Actorized MCP server the tool is associated with
+    /**
+     * ID of the Actorized MCP server the tool is associated with.
+     * See getMCPServerID()
+     */
     serverId: string;
+    // Connection URL of the Actorized MCP server
     serverUrl: string;
 }
 

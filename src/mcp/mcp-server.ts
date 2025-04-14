@@ -63,6 +63,8 @@ export class ActorsMcpServer {
     /**
      * Loads tools from URL params.
      *
+     * This method also handles enabling of Actor auto loading via the processParamsGetTools.
+     *
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyToken: string) {
@@ -165,7 +167,7 @@ export class ActorsMcpServer {
                     try {
                         client = await createMCPClient(serverTool.serverUrl, apifyToken);
                         const res = await client.callTool({
-                            name: name,
+                            name: serverTool.originToolName,
                             arguments: args,
                         });
 

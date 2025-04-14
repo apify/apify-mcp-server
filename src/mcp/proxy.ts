@@ -1,7 +1,7 @@
 import Ajv from "ajv";
 import { ActorMCPTool, ToolWrap } from "../types";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { getMCPServerID } from "./utils";
+import { getMCPServerID, getProxyMCPServerToolName } from "./utils";
 
 export async function getMCPServerTools(
     actorID: string,
@@ -21,7 +21,9 @@ export async function getMCPServerTools(
             actorID,
             serverId: getMCPServerID(serverUrl),
             serverUrl,
-            name: tool.name,
+            originToolName: tool.name,
+
+            name: getProxyMCPServerToolName(serverUrl, tool.name),
             description: tool.description || "",
             inputSchema: tool.inputSchema,
             ajvValidate: ajv.compile(tool.inputSchema)
