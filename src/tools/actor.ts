@@ -15,6 +15,11 @@ import {
     markInputPropertiesAsRequired,
     shortenProperties,
 } from './utils.js';
+import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
+import { createMCPClient } from '../mcp/client.js';
+import { getMCPServerTools } from '../mcp/proxy.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { cp } from 'node:fs';
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
@@ -55,6 +60,8 @@ export async function callActorGetDataset(
 }
 
 /**
+ * This function is used to fetch normal non-MCP server Actors as a tool.
+ *
  * Fetches actor input schemas by Actor IDs or Actor full names and creates MCP tools.
  *
  * This function retrieves the input schemas for the specified actors and compiles them into MCP tools.
@@ -72,7 +79,7 @@ export async function callActorGetDataset(
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
-export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
+export async function getNormalActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     const results = await Promise.all(actors.map(getActorDefinition));
     const tools: ToolWrap[] = [];
@@ -104,4 +111,52 @@ export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
         }
     }
     return tools;
+}
+
+async function getMCPServersAsTools(
+    actors: string[],
+    apifyToken: string
+): Promise<ToolWrap[]> {
+    const actorsMCPServerTools: ToolWrap[] = [];
+    for (const actorID of actors) {
+        const serverUrl = await getActorsMCPServerURL(actorID);
+
+        let client: Client | undefined;
+        try {
+            client = await createMCPClient(serverUrl, apifyToken);
+            const serverTools = await getMCPServerTools(actorID, client, serverUrl)
+            actorsMCPServerTools.push(...serverTools);
+        } finally {
+            if (client) await client.close();
+        }
+    }
+
+    return actorsMCPServerTools;
+}
+
+export async function getActorsAsTools(
+    actors: string[],
+    apifyToken: string
+): Promise<ToolWrap[]> {
+    console.log('Fetching actors as tools...');
+    console.log(actors)
+    // Actorized MCP servers
+    const actorsMCPServer: string[] = [];
+    for (const actorID of actors) {
+        if (await isActorMCPServer(actorID)) {
+            actorsMCPServer.push(actorID);
+        }
+    }
+    // Normal Actors as a tool
+    const toolActors = actors.filter((actorID) => !actorsMCPServer.includes(actorID));
+    console.log('actorsMCPserver', actorsMCPServer);
+    console.log('toolActors', toolActors);
+
+    // Normal Actors as a tool
+    const normalTools = await getNormalActorsAsTools(toolActors);
+
+    // Tools from Actorized MCP servers
+    const mcpServerTools = await getMCPServersAsTools(actorsMCPServer, apifyToken);
+
+    return [...normalTools, ...mcpServerTools];
 }

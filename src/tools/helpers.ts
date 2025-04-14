@@ -25,9 +25,9 @@ export const addTool: ToolWrap = {
         ajvValidate: ajv.compile(zodToJsonSchema(AddToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, mcpServer, args } = toolArgs;
+            const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
             const parsed = AddToolArgsSchema.parse(args);
-            const tools = await getActorsAsTools([parsed.actorName]);
+            const tools = await getActorsAsTools([parsed.actorName], apifyToken);
             const toolsAdded = apifyMcpServer.updateTools(tools);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
 

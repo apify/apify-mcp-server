@@ -8,10 +8,10 @@ import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
-import { processInput } from './actor/input.js';
+import { processInput } from './input.js';
 import { createExpressApp } from './actor/server.js';
-import type { Input } from './actor/types';
-import { ActorsMcpServer } from './mcp-server.js';
+import type { Input } from './types.js';
+import { ActorsMcpServer } from './mcp/mcp-server.js';
 import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';

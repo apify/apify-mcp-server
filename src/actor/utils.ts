@@ -1,34 +1,7 @@
-import { parse } from 'node:querystring';
 
 import { Actor } from 'apify';
+import type { ActorRunData } from './types.js';
 
-import { processInput } from './input.js';
-import type { ActorRunData, Input } from './types.js';
-import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
-import type { ToolWrap } from '../types.js';
-
-export function parseInputParamsFromUrl(url: string): Input {
-    const query = url.split('?')[1] || '';
-    const params = parse(query) as unknown as Input;
-    return processInput(params);
-}
-
-/**
- * Process input parameters and get tools
- * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
- * @param url
- */
-export async function processParamsGetTools(url: string) {
-    const input = parseInputParamsFromUrl(url);
-    let tools: ToolWrap[] = [];
-    if (input.actors) {
-        tools = await getActorsAsTools(input.actors as string[]);
-    }
-    if (input.enableActorAutoLoading) {
-        tools.push(addTool, removeTool);
-    }
-    return tools;
-}
 
 export function getActorRunData(): ActorRunData | null {
     return Actor.isAtHome() ? {

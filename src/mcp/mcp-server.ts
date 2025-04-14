@@ -1,3 +1,4 @@
+
 /**
  * Model Context Protocol (MCP) server for Apify Actors
  */
@@ -14,12 +15,14 @@ import {
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     SERVER_NAME,
     SERVER_VERSION,
-} from './const.js';
-import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
-import type { ActorTool, HelperTool, ToolWrap } from './types.js';
-import { defaults } from './const.js';
-import { actorNameToToolName } from './tools/utils.js';
-import { processParamsGetTools } from './actor/utils.js';
+} from '../const.js';
+import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from '../tools/index.js';
+import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
+import { defaults } from '../const.js';
+import { actorNameToToolName } from '../tools/utils.js';
+import { processParamsGetTools } from './utils.js';
+import { createMCPClient } from './client.js';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 /**
  * Create Apify MCP server
@@ -51,9 +54,9 @@ export class ActorsMcpServer {
     /**
      * Loads missing default tools.
      */
-    public async loadDefaultTools() {
+    public async loadDefaultTools(apifyToken: string) {
         const missingDefaultTools = defaults.actors.filter(name => !this.tools.has(actorNameToToolName(name)));
-        const tools = await getActorsAsTools(missingDefaultTools);
+        const tools = await getActorsAsTools(missingDefaultTools, apifyToken);
         if (tools.length > 0) this.updateTools(tools);
     }
 
@@ -62,8 +65,8 @@ export class ActorsMcpServer {
      *
      * Used primarily for SSE.
      */
-    public async loadToolsFromUrl(url: string) {
-        const tools = await processParamsGetTools(url);
+    public async loadToolsFromUrl(url: string, apifyToken: string) {
+        const tools = await processParamsGetTools(url, apifyToken);
         if (tools.length > 0) this.updateTools(tools);
     }
 
@@ -117,7 +120,10 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
             const { name, arguments: args } = request.params;
-            const apifyToken = request.params.apifyToken || process.env.APIFY_TOKEN;
+            const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
+
+            // Remove apifyToken from request.params just in case
+            delete request.params.apifyToken;
 
             // Validate token
             if (!apifyToken) {
@@ -147,9 +153,27 @@ export class ActorsMcpServer {
                         args,
                         apifyMcpServer: this,
                         mcpServer: this.server,
+                        apifyToken,
                     }) as object;
 
                     return { ...res };
+                }
+
+                if (tool.type === 'actor-mcp') {
+                    const serverTool = tool.tool as ActorMCPTool;
+                    let client: Client | undefined;
+                    try {
+                        client = await createMCPClient(serverTool.serverUrl, apifyToken);
+                        const res = await client.callTool({
+                            name: name,
+                            arguments: args,
+                        });
+
+                        return { ...res };
+                    } finally {
+                        if (client) await client.close();
+                    }
+
                 }
 
                 // Handle actor tool
