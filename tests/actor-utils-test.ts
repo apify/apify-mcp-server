@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { parseInputParamsFromUrl } from '../src/actor/utils.js';
+import { parseInputParamsFromUrl } from '../src/mcp/utils.js';
 
 describe('parseInputParamsFromUrl', () => {
     it('should parse actors from URL query params', () => {
