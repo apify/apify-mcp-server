@@ -27,3 +27,13 @@ export enum HelperTools {
     REMOVE_TOOL = 'remove-tool',
     GET_TOOL_DETAILS = 'get-tool-details',
 }
+
+export const defaults = {
+    actors: [
+        'apify/instagram-scraper',
+        'apify/rag-web-browser',
+        'lukaskrivka/google-maps-with-contact-details',
+    ],
+    enableActorAutoLoading: false,
+    maxMemoryMbytes: 4096,
+};

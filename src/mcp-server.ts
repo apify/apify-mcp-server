@@ -17,7 +17,7 @@ import {
 } from './const.js';
 import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
 import type { ActorTool, HelperTool, ToolWrap } from './types.js';
-import { defaults } from './actor/const.js';
+import { defaults } from './const.js';
 import { actorNameToToolName } from './tools/utils.js';
 import { processParamsGetTools } from './actor/utils.js';
 
