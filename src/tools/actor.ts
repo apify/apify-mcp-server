@@ -145,8 +145,8 @@ export async function getActorsAsTools(
     actors: string[],
     apifyToken: string
 ): Promise<ToolWrap[]> {
-    console.log('Fetching actors as tools...');
-    console.log(actors)
+    log.debug(`Fetching actors as tools...`);
+    log.debug(`Actors: ${actors}`);
     // Actorized MCP servers
     const actorsMCPServers: string[] = [];
     for (const actorID of actors) {
@@ -156,8 +156,8 @@ export async function getActorsAsTools(
     }
     // Normal Actors as a tool
     const toolActors = actors.filter((actorID) => !actorsMCPServers.includes(actorID));
-    console.log('actorsMCPserver', actorsMCPServers);
-    console.log('toolActors', toolActors);
+    log.debug(`actorsMCPserver: ${actorsMCPServers}`);
+    log.debug(`toolActors: ${toolActors}`);
 
     // Normal Actors as a tool
     const normalTools = await getNormalActorsAsTools(toolActors, apifyToken);
