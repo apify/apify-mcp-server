@@ -13,7 +13,8 @@ import { processInput } from './input.js';
 import { createExpressApp } from './actor/server.js';
 import type { Input } from './types.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
+import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset, getActorsAsTools } from './tools/index.js';
+import { defaults } from './const.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
@@ -38,6 +39,14 @@ if (STANDBY_MODE) {
     const tools = [searchTool, actorDefinitionTool];
     if (input.enableActorAutoLoading) {
         tools.push(addTool, removeTool);
+    }
+    if (input.actors === undefined || input.actors === null) {
+        const actorTools = await getActorsAsTools(defaults.actors, process.env.APIFY_TOKEN as string);
+        tools.push(...actorTools);
+    } else {
+        const actorsToLoad = Array.isArray(input.actors) ? input.actors : input.actors.split(',');
+        const actorTools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
+        tools.push(...actorTools);
     }
     mcpServer.updateTools(tools);
     app.listen(PORT, () => {
