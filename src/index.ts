@@ -5,5 +5,4 @@
 
 import { ActorsMcpServer } from './mcp-server.js';
 
-// eslint-disable-next-line import/no-default-export
-export default ActorsMcpServer;
+export { ActorsMcpServer };
