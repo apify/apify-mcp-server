@@ -40,14 +40,10 @@ if (STANDBY_MODE) {
     if (input.enableActorAutoLoading) {
         tools.push(addTool, removeTool);
     }
-    if (input.actors === undefined || input.actors === null) {
-        const actorTools = await getActorsAsTools(defaults.actors, process.env.APIFY_TOKEN as string);
-        tools.push(...actorTools);
-    } else {
-        const actorsToLoad = Array.isArray(input.actors) ? input.actors : input.actors.split(',');
-        const actorTools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
-        tools.push(...actorTools);
-    }
+    const actors = input.actors ?? defaults.actors;
+    const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
+    const actorTools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
+    tools.push(...actorTools);
     mcpServer.updateTools(tools);
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
