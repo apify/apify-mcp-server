@@ -21,7 +21,7 @@ export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         super({
             ...options,
-            baseUrl: process.env.MCP_APIFY_BASE_URL || undefined,
+            baseUrl: process.env.APIFY_API_BASE_URL || undefined,
             requestInterceptors: [addUserAgent],
         });
     }
