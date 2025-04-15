@@ -1,3 +1,4 @@
+
 /**
  * Serves as an Actor MCP SSE server entry point.
  * This file needs to be named `main.ts` to be recognized by the Apify platform.
@@ -11,7 +12,7 @@ import log from '@apify/log';
 import { processInput } from './input.js';
 import { createExpressApp } from './actor/server.js';
 import type { Input } from './types.js';
-import { ActorsMcpServer } from './mcp/mcp-server.js';
+import { ActorsMcpServer } from './mcp/server.js';
 import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';

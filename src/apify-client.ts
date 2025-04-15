@@ -3,7 +3,7 @@ import type { ApifyClientOptions } from 'apify';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { USER_AGENT_ORIGIN } from '../const.js';
+import { USER_AGENT_ORIGIN } from './const.js';
 
 /**
  * Adds a User-Agent header to the request config.

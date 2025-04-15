@@ -1,7 +1,8 @@
+
 /*
  This file provides essential functions and tools for MCP servers, serving as a library.
  The ActorsMcpServer should be the only class exported from the package
 */
 
-import { ActorsMcpServer } from './mcp/mcp-server.js';
+import { ActorsMcpServer } from './mcp/server.js';
 export default ActorsMcpServer;

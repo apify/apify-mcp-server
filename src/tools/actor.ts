@@ -6,7 +6,7 @@ import log from '@apify/log';
 import type { ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
-import { ApifyClient } from './mcp-apify-client.js';
+import { ApifyClient } from '../apify-client.js';
 import {
     actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
@@ -79,9 +79,16 @@ export async function callActorGetDataset(
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
-export async function getNormalActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
+export async function getNormalActorsAsTools(
+    actors: string[],
+    apifyToken: string,
+): Promise<ToolWrap[]> {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
-    const results = await Promise.all(actors.map(getActorDefinition));
+    const getActorDefinitionWithToken = async (actorId: string) => {
+        const actor = await getActorDefinition(actorId, apifyToken);
+        return actor;
+    };
+    const results = await Promise.all(actors.map(getActorDefinitionWithToken));
     const tools: ToolWrap[] = [];
     for (const result of results) {
         if (result) {
@@ -153,7 +160,7 @@ export async function getActorsAsTools(
     console.log('toolActors', toolActors);
 
     // Normal Actors as a tool
-    const normalTools = await getNormalActorsAsTools(toolActors);
+    const normalTools = await getNormalActorsAsTools(toolActors, apifyToken);
 
     // Tools from Actorized MCP servers
     const mcpServerTools = await getMCPServersAsTools(actorsMCPServer, apifyToken);

@@ -1,5 +1,5 @@
 import { Ajv } from 'ajv';
-import { ApifyClient } from 'apify-client';
+import { ApifyClient } from '../apify-client.js';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -19,8 +19,12 @@ const ajv = new Ajv({ coerceTypes: 'array', strict: false });
  * @param {number} limit - Truncate the README to this limit.
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
-export async function getActorDefinition(actorIdOrName: string, limit: number = ACTOR_README_MAX_LENGTH): Promise<ActorDefinitionPruned | null> {
-    const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+export async function getActorDefinition(
+    actorIdOrName: string,
+    apifyToken: string,
+    limit: number = ACTOR_README_MAX_LENGTH
+): Promise<ActorDefinitionPruned | null> {
+    const client = new ApifyClient({ token: apifyToken });
     const actorClient = client.actor(actorIdOrName);
     try {
         // Fetch actor details
@@ -114,10 +118,10 @@ export const actorDefinitionTool: ToolWrap = {
         inputSchema: zodToJsonSchema(GetActorDefinitionArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(GetActorDefinitionArgsSchema)),
         call: async (toolArgs) => {
-            const { args } = toolArgs;
+            const { args, apifyToken } = toolArgs;
 
             const parsed = GetActorDefinitionArgsSchema.parse(args);
-            const v = await getActorDefinition(parsed.actorName, parsed.limit);
+            const v = await getActorDefinition(parsed.actorName, apifyToken, parsed.limit);
             if (v && v.input && 'properties' in v.input && v.input) {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                 v.input.properties = shortenProperties(properties);

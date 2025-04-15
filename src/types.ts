@@ -3,7 +3,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
-import type { ActorsMcpServer } from './mcp/mcp-server.js';
+import type { ActorsMcpServer } from './mcp/server.js';
 
 export interface ISchemaProperties {
     type: string;

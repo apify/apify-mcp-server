@@ -1,6 +1,6 @@
 import { Ajv } from 'ajv';
 import type { ActorStoreList } from 'apify-client';
-import { ApifyClient } from 'apify-client';
+import { ApifyClient } from '../apify-client.js';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -35,10 +35,11 @@ function pruneActorStoreInfo(response: ActorStoreList): ActorStorePruned {
 
 export async function searchActorsByKeywords(
     search: string,
+    apifyToken: string,
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
 ): Promise<ActorStorePruned[] | null> {
-    const client = new ApifyClient({ token: process.env.APIFY_TOKEN });
+    const client = new ApifyClient({ token: apifyToken });
     const results = await client.store().list({ search, limit, offset });
     return results.items.map((x) => pruneActorStoreInfo(x));
 }
@@ -80,10 +81,11 @@ export const searchTool: ToolWrap = {
         inputSchema: zodToJsonSchema(SearchToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(SearchToolArgsSchema)),
         call: async (toolArgs) => {
-            const { args } = toolArgs;
+            const { args, apifyToken } = toolArgs;
             const parsed = SearchToolArgsSchema.parse(args);
             const actors = await searchActorsByKeywords(
                 parsed.search,
+                apifyToken,
                 parsed.limit,
                 parsed.offset,
             );

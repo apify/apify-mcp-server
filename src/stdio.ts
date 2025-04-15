@@ -18,7 +18,7 @@ import minimist from 'minimist';
 import log from '@apify/log';
 
 import { defaults } from './const.js';
-import { ActorsMcpServer } from './mcp/mcp-server.js';
+import { ActorsMcpServer } from './mcp/server.js';
 import { addTool, removeTool, getActorsAsTools } from './tools/index.js';
 
 // Configure logging, set to ERROR

@@ -9,7 +9,7 @@ import express from 'express';
 import log from '@apify/log';
 
 import { HEADER_READINESS_PROBE, Routes } from './const.js';
-import { type ActorsMcpServer } from '../mcp/mcp-server.js';
+import { type ActorsMcpServer } from '../mcp/server.js';
 import { getActorRunData } from './utils.js';
 import { processParamsGetTools } from '../mcp/utils.js';
 

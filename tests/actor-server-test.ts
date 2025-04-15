@@ -7,7 +7,7 @@ import log from '@apify/log';
 
 import { createExpressApp } from '../src/actor/server.js';
 import { HelperTools } from '../src/const.js';
-import { ActorsMcpServer } from '../src/mcp/mcp-server.js';
+import { ActorsMcpServer } from '../src/mcp/server.js';
 
 describe('ApifyMcpServer initialization', () => {
     let app: Express;
