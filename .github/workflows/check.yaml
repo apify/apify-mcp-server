@@ -27,13 +27,16 @@ jobs:
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install Dependencies
-                run: npm ci
+                run: npm install
 
             -   name: Lint
-                run: npm run lint
+                run: npm run lint --verbose
 
             -   name: Build
                 run: npm run build
 
             -   name: Test
                 run: npm run test
+
+            -   name: Type checks
+                run: npm run type-check
