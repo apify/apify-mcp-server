@@ -24,6 +24,20 @@ export function createExpressApp(
     let transportSSE: SSEServerTransport;
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
+    function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
+        log.error(`${logMessage}: ${error}`);
+        if (!res.headersSent) {
+            res.status(statusCode).json({
+                jsonrpc: '2.0',
+                error: {
+                    code: statusCode === 500 ? -32603 : -32000,
+                    message: statusCode === 500 ? 'Internal server error' : 'Bad Request',
+                },
+                id: null,
+            });
+        }
+    }
+
     app.get(Routes.ROOT, async (req: Request, res: Response) => {
         if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
             log.debug('Received readiness probe');
@@ -41,15 +55,7 @@ export function createExpressApp(
             res.setHeader('Connection', 'keep-alive');
             res.status(200).json({ message: `Actor is using Model Context Protocol. ${getHelpMessage(host)}`, data: getActorRunData() }).end();
         } catch (error) {
-            log.error(`Error in GET ${Routes.ROOT} ${error}`);
-            res.status(500).json({
-                jsonrpc: '2.0',
-                error: {
-                    code: -32603,
-                    message: 'Internal server error',
-                },
-                id: null,
-            });
+            respondWithError(res, error, `Error in GET ${Routes.ROOT}`);
         }
     });
 
@@ -67,15 +73,7 @@ export function createExpressApp(
             transportSSE = new SSEServerTransport(Routes.MESSAGE, res);
             await mcpServer.connect(transportSSE);
         } catch (error) {
-            log.error(`Error in GET ${Routes.SSE}: ${error}`);
-            res.status(500).json({
-                jsonrpc: '2.0',
-                error: {
-                    code: -32603,
-                    message: 'Internal server error',
-                },
-                id: null,
-            });
+            respondWithError(res, error, `Error in GET ${Routes.SSE}`);
         }
     });
 
@@ -97,22 +95,12 @@ export function createExpressApp(
                 });
             }
         } catch (error) {
-            log.error(`Error in POST ${Routes.MESSAGE}: ${error}`);
-            if (!res.headersSent) {
-                res.status(500).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32603,
-                        message: 'Internal server error',
-                    },
-                    id: null,
-                });
-            }
+            respondWithError(res, error, `Error in POST ${Routes.MESSAGE}`);
         }
     });
 
     app.post(Routes.MCP, async (req: Request, res: Response) => {
-        console.log('Received MCP request:', req.body); // eslint-disable-line no-console
+        log.info('Received MCP request:', req.body);
         try {
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
@@ -155,17 +143,7 @@ export function createExpressApp(
             // Handle the request with existing transport - no need to reconnect
             await transport.handleRequest(req, res, req.body);
         } catch (error) {
-            console.error('Error handling MCP request:', error); // eslint-disable-line no-console
-            if (!res.headersSent) {
-                res.status(500).json({
-                    jsonrpc: '2.0',
-                    error: {
-                        code: -32603,
-                        message: 'Internal server error',
-                    },
-                    id: null,
-                });
-            }
+            respondWithError(res, error, 'Error handling MCP request');
         }
     });
 
