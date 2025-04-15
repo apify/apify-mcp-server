@@ -8,6 +8,8 @@ export async function isActorMCPServer(actorID: string, _apifyToken: string): Pr
 
 export async function getActorsMCPServerURL(actorID: string, _apifyToken: string): Promise<string> {
     // TODO: get from API instead
-    const standbyUrl = getActorStandbyURL(actorID)
+    const standbyBaseUrl = process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com' ?
+        '.mcp-securitybyobscurity.apify.actor' : '.apify.actor';
+    const standbyUrl = getActorStandbyURL(actorID, standbyBaseUrl);
     return `${standbyUrl}/sse`;
 }

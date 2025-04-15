@@ -69,7 +69,7 @@ export function parseInputParamsFromUrl(url: string): Input {
 * @param standbyBaseUrl
 * @returns
 */
-export function getActorStandbyURL(actorID: string, standbyBaseUrl = '.apify.actor'): string {
+export function getActorStandbyURL(actorID: string, standbyBaseUrl = 'apify.actor'): string {
     const actorOwner = actorID.split('/')[0];
     const actorName = actorID.split('/')[1];
     if (!actorOwner || !actorName) {
@@ -78,5 +78,5 @@ export function getActorStandbyURL(actorID: string, standbyBaseUrl = '.apify.act
 
     const prefix = actorOwner === APIFY_USERNAME ? '' : `${actorOwner}--`;
 
-    return `https://${prefix}${actorName}${standbyBaseUrl}`;
+    return `https://${prefix}${actorName}.${standbyBaseUrl}`;
 }

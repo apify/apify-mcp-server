@@ -127,6 +127,7 @@ async function getMCPServersAsTools(
     const actorsMCPServerTools: ToolWrap[] = [];
     for (const actorID of actors) {
         const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
+        log.info(`ActorID: ${actorID} MCP server URL: ${serverUrl}`);
 
         let client: Client | undefined;
         try {
