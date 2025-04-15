@@ -18,5 +18,5 @@ export async function getActorsMCPServerURL(actorID: string, _apifyToken: string
         'securitybyobscurity.apify.actor' : 'apify.actor';
     const standbyUrl = getActorStandbyURL(actorID, standbyBaseUrl);
     const mcpPath = await getActorsMCPServerPath(actorID, _apifyToken);
-    return `${standbyUrl}/${mcpPath}`;
+    return `${standbyUrl}${mcpPath}`;
 }
