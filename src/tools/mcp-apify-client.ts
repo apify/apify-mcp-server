@@ -1,3 +1,4 @@
+
 import type { ApifyClientOptions } from 'apify';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
@@ -20,6 +21,7 @@ export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         super({
             ...options,
+            baseUrl: process.env.MCP_APIFY_BASE_URL || undefined,
             requestInterceptors: [addUserAgent],
         });
     }
