@@ -2,10 +2,10 @@ import { parse } from 'node:querystring';
 
 import { Actor } from 'apify';
 
-import { processInput } from './input.js';
-import type { ActorRunData, Input } from './types.js';
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
 import type { ToolWrap } from '../types.js';
+import { processInput } from './input.js';
+import type { ActorRunData, Input } from './types.js';
 
 export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';

@@ -17,17 +17,17 @@
  * Let me summarize the key points:
  */
 
-import { execSync } from 'child_process';
-import path from 'path';
-import * as readline from 'readline';
-import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
+import path from 'node:path';
+import * as readline from 'node:readline';
+import { fileURLToPath } from 'node:url';
 
-import { Anthropic } from '@anthropic-ai/sdk';
-import type { Message, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources/messages';
+import { Anthropic } from '@anthropic-ai/sdk'; // eslint-disable-line import/no-extraneous-dependencies
+import type { Message, MessageParam, ToolUseBlock } from '@anthropic-ai/sdk/resources/messages';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'; // eslint-disable-line import/no-extraneous-dependencies
 
 const filename = fileURLToPath(import.meta.url);
 const dirname = path.dirname(filename);

@@ -6,14 +6,14 @@
  * You can choose actors to run in the server, for example: `apify/rag-web-browser`.
  */
 
-import { execSync } from 'child_process';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'; // eslint-disable-line import/no-extraneous-dependencies
 
 import { actorNameToToolName } from '../tools/utils.js';
 

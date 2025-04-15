@@ -19,7 +19,7 @@ import log from '@apify/log';
 
 import { defaults } from './const.js';
 import { ActorsMcpServer } from './mcp-server.js';
-import { addTool, removeTool, getActorsAsTools } from './tools/index.js';
+import { addTool, getActorsAsTools, removeTool } from './tools/index.js';
 
 // Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
