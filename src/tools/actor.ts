@@ -150,6 +150,7 @@ export async function getActorsAsTools(
     // Actorized MCP servers
     const actorsMCPServers: string[] = [];
     for (const actorID of actors) {
+        // TODO: rework, we are fetching actor definition from API twice - in the getMCPServerTools
         if (await isActorMCPServer(actorID, apifyToken)) {
             actorsMCPServers.push(actorID);
         }
