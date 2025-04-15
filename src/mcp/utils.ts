@@ -76,7 +76,8 @@ export function getActorStandbyURL(actorID: string, standbyBaseUrl = 'apify.acto
         throw new Error(`Invalid actor ID: ${actorID}`);
     }
 
-    const prefix = actorOwner === APIFY_USERNAME ? '' : `${actorOwner}--`;
+    const actorOwnerDNSFriendly = actorOwner.replace('.', '-');
+    const prefix = actorOwner === APIFY_USERNAME ? '' : `${actorOwnerDNSFriendly}--`;
 
     return `https://${prefix}${actorName}.${standbyBaseUrl}`;
 }
