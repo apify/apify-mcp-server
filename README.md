@@ -27,6 +27,7 @@ For example it can:
 
 To interact with the Apify MCP server, you can use MCP clients such as:
 - [Claude Desktop](https://claude.ai/download) (only Stdio support)
+- [Visual Studio Code](https://code.visualstudio.com/) (Stdio and SSE support)
 - [LibreChat](https://www.librechat.ai/) (stdio and SSE support (yet without Authorization header))
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
 - other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
@@ -275,6 +276,63 @@ To configure Claude Desktop to work with the MCP server, follow these steps. For
     Find and analyze instagram profile of the Rock.
     ```
 
+#### VS Code
+
+For one-click installation, click one of the install buttons below:
+
+[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-NPM-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D) [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-NPM-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D&quality=insiders)
+
+##### Manual installation
+
+You can manually install the Apify MCP Server in VS Code. First, click one of the install buttons at the top of this section for a one-click installation.
+
+Alternatively, add the following JSON block to your User Settings (JSON) file in VS Code. You can do this by pressing `Ctrl + Shift + P` and typing `Preferences: Open User Settings (JSON)`.
+
+```json
+{
+  "mcp": {
+    "inputs": [
+      {
+        "type": "promptString",
+        "id": "apify_token",
+        "description": "Apify API Token",
+        "password": true
+      }
+    ],
+    "servers": {
+      "actors-mcp-server": {
+        "command": "npx",
+        "args": ["-y", "@apify/actors-mcp-server"],
+        "env": {
+          "APIFY_TOKEN": "${input:apify_token}"
+        }
+      }
+    }
+  }
+}
+```
+
+Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace - just omit the top-level `mcp {}` key. This will allow you to share the configuration with others.
+
+If you want to specify which Actors to load, you can add the `--actors` argument:
+
+```json
+{
+  "servers": {
+    "actors-mcp-server": {
+      "command": "npx",
+      "args": [
+        "-y", "@apify/actors-mcp-server",
+        "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
+      ],
+      "env": {
+        "APIFY_TOKEN": "${input:apify_token}"
+      }
+    }
+  }
+}
+```
+
 #### Debugging NPM package @apify/actors-mcp-server with @modelcontextprotocol/inspector
 
 To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
@@ -365,8 +423,13 @@ Upon launching, the Inspector will display a URL that you can access in your bro
 
 ## ⓘ Limitations and feedback
 
-To limit the context size the properties in the `input schema` are pruned and description is truncated to 500 characters.
-Enum fields and titles are truncated to max 50 options.
+The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
+- **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
+- **Enum fields** are truncated to a maximum combined length of 200 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
+- **Required fields** are explicitly marked with a "REQUIRED" prefix in their descriptions for compatibility with frameworks that may not handle JSON schema properly.
+- **Nested properties** are built for special cases like proxy configuration and request list sources to ensure correct input structure.
+- **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
+- **Enum values and examples** are added to property descriptions to ensure visibility even if the client doesn't fully support JSON schema.
 
 Memory for each Actor is limited to 4GB.
 Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.

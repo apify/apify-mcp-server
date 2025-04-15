@@ -1,6 +1,7 @@
 name: Create a pre-release
 
 on:
+    workflow_dispatch:
     # Push to master will deploy a beta version
     push:
         branches:
