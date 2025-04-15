@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.1.22 - **not yet released**
 
+### 🚀 Features
+
+- Local apify api base url (#71) ([581f096](https://github.com/apify/actors-mcp-server/commit/581f096030018aa9f1052151c5b628d9b186193b))
+
 ### 🐛 Bug Fixes
 
 - Clearly separate Actor related code and rest of the codebase. Only export ApifyMcpServer from the package ([ce711e9](https://github.com/apify/actors-mcp-server/commit/ce711e9096ce2f51f6c3f78c0966a27ef73ad945))
