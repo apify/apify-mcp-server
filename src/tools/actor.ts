@@ -126,7 +126,7 @@ async function getMCPServersAsTools(
 ): Promise<ToolWrap[]> {
     const actorsMCPServerTools: ToolWrap[] = [];
     for (const actorID of actors) {
-        const serverUrl = await getActorsMCPServerURL(actorID);
+        const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
 
         let client: Client | undefined;
         try {
@@ -148,22 +148,22 @@ export async function getActorsAsTools(
     console.log('Fetching actors as tools...');
     console.log(actors)
     // Actorized MCP servers
-    const actorsMCPServer: string[] = [];
+    const actorsMCPServers: string[] = [];
     for (const actorID of actors) {
-        if (await isActorMCPServer(actorID)) {
-            actorsMCPServer.push(actorID);
+        if (await isActorMCPServer(actorID, apifyToken)) {
+            actorsMCPServers.push(actorID);
         }
     }
     // Normal Actors as a tool
-    const toolActors = actors.filter((actorID) => !actorsMCPServer.includes(actorID));
-    console.log('actorsMCPserver', actorsMCPServer);
+    const toolActors = actors.filter((actorID) => !actorsMCPServers.includes(actorID));
+    console.log('actorsMCPserver', actorsMCPServers);
     console.log('toolActors', toolActors);
 
     // Normal Actors as a tool
     const normalTools = await getNormalActorsAsTools(toolActors, apifyToken);
 
     // Tools from Actorized MCP servers
-    const mcpServerTools = await getMCPServersAsTools(actorsMCPServer, apifyToken);
+    const mcpServerTools = await getMCPServersAsTools(actorsMCPServers, apifyToken);
 
     return [...normalTools, ...mcpServerTools];
 }

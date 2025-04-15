@@ -1,13 +1,13 @@
 
-export async function isActorMCPServer(actorID: string): Promise<boolean> {
+import { getActorStandbyURL } from "./utils.js";
+
+export async function isActorMCPServer(actorID: string, _apifyToken: string): Promise<boolean> {
     // TODO: implement the logic
-    return actorID === 'apify/actors-mcp-server';
+    return actorID.toLowerCase().includes('mcp-') || actorID.toLowerCase().includes('-mcp');
 }
 
-export async function getActorsMCPServerURL(actorID: string): Promise<string> {
-    // TODO: implement the logic
-    if (actorID === 'apify/actors-mcp-server') {
-        return 'https://actors-mcp-server.apify.actor/sse';
-    }
-    throw new Error(`Actor ${actorID} is not an MCP server`);
+export async function getActorsMCPServerURL(actorID: string, _apifyToken: string): Promise<string> {
+    // TODO: get from API instead
+    const standbyUrl = getActorStandbyURL(actorID)
+    return `${standbyUrl}/sse`;
 }

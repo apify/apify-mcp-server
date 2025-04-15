@@ -8,6 +8,7 @@ import type { ToolWrap } from '../types.js';
 
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
 import { Input } from "../types.js";
+import { APIFY_USERNAME } from "../const.js";
 
 /**
  * Generates a unique server ID based on the provided URL.
@@ -59,4 +60,23 @@ export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
     const params = parse(query) as unknown as Input;
     return processInput(params);
+}
+
+/**
+* Returns standby URL for given Actor ID.
+*
+* @param actorID
+* @param standbyBaseUrl
+* @returns
+*/
+export function getActorStandbyURL(actorID: string, standbyBaseUrl = '.apify.actor'): string {
+    const actorOwner = actorID.split('/')[0];
+    const actorName = actorID.split('/')[1];
+    if (!actorOwner || !actorName) {
+        throw new Error(`Invalid actor ID: ${actorID}`);
+    }
+
+    const prefix = actorOwner === APIFY_USERNAME ? '' : `${actorOwner}--`;
+
+    return `https://${prefix}${actorName}${standbyBaseUrl}`;
 }
