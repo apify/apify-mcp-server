@@ -1,6 +1,6 @@
 
 import { createHash } from "node:crypto";
-import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from "./const";
+import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from "./const.js";
 
 import { parse } from 'node:querystring';
 import { processInput } from '../input.js';
