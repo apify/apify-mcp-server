@@ -19,7 +19,6 @@ import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
 import { createMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { cp } from 'node:fs';
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
