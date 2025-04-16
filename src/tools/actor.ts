@@ -1,12 +1,16 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
 import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
+import { ApifyClient } from '../apify-client.js';
 import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
+import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
+import { createMCPClient } from '../mcp/client.js';
+import { getMCPServerTools } from '../mcp/proxy.js';
 import type { ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
-import { ApifyClient } from './mcp-apify-client.js';
 import {
     actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
@@ -55,6 +59,8 @@ export async function callActorGetDataset(
 }
 
 /**
+ * This function is used to fetch normal non-MCP server Actors as a tool.
+ *
  * Fetches actor input schemas by Actor IDs or Actor full names and creates MCP tools.
  *
  * This function retrieves the input schemas for the specified actors and compiles them into MCP tools.
@@ -72,9 +78,16 @@ export async function callActorGetDataset(
  * @param {string[]} actors - An array of actor IDs or Actor full names.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
-export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
+export async function getNormalActorsAsTools(
+    actors: string[],
+    apifyToken: string,
+): Promise<ToolWrap[]> {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
-    const results = await Promise.all(actors.map(getActorDefinition));
+    const getActorDefinitionWithToken = async (actorId: string) => {
+        const actor = await getActorDefinition(actorId, apifyToken);
+        return actor;
+    };
+    const results = await Promise.all(actors.map(getActorDefinitionWithToken));
     const tools: ToolWrap[] = [];
     for (const result of results) {
         if (result) {
@@ -104,4 +117,54 @@ export async function getActorsAsTools(actors: string[]): Promise<ToolWrap[]> {
         }
     }
     return tools;
+}
+
+async function getMCPServersAsTools(
+    actors: string[],
+    apifyToken: string,
+): Promise<ToolWrap[]> {
+    const actorsMCPServerTools: ToolWrap[] = [];
+    for (const actorID of actors) {
+        const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
+        log.info(`ActorID: ${actorID} MCP server URL: ${serverUrl}`);
+
+        let client: Client | undefined;
+        try {
+            client = await createMCPClient(serverUrl, apifyToken);
+            const serverTools = await getMCPServerTools(actorID, client, serverUrl);
+            actorsMCPServerTools.push(...serverTools);
+        } finally {
+            if (client) await client.close();
+        }
+    }
+
+    return actorsMCPServerTools;
+}
+
+export async function getActorsAsTools(
+    actors: string[],
+    apifyToken: string,
+): Promise<ToolWrap[]> {
+    log.debug(`Fetching actors as tools...`);
+    log.debug(`Actors: ${actors}`);
+    // Actorized MCP servers
+    const actorsMCPServers: string[] = [];
+    for (const actorID of actors) {
+        // TODO: rework, we are fetching actor definition from API twice - in the getMCPServerTools
+        if (await isActorMCPServer(actorID, apifyToken)) {
+            actorsMCPServers.push(actorID);
+        }
+    }
+    // Normal Actors as a tool
+    const toolActors = actors.filter((actorID) => !actorsMCPServers.includes(actorID));
+    log.debug(`actorsMCPserver: ${actorsMCPServers}`);
+    log.debug(`toolActors: ${toolActors}`);
+
+    // Normal Actors as a tool
+    const normalTools = await getNormalActorsAsTools(toolActors, apifyToken);
+
+    // Tools from Actorized MCP servers
+    const mcpServerTools = await getMCPServersAsTools(actorsMCPServers, apifyToken);
+
+    return [...normalTools, ...mcpServerTools];
 }

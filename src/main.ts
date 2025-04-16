@@ -8,11 +8,12 @@ import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
-import { processInput } from './actor/input.js';
 import { createExpressApp } from './actor/server.js';
-import type { Input } from './actor/types';
-import { ActorsMcpServer } from './mcp-server.js';
-import { actorDefinitionTool, addTool, callActorGetDataset, removeTool, searchTool } from './tools/index.js';
+import { defaults } from './const.js';
+import { processInput } from './input.js';
+import { ActorsMcpServer } from './mcp/server.js';
+import { actorDefinitionTool, addTool, callActorGetDataset, getActorsAsTools, removeTool, searchTool } from './tools/index.js';
+import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
@@ -38,6 +39,10 @@ if (STANDBY_MODE) {
     if (input.enableActorAutoLoading) {
         tools.push(addTool, removeTool);
     }
+    const actors = input.actors ?? defaults.actors;
+    const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
+    const actorTools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
+    tools.push(...actorTools);
     mcpServer.updateTools(tools);
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);

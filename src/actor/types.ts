@@ -1,11 +1,3 @@
-export type Input = {
-    actors: string[] | string;
-    enableActorAutoLoading?: boolean;
-    maxActorMemoryBytes?: number;
-    debugActor?: string;
-    debugActorInput?: unknown;
-};
-
 export interface ActorRunData {
     id?: string;
     actId?: string;

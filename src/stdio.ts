@@ -18,7 +18,7 @@ import minimist from 'minimist';
 import log from '@apify/log';
 
 import { defaults } from './const.js';
-import { ActorsMcpServer } from './mcp-server.js';
+import { ActorsMcpServer } from './mcp/server.js';
 import { addTool, getActorsAsTools, removeTool } from './tools/index.js';
 
 // Configure logging, set to ERROR
@@ -37,7 +37,7 @@ if (!process.env.APIFY_TOKEN) {
 async function main() {
     const mcpServer = new ActorsMcpServer();
     // Initialize tools
-    const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors);
+    const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
     if (enableActorAutoLoading) {
         tools.push(addTool, removeTool);
     }

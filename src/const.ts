@@ -37,3 +37,5 @@ export const defaults = {
     enableActorAutoLoading: false,
     maxMemoryMbytes: 4096,
 };
+
+export const APIFY_USERNAME = 'apify';

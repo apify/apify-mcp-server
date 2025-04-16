@@ -2,7 +2,7 @@ import type { ApifyClientOptions } from 'apify';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { USER_AGENT_ORIGIN } from '../const.js';
+import { USER_AGENT_ORIGIN } from './const.js';
 
 /**
  * Adds a User-Agent header to the request config.
@@ -16,11 +16,15 @@ function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
     return updatedConfig;
 }
 
+export function getApifyAPIBaseUrl(): string {
+    return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';
+}
+
 export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         super({
             ...options,
-            baseUrl: process.env.MCP_APIFY_BASE_URL || undefined,
+            baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors: [addUserAgent],
         });
     }

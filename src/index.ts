@@ -3,6 +3,6 @@
  The ActorsMcpServer should be the only class exported from the package
 */
 
-import { ActorsMcpServer } from './mcp-server.js';
+import { ActorsMcpServer } from './mcp/server.js';
 
 export { ActorsMcpServer };

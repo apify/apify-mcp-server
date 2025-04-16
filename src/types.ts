@@ -2,7 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
-import type { ActorsMcpServer } from './mcp-server.js';
+import type { ActorsMcpServer } from './mcp/server.js';
 
 export interface ISchemaProperties {
     type: string;
@@ -83,6 +83,8 @@ export type InternalToolArgs = {
     apifyMcpServer: ActorsMcpServer;
     /** Reference to the MCP server instance */
     mcpServer: Server;
+    /** Apify API token */
+    apifyToken: string;
 }
 
 /**
@@ -99,6 +101,24 @@ export interface HelperTool extends ToolBase {
 }
 
 /**
+* Actorized MCP server tool where this MCP server acts as a proxy.
+* Extends ToolBase with tool associated MCP server.
+*/
+export interface ActorMCPTool extends ToolBase {
+    // Origin MCP server tool name, is needed for the tool call
+    originToolName: string;
+    // ID of the Actorized MCP server
+    actorID: string;
+    /**
+     * ID of the Actorized MCP server the tool is associated with.
+     * See getMCPServerID()
+     */
+    serverId: string;
+    // Connection URL of the Actorized MCP server
+    serverUrl: string;
+}
+
+/**
  * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
  */
 export type ToolType = 'internal' | 'actor' | 'actor-mcp';
@@ -111,7 +131,7 @@ export interface ToolWrap {
     /** Type of the tool (internal or actor) */
     type: ToolType;
     /** The tool instance */
-    tool: ActorTool | HelperTool;
+    tool: ActorTool | HelperTool | ActorMCPTool;
 }
 
 //  ActorStoreList for actor-search tool
@@ -152,3 +172,11 @@ export interface InternalTool extends ToolBase {
      */
     call: (toolArgs: InternalToolArgs) => Promise<object>;
 }
+
+export type Input = {
+    actors: string[] | string;
+    enableActorAutoLoading?: boolean;
+    maxActorMemoryBytes?: number;
+    debugActor?: string;
+    debugActorInput?: unknown;
+};

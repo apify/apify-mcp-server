@@ -11,9 +11,10 @@ import express from 'express';
 
 import log from '@apify/log';
 
-import { type ActorsMcpServer } from '../mcp-server.js';
+import { type ActorsMcpServer } from '../mcp/server.js';
+import { processParamsGetTools } from '../mcp/utils.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
-import { getActorRunData, processParamsGetTools } from './utils.js';
+import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,
@@ -46,7 +47,7 @@ export function createExpressApp(
         }
         try {
             log.info(`Received GET message at: ${Routes.ROOT}`);
-            const tools = await processParamsGetTools(req.url);
+            const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
             if (tools) {
                 mcpServer.updateTools(tools);
             }
@@ -66,7 +67,7 @@ export function createExpressApp(
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
-            const tools = await processParamsGetTools(req.url);
+            const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
             if (tools) {
                 mcpServer.updateTools(tools);
             }
