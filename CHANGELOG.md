@@ -2,24 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.1.22 - **not yet released**
-
-### 🚀 Features
-
-- Local apify api base url (#71) ([581f096](https://github.com/apify/actors-mcp-server/commit/581f096030018aa9f1052151c5b628d9b186193b))
-- Add new specification regarding json response streamable http (#72) ([e918d26](https://github.com/apify/actors-mcp-server/commit/e918d26f224466cca58fa5ed35063c13054f9480))
+## [0.1.23](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.23) (2025-04-16)
 
 ### 🐛 Bug Fixes
 
-- Clearly separate Actor related code and rest of the codebase. Only export ApifyMcpServer from the package ([ce711e9](https://github.com/apify/actors-mcp-server/commit/ce711e9096ce2f51f6c3f78c0966a27ef73ad945))
-- Update packages, add TODOs ([b78fb6b](https://github.com/apify/actors-mcp-server/commit/b78fb6b1caadb2ec886eb0b11702bda10b151fdb))
-- Lint issue ([8735e8f](https://github.com/apify/actors-mcp-server/commit/8735e8f99ba2d71db732978a1a5ffaae5dc3f898))
-- Rename server to ActorsMcpServer ([6879923](https://github.com/apify/actors-mcp-server/commit/6879923a946536b8ea422e2bed943f1ed021a458))
-- Deploy to npm ([90b87f8](https://github.com/apify/actors-mcp-server/commit/90b87f8edc59a4d3c375ba6344073bafe49a9454))
+- Add default Actors in standby mode ([#77](https://github.com/apify/actors-mcp-server/pull/77)) ([4b44e78](https://github.com/apify/actors-mcp-server/commit/4b44e7869549697ff2256a7794e61e3cfec3dd4e)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
+## [0.1.22](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.22) (2025-04-16)
+
+### 🐛 Bug Fixes
+
+- Deprecate enableActorAutoLoading in favor of enable-adding-actors, and load tools only if not provided in query parameter ([#63](https://github.com/apify/actors-mcp-server/pull/63)) ([8add54c](https://github.com/apify/actors-mcp-server/commit/8add54ce94952bc23653b1f5c6c568e51589ffa5)) by [@jirispilka](https://github.com/jirispilka), closes [#54](https://github.com/apify/actors-mcp-server/issues/54)
+- CI ([#75](https://github.com/apify/actors-mcp-server/pull/75)) ([3433a39](https://github.com/apify/actors-mcp-server/commit/3433a39305f59c7964401a3d68db06cb47bb243a)) by [@jirispilka](https://github.com/jirispilka)
+- Add tools with query parameter ([#76](https://github.com/apify/actors-mcp-server/pull/76)) ([dc9a07a](https://github.com/apify/actors-mcp-server/commit/dc9a07a37db076eb9fe064e726cae6e7bdb2bf0f)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.1.21](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.21) (2025-03-27)
 
 ### 🐛 Bug Fixes

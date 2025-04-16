@@ -1,6 +1,8 @@
 /*
  * Actor input processing.
  */
+import log from '@apify/log';
+
 import type { Input } from './types.js';
 
 /**
@@ -15,12 +17,18 @@ export function processInput(originalInput: Partial<Input>): Input {
     if (input.actors && typeof input.actors === 'string') {
         input.actors = input.actors.split(',').map((format: string) => format.trim()) as string[];
     }
-    // Convert string boolean to actual boolean
-    if (input.enableActorAutoLoading && typeof input.enableActorAutoLoading === 'string') {
-        input.enableActorAutoLoading = input.enableActorAutoLoading === 'true';
+
+    // enableAddingActors is deprecated, use enableActorAutoLoading instead
+    if (input.enableActorAutoLoading !== undefined && input.enableAddingActors === undefined) {
+        log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
+        input.enableAddingActors = input.enableActorAutoLoading;
     }
-    if (!input.enableActorAutoLoading) {
-        input.enableActorAutoLoading = false;
+
+    if (!input.enableAddingActors) {
+        input.enableAddingActors = false;
     }
+
+    input.enableActorAutoLoading = input.enableAddingActors;
+
     return input;
 }

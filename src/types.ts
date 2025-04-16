@@ -175,7 +175,11 @@ export interface InternalTool extends ToolBase {
 
 export type Input = {
     actors: string[] | string;
+    /**
+    * @deprecated Use `enableAddingActors` instead.
+    */
     enableActorAutoLoading?: boolean;
+    enableAddingActors?: boolean;
     maxActorMemoryBytes?: number;
     debugActor?: string;
     debugActorInput?: unknown;

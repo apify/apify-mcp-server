@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.1.22",
+  "version": "0.1.23",
   "type": "module",
   "description": "Model Context Protocol Server for Apify",
   "engines": {
@@ -47,6 +47,7 @@
     "@apify/tsconfig": "^0.1.0",
     "@types/express": "^4.0.0",
     "@types/minimist": "^1.2.5",
+    "@types/yargs-parser": "^21.0.3",
     "dotenv": "^16.4.7",
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
@@ -64,7 +65,7 @@
     "build": "tsc -b src",
     "build:watch": "tsc -b src -w",
     "type-check": "tsc --noEmit",
-    "inspector": "npx @modelcontextprotocol/inspector dist/stdio.js",
+    "inspector": "npm run build && npx @modelcontextprotocol/inspector dist/stdio.js",
     "test": "vitest run",
     "clean": "tsc -b src --clean"
   },

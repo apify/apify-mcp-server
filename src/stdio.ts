@@ -25,7 +25,18 @@ import { addTool, getActorsAsTools, removeTool } from './tools/index.js';
 log.setLevel(log.LEVELS.ERROR);
 
 // Parse command line arguments
-const { actors = '', enableActorAutoLoading = false } = minimist(process.argv.slice(2));
+const parser = minimist;
+const argv = parser(process.argv.slice(2), {
+    boolean: [
+        'enable-adding-actors',
+        'enableActorAutoLoading', // deprecated
+    ],
+    string: ['actors'],
+    default: {
+        'enable-adding-actors': false,
+    },
+});
+const { actors = '', enableActorAutoLoading = false } = argv;
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
 
 // Validate environment
