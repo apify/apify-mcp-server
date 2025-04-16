@@ -21,7 +21,6 @@ export function createExpressApp(
     mcpServer: ActorsMcpServer,
 ): express.Express {
     const app = express();
-    app.use(express.json());
     let transportSSE: SSEServerTransport;
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
@@ -159,6 +158,7 @@ export function createExpressApp(
     app.use((req: Request, res: Response) => {
         res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${getHelpMessage(host)}` }).end();
     });
+    app.use(express.json());
 
     return app;
 }
