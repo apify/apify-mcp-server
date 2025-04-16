@@ -1,7 +1,6 @@
 import type { ActorDefinition } from 'apify-client';
 
-import { ActorDefinition } from "apify-client";
-import { ApifyClient, getApifyAPIBaseUrl } from "../apify-client.js";
+import { ApifyClient, getApifyAPIBaseUrl } from '../apify-client.js';
 
 export async function isActorMCPServer(actorID: string, apifyToken: string): Promise<boolean> {
     const mcpPath = await getActorsMCPServerPath(actorID, apifyToken);
@@ -69,13 +68,13 @@ export async function getActorDefinition(actorID: string, apifyToken: string): P
     const res = await fetch(`${getApifyAPIBaseUrl()}/v2/acts/${actorObjID}/builds/default`, {
         headers: {
             // This is done so tests can pass with public Actors without token
-            ...(apifyToken ? { 'Authorization': `Bearer ${apifyToken}` } : {})
-        }
+            ...(apifyToken ? { Authorization: `Bearer ${apifyToken}` } : {}),
+        },
     });
     if (!res.ok) {
         throw new Error(`Failed to fetch default build for actor ${actorID}: ${res.statusText}`);
     }
-    const json = await res.json() as any;
+    const json = await res.json() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
     const buildInfo = json.data;
     if (!buildInfo) {
         throw new Error(`Default build for Actor ${actorID} not found`);
