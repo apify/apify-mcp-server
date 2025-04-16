@@ -72,6 +72,9 @@ async function processParamsAndUpdateTools(url: string) {
     } else if (mcpServer.getToolNames().length === 0) {
         await mcpServer.addToolsFromDefaultActors();
     }
+    if (input.enableAddingActors) {
+        mcpServer.updateTools(getActorAutoLoadingTools());
+    }
     log.debug(`Server is running in STANDBY mode with the following Actors (tools): ${mcpServer.getToolNames()}.
     To use different Actors, provide them in query parameter "actors" or include them in the Actor Task input.`);
 }
