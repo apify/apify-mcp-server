@@ -1,14 +1,9 @@
 {
-  "extends": "./tsconfig.json",
-  "include": [
-    "src/**/*.ts",
-    "tests/**/*.ts",
-    "*.ts",
-    "*.js",
-    ".eslintrc.js"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+    "extends": "./tsconfig.json",
+    "include": [
+        "src",
+        "test",
+        "tests",
+        "vitest.config.ts"
+    ],
 }

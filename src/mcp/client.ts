@@ -1,13 +1,13 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
-import { getMCPServerID } from "./utils.js";
+import { getMCPServerID } from './utils.js';
 
 /**
  * Creates and connects a ModelContextProtocol client.
  */
 export async function createMCPClient(
-    url: string, token: string
+    url: string, token: string,
 ): Promise<Client> {
     const transport = new SSEClientTransport(
         new URL(url),
@@ -32,7 +32,7 @@ export async function createMCPClient(
 
     const client = new Client({
         name: getMCPServerID(url),
-        version: "1.0.0",
+        version: '1.0.0',
     });
 
     await client.connect(transport);

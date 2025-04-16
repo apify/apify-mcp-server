@@ -1,4 +1,3 @@
-
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';

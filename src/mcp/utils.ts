@@ -1,13 +1,10 @@
-
-import { createHash } from "node:crypto";
-import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from "./const.js";
-
+import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
-import { processInput } from '../input.js';
-import type { ToolWrap } from '../types.js';
 
+import { processInput } from '../input.js';
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
-import { Input } from "../types.js";
+import type { Input, ToolWrap } from '../types.js';
+import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
  * Generates a unique server ID based on the provided URL.
@@ -40,6 +37,7 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
  * Process input parameters and get tools
  * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
  * @param url
+ * @param apifyToken
  */
 export async function processParamsGetTools(url: string, apifyToken: string) {
     const input = parseInputParamsFromUrl(url);

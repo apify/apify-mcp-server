@@ -1,4 +1,4 @@
-import type { Server as HttpServer } from 'http';
+import type { Server as HttpServer } from 'node:http';
 
 import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';

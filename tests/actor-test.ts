@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH } from '../src/const.js';
 import { actorNameToToolName, inferArrayItemType, shortenEnum } from '../src/tools/utils.js';

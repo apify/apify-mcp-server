@@ -1,12 +1,16 @@
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
 import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
+import { ApifyClient } from '../apify-client.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
+import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
+import { createMCPClient } from '../mcp/client.js';
+import { getMCPServerTools } from '../mcp/proxy.js';
 import type { ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
-import { ApifyClient } from '../apify-client.js';
 import {
     actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
@@ -15,10 +19,6 @@ import {
     markInputPropertiesAsRequired,
     shortenProperties,
 } from './utils.js';
-import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
-import { createMCPClient } from '../mcp/client.js';
-import { getMCPServerTools } from '../mcp/proxy.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
@@ -121,7 +121,7 @@ export async function getNormalActorsAsTools(
 
 async function getMCPServersAsTools(
     actors: string[],
-    apifyToken: string
+    apifyToken: string,
 ): Promise<ToolWrap[]> {
     const actorsMCPServerTools: ToolWrap[] = [];
     for (const actorID of actors) {
@@ -131,7 +131,7 @@ async function getMCPServersAsTools(
         let client: Client | undefined;
         try {
             client = await createMCPClient(serverUrl, apifyToken);
-            const serverTools = await getMCPServerTools(actorID, client, serverUrl)
+            const serverTools = await getMCPServerTools(actorID, client, serverUrl);
             actorsMCPServerTools.push(...serverTools);
         } finally {
             if (client) await client.close();
@@ -143,7 +143,7 @@ async function getMCPServersAsTools(
 
 export async function getActorsAsTools(
     actors: string[],
-    apifyToken: string
+    apifyToken: string,
 ): Promise<ToolWrap[]> {
     log.debug(`Fetching actors as tools...`);
     log.debug(`Actors: ${actors}`);

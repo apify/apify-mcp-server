@@ -1,8 +1,8 @@
-
 /**
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -13,23 +13,22 @@ import log from '@apify/log';
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
+    defaults,
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
 import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from '../tools/index.js';
-import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
-import { defaults } from '../const.js';
 import { actorNameToToolName } from '../tools/utils.js';
-import { processParamsGetTools } from './utils.js';
+import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
 import { createMCPClient } from './client.js';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { processParamsGetTools } from './utils.js';
 
 /**
  * Create Apify MCP server
  */
 export class ActorsMcpServer {
-    public server: Server;
-    public tools: Map<string, ToolWrap>;
+    public readonly server: Server;
+    public readonly tools: Map<string, ToolWrap>;
 
     constructor() {
         this.server = new Server(
@@ -40,6 +39,7 @@ export class ActorsMcpServer {
             {
                 capabilities: {
                     tools: { listChanged: true },
+                    logging: {},
                 },
             },
         );
@@ -55,7 +55,7 @@ export class ActorsMcpServer {
      * Loads missing default tools.
      */
     public async loadDefaultTools(apifyToken: string) {
-        const missingDefaultTools = defaults.actors.filter(name => !this.tools.has(actorNameToToolName(name)));
+        const missingDefaultTools = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingDefaultTools, apifyToken);
         if (tools.length > 0) this.updateTools(tools);
     }
@@ -175,7 +175,6 @@ export class ActorsMcpServer {
                     } finally {
                         if (client) await client.close();
                     }
-
                 }
 
                 // Handle actor tool

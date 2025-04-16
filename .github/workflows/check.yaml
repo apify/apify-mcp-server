@@ -9,7 +9,6 @@ on:
     push:
         branches:
             - master
-            - 'feat/decouple'
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
@@ -37,3 +36,6 @@ jobs:
 
             -   name: Test
                 run: npm run test
+
+            -   name: Type checks
+                run: npm run type-check
