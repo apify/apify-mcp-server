@@ -24,7 +24,19 @@ describe('parseInputParamsFromUrl', () => {
     it('should parse enableActorAutoLoading flag', () => {
         const url = 'https://actors-mcp-server.apify.actor?enableActorAutoLoading=true';
         const result = parseInputParamsFromUrl(url);
-        expect(result.enableActorAutoLoading).toBe(true);
+        expect(result.enableAddingActors).toBe(true);
+    });
+
+    it('should parse enableAddingActors flag', () => {
+        const url = 'https://actors-mcp-server.apify.actor?enableAddingActors=true';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.enableAddingActors).toBe(true);
+    });
+
+    it('should parse enableAddingActors flag', () => {
+        const url = 'https://actors-mcp-server.apify.actor?enableAddingActors=false';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.enableAddingActors).toBe(false);
     });
 
     it('should handle actors as string parameter', () => {

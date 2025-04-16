@@ -19,16 +19,15 @@ export function processInput(originalInput: Partial<Input>): Input {
     }
 
     // enableAddingActors is deprecated, use enableActorAutoLoading instead
-    if (input.enableActorAutoLoading !== undefined && input.enableAddingActors === undefined) {
-        log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
-        input.enableAddingActors = input.enableActorAutoLoading;
+    if (input.enableAddingActors === undefined) {
+        if (input.enableActorAutoLoading !== undefined) {
+            log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
+            input.enableAddingActors = input.enableActorAutoLoading === true || input.enableActorAutoLoading === 'true';
+        } else {
+            input.enableAddingActors = false;
+        }
+    } else {
+        input.enableAddingActors = input.enableAddingActors === true || input.enableAddingActors === 'true';
     }
-
-    if (!input.enableAddingActors) {
-        input.enableAddingActors = false;
-    }
-
-    input.enableActorAutoLoading = input.enableAddingActors;
-
     return input;
 }

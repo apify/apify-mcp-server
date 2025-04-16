@@ -178,8 +178,8 @@ export type Input = {
     /**
     * @deprecated Use `enableAddingActors` instead.
     */
-    enableActorAutoLoading?: boolean;
-    enableAddingActors?: boolean;
+    enableActorAutoLoading?: boolean | string;
+    enableAddingActors?: boolean | string;
     maxActorMemoryBytes?: number;
     debugActor?: string;
     debugActorInput?: unknown;
