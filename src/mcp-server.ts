@@ -10,10 +10,13 @@ import type { ActorCallOptions } from 'apify-client';
 import log from '@apify/log';
 
 import { processParamsGetTools } from './actor/utils.js';
-import { ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
+import {
+    ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
     ACTOR_OUTPUT_TRUNCATED_MESSAGE,
-    defaults, SERVER_NAME,
-    SERVER_VERSION } from './const.js';
+    defaults,
+    SERVER_NAME,
+    SERVER_VERSION,
+} from './const.js';
 import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ActorTool, HelperTool, ToolWrap } from './types.js';

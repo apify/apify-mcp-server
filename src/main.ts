@@ -12,13 +12,7 @@ import { processInput } from './actor/input.js';
 import { createExpressApp } from './actor/server.js';
 import type { Input } from './actor/types';
 import { ActorsMcpServer } from './mcp-server.js';
-import {
-    actorDefinitionTool,
-    addTool,
-    callActorGetDataset,
-    removeTool,
-    searchTool,
-} from './tools/index.js';
+import { actorDefinitionTool, addTool, callActorGetDataset, removeTool, searchTool } from './tools/index.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 

@@ -6,7 +6,13 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import log from '@apify/log';
 
 import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
-import type { ActorDefinitionPruned, ActorDefinitionWithDesc, InternalTool, ISchemaProperties, ToolWrap } from '../types.js';
+import type {
+    ActorDefinitionPruned,
+    ActorDefinitionWithDesc,
+    InternalTool,
+    ISchemaProperties,
+    ToolWrap,
+} from '../types.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
