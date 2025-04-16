@@ -14,7 +14,7 @@ on:
 
 jobs:
     lint_and_test:
-        name: Build & Test
+        name: Code checks
         runs-on: ubuntu-latest
 
         steps:
