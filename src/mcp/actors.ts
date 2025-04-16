@@ -1,6 +1,6 @@
 
 import { ActorDefinition } from "apify-client";
-import { ApifyClient } from "../apify-client.js";
+import { ApifyClient, getApifyAPIBaseUrl } from "../apify-client.js";
 
 
 export async function isActorMCPServer(actorID: string, apifyToken: string): Promise<boolean> {
@@ -58,18 +58,23 @@ export async function getActorDefinition(actorID: string, apifyToken: string): P
     if (!info) {
         throw new Error(`Actor ${actorID} not found`);
     }
-    const latestBuildID = info.taggedBuilds?.['latest']?.buildId;
-    if (!latestBuildID) {
-        throw new Error(`Actor ${actorID} does not have a latest build`);
+    const actorObjID = info.id;
+    const res = await fetch(`${getApifyAPIBaseUrl()}/v2/acts/${actorObjID}/builds/default`, {
+        headers: {
+            'Authorization': `Bearer ${apifyToken}`
+        }
+    });
+    if (!res.ok) {
+        throw new Error(`Failed to fetch default build for actor ${actorID}: ${res.statusText}`);
     }
-    const build = apifyClient.build(latestBuildID);
-    const buildInfo = await build.get();
+    const json = await res.json() as any;
+    const buildInfo = json.data;
     if (!buildInfo) {
-        throw new Error(`Build ${latestBuildID} not found`);
+        throw new Error(`Default build for Actor ${actorID} not found`);
     }
     const actorDefinition = buildInfo.actorDefinition;
     if (!actorDefinition) {
-        throw new Error(`Build ${latestBuildID} does not have an actor definition`);
+        throw new Error(`Actor default build ${actorID} does not have Actor definition`);
     }
 
     return actorDefinition;
