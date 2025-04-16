@@ -12,14 +12,20 @@ import { processInput } from './actor/input.js';
 import { createExpressApp } from './actor/server.js';
 import type { Input } from './actor/types';
 import { ActorsMcpServer } from './mcp-server.js';
-import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset } from './tools/index.js';
+import {
+    actorDefinitionTool,
+    addTool,
+    callActorGetDataset,
+    removeTool,
+    searchTool,
+} from './tools/index.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
 await Actor.init();
 
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL as string : 'http://localhost';
-const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3001;
+const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3000;
 
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');

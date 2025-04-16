@@ -3,9 +3,9 @@ import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
 import type { ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
 import { ApifyClient } from './mcp-apify-client.js';
 import {
     actorNameToToolName,

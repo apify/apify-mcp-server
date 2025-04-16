@@ -3,9 +3,9 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
-import { actorNameToToolName } from './utils.js';
 import type { ActorTool, InternalTool, ToolWrap } from '../types';
 import { getActorsAsTools } from './actor.js';
+import { actorNameToToolName } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 export const AddToolArgsSchema = z.object({

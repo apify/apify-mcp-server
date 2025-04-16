@@ -9,24 +9,21 @@ import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
-import {
-    ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
-    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
-    SERVER_NAME,
-    SERVER_VERSION,
-} from './const.js';
-import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
-import type { ActorTool, HelperTool, ToolWrap } from './types.js';
-import { defaults } from './const.js';
-import { actorNameToToolName } from './tools/utils.js';
 import { processParamsGetTools } from './actor/utils.js';
+import { ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
+    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
+    defaults, SERVER_NAME,
+    SERVER_VERSION } from './const.js';
+import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from './tools/index.js';
+import { actorNameToToolName } from './tools/utils.js';
+import type { ActorTool, HelperTool, ToolWrap } from './types.js';
 
 /**
  * Create Apify MCP server
  */
 export class ActorsMcpServer {
-    public server: Server;
-    public tools: Map<string, ToolWrap>;
+    public readonly server: Server;
+    public readonly tools: Map<string, ToolWrap>;
 
     constructor() {
         this.server = new Server(
@@ -37,6 +34,7 @@ export class ActorsMcpServer {
             {
                 capabilities: {
                     tools: { listChanged: true },
+                    logging: {},
                 },
             },
         );
@@ -52,7 +50,7 @@ export class ActorsMcpServer {
      * Loads missing default tools.
      */
     public async loadDefaultTools() {
-        const missingDefaultTools = defaults.actors.filter(name => !this.tools.has(actorNameToToolName(name)));
+        const missingDefaultTools = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingDefaultTools);
         if (tools.length > 0) this.updateTools(tools);
     }

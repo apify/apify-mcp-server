@@ -4,4 +4,5 @@
 */
 
 import { ActorsMcpServer } from './mcp-server.js';
-export default ActorsMcpServer;
+
+export { ActorsMcpServer };
