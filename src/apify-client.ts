@@ -16,11 +16,15 @@ function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
     return updatedConfig;
 }
 
+export function getApifyAPIBaseUrl(): string {
+    return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';
+}
+
 export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         super({
             ...options,
-            baseUrl: process.env.APIFY_API_BASE_URL || undefined,
+            baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors: [addUserAgent],
         });
     }
