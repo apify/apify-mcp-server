@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Local apify api base url (#71) ([581f096](https://github.com/apify/actors-mcp-server/commit/581f096030018aa9f1052151c5b628d9b186193b))
+- Add new specification regarding json response streamable http (#72) ([e918d26](https://github.com/apify/actors-mcp-server/commit/e918d26f224466cca58fa5ed35063c13054f9480))
 
 ### 🐛 Bug Fixes
 

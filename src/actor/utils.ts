@@ -1,7 +1,6 @@
-
 import { Actor } from 'apify';
-import type { ActorRunData } from './types.js';
 
+import type { ActorRunData } from './types.js';
 
 export function getActorRunData(): ActorRunData | null {
     return Actor.isAtHome() ? {

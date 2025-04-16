@@ -1,4 +1,3 @@
-
 /**
  * Serves as an Actor MCP SSE server entry point.
  * This file needs to be named `main.ts` to be recognized by the Apify platform.
@@ -9,19 +8,19 @@ import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
-import { processInput } from './input.js';
 import { createExpressApp } from './actor/server.js';
-import type { Input } from './types.js';
-import { ActorsMcpServer } from './mcp/server.js';
-import { actorDefinitionTool, addTool, removeTool, searchTool, callActorGetDataset, getActorsAsTools } from './tools/index.js';
 import { defaults } from './const.js';
+import { processInput } from './input.js';
+import { ActorsMcpServer } from './mcp/server.js';
+import { actorDefinitionTool, addTool, callActorGetDataset, getActorsAsTools, removeTool, searchTool } from './tools/index.js';
+import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
 await Actor.init();
 
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL as string : 'http://localhost';
-const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3001;
+const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3000;
 
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');

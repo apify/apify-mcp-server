@@ -1,7 +1,7 @@
+import type { ActorDefinition } from 'apify-client';
 
 import { ActorDefinition } from "apify-client";
 import { ApifyClient, getApifyAPIBaseUrl } from "../apify-client.js";
-
 
 export async function isActorMCPServer(actorID: string, apifyToken: string): Promise<boolean> {
     const mcpPath = await getActorsMCPServerPath(actorID, apifyToken);
@@ -10,13 +10,18 @@ export async function isActorMCPServer(actorID: string, apifyToken: string): Pro
 
 export async function getActorsMCPServerPath(actorID: string, apifyToken: string): Promise<string | undefined> {
     const actorDefinition = await getActorDefinition(actorID, apifyToken);
-    return (actorDefinition as any).webServerMcpPath;
+
+    if ('webServerMcpPath' in actorDefinition && typeof actorDefinition.webServerMcpPath === 'string') {
+        return actorDefinition.webServerMcpPath;
+    }
+
+    return undefined;
 }
 
 export async function getActorsMCPServerURL(actorID: string, apifyToken: string): Promise<string> {
     // TODO: get from API instead
-    const standbyBaseUrl = process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com' ?
-        'securitybyobscurity.apify.actor' : 'apify.actor';
+    const standbyBaseUrl = process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com'
+        ? 'securitybyobscurity.apify.actor' : 'apify.actor';
     const standbyUrl = await getActorStandbyURL(actorID, apifyToken, standbyBaseUrl);
     const mcpPath = await getActorsMCPServerPath(actorID, apifyToken);
     return `${standbyUrl}${mcpPath}`;
@@ -26,6 +31,7 @@ export async function getActorsMCPServerURL(actorID: string, apifyToken: string)
 * Gets Actor ID from the Actor object.
 *
 * @param actorID
+* @param apifyToken
 */
 export async function getRealActorID(actorID: string, apifyToken: string): Promise<string> {
     const apifyClient = new ApifyClient({ token: apifyToken });
@@ -43,6 +49,7 @@ export async function getRealActorID(actorID: string, apifyToken: string): Promi
 *
 * @param actorID
 * @param standbyBaseUrl
+* @param apifyToken
 * @returns
 */
 export async function getActorStandbyURL(actorID: string, apifyToken: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
@@ -51,13 +58,13 @@ export async function getActorStandbyURL(actorID: string, apifyToken: string, st
 }
 
 export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
-    const apifyClient = new ApifyClient({ token: apifyToken
-     })
+    const apifyClient = new ApifyClient({ token: apifyToken });
     const actor = apifyClient.actor(actorID);
     const info = await actor.get();
     if (!info) {
         throw new Error(`Actor ${actorID} not found`);
     }
+
     const actorObjID = info.id;
     const res = await fetch(`${getApifyAPIBaseUrl()}/v2/acts/${actorObjID}/builds/default`, {
         headers: {
@@ -73,7 +80,7 @@ export async function getActorDefinition(actorID: string, apifyToken: string): P
     if (!buildInfo) {
         throw new Error(`Default build for Actor ${actorID} not found`);
     }
-    const actorDefinition = buildInfo.actorDefinition;
+    const { actorDefinition } = buildInfo;
     if (!actorDefinition) {
         throw new Error(`Actor default build ${actorID} does not have Actor definition`);
     }
