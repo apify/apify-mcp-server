@@ -8,9 +8,6 @@ import type { ToolWrap } from '../types.js';
 
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
 import { Input } from "../types.js";
-import { APIFY_USERNAME } from "../const.js";
-import { ActorDefinition } from "apify-client";
-import { ApifyClient } from "../apify-client.js";
 
 /**
  * Generates a unique server ID based on the provided URL.
@@ -62,53 +59,4 @@ export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
     const params = parse(query) as unknown as Input;
     return processInput(params);
-}
-
-/**
-* Returns standby URL for given Actor ID.
-*
-* @param actorID
-* @param standbyBaseUrl
-* @returns
-*/
-export function getActorStandbyURL(actorID: string, standbyBaseUrl = 'apify.actor'): string {
-    const actorOwner = actorID.split('/')[0];
-    const actorName = actorID.split('/')[1];
-    if (!actorOwner || !actorName) {
-        throw new Error(`Invalid actor ID: ${actorID}`);
-    }
-
-    // TODO: get from API
-    const actorOwnerDNSFriendly = actorOwner
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, '-') // only alphanumeric chars and hyphens allowed
-        .replace(/-+/g, '-'); // replace multiple hyphens with one
-    const prefix = actorOwner === APIFY_USERNAME ? '' : `${actorOwnerDNSFriendly}--`;
-
-    return `https://${prefix}${actorName}.${standbyBaseUrl}`;
-}
-
-export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
-    const apifyClient = new ApifyClient({ token: apifyToken
-     })
-    const actor = apifyClient.actor(actorID);
-    const info = await actor.get();
-    if (!info) {
-        throw new Error(`Actor ${actorID} not found`);
-    }
-    const latestBuildID = info.taggedBuilds?.['latest']?.buildId;
-    if (!latestBuildID) {
-        throw new Error(`Actor ${actorID} does not have a latest build`);
-    }
-    const build = apifyClient.build(latestBuildID);
-    const buildInfo = await build.get();
-    if (!buildInfo) {
-        throw new Error(`Build ${latestBuildID} not found`);
-    }
-    const actorDefinition = buildInfo.actorDefinition;
-    if (!actorDefinition) {
-        throw new Error(`Build ${latestBuildID} does not have an actor definition`);
-    }
-
-    return actorDefinition;
 }
