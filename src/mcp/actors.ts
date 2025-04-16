@@ -61,7 +61,8 @@ export async function getActorDefinition(actorID: string, apifyToken: string): P
     const actorObjID = info.id;
     const res = await fetch(`${getApifyAPIBaseUrl()}/v2/acts/${actorObjID}/builds/default`, {
         headers: {
-            'Authorization': `Bearer ${apifyToken}`
+            // This is done so tests can pass with public Actors without token
+            ...(apifyToken ? { 'Authorization': `Bearer ${apifyToken}` } : {})
         }
     });
     if (!res.ok) {
