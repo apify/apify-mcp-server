@@ -19,7 +19,7 @@ const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 await Actor.init();
 
 const HOST = Actor.isAtHome() ? process.env.ACTOR_STANDBY_URL as string : 'http://localhost';
-const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3000;
+const PORT = Actor.isAtHome() ? Number(process.env.ACTOR_STANDBY_PORT) : 3001;
 
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
