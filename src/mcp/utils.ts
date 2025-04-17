@@ -47,7 +47,7 @@ export async function processParamsGetTools(url: string, apifyToken: string) {
         // Normal Actors as a tool
         tools = await getActorsAsTools(actors, apifyToken);
     }
-    if (input.enableActorAutoLoading) {
+    if (input.enableAddingActors) {
         tools.push(addTool, removeTool);
     }
     return tools;

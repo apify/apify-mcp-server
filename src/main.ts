@@ -9,10 +9,9 @@ import type { ActorCallOptions } from 'apify-client';
 import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
-import { defaults } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { actorDefinitionTool, addTool, callActorGetDataset, getActorsAsTools, removeTool, searchTool } from './tools/index.js';
+import { actorDefinitionTool, addTool, callActorGetDataset, removeTool, searchTool } from './tools/index.js';
 import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
@@ -35,14 +34,11 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 if (STANDBY_MODE) {
     const app = createExpressApp(HOST, mcpServer);
     log.info('Actor is running in the STANDBY mode.');
+    // Do not load default Actors here, for mastra.ai template we need to start without default Actors
     const tools = [searchTool, actorDefinitionTool];
-    if (input.enableActorAutoLoading) {
+    if (input.enableAddingActors) {
         tools.push(addTool, removeTool);
     }
-    const actors = input.actors ?? defaults.actors;
-    const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
-    const actorTools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
-    tools.push(...actorTools);
     mcpServer.updateTools(tools);
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);

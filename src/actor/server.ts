@@ -69,6 +69,9 @@ export function createExpressApp(
             const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
             if (tools) {
                 mcpServer.updateTools(tools);
+            } else {
+                // We are loading default Actors (if not specified otherwise), so that we don't have "empty" tools
+                await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
             }
             transportSSE = new SSEServerTransport(Routes.MESSAGE, res);
             await mcpServer.connect(transportSSE);
