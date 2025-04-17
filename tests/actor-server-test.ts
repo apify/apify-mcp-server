@@ -59,7 +59,7 @@ describe('ApifyMcpServer initialization', () => {
 
         const toolNames = server.getToolNames();
         expect(toolNames).toEqual([
-            HelperTools.SEARCH,
+            HelperTools.SEARCH_ACTOR,
             HelperTools.GET_TOOL_DETAILS,
             HelperTools.ADD_TOOL,
             HelperTools.REMOVE_TOOL,

@@ -59,7 +59,7 @@ export const SearchToolArgsSchema = z.object({
         .describe('The number of elements that should be skipped at the start. Default value is 0.'),
     search: z.string()
         .default('')
-        .describe('String of key words to search by. '
+        .describe('String of key words to search Actors by. '
             + 'Searches the title, name, description, username, and readme of an Actor.'
             + 'Only key word search is supported, no advanced search.'
             + 'Always prefer simple keywords over complex queries.'),
@@ -67,17 +67,18 @@ export const SearchToolArgsSchema = z.object({
         .default('')
         .describe('Filters the results by the specified category.'),
 });
-export const searchTool: ToolWrap = {
+export const searchActorTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.SEARCH,
-        actorFullName: HelperTools.SEARCH,
-        description: `Discover available Actors using full text search using keywords.`
-            + `Users try to discover Actors using free form query in this case search query needs to be converted to full text search. `
-            + `Prefer Actors from Apify as they are generally more reliable and have better support. `
+        name: HelperTools.SEARCH_ACTOR,
+        actorFullName: HelperTools.SEARCH_ACTOR,
+        description: `Discover available Actors or MCP-Servers in Apify Store using full text search using keywords.`
+            + `Users try to discover Actors using free form query in this case search query must be converted to full text search. `
             + `Returns a list of Actors with name, description, run statistics, pricing, starts, and URL. `
             + `You perhaps need to use this tool several times to find the right Actor. `
-            + `Limit number of results returned but ensure that relevant results are returned. `,
+            + `You should prefer simple keywords over complex queries. `
+            + `Limit number of results returned but ensure that relevant results are returned. `
+            + `This is not a general search tool, it is designed to search for Actors in Apify Store. `,
         inputSchema: zodToJsonSchema(SearchToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(SearchToolArgsSchema)),
         call: async (toolArgs) => {

@@ -10,16 +10,16 @@ import { actorNameToToolName } from './utils.js';
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 export const AddToolArgsSchema = z.object({
     actorName: z.string()
-        .describe('Add a tool to available tools by Tool ID or tool full name.'
+        .describe('Add a tool, Actor or MCP-Server to available tools by Actor ID or tool full name.'
             + 'Tool name is always composed from `username/name`'),
 });
 export const addTool: ToolWrap = {
     type: 'internal',
     tool: {
         name: HelperTools.ADD_TOOL,
-        description: 'Add a tool to available tools by Actor ID or Actor name. '
+        description: 'Add a tool, Actor or MCP-Server to available tools by Actor ID or Actor name. '
+            + 'A tool is an Actor or MCP-Server that can be called by the user'
             + 'Do not execute the tool, only add it and list it in available tools. '
-            + 'Never run the tool without user consent! '
             + 'For example, add a tool with username/name when user wants to scrape data from a website.',
         inputSchema: zodToJsonSchema(AddToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(AddToolArgsSchema)),
@@ -49,7 +49,7 @@ export const removeTool: ToolWrap = {
     type: 'internal',
     tool: {
         name: HelperTools.REMOVE_TOOL,
-        description: 'Remove tool by name from available tools. '
+        description: 'Remove a tool, an Actor or MCP-Server by name from available tools. '
             + 'For example, when user says, I do not need a tool username/name anymore',
         inputSchema: zodToJsonSchema(RemoveToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(RemoveToolArgsSchema)),
