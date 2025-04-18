@@ -132,11 +132,16 @@ export class ActorsMcpServer {
                 throw new Error('APIFY_TOKEN is required but not set in the environment variables or passed as a parameter.');
             }
 
+            // TODO - log errors
+            // TODO: handle errors better, server.sendLoggingMessage (   )
+            // TODO - do not raise but return mcp errors
+            // TODO - if connection is /mcp client will not receive notification on tool change
+
             // Find tool by name or actor full name
             const tool = Array.from(this.tools.values())
                 .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
             if (!tool) {
-                // TODO: handle errors better, server.sendLoggingMessage (   )
+                await this.server.sendLoggingMessage({ level: 'info', data: `Unknown tool $\{name}, available tools ${this.getToolNames()}` });
                 throw new Error(`Unknown tool: ${name}`);
             }
             if (!args) {

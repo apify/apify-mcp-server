@@ -31,7 +31,7 @@
   ],
   "dependencies": {
     "@apify/log": "^2.5.16",
-    "@modelcontextprotocol/sdk": "github:jirispilka/mcp-typescript-sdk#fix/add-src-dir",
+    "@modelcontextprotocol/sdk": "^1.10.0",
     "ajv": "^8.17.1",
     "apify": "^3.4.0",
     "apify-client": "^2.12.1",
