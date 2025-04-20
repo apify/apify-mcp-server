@@ -57,7 +57,10 @@ export class ActorsMcpServer {
     public async loadDefaultTools(apifyToken: string) {
         const missingDefaultTools = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingDefaultTools, apifyToken);
-        if (tools.length > 0) this.updateTools(tools);
+        if (tools.length > 0) {
+            log.info('Loading default tools...');
+            this.updateTools(tools);
+        }
     }
 
     /**
@@ -69,7 +72,10 @@ export class ActorsMcpServer {
      */
     public async loadToolsFromUrl(url: string, apifyToken: string) {
         const tools = await processParamsGetTools(url, apifyToken);
-        if (tools.length > 0) this.updateTools(tools);
+        if (tools.length > 0) {
+            log.info('Loading tools from query parameters...');
+            this.updateTools(tools);
+        }
     }
 
     /**

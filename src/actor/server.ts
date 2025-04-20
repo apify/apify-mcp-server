@@ -121,6 +121,14 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: true, // Enable JSON response mode
                 });
+                // Load MCP server tools
+                // TODO using query parameters in POST request is not standard
+                const urlSearchParams = new URLSearchParams(req.url.split('?')[1]);
+                if (urlSearchParams.get('actors')) {
+                    await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
+                } else {
+                    await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
+                }
 
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
