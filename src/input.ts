@@ -6,7 +6,7 @@ import log from '@apify/log';
 import type { Input } from './types.js';
 
 /**
- * Process input parameters, split actors string into an array
+ * Process input parameters, split Actors string into an array
  * @param originalInput
  * @returns input
  */

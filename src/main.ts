@@ -11,7 +11,14 @@ import log from '@apify/log';
 import { createExpressApp } from './actor/server.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { actorDefinitionTool, addTool, callActorGetDataset, removeTool, searchTool } from './tools/index.js';
+import {
+    actorDefinitionTool,
+    addTool,
+    callActorGetDataset,
+    getActorsAsTools,
+    removeTool,
+    searchTool,
+} from './tools/index.js';
 import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
@@ -38,6 +45,11 @@ if (STANDBY_MODE) {
     const tools = [searchTool, actorDefinitionTool];
     if (input.enableAddingActors) {
         tools.push(addTool, removeTool);
+    }
+    if (input.actors && input.actors.length > 0) {
+        const { actors } = input;
+        const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
+        tools.push(...await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string));
     }
     mcpServer.updateTools(tools);
     app.listen(PORT, () => {
