@@ -1,3 +1,4 @@
+import { log } from 'apify';
 import type { ActorDefinition } from 'apify-client';
 
 import { ApifyClient, getApifyAPIBaseUrl } from '../apify-client.js';
@@ -8,7 +9,7 @@ export async function isActorMCPServer(actorID: string, apifyToken: string): Pro
 }
 
 export async function getActorsMCPServerPath(actorID: string, apifyToken: string): Promise<string | undefined> {
-    const actorDefinition = await getActorDefinition(actorID, apifyToken);
+    const actorDefinition = await getFullActorDefinition(actorID, apifyToken);
 
     if ('webServerMcpPath' in actorDefinition && typeof actorDefinition.webServerMcpPath === 'string') {
         return actorDefinition.webServerMcpPath;
@@ -26,6 +27,8 @@ export async function getActorsMCPServerURL(actorID: string, apifyToken: string)
     return `${standbyUrl}${mcpPath}`;
 }
 
+// ID does not change, so no TTL
+export const actorIDCache: Record<string, string> = {};
 /**
 * Gets Actor ID from the Actor object.
 *
@@ -33,12 +36,22 @@ export async function getActorsMCPServerURL(actorID: string, apifyToken: string)
 * @param apifyToken
 */
 export async function getRealActorID(actorID: string, apifyToken: string): Promise<string> {
+    if (actorIDCache[actorID]) {
+        log.debug(`Actor ${actorID} ID cache hit`);
+        return actorIDCache[actorID];
+    }
+    log.debug(`Actor ${actorID} ID cache miss`);
+
     const apifyClient = new ApifyClient({ token: apifyToken });
 
     const actor = apifyClient.actor(actorID);
     const info = await actor.get();
     if (!info) {
         throw new Error(`Actor ${actorID} not found`);
+    }
+
+    if (!actorIDCache[actorID]) {
+        actorIDCache[actorID] = info.id;
     }
     return info.id;
 }
@@ -56,7 +69,29 @@ export async function getActorStandbyURL(actorID: string, apifyToken: string, st
     return `https://${actorRealID}.${standbyBaseUrl}`;
 }
 
-export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
+export const actorDefinitionCache: Record<string, {
+    timestamp: number;
+    definition: ActorDefinition;
+}> = {};
+export const ACTOR_DEFINITION_CACHE_TTL_MS = 1000 * 60 * 60; // 1 hour
+/**
+* Gets full Actor definition from the Apify API.
+*/
+export async function getFullActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
+    const cacheInTTL = Date.now() - (actorDefinitionCache[actorID]?.timestamp || 0) < ACTOR_DEFINITION_CACHE_TTL_MS;
+    // Hit the cache
+    if (actorDefinitionCache[actorID]
+        && cacheInTTL) {
+        log.debug(`Actor ${actorID} definition cache hit`);
+        return actorDefinitionCache[actorID].definition;
+    }
+    // Refresh the cache after TTL expired
+    if (actorDefinitionCache[actorID] && !cacheInTTL) {
+        log.debug(`Actor ${actorID} definition cache TTL expired, re-fetching`);
+    } else {
+        log.debug(`Actor ${actorID} definition cache miss`);
+    }
+
     const apifyClient = new ApifyClient({ token: apifyToken });
     const actor = apifyClient.actor(actorID);
     const info = await actor.get();
@@ -82,6 +117,15 @@ export async function getActorDefinition(actorID: string, apifyToken: string): P
     const { actorDefinition } = buildInfo;
     if (!actorDefinition) {
         throw new Error(`Actor default build ${actorID} does not have Actor definition`);
+    }
+
+    // If the Actor is public, we cache the definition
+    // This code branch is executed only on cache miss, so we know the cache entry is empty
+    if (info.isPublic) {
+        actorDefinitionCache[actorID] = {
+            timestamp: Date.now(),
+            definition: actorDefinition,
+        };
     }
 
     return actorDefinition;
