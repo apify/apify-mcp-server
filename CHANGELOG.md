@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.1.26 - **not yet released**
+## [0.1.26](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.26) (2025-04-22)
 
 ### 🐛 Bug Fixes
 
-- Move logic to enableAddingActors and enableDefaultActors to constructor ([e8ff49c](https://github.com/apify/actors-mcp-server/commit/e8ff49c4dff7db4ab49392fc84d424c608667ce1))
+- Readme smithery ([#92](https://github.com/apify/actors-mcp-server/pull/92)) ([e585cf3](https://github.com/apify/actors-mcp-server/commit/e585cf394a16aa9891428106d91c443ce9791001)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.1.25](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.25) (2025-04-21)
 
 ### 🐛 Bug Fixes
