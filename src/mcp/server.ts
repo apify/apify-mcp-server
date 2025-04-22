@@ -17,11 +17,23 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { actorDefinitionTool, callActorGetDataset, getActorsAsTools, searchTool } from '../tools/index.js';
+import {
+    actorDefinitionTool,
+    addTool,
+    callActorGetDataset,
+    getActorsAsTools,
+    removeTool,
+    searchTool,
+} from '../tools/index.js';
 import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
 import { createMCPClient } from './client.js';
 import { processParamsGetTools } from './utils.js';
+
+type ActorsMcpServerOptions = {
+    enableAddingActors?: boolean;
+    enableDefaultActors?: boolean;
+};
 
 /**
  * Create Apify MCP server
@@ -29,8 +41,13 @@ import { processParamsGetTools } from './utils.js';
 export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolWrap>;
+    private readonly options: ActorsMcpServerOptions;
 
-    constructor() {
+    constructor(options: ActorsMcpServerOptions = {}) {
+        this.options = {
+            enableAddingActors: options.enableAddingActors ?? false,
+            enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
+        };
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -49,10 +66,29 @@ export class ActorsMcpServer {
 
         // Add default tools
         this.updateTools([searchTool, actorDefinitionTool]);
+
+        // Add tools to dynamically load Actors
+        if (this.options.enableAddingActors) {
+            this.loadToolsToAddActors();
+        }
+
+        // Initialize automatically for backward compatibility
+        this.initialize().catch((error) => {
+            log.error('Failed to initialize server:', error);
+        });
     }
 
     /**
-     * Loads missing default tools.
+     * Initialize the server with default tools if enabled
+     */
+    public async initialize(): Promise<void> {
+        if (this.options.enableDefaultActors) {
+            await this.loadDefaultTools(process.env.APIFY_TOKEN as string);
+        }
+    }
+
+    /**
+     * Loads default tools if not already loaded.
      */
     public async loadDefaultTools(apifyToken: string) {
         const missingDefaultTools = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
@@ -76,6 +112,13 @@ export class ActorsMcpServer {
             log.info('Loading tools from query parameters...');
             this.updateTools(tools);
         }
+    }
+
+    /**
+     * Add Actors to server dynamically
+     */
+    public loadToolsToAddActors() {
+        this.updateTools([addTool, removeTool]);
     }
 
     /**
