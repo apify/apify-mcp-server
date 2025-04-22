@@ -102,7 +102,7 @@ export class ActorsMcpServer {
     /**
      * Loads tools from URL params.
      *
-     * This method also handles enabling of Actor auto loading via the processParamsGetTools.
+     * This method also handles enabling of Actor autoloading via the processParamsGetTools.
      *
      * Used primarily for SSE.
      */
