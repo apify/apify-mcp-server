@@ -5,7 +5,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { CallToolRequestSchema, CallToolResultSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
@@ -28,6 +28,7 @@ import {
 import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
 import { createMCPClient } from './client.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
 
 type ActorsMcpServerOptions = {
@@ -223,6 +224,8 @@ export class ActorsMcpServer {
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
+                        }, CallToolResultSchema, {
+                            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
                         });
 
                         return { ...res };
