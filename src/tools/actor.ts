@@ -125,7 +125,6 @@ async function getMCPServersAsTools(
 ): Promise<ToolWrap[]> {
     const actorsMCPServerTools: ToolWrap[] = [];
     for (const actorID of actors) {
-        // getFullActorDefinition uses cache, so we can call it twice (this is the second time)
         const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
         log.info(`ActorID: ${actorID} MCP server URL: ${serverUrl}`);
 
@@ -151,7 +150,7 @@ export async function getActorsAsTools(
     // Actorized MCP servers
     const actorsMCPServers: string[] = [];
     for (const actorID of actors) {
-        // getFullActorDefinition uses cache, so we can call it twice (second time in the getMCPServerTools)
+        // TODO: rework, we are fetching actor definition from API twice - in the getMCPServerTools
         if (await isActorMCPServer(actorID, apifyToken)) {
             actorsMCPServers.push(actorID);
         }
