@@ -11,14 +11,7 @@ import log from '@apify/log';
 import { createExpressApp } from './actor/server.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import {
-    actorDefinitionTool,
-    addTool,
-    callActorGetDataset,
-    getActorsAsTools,
-    removeTool,
-    searchTool,
-} from './tools/index.js';
+import { callActorGetDataset, getActorsAsTools } from './tools/index.js';
 import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
@@ -33,25 +26,26 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
-const mcpServer = new ActorsMcpServer();
-
 const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
+    const mcpServer = new ActorsMcpServer({
+        enableAddingActors: Boolean(input.enableAddingActors),
+        enableDefaultActors: false,
+    });
+
     const app = createExpressApp(HOST, mcpServer);
     log.info('Actor is running in the STANDBY mode.');
-    // Do not load default Actors here, for mastra.ai template we need to start without default Actors
-    const tools = [searchTool, actorDefinitionTool];
-    if (input.enableAddingActors) {
-        tools.push(addTool, removeTool);
-    }
+
+    // Load only Actors specified in the input
+    // If you wish to start without any Actor, create a task and leave the input empty
     if (input.actors && input.actors.length > 0) {
         const { actors } = input;
         const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
-        tools.push(...await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string));
+        const tools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
+        mcpServer.updateTools(tools);
     }
-    mcpServer.updateTools(tools);
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });

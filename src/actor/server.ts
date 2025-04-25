@@ -13,6 +13,7 @@ import log from '@apify/log';
 
 import { type ActorsMcpServer } from '../mcp/server.js';
 import { processParamsGetTools } from '../mcp/utils.js';
+import { addTool, removeTool } from '../tools/helpers.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -69,7 +70,9 @@ export function createExpressApp(
             const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
             if (tools.length > 0) {
                 mcpServer.updateTools(tools);
-            } else {
+            }
+            // TODO fix this - we should not be loading default tools here or provide more generic way
+            if (tools.length === 2 && tools.includes(addTool) && tools.includes(removeTool)) {
                 // We are loading default Actors (if not specified otherwise), so that we don't have "empty" tools
                 await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
             }

@@ -19,7 +19,7 @@ import log from '@apify/log';
 
 import { defaults } from './const.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { addTool, getActorsAsTools, removeTool } from './tools/index.js';
+import { getActorsAsTools } from './tools/index.js';
 
 // Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
@@ -36,7 +36,8 @@ const argv = parser(process.argv.slice(2), {
         'enable-adding-actors': false,
     },
 });
-const { actors = '', enableActorAutoLoading = false } = argv;
+const enableAddingActors = argv['enable-adding-actors'] || argv.enableActorAutoLoading || false;
+const { actors = '' } = argv;
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
 
 // Validate environment
@@ -46,12 +47,8 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer();
-    // Initialize tools
+    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
     const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
-    if (enableActorAutoLoading) {
-        tools.push(addTool, removeTool);
-    }
     mcpServer.updateTools(tools);
 
     // Start server
