@@ -22,10 +22,10 @@ export const SERVER_VERSION = '1.0.0';
 export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 export enum HelperTools {
-    SEARCH_ACTOR = 'search-actor',
-    ADD_TOOL = 'add-tool',
-    REMOVE_TOOL = 'remove-tool',
-    GET_TOOL_DETAILS = 'get-tool-details',
+    SEARCH_ACTORS = 'search-actors',
+    ADD_ACTOR = 'add-actor',
+    REMOVE_ACTOR = 'remove-actor',
+    GET_ACTOR_DETAILS = 'get-actor-details',
 }
 
 export const defaults = {

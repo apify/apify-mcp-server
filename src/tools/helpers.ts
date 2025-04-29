@@ -16,7 +16,7 @@ export const AddToolArgsSchema = z.object({
 export const addTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.ADD_TOOL,
+        name: HelperTools.ADD_ACTOR,
         description: 'Add a tool, Actor or MCP-Server to available tools by Actor ID or Actor name. '
             + 'A tool is an Actor or MCP-Server that can be called by the user'
             + 'Do not execute the tool, only add it and list it in available tools. '
@@ -48,7 +48,7 @@ export const RemoveToolArgsSchema = z.object({
 export const removeTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.REMOVE_TOOL,
+        name: HelperTools.REMOVE_ACTOR,
         description: 'Remove a tool, an Actor or MCP-Server by name from available tools. '
             + 'For example, when user says, I do not need a tool username/name anymore',
         inputSchema: zodToJsonSchema(RemoveToolArgsSchema),

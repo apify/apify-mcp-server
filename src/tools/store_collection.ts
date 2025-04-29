@@ -70,8 +70,8 @@ export const SearchToolArgsSchema = z.object({
 export const searchActorTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.SEARCH_ACTOR,
-        actorFullName: HelperTools.SEARCH_ACTOR,
+        name: HelperTools.SEARCH_ACTORS,
+        actorFullName: HelperTools.SEARCH_ACTORS,
         description: `Discover available Actors or MCP-Servers in Apify Store using full text search using keywords.`
             + `Users try to discover Actors using free form query in this case search query must be converted to full text search. `
             + `Returns a list of Actors with name, description, run statistics, pricing, starts, and URL. `

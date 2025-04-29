@@ -59,10 +59,10 @@ describe('ApifyMcpServer initialization', () => {
 
         const toolNames = server.getToolNames();
         expect(toolNames).toEqual([
-            HelperTools.SEARCH_ACTOR,
-            HelperTools.GET_TOOL_DETAILS,
-            HelperTools.ADD_TOOL,
-            HelperTools.REMOVE_TOOL,
+            HelperTools.SEARCH_ACTORS,
+            HelperTools.GET_ACTOR_DETAILS,
+            HelperTools.ADD_ACTOR,
+            HelperTools.REMOVE_ACTOR,
         ]);
     });
 });

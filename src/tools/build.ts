@@ -116,8 +116,9 @@ const GetActorDefinitionArgsSchema = z.object({
 export const actorDefinitionTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.GET_TOOL_DETAILS,
-        actorFullName: HelperTools.GET_TOOL_DETAILS,
+        name: HelperTools.GET_ACTOR_DETAILS,
+        // TODO: remove actorFullName from internal tools
+        actorFullName: HelperTools.GET_ACTOR_DETAILS,
         description: 'Get documentation, readme, input schema and other details about an Actor. '
             + 'For example, when user says, I need to know more about web crawler Actor.'
             + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
