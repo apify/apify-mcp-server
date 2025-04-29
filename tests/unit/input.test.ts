@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { processInput } from '../src/input.js';
-import type { Input } from '../src/types.js';
+import { processInput } from '../../src/input.js';
+import type { Input } from '../../src/types.js';
 
 describe('processInput', () => {
     it('should handle string actors input and convert to array', async () => {

@@ -5,11 +5,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import log from '@apify/log';
 
-import { createExpressApp } from '../src/actor/server.js';
-import { HelperTools } from '../src/const.js';
-import { ActorsMcpServer } from '../src/mcp/server.js';
+import { createExpressApp } from '../../src/actor/server.js';
+import { HelperTools } from '../../src/const.js';
+import { ActorsMcpServer } from '../../src/mcp/server.js';
 
-describe('ApifyMcpServer initialization', () => {
+describe('Actors MCP Server', () => {
     let app: Express;
     let server: ActorsMcpServer;
     let httpServer: HttpServer;
