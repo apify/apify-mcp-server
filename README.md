@@ -3,12 +3,12 @@
 [![Actors MCP Server](https://apify.com/actor-badge?actor=apify/actors-mcp-server)](https://apify.com/apify/actors-mcp-server)
 [![smithery badge](https://smithery.ai/badge/@apify/actors-mcp-server)](https://smithery.ai/server/@apify/actors-mcp-server)
 
-Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
-This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
+Implementation of an MCP server for all [Apify Actors](https://apify.com/store) that enables interaction with Apify Actors.
 
-The server can be used in two ways:
+The server can be used in the following ways:
 - **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE), see [guide](#-mcp-server-actor)
 - **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio), see [guide](#-mcp-server-at-a-local-host)
+- **🇦 Apify MCP API (alpha)** – HTTP server accessible via Server-Sent Events (SSE), see [guide](#apify-mcp-api)
 
 You can also interact with the MCP server using a chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 
@@ -66,7 +66,7 @@ Interested in building and monetizing your own AI agent on Apify? Check out our 
 
 ### Actors
 
-Any [Apify Actor](https://apify.com/store) can be used as a tool.
+Any [Apify Actor](https://apify.com/store) can be used as a tool via this MCP server.
 By default, the server is pre-configured with the Actors specified below, but this can be overridden by providing Actor input.
 
 ```text
@@ -74,36 +74,20 @@ By default, the server is pre-configured with the Actors specified below, but th
 'apify/rag-web-browser'
 'lukaskrivka/google-maps-with-contact-details'
 ```
-The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
-See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
-
-The tool name must always be the full Actor name, such as `apify/rag-web-browser`.
-The arguments for an MCP tool represent the input parameters of the Actor.
-For example, for the `apify/rag-web-browser` Actor, the arguments are:
-
-```json
-{
-  "query": "restaurants in San Francisco",
-  "maxResults": 3
-}
-```
-You don't need to specify the input parameters or which Actor to call; everything is managed by an LLM.
-When a tool is called, the arguments are automatically passed to the Actor by the LLM.
-You can refer to the specific Actor's documentation for a list of available arguments.
 
 ### Helper tools
 
 The server provides a set of helper tools to discover available Actors and retrieve their details:
 - `get-actor-details`: Retrieves documentation, input schema, and details about a specific Actor.
-- `discover-actors`: Searches for relevant Actors using keywords and returns their details.
+- `search-actors`: Searches for relevant Actors using keywords and returns their details.
 
-There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to update the tools list (handle `ToolListChangedNotificationSchema`), which is typically not supported.
+There are also tools to manage the available tools list. However, **dynamically adding and removing tools requires the MCP client to have the capability to update the tools list** (handle `ToolListChangedNotificationSchema`), which is typically not supported.
 
 You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor.
-To enable it, set the `enableActorAutoLoading` parameter.
+To enable it, set the `enableAddingActors` parameter.
 
-- `add-actor-as-tool`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
-- `remove-actor-from-tool`: Removes an Actor by name from the available tools list when it's no longer needed.
+- `add-actor`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
+- `remove-actor`: Removes an Actor by name from the available tools list when it's no longer needed.
 
 ## Prompt & Resources
 
@@ -112,94 +96,51 @@ We plan to add [Apify's dataset](https://docs.apify.com/platform/storage/dataset
 
 # ⚙️ Usage
 
-The Apify MCP Server can be used in two ways: **as an Apify Actor** running on the Apify platform
-or as a **local server** running on your machine.
+The Apify MCP Server can be used in the following ways: **as an Apify Actor** running on the Apify platform, as a **local server** running on your machine and experimentally as an **Apify MCP API** at [mcp.apify.com](https://mcp.apify.com).
 
 ## 🇦 MCP Server Actor
 
-### Standby web server
+### Standby web server over SSE
 
 The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
 
-To start the server with default Actors, send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
+To use the server, connect your MCP client to the following URL with the `Authorization` header set to your [Apify API token](https://console.apify.com/settings/integrations):
+```text
+https://actors-mcp-server.apify.actor/sse
+
+Authorization: Bearer <APIFY_TOKEN>
 ```
-https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>
+
+In case your client does not support setting the `Authorization` header, you can use the `token` query parameter instead:
+```text
+https://actors-mcp-server.apify.actor/sse?token=<APIFY_TOKEN>
 ```
+
 It is also possible to start the MCP server with a different set of Actors.
-To do this, create a [task](https://docs.apify.com/platform/actors/running/tasks) and specify the list of Actors you want to use.
+To do this, you can either specify Actors in the `actors` query parameter (comma-separated) or create a [task](https://docs.apify.com/platform/actors/running/tasks) and specify the list of Actors you want to use.
 
-Then, run the task in Standby mode with the selected Actors:
-```shell
-https://USERNAME--actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
+To specify the Actors in the `actors` query parameter, use the following URL:
+```text
+https://actors-mcp-server.apify.actor/sse?actors=apify/instagram-scraper,apify/rag-web-browser
+
+Authorization: Bearer <APIFY_TOKEN>
 ```
 
-You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
-
-#### 💬 Interact with the MCP Server over SSE
-
-Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
-The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
-
-[Claude Desktop](https://claude.ai/download) currently lacks SSE support, but you can use it with Stdio transport; see [MCP Server at a local host](#-mcp-server-at-a-local-host) for more details.
-Note: The free version of Claude Desktop may experience intermittent connection issues with the server.
-
-In the client settings, you need to provide server configuration:
-```json
-{
-    "mcpServers": {
-        "apify": {
-            "type": "sse",
-            "url": "https://actors-mcp-server.apify.actor/sse",
-            "env": {
-                "APIFY_TOKEN": "your-apify-token"
-            }
-        }
-    }
-}
+Or with the `token` query parameter:
+```text
+https://actors-mcp-server.apify.actor/sse?token=<APIFY_TOKEN>&actors=apify/instagram-scraper,apify/rag-web-browser
 ```
-Alternatively, you can use [clientSse.ts](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientSse.ts) script or test the server using `curl` </> commands.
 
-1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
-    ```
-    curl https://actors-mcp-server.apify.actor/sse?token=<APIFY_TOKEN>
-    ```
-    The server will respond with a `sessionId`, which you can use to send messages to the server:
-    ```shell
-    event: endpoint
-    data: /message?sessionId=a1b
-    ```
-
-2. Send a message to the server by making a POST request with the `sessionId`:
-    ```shell
-    curl -X POST "https://actors-mcp-server.apify.actor/message?token=<APIFY_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
-      "jsonrpc": "2.0",
-      "id": 1,
-      "method": "tools/call",
-      "params": {
-        "arguments": { "searchStringsArray": ["restaurants in San Francisco"], "maxCrawledPlacesPerSearch": 3 },
-        "name": "lukaskrivka/google-maps-with-contact-details"
-      }
-    }'
-    ```
-    The MCP server will start the Actor `lukaskrivka/google-maps-with-contact-details` with the provided arguments as input parameters.
-    For this POST request, the server will respond with:
-
-    ```text
-    Accepted
-    ```
-
-3. Receive the response. The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
-    The response will be returned as JSON text.
-
-    ```text
-    event: message
-    data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
-    ```
+If you created a task instead, then use the task Actor URL with either the `Authorization` header or the `token` query parameter (the URL can be found in the task Standby tab in the Apify Console):
+```text
+https://USERNAME--actors-mcp-server-task.apify.actor/sse
+```
 
 ## ⾕ MCP Server at a local host
 
 You can run the Apify MCP Server on your local machine by configuring it with Claude Desktop or any other [MCP client](https://modelcontextprotocol.io/clients).
 You can also use [Smithery](https://smithery.ai/server/@apify/actors-mcp-server) to install the server automatically.
+Note: The free version of Claude Desktop may experience intermittent connection issues with the server.
 
 ### Prerequisites
 
