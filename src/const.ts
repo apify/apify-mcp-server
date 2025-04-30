@@ -34,6 +34,14 @@ export const defaults = {
         'apify/rag-web-browser',
         'lukaskrivka/google-maps-with-contact-details',
     ],
+    helperTools: [
+        HelperTools.SEARCH_ACTORS,
+        HelperTools.GET_ACTOR_DETAILS,
+    ],
+    actorAddingTools: [
+        HelperTools.ADD_ACTOR,
+        HelperTools.REMOVE_ACTOR,
+    ],
     enableActorAutoLoading: false,
     maxMemoryMbytes: 4096,
 };

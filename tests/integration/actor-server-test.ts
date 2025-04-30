@@ -9,7 +9,9 @@ import { createExpressApp } from '../../src/actor/server.js';
 import { HelperTools } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 
-describe('Actors MCP Server', () => {
+describe('Actors MCP Server', {
+    concurrent: false, // Run test serially to prevent port already in use
+}, () => {
     let app: Express;
     let server: ActorsMcpServer;
     let httpServer: HttpServer;
