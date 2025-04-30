@@ -164,4 +164,33 @@ describe('MCP STDIO', () => {
 
         await client.close();
     });
+
+    it('should remove Actor from tools list', async () => {
+        const actor = 'apify/python-example';
+        const selectedToolName = actorNameToToolName(actor);
+        const client = await createMCPClient({
+            actors: [actor],
+            enableAddingActors: true,
+        });
+
+        // Verify actor is in the tools list
+        const toolsBefore = await client.listTools();
+        const namesBefore = toolsBefore.tools.map((tool) => tool.name);
+        expect(namesBefore).toContain(selectedToolName);
+
+        // Remove the actor
+        await client.callTool({
+            name: HelperTools.REMOVE_ACTOR,
+            arguments: {
+                toolName: selectedToolName,
+            },
+        });
+
+        // Verify actor is removed
+        const toolsAfter = await client.listTools();
+        const namesAfter = toolsAfter.tools.map((tool) => tool.name);
+        expect(namesAfter).not.toContain(selectedToolName);
+
+        await client.close();
+    });
 });
