@@ -295,4 +295,8 @@ export class ActorsMcpServer {
     async connect(transport: Transport): Promise<void> {
         await this.server.connect(transport);
     }
+
+    async close(): Promise<void> {
+        await this.server.close();
+    }
 }

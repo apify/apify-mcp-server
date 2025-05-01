@@ -125,10 +125,12 @@ export function createExpressApp(
                 });
                 // Load MCP server tools
                 // TODO using query parameters in POST request is not standard
-                const urlSearchParams = new URLSearchParams(req.url.split('?')[1]);
-                if (urlSearchParams.get('actors')) {
+                const input = parseInputParamsFromUrl(req.url);
+                if (input.actors || input.enableAddingActors) {
                     await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
-                } else {
+                }
+                // Load default tools if no actors are specified
+                if (!input.actors) {
                     await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
                 }
 
