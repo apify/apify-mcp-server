@@ -9,6 +9,8 @@ import {
 
 import log from '@apify/log';
 
+import { HelperTools } from '../const.js';
+
 log.setLevel(log.LEVELS.DEBUG);
 
 async function main(): Promise<void> {
@@ -65,7 +67,7 @@ async function callSearchTool(client: Client): Promise<void> {
         const searchRequest: CallToolRequest = {
             method: 'tools/call',
             params: {
-                name: 'search',
+                name: HelperTools.SEARCH_ACTORS,
                 arguments: { search: 'rag web browser', limit: 1 },
             },
         };
@@ -104,6 +106,6 @@ async function callActor(client: Client): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-    log.error('Error running MCP client:', error as Error);
+    log.error(`Error running MCP client: ${error as Error}`);
     process.exit(1);
 });
