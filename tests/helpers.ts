@@ -1,0 +1,81 @@
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+
+export async function createMCPSSEClient(
+    serverUrl: string,
+    options?: {
+        actors?: string[];
+        enableAddingActors?: boolean;
+    },
+): Promise<Client> {
+    if (!process.env.APIFY_TOKEN) {
+        throw new Error('APIFY_TOKEN environment variable is not set.');
+    }
+    const url = new URL(serverUrl);
+    const { actors, enableAddingActors } = options || {};
+    if (actors) {
+        url.searchParams.append('actors', actors.join(','));
+    }
+    if (enableAddingActors) {
+        url.searchParams.append('enableAddingActors', 'true');
+    }
+
+    const transport = new SSEClientTransport(
+        url,
+        {
+            requestInit: {
+                headers: {
+                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
+                },
+            },
+        },
+    );
+
+    const client = new Client({
+        name: 'sse-client',
+        version: '1.0.0',
+    });
+    await client.connect(transport);
+
+    return client;
+}
+
+export async function createMCPStreamableClient(
+    serverUrl: string,
+    options?: {
+        actors?: string[];
+        enableAddingActors?: boolean;
+    },
+): Promise<Client> {
+    if (!process.env.APIFY_TOKEN) {
+        throw new Error('APIFY_TOKEN environment variable is not set.');
+    }
+    const url = new URL(serverUrl);
+    const { actors, enableAddingActors } = options || {};
+    if (actors) {
+        url.searchParams.append('actors', actors.join(','));
+    }
+    if (enableAddingActors) {
+        url.searchParams.append('enableAddingActors', 'true');
+    }
+
+    const transport = new StreamableHTTPClientTransport(
+        url,
+        {
+            requestInit: {
+                headers: {
+                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
+                },
+            },
+        },
+    );
+
+    const client = new Client({
+        name: 'sse-client',
+        version: '1.0.0',
+    });
+    await client.connect(transport);
+
+    return client;
+}

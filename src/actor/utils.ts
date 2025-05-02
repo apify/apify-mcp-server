@@ -1,5 +1,7 @@
 import { Actor } from 'apify';
 
+import { ActorsMcpServer } from '../mcp/server.js';
+import type { Input } from '../types.js';
 import type { ActorRunData } from './types.js';
 
 export function getActorRunData(): ActorRunData | null {
@@ -25,4 +27,13 @@ export function getActorRunData(): ActorRunData | null {
         containerUrl: process.env.ACTOR_WEB_SERVER_URL,
         standbyUrl: process.env.ACTOR_STANDBY_URL,
     } : null;
+}
+
+export function createActorMCPServer(
+    actorInput?: Input,
+): ActorsMcpServer {
+    return new ActorsMcpServer({
+        enableAddingActors: Boolean(actorInput?.enableAddingActors || false),
+        enableDefaultActors: false,
+    });
 }

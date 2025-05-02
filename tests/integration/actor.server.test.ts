@@ -1,95 +1,16 @@
 import type { Server as HttpServer } from 'node:http';
 
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import log from '@apify/log';
 
 import { createExpressApp } from '../../src/actor/server.js';
+import { createActorMCPServer } from '../../src/actor/utils.js';
 import { defaults, HelperTools } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-
-async function createMCPSSEClient(
-    serverUrl: string,
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
-): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
-    const url = new URL(serverUrl);
-    const { actors, enableAddingActors } = options || {};
-    if (actors) {
-        url.searchParams.append('actors', actors.join(','));
-    }
-    if (enableAddingActors) {
-        url.searchParams.append('enableAddingActors', 'true');
-    }
-
-    const transport = new SSEClientTransport(
-        url,
-        {
-            requestInit: {
-                headers: {
-                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
-                },
-            },
-        },
-    );
-
-    const client = new Client({
-        name: 'sse-client',
-        version: '1.0.0',
-    });
-    await client.connect(transport);
-
-    return client;
-}
-
-async function createMCPStreamableClient(
-    serverUrl: string,
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
-): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
-    const url = new URL(serverUrl);
-    const { actors, enableAddingActors } = options || {};
-    if (actors) {
-        url.searchParams.append('actors', actors.join(','));
-    }
-    if (enableAddingActors) {
-        url.searchParams.append('enableAddingActors', 'true');
-    }
-
-    const transport = new StreamableHTTPClientTransport(
-        url,
-        {
-            requestInit: {
-                headers: {
-                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
-                },
-            },
-        },
-    );
-
-    const client = new Client({
-        name: 'sse-client',
-        version: '1.0.0',
-    });
-    await client.connect(transport);
-
-    return client;
-}
+import { createMCPSSEClient, createMCPStreamableClient } from '../helpers.js';
 
 describe('Actors MCP Server SSE', {
     concurrent: false, // Run test serially to prevent port already in use
@@ -103,6 +24,7 @@ describe('Actors MCP Server SSE', {
     beforeEach(async () => {
         // same as in main.ts
         // TODO: unify
+        server = createActorMCPServer();
         server = new ActorsMcpServer({
             enableAddingActors: false,
             enableDefaultActors: false,
