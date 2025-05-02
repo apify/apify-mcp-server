@@ -72,7 +72,7 @@ export async function createMCPStreamableClient(
     );
 
     const client = new Client({
-        name: 'sse-client',
+        name: 'streamable-http-client',
         version: '1.0.0',
     });
     await client.connect(transport);
