@@ -76,12 +76,14 @@ async function run() {
             CallToolResultSchema,
         );
         console.log('Tool result:', JSON.stringify(result));
+
+        await client.close();
     } catch (error) {
         console.error('Error:', error);
     }
 }
 
 run().catch((error) => {
-    console.error('Unhandled error:', error);
+    console.error(`Error running MCP client: ${error as Error}`);
     process.exit(1);
 });
