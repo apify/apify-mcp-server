@@ -26,6 +26,7 @@ export enum HelperTools {
     ADD_ACTOR = 'add-actor',
     REMOVE_ACTOR = 'remove-actor',
     GET_ACTOR_DETAILS = 'get-actor-details',
+    HELP_TOOL = 'help-tool',
 }
 
 export const defaults = {
@@ -35,6 +36,7 @@ export const defaults = {
     helperTools: [
         HelperTools.SEARCH_ACTORS,
         HelperTools.GET_ACTOR_DETAILS,
+        HelperTools.HELP_TOOL,
     ],
     actorAddingTools: [
         HelperTools.ADD_ACTOR,
