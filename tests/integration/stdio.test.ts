@@ -1,46 +1,12 @@
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-
-async function createMCPClient(
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
-): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
-    const { actors, enableAddingActors } = options || {};
-    const args = ['dist/stdio.js'];
-    if (actors) {
-        args.push('--actors', actors.join(','));
-    }
-    if (enableAddingActors) {
-        args.push('--enable-adding-actors');
-    }
-    const transport = new StdioClientTransport({
-        command: 'node',
-        args,
-        env: {
-            APIFY_TOKEN: process.env.APIFY_TOKEN as string,
-        },
-    });
-    const client = new Client({
-        name: 'stdio-client',
-        version: '1.0.0',
-    });
-    await client.connect(transport);
-
-    return client;
-}
+import { createMCPStdioClient } from '../helpers.js';
 
 describe('MCP STDIO', () => {
     it('list default tools', async () => {
-        const client = await createMCPClient();
+        const client = await createMCPStdioClient();
         const tools = await client.listTools();
         const names = tools.tools.map((tool) => tool.name);
 
@@ -57,7 +23,7 @@ describe('MCP STDIO', () => {
     it('use only apify/python-example Actor and call it', async () => {
         const actorName = 'apify/python-example';
         const selectedToolName = actorNameToToolName(actorName);
-        const client = await createMCPClient({
+        const client = await createMCPStdioClient({
             actors: [actorName],
             enableAddingActors: false,
         });
@@ -93,7 +59,7 @@ describe('MCP STDIO', () => {
 
     it('load Actors from parameters', async () => {
         const actors = ['apify/rag-web-browser', 'apify/instagram-scraper'];
-        const client = await createMCPClient({
+        const client = await createMCPStdioClient({
             actors,
             enableAddingActors: false,
         });
@@ -113,7 +79,7 @@ describe('MCP STDIO', () => {
     it('load Actor dynamically and call it', async () => {
         const actor = 'apify/python-example';
         const selectedToolName = actorNameToToolName(actor);
-        const client = await createMCPClient({
+        const client = await createMCPStdioClient({
             enableAddingActors: true,
         });
         const tools = await client.listTools();
@@ -168,7 +134,7 @@ describe('MCP STDIO', () => {
     it('should remove Actor from tools list', async () => {
         const actor = 'apify/python-example';
         const selectedToolName = actorNameToToolName(actor);
-        const client = await createMCPClient({
+        const client = await createMCPStdioClient({
             actors: [actor],
             enableAddingActors: true,
         });

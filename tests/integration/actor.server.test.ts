@@ -20,6 +20,7 @@ describe('Actors MCP Server SSE', {
     let httpServer: HttpServer;
     const testPort = 50000;
     const testHost = `http://localhost:${testPort}`;
+    const serverStartWaitTimeMillis = 100;
 
     beforeEach(async () => {
         // same as in main.ts
@@ -36,11 +37,12 @@ describe('Actors MCP Server SSE', {
 
         // Start test server
         await new Promise<void>((resolve) => {
-            httpServer = app.listen(testPort, () => resolve());
+            httpServer = app.listen(testPort, () => {
+                // Wait for the server to be fully initialized
+                // TODO: figure out why this is needed
+                setTimeout(() => resolve(), serverStartWaitTimeMillis);
+            });
         });
-
-        // TODO: figure out why this is needed
-        await new Promise<void>((resolve) => { setTimeout(resolve, 1000); });
     });
 
     afterEach(async () => {

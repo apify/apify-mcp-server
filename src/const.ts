@@ -30,9 +30,7 @@ export enum HelperTools {
 
 export const defaults = {
     actors: [
-        'apify/instagram-scraper',
         'apify/rag-web-browser',
-        'lukaskrivka/google-maps-with-contact-details',
     ],
     helperTools: [
         HelperTools.SEARCH_ACTORS,
@@ -42,8 +40,6 @@ export const defaults = {
         HelperTools.ADD_ACTOR,
         HelperTools.REMOVE_ACTOR,
     ],
-    enableActorAutoLoading: false,
-    maxMemoryMbytes: 4096,
 };
 
 export const APIFY_USERNAME = 'apify';
