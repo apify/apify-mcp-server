@@ -9,8 +9,8 @@ import type { ActorCallOptions } from 'apify-client';
 import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
-import { createActorMCPServer } from './actor/utils.js';
 import { processInput } from './input.js';
+import { ActorsMcpServer } from './mcp/server.js';
 import { callActorGetDataset, getActorsAsTools } from './tools/index.js';
 import type { Input } from './types.js';
 
@@ -30,7 +30,11 @@ const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as In
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
-    const mcpServer = createActorMCPServer(input);
+    const mcpServer = new ActorsMcpServer({
+        enableAddingActors: Boolean(input.enableAddingActors),
+        enableDefaultActors: false,
+    });
+
     const app = createExpressApp(HOST, mcpServer);
     log.info('Actor is running in the STANDBY mode.');
 

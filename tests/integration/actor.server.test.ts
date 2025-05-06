@@ -6,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import log from '@apify/log';
 
 import { createExpressApp } from '../../src/actor/server.js';
-import { createActorMCPServer } from '../../src/actor/utils.js';
 import { defaults, HelperTools } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
@@ -23,11 +22,7 @@ describe('Actors MCP Server SSE', {
     const serverStartWaitTimeMillis = 100;
 
     beforeEach(async () => {
-        // same as in main.ts
-        // TODO: unify
-        server = createActorMCPServer();
         server = new ActorsMcpServer({
-            enableAddingActors: false,
             enableDefaultActors: false,
         });
         log.setLevel(log.LEVELS.OFF);
@@ -222,10 +217,7 @@ describe('Actors MCP Server Streamable HTTP', {
     const testHost = `http://localhost:${testPort}`;
 
     beforeEach(async () => {
-        // same as in main.ts
-        // TODO: unify
         server = new ActorsMcpServer({
-            enableAddingActors: false,
             enableDefaultActors: false,
         });
         log.setLevel(log.LEVELS.OFF);
