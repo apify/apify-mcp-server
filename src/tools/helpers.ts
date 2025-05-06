@@ -124,7 +124,7 @@ export const helpTool: ToolWrap = {
     tool: {
         name: HelperTools.HELP_TOOL,
         description: 'Helper tool to get information on how to use and troubleshoot the Apify MCP server. '
-            + 'This tool returns a message with information about the server and how to use it. '
+            + 'This tool always returns the same help message with information about the server and how to use it. '
             + 'Call this tool in case of any problems or uncertainties with the server. ',
         inputSchema: zodToJsonSchema(HelpToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(HelpToolArgsSchema)),
