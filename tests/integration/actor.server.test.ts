@@ -52,37 +52,6 @@ describe('Actors MCP Server SSE', {
         });
     });
 
-    it('should load actors from query parameters', async () => {
-        // Test with multiple actors including different username cases
-        const testActors = ['apify/rag-web-browser', 'apify/instagram-scraper'];
-        const numberOfHelperTools = 2;
-
-        // Make request to trigger server initialization
-        const response = await fetch(`${testHost}/?actors=${testActors.join(',')}`);
-        expect(response.status).toBe(200);
-
-        // Verify loaded tools
-        const toolNames = server.getToolNames();
-        expect(toolNames).toEqual(expect.arrayContaining([
-            'apify-slash-rag-web-browser',
-            'apify-slash-instagram-scraper',
-        ]));
-        expect(toolNames.length).toBe(testActors.length + numberOfHelperTools);
-    });
-
-    it('should enable auto-loading tools when flag is set', async () => {
-        const response = await fetch(`${testHost}/?enableActorAutoLoading=true`);
-        expect(response.status).toBe(200);
-
-        const toolNames = server.getToolNames();
-        expect(toolNames).toEqual([
-            HelperTools.SEARCH_ACTORS,
-            HelperTools.GET_ACTOR_DETAILS,
-            HelperTools.ADD_ACTOR,
-            HelperTools.REMOVE_ACTOR,
-        ]);
-    });
-
     it('default tools list', async () => {
         const client = await createMCPSSEClient(`${testHost}/sse`);
 

@@ -17,6 +17,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
+import { helpTool } from '../tools/helpers.js';
 import {
     actorDefinitionTool,
     addTool,
@@ -66,7 +67,7 @@ export class ActorsMcpServer {
         this.setupToolHandlers();
 
         // Add default tools
-        this.updateTools([searchTool, actorDefinitionTool]);
+        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
 
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
