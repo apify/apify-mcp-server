@@ -93,9 +93,7 @@ export class ActorsMcpServer {
         }
 
         // Initialize automatically for backward compatibility
-        this.initialize().catch((error) => {
-            log.error('Failed to initialize server:', error);
-        });
+        await this.initialize();
     }
 
     /**
