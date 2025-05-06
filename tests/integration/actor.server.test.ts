@@ -1,7 +1,7 @@
 import type { Server as HttpServer } from 'node:http';
 
 import type { Express } from 'express';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import log from '@apify/log';
 
@@ -19,9 +19,8 @@ describe('Actors MCP Server SSE', {
     let httpServer: HttpServer;
     const testPort = 50000;
     const testHost = `http://localhost:${testPort}`;
-    const serverStartWaitTimeMillis = 100;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
         server = new ActorsMcpServer({
             enableDefaultActors: false,
         });
@@ -32,15 +31,16 @@ describe('Actors MCP Server SSE', {
 
         // Start test server
         await new Promise<void>((resolve) => {
-            httpServer = app.listen(testPort, () => {
-                // Wait for the server to be fully initialized
-                // TODO: figure out why this is needed
-                setTimeout(() => resolve(), serverStartWaitTimeMillis);
-            });
+            httpServer = app.listen(testPort, () => resolve());
         });
     });
 
-    afterEach(async () => {
+    beforeEach(async () => {
+        // Reset the MCP server state before each test
+        await server.reset();
+    });
+
+    afterAll(async () => {
         await server.close();
         await new Promise<void>((resolve) => {
             httpServer.close(() => resolve());
@@ -216,7 +216,7 @@ describe('Actors MCP Server Streamable HTTP', {
     const testPort = 50001;
     const testHost = `http://localhost:${testPort}`;
 
-    beforeEach(async () => {
+    beforeAll(async () => {
         server = new ActorsMcpServer({
             enableDefaultActors: false,
         });
@@ -234,7 +234,12 @@ describe('Actors MCP Server Streamable HTTP', {
         await new Promise<void>((resolve) => { setTimeout(resolve, 1000); });
     });
 
-    afterEach(async () => {
+    beforeEach(async () => {
+        // Reset the MCP server state before each test
+        await server.reset();
+    });
+
+    afterAll(async () => {
         await new Promise<void>((resolve) => {
             httpServer.close(() => resolve());
         });

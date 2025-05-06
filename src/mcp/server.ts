@@ -81,6 +81,24 @@ export class ActorsMcpServer {
     }
 
     /**
+    * Resets the server to the default state.
+    * This method clears all tools and loads the default tools.
+    * Used primarily for testing purposes.
+    */
+    public async reset(): Promise<void> {
+        this.tools.clear();
+        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
+        if (this.options.enableAddingActors) {
+            this.loadToolsToAddActors();
+        }
+
+        // Initialize automatically for backward compatibility
+        this.initialize().catch((error) => {
+            log.error('Failed to initialize server:', error);
+        });
+    }
+
+    /**
      * Initialize the server with default tools if enabled
      */
     public async initialize(): Promise<void> {
