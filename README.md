@@ -217,7 +217,7 @@ If not, follow this guide to install Node.js: [Downloading and installing Node.j
 
 #### Claude Desktop
 
-To configure Claude Desktop to work with the MCP server, follow these steps. For a detailed guide, refer to the [Claude Desktop Users Guide](https://modelcontextprotocol.io/quickstart/user).
+To configure Claude Desktop to work with the MCP server, follow these steps. For a detailed guide, refer to the [Claude Desktop Users Guide](https://modelcontextprotocol.io/quickstart/user) or watch the [video tutorial](https://youtu.be/gf5WXeqydUU?t=440).
 
 1. Download Claude for desktop
    - Available for Windows and macOS.
@@ -500,6 +500,7 @@ If you need other features or have any feedback, [submit an issue](https://conso
 - [Model Context Protocol](https://modelcontextprotocol.org/)
 - [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/)
 - [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
+- [How to use MCP with Apify Actors](https://blog.apify.com/how-to-use-mcp/)
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/)
 - [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)
