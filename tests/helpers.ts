@@ -3,12 +3,14 @@ import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
+export interface MCPClientOptions {
+    actors?: string[];
+    enableAddingActors?: boolean;
+}
+
 export async function createMCPSSEClient(
     serverUrl: string,
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
+    options?: MCPClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
@@ -44,10 +46,7 @@ export async function createMCPSSEClient(
 
 export async function createMCPStreamableClient(
     serverUrl: string,
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
+    options?: MCPClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
@@ -82,10 +81,7 @@ export async function createMCPStreamableClient(
 }
 
 export async function createMCPStdioClient(
-    options?: {
-        actors?: string[];
-        enableAddingActors?: boolean;
-    },
+    options?: MCPClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');

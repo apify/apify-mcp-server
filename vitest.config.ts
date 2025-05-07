@@ -6,7 +6,7 @@ export default defineConfig({
     test: {
         globals: true,
         environment: 'node',
-        include: ['tests/**/*.ts'],
+        include: ['tests/**/*.test.ts'],
         testTimeout: 60_000, // 1 minute
     },
 });
