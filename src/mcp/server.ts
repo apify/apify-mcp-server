@@ -45,7 +45,7 @@ export class ActorsMcpServer {
     public readonly tools: Map<string, ToolWrap>;
     private readonly options: ActorsMcpServerOptions;
 
-    constructor(options: ActorsMcpServerOptions = {}) {
+    constructor(options: ActorsMcpServerOptions = {}, setupSIGINTHandler = true) {
         this.options = {
             enableAddingActors: options.enableAddingActors ?? false,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
@@ -63,7 +63,7 @@ export class ActorsMcpServer {
             },
         );
         this.tools = new Map();
-        this.setupErrorHandling();
+        this.setupErrorHandling(setupSIGINTHandler);
         this.setupToolHandlers();
 
         // Add default tools
@@ -160,14 +160,17 @@ export class ActorsMcpServer {
         return Array.from(this.tools.keys());
     }
 
-    private setupErrorHandling(): void {
+    private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
             console.error('[MCP Error]', error); // eslint-disable-line no-console
         };
-        process.on('SIGINT', async () => {
-            await this.server.close();
-            process.exit(0);
-        });
+        // Allow disable of SIGINT handler to prevent max listeners warning
+        if (setupSIGINTHandler) {
+            process.on('SIGINT', async () => {
+                await this.server.close();
+                process.exit(0);
+            });
+        }
     }
 
     private setupToolHandlers(): void {
