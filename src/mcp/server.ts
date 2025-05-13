@@ -125,6 +125,11 @@ export class ActorsMcpServer {
         this.toolsChangedHandler = undefined;
     }
 
+    /**
+    * Loads missing tools from the tools list.
+    * @param tools
+    * @param apifyToken
+    */
     public async loadToolsFromToolsList(tools: string[], apifyToken: string) {
         const loadedTools = this.getLoadedActorToolsList();
         const actorsToLoad: string[] = [];
