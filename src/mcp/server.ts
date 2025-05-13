@@ -17,6 +17,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
+import { internalToolsMap } from '../toolmap.js';
 import { helpTool } from '../tools/helpers.js';
 import {
     actorDefinitionTool,
@@ -70,7 +71,7 @@ export class ActorsMcpServer {
         this.setupToolHandlers();
 
         // Add default tools
-        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
+        this.updateTools([searchTool, actorDefinitionTool, helpTool], false);
 
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
@@ -124,10 +125,41 @@ export class ActorsMcpServer {
         this.toolsChangedHandler = undefined;
     }
 
-    private notifyToolsChangedHandler() {
-        // If no handler is registered, do nothing
-        if (!this.toolsChangedHandler) return;
+    public async loadToolsFromToolsList(tools: string[], apifyToken: string) {
+        const loadedTools = this.getLoadedActorToolsList();
+        const actorsToLoad: string[] = [];
 
+        for (const tool of tools) {
+            // Skip if the tool is already loaded
+            if (loadedTools.includes(tool)) {
+                continue;
+            }
+
+            // Load internal tool
+            if (internalToolsMap.has(tool)) {
+                const toolWrap = internalToolsMap.get(tool) as ToolWrap;
+                this.tools.set(tool, toolWrap);
+                log.info(`Added internal tool: ${tool}`);
+                // Handler Actor tool
+            } else {
+                actorsToLoad.push(tool);
+            }
+        }
+
+        if (actorsToLoad.length > 0) {
+            const actorTools = await getActorsAsTools(actorsToLoad, apifyToken);
+            if (actorTools.length > 0) {
+                this.updateTools(actorTools);
+            }
+            log.info(`Loaded tools: ${actorTools.map((t) => t.tool.name).join(', ')}`);
+        }
+    }
+
+    /**
+    * Returns the list of loaded Actor tool IDs - for example: apify/actors-mcp-server
+    * @returns {string[]} - The list of loaded Actor tool IDs.
+    */
+    public getLoadedActorToolsList(): string[] {
         // Get the list of tool names
         const tools: string[] = [];
         for (const tool of this.tools.values()) {
@@ -143,6 +175,16 @@ export class ActorsMcpServer {
         }
         // Add unique list Actorized MCP servers original Actor IDs - for example: apify/actors-mcp-server
         tools.push(...this.getToolMCPServerActors());
+
+        return tools;
+    }
+
+    private notifyToolsChangedHandler() {
+        // If no handler is registered, do nothing
+        if (!this.toolsChangedHandler) return;
+
+        // Get the list of tool names
+        const tools: string[] = this.getLoadedActorToolsList();
 
         this.toolsChangedHandler(tools);
     }
@@ -199,7 +241,7 @@ export class ActorsMcpServer {
         const tools = await processParamsGetTools(url, apifyToken);
         if (tools.length > 0) {
             log.info('Loading tools from query parameters...');
-            this.updateTools(tools);
+            this.updateTools(tools, false);
         }
     }
 
@@ -207,7 +249,7 @@ export class ActorsMcpServer {
      * Add Actors to server dynamically
      */
     public loadToolsToAddActors() {
-        this.updateTools([addTool, removeTool]);
+        this.updateTools([addTool, removeTool], false);
     }
 
     /**
@@ -215,12 +257,12 @@ export class ActorsMcpServer {
      * @param tools - Array of tool wrappers.
      * @returns Array of tool wrappers.
      */
-    public updateTools(tools: ToolWrap[]) {
+    public updateTools(tools: ToolWrap[], notifyToolsChangedHandler = true) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
             log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
-        this.notifyToolsChangedHandler();
+        if (notifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
     }
 

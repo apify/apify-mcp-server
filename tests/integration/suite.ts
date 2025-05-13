@@ -4,7 +4,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { defaults, HelperTools } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import { type MCPClientOptions } from '../helpers.js';
+import { addActor, expectArrayWeakEquals, type MCPClientOptions } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
@@ -207,7 +207,62 @@ export function createIntegrationTestsSuite(
         // STDIO is skipped because we are running compiled version through node and there is not way (easy)
         // to get the MCP server instance
         if (getActorsMCPServer) {
-            it('should notify tools changed handler when tools are added or removed', async () => {
+            it('INTERNAL load tool state from tool name list if tool list empty', async () => {
+                const client = await createClientFn({
+                    enableAddingActors: true,
+                });
+                const actorsMCPServer = getActorsMCPServer();
+
+                // Add a new Actor
+                const actor = 'apify/python-example';
+                await addActor(client, actor);
+
+                // Store the tool name list
+                const toolList = actorsMCPServer.getLoadedActorToolsList();
+                expectArrayWeakEquals(toolList, [...defaults.helperTools, ...defaults.actorAddingTools, ...defaults.actors, actor]);
+
+                // Remove all tools
+                actorsMCPServer.tools.clear();
+                expect(actorsMCPServer.getLoadedActorToolsList()).toEqual([]);
+
+                // Load the tool state from the tool name list
+                await actorsMCPServer.loadToolsFromToolsList(toolList, process.env.APIFY_TOKEN as string);
+
+                // Check if the tool name list is restored
+                expectArrayWeakEquals(actorsMCPServer.getLoadedActorToolsList(),
+                    [...defaults.helperTools, ...defaults.actorAddingTools, ...defaults.actors, actor]);
+
+                await client.close();
+            });
+            it('INTERNAL load tool state from tool name list if tool list default', async () => {
+                const client = await createClientFn({
+                    enableAddingActors: true,
+                });
+                const actorsMCPServer = getActorsMCPServer();
+
+                // Add a new Actor
+                const actor = 'apify/python-example';
+                await addActor(client, actor);
+
+                // Store the tool name list
+                const toolList = actorsMCPServer.getLoadedActorToolsList();
+                expectArrayWeakEquals(toolList, [...defaults.helperTools, ...defaults.actorAddingTools, ...defaults.actors, actor]);
+
+                // Remove all tools
+                await actorsMCPServer.reset();
+                actorsMCPServer.loadToolsToAddActors();
+                expectArrayWeakEquals(actorsMCPServer.getLoadedActorToolsList(), [...defaults.helperTools, ...defaults.actorAddingTools]);
+
+                // Load the tool state from the tool name list
+                await actorsMCPServer.loadToolsFromToolsList(toolList, process.env.APIFY_TOKEN as string);
+
+                // Check if the tool name list is restored
+                expectArrayWeakEquals(actorsMCPServer.getLoadedActorToolsList(),
+                    [...defaults.helperTools, ...defaults.actorAddingTools, ...defaults.actors, actor]);
+
+                await client.close();
+            });
+            it('INTERNAL should notify tools changed handler when tools are added or removed', async () => {
                 const client = await createClientFn({
                     enableAddingActors: true,
                 });
@@ -270,7 +325,7 @@ export function createIntegrationTestsSuite(
 
                 await client.close();
             });
-            it('should not notify tools changed handler after unregister', async () => {
+            it('INTERNAL should not notify tools changed handler after unregister', async () => {
                 const client = await createClientFn({
                     enableAddingActors: true,
                 });
