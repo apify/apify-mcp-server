@@ -41,18 +41,9 @@ export async function getActorDefinition(
             return null;
         }
 
-        // fnesveda: The default build is not necessarily tagged, you can specify any build number as default build.
-        // There will be a new API endpoint to fetch a default build.
-        // For now, we'll use the tagged build, it will work for 90% of Actors. Later, we can update this.
-        const tag = actor.defaultRunOptions?.build || '';
-        const buildId = actor.taggedBuilds?.[tag]?.buildId || '';
+        const defaultBuildClient = await actorClient.defaultBuild();
+        const buildDetails = await defaultBuildClient.get();
 
-        if (!buildId) {
-            log.error(`Failed to fetch input schema for Actor: ${actorIdOrName}. Build ID not found.`);
-            return null;
-        }
-        // Fetch build details and return the input schema
-        const buildDetails = await client.build(buildId).get();
         if (buildDetails?.actorDefinition) {
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             actorDefinitions.id = actor.id;
