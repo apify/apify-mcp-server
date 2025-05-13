@@ -18,6 +18,8 @@ const mcpUrl = `${httpServerHost}/mcp`;
 
 createIntegrationTestsSuite({
     suiteName: 'Actors MCP Server Streamable HTTP',
+    concurrent: false,
+    getActorsMCPServer: () => mcpServer,
     createClientFn: async (options) => await createMCPStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         mcpServer = new ActorsMcpServer({

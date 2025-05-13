@@ -18,6 +18,8 @@ const mcpUrl = `${httpServerHost}/sse`;
 
 createIntegrationTestsSuite({
     suiteName: 'Actors MCP Server SSE',
+    concurrent: false,
+    getActorsMCPServer: () => mcpServer,
     createClientFn: async (options) => await createMCPSSEClient(mcpUrl, options),
     beforeAllFn: async () => {
         mcpServer = new ActorsMcpServer({

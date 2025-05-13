@@ -107,7 +107,7 @@ export interface HelperTool extends ToolBase {
 export interface ActorMCPTool extends ToolBase {
     // Origin MCP server tool name, is needed for the tool call
     originToolName: string;
-    // ID of the Actorized MCP server
+    // ID of the Actorized MCP server - for example apify/actors-mcp-server
     actorID: string;
     /**
      * ID of the Actorized MCP server the tool is associated with.

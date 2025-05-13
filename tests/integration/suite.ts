@@ -2,11 +2,14 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
+import type { ActorsMcpServer } from '../../src/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { MCPClientOptions } from '../helpers';
+import { type MCPClientOptions } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
+    getActorsMCPServer?: () => ActorsMcpServer;
+    concurrent?: boolean;
     createClientFn: (options?: MCPClientOptions) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
@@ -19,6 +22,8 @@ export function createIntegrationTestsSuite(
 ) {
     const {
         suiteName,
+        getActorsMCPServer,
+        concurrent,
         createClientFn,
         beforeAllFn,
         afterAllFn,
@@ -40,7 +45,9 @@ export function createIntegrationTestsSuite(
         afterEach(afterEachFn);
     }
 
-    describe(suiteName, () => {
+    describe(suiteName, {
+        concurrent: concurrent ?? true,
+    }, () => {
         it('list default tools', async () => {
             const client = await createClientFn();
             const tools = await client.listTools();
@@ -195,5 +202,127 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+
+        // Execute only when we can get the MCP server instance - currently skips only STDIO
+        // STDIO is skipped because we are running compiled version through node and there is not way (easy)
+        // to get the MCP server instance
+        if (getActorsMCPServer) {
+            it('should notify tools changed handler when tools are added or removed', async () => {
+                const client = await createClientFn({
+                    enableAddingActors: true,
+                });
+
+                const toolsChangedNotifications: string[][] = [];
+
+                const onToolsChanged = (tools: string[]) => {
+                    toolsChangedNotifications.push(tools);
+                };
+
+                const actorsMCPServer = getActorsMCPServer();
+                actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
+
+                // Add a new Actor
+                const actor = 'apify/python-example';
+                await client.callTool({
+                    name: HelperTools.ADD_ACTOR,
+                    arguments: {
+                        actorName: actor,
+                    },
+                });
+
+                // Check if the notification was received
+                expect(toolsChangedNotifications.length).toBe(1);
+                expect(toolsChangedNotifications[0].length).toBe(defaults.helperTools.length
+                    + defaults.actorAddingTools.length + defaults.actors.length + 1);
+                expect(toolsChangedNotifications[0]).toContain(actor);
+                for (const tool of defaults.helperTools) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+                for (const tool of defaults.actorAddingTools) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+                for (const tool of defaults.actors) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+
+                // Remove the Actor
+                await client.callTool({
+                    name: HelperTools.REMOVE_ACTOR,
+                    arguments: {
+                        toolName: actorNameToToolName(actor),
+                    },
+                });
+
+                // Check if the notification was received
+                expect(toolsChangedNotifications.length).toBe(2);
+                expect(toolsChangedNotifications[1].length).toBe(defaults.helperTools.length
+                    + defaults.actorAddingTools.length + defaults.actors.length);
+                expect(toolsChangedNotifications[1]).not.toContain(actor);
+                for (const tool of defaults.helperTools) {
+                    expect(toolsChangedNotifications[1]).toContain(tool);
+                }
+                for (const tool of defaults.actorAddingTools) {
+                    expect(toolsChangedNotifications[1]).toContain(tool);
+                }
+                for (const tool of defaults.actors) {
+                    expect(toolsChangedNotifications[1]).toContain(tool);
+                }
+
+                await client.close();
+            });
+            it('should not notify tools changed handler after unregister', async () => {
+                const client = await createClientFn({
+                    enableAddingActors: true,
+                });
+
+                const toolsChangedNotifications: string[][] = [];
+
+                const onToolsChanged = (tools: string[]) => {
+                    toolsChangedNotifications.push(tools);
+                };
+
+                const actorsMCPServer = getActorsMCPServer();
+                actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
+
+                // Add a new Actor
+                const actor = 'apify/python-example';
+                await client.callTool({
+                    name: HelperTools.ADD_ACTOR,
+                    arguments: {
+                        actorName: actor,
+                    },
+                });
+
+                // Check if the notification was received
+                expect(toolsChangedNotifications.length).toBe(1);
+                expect(toolsChangedNotifications[0].length).toBe(defaults.helperTools.length
+                    + defaults.actorAddingTools.length + defaults.actors.length + 1);
+                expect(toolsChangedNotifications[0]).toContain(actor);
+                for (const tool of defaults.helperTools) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+                for (const tool of defaults.actorAddingTools) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+                for (const tool of defaults.actors) {
+                    expect(toolsChangedNotifications[0]).toContain(tool);
+                }
+
+                actorsMCPServer.unregisterToolsChangedHandler();
+
+                // Remove the Actor
+                await client.callTool({
+                    name: HelperTools.REMOVE_ACTOR,
+                    arguments: {
+                        toolName: actorNameToToolName(actor),
+                    },
+                });
+
+                // Check if the notification was NOT received
+                expect(toolsChangedNotifications.length).toBe(1);
+
+                await client.close();
+            });
+        }
     });
 }

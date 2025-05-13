@@ -37,6 +37,8 @@ type ActorsMcpServerOptions = {
     enableDefaultActors?: boolean;
 };
 
+type ToolsChangedHandler = (toolNames: string[]) => void;
+
 /**
  * Create Apify MCP server
  */
@@ -44,6 +46,7 @@ export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolWrap>;
     private readonly options: ActorsMcpServerOptions;
+    private toolsChangedHandler: ToolsChangedHandler | undefined;
 
     constructor(options: ActorsMcpServerOptions = {}, setupSIGINTHandler = true) {
         this.options = {
@@ -81,12 +84,80 @@ export class ActorsMcpServer {
     }
 
     /**
+    * Returns list of added Actor MCP servers.
+    * @returns {string[]} - An array of Actor MCP server Actor IDs.
+    */
+    public getToolMCPServerActors(): string[] {
+        const mcpServerActors: Set<string> = new Set();
+        for (const tool of this.tools.values()) {
+            if (tool.type === 'actor-mcp') {
+                mcpServerActors.add((tool.tool as ActorMCPTool).actorID);
+            }
+        }
+
+        return Array.from(mcpServerActors);
+    }
+
+    /**
+    * Register handler to get notified when tools change.
+    * The handler receives Actor IDs of the tools that server has after the change.
+    * This is primarily used to store the tools in the shared state (Redis) so
+    * we can recover them when the server loses local state.
+    * @throws {Error} - If the handler is already registered.
+    * @param handler - The handler function to be called when tools change.
+    */
+    public registerToolsChangedHandler(handler: (toolNames: string[]) => void) {
+        if (this.toolsChangedHandler) {
+            throw new Error('Tools changed handler is already registered.');
+        }
+        this.toolsChangedHandler = handler;
+    }
+
+    /**
+    * Unregister the handler for tools changed event.
+    * @throws {Error} - If the handler is not registered.
+    */
+    public unregisterToolsChangedHandler() {
+        if (!this.toolsChangedHandler) {
+            throw new Error('Tools changed handler is not registered.');
+        }
+        this.toolsChangedHandler = undefined;
+    }
+
+    private notifyToolsChangedHandler() {
+        // If no handler is registered, do nothing
+        if (!this.toolsChangedHandler) return;
+
+        // Get the list of tool names
+        const tools: string[] = [];
+        for (const tool of this.tools.values()) {
+            if (tool.type === 'actor') {
+                tools.push((tool.tool as ActorTool).actorFullName);
+            // Skip Actorized MCP servers since there may be multiple tools from the same Actor MCP server
+            // so we skip and then get unique list of Actor MCP servers separately
+            } else if (tool.type === 'actor-mcp') {
+                continue;
+            } else {
+                tools.push(tool.tool.name);
+            }
+        }
+        // Add unique list Actorized MCP servers original Actor IDs - for example: apify/actors-mcp-server
+        tools.push(...this.getToolMCPServerActors());
+
+        this.toolsChangedHandler(tools);
+    }
+
+    /**
     * Resets the server to the default state.
     * This method clears all tools and loads the default tools.
     * Used primarily for testing purposes.
     */
     public async reset(): Promise<void> {
         this.tools.clear();
+        // Unregister the tools changed handler
+        if (this.toolsChangedHandler) {
+            this.unregisterToolsChangedHandler();
+        }
         this.updateTools([searchTool, actorDefinitionTool, helpTool]);
         if (this.options.enableAddingActors) {
             this.loadToolsToAddActors();
@@ -149,7 +220,32 @@ export class ActorsMcpServer {
             this.tools.set(wrap.tool.name, wrap);
             log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
+        this.notifyToolsChangedHandler();
         return tools;
+    }
+
+    /**
+    * Delete tools by name.
+    * @param toolNames - Array of tool names to delete.
+    * @returns Array of tool names that were deleted.
+    */
+    public deleteTools(toolNames: string[]): string[] {
+        const notFoundTools: string[] = [];
+        // Delete the tools
+        for (const toolName of toolNames) {
+            if (this.tools.has(toolName)) {
+                this.tools.delete(toolName);
+                log.info(`Deleted tool: ${toolName}`);
+            } else {
+                notFoundTools.push(toolName);
+            }
+        }
+
+        if (toolNames.length > notFoundTools.length) {
+            this.notifyToolsChangedHandler();
+        }
+        // Return the list of tools that were removed
+        return toolNames.filter((toolName) => !notFoundTools.includes(toolName));
     }
 
     /**
