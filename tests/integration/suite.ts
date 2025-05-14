@@ -203,6 +203,27 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should search for Actor successfully', async () => {
+            const query = 'python-example';
+            const actorName = 'apify/python-example';
+            const client = await createClientFn({
+                enableAddingActors: false,
+            });
+
+            // Remove the actor
+            const result = await client.callTool({
+                name: HelperTools.SEARCH_ACTORS,
+                arguments: {
+                    search: query,
+                    limit: 5,
+                },
+            });
+            const content = result.content as {text: string}[];
+            expect(content.some((item) => item.text.includes(actorName))).toBe(true);
+
+            await client.close();
+        });
+
         // Execute only when we can get the MCP server instance - currently skips only STDIO
         // STDIO is skipped because we are running compiled version through node and there is not way (easy)
         // to get the MCP server instance
