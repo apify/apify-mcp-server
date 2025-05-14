@@ -261,15 +261,15 @@ export class ActorsMcpServer {
     /**
      * Upsert new tools.
      * @param tools - Array of tool wrappers to add or update
-     * @param notifyToolsChangedHandler - Whether to notify the tools changed handler
+     * @param shouldNotifyToolsChangedHandler - Whether to notify the tools changed handler
      * @returns Array of added/updated tool wrappers
      */
-    public updateTools(tools: ToolWrap[], notifyToolsChangedHandler = false) {
+    public updateTools(tools: ToolWrap[], shouldNotifyToolsChangedHandler = false) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
             log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
-        if (notifyToolsChangedHandler) this.notifyToolsChangedHandler();
+        if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
     }
 
