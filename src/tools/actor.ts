@@ -76,6 +76,7 @@ export async function callActorGetDataset(
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {string[]} actors - An array of actor IDs or Actor full names.
+ * @param {string} apifyToken - The Apify token to use for authentication.
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
@@ -84,8 +85,7 @@ export async function getNormalActorsAsTools(
 ): Promise<ToolWrap[]> {
     const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     const getActorDefinitionWithToken = async (actorId: string) => {
-        const actor = await getActorDefinition(actorId, apifyToken);
-        return actor;
+        return await getActorDefinition(actorId, apifyToken);
     };
     const results = await Promise.all(actors.map(getActorDefinitionWithToken));
     const tools: ToolWrap[] = [];
