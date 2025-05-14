@@ -17,14 +17,12 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { helpTool } from '../tools/helpers.js';
 import {
-    actorDefinitionTool,
     addTool,
     callActorGetDataset,
+    defaultTools,
     getActorsAsTools,
     removeTool,
-    searchTool,
 } from '../tools/index.js';
 import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMCPTool, ActorTool, HelperTool, ToolWrap } from '../types.js';
@@ -67,7 +65,7 @@ export class ActorsMcpServer {
         this.setupToolHandlers();
 
         // Add default tools
-        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
+        this.updateTools(defaultTools);
 
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
@@ -87,7 +85,7 @@ export class ActorsMcpServer {
     */
     public async reset(): Promise<void> {
         this.tools.clear();
-        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
+        this.updateTools(defaultTools);
         if (this.options.enableAddingActors) {
             this.loadToolsToAddActors();
         }

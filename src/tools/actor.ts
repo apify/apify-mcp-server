@@ -1,15 +1,17 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
 import type { ActorCallOptions } from 'apify-client';
+import { z } from 'zod';
+import zodToJsonSchema from 'zod-to-json-schema';
 
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES } from '../const.js';
+import { ACTOR_ADDITIONAL_INSTRUCTIONS, ACTOR_MAX_MEMORY_MBYTES, HelperTools } from '../const.js';
 import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
 import { createMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
-import type { ToolWrap } from '../types.js';
+import type { InternalTool, ToolWrap } from '../types.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
@@ -20,6 +22,7 @@ import {
     shortenProperties,
 } from './utils.js';
 
+const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 /**
  * Calls an Apify actor and retrieves the dataset items.
  *
@@ -83,7 +86,6 @@ export async function getNormalActorsAsTools(
     actors: string[],
     apifyToken: string,
 ): Promise<ToolWrap[]> {
-    const ajv = new Ajv({ coerceTypes: 'array', strict: false });
     const getActorDefinitionWithToken = async (actorId: string) => {
         return await getActorDefinition(actorId, apifyToken);
     };
@@ -168,3 +170,30 @@ export async function getActorsAsTools(
 
     return [...normalTools, ...mcpServerTools];
 }
+
+const GetActorArgs = z.object({
+    actorId: z.string().describe('Actor ID or a tilde-separated owner\'s username and Actor name.'),
+});
+
+export const getActor: ToolWrap = {
+    type: 'internal',
+    tool: {
+        name: HelperTools.GET_ACTOR,
+        actorFullName: HelperTools.GET_ACTOR,
+        description: 'Gets an object that contains all the details about a specific Actor.'
+            + 'Actor basic information (ID, name, owner, description)'
+            + 'Statistics (number of runs, users, etc.)'
+            + 'Available versions, and configuration details'
+            + 'Use Actor ID or Actor full name, separated by tilde username~name.',
+        inputSchema: zodToJsonSchema(GetActorArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(GetActorArgs)),
+        call: async (toolArgs) => {
+            const { args, apifyToken } = toolArgs;
+            const parsed = GetActorArgs.parse(args);
+            const client = new ApifyClient({ token: apifyToken });
+            // Get Actor - contains a lot of irrelevant information
+            const actor = await client.actor(parsed.actorId).get();
+            return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
+        },
+    } as InternalTool,
+};

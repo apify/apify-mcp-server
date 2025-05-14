@@ -11,6 +11,8 @@ export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it w
 export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user. '
     + 'Always limit the number of results in the call arguments.';
 
+// TODO - describe the flow, that each actor will produce a dataset id and key value store
+
 // Actor run const
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
 
@@ -27,6 +29,8 @@ export enum HelperTools {
     REMOVE_ACTOR = 'remove-actor',
     GET_ACTOR_DETAILS = 'get-actor-details',
     HELP_TOOL = 'help-tool',
+    GET_ACTOR = 'get-actor',
+    GET_ACTOR_RUN_LIST = 'get-actor-run-list',
 }
 
 export const defaults = {

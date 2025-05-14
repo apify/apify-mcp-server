@@ -67,7 +67,7 @@ export const SearchToolArgsSchema = z.object({
         .default('')
         .describe('Filters the results by the specified category.'),
 });
-export const searchActorTool: ToolWrap = {
+export const searchActors: ToolWrap = {
     type: 'internal',
     tool: {
         name: HelperTools.SEARCH_ACTORS,
