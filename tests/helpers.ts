@@ -113,6 +113,11 @@ export async function createMCPStdioClient(
     return client;
 }
 
+/**
+ * Adds an Actor as a tool using the ADD_ACTOR helper tool.
+ * @param client - MCP client instance
+ * @param actorName - Name of the Actor to add
+ */
 export async function addActor(client: Client, actorName: string): Promise<void> {
     await client.callTool({
         name: HelperTools.ADD_ACTOR,
@@ -122,6 +127,11 @@ export async function addActor(client: Client, actorName: string): Promise<void>
     });
 }
 
+/**
+ * Asserts that two arrays contain the same elements, regardless of order.
+ * @param array - The array to test
+ * @param values - The expected values
+ */
 export function expectArrayWeakEquals(array: unknown[], values: unknown[]): void {
     expect(array.length).toBe(values.length);
     for (const value of values) {

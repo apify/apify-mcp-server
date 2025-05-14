@@ -71,7 +71,7 @@ export class ActorsMcpServer {
         this.setupToolHandlers();
 
         // Add default tools
-        this.updateTools([searchTool, actorDefinitionTool, helpTool], false);
+        this.updateTools([searchTool, actorDefinitionTool, helpTool]);
 
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
@@ -85,8 +85,8 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Returns list of added Actor MCP servers.
-    * @returns {string[]} - An array of Actor MCP server Actor IDs.
+    * Returns a list of Actor IDs that are registered as MCP servers.
+    * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
     */
     public getToolMCPServerActors(): string[] {
         const mcpServerActors: Set<string> = new Set();
@@ -101,10 +101,10 @@ export class ActorsMcpServer {
 
     /**
     * Register handler to get notified when tools change.
-    * The handler receives Actor IDs of the tools that server has after the change.
-    * This is primarily used to store the tools in the shared state (Redis) so
-    * we can recover them when the server loses local state.
-    * @throws {Error} - If the handler is already registered.
+    * The handler receives an array of tool names that the server has after the change.
+    * This is primarily used to store the tools in shared state (e.g., Redis) for recovery
+    * when the server loses local state.
+    * @throws {Error} - If a handler is already registered.
     * @param handler - The handler function to be called when tools change.
     */
     public registerToolsChangedHandler(handler: (toolNames: string[]) => void) {
@@ -116,7 +116,7 @@ export class ActorsMcpServer {
 
     /**
     * Unregister the handler for tools changed event.
-    * @throws {Error} - If the handler is not registered.
+    * @throws {Error} - If no handler is currently registered.
     */
     public unregisterToolsChangedHandler() {
         if (!this.toolsChangedHandler) {
@@ -126,9 +126,10 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Loads missing tools from the tools list.
-    * @param tools
-    * @param apifyToken
+    * Loads missing tools from a provided list of tool names.
+    * Skips tools that are already loaded and loads only the missing ones.
+    * @param tools - Array of tool names to ensure are loaded
+    * @param apifyToken - Apify API token for authentication
     */
     public async loadToolsFromToolsList(tools: string[], apifyToken: string) {
         const loadedTools = this.getLoadedActorToolsList();
@@ -161,8 +162,8 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Returns the list of loaded Actor tool IDs - for example: apify/actors-mcp-server
-    * @returns {string[]} - The list of loaded Actor tool IDs.
+    * Returns the list of all currently loaded Actor tool IDs.
+    * @returns {string[]} - Array of loaded Actor tool IDs (e.g., 'apify/rag-web-browser')
     */
     public getLoadedActorToolsList(): string[] {
         // Get the list of tool names
@@ -259,10 +260,11 @@ export class ActorsMcpServer {
 
     /**
      * Upsert new tools.
-     * @param tools - Array of tool wrappers.
-     * @returns Array of tool wrappers.
+     * @param tools - Array of tool wrappers to add or update
+     * @param notifyToolsChangedHandler - Whether to notify the tools changed handler
+     * @returns Array of added/updated tool wrappers
      */
-    public updateTools(tools: ToolWrap[], notifyToolsChangedHandler = true) {
+    public updateTools(tools: ToolWrap[], notifyToolsChangedHandler = false) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
             log.info(`Added/updated tool: ${wrap.tool.name}`);
@@ -273,8 +275,9 @@ export class ActorsMcpServer {
 
     /**
     * Delete tools by name.
-    * @param toolNames - Array of tool names to delete.
-    * @returns Array of tool names that were deleted.
+    * Notifies the tools changed handler if any tools were deleted.
+    * @param toolNames - Array of tool names to delete
+    * @returns Array of tool names that were successfully deleted
     */
     public deleteTools(toolNames: string[]): string[] {
         const notFoundTools: string[] = [];

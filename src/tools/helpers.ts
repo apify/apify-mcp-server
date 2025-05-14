@@ -80,7 +80,7 @@ export const addTool: ToolWrap = {
             const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
             const parsed = AddToolArgsSchema.parse(args);
             const tools = await getActorsAsTools([parsed.actorName], apifyToken);
-            const toolsAdded = apifyMcpServer.updateTools(tools);
+            const toolsAdded = apifyMcpServer.updateTools(tools, true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
 
             return {

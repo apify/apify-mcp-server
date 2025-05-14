@@ -5,6 +5,10 @@ import { actorDefinitionTool, addTool, removeTool } from './tools/index.js';
 import { searchActorTool } from './tools/store_collection.js';
 import type { ToolWrap } from './types.js';
 
+/**
+ * Map of internal tools indexed by their name.
+ * Created to prevent circular import dependencies between modules.
+ */
 export const internalToolsMap: Map<string, ToolWrap> = new Map([
     [HelperTools.SEARCH_ACTORS.toString(), searchActorTool],
     [HelperTools.ADD_ACTOR.toString(), addTool],
