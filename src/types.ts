@@ -184,3 +184,8 @@ export type Input = {
     debugActor?: string;
     debugActorInput?: unknown;
 };
+
+export interface ToolCacheEntry {
+    expiresAt: number;
+    tool: ToolWrap;
+}

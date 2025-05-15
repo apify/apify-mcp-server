@@ -1,6 +1,6 @@
 import type { ActorDefinition } from 'apify-client';
 
-import { ApifyClient, getApifyAPIBaseUrl } from '../apify-client.js';
+import { ApifyClient } from '../apify-client.js';
 
 export async function isActorMCPServer(actorID: string, apifyToken: string): Promise<boolean> {
     const mcpPath = await getActorsMCPServerPath(actorID, apifyToken);
@@ -56,26 +56,12 @@ export async function getActorStandbyURL(actorID: string, apifyToken: string, st
     return `https://${actorRealID}.${standbyBaseUrl}`;
 }
 
+// TODO: optimize this to only use /builds/default endpoint with Actor name replacing / with ~
 export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
     const apifyClient = new ApifyClient({ token: apifyToken });
     const actor = apifyClient.actor(actorID);
-    const info = await actor.get();
-    if (!info) {
-        throw new Error(`Actor ${actorID} not found`);
-    }
-
-    const actorObjID = info.id;
-    const res = await fetch(`${getApifyAPIBaseUrl()}/v2/acts/${actorObjID}/builds/default`, {
-        headers: {
-            // This is done so tests can pass with public Actors without token
-            ...(apifyToken ? { Authorization: `Bearer ${apifyToken}` } : {}),
-        },
-    });
-    if (!res.ok) {
-        throw new Error(`Failed to fetch default build for actor ${actorID}: ${res.statusText}`);
-    }
-    const json = await res.json() as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-    const buildInfo = json.data;
+    const defaultBuildClient = await actor.defaultBuild();
+    const buildInfo = await defaultBuildClient.get();
     if (!buildInfo) {
         throw new Error(`Default build for Actor ${actorID} not found`);
     }

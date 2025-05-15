@@ -45,3 +45,6 @@ export const defaults = {
 };
 
 export const APIFY_USERNAME = 'apify';
+
+export const TOOL_CACHE_MAX_SIZE = 500;
+export const TOOL_CACHE_TTL_SECS = 30 * 60;
