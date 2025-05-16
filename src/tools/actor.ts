@@ -89,15 +89,15 @@ export async function getNormalActorsAsTools(
     apifyToken: string,
 ): Promise<ToolWrap[]> {
     const tools: ToolWrap[] = [];
-    const actorsLoadedFromCache: string[] = [];
+    const actorsToLoad: string[] = [];
     for (const actorID of actors) {
         const cacheEntry = normalActorToolsCache.get(actorID);
         if (cacheEntry && cacheEntry.expiresAt > Date.now()) {
             tools.push(cacheEntry.tool);
-            actorsLoadedFromCache.push(actorID);
+        } else {
+            actorsToLoad.push(actorID);
         }
     }
-    const actorsToLoad = actors.filter((actorID) => !actorsLoadedFromCache.includes(actorID));
     if (actorsToLoad.length === 0) {
         return tools;
     }
