@@ -167,6 +167,27 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should search for Actor successfully', async () => {
+            const query = 'python-example';
+            const actorName = 'apify/python-example';
+            const client = await createClientFn({
+                enableAddingActors: false,
+            });
+
+            // Remove the actor
+            const result = await client.callTool({
+                name: HelperTools.SEARCH_ACTORS,
+                arguments: {
+                    search: query,
+                    limit: 5,
+                },
+            });
+            const content = result.content as {text: string}[];
+            expect(content.some((item) => item.text.includes(actorName))).toBe(true);
+
+            await client.close();
+        });
+
         it('should remove Actor from tools list', async () => {
             const actor = 'apify/python-example';
             const selectedToolName = actorNameToToolName(actor);

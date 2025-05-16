@@ -21,6 +21,12 @@ import {
     shortenProperties,
 } from './utils.js';
 
+
+// Cache for normal Actor tools
+const normalActorToolsCache = new LruCache<ToolCacheEntry>({
+    maxLength: TOOL_CACHE_MAX_SIZE,
+});
+
 /**
  * Calls an Apify actor and retrieves the dataset items.
  *
@@ -59,10 +65,6 @@ export async function callActorGetDataset(
     }
 }
 
-// Cache for normal Actor tools
-const normalActorToolsCache = new LruCache<ToolCacheEntry>({
-    maxLength: TOOL_CACHE_MAX_SIZE,
-});
 /**
  * This function is used to fetch normal non-MCP server Actors as a tool.
  *
@@ -111,7 +113,11 @@ export async function getNormalActorsAsTools(
     // Zip the results with their corresponding actorIDs
     for (let i = 0; i < results.length; i++) {
         const result = results[i];
-        const actorID = actorsToLoad[i];
+        // We need to get the orignal input from the user
+        // sonce the user can input real Actor ID like '3ox4R101TgZz67sLr' instead of
+        // 'username/actorName' even though we encourage that.
+        // And the getActorDefinition does not return the original input it received, just the actorFullName or actorID
+        const actorIDOrName = actorsToLoad[i];
 
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
@@ -135,7 +141,7 @@ export async function getNormalActorsAsTools(
                     },
                 };
                 tools.push(tool);
-                normalActorToolsCache.add(actorID, {
+                normalActorToolsCache.add(actorIDOrName, {
                     tool,
                     expiresAt: Date.now() + TOOL_CACHE_TTL_SECS * 1000,
                 });

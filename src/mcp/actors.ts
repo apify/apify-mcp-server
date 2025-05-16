@@ -56,7 +56,6 @@ export async function getActorStandbyURL(actorID: string, apifyToken: string, st
     return `https://${actorRealID}.${standbyBaseUrl}`;
 }
 
-// TODO: optimize this to only use /builds/default endpoint with Actor name replacing / with ~
 export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
     const apifyClient = new ApifyClient({ token: apifyToken });
     const actor = apifyClient.actor(actorID);
