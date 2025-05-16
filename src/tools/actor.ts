@@ -21,7 +21,6 @@ import {
     shortenProperties,
 } from './utils.js';
 
-
 // Cache for normal Actor tools
 const normalActorToolsCache = new LruCache<ToolCacheEntry>({
     maxLength: TOOL_CACHE_MAX_SIZE,
