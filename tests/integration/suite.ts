@@ -2,6 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
+import { defaultTools } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { MCPClientOptions } from '../helpers';
 
@@ -12,6 +13,38 @@ interface IntegrationTestsSuiteOptions {
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
     afterEachFn?: () => Promise<void>;
+}
+
+function expectToolNamesToContain(names: string[], actors: string[] = []) {
+    expect(names.length).toEqual(defaultTools.length + actors.length);
+    for (const tool of defaultTools) {
+        expect(names).toContain(tool.tool.name);
+    }
+    for (const actor of actors) {
+        expect(names).toContain(actorNameToToolName(actor));
+    }
+}
+
+async function callPythonExampleActor(client: Client, selectedToolName: string) {
+    const result = await client.callTool({
+        name: selectedToolName,
+        arguments: {
+            first_number: 1,
+            second_number: 2,
+        },
+    });
+
+    type ContentItem = { text: string; type: string };
+    const content = result.content as ContentItem[];
+    // The result is { content: [ ... ] }, and the last content is the sum
+    expect(content[content.length - 1]).toEqual({
+        text: JSON.stringify({
+            first_number: 1,
+            second_number: 2,
+            sum: 3,
+        }),
+        type: 'text',
+    });
 }
 
 export function createIntegrationTestsSuite(
@@ -46,49 +79,25 @@ export function createIntegrationTestsSuite(
             const tools = await client.listTools();
             const names = tools.tools.map((tool) => tool.name);
 
-            expect(names.length).toEqual(defaults.actors.length + defaults.helperTools.length);
-            for (const tool of defaults.helperTools) {
-                expect(names).toContain(tool);
-            }
-            for (const actor of defaults.actors) {
-                expect(names).toContain(actorNameToToolName(actor));
-            }
+            expectToolNamesToContain(names, defaults.actors);
+
             await client.close();
         });
 
         it('use only apify/python-example Actor and call it', async () => {
-            const actorName = 'apify/python-example';
-            const selectedToolName = actorNameToToolName(actorName);
+            const actors = ['apify/python-example'];
             const client = await createClientFn({
-                actors: [actorName],
+                actors,
                 enableAddingActors: false,
             });
             const tools = await client.listTools();
             const names = tools.tools.map((tool) => tool.name);
-            expect(names.length).toEqual(defaults.helperTools.length + 1);
-            for (const tool of defaults.helperTools) {
-                expect(names).toContain(tool);
-            }
+            expectToolNamesToContain(names, actors);
+
+            const selectedToolName = actorNameToToolName(actors[0]);
             expect(names).toContain(selectedToolName);
 
-            const result = await client.callTool({
-                name: selectedToolName,
-                arguments: {
-                    first_number: 1,
-                    second_number: 2,
-                },
-            });
-
-            expect(result).toEqual({
-                content: [{
-                    text: JSON.stringify({
-                        first_number: 1,
-                        second_number: 2,
-                        sum: 3,
-                    }),
-                    type: 'text',
-                }],
-            });
+            await callPythonExampleActor(client, selectedToolName);
 
             await client.close();
         });
@@ -101,13 +110,7 @@ export function createIntegrationTestsSuite(
             });
             const tools = await client.listTools();
             const names = tools.tools.map((tool) => tool.name);
-            expect(names.length).toEqual(defaults.helperTools.length + actors.length);
-            for (const tool of defaults.helperTools) {
-                expect(names).toContain(tool);
-            }
-            for (const actor of actors) {
-                expect(names).toContain(actorNameToToolName(actor));
-            }
+            expectToolNamesToContain(names, actors);
 
             await client.close();
         });
@@ -120,9 +123,9 @@ export function createIntegrationTestsSuite(
             });
             const tools = await client.listTools();
             const names = tools.tools.map((tool) => tool.name);
-            expect(names.length).toEqual(defaults.helperTools.length + defaults.actorAddingTools.length + defaults.actors.length);
-            for (const tool of defaults.helperTools) {
-                expect(names).toContain(tool);
+            expect(names.length).toEqual(defaultTools.length + defaults.actorAddingTools.length + defaults.actors.length);
+            for (const tool of defaultTools) {
+                expect(names).toContain(tool.tool.name);
             }
             for (const tool of defaults.actorAddingTools) {
                 expect(names).toContain(tool);
@@ -133,7 +136,7 @@ export function createIntegrationTestsSuite(
 
             // Add Actor dynamically
             await client.callTool({
-                name: HelperTools.ADD_ACTOR,
+                name: HelperTools.ACTOR_ADD,
                 arguments: {
                     actorName: actor,
                 },
@@ -142,27 +145,10 @@ export function createIntegrationTestsSuite(
             // Check if tools was added
             const toolsAfterAdd = await client.listTools();
             const namesAfterAdd = toolsAfterAdd.tools.map((tool) => tool.name);
-            expect(namesAfterAdd.length).toEqual(defaults.helperTools.length + defaults.actorAddingTools.length + defaults.actors.length + 1);
+            expect(namesAfterAdd.length).toEqual(defaultTools.length + defaults.actorAddingTools.length + defaults.actors.length + 1);
             expect(namesAfterAdd).toContain(selectedToolName);
 
-            const result = await client.callTool({
-                name: selectedToolName,
-                arguments: {
-                    first_number: 1,
-                    second_number: 2,
-                },
-            });
-
-            expect(result).toEqual({
-                content: [{
-                    text: JSON.stringify({
-                        first_number: 1,
-                        second_number: 2,
-                        sum: 3,
-                    }),
-                    type: 'text',
-                }],
-            });
+            await callPythonExampleActor(client, selectedToolName);
 
             await client.close();
         });
@@ -182,7 +168,7 @@ export function createIntegrationTestsSuite(
 
             // Remove the actor
             await client.callTool({
-                name: HelperTools.REMOVE_ACTOR,
+                name: HelperTools.ACTOR_REMOVE,
                 arguments: {
                     toolName: selectedToolName,
                 },

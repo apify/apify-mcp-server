@@ -104,12 +104,15 @@ const GetActorDefinitionArgsSchema = z.object({
         .describe(`Truncate the README to this limit. Default value is ${ACTOR_README_MAX_LENGTH}.`),
 });
 
+/**
+ * https://docs.apify.com/api/v2/actor-build-get
+ */
 export const actorDefinitionTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.GET_ACTOR_DETAILS,
+        name: HelperTools.ACTOR_GET_DETAILS,
         // TODO: remove actorFullName from internal tools
-        actorFullName: HelperTools.GET_ACTOR_DETAILS,
+        actorFullName: HelperTools.ACTOR_GET_DETAILS,
         description: 'Get documentation, readme, input schema and other details about an Actor. '
             + 'For example, when user says, I need to know more about web crawler Actor.'
             + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'

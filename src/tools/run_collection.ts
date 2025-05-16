@@ -24,23 +24,17 @@ const GetUserRunsListArgs = z.object({
         .describe('Return only runs with the provided status.'),
 });
 
+/**
+ * https://docs.apify.com/api/v2/act-runs-get
+ */
 export const getUserRunsList: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.GET_ACTOR_RUN_LIST,
-        actorFullName: HelperTools.GET_ACTOR_RUN_LIST,
-        description: 'Gets a list of all Actor runs. '
-            + 'The response is a list of run objects with information about a single Actor run and associated default datasetId and keyValueStoreId.'
-            + 'The endpoint supports pagination using the limit and offset parameters'
-            + 'Runs can be filtered by status with the following values:'
-            + 'READY: initial - Started but not allocated to any worker yet'
-            + 'RUNNING: transitional - Executing on a worker machine'
-            + 'SUCCEEDED: terminal - Finished successfully'
-            + 'FAILED: terminal - Run failed'
-            + 'TIMING-OUT: transitional - Timing out now'
-            + 'TIMED-OUT: terminal - Timed out'
-            + 'ABORTING: transitional - Being aborted by the user'
-            + 'ABORTED: terminal - Aborted by the user',
+        name: HelperTools.ACTOR_RUN_LIST_GET,
+        actorFullName: HelperTools.ACTOR_RUN_LIST_GET,
+        description: `Gets a paginated list of Actor runs with run details, datasetId, and keyValueStoreId.
+           Filter by status: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed),
+           TIMING-OUT (timing out), TIMED-OUT (timed out), ABORTING (being aborted), ABORTED (aborted).`,
         inputSchema: zodToJsonSchema(GetUserRunsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(GetUserRunsListArgs)),
         call: async (toolArgs) => {
@@ -52,5 +46,3 @@ export const getUserRunsList: ToolWrap = {
         },
     } as InternalTool,
 };
-
-// TODO https://docs.apify.com/api/v2/actor-run-get, https://docs.apify.com/api/v2/actor-run-abort-post,

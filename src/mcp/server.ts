@@ -203,7 +203,6 @@ export class ActorsMcpServer {
             }
 
             // TODO - if connection is /mcp client will not receive notification on tool change
-
             // Find tool by name or actor full name
             const tool = Array.from(this.tools.values())
                 .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
@@ -272,18 +271,25 @@ export class ActorsMcpServer {
                 if (tool.type === 'actor') {
                     const actorTool = tool.tool as ActorTool;
 
-                    const callOptions: ActorCallOptions = {
-                        memory: actorTool.memoryMbytes,
-                    };
+                    const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
+                    const { actorRun, datasetInfo, items } = await callActorGetDataset(
+                        actorTool.actorFullName,
+                        args,
+                        apifyToken as string,
+                        callOptions,
+                    );
+                    const content = [
+                        { type: 'text', text: `Actor finished with run information: ${JSON.stringify(actorRun)}` },
+                        { type: 'text', text: `Dataset information: ${JSON.stringify(datasetInfo)}` },
+                    ];
 
-                    const items = await callActorGetDataset(actorTool.actorFullName, args, apifyToken as string, callOptions);
-
-                    const content = items.map((item) => {
+                    const itemContents = items.items.map((item: Record<string, unknown>) => {
                         const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
                         return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
                             ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
                             : { type: 'text', text };
                     });
+                    content.push(...itemContents);
                     return { content };
                 }
             } catch (error) {

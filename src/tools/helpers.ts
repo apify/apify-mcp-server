@@ -9,7 +9,7 @@ import { actorNameToToolName } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
-const HELP_TOOL_TEXT = `Apify MCP server help:
+const APIFY_MCP_HELP_TOOL_TEXT = `Apify MCP server help:
 
 Note: "MCP" stands for "Model Context Protocol". The user can use the "RAG Web Browser" tool to get the content of the links mentioned in this help and present it to the user.
 
@@ -68,7 +68,7 @@ export const AddToolArgsSchema = z.object({
 export const addTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.ADD_ACTOR,
+        name: HelperTools.ACTOR_ADD,
         description: 'Add a tool, Actor or MCP-Server to available tools by Actor ID or Actor name. '
             + 'A tool is an Actor or MCP-Server that can be called by the user'
             + 'Do not execute the tool, only add it and list it in available tools. '
@@ -100,7 +100,7 @@ export const RemoveToolArgsSchema = z.object({
 export const removeTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.REMOVE_ACTOR,
+        name: HelperTools.ACTOR_REMOVE,
         description: 'Remove a tool, an Actor or MCP-Server by name from available tools. '
             + 'For example, when user says, I do not need a tool username/name anymore',
         inputSchema: zodToJsonSchema(RemoveToolArgsSchema),
@@ -122,14 +122,14 @@ export const HelpToolArgsSchema = z.object({});
 export const helpTool: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.HELP_TOOL,
+        name: HelperTools.APIFY_MCP_HELP_TOOL,
         description: 'Helper tool to get information on how to use and troubleshoot the Apify MCP server. '
             + 'This tool always returns the same help message with information about the server and how to use it. '
             + 'Call this tool in case of any problems or uncertainties with the server. ',
         inputSchema: zodToJsonSchema(HelpToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(HelpToolArgsSchema)),
         call: async () => {
-            return { content: [{ type: 'text', text: HELP_TOOL_TEXT }] };
+            return { content: [{ type: 'text', text: APIFY_MCP_HELP_TOOL_TEXT }] };
         },
     } as InternalTool,
 };

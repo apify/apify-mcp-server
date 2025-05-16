@@ -67,11 +67,15 @@ export const SearchToolArgsSchema = z.object({
         .default('')
         .describe('Filters the results by the specified category.'),
 });
+
+/**
+ * https://docs.apify.com/api/v2/store-get
+ */
 export const searchActors: ToolWrap = {
     type: 'internal',
     tool: {
-        name: HelperTools.SEARCH_ACTORS,
-        actorFullName: HelperTools.SEARCH_ACTORS,
+        name: HelperTools.STORE_SEARCH,
+        actorFullName: HelperTools.STORE_SEARCH,
         description: `Discover available Actors or MCP-Servers in Apify Store using full text search using keywords.`
             + `Users try to discover Actors using free form query in this case search query must be converted to full text search. `
             + `Returns a list of Actors with name, description, run statistics, pricing, starts, and URL. `

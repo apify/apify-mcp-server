@@ -67,7 +67,7 @@ async function callSearchTool(client: Client): Promise<void> {
         const searchRequest: CallToolRequest = {
             method: 'tools/call',
             params: {
-                name: HelperTools.SEARCH_ACTORS,
+                name: HelperTools.STORE_SEARCH,
                 arguments: { search: 'rag web browser', limit: 1 },
             },
         };

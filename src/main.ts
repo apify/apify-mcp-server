@@ -56,9 +56,9 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const items = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
+    const { datasetInfo, items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
 
     await Actor.pushData(items);
-    log.info(`Pushed ${items.length} items to the dataset`);
+    log.info(`Pushed ${datasetInfo?.itemCount} items to the dataset`);
     await Actor.exit();
 }
