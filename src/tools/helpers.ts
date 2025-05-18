@@ -60,7 +60,7 @@ If the user is using these tools and it seems like the tools have been added but
 In that case, the user should check the MCP client documentation to see if the client supports this feature.
 `;
 
-export const AddToolArgsSchema = z.object({
+export const addToolArgsSchema = z.object({
     actorName: z.string()
         .describe('Add a tool, Actor or MCP-Server to available tools by Actor ID or tool full name.'
             + 'Tool name is always composed from `username/name`'),
@@ -73,12 +73,12 @@ export const addTool: ToolWrap = {
             + 'A tool is an Actor or MCP-Server that can be called by the user'
             + 'Do not execute the tool, only add it and list it in available tools. '
             + 'For example, add a tool with username/name when user wants to scrape data from a website.',
-        inputSchema: zodToJsonSchema(AddToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(AddToolArgsSchema)),
+        inputSchema: zodToJsonSchema(addToolArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
-            const parsed = AddToolArgsSchema.parse(args);
+            const parsed = addToolArgsSchema.parse(args);
             const tools = await getActorsAsTools([parsed.actorName], apifyToken);
             const toolsAdded = apifyMcpServer.updateTools(tools);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
@@ -92,7 +92,7 @@ export const addTool: ToolWrap = {
         },
     } as InternalTool,
 };
-export const RemoveToolArgsSchema = z.object({
+export const removeToolArgsSchema = z.object({
     toolName: z.string()
         .describe('Tool name to remove from available tools.')
         .transform((val) => actorNameToToolName(val)),
@@ -103,13 +103,13 @@ export const removeTool: ToolWrap = {
         name: HelperTools.ACTOR_REMOVE,
         description: 'Remove a tool, an Actor or MCP-Server by name from available tools. '
             + 'For example, when user says, I do not need a tool username/name anymore',
-        inputSchema: zodToJsonSchema(RemoveToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(RemoveToolArgsSchema)),
+        inputSchema: zodToJsonSchema(removeToolArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(removeToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, args } = toolArgs;
 
-            const parsed = RemoveToolArgsSchema.parse(args);
+            const parsed = removeToolArgsSchema.parse(args);
             apifyMcpServer.tools.delete(parsed.toolName);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
             return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
@@ -118,7 +118,7 @@ export const removeTool: ToolWrap = {
 };
 
 // Tool takes no arguments
-export const HelpToolArgsSchema = z.object({});
+export const helpToolArgsSchema = z.object({});
 export const helpTool: ToolWrap = {
     type: 'internal',
     tool: {
@@ -126,8 +126,8 @@ export const helpTool: ToolWrap = {
         description: 'Helper tool to get information on how to use and troubleshoot the Apify MCP server. '
             + 'This tool always returns the same help message with information about the server and how to use it. '
             + 'Call this tool in case of any problems or uncertainties with the server. ',
-        inputSchema: zodToJsonSchema(HelpToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(HelpToolArgsSchema)),
+        inputSchema: zodToJsonSchema(helpToolArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(helpToolArgsSchema)),
         call: async () => {
             return { content: [{ type: 'text', text: APIFY_MCP_HELP_TOOL_TEXT }] };
         },

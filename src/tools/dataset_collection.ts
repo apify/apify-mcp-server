@@ -8,7 +8,7 @@ import type { InternalTool, ToolWrap } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
-const GetUserDatasetsListArgs = z.object({
+const getUserDatasetsListArgs = z.object({
     offset: z.number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')
         .default(0),
@@ -38,11 +38,11 @@ export const getUserDatasetsList: ToolWrap = {
             + 'Each dataset includes itemCount, access settings, and usage stats (readCount, writeCount). '
             + 'Results are sorted by createdAt in ascending order (use desc=true for descending). '
             + 'Supports pagination with limit (max 20) and offset parameters.',
-        inputSchema: zodToJsonSchema(GetUserDatasetsListArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetUserDatasetsListArgs)),
+        inputSchema: zodToJsonSchema(getUserDatasetsListArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetUserDatasetsListArgs.parse(args);
+            const parsed = getUserDatasetsListArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const datasets = await client.datasets().list({
                 limit: parsed.limit,

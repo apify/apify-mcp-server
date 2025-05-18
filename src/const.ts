@@ -27,6 +27,10 @@ export enum HelperTools {
     DATASET_GET = 'get-dataset',
     DATASET_LIST_GET = 'get-dataset-list',
     DATASET_GET_ITEMS = 'get-dataset-items',
+    KEY_VALUE_STORE_LIST_GET = 'get-key-value-store-list',
+    KEY_VALUE_STORE_GET = 'get-key-value-store',
+    KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
+    KEY_VALUE_STORE_RECORD_GET = 'get-key-value-store-record',
     APIFY_MCP_HELP_TOOL = 'apify-actor-help-tool',
     STORE_SEARCH = 'search-actors',
 }

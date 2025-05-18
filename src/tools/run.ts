@@ -8,11 +8,11 @@ import type { InternalTool, ToolWrap } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
-const GetRunArgs = z.object({
+const getActorRunArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
 });
 
-const AbortRunArgs = z.object({
+const abortRunArgs = z.object({
     runId: z.string().describe('The ID of the Actor run to abort.'),
     gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
 });
@@ -28,11 +28,11 @@ export const getActorRun: ToolWrap = {
         description: 'Gets detailed information about a specific Actor run including its status, status message, metrics, and resources. '
             + 'The response includes run metadata (ID, status, status message, timestamps), performance stats (CPU, memory, network), '
             + 'resource IDs (dataset, key-value store, request queue), and configuration options.',
-        inputSchema: zodToJsonSchema(GetRunArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetRunArgs)),
+        inputSchema: zodToJsonSchema(getActorRunArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetRunArgs.parse(args);
+            const parsed = getActorRunArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).get();
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
@@ -84,11 +84,11 @@ export const abortActorRun: ToolWrap = {
         description: 'Aborts an Actor run that is currently starting or running. '
             + 'For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect. '
             + 'Returns the updated run details after aborting.',
-        inputSchema: zodToJsonSchema(AbortRunArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(AbortRunArgs)),
+        inputSchema: zodToJsonSchema(abortRunArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = AbortRunArgs.parse(args);
+            const parsed = abortRunArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };

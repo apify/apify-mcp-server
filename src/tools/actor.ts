@@ -179,7 +179,7 @@ export async function getActorsAsTools(
     return [...normalTools, ...mcpServerTools];
 }
 
-const GetActorArgs = z.object({
+const getActorArgs = z.object({
     actorId: z.string().describe('Actor ID or a tilde-separated owner\'s username and Actor name.'),
 });
 
@@ -196,11 +196,11 @@ export const getActor: ToolWrap = {
             + 'Statistics (number of runs, users, etc.)'
             + 'Available versions, and configuration details'
             + 'Use Actor ID or Actor full name, separated by tilde username~name.',
-        inputSchema: zodToJsonSchema(GetActorArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetActorArgs)),
+        inputSchema: zodToJsonSchema(getActorArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getActorArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetActorArgs.parse(args);
+            const parsed = getActorArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             // Get Actor - contains a lot of irrelevant information
             const actor = await client.actor(parsed.actorId).get();

@@ -8,7 +8,7 @@ import type { InternalTool, ToolWrap } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
-const GetUserRunsListArgs = z.object({
+const getUserRunsListArgs = z.object({
     offset: z.number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')
         .default(0),
@@ -35,11 +35,11 @@ export const getUserRunsList: ToolWrap = {
         description: `Gets a paginated list of Actor runs with run details, datasetId, and keyValueStoreId.
            Filter by status: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed),
            TIMING-OUT (timing out), TIMED-OUT (timed out), ABORTING (being aborted), ABORTED (aborted).`,
-        inputSchema: zodToJsonSchema(GetUserRunsListArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetUserRunsListArgs)),
+        inputSchema: zodToJsonSchema(getUserRunsListArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetUserRunsListArgs.parse(args);
+            const parsed = getUserRunsListArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
             return { content: [{ type: 'text', text: JSON.stringify(runs) }] };

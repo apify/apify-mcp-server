@@ -8,11 +8,11 @@ import type { InternalTool, ToolWrap } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
-const GetDatasetArgs = z.object({
+const getDatasetArgs = z.object({
     datasetId: z.string().describe('Dataset ID or username~dataset-name.'),
 });
 
-const GetDatasetItemsArgs = z.object({
+const getDatasetItemsArgs = z.object({
     datasetId: z.string().describe('Dataset ID or username~dataset-name.'),
     clean: z.boolean().optional()
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
@@ -46,11 +46,11 @@ export const getDataset: ToolWrap = {
             + 'Returns information about dataset object with metadata (itemCount, schema, fields, stats). '
             + `Fields describe the structure of the dataset and can be used to filter the data with the ${HelperTools.DATASET_GET_ITEMS} tool. `
             + 'Note: itemCount updates may have 5s delay.',
-        inputSchema: zodToJsonSchema(GetDatasetArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetDatasetArgs)),
+        inputSchema: zodToJsonSchema(getDatasetArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetDatasetArgs.parse(args);
+            const parsed = getDatasetArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.dataset(parsed.datasetId).get();
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
@@ -76,11 +76,11 @@ export const getDatasetItems: ToolWrap = {
             + '(e.g. {"metadata":{"url":"x"}} becomes {"metadata.url":"x"}). '
             + 'Retrieve only the fields you need, reducing the response size and improving performance. '
             + 'The response includes total count, offset, limit, and items array.',
-        inputSchema: zodToJsonSchema(GetDatasetItemsArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetDatasetItemsArgs)),
+        inputSchema: zodToJsonSchema(getDatasetItemsArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = GetDatasetItemsArgs.parse(args);
+            const parsed = getDatasetItemsArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
 
             // Convert comma-separated strings to arrays

@@ -45,7 +45,7 @@ export async function searchActorsByKeywords(
 }
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
-export const SearchToolArgsSchema = z.object({
+export const searchActorsArgsSchema = z.object({
     limit: z.number()
         .int()
         .min(1)
@@ -83,11 +83,11 @@ export const searchActors: ToolWrap = {
             + `You should prefer simple keywords over complex queries. `
             + `Limit number of results returned but ensure that relevant results are returned. `
             + `This is not a general search tool, it is designed to search for Actors in Apify Store. `,
-        inputSchema: zodToJsonSchema(SearchToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(SearchToolArgsSchema)),
+        inputSchema: zodToJsonSchema(searchActorsArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = SearchToolArgsSchema.parse(args);
+            const parsed = searchActorsArgsSchema.parse(args);
             const actors = await searchActorsByKeywords(
                 parsed.search,
                 apifyToken,

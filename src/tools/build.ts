@@ -94,7 +94,7 @@ function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): s
     return `${readmeFirst}\n\nREADME was truncated because it was too long. Remaining headers:\n${prunedReadme.join(', ')}`;
 }
 
-const GetActorDefinitionArgsSchema = z.object({
+const getActorDefinitionArgsSchema = z.object({
     actorName: z.string()
         .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
             + 'Actor name is always composed from `username/name`'),
@@ -117,12 +117,12 @@ export const actorDefinitionTool: ToolWrap = {
             + 'For example, when user says, I need to know more about web crawler Actor.'
             + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
             + `Limit the length of the README if needed.`,
-        inputSchema: zodToJsonSchema(GetActorDefinitionArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetActorDefinitionArgsSchema)),
+        inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
 
-            const parsed = GetActorDefinitionArgsSchema.parse(args);
+            const parsed = getActorDefinitionArgsSchema.parse(args);
             const v = await getActorDefinition(parsed.actorName, apifyToken, parsed.limit);
             if (v && v.input && 'properties' in v.input && v.input) {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
