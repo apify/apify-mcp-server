@@ -45,7 +45,8 @@ export const getDataset: ToolWrap = {
         description: 'Dataset is a collection of structured data created by an Actor run. '
             + 'Returns information about dataset object with metadata (itemCount, schema, fields, stats). '
             + `Fields describe the structure of the dataset and can be used to filter the data with the ${HelperTools.DATASET_GET_ITEMS} tool. `
-            + 'Note: itemCount updates may have 5s delay.',
+            + 'Note: itemCount updates may have 5s delay.'
+            + 'The dataset can be accessed with the dataset URL: GET: https://api.apify.com/v2/datasets/:datasetId',
         inputSchema: zodToJsonSchema(getDatasetArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
         call: async (toolArgs) => {

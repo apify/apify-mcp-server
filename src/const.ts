@@ -55,4 +55,5 @@ export const ACTOR_ADDITIONAL_INSTRUCTIONS = `Never call/execute tool/Actor unle
      Datasets (for structured/tabular data) and Key-Value Store (for various data types like JSON, images, HTML).
      Each Actor run produces a dataset ID and key-value store ID for accessing the results.
      By default, the number of items returned from an Actor run is limited to ${ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS}.
-     You can always use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.`;
+     You can always use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.
+     Actor run input is always stored in the key-value store, recordKey: INPUT.`;
