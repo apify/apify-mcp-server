@@ -28,6 +28,14 @@ import {
 } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+
+// Define a named return type for callActorGetDataset
+export type CallActorGetDatasetResult = {
+    actorRun: ActorRun;
+    datasetInfo: Dataset | undefined;
+    items: PaginatedList<Record<string, unknown>>;
+};
+
 /**
  * Calls an Apify actor and retrieves the dataset items.
  *
@@ -49,7 +57,7 @@ export async function callActorGetDataset(
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
     limit = ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS,
-): Promise<{ actorRun: ActorRun, datasetInfo: Dataset | undefined, items: PaginatedList<Record<string, unknown>> }> {
+): Promise<CallActorGetDatasetResult> {
     try {
         log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
 
@@ -58,8 +66,10 @@ export async function callActorGetDataset(
 
         const actorRun: ActorRun = await actorClient.call(input, callOptions);
         const dataset = client.dataset(actorRun.defaultDatasetId);
-        const datasetInfo = await dataset.get();
-        const items = await dataset.listItems({ limit });
+        const [datasetInfo, items] = await Promise.all([
+            dataset.get(),
+            dataset.listItems({ limit }),
+        ]);
         log.info(`Actor ${actorName} finished with ${datasetInfo?.itemCount} items`);
 
         return { actorRun, datasetInfo, items };
