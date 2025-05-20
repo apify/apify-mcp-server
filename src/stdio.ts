@@ -64,7 +64,7 @@ const argv = yargs(hideBin(process.argv))
     .version(false)
     .epilogue(
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
-        + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n'
+        + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
     .epilogue('For more information, visit https://github.com/apify/actors-mcp-server')
     .parseSync() as CliArgs;
