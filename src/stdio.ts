@@ -23,7 +23,7 @@ import { defaults } from './const.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getActorsAsTools } from './tools/index.js';
 
-// Keeping this interfafce here and not types.ts since
+// Keeping this interface here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
 /**
  * Interface for command line arguments
