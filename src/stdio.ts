@@ -15,6 +15,7 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import yargs from 'yargs';
+// eslint-disable-next-line import/extensions
 import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
