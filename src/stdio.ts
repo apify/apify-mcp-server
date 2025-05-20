@@ -15,6 +15,8 @@
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import yargs from 'yargs';
+// Had to ignore the eslint import extension error for the yargs package.
+// Using .js or /index.js didn't resolve it due to the @types package issues.
 // eslint-disable-next-line import/extensions
 import { hideBin } from 'yargs/helpers';
 
