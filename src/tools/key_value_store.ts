@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolWrap } from '../types.js';
+import type { InternalTool, ToolEntry } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -16,7 +16,7 @@ const getKeyValueStoreArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-get
  */
-export const getKeyValueStore: ToolWrap = {
+export const getKeyValueStore: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_GET,
@@ -51,7 +51,7 @@ const getKeyValueStoreKeysArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  */
-export const getKeyValueStoreKeys: ToolWrap = {
+export const getKeyValueStoreKeys: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
@@ -85,7 +85,7 @@ const getKeyValueStoreRecordArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-record-get
  */
-export const getKeyValueStoreRecord: ToolWrap = {
+export const getKeyValueStoreRecord: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_RECORD_GET,

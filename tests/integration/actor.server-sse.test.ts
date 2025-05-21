@@ -6,7 +6,7 @@ import log from '@apify/log';
 
 import { createExpressApp } from '../../src/actor/server.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import { createMCPSSEClient } from '../helpers.js';
+import { createMcpSseClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
 
 let app: Express;
@@ -18,11 +18,10 @@ const mcpUrl = `${httpServerHost}/sse`;
 
 createIntegrationTestsSuite({
     suiteName: 'Actors MCP Server SSE',
-    createClientFn: async (options) => await createMCPSSEClient(mcpUrl, options),
+    getActorsMcpServer: () => mcpServer,
+    createClientFn: async (options) => await createMcpSseClient(mcpUrl, options),
     beforeAllFn: async () => {
-        mcpServer = new ActorsMcpServer({
-            enableDefaultActors: false,
-        });
+        mcpServer = new ActorsMcpServer({ enableAddingActors: false });
         log.setLevel(log.LEVELS.OFF);
 
         // Create express app using the proper server setup
@@ -34,6 +33,7 @@ createIntegrationTestsSuite({
         });
     },
     beforeEachFn: async () => {
+        mcpServer.disableDynamicActorTools();
         await mcpServer.reset();
     },
     afterAllFn: async () => {

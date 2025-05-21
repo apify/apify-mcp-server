@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolWrap } from '../types.js';
+import type { InternalTool, ToolEntry } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -20,7 +20,7 @@ const abortRunArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/actor-run-get
  */
-export const getActorRun: ToolWrap = {
+export const getActorRun: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_GET,
@@ -52,7 +52,7 @@ const GetRunLogArgs = z.object({
  * https://docs.apify.com/api/v2/actor-run-get
  *  /v2/actor-runs/{runId}/log{?token}
  */
-export const getActorLog: ToolWrap = {
+export const getActorLog: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_LOG,
@@ -76,7 +76,7 @@ export const getActorLog: ToolWrap = {
 /**
  * https://docs.apify.com/api/v2/actor-run-abort-post
  */
-export const abortActorRun: ToolWrap = {
+export const abortActorRun: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_ABORT,

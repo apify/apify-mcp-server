@@ -3,7 +3,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
-import type { ActorTool, InternalTool, ToolWrap } from '../types';
+import type { ActorTool, InternalTool, ToolEntry } from '../types';
 import { getActorsAsTools } from './actor.js';
 import { actorNameToToolName } from './utils.js';
 
@@ -65,7 +65,7 @@ export const addToolArgsSchema = z.object({
         .describe('Add a tool, Actor or MCP-Server to available tools by Actor ID or tool full name.'
             + 'Tool name is always composed from `username/name`'),
 });
-export const addTool: ToolWrap = {
+export const addTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_ADD,
@@ -80,7 +80,7 @@ export const addTool: ToolWrap = {
             const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
             const tools = await getActorsAsTools([parsed.actorName], apifyToken);
-            const toolsAdded = apifyMcpServer.updateTools(tools);
+            const toolsAdded = apifyMcpServer.upsertTools(tools, true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
 
             return {
@@ -97,7 +97,7 @@ export const removeToolArgsSchema = z.object({
         .describe('Tool name to remove from available tools.')
         .transform((val) => actorNameToToolName(val)),
 });
-export const removeTool: ToolWrap = {
+export const removeTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_REMOVE,
@@ -110,16 +110,16 @@ export const removeTool: ToolWrap = {
             const { apifyMcpServer, mcpServer, args } = toolArgs;
 
             const parsed = removeToolArgsSchema.parse(args);
-            apifyMcpServer.tools.delete(parsed.toolName);
+            const removedTools = apifyMcpServer.removeToolsByName([parsed.toolName], true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
-            return { content: [{ type: 'text', text: `Tool ${parsed.toolName} was removed` }] };
+            return { content: [{ type: 'text', text: `Tools removed: ${removedTools.join(', ')}` }] };
         },
     } as InternalTool,
 };
 
 // Tool takes no arguments
 export const helpToolArgsSchema = z.object({});
-export const helpTool: ToolWrap = {
+export const helpTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.APIFY_MCP_HELP_TOOL,

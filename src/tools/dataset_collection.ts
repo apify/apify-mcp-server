@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolWrap } from '../types.js';
+import type { InternalTool, ToolEntry } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -27,7 +27,7 @@ const getUserDatasetsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/datasets-get
  */
-export const getUserDatasetsList: ToolWrap = {
+export const getUserDatasetsList: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DATASET_LIST_GET,

@@ -28,6 +28,11 @@ export const defaultTools = [
     searchActors,
 ];
 
+export const addRemoveTools = [
+    addTool,
+    removeTool,
+];
+
 // Export only the tools that are being used
 export {
     addTool,

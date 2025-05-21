@@ -49,7 +49,7 @@ if (!process.env.APIFY_TOKEN) {
 async function main() {
     const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
     const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
-    mcpServer.updateTools(tools);
+    mcpServer.upsertTools(tools);
 
     // Start server
     const transport = new StdioServerTransport();

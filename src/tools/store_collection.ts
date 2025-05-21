@@ -5,7 +5,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { ActorStorePruned, HelperTool, PricingInfo, ToolWrap } from '../types.js';
+import type { ActorStorePruned, HelperTool, PricingInfo, ToolEntry } from '../types.js';
 
 function pruneActorStoreInfo(response: ActorStoreList): ActorStorePruned {
     const stats = response.stats || {};
@@ -71,7 +71,7 @@ export const searchActorsArgsSchema = z.object({
 /**
  * https://docs.apify.com/api/v2/store-get
  */
-export const searchActors: ToolWrap = {
+export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,

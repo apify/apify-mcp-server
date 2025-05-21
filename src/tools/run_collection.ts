@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolWrap } from '../types.js';
+import type { InternalTool, ToolEntry } from '../types.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -27,7 +27,7 @@ const getUserRunsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/act-runs-get
  */
-export const getUserRunsList: ToolWrap = {
+export const getUserRunsList: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUN_LIST_GET,

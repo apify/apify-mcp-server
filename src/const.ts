@@ -39,10 +39,6 @@ export const defaults = {
     actors: [
         'apify/rag-web-browser',
     ],
-    actorAddingTools: [
-        HelperTools.ACTOR_ADD,
-        HelperTools.ACTOR_REMOVE,
-    ],
 };
 
 // Actor output const
@@ -57,3 +53,6 @@ export const ACTOR_ADDITIONAL_INSTRUCTIONS = `Never call/execute tool/Actor unle
      By default, the number of items returned from an Actor run is limited to ${ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS}.
      You can always use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.
      Actor run input is always stored in the key-value store, recordKey: INPUT.`;
+
+export const TOOL_CACHE_MAX_SIZE = 500;
+export const TOOL_CACHE_TTL_SECS = 30 * 60;

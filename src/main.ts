@@ -44,7 +44,7 @@ if (STANDBY_MODE) {
         const { actors } = input;
         const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
         const tools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
-        mcpServer.updateTools(tools);
+        mcpServer.upsertTools(tools);
     }
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);

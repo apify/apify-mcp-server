@@ -104,11 +104,11 @@ export interface HelperTool extends ToolBase {
 * Actorized MCP server tool where this MCP server acts as a proxy.
 * Extends ToolBase with a tool-associated MCP server.
 */
-export interface ActorMCPTool extends ToolBase {
+export interface ActorMcpTool extends ToolBase {
     // Origin MCP server tool name is needed for the tool call
     originToolName: string;
-    // ID of the Actorized MCP server
-    actorID: string;
+    // ID of the Actorized MCP server - for example, apify/actors-mcp-server
+    actorId: string;
     /**
      * ID of the Actorized MCP server the tool is associated with.
      * serverId is generated unique ID based on the serverUrl.
@@ -127,11 +127,11 @@ export type ToolType = 'internal' | 'actor' | 'actor-mcp';
  * Wrapper interface that combines a tool with its type discriminator.
  * Used to store and manage tools of different types uniformly.
  */
-export interface ToolWrap {
+export interface ToolEntry {
     /** Type of the tool (internal or actor) */
     type: ToolType;
     /** The tool instance */
-    tool: ActorTool | HelperTool | ActorMCPTool;
+    tool: ActorTool | HelperTool | ActorMcpTool;
 }
 
 //  ActorStoreList for actor-search tool
@@ -184,3 +184,8 @@ export type Input = {
     debugActor?: string;
     debugActorInput?: unknown;
 };
+
+export interface ToolCacheEntry {
+    expiresAt: number;
+    tool: ToolEntry;
+}

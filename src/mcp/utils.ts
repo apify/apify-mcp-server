@@ -3,7 +3,7 @@ import { parse } from 'node:querystring';
 
 import { processInput } from '../input.js';
 import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
-import type { Input, ToolWrap } from '../types.js';
+import type { Input, ToolEntry } from '../types.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
@@ -41,7 +41,7 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
  */
 export async function processParamsGetTools(url: string, apifyToken: string) {
     const input = parseInputParamsFromUrl(url);
-    let tools: ToolWrap[] = [];
+    let tools: ToolEntry[] = [];
     if (input.actors) {
         const actors = input.actors as string[];
         // Normal Actors as a tool

@@ -6,7 +6,7 @@ import log from '@apify/log';
 
 import { createExpressApp } from '../../src/actor/server.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
-import { createMCPStreamableClient } from '../helpers.js';
+import { createMcpStreamableClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
 
 let app: Express;
@@ -18,14 +18,12 @@ const mcpUrl = `${httpServerHost}/mcp`;
 
 createIntegrationTestsSuite({
     suiteName: 'Actors MCP Server Streamable HTTP',
-    createClientFn: async (options) => await createMCPStreamableClient(mcpUrl, options),
+    getActorsMcpServer: () => mcpServer,
+    createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
-        mcpServer = new ActorsMcpServer({
-            enableDefaultActors: false,
-        });
         log.setLevel(log.LEVELS.OFF);
-
         // Create express app using the proper server setup
+        mcpServer = new ActorsMcpServer({ enableAddingActors: false });
         app = createExpressApp(httpServerHost, mcpServer);
 
         // Start test server
@@ -34,10 +32,10 @@ createIntegrationTestsSuite({
         });
     },
     beforeEachFn: async () => {
+        mcpServer.disableDynamicActorTools();
         await mcpServer.reset();
     },
     afterAllFn: async () => {
-        await mcpServer.close();
         await new Promise<void>((resolve) => {
             httpServer.close(() => resolve());
         });

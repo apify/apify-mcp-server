@@ -49,7 +49,7 @@ export function createExpressApp(
             // TODO: I think we should remove this logic, root should return only help message
             const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
             if (tools) {
-                mcpServer.updateTools(tools);
+                mcpServer.upsertTools(tools);
             }
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
@@ -68,12 +68,13 @@ export function createExpressApp(
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
             const input = parseInputParamsFromUrl(req.url);
-            if (input.actors || input.enableAddingActors) {
+            if (input.actors) {
                 await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
+            } else {
+                await mcpServer.loadDefaultActors(process.env.APIFY_TOKEN as string);
             }
-            // Load default tools if no actors are specified
-            if (!input.actors) {
-                await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
+            if (input.enableAddingActors) {
+                mcpServer.enableDynamicActorTools();
             }
             transportSSE = new SSEServerTransport(Routes.MESSAGE, res);
             await mcpServer.connect(transportSSE);
@@ -126,14 +127,14 @@ export function createExpressApp(
                 // Load MCP server tools
                 // TODO using query parameters in POST request is not standard
                 const input = parseInputParamsFromUrl(req.url);
-                if (input.actors || input.enableAddingActors) {
+                if (input.actors) {
                     await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
+                } else {
+                    await mcpServer.loadDefaultActors(process.env.APIFY_TOKEN as string);
                 }
-                // Load default tools if no actors are specified
-                if (!input.actors) {
-                    await mcpServer.loadDefaultTools(process.env.APIFY_TOKEN as string);
+                if (input.enableAddingActors) {
+                    mcpServer.enableDynamicActorTools();
                 }
-
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
 

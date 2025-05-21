@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.1.31 - **not yet released**
+
+### 🚀 Features
+
+- Normal Actor tools cache ([#117](https://github.com/apify/actors-mcp-server/pull/117)) ([1a3ce16](https://github.com/apify/actors-mcp-server/commit/1a3ce16026d44e49fc1b930c03cae2f4631d11ca)) by [@MQ37](https://github.com/MQ37)
+- Tool state handler ([#116](https://github.com/apify/actors-mcp-server/pull/116)) ([681c466](https://github.com/apify/actors-mcp-server/commit/681c466e0f06352fa528e1a56f6bbe93d0207312)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Apify-mcp-server max listeners warning ([#113](https://github.com/apify/actors-mcp-server/pull/113)) ([219f8ee](https://github.com/apify/actors-mcp-server/commit/219f8eeea3174b6cd44af08d563d2f65db23aa3f)) by [@MQ37](https://github.com/MQ37)
+- Use a new API to get Actor default build ([#114](https://github.com/apify/actors-mcp-server/pull/114)) ([6236e44](https://github.com/apify/actors-mcp-server/commit/6236e442455522c10fcd8a3ac7a91d086f941378)) by [@jirispilka](https://github.com/jirispilka)
+- Update README.md ([#123](https://github.com/apify/actors-mcp-server/pull/123)) ([2b82932](https://github.com/apify/actors-mcp-server/commit/2b82932e19af7bc808536e5dd084904e467d99f1)) by [@samehjarour](https://github.com/samehjarour)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.1.30](https://github.com/apify/actors-mcp-server/releases/tag/v0.1.30) (2025-05-07)
 
 ### 🐛 Bug Fixes

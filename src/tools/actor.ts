@@ -4,6 +4,7 @@ import type { ActorCallOptions, ActorRun, Dataset, PaginatedList } from 'apify-c
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
+import { LruCache } from '@apify/datastructures';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
@@ -12,11 +13,13 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS,
     HelperTools,
+    TOOL_CACHE_MAX_SIZE,
+    TOOL_CACHE_TTL_SECS,
 } from '../const.js';
 import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
 import { createMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
-import type { InternalTool, ToolWrap } from '../types.js';
+import type { InternalTool, ToolCacheEntry, ToolEntry } from '../types.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
@@ -35,6 +38,11 @@ export type CallActorGetDatasetResult = {
     datasetInfo: Dataset | undefined;
     items: PaginatedList<Record<string, unknown>>;
 };
+
+// Cache for normal Actor tools
+const normalActorToolsCache = new LruCache<ToolCacheEntry>({
+    maxLength: TOOL_CACHE_MAX_SIZE,
+});
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
@@ -103,13 +111,35 @@ export async function callActorGetDataset(
 export async function getNormalActorsAsTools(
     actors: string[],
     apifyToken: string,
-): Promise<ToolWrap[]> {
+): Promise<ToolEntry[]> {
+    const tools: ToolEntry[] = [];
+    const actorsToLoad: string[] = [];
+    for (const actorID of actors) {
+        const cacheEntry = normalActorToolsCache.get(actorID);
+        if (cacheEntry && cacheEntry.expiresAt > Date.now()) {
+            tools.push(cacheEntry.tool);
+        } else {
+            actorsToLoad.push(actorID);
+        }
+    }
+    if (actorsToLoad.length === 0) {
+        return tools;
+    }
+
     const getActorDefinitionWithToken = async (actorId: string) => {
         return await getActorDefinition(actorId, apifyToken);
     };
-    const results = await Promise.all(actors.map(getActorDefinitionWithToken));
-    const tools: ToolWrap[] = [];
-    for (const result of results) {
+    const results = await Promise.all(actorsToLoad.map(getActorDefinitionWithToken));
+
+    // Zip the results with their corresponding actorIDs
+    for (let i = 0; i < results.length; i++) {
+        const result = results[i];
+        // We need to get the orignal input from the user
+        // sonce the user can input real Actor ID like '3ox4R101TgZz67sLr' instead of
+        // 'username/actorName' even though we encourage that.
+        // And the getActorDefinition does not return the original input it received, just the actorFullName or actorID
+        const actorIDOrName = actorsToLoad[i];
+
         if (result) {
             if (result.input && 'properties' in result.input && result.input) {
                 result.input.properties = markInputPropertiesAsRequired(result.input);
@@ -120,7 +150,7 @@ export async function getNormalActorsAsTools(
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
-                tools.push({
+                const tool: ToolEntry = {
                     type: 'actor',
                     tool: {
                         name: actorNameToToolName(result.actorFullName),
@@ -130,6 +160,11 @@ export async function getNormalActorsAsTools(
                         ajvValidate: ajv.compile(result.input || {}),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },
+                };
+                tools.push(tool);
+                normalActorToolsCache.add(actorIDOrName, {
+                    tool,
+                    expiresAt: Date.now() + TOOL_CACHE_TTL_SECS * 1000,
                 });
             } catch (validationError) {
                 log.error(`Failed to compile AJV schema for Actor: ${result.actorFullName}. Error: ${validationError}`);
@@ -142,8 +177,8 @@ export async function getNormalActorsAsTools(
 async function getMCPServersAsTools(
     actors: string[],
     apifyToken: string,
-): Promise<ToolWrap[]> {
-    const actorsMCPServerTools: ToolWrap[] = [];
+): Promise<ToolEntry[]> {
+    const actorsMCPServerTools: ToolEntry[] = [];
     for (const actorID of actors) {
         const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
         log.info(`ActorID: ${actorID} MCP server URL: ${serverUrl}`);
@@ -164,7 +199,7 @@ async function getMCPServersAsTools(
 export async function getActorsAsTools(
     actors: string[],
     apifyToken: string,
-): Promise<ToolWrap[]> {
+): Promise<ToolEntry[]> {
     log.debug(`Fetching actors as tools...`);
     log.debug(`Actors: ${actors}`);
     // Actorized MCP servers
@@ -196,7 +231,7 @@ const getActorArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/act-get
  */
-export const getActor: ToolWrap = {
+export const getActor: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_GET,

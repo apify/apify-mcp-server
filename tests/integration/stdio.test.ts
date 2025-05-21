@@ -1,7 +1,7 @@
-import { createMCPStdioClient } from '../helpers.js';
+import { createMcpStdioClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
 
 createIntegrationTestsSuite({
-    suiteName: 'MCP STDIO',
-    createClientFn: createMCPStdioClient,
+    suiteName: 'MCP stdio',
+    createClientFn: createMcpStdioClient,
 });

@@ -11,7 +11,7 @@ import type {
     ActorDefinitionWithDesc,
     InternalTool,
     ISchemaProperties,
-    ToolWrap,
+    ToolEntry,
 } from '../types.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
@@ -107,7 +107,7 @@ const getActorDefinitionArgsSchema = z.object({
 /**
  * https://docs.apify.com/api/v2/actor-build-get
  */
-export const actorDefinitionTool: ToolWrap = {
+export const actorDefinitionTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_GET_DETAILS,
