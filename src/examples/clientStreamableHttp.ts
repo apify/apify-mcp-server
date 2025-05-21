@@ -73,7 +73,8 @@ async function callSearchTool(client: Client): Promise<void> {
         };
         const searchResult = await client.request(searchRequest, CallToolResultSchema);
         log.debug('Search result:');
-        searchResult.content.forEach((item) => {
+        const resultContent = searchResult.content || [];
+        resultContent.forEach((item) => {
             if (item.type === 'text') {
                 log.debug(`\t${item.text}`);
             }
@@ -95,7 +96,8 @@ async function callActor(client: Client): Promise<void> {
         };
         const actorResult = await client.request(actorRequest, CallToolResultSchema);
         log.debug('Actor results:');
-        actorResult.content.forEach((item) => {
+        const resultContent = actorResult.content || [];
+        resultContent.forEach((item) => {
             if (item.type === 'text') {
                 log.debug(`- ${item.text}`);
             }
