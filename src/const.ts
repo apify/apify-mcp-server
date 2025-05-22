@@ -31,7 +31,7 @@ export enum HelperTools {
 
 export const defaults = {
     actors: [
-        'agreeable_money/respects-exit-code',
+        'apify/rag-web-browser',
     ],
     helperTools: [
         HelperTools.SEARCH_ACTORS,
