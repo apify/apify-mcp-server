@@ -140,9 +140,11 @@ export class ActorsMcpServer {
      * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
      */
     private listActorMcpServerToolIds(): string[] {
-        return Array.from(this.tools.values())
-            .filter((tool) => tool.type === 'actor-mcp')
-            .map((tool) => (tool.tool as ActorMcpTool).actorId);
+        const ids = Array.from(this.tools.values())
+            .filter((tool: ToolEntry) => tool.type === 'actor-mcp')
+            .map((tool: ToolEntry) => (tool.tool as ActorMcpTool).actorId);
+        // Ensure uniqueness
+        return Array.from(new Set(ids));
     }
 
     /**

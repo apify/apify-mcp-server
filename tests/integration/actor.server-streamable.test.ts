@@ -22,11 +22,11 @@ createIntegrationTestsSuite({
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
-        // Create express app using the proper server setup
+        // Create an express app using the proper server setup
         mcpServer = new ActorsMcpServer({ enableAddingActors: false });
         app = createExpressApp(httpServerHost, mcpServer);
 
-        // Start test server
+        // Start a test server
         await new Promise<void>((resolve) => {
             httpServer = app.listen(httpServerPort, () => resolve());
         });

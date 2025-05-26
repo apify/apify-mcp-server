@@ -2,14 +2,14 @@ import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
 import { processInput } from '../input.js';
-import { addTool, getActorsAsTools, removeTool } from '../tools/index.js';
+import { addRemoveTools, getActorsAsTools } from '../tools/index.js';
 import type { Input, ToolEntry } from '../types.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
  * Generates a unique server ID based on the provided URL.
  *
- * URL is used instead of Actor ID becase one Actor may expose multiple servers - legacy SSE / streamable HTTP.
+ * URL is used instead of Actor ID because one Actor may expose multiple servers - legacy SSE / streamable HTTP.
  *
  * @param url The URL to generate the server ID from.
  * @returns A unique server ID.
@@ -48,7 +48,7 @@ export async function processParamsGetTools(url: string, apifyToken: string) {
         tools = await getActorsAsTools(actors, apifyToken);
     }
     if (input.enableAddingActors) {
-        tools.push(addTool, removeTool);
+        tools.push(...addRemoveTools);
     }
     return tools;
 }

@@ -24,10 +24,10 @@ createIntegrationTestsSuite({
         mcpServer = new ActorsMcpServer({ enableAddingActors: false });
         log.setLevel(log.LEVELS.OFF);
 
-        // Create express app using the proper server setup
+        // Create an express app using the proper server setup
         app = createExpressApp(httpServerHost, mcpServer);
 
-        // Start test server
+        // Start a test server
         await new Promise<void>((resolve) => {
             httpServer = app.listen(httpServerPort, () => resolve());
         });

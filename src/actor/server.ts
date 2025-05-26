@@ -16,6 +16,22 @@ import { parseInputParamsFromUrl, processParamsGetTools } from '../mcp/utils.js'
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
 import { getActorRunData } from './utils.js';
 
+/**
+ * Helper function to load tools and actors based on input parameters
+ * @param mcpServer The MCP server instance
+ * @param url The request URL to parse parameters from
+ * @param apifyToken The Apify token for authentication
+ */
+async function loadToolsAndActors(mcpServer: ActorsMcpServer, url: string, apifyToken: string): Promise<void> {
+    const input = parseInputParamsFromUrl(url);
+    if (input.actors || input.enableAddingActors) {
+        await mcpServer.loadToolsFromUrl(url, apifyToken);
+    }
+    if (!input.actors) {
+        await mcpServer.loadDefaultActors(apifyToken);
+    }
+}
+
 export function createExpressApp(
     host: string,
     mcpServer: ActorsMcpServer,
@@ -67,15 +83,7 @@ export function createExpressApp(
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
-            const input = parseInputParamsFromUrl(req.url);
-            if (input.actors) {
-                await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
-            } else {
-                await mcpServer.loadDefaultActors(process.env.APIFY_TOKEN as string);
-            }
-            if (input.enableAddingActors) {
-                mcpServer.enableDynamicActorTools();
-            }
+            await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
             transportSSE = new SSEServerTransport(Routes.MESSAGE, res);
             await mcpServer.connect(transportSSE);
         } catch (error) {
@@ -125,16 +133,7 @@ export function createExpressApp(
                     enableJsonResponse: true, // Enable JSON response mode
                 });
                 // Load MCP server tools
-                // TODO using query parameters in POST request is not standard
-                const input = parseInputParamsFromUrl(req.url);
-                if (input.actors) {
-                    await mcpServer.loadToolsFromUrl(req.url, process.env.APIFY_TOKEN as string);
-                } else {
-                    await mcpServer.loadDefaultActors(process.env.APIFY_TOKEN as string);
-                }
-                if (input.enableAddingActors) {
-                    mcpServer.enableDynamicActorTools();
-                }
+                await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
 
