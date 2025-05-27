@@ -3,7 +3,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
-import type { ActorTool, InternalTool, ToolEntry } from '../types';
+import type { InternalTool, ToolEntry } from '../types';
 import { getActorsAsTools } from './actor.js';
 import { actorNameToToolName } from './utils.js';
 
@@ -86,7 +86,11 @@ export const addTool: ToolEntry = {
             return {
                 content: [{
                     type: 'text',
-                    text: `Actor added: ${toolsAdded.map((t) => `${(t.tool as ActorTool).actorFullName} (tool name: ${t.tool.name})`).join(', ')}`,
+                    text: `Actor ${parsed.actorName} has been added. Newly available tools: ${
+                        toolsAdded.map(
+                            (t) => `${t.tool.name}`,
+                        ).join(', ')
+                    }.`,
                 }],
             };
         },
