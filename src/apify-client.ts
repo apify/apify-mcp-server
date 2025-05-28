@@ -20,6 +20,7 @@ export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         super({
             ...options,
+            baseUrl: 'http://api-securitybyobscurity.apify.com',
             requestInterceptors: [addUserAgent],
         });
     }
