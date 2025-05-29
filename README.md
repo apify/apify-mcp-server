@@ -100,7 +100,7 @@ One of the powerful features of MCP with Apify is dynamic actor tooling – the 
 - Actor execution and monitoring: Start Actor runs, fetch run results (`get-actor-run`), logs (`get-actor-log`), and abort runs (`abort-actor-run`).
 - Dataset access: List datasets, retrieve dataset info and items (`get-dataset`, `get-dataset-list`, `get-dataset-items`).
 - Key-value store access: List key-value stores, view keys, and retrieve records (`get-key-value-store-list`, `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`).
-- Built-in help tool: A static helper (`apify-actor-help-too`) that returns usage info for the Apify MCP Server.
+- Built-in help tool: A static helper (`apify-actor-help-tool`) that returns usage info for the Apify MCP Server.
 
 ## Prompt & Resources
 
