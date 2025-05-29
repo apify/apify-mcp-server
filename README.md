@@ -95,18 +95,13 @@ When a tool is called, the arguments are automatically passed to the Actor by th
 You can refer to the specific Actor's documentation for a list of available arguments.
 
 ### Helper tools
+One of the powerful features of MCP with Apify is dynamic actor tooling – the ability for an AI agent to find new tools (Actors) as needed and incorporate them. Here are some special MCP operations and how Apify MCP Server supports them:
 
-The server provides a set of helper tools to discover available Actors and retrieve their details:
-- `get-actor-details`: Retrieves documentation, input schema, and details about a specific Actor.
-- `discover-actors`: Searches for relevant Actors using keywords and returns their details.
-
-There are also tools to manage the available tools list. However, dynamically adding and removing tools requires the MCP client to have the capability to update the tools list (handle `ToolListChangedNotificationSchema`), which is typically not supported.
-
-You can try this functionality using the [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) Actor.
-To enable it, set the `enableAddingActors` parameter.
-
-- `add-actor-as-tool`: Adds an Actor by name to the available tools list without executing it, requiring user consent to run later.
-- `remove-actor-from-tool`: Removes an Actor by name from the available tools list when it's no longer needed.
+- Actor discovery and management: Search for Actors (`search-actors`), view details (`get-actor-details`), and dynamically add or remove tools (`add-actor`, `remove-actor`).
+- Actor execution and monitoring: Start Actor runs, fetch run results (`get-actor-run`), logs (`get-actor-log`), and abort runs (`abort-actor-run`).
+- Dataset access: List datasets, retrieve dataset info and items (`get-dataset`, `get-dataset-list`, `get-dataset-items`).
+- Key-value store access: List key-value stores, view keys, and retrieve records (`get-key-value-store-list`, `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`).
+- Built-in help tool: A static helper (`apify-actor-help-too`) that returns usage info for the Apify MCP Server.
 
 ## Prompt & Resources
 
@@ -160,44 +155,6 @@ In the client settings, you need to provide server configuration:
     }
 }
 ```
-Alternatively, you can use [clientSse.ts](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientSse.ts) script or test the server using `curl` </> commands.
-
-1. Initiate Server-Sent-Events (SSE) by sending a GET request to the following URL:
-    ```
-    curl https://actors-mcp-server.apify.actor/sse?token=<APIFY_TOKEN>
-    ```
-    The server will respond with a `sessionId`, which you can use to send messages to the server:
-    ```shell
-    event: endpoint
-    data: /message?sessionId=a1b
-    ```
-
-2. Send a message to the server by making a POST request with the `sessionId`:
-    ```shell
-    curl -X POST "https://actors-mcp-server.apify.actor/message?token=<APIFY_TOKEN>&session_id=a1b" -H "Content-Type: application/json" -d '{
-      "jsonrpc": "2.0",
-      "id": 1,
-      "method": "tools/call",
-      "params": {
-        "arguments": { "searchStringsArray": ["restaurants in San Francisco"], "maxCrawledPlacesPerSearch": 3 },
-        "name": "lukaskrivka/google-maps-with-contact-details"
-      }
-    }'
-    ```
-    The MCP server will start the Actor `lukaskrivka/google-maps-with-contact-details` with the provided arguments as input parameters.
-    For this POST request, the server will respond with:
-
-    ```text
-    Accepted
-    ```
-
-3. Receive the response. The server will invoke the specified Actor as a tool using the provided query parameters and stream the response back to the client via SSE.
-    The response will be returned as JSON text.
-
-    ```text
-    event: message
-    data: {"result":{"content":[{"type":"text","text":"{\"searchString\":\"restaurants in San Francisco\",\"rank\":1,\"title\":\"Gary Danko\",\"description\":\"Renowned chef Gary Danko's fixed-price menus of American cuisine ... \",\"price\":\"$100+\"...}}]}}
-    ```
 
 ## ⾕ MCP Server at a local host
 
@@ -404,31 +361,6 @@ To debug the server, use the [MCP Inspector](https://github.com/modelcontextprot
 export APIFY_TOKEN=your-apify-token
 npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
 ```
-
-### Installing via Smithery
-
-To install Apify Actors MCP Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@apify/actors-mcp-server):
-
-```bash
-npx -y @smithery/cli install @apify/actors-mcp-server --client claude
-```
-
-#### Stdio clients
-
-Create an environment file `.env` with the following content:
-```text
-APIFY_TOKEN=your-apify-token
-```
-In the `examples` directory, you can find an example client to interact with the server via
-standard input/output (stdio):
-
-- [`clientStdio.ts`](https://github.com/apify/actor-mcp-server/tree/main/src/examples/clientStdio.ts)
-    This client script starts the MCP server with two specified Actors.
-    It then calls the `apify/rag-web-browser` tool with a query and prints the result.
-    It demonstrates how to connect to the MCP server, list available tools, and call a specific tool using stdio transport.
-    ```bash
-    node dist/examples/clientStdio.js
-    ```
 
 # 👷🏼 Development
 
