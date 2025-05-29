@@ -4,7 +4,6 @@
 > This Actor is legacy implementation of the Apify MCP Server. For the current and actively maintained solution, please visit **[mcp.apify.com](https://mcp.apify.com)** where you'll find the latest server, comprehensive documentation, and setup guides.
 
 [![Actors MCP Server](https://apify.com/actor-badge?actor=apify/actors-mcp-server)](https://apify.com/apify/actors-mcp-server)
-[![smithery badge](https://smithery.ai/badge/@apify/actors-mcp-server)](https://smithery.ai/server/@apify/actors-mcp-server)
 
 Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
 This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
