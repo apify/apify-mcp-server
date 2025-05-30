@@ -149,7 +149,7 @@ export const removeTool: ToolEntry = {
                 return {
                     content: [{
                         type: 'text',
-                        text: `Tool '${args.toolName}' not found. No tools were removed.`,
+                        text: `Tool '${parsed.toolName}' not found. No tools were removed.`,
                     }],
                 };
             }
