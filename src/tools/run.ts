@@ -1,9 +1,6 @@
 import { Ajv } from 'ajv';
-import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
-
-import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
@@ -105,16 +102,8 @@ export const abortActorRun: ToolEntry = {
                 return { content: [{ type: 'text', text: 'Run ID is required.' }] };
             }
             const client = new ApifyClient({ token: apifyToken });
-            try {
-                const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
-                return { content: [{ type: 'text', text: JSON.stringify(v) }] };
-            } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    log.error(`[abortActorRun] Failed to abort run ${parsed.runId}: ${error.message}`);
-                    return { content: [{ type: 'text', text: `Failed to abort run: ${error.message}` }] };
-                }
-                throw error;
-            }
+            const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
         },
     } as InternalTool,
 };

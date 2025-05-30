@@ -250,18 +250,11 @@ export const getActor: ToolEntry = {
                 return { content: [{ type: 'text', text: 'Actor ID is required.' }] };
             }
             const client = new ApifyClient({ token: apifyToken });
-            try {
-                const actor = await client.actor(actorId).get();
-                if (!actor) {
-                    return { content: [{ type: 'text', text: `Actor '${actorId}' not found.` }] };
-                }
-                return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
-            } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    return { content: [{ type: 'text', text: `Failed to get actor details: ${error.message}` }] };
-                }
-                throw error;
+            const actor = await client.actor(actorId).get();
+            if (!actor) {
+                return { content: [{ type: 'text', text: `Actor '${actorId}' not found.` }] };
             }
+            return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
         },
     } as InternalTool,
 };

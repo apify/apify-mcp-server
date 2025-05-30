@@ -1,9 +1,6 @@
 import { Ajv } from 'ajv';
-import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
-
-import log from '@apify/log';
 
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types';
@@ -93,21 +90,7 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            let tools;
-            try {
-                tools = await getActorsAsTools([parsed.actorName], apifyToken);
-            } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    log.error(`[addTool] Failed to add Actor ${parsed.actorName}: ${error.message}`);
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: `Failed to add Actor ${parsed.actorName}. Error: ${error.message}`,
-                        }],
-                    };
-                }
-                throw error;
-            }
+            const tools = await getActorsAsTools([parsed.actorName], apifyToken);
             const toolsAdded = apifyMcpServer.upsertTools(tools, true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
 

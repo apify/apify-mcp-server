@@ -1,5 +1,4 @@
 import { Ajv } from 'ajv';
-import { ApifyApiError } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -42,15 +41,8 @@ export const getUserRunsList: ToolEntry = {
             const { args, apifyToken } = toolArgs;
             const parsed = getUserRunsListArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
-            try {
-                const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
-                return { content: [{ type: 'text', text: JSON.stringify(runs) }] };
-            } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    return { content: [{ type: 'text', text: `Failed to get runs list: ${error.message}` }] };
-                }
-                throw error;
-            }
+            const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
+            return { content: [{ type: 'text', text: JSON.stringify(runs) }] };
         },
     } as InternalTool,
 };

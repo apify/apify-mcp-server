@@ -12,7 +12,7 @@ import {
     ListToolsRequestSchema,
     McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { ActorCallOptions } from 'apify-client';
+import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 
 import log from '@apify/log';
 
@@ -453,6 +453,14 @@ export class ActorsMcpServer {
                     return { content };
                 }
             } catch (error) {
+                if (error instanceof ApifyApiError) {
+                    log.error(`Apify API error calling tool ${name}: ${error.message}`);
+                    return {
+                        content: [
+                            { type: 'text', text: `Apify API erro calling tool ${name}: ${error.message}` },
+                        ],
+                    };
+                }
                 log.error(`Error calling tool ${name}: ${error}`);
                 throw new McpError(
                     ErrorCode.InternalError,
