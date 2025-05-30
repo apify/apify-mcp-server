@@ -123,7 +123,13 @@ export const actorDefinitionTool: ToolEntry = {
             const { args, apifyToken } = toolArgs;
 
             const parsed = getActorDefinitionArgsSchema.parse(args);
+            if (!parsed.actorName || typeof parsed.actorName !== 'string' || parsed.actorName.trim() === '') {
+                return { content: [{ type: 'text', text: 'Actor name is required.' }] };
+            }
             const v = await getActorDefinition(parsed.actorName, apifyToken, parsed.limit);
+            if (!v) {
+                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+            }
             if (v && v.input && 'properties' in v.input && v.input) {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                 v.input.properties = shortenProperties(properties);
