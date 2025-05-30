@@ -225,7 +225,9 @@ export async function getActorsAsTools(
 }
 
 const getActorArgs = z.object({
-    actorId: z.string().describe('Actor ID or a tilde-separated owner\'s username and Actor name.'),
+    actorId: z.string()
+        .min(1)
+        .describe('Actor ID or a tilde-separated owner\'s username and Actor name.'),
 });
 
 /**
@@ -246,9 +248,6 @@ export const getActor: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const { actorId } = getActorArgs.parse(args);
-            if (!actorId || typeof actorId !== 'string' || actorId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Actor ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
             // Get Actor - contains a lot of irrelevant information
             const actor = await client.actor(actorId).get();

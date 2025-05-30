@@ -9,11 +9,15 @@ import type { InternalTool, ToolEntry } from '../types.js';
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 const getActorRunArgs = z.object({
-    runId: z.string().describe('The ID of the Actor run.'),
+    runId: z.string()
+        .min(1)
+        .describe('The ID of the Actor run.'),
 });
 
 const abortRunArgs = z.object({
-    runId: z.string().describe('The ID of the Actor run to abort.'),
+    runId: z.string()
+        .min(1)
+        .describe('The ID of the Actor run to abort.'),
     gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
 });
 
@@ -33,9 +37,6 @@ export const getActorRun: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getActorRunArgs.parse(args);
-            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).get();
             if (!v) {
@@ -70,9 +71,6 @@ export const getActorLog: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = GetRunLogArgs.parse(args);
-            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).log().get() ?? '';
             const lines = v.split('\n');
@@ -98,9 +96,6 @@ export const abortActorRun: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = abortRunArgs.parse(args);
-            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };

@@ -62,6 +62,7 @@ In that case, the user should check the MCP client documentation to see if the c
 
 export const addToolArgsSchema = z.object({
     actorName: z.string()
+        .min(1)
         .describe('Add a tool, Actor or MCP-Server to available tools by Actor ID or tool full name.'
             + 'Tool name is always composed from `username/name`'),
 });
@@ -79,9 +80,6 @@ export const addTool: ToolEntry = {
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
-            if (!parsed.actorName || typeof parsed.actorName !== 'string' || parsed.actorName.trim() === '') {
-                return { content: [{ type: 'text', text: 'Actor name is required.' }] };
-            }
             if (apifyMcpServer.listAllToolNames().includes(parsed.actorName)) {
                 return {
                     content: [{
@@ -109,6 +107,7 @@ export const addTool: ToolEntry = {
 };
 export const removeToolArgsSchema = z.object({
     toolName: z.string()
+        .min(1)
         .describe('Tool name to remove from available tools.')
         .transform((val) => actorNameToToolName(val)),
 });

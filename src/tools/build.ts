@@ -96,6 +96,7 @@ function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): s
 
 const getActorDefinitionArgsSchema = z.object({
     actorName: z.string()
+        .min(1)
         .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
             + 'Actor name is always composed from `username/name`'),
     limit: z.number()
@@ -123,9 +124,6 @@ export const actorDefinitionTool: ToolEntry = {
             const { args, apifyToken } = toolArgs;
 
             const parsed = getActorDefinitionArgsSchema.parse(args);
-            if (!parsed.actorName || typeof parsed.actorName !== 'string' || parsed.actorName.trim() === '') {
-                return { content: [{ type: 'text', text: 'Actor name is required.' }] };
-            }
             const v = await getActorDefinition(parsed.actorName, apifyToken, parsed.limit);
             if (!v) {
                 return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };

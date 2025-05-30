@@ -9,11 +9,15 @@ import type { InternalTool, ToolEntry } from '../types.js';
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 const getDatasetArgs = z.object({
-    datasetId: z.string().describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string()
+        .min(1)
+        .describe('Dataset ID or username~dataset-name.'),
 });
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string().describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string()
+        .min(1)
+        .describe('Dataset ID or username~dataset-name.'),
     clean: z.boolean().optional()
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
     offset: z.number().optional()
@@ -52,9 +56,6 @@ export const getDataset: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetArgs.parse(args);
-            if (!parsed.datasetId || typeof parsed.datasetId !== 'string' || parsed.datasetId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Dataset ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.dataset(parsed.datasetId).get();
             if (!v) {
@@ -88,10 +89,8 @@ export const getDatasetItems: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetItemsArgs.parse(args);
-            if (!parsed.datasetId || typeof parsed.datasetId !== 'string' || parsed.datasetId.trim() === '') {
-                return { content: [{ type: 'text', text: 'Dataset ID is required.' }] };
-            }
             const client = new ApifyClient({ token: apifyToken });
+
             // Convert comma-separated strings to arrays
             const fields = parsed.fields?.split(',').map((f) => f.trim());
             const omit = parsed.omit?.split(',').map((f) => f.trim());
