@@ -457,7 +457,7 @@ export class ActorsMcpServer {
                     log.error(`Apify API error calling tool ${name}: ${error.message}`);
                     return {
                         content: [
-                            { type: 'text', text: `Apify API erro calling tool ${name}: ${error.message}` },
+                            { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },
                         ],
                     };
                 }
