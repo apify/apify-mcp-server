@@ -103,8 +103,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // TODO: This test is not working as there is a problem with server reset, which loads default Actors
-        it.runIf(false)('should list all default tools and two loaded Actors', async () => {
+        it('should list all default tools and two loaded Actors', async () => {
             const actors = ['apify/website-content-crawler', 'apify/instagram-scraper'];
             const client = await createClientFn({ actors, enableAddingActors: false });
             const names = getToolNames(await client.listTools());
@@ -210,25 +209,27 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(getActorsMcpServer)('should reset and restore tool state with default tools', async () => {
-            const client = await createClientFn({ enableAddingActors: true });
+            const firstClient = await createClientFn({ enableAddingActors: true });
             const actorsMCPServer = getActorsMcpServer!();
             const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
             const toolList = actorsMCPServer.listAllToolNames();
             expect(toolList.length).toEqual(numberOfTools);
             // Add a new Actor
-            await addActor(client, ACTOR_PYTHON_EXAMPLE);
+            await addActor(firstClient, ACTOR_PYTHON_EXAMPLE);
 
             // Store the tool name list
             const toolListWithActor = actorsMCPServer.listAllToolNames();
             expect(toolListWithActor.length).toEqual(numberOfTools + 1); // + 1 for the added Actor
+            await firstClient.close();
 
             // Remove all tools
-            // TODO: The reset functions sets the enableAddingActors to false, which is not expected
-            // await actorsMCPServer.reset();
-            // const toolListAfterReset = actorsMCPServer.listAllToolNames();
-            // expect(toolListAfterReset.length).toEqual(numberOfTools);
-
-            await client.close();
+            await actorsMCPServer.reset();
+            // We connect second client so that the default tools are loaded
+            // if no specific list of Actors is provided
+            const secondClient = await createClientFn({ enableAddingActors: true });
+            const toolListAfterReset = actorsMCPServer.listAllToolNames();
+            expect(toolListAfterReset.length).toEqual(numberOfTools);
+            await secondClient.close();
         });
 
         it.runIf(getActorsMcpServer)('should notify tools changed handler on tool modifications', async () => {

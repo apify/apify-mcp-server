@@ -23,7 +23,7 @@ createIntegrationTestsSuite({
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
         // Create an express app using the proper server setup
-        mcpServer = new ActorsMcpServer({ enableAddingActors: false });
+        mcpServer = new ActorsMcpServer({ enableAddingActors: false, enableDefaultActors: false });
         app = createExpressApp(httpServerHost, mcpServer);
 
         // Start a test server
