@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
-import { type ActorCallOptions, type ActorRun, ApifyApiError, type Dataset, type PaginatedList } from 'apify-client';
+import { type ActorCallOptions, type ActorRun, type Dataset, type PaginatedList } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -250,6 +250,7 @@ export const getActor: ToolEntry = {
                 return { content: [{ type: 'text', text: 'Actor ID is required.' }] };
             }
             const client = new ApifyClient({ token: apifyToken });
+            // Get Actor - contains a lot of irrelevant information
             const actor = await client.actor(actorId).get();
             if (!actor) {
                 return { content: [{ type: 'text', text: `Actor '${actorId}' not found.` }] };
