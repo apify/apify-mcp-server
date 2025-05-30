@@ -245,11 +245,20 @@ export const getActor: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(getActorArgs)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
-            const parsed = getActorArgs.parse(args);
+            const { actorId } = getActorArgs.parse(args);
+            if (!actorId || typeof actorId !== 'string' || actorId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Actor ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
-            // Get Actor - contains a lot of irrelevant information
-            const actor = await client.actor(parsed.actorId).get();
-            return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
+            try {
+                const actor = await client.actor(actorId).get();
+                if (!actor) {
+                    return { content: [{ type: 'text', text: `Actor '${actorId}' not found.` }] };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
+            } catch {
+                return { content: [{ type: 'text', text: `Invalid actor ID or actor not found.` }] };
+            }
         },
     } as InternalTool,
 };

@@ -33,6 +33,9 @@ export const getActorRun: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getActorRunArgs.parse(args);
+            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).get();
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
@@ -64,6 +67,9 @@ export const getActorLog: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = GetRunLogArgs.parse(args);
+            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).log().get() ?? '';
             const lines = v.split('\n');
@@ -89,6 +95,9 @@ export const abortActorRun: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = abortRunArgs.parse(args);
+            if (!parsed.runId || typeof parsed.runId !== 'string' || parsed.runId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Run ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };

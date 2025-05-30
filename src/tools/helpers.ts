@@ -6,6 +6,8 @@ import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types';
 import { getActorsAsTools } from './actor.js';
 import { actorNameToToolName } from './utils.js';
+import { ApifyApiError } from 'apify-client';
+import log from '@apify/log';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -79,7 +81,32 @@ export const addTool: ToolEntry = {
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
-            const tools = await getActorsAsTools([parsed.actorName], apifyToken);
+            if (!parsed.actorName || typeof parsed.actorName !== 'string' || parsed.actorName.trim() === '') {
+                return { content: [{ type: 'text', text: 'Actor name is required.' }] };
+            }
+            if (apifyMcpServer.listAllToolNames().includes(parsed.actorName)) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Actor ${parsed.actorName} is already available. No new tools were added.`,
+                    }],
+                };
+            }
+            let tools;
+            try {
+                tools = await getActorsAsTools([parsed.actorName], apifyToken);
+            } catch (error) {
+                if (error instanceof ApifyApiError) {
+                    log.error(`[addTool] Failed to add Actor ${parsed.actorName}: ${error.message}`);
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: `Failed to add Actor ${parsed.actorName}. Error: ${error.message}`,
+                        }],
+                    };
+                }
+                throw error;
+            }
             const toolsAdded = apifyMcpServer.upsertTools(tools, true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
 
@@ -112,8 +139,19 @@ export const removeTool: ToolEntry = {
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, mcpServer, args } = toolArgs;
-
             const parsed = removeToolArgsSchema.parse(args);
+            // Check if tool exists before attempting removal
+            if (!apifyMcpServer.tools.has(parsed.toolName)) {
+                // Send notification so client can update its tool list
+                // just in case the client tool list is out of sync
+                await mcpServer.notification({ method: 'notifications/tools/list_changed' });
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Tool '${args.toolName}' not found. No tools were removed.`,
+                    }],
+                };
+            }
             const removedTools = apifyMcpServer.removeToolsByName([parsed.toolName], true);
             await mcpServer.notification({ method: 'notifications/tools/list_changed' });
             return { content: [{ type: 'text', text: `Tools removed: ${removedTools.join(', ')}` }] };

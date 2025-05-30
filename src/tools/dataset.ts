@@ -52,9 +52,19 @@ export const getDataset: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetArgs.parse(args);
+            if (!parsed.datasetId || typeof parsed.datasetId !== 'string' || parsed.datasetId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Dataset ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
-            const v = await client.dataset(parsed.datasetId).get();
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            try {
+                const v = await client.dataset(parsed.datasetId).get();
+                if (!v) {
+                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            } catch {
+                return { content: [{ type: 'text', text: `Invalid dataset ID or dataset not found.` }] };
+            }
         },
     } as InternalTool,
 };
@@ -82,23 +92,32 @@ export const getDatasetItems: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetItemsArgs.parse(args);
+            if (!parsed.datasetId || typeof parsed.datasetId !== 'string' || parsed.datasetId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Dataset ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
+            try {
+                // Convert comma-separated strings to arrays
+                const fields = parsed.fields?.split(',').map((f) => f.trim());
+                const omit = parsed.omit?.split(',').map((f) => f.trim());
+                const flatten = parsed.flatten?.split(',').map((f) => f.trim());
 
-            // Convert comma-separated strings to arrays
-            const fields = parsed.fields?.split(',').map((f) => f.trim());
-            const omit = parsed.omit?.split(',').map((f) => f.trim());
-            const flatten = parsed.flatten?.split(',').map((f) => f.trim());
-
-            const v = await client.dataset(parsed.datasetId).listItems({
-                clean: parsed.clean,
-                offset: parsed.offset,
-                limit: parsed.limit,
-                fields,
-                omit,
-                desc: parsed.desc,
-                flatten,
-            });
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+                const v = await client.dataset(parsed.datasetId).listItems({
+                    clean: parsed.clean,
+                    offset: parsed.offset,
+                    limit: parsed.limit,
+                    fields,
+                    omit,
+                    desc: parsed.desc,
+                    flatten,
+                });
+                if (!v) {
+                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+                }
+                return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            } catch {
+                return { content: [{ type: 'text', text: `Invalid input or dataset not found.` }] };
+            }
         },
     } as InternalTool,
 };

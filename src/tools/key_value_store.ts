@@ -29,6 +29,9 @@ export const getKeyValueStore: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreArgs.parse(args);
+            if (!parsed.storeId || typeof parsed.storeId !== 'string' || parsed.storeId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Store ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const store = await client.keyValueStore(parsed.storeId).get();
             return { content: [{ type: 'text', text: JSON.stringify(store) }] };
@@ -65,6 +68,9 @@ export const getKeyValueStoreKeys: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreKeysArgs.parse(args);
+            if (!parsed.storeId || typeof parsed.storeId !== 'string' || parsed.storeId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Store ID is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const keys = await client.keyValueStore(parsed.storeId).listKeys({
                 exclusiveStartKey: parsed.exclusiveStartKey,
@@ -100,6 +106,12 @@ export const getKeyValueStoreRecord: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreRecordArgs.parse(args);
+            if (!parsed.storeId || typeof parsed.storeId !== 'string' || parsed.storeId.trim() === '') {
+                return { content: [{ type: 'text', text: 'Store ID is required.' }] };
+            }
+            if (!parsed.recordKey || typeof parsed.recordKey !== 'string' || parsed.recordKey.trim() === '') {
+                return { content: [{ type: 'text', text: 'Record key is required.' }] };
+            }
             const client = new ApifyClient({ token: apifyToken });
             const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
             return { content: [{ type: 'text', text: JSON.stringify(record) }] };

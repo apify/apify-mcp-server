@@ -88,6 +88,14 @@ export const searchActors: ToolEntry = {
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
+            if (!parsed.search || parsed.search.trim() === '') {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: 'Search string must not be empty. Please provide keywords to search for Actors.',
+                    }],
+                };
+            }
             const actors = await searchActorsByKeywords(
                 parsed.search,
                 apifyToken,
