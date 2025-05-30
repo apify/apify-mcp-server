@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
-import { type ActorCallOptions, type ActorRun, type Dataset, type PaginatedList } from 'apify-client';
+import type { ActorCallOptions, ActorRun, Dataset, PaginatedList } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
