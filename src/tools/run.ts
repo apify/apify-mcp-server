@@ -5,6 +5,8 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
+import { ApifyApiError } from 'apify-client';
+import log from '@apify/log';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -38,6 +40,9 @@ export const getActorRun: ToolEntry = {
             }
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).get();
+            if (!v) {
+                return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
+            }
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
         },
     } as InternalTool,
@@ -99,8 +104,16 @@ export const abortActorRun: ToolEntry = {
                 return { content: [{ type: 'text', text: 'Run ID is required.' }] };
             }
             const client = new ApifyClient({ token: apifyToken });
-            const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            try {
+                const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
+                return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            } catch (error) {
+                if (error instanceof ApifyApiError) {
+                    log.error(`[abortActorRun] Failed to abort run ${parsed.runId}: ${error.message}`);
+                    return { content: [{ type: 'text', text: `Failed to abort run: ${error.message}` }] };
+                }
+                throw error;
+            }
         },
     } as InternalTool,
 };
