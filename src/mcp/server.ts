@@ -345,7 +345,8 @@ export class ActorsMcpServer {
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-            const { name, arguments: args } = request.params;
+            // eslint-disable-next-line prefer-const
+            let { name, arguments: args } = request.params;
             const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
 
             // Remove apifyToken from request.params just in case
@@ -362,6 +363,16 @@ export class ActorsMcpServer {
                 );
             }
 
+            // Claude is saving tool names with 'local__' prefix, name is local__apify-actors__compass-slash-crawler-google-places
+            // We are interested in the Actor name only, so we remove the 'local__apify-actors__' prefix
+            if (name.startsWith('local__')) {
+                // we split the name by '__' and take the last part, which is the actual Actor name
+                const parts = name.split('__');
+                log.info(`Tool name with prefix detected: ${name}, using last part: ${parts[parts.length - 1]}`);
+                if (parts.length > 1) {
+                    name = parts[parts.length - 1];
+                }
+            }
             // TODO - if connection is /mcp client will not receive notification on tool change
             // Find tool by name or actor full name
             const tool = Array.from(this.tools.values())
