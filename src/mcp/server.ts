@@ -45,6 +45,7 @@ export class ActorsMcpServer {
     public readonly tools: Map<string, ToolEntry>;
     private options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
+    private sigintHandler: (() => Promise<void>) | undefined;
 
     constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
         this.options = {
@@ -319,12 +320,13 @@ export class ActorsMcpServer {
         this.server.onerror = (error) => {
             console.error('[MCP Error]', error); // eslint-disable-line no-console
         };
-        // Allow disabling of the SIGINT handler to prevent max listeners warning
         if (setupSIGINTHandler) {
-            process.on('SIGINT', async () => {
+            const handler = async () => {
                 await this.server.close();
                 process.exit(0);
-            });
+            };
+            process.once('SIGINT', handler);
+            this.sigintHandler = handler; // Store the actual handler
         }
     }
 
@@ -497,6 +499,18 @@ export class ActorsMcpServer {
     }
 
     async close(): Promise<void> {
+        // 1. Remove SIGINT handler
+        if (this.sigintHandler) {
+            process.removeListener('SIGINT', this.sigintHandler);
+            this.sigintHandler = undefined;
+        }
+        // // 2. Clear all tools
+        this.tools.clear();
+        // 3. Unregister tools changed handler
+        if (this.toolsChangedHandler) {
+            this.unregisterToolsChangedHandler();
+        }
+        // 4. Close server (which should also remove its event handlers)
         await this.server.close();
     }
 }
