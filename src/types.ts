@@ -24,7 +24,7 @@ export interface ISchemaProperties {
 }
 
 export interface IActorInputSchema {
-    $id: string;
+    $id?: string;
     title?: string;
     description?: string;
 
