@@ -8,6 +8,10 @@ export function actorNameToToolName(actorName: string): string {
         .slice(0, 64);
 }
 
+export function getToolSchemaID(actorName: string): string {
+    return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
+}
+
 /**
  * Builds nested properties for object types in the schema.
  *

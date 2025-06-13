@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { ValidateFunction } from 'ajv';
 import { Ajv } from 'ajv';
 import type { ActorCallOptions, ActorRun, Dataset, PaginatedList } from 'apify-client';
 import { z } from 'zod';
@@ -26,11 +27,31 @@ import {
     addEnumsToDescriptionsWithExamples,
     buildNestedProperties,
     filterSchemaProperties,
+    getToolSchemaID,
     markInputPropertiesAsRequired,
     shortenProperties,
 } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+
+// source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
+function fixedCompile(schema: object): ValidateFunction<unknown> {
+    const validate = ajv.compile(schema);
+    ajv.removeSchema(schema);
+
+    // Force reset values that aren't reset with removeSchema
+    /* eslint-disable no-underscore-dangle */
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    (ajv.scope as any)._values.schema!.delete(schema);
+    (ajv.scope as any)._values.validate!.delete(validate);
+    const schemaIdx = (ajv.scope as any)._scope.schema.indexOf(schema);
+    const validateIdx = (ajv.scope as any)._scope.validate.indexOf(validate);
+    if (schemaIdx !== -1) (ajv.scope as any)._scope.schema.splice(schemaIdx, 1);
+    if (validateIdx !== -1) (ajv.scope as any)._scope.validate.splice(validateIdx, 1);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    /* eslint-enable no-underscore-dangle */
+    return validate;
+}
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
@@ -141,12 +162,16 @@ export async function getNormalActorsAsTools(
         const actorIDOrName = actorsToLoad[i];
 
         if (result) {
+            const schemaID = getToolSchemaID(result.actorFullName);
             if (result.input && 'properties' in result.input && result.input) {
                 result.input.properties = markInputPropertiesAsRequired(result.input);
                 result.input.properties = buildNestedProperties(result.input.properties);
                 result.input.properties = filterSchemaProperties(result.input.properties);
                 result.input.properties = shortenProperties(result.input.properties);
                 result.input.properties = addEnumsToDescriptionsWithExamples(result.input.properties);
+                // Add schema $id, each valid JSON schema should have a unique $id
+                // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
+                result.input.$id = schemaID;
             }
             try {
                 const memoryMbytes = result.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
@@ -157,7 +182,7 @@ export async function getNormalActorsAsTools(
                         actorFullName: result.actorFullName,
                         description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                         inputSchema: result.input || {},
-                        ajvValidate: ajv.compile(result.input || {}),
+                        ajvValidate: fixedCompile(result.input || {}),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },
                 };
