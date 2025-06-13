@@ -190,3 +190,5 @@ export interface ToolCacheEntry {
     expiresAt: number;
     tool: ToolEntry;
 }
+
+export type ApifyStorePricingModel = 'FREE' | 'FLAT_PRICE_PER_MONTH' | 'PRICE_PER_DATASET_ITEM';
