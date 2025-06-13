@@ -12,6 +12,7 @@ import {
     ListToolsRequestSchema,
     McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 
 import log from '@apify/log';
@@ -293,7 +294,6 @@ export class ActorsMcpServer {
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
-            log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
@@ -499,18 +499,23 @@ export class ActorsMcpServer {
     }
 
     async close(): Promise<void> {
-        // 1. Remove SIGINT handler
+        // Remove SIGINT handler
         if (this.sigintHandler) {
             process.removeListener('SIGINT', this.sigintHandler);
             this.sigintHandler = undefined;
         }
-        // // 2. Clear all tools
+        // Clear all tools and their compiled schemas
+        for (const tool of this.tools.values()) {
+            if (tool.tool.ajvValidate && typeof tool.tool.ajvValidate === 'function') {
+                (tool.tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
+            }
+        }
         this.tools.clear();
-        // 3. Unregister tools changed handler
+        // Unregister tools changed handler
         if (this.toolsChangedHandler) {
             this.unregisterToolsChangedHandler();
         }
-        // 4. Close server (which should also remove its event handlers)
+        // Close server (which should also remove its event handlers)
         await this.server.close();
     }
 }
