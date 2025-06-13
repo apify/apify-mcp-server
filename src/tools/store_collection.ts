@@ -39,7 +39,7 @@ export async function searchActorsByKeywords(
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
     pricingModel: ApifyStorePricingModel | undefined = undefined,
-): Promise<ActorStorePruned[] | null> {
+): Promise<ActorStorePruned[]> {
     const client = new ApifyClient({ token: apifyToken });
     const results = await client.store().list({ search, limit, offset, pricingModel });
     return results.items.map((x) => pruneActorStoreInfo(x));
