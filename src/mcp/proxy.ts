@@ -1,6 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import Ajv from 'ajv';
 
+import { fixedAjvCompile } from '../tools/utils.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
 import { getMCPServerID, getProxyMCPServerToolName } from './utils.js';
 
@@ -26,7 +27,7 @@ export async function getMCPServerTools(
             name: getProxyMCPServerToolName(serverUrl, tool.name),
             description: tool.description || '',
             inputSchema: tool.inputSchema,
-            ajvValidate: ajv.compile(tool.inputSchema),
+            ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
         };
 
         const wrap: ToolEntry = {

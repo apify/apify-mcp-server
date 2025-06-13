@@ -1,3 +1,6 @@
+import type { ValidateFunction } from 'ajv';
+import type Ajv from 'ajv';
+
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
 import type { IActorInputSchema, ISchemaProperties } from '../types.js';
 
@@ -10,6 +13,25 @@ export function actorNameToToolName(actorName: string): string {
 
 export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
+}
+
+// source https://github.com/ajv-validator/ajv/issues/1413#issuecomment-867064234
+export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunction<unknown> {
+    const validate = ajvInstance.compile(schema);
+    ajvInstance.removeSchema(schema);
+
+    // Force reset values that aren't reset with removeSchema
+    /* eslint-disable no-underscore-dangle */
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    (ajvInstance.scope as any)._values.schema!.delete(schema);
+    (ajvInstance.scope as any)._values.validate!.delete(validate);
+    const schemaIdx = (ajvInstance.scope as any)._scope.schema.indexOf(schema);
+    const validateIdx = (ajvInstance.scope as any)._scope.validate.indexOf(validate);
+    if (schemaIdx !== -1) (ajvInstance.scope as any)._scope.schema.splice(schemaIdx, 1);
+    if (validateIdx !== -1) (ajvInstance.scope as any)._scope.validate.splice(validateIdx, 1);
+    /* eslint-enable @typescript-eslint/no-explicit-any */
+    /* eslint-enable no-underscore-dangle */
+    return validate;
 }
 
 /**
