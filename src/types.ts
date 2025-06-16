@@ -1,4 +1,6 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
+import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
@@ -80,6 +82,10 @@ export interface ActorTool extends ToolBase {
 export type InternalToolArgs = {
     /** Arguments passed to the tool */
     args: Record<string, unknown>;
+    /** MCP server extra args.
+     * Can be used to send notifications from the server to the client.
+     */
+    extra: RequestHandlerExtra<Request, Notification>;
     /** Reference to the Apify MCP server instance */
     apifyMcpServer: ActorsMcpServer;
     /** Reference to the MCP server instance */

@@ -344,7 +344,7 @@ export class ActorsMcpServer {
          * @param {object} request - The request object containing tool name and arguments.
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args } = request.params;
             const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
@@ -412,6 +412,7 @@ export class ActorsMcpServer {
                     const internalTool = tool.tool as HelperTool;
                     const res = await internalTool.call({
                         args,
+                        extra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
                         apifyToken,

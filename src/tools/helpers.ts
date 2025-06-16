@@ -78,7 +78,7 @@ export const addTool: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, mcpServer, apifyToken, args } = toolArgs;
+            const { apifyMcpServer, apifyToken, args, extra } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
             if (apifyMcpServer.listAllToolNames().includes(parsed.actorName)) {
                 return {
@@ -90,7 +90,7 @@ export const addTool: ToolEntry = {
             }
             const tools = await getActorsAsTools([parsed.actorName], apifyToken);
             const toolsAdded = apifyMcpServer.upsertTools(tools, true);
-            await mcpServer.notification({ method: 'notifications/tools/list_changed' });
+            await extra.sendNotification({ method: 'notifications/tools/list_changed' });
 
             return {
                 content: [{
@@ -121,13 +121,13 @@ export const removeTool: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(removeToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, mcpServer, args } = toolArgs;
+            const { apifyMcpServer, args, extra } = toolArgs;
             const parsed = removeToolArgsSchema.parse(args);
             // Check if tool exists before attempting removal
             if (!apifyMcpServer.tools.has(parsed.toolName)) {
                 // Send notification so client can update its tool list
                 // just in case the client tool list is out of sync
-                await mcpServer.notification({ method: 'notifications/tools/list_changed' });
+                await extra.sendNotification({ method: 'notifications/tools/list_changed' });
                 return {
                     content: [{
                         type: 'text',
@@ -136,7 +136,7 @@ export const removeTool: ToolEntry = {
                 };
             }
             const removedTools = apifyMcpServer.removeToolsByName([parsed.toolName], true);
-            await mcpServer.notification({ method: 'notifications/tools/list_changed' });
+            await extra.sendNotification({ method: 'notifications/tools/list_changed' });
             return { content: [{ type: 'text', text: `Tools removed: ${removedTools.join(', ')}` }] };
         },
     } as InternalTool,
