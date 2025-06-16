@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
@@ -327,6 +328,25 @@ export function createIntegrationTestsSuite(
 
             // Check if the notification was NOT received
             expect(notificationCount).toBe(1);
+            await client.close();
+        });
+
+        it('should notify client about tool list changed', async () => {
+            const client = await createClientFn({ enableAddingActors: true });
+
+            // This flag is set to true when a 'notifications/tools/list_changed' notification is received,
+            // indicating that the tool list has been updated dynamically.
+            let hasReceivedNotification = false;
+            client.setNotificationHandler(ToolListChangedNotificationSchema, async (notification) => {
+                if (notification.method === 'notifications/tools/list_changed') {
+                    hasReceivedNotification = true;
+                }
+            });
+            // Add Actor dynamically
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actorName: ACTOR_PYTHON_EXAMPLE } });
+
+            expect(hasReceivedNotification).toBe(true);
+
             await client.close();
         });
     });
