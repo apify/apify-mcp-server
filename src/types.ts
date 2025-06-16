@@ -82,8 +82,11 @@ export interface ActorTool extends ToolBase {
 export type InternalToolArgs = {
     /** Arguments passed to the tool */
     args: Record<string, unknown>;
-    /** MCP server extra args.
+    /** Extra data given to request handlers.
+     *
      * Can be used to send notifications from the server to the client.
+     *
+     * For more details see: https://github.com/modelcontextprotocol/typescript-sdk/blob/f822c1255edcf98c4e73b9bf17a9dd1b03f86716/src/shared/protocol.ts#L102
      */
     extra: RequestHandlerExtra<Request, Notification>;
     /** Reference to the Apify MCP server instance */

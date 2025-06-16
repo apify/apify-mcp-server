@@ -342,6 +342,7 @@ export class ActorsMcpServer {
         /**
          * Handles the request to call a tool.
          * @param {object} request - The request object containing tool name and arguments.
+         * @param {object} extra - Extra data given to the request handler, such as sendNotification function.
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
