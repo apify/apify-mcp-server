@@ -24,7 +24,7 @@ export function processInput(originalInput: Partial<Input>): Input {
             log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
             input.enableAddingActors = input.enableActorAutoLoading === true || input.enableActorAutoLoading === 'true';
         } else {
-            input.enableAddingActors = false;
+            input.enableAddingActors = true;
         }
     } else {
         input.enableAddingActors = input.enableAddingActors === true || input.enableAddingActors === 'true';

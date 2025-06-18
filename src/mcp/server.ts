@@ -50,7 +50,7 @@ export class ActorsMcpServer {
 
     constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
         this.options = {
-            enableAddingActors: options.enableAddingActors ?? false,
+            enableAddingActors: options.enableAddingActors ?? true,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
         };
         this.server = new Server(

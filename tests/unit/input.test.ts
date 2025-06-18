@@ -39,11 +39,11 @@ describe('processInput', () => {
         expect(processed.enableAddingActors).toBe(false);
     });
 
-    it('should default enableAddingActors to false when not provided', async () => {
+    it('should default enableAddingActors to true when not provided', async () => {
         const input: Partial<Input> = {
             actors: ['actor1'],
         };
         const processed = processInput(input);
-        expect(processed.enableAddingActors).toBe(false);
+        expect(processed.enableAddingActors).toBe(true);
     });
 });

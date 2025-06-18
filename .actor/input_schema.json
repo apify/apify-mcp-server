@@ -25,7 +25,7 @@
             "title": "Enable adding Actors based on context and use-case (experimental, check if it supported by your client)",
             "type": "boolean",
             "description": "When enabled, the server can dynamically add Actors as tools based on user requests and context. \n\nNote: MCP client must support notification on tool updates. To try it, you can use the [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client). This is an experimental feature and may require client-specific support.",
-            "default": false
+            "default": true
         },
         "maxActorMemoryBytes": {
             "title": "Limit the maximum memory used by an Actor",
@@ -48,7 +48,7 @@
             "description": "Specify the input for the Actor that will be used for debugging in normal mode",
             "editor": "json",
             "prefill": {
-            "query": "hello world"
+                "query": "hello world"
             }
         }
     }

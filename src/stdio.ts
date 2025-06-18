@@ -33,8 +33,9 @@ import { getActorsAsTools } from './tools/index.js';
  */
 interface CliArgs {
     actors?: string;
-    'enable-adding-actors'?: boolean;
-    enableActorAutoLoading?: boolean;
+    enableAddingActors: boolean;
+    /** @deprecated */
+    enableActorAutoLoading: boolean;
 }
 
 // Configure logging, set to ERROR
@@ -50,12 +51,12 @@ const argv = yargs(hideBin(process.argv))
     })
     .option('enable-adding-actors', {
         type: 'boolean',
-        default: false,
+        default: true,
         describe: 'Enable dynamically adding Actors as tools based on user requests',
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
-        default: false,
+        default: true,
         hidden: true,
         describe: 'Deprecated: use enable-adding-actors instead',
     })
@@ -69,7 +70,7 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('For more information, visit https://github.com/apify/actors-mcp-server')
     .parseSync() as CliArgs;
 
-const enableAddingActors = argv['enable-adding-actors'] || argv.enableActorAutoLoading || false;
+const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
 const actors = argv.actors as string || '';
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
 
