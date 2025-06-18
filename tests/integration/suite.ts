@@ -84,11 +84,12 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and default Actors', async () => {
             const client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length);
+            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + addRemoveTools.length);
 
             const names = getToolNames(tools);
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
             await client.close();
         });
 

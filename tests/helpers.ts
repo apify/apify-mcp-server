@@ -23,8 +23,8 @@ export async function createMcpSseClient(
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
-    if (enableAddingActors) {
-        url.searchParams.append('enableAddingActors', 'true');
+    if (enableAddingActors !== undefined) {
+        url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
 
     const transport = new SSEClientTransport(
@@ -59,8 +59,8 @@ export async function createMcpStreamableClient(
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
-    if (enableAddingActors) {
-        url.searchParams.append('enableAddingActors', 'true');
+    if (enableAddingActors !== undefined) {
+        url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
 
     const transport = new StreamableHTTPClientTransport(
@@ -94,8 +94,8 @@ export async function createMcpStdioClient(
     if (actors) {
         args.push('--actors', actors.join(','));
     }
-    if (enableAddingActors) {
-        args.push('--enable-adding-actors');
+    if (enableAddingActors !== undefined) {
+        args.push('--enable-adding-actors', enableAddingActors.toString());
     }
     const transport = new StdioClientTransport({
         command: 'node',
