@@ -87,6 +87,8 @@ export type InternalToolArgs = {
     mcpServer: Server;
     /** Apify API token */
     apifyToken: string;
+    /** List of Actor IDs that the user has rented */
+    userRentedActorIds?: string[];
 }
 
 /**

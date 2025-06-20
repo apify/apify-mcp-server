@@ -69,19 +69,26 @@ export const searchActorsArgsSchema = z.object({
 });
 
 /**
- * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors)..
+ * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors),
+ * unless the actor's ID is present in the user's rented actor IDs list.
  *
- * Returns new array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model.
+ * This is necessary because the Store list API does not support filtering by multiple pricing models at once.
  *
  * @param actors - Array of ActorStorePruned objects to filter.
- * @returns Array of actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model.
+ * @param userRentedActorIds - Array of actor IDs that the user has rented.
+ * @returns Array of actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model,
+ *          except for actors that the user has rented (whose IDs are in userRentedActorIds).
  */
 function filterRentalActors(
     actors: ActorStorePruned[],
+    userRentedActorIds: string[],
 ): ActorStorePruned[] {
     // Store list API does not support filtering by two pricing models at once,
     // so we filter the results manually after fetching them.
-    return actors.filter((actor) => (actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH');
+    return actors.filter((actor) => (
+        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH'
+        || userRentedActorIds.includes(actor.id),
+    );
 }
 
 /**
@@ -102,7 +109,7 @@ export const searchActors: ToolEntry = {
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, apifyToken, userRentedActorIds } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
             let actors = await searchActorsByKeywords(
                 parsed.search,
@@ -110,7 +117,7 @@ export const searchActors: ToolEntry = {
                 parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
             );
-            actors = filterRentalActors(actors || []).slice(0, parsed.limit);
+            actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
 
             return { content: actors?.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
         },
