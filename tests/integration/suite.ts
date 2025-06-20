@@ -175,6 +175,31 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        // It should filter out all rental Actors only if we run locally or as standby, where
+        // we cannot access MongoDB to get the user's rented Actors.
+        // In case of apify-mcp-server it should include user's rented Actors.
+        it('should filter out all rental Actors from store search', async () => {
+            const client = await createClientFn();
+
+            const result = await client.callTool({
+                name: HelperTools.STORE_SEARCH,
+                arguments: {
+                    search: 'rental',
+                    limit: 100,
+                },
+            });
+            const content = result.content as {text: string}[];
+            const actors = content.map((item) => JSON.parse(item.text));
+            expect(actors.length).toBeGreaterThan(0);
+
+            // Check that no rental Actors are present
+            for (const actor of actors) {
+                expect(actor.currentPricingInfo.pricingModel).not.toBe('FLAT_PRICE_PER_MONTH');
+            }
+
+            await client.close();
+        });
+
         // Execute only when we can get the MCP server instance - currently skips only stdio
         // is skipped because we are running a compiled version through node and there is no way (easy)
         // to get the MCP server instance
