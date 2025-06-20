@@ -56,3 +56,19 @@ export const ACTOR_ADDITIONAL_INSTRUCTIONS = `Never call/execute tool/Actor unle
 
 export const TOOL_CACHE_MAX_SIZE = 500;
 export const TOOL_CACHE_TTL_SECS = 30 * 60;
+
+export const ACTOR_PRICING_MODEL = {
+    /** Rental actors */
+    FLAT_PRICE_PER_MONTH: 'FLAT_PRICE_PER_MONTH',
+    FREE: 'FREE',
+    /** Pay per result (PPR) actors */
+    PRICE_PER_DATASET_ITEM: 'PRICE_PER_DATASET_ITEM',
+    /** Pay per event (PPE) actors */
+    PAY_PER_EVENT: 'PAY_PER_EVENT',
+} as const;
+
+/**
+ * Used in search Actors tool to search above the input supplied limit,
+ * so we can safely filter out rental Actors from the search and ensure we return some results.
+ */
+export const ACTOR_SEARCH_ABOVE_LIMIT = 50;

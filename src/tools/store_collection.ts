@@ -4,8 +4,8 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { ActorStorePruned, ApifyStorePricingModel, HelperTool, PricingInfo, ToolEntry } from '../types.js';
+import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import type { ActorPricingModel, ActorStorePruned, HelperTool, PricingInfo, ToolEntry } from '../types.js';
 
 function pruneActorStoreInfo(response: ActorStoreList): ActorStorePruned {
     const stats = response.stats || {};
@@ -38,10 +38,9 @@ export async function searchActorsByKeywords(
     apifyToken: string,
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
-    pricingModel: ApifyStorePricingModel | undefined = undefined,
 ): Promise<ActorStorePruned[]> {
     const client = new ApifyClient({ token: apifyToken });
-    const results = await client.store().list({ search, limit, offset, pricingModel });
+    const results = await client.store().list({ search, limit, offset });
     return results.items.map((x) => pruneActorStoreInfo(x));
 }
 
@@ -70,7 +69,9 @@ export const searchActorsArgsSchema = z.object({
 });
 
 /**
- * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors).
+ * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors)..
+ *
+ * Returns new array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model.
  *
  * @param actors - Array of ActorStorePruned objects to filter.
  * @returns Array of actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model.
@@ -80,48 +81,7 @@ function filterRentalActors(
 ): ActorStorePruned[] {
     // Store list API does not support filtering by two pricing models at once,
     // so we filter the results manually after fetching them.
-    return actors.filter((actor) => (actor.currentPricingInfo.pricingModel as ApifyStorePricingModel) !== 'FLAT_PRICE_PER_MONTH');
-}
-
-/**
- * Fallback function to fetch actors if no rental actors are found.
- * Fetches both free and pay-per-result actors and merges them in a zig-zag order.
- *
- * @param search - Search keywords for actors.
- * @param apifyToken - Apify API token.
- * @param limit - Maximum number of actors to return.
- * @param offset - Number of actors to skip from the start.
- * @returns Array of ActorStorePruned objects, alternating between free and pay-per-result actors.
- */
-async function getFallbackActors(
-    search: string,
-    apifyToken: string,
-    limit: number | undefined,
-    offset: number | undefined,
-): Promise<ActorStorePruned[]> {
-    const freeActors = await searchActorsByKeywords(
-        search,
-        apifyToken,
-        limit,
-        offset,
-        'FREE',
-    );
-    const payPerResultActors = await searchActorsByKeywords(
-        search,
-        apifyToken,
-        limit,
-        offset,
-        'PRICE_PER_DATASET_ITEM',
-    );
-    const allActors: ActorStorePruned[] = [];
-    // Push Actors in zig-zag order to ensure that we return all Actors
-    // in relevant order.
-    const maxLength = Math.max(freeActors?.length || 0, payPerResultActors?.length || 0);
-    for (let i = 0; i < maxLength; i++) {
-        if (freeActors && freeActors[i]) allActors.push(freeActors[i]);
-        if (payPerResultActors && payPerResultActors[i]) allActors.push(payPerResultActors[i]);
-    }
-    return allActors;
+    return actors.filter((actor) => (actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH');
 }
 
 /**
@@ -147,21 +107,10 @@ export const searchActors: ToolEntry = {
             let actors = await searchActorsByKeywords(
                 parsed.search,
                 apifyToken,
-                parsed.limit,
+                parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
             );
-            actors = filterRentalActors(actors || []);
-            if (actors.length === 0) {
-                // If no non-rental actors found, search for free and pay-per-result actors directly
-                // and sort them by total stars.
-                // This is a fallback to ensure we return some results.
-                actors = await getFallbackActors(
-                    parsed.search,
-                    apifyToken,
-                    parsed.limit,
-                    parsed.offset,
-                );
-            }
+            actors = filterRentalActors(actors || []).slice(0, parsed.limit);
 
             return { content: actors?.map((item) => ({ type: 'text', text: JSON.stringify(item) })) };
         },

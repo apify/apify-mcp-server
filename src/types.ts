@@ -2,6 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
 
+import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 
 export interface ISchemaProperties {
@@ -191,4 +192,5 @@ export interface ToolCacheEntry {
     tool: ToolEntry;
 }
 
-export type ApifyStorePricingModel = 'FREE' | 'FLAT_PRICE_PER_MONTH' | 'PRICE_PER_DATASET_ITEM';
+// Utility type to get the union of values of an object type
+export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
