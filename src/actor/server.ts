@@ -130,7 +130,7 @@ export function createExpressApp(
             // New initialization request - use JSON response mode
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
-                    enableJsonResponse: true, // Enable JSON response mode
+                    enableJsonResponse: false, // Use SSE response mode
                 });
                 // Load MCP server tools
                 await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
