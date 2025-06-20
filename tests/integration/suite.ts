@@ -82,7 +82,7 @@ export function createIntegrationTestsSuite(
     describe(suiteName, {
         concurrent: false, // Make all tests sequential to prevent state interference
     }, () => {
-        it('should list all default tools and default Actors', async () => {
+        it('should list all default tools and Actors', async () => {
             const client = await createClientFn();
             const tools = await client.listTools();
             expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + addRemoveTools.length);
@@ -94,7 +94,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list all default tools, tools for adding/removing Actors, and default Actors', async () => {
+        it('should list all default tools and Actors, with add/remove tools', async () => {
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(defaultTools.length + defaults.actors.length + addRemoveTools.length);
@@ -102,6 +102,16 @@ export function createIntegrationTestsSuite(
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
+            await client.close();
+        });
+
+        it('should list all default tools and Actors, without add/remove tools', async () => {
+            const client = await createClientFn({ enableAddingActors: false });
+            const names = getToolNames(await client.listTools());
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+
+            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             await client.close();
         });
 
