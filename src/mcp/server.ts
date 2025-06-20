@@ -12,6 +12,7 @@ import {
     ListToolsRequestSchema,
     McpError,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 
 import log from '@apify/log';
@@ -45,6 +46,7 @@ export class ActorsMcpServer {
     public readonly tools: Map<string, ToolEntry>;
     private options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
+    private sigintHandler: (() => Promise<void>) | undefined;
 
     constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
         this.options = {
@@ -292,7 +294,6 @@ export class ActorsMcpServer {
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
-            log.info(`Added/updated tool: ${wrap.tool.name}`);
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
@@ -319,12 +320,13 @@ export class ActorsMcpServer {
         this.server.onerror = (error) => {
             console.error('[MCP Error]', error); // eslint-disable-line no-console
         };
-        // Allow disabling of the SIGINT handler to prevent max listeners warning
         if (setupSIGINTHandler) {
-            process.on('SIGINT', async () => {
+            const handler = async () => {
                 await this.server.close();
                 process.exit(0);
-            });
+            };
+            process.once('SIGINT', handler);
+            this.sigintHandler = handler; // Store the actual handler
         }
     }
 
@@ -342,9 +344,10 @@ export class ActorsMcpServer {
         /**
          * Handles the request to call a tool.
          * @param {object} request - The request object containing tool name and arguments.
+         * @param {object} extra - Extra data given to the request handler, such as sendNotification function.
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
-        this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args } = request.params;
             const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
@@ -415,6 +418,7 @@ export class ActorsMcpServer {
                     const internalTool = tool.tool as HelperTool;
                     const res = await internalTool.call({
                         args,
+                        extra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
                         apifyToken,
@@ -501,6 +505,23 @@ export class ActorsMcpServer {
     }
 
     async close(): Promise<void> {
+        // Remove SIGINT handler
+        if (this.sigintHandler) {
+            process.removeListener('SIGINT', this.sigintHandler);
+            this.sigintHandler = undefined;
+        }
+        // Clear all tools and their compiled schemas
+        for (const tool of this.tools.values()) {
+            if (tool.tool.ajvValidate && typeof tool.tool.ajvValidate === 'function') {
+                (tool.tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
+            }
+        }
+        this.tools.clear();
+        // Unregister tools changed handler
+        if (this.toolsChangedHandler) {
+            this.unregisterToolsChangedHandler();
+        }
+        // Close server (which should also remove its event handlers)
         await this.server.close();
     }
 }

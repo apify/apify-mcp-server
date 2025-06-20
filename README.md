@@ -70,9 +70,7 @@ Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with the Actors specified below, but this can be overridden by providing Actor input.
 
 ```text
-'apify/instagram-scraper'
 'apify/rag-web-browser'
-'lukaskrivka/google-maps-with-contact-details'
 ```
 The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
 See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
