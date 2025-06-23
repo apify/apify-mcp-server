@@ -203,5 +203,5 @@ export interface ToolCacheEntry {
     tool: ToolEntry;
 }
 
-// Utility type to get the union of values of an object type
+// Utility type to get a union of values from an object type
 export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
