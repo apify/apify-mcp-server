@@ -75,9 +75,8 @@ export const searchActorsArgsSchema = z.object({
  * This is necessary because the Store list API does not support filtering by multiple pricing models at once.
  *
  * @param actors - Array of ActorStorePruned objects to filter.
- * @param userRentedActorIds - Array of actor IDs that the user has rented.
- * @returns Array of actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model,
- *          except for actors that the user has rented (whose IDs are in userRentedActorIds).
+ * @param userRentedActorIds - Array of Actor IDs that the user has rented.
+ * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors), except for Actors that the user has rented (whose IDs are in userRentedActorIds).
  */
 function filterRentalActors(
     actors: ActorStorePruned[],
