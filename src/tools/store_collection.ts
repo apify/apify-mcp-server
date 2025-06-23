@@ -76,7 +76,8 @@ export const searchActorsArgsSchema = z.object({
  *
  * @param actors - Array of ActorStorePruned objects to filter.
  * @param userRentedActorIds - Array of Actor IDs that the user has rented.
- * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors), except for Actors that the user has rented (whose IDs are in userRentedActorIds).
+ * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
+ *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
  */
 function filterRentalActors(
     actors: ActorStorePruned[],
