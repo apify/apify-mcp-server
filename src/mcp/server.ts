@@ -19,7 +19,6 @@ import log from '@apify/log';
 
 import {
     ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
-    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     defaults,
     SERVER_NAME,
     SERVER_VERSION,
@@ -29,7 +28,7 @@ import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { createMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
-import { processParamsGetTools } from './utils.js';
+import { processParamsGetTools, truncateDatasetItems } from './utils.js';
 
 type ActorsMcpServerOptions = {
     enableAddingActors?: boolean;
@@ -462,12 +461,17 @@ export class ActorsMcpServer {
                         { type: 'text', text: `Dataset information: ${JSON.stringify(datasetInfo)}` },
                     ];
 
-                    const itemContents = items.items.map((item: Record<string, unknown>) => {
-                        const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
-                        return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
-                            ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
-                            : { type: 'text', text };
-                    });
+                    // Get max char length for whole dataset based on the number of items
+                    const maxDatasetLength = ACTOR_OUTPUT_MAX_CHARS_PER_ITEM * items.items.length;
+                    const itemContents = truncateDatasetItems(items, maxDatasetLength, datasetInfo?.itemCount || 0)
+                        .items.map(
+                            (item: Record<string, unknown>) => {
+                                return {
+                                    type: 'text',
+                                    text: JSON.stringify(item),
+                                };
+                            },
+                        );
                     content.push(...itemContents);
                     return { content };
                 }

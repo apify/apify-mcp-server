@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
+import type { PaginatedList } from 'apify-client';
+
+import { ACTOR_OUTPUT_TRUNCATED_MESSAGE } from '../const.js';
 import { processInput } from '../input.js';
 import { addRemoveTools, getActorsAsTools } from '../tools/index.js';
 import type { Input, ToolEntry } from '../types.js';
@@ -57,4 +60,44 @@ export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
     const params = parse(query) as unknown as Input;
     return processInput(params);
+}
+
+/**
+ * Truncates dataset items to fit within a specified character limit.
+ *
+ * This function will remove items from the end of the dataset until the total
+ * character count of the dataset items is within the specified limit.
+ * If there is only one item (left) in the dataset, it will not be truncated.
+ */
+export function truncateDatasetItems(
+    items: PaginatedList<Record<string, unknown>>,
+    maxChars: number,
+    originalItemCount: number,
+): PaginatedList<Record<string, unknown>> {
+    // If within the limit, return as is.
+    if (JSON.stringify(items).length <= maxChars) {
+        return items;
+    }
+
+    // Do not truncate single item datasets.
+    if (items.items.length < 2) {
+        return items;
+    }
+
+    // Truncate from back and check if the total length is within the limit.
+    while (items.items.length > 1) {
+        if (JSON.stringify(items).length <= maxChars) {
+            break; // If the dataset is within the limit, stop truncating.
+        }
+        items.items.pop(); // Remove the last item if the dataset exceeds the limit.
+    }
+
+    // Add truncation message
+    items.items.push({
+        truncationInfo: ACTOR_OUTPUT_TRUNCATED_MESSAGE,
+        originalItemCount,
+        itemCountAfterTruncation: items.items.length,
+    });
+
+    return items;
 }
