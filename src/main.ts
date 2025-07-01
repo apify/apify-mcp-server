@@ -10,8 +10,7 @@ import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
 import { processInput } from './input.js';
-import { ActorsMcpServer } from './mcp/server.js';
-import { callActorGetDataset, getActorsAsTools } from './tools/index.js';
+import { callActorGetDataset } from './tools/index.js';
 import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
@@ -30,22 +29,21 @@ const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as In
 log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
-    const mcpServer = new ActorsMcpServer({
-        enableAddingActors: Boolean(input.enableAddingActors),
-        enableDefaultActors: false,
-    });
-
-    const app = createExpressApp(HOST, mcpServer);
-    log.info('Actor is running in the STANDBY mode.');
-
+    let actorsToLoad: string[] = [];
     // Load only Actors specified in the input
     // If you wish to start without any Actor, create a task and leave the input empty
     if (input.actors && input.actors.length > 0) {
         const { actors } = input;
-        const actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
-        const tools = await getActorsAsTools(actorsToLoad, process.env.APIFY_TOKEN as string);
-        mcpServer.upsertTools(tools);
+        actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
     }
+    // Include Actors to load in the MCP server options for backwards compatibility
+    const app = createExpressApp(HOST, {
+        enableAddingActors: Boolean(input.enableAddingActors),
+        enableDefaultActors: false,
+        actors: actorsToLoad,
+    });
+    log.info('Actor is running in the STANDBY mode.');
+
     app.listen(PORT, () => {
         log.info(`The Actor web server is listening for user requests at ${HOST}`);
     });

@@ -54,8 +54,8 @@ export const ACTOR_ADDITIONAL_INSTRUCTIONS = `Never call/execute tool/Actor unle
      You can always use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.
      Actor run input is always stored in the key-value store, recordKey: INPUT.`;
 
-export const TOOL_CACHE_MAX_SIZE = 500;
-export const TOOL_CACHE_TTL_SECS = 30 * 60;
+export const ACTOR_CACHE_MAX_SIZE = 500;
+export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental actors */
@@ -72,3 +72,5 @@ export const ACTOR_PRICING_MODEL = {
  * so we can safely filter out rental Actors from the search and ensure we return some results.
  */
 export const ACTOR_SEARCH_ABOVE_LIMIT = 50;
+
+export const MCP_STREAMABLE_ENDPOINT = '/mcp';

@@ -47,8 +47,14 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     input?: IActorInputSchema;
 }
 
+/**
+ * Pruned Actor definition type.
+ * The `id` property is set to Actor ID.
+ */
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
-    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'>
+    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'> & {
+        webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    }
 
 /**
  * Base interface for all tools in the MCP server.
@@ -198,10 +204,13 @@ export type Input = {
     debugActorInput?: unknown;
 };
 
-export interface ToolCacheEntry {
-    expiresAt: number;
-    tool: ToolEntry;
-}
-
 // Utility type to get a union of values from an object type
 export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
+
+/**
+ * Type representing the Actor information needed in order to turn it into an MCP server tool.
+ */
+export interface ActorInfo {
+    webServerMcpPath: string | null; // To determined if the Actor is an MCP server
+    actorDefinitionPruned: ActorDefinitionPruned;
+}

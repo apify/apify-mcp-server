@@ -19,7 +19,7 @@ const getUserRunsListArgs = z.object({
     desc: z.boolean()
         .describe('If true or 1 then the runs are sorted by the startedAt field in descending order. Default: sorted in ascending order.')
         .default(false),
-    status: z.enum(['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'TIMING_OUT', 'TIMED_OUT', 'ABORTING', 'ABORTED'])
+    status: z.enum(['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'TIMING-OUT', 'TIMED-OUT', 'ABORTING', 'ABORTED'])
         .optional()
         .describe('Return only runs with the provided status.'),
 });

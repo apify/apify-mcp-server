@@ -46,6 +46,7 @@ export async function getActorDefinition(
 
         if (buildDetails?.actorDefinition) {
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
+            // We set actorDefinition ID to Actor ID
             actorDefinitions.id = actor.id;
             actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
             actorDefinitions.description = actor.description || '';
@@ -75,6 +76,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
             : undefined,
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
+        webServerMcpPath: 'webServerMcpPath' in response ? response.webServerMcpPath as string : undefined,
     };
 }
 /** Prune Actor README if it is too long

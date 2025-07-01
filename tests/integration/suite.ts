@@ -1,26 +1,23 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
-import type { ActorsMcpServer } from '../../src/index.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import { addActor, expectArrayWeakEquals, type McpClientOptions } from '../helpers.js';
+import { ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
+import { type McpClientOptions } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
-    getActorsMcpServer?: () => ActorsMcpServer;
+    transport: 'sse' | 'streamable-http' | 'stdio';
     createClientFn: (options?: McpClientOptions) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
     afterEachFn?: () => Promise<void>;
 }
-
-const ACTOR_PYTHON_EXAMPLE = 'apify/python-example';
-const DEFAULT_TOOL_NAMES = defaultTools.map((tool) => tool.tool.name);
-const DEFAULT_ACTOR_NAMES = defaults.actors.map((tool) => actorNameToToolName(tool));
 
 function getToolNames(tools: { tools: { name: string }[] }) {
     return tools.tools.map((tool) => tool.name);
@@ -57,7 +54,6 @@ export function createIntegrationTestsSuite(
 ) {
     const {
         suiteName,
-        getActorsMcpServer,
         createClientFn,
         beforeAllFn,
         afterAllFn,
@@ -212,161 +208,6 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // Execute only when we can get the MCP server instance - currently skips only stdio
-        // is skipped because we are running a compiled version through node and there is no way (easy)
-        // to get the MCP server instance
-        it.runIf(getActorsMcpServer)('should load and restore tools from a tool list', async () => {
-            const client = await createClientFn({ enableAddingActors: true });
-            const actorsMcpServer = getActorsMcpServer!();
-
-            // Add a new Actor
-            await addActor(client, ACTOR_PYTHON_EXAMPLE);
-
-            // Store the tool name list
-            const names = actorsMcpServer.listAllToolNames();
-            const expectedToolNames = [
-                ...DEFAULT_TOOL_NAMES,
-                ...defaults.actors,
-                ...addRemoveTools.map((tool) => tool.tool.name),
-                ...[ACTOR_PYTHON_EXAMPLE],
-            ];
-            expectArrayWeakEquals(expectedToolNames, names);
-
-            // Remove all tools
-            actorsMcpServer.tools.clear();
-            expect(actorsMcpServer.listAllToolNames()).toEqual([]);
-
-            // Load the tool state from the tool name list
-            await actorsMcpServer.loadToolsByName(names, process.env.APIFY_TOKEN as string);
-
-            // Check if the tool name list is restored
-            expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
-
-            await client.close();
-        });
-
-        it.runIf(getActorsMcpServer)('should reset and restore tool state with default tools', async () => {
-            const firstClient = await createClientFn({ enableAddingActors: true });
-            const actorsMCPServer = getActorsMcpServer!();
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
-            const toolList = actorsMCPServer.listAllToolNames();
-            expect(toolList.length).toEqual(numberOfTools);
-            // Add a new Actor
-            await addActor(firstClient, ACTOR_PYTHON_EXAMPLE);
-
-            // Store the tool name list
-            const toolListWithActor = actorsMCPServer.listAllToolNames();
-            expect(toolListWithActor.length).toEqual(numberOfTools + 1); // + 1 for the added Actor
-            await firstClient.close();
-
-            // Remove all tools
-            await actorsMCPServer.reset();
-            // We connect second client so that the default tools are loaded
-            // if no specific list of Actors is provided
-            const secondClient = await createClientFn({ enableAddingActors: true });
-            const toolListAfterReset = actorsMCPServer.listAllToolNames();
-            expect(toolListAfterReset.length).toEqual(numberOfTools);
-            await secondClient.close();
-        });
-
-        it.runIf(getActorsMcpServer)('should notify tools changed handler on tool modifications', async () => {
-            const client = await createClientFn({ enableAddingActors: true });
-            let latestTools: string[] = [];
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
-
-            let toolNotificationCount = 0;
-            const onToolsChanged = (tools: string[]) => {
-                latestTools = tools;
-                toolNotificationCount++;
-            };
-
-            const actorsMCPServer = getActorsMcpServer!();
-            actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
-
-            // Add a new Actor
-            const actor = ACTOR_PYTHON_EXAMPLE;
-            await client.callTool({
-                name: HelperTools.ACTOR_ADD,
-                arguments: {
-                    actorName: actor,
-                },
-            });
-
-            // Check if the notification was received with the correct tools
-            expect(toolNotificationCount).toBe(1);
-            expect(latestTools.length).toBe(numberOfTools + 1);
-            expect(latestTools).toContain(actor);
-            for (const tool of [...defaultTools, ...addRemoveTools]) {
-                expect(latestTools).toContain(tool.tool.name);
-            }
-            for (const tool of defaults.actors) {
-                expect(latestTools).toContain(tool);
-            }
-
-            // Remove the Actor
-            await client.callTool({
-                name: HelperTools.ACTOR_REMOVE,
-                arguments: {
-                    toolName: actorNameToToolName(actor),
-                },
-            });
-
-            // Check if the notification was received with the correct tools
-            expect(toolNotificationCount).toBe(2);
-            expect(latestTools.length).toBe(numberOfTools);
-            expect(latestTools).not.toContain(actor);
-            for (const tool of [...defaultTools, ...addRemoveTools]) {
-                expect(latestTools).toContain(tool.tool.name);
-            }
-            for (const tool of defaults.actors) {
-                expect(latestTools).toContain(tool);
-            }
-
-            await client.close();
-        });
-
-        it.runIf(getActorsMcpServer)('should stop notifying after unregistering tools changed handler', async () => {
-            const client = await createClientFn({ enableAddingActors: true });
-            let latestTools: string[] = [];
-            let notificationCount = 0;
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
-            const onToolsChanged = (tools: string[]) => {
-                latestTools = tools;
-                notificationCount++;
-            };
-
-            const actorsMCPServer = getActorsMcpServer!();
-            actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
-
-            // Add a new Actor
-            const actor = ACTOR_PYTHON_EXAMPLE;
-            await client.callTool({
-                name: HelperTools.ACTOR_ADD,
-                arguments: {
-                    actorName: actor,
-                },
-            });
-
-            // Check if the notification was received
-            expect(notificationCount).toBe(1);
-            expect(latestTools.length).toBe(numberOfTools + 1);
-            expect(latestTools).toContain(actor);
-
-            actorsMCPServer.unregisterToolsChangedHandler();
-
-            // Remove the Actor
-            await client.callTool({
-                name: HelperTools.ACTOR_REMOVE,
-                arguments: {
-                    toolName: actorNameToToolName(actor),
-                },
-            });
-
-            // Check if the notification was NOT received
-            expect(notificationCount).toBe(1);
-            await client.close();
-        });
-
         it('should notify client about tool list changed', async () => {
             const client = await createClientFn({ enableAddingActors: true });
 
@@ -383,6 +224,13 @@ export function createIntegrationTestsSuite(
 
             expect(hasReceivedNotification).toBe(true);
 
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'streamable-http')('should successfully terminate streamable session', async () => {
+            const client = await createClientFn();
+            await client.listTools();
+            await (client.transport as StreamableHTTPClientTransport).terminateSession();
             await client.close();
         });
     });

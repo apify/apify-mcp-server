@@ -11,8 +11,9 @@ import express from 'express';
 
 import log from '@apify/log';
 
-import { type ActorsMcpServer } from '../mcp/server.js';
-import { parseInputParamsFromUrl, processParamsGetTools } from '../mcp/utils.js';
+import { ActorsMcpServer } from '../mcp/server.js';
+import { parseInputParamsFromUrl } from '../mcp/utils.js';
+import { getActorsAsTools } from '../tools/actor.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -34,10 +35,15 @@ async function loadToolsAndActors(mcpServer: ActorsMcpServer, url: string, apify
 
 export function createExpressApp(
     host: string,
-    mcpServer: ActorsMcpServer,
+    mcpServerOptions: {
+        enableAddingActors?: boolean;
+        enableDefaultActors?: boolean;
+        actors?: string[];
+    },
 ): express.Express {
     const app = express();
-    let transportSSE: SSEServerTransport;
+    const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
+    const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
@@ -62,11 +68,6 @@ export function createExpressApp(
         }
         try {
             log.info(`Received GET message at: ${Routes.ROOT}`);
-            // TODO: I think we should remove this logic, root should return only help message
-            const tools = await processParamsGetTools(req.url, process.env.APIFY_TOKEN as string);
-            if (tools) {
-                mcpServer.upsertTools(tools);
-            }
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
@@ -83,9 +84,25 @@ export function createExpressApp(
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
+            const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+            // Load tools from Actor input for backwards compatibility
+            if (mcpServerOptions.actors && mcpServerOptions.actors.length > 0) {
+                const tools = await getActorsAsTools(mcpServerOptions.actors, process.env.APIFY_TOKEN as string);
+                mcpServer.upsertTools(tools);
+            }
             await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
-            transportSSE = new SSEServerTransport(Routes.MESSAGE, res);
-            await mcpServer.connect(transportSSE);
+            const transport = new SSEServerTransport(Routes.MESSAGE, res);
+            transportsSSE[transport.sessionId] = transport;
+            mcpServers[transport.sessionId] = mcpServer;
+            await mcpServer.connect(transport);
+
+            res.on('close', () => {
+                log.info('Connection closed, cleaning up', {
+                    sessionId: transport.sessionId,
+                });
+                delete transportsSSE[transport.sessionId];
+                delete mcpServers[transport.sessionId];
+            });
         } catch (error) {
             respondWithError(res, error, `Error in GET ${Routes.SSE}`);
         }
@@ -94,8 +111,22 @@ export function createExpressApp(
     app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
         try {
             log.info(`Received POST message at: ${Routes.MESSAGE}`);
-            if (transportSSE) {
-                await transportSSE.handlePostMessage(req, res);
+            const sessionId = new URL(req.url, `http://${req.headers.host}`).searchParams.get('sessionId');
+            if (!sessionId) {
+                log.error('No session ID provided in POST request');
+                res.status(400).json({
+                    jsonrpc: '2.0',
+                    error: {
+                        code: -32000,
+                        message: 'Bad Request: No session ID provided',
+                    },
+                    id: null,
+                });
+                return;
+            }
+            const transport = transportsSSE[sessionId];
+            if (transport) {
+                await transport.handlePostMessage(req, res);
             } else {
                 log.error('Server is not connected to the client.');
                 res.status(400).json({
@@ -132,6 +163,12 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
+                const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+                // Load tools from Actor input for backwards compatibility
+                if (mcpServerOptions.actors && mcpServerOptions.actors.length > 0) {
+                    const tools = await getActorsAsTools(mcpServerOptions.actors, process.env.APIFY_TOKEN as string);
+                    mcpServer.upsertTools(tools);
+                }
                 // Load MCP server tools
                 await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
                 // Connect the transport to the MCP server BEFORE handling the request
@@ -143,6 +180,7 @@ export function createExpressApp(
                 // Store the transport by session ID for future requests
                 if (transport.sessionId) {
                     transports[transport.sessionId] = transport;
+                    mcpServers[transport.sessionId] = mcpServer;
                 }
                 return; // Already handled
             } else {
@@ -170,6 +208,20 @@ export function createExpressApp(
         // We don't support GET requests for this server
         // The spec requires returning 405 Method Not Allowed in this case
         res.status(405).set('Allow', 'POST').send('Method Not Allowed');
+    });
+
+    app.delete(Routes.MCP, async (req: Request, res: Response) => {
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+        const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
+        if (transport) {
+            log.info(`Deleting MCP session with ID: ${sessionId}`);
+            await transport.handleRequest(req, res, req.body);
+            return;
+        }
+
+        log.error('Session not found', { sessionId });
+        res.status(400).send('Bad Request: Session not found').end();
     });
 
     // Catch-all for undefined routes

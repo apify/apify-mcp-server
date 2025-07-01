@@ -4,7 +4,6 @@ import type { ActorCallOptions, ActorRun, Dataset, PaginatedList } from 'apify-c
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { LruCache } from '@apify/datastructures';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
@@ -13,13 +12,12 @@ import {
     ACTOR_MAX_MEMORY_MBYTES,
     ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS,
     HelperTools,
-    TOOL_CACHE_MAX_SIZE,
-    TOOL_CACHE_TTL_SECS,
 } from '../const.js';
-import { getActorsMCPServerURL, isActorMCPServer } from '../mcp/actors.js';
+import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { createMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
-import type { InternalTool, ToolCacheEntry, ToolEntry } from '../types.js';
+import { actorDefinitionPrunedCache } from '../state.js';
+import type { ActorInfo, InternalTool, ToolEntry } from '../types.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
@@ -40,11 +38,6 @@ export type CallActorGetDatasetResult = {
     datasetInfo: Dataset | undefined;
     items: PaginatedList<Record<string, unknown>>;
 };
-
-// Cache for normal Actor tools
-const normalActorToolsCache = new LruCache<ToolCacheEntry>({
-    maxLength: TOOL_CACHE_MAX_SIZE,
-});
 
 /**
  * Calls an Apify actor and retrieves the dataset items.
@@ -111,69 +104,42 @@ export async function callActorGetDataset(
  * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
-    actors: string[],
-    apifyToken: string,
+    actorsInfo: ActorInfo[],
 ): Promise<ToolEntry[]> {
     const tools: ToolEntry[] = [];
-    const actorsToLoad: string[] = [];
-    for (const actorID of actors) {
-        const cacheEntry = normalActorToolsCache.get(actorID);
-        if (cacheEntry && cacheEntry.expiresAt > Date.now()) {
-            tools.push(cacheEntry.tool);
-        } else {
-            actorsToLoad.push(actorID);
-        }
-    }
-    if (actorsToLoad.length === 0) {
-        return tools;
-    }
-
-    const getActorDefinitionWithToken = async (actorId: string) => {
-        return await getActorDefinition(actorId, apifyToken);
-    };
-    const results = await Promise.all(actorsToLoad.map(getActorDefinitionWithToken));
 
     // Zip the results with their corresponding actorIDs
-    for (let i = 0; i < results.length; i++) {
-        const result = results[i];
-        // We need to get the orignal input from the user
-        // sonce the user can input real Actor ID like '3ox4R101TgZz67sLr' instead of
-        // 'username/actorName' even though we encourage that.
-        // And the getActorDefinition does not return the original input it received, just the actorFullName or actorID
-        const actorIDOrName = actorsToLoad[i];
+    for (const actorInfo of actorsInfo) {
+        const { actorDefinitionPruned } = actorInfo;
 
-        if (result) {
-            const schemaID = getToolSchemaID(result.actorFullName);
-            if (result.input && 'properties' in result.input && result.input) {
-                result.input.properties = markInputPropertiesAsRequired(result.input);
-                result.input.properties = buildNestedProperties(result.input.properties);
-                result.input.properties = filterSchemaProperties(result.input.properties);
-                result.input.properties = shortenProperties(result.input.properties);
-                result.input.properties = addEnumsToDescriptionsWithExamples(result.input.properties);
+        if (actorDefinitionPruned) {
+            const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
+            if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
+                actorDefinitionPruned.input.properties = markInputPropertiesAsRequired(actorDefinitionPruned.input);
+                actorDefinitionPruned.input.properties = buildNestedProperties(actorDefinitionPruned.input.properties);
+                actorDefinitionPruned.input.properties = filterSchemaProperties(actorDefinitionPruned.input.properties);
+                actorDefinitionPruned.input.properties = shortenProperties(actorDefinitionPruned.input.properties);
+                actorDefinitionPruned.input.properties = addEnumsToDescriptionsWithExamples(actorDefinitionPruned.input.properties);
                 // Add schema $id, each valid JSON schema should have a unique $id
                 // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
-                result.input.$id = schemaID;
+                actorDefinitionPruned.input.$id = schemaID;
             }
             try {
-                const memoryMbytes = result.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
+                const memoryMbytes = actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
                 const tool: ToolEntry = {
                     type: 'actor',
                     tool: {
-                        name: actorNameToToolName(result.actorFullName),
-                        actorFullName: result.actorFullName,
-                        description: `${result.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
-                        inputSchema: result.input || {},
-                        ajvValidate: fixedAjvCompile(ajv, result.input || {}),
+                        name: actorNameToToolName(actorDefinitionPruned.actorFullName),
+                        actorFullName: actorDefinitionPruned.actorFullName,
+                        description: `${actorDefinitionPruned.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
+                        inputSchema: actorDefinitionPruned.input || {},
+                        ajvValidate: fixedAjvCompile(ajv, actorDefinitionPruned.input || {}),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },
                 };
                 tools.push(tool);
-                normalActorToolsCache.add(actorIDOrName, {
-                    tool,
-                    expiresAt: Date.now() + TOOL_CACHE_TTL_SECS * 1000,
-                });
             } catch (validationError) {
-                log.error(`Failed to compile AJV schema for Actor: ${result.actorFullName}. Error: ${validationError}`);
+                log.error(`Failed to compile AJV schema for Actor: ${actorDefinitionPruned.actorFullName}. Error: ${validationError}`);
             }
         }
     }
@@ -181,18 +147,33 @@ export async function getNormalActorsAsTools(
 }
 
 async function getMCPServersAsTools(
-    actors: string[],
+    actorsInfo: ActorInfo[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
     const actorsMCPServerTools: ToolEntry[] = [];
-    for (const actorID of actors) {
-        const serverUrl = await getActorsMCPServerURL(actorID, apifyToken);
-        log.info(`ActorID: ${actorID} MCP server URL: ${serverUrl}`);
+    for (const actorInfo of actorsInfo) {
+        const actorId = actorInfo.actorDefinitionPruned.id;
+        if (!actorInfo.webServerMcpPath) {
+            log.warning('Actor does not have a web server MCP path, skipping', {
+                actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+                actorId,
+            });
+            continue;
+        }
+        const mcpServerUrl = await getActorMCPServerURL(
+            actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
+            actorInfo.webServerMcpPath,
+        );
+        log.info('Retrieved MCP server URL for Actor', {
+            actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+            actorId,
+            mcpServerUrl,
+        });
 
         let client: Client | undefined;
         try {
-            client = await createMCPClient(serverUrl, apifyToken);
-            const serverTools = await getMCPServerTools(actorID, client, serverUrl);
+            client = await createMCPClient(mcpServerUrl, apifyToken);
+            const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
             actorsMCPServerTools.push(...serverTools);
         } finally {
             if (client) await client.close();
@@ -203,29 +184,45 @@ async function getMCPServersAsTools(
 }
 
 export async function getActorsAsTools(
-    actors: string[],
+    actorIdsOrNames: string[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
     log.debug(`Fetching actors as tools...`);
-    log.debug(`Actors: ${actors}`);
-    // Actorized MCP servers
-    const actorsMCPServers: string[] = [];
-    for (const actorID of actors) {
-        // TODO: rework, we are fetching actor definition from API twice - in the getMCPServerTools
-        if (await isActorMCPServer(actorID, apifyToken)) {
-            actorsMCPServers.push(actorID);
-        }
-    }
-    // Normal Actors as a tool
-    const toolActors = actors.filter((actorID) => !actorsMCPServers.includes(actorID));
-    log.debug(`actorsMCPserver: ${actorsMCPServers}`);
-    log.debug(`toolActors: ${toolActors}`);
+    log.debug(`Actors: ${actorIdsOrNames}`);
 
-    // Normal Actors as a tool
-    const normalTools = await getNormalActorsAsTools(toolActors, apifyToken);
+    const actorsInfo: (ActorInfo | null)[] = await Promise.all(
+        actorIdsOrNames.map(async (actorIdOrName) => {
+            const actorDefinitionPrunedCached = actorDefinitionPrunedCache.get(actorIdOrName);
+            if (actorDefinitionPrunedCached) {
+                return {
+                    actorDefinitionPruned: actorDefinitionPrunedCached,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPrunedCached),
 
-    // Tools from Actorized MCP servers
-    const mcpServerTools = await getMCPServersAsTools(actorsMCPServers, apifyToken);
+                } as ActorInfo;
+            }
+
+            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
+            if (!actorDefinitionPruned) {
+                log.error('Actor not found or definition is not available', { actorIdOrName });
+                return null;
+            }
+            // Cache the pruned Actor definition
+            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
+            return {
+                actorDefinitionPruned,
+                webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
+            } as ActorInfo;
+        }),
+    );
+
+    // Filter out nulls and separate Actors with MCP servers and normal Actors
+    const actorMCPServersInfo = actorsInfo.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
+    const normalActorsInfo = actorsInfo.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
+
+    const [normalTools, mcpServerTools] = await Promise.all([
+        getNormalActorsAsTools(normalActorsInfo),
+        getMCPServersAsTools(actorMCPServersInfo, apifyToken),
+    ]);
 
     return [...normalTools, ...mcpServerTools];
 }
