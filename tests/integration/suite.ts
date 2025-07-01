@@ -6,8 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { defaults, HelperTools } from '../../src/const.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import { ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
-import { type McpClientOptions } from '../helpers.js';
+import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
+import { addActor, type McpClientOptions } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
@@ -227,6 +227,38 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should be able to add and call Actorized MCP server', async () => {
+            const client = await createClientFn({ enableAddingActors: true });
+
+            const toolNamesBefore = getToolNames(await client.listTools());
+            const searchToolCountBefore = toolNamesBefore.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
+            expect(searchToolCountBefore).toBe(1);
+
+            // Add self as an Actorized MCP server
+            await addActor(client, ACTOR_MCP_SERVER_ACTOR_NAME);
+
+            const toolNamesAfter = getToolNames(await client.listTools());
+            const searchToolCountAfter = toolNamesAfter.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
+            expect(searchToolCountAfter).toBe(2);
+
+            // Find the search tool from the Actorized MCP server
+            const actorizedMCPSearchTool = toolNamesAfter.find(
+                (name) => name.includes(HelperTools.STORE_SEARCH) && name !== HelperTools.STORE_SEARCH);
+            expect(actorizedMCPSearchTool).toBeDefined();
+
+            const result = await client.callTool({
+                name: actorizedMCPSearchTool as string,
+                arguments: {
+                    search: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    limit: 1,
+                },
+            });
+            expect(result.content).toBeDefined();
+
+            await client.close();
+        });
+
+        // Session termination is only possible for streamable HTTP transport.
         it.runIf(options.transport === 'streamable-http')('should successfully terminate streamable session', async () => {
             const client = await createClientFn();
             await client.listTools();

@@ -14,7 +14,7 @@ import {
     HelperTools,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
-import { createMCPClient } from '../mcp/client.js';
+import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorInfo, InternalTool, ToolEntry } from '../types.js';
@@ -172,7 +172,7 @@ async function getMCPServersAsTools(
 
         let client: Client | undefined;
         try {
-            client = await createMCPClient(mcpServerUrl, apifyToken);
+            client = await connectMCPClient(mcpServerUrl, apifyToken);
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
             actorsMCPServerTools.push(...serverTools);
         } finally {

@@ -27,7 +27,7 @@ import {
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
 import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
-import { createMCPClient } from './client.js';
+import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
 
@@ -432,7 +432,7 @@ export class ActorsMcpServer {
                     const serverTool = tool.tool as ActorMcpTool;
                     let client: Client | undefined;
                     try {
-                        client = await createMCPClient(serverTool.serverUrl, apifyToken);
+                        client = await connectMCPClient(serverTool.serverUrl, apifyToken);
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
