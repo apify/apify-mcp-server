@@ -62,3 +62,9 @@ if (STANDBY_MODE) {
     log.info(`Pushed ${datasetInfo?.itemCount} items to the dataset`);
     await Actor.exit();
 }
+
+// So Ctrl+C works locally
+process.on('SIGINT', async () => {
+    log.info('Received SIGINT, shutting down gracefully...');
+    await Actor.exit();
+});

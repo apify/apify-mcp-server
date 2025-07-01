@@ -11,6 +11,7 @@ import {
     ErrorCode,
     ListToolsRequestSchema,
     McpError,
+    ServerNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions, ApifyApiError } from 'apify-client';
@@ -433,6 +434,22 @@ export class ActorsMcpServer {
                     let client: Client | undefined;
                     try {
                         client = await connectMCPClient(serverTool.serverUrl, apifyToken);
+
+                        // TODO: for some reason the client does not receive notifications
+                        // we need to investigate this
+                        // Set up notification handlers for the client
+                        for (const schema of ServerNotificationSchema.options) {
+                            const method = schema.shape.method.value;
+                            // Forward notifications from the proxy client to the server
+                            client.setNotificationHandler(schema, async (notification) => {
+                                log.info('Sending MCP notification', {
+                                    method,
+                                    notification,
+                                });
+                                await extra.sendNotification(notification);
+                            });
+                        }
+
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
