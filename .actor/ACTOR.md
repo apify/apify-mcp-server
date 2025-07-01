@@ -67,13 +67,17 @@ Interested in building and monetizing your own AI agent on Apify? Check out our 
 ## Tools
 
 ### Actors
-
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with the Actors specified below, but this can be overridden by providing Actor input.
+By default, the server is pre-configured with the Actors specified below, but this can be overridden by providing the `?actors` URL query parameter.
 
 ```text
 'apify/rag-web-browser'
 ```
+For example, to additionally load the `apify/instagram-scraper` Actor, you can start the server with the following URL:
+```text
+https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>&actors=apify/rag-web-browser,apify/instagram-scraper
+```
+
 The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
 See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
 

@@ -30,6 +30,8 @@ log.info(`Loaded input: ${JSON.stringify(input)} `);
 
 if (STANDBY_MODE) {
     let actorsToLoad: string[] = [];
+    // TODO: in standby mode the input loading does not actually work,
+    // we should remove this since we are using the URL query parameters to load Actors
     // Load only Actors specified in the input
     // If you wish to start without any Actor, create a task and leave the input empty
     if (input.actors && input.actors.length > 0) {
