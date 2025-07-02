@@ -42,10 +42,13 @@
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
+    "@ai-sdk/openai": "^1.3.22",
     "@anthropic-ai/sdk": "^0.33.1",
     "@anthropic-ai/tokenizer": "^0.0.4",
     "@apify/eslint-config": "^1.0.0",
     "@apify/tsconfig": "^0.1.0",
+    "@mastra/core": "^0.10.8",
+    "@mastra/mcp": "^0.10.5",
     "@types/express": "^4.0.0",
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
@@ -69,6 +72,7 @@
     "inspector": "npm run build && npx @modelcontextprotocol/inspector dist/stdio.js",
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
+    "test:evaluate": "vitest run tests/evaluate",
     "test:integration": "npm run build && vitest run tests/integration",
     "clean": "tsc -b src --clean"
   },
