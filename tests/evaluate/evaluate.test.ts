@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import { makeMCPRequest } from './setup.js';
 
-describe('Evaluation Tests', () => {
+describe.concurrent.for([
+    'openai/gpt-4o-mini', 'anthropic/claude-sonnet-4-0',
+])('Evaluation Tests (model %s)', (model) => {
     it('Check read not existing dataset', async () => {
-        const result = await makeMCPRequest('Read dataset with id "dataset-id"');
-
-        const mcpCalls = result.steps.flatMap((step) => step.toolCalls).map((call) => ({
-            tool: call.toolName,
-            args: call.args,
-        }));
+        const { mcpCalls, usage } = await makeMCPRequest('Read dataset with id "dataset-id"', model);
 
         expect(mcpCalls).toEqual([
             {
@@ -20,32 +17,34 @@ describe('Evaluation Tests', () => {
             },
         ]);
 
-        console.log('Tokens used:', result.steps.reduce((sum, step) => sum + step.usage.totalTokens, 0));
+        console.log('Tokens used:', usage);
     });
 
-    it.only('Install instagram tool', async () => {
-        const result = await makeMCPRequest('Install instagram scraper and load latest data about "apify" on Instagram');
-
-        const mcpCalls = result.steps.flatMap((step) => step.toolCalls).map((call) => ({
-            tool: call.toolName,
-            args: call.args,
-        }));
+    it('Install instagram tool', async () => {
+        const { mcpCalls, usage } = await makeMCPRequest('Use instagram scraper and load latest posts with #AI', model);
 
         expect(mcpCalls).toEqual([
             {
-                tool: 'add-actor',
+                tool: 'search-actors',
                 args: {
-                    actorName: 'apify/instagram-scraper',
+                    search: 'instagram scraper',
+                    limit: 5,
                 },
             },
             {
-                tool: 'apify-slash-instragram-scraper',
+                tool: 'add-actor',
+                args: {
+                    actorName: 'apify/instagram-hashtag-scraper',
+                },
+            },
+            {
+                tool: 'apify-slash-instragram-hashtag-scraper',
                 args: {
 
                 },
             },
         ]);
 
-        console.log('Tokens used:', result.steps.reduce((sum, step) => sum + step.usage.totalTokens, 0));
+        console.log('Tokens used:', usage);
     });
 });
