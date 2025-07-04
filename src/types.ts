@@ -241,3 +241,20 @@ export type ExtendedActorStoreList = ActorStoreList & {
     bookmarkCount?: number;
     actorReviewRating?: number;
 };
+
+export type ActorDefinitionStorage = {
+    views: Record<
+        string,
+        {
+            transformation: {
+                fields?: string[];
+            };
+            display: {
+                properties: Record<
+                    string,
+                    object
+                >;
+            };
+        }
+    >;
+};

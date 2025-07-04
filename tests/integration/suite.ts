@@ -40,14 +40,18 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     type ContentItem = { text: string; type: string };
     const content = result.content as ContentItem[];
     // The result is { content: [ ... ] }, and the last content is the sum
-    expect(content[content.length - 1]).toEqual({
+    const expected = {
         text: JSON.stringify({
             first_number: 1,
             second_number: 2,
             sum: 3,
         }),
         type: 'text',
-    });
+    };
+    // Parse the JSON to compare objects regardless of property order
+    const actual = content[content.length - 1];
+    expect(JSON.parse(actual.text)).toEqual(JSON.parse(expected.text));
+    expect(actual.type).toBe(expected.type);
 }
 
 export function createIntegrationTestsSuite(

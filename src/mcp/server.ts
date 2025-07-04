@@ -19,8 +19,6 @@ import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 import log from '@apify/log';
 
 import {
-    ACTOR_OUTPUT_MAX_CHARS_PER_ITEM,
-    ACTOR_OUTPUT_TRUNCATED_MESSAGE,
     defaults,
     SERVER_NAME,
     SERVER_VERSION,
@@ -468,25 +466,20 @@ export class ActorsMcpServer {
                     const actorTool = tool.tool as ActorTool;
 
                     const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
-                    const { actorRun, datasetInfo, items } = await callActorGetDataset(
+                    const { items } = await callActorGetDataset(
                         actorTool.actorFullName,
                         args,
                         apifyToken as string,
                         callOptions,
                     );
-                    const content = [
-                        { type: 'text', text: `Actor finished with run information: ${JSON.stringify(actorRun)}` },
-                        { type: 'text', text: `Dataset information: ${JSON.stringify(datasetInfo)}` },
-                    ];
-
-                    const itemContents = items.items.map((item: Record<string, unknown>) => {
-                        const text = JSON.stringify(item).slice(0, ACTOR_OUTPUT_MAX_CHARS_PER_ITEM);
-                        return text.length === ACTOR_OUTPUT_MAX_CHARS_PER_ITEM
-                            ? { type: 'text', text: `${text} ... ${ACTOR_OUTPUT_TRUNCATED_MESSAGE}` }
-                            : { type: 'text', text };
-                    });
-                    content.push(...itemContents);
-                    return { content };
+                    return {
+                        content: items.items.map((item: Record<string, unknown>) => {
+                            return {
+                                type: 'text',
+                                text: JSON.stringify(item),
+                            };
+                        }),
+                    };
                 }
             } catch (error) {
                 if (error instanceof ApifyApiError) {
