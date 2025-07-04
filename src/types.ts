@@ -2,7 +2,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import type { ActorDefaultRunOptions, ActorDefinition } from 'apify-client';
+import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 
 import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
@@ -160,24 +160,45 @@ export interface ActorStats {
     publicActorRunStats30Days: unknown;
 }
 
-export interface PricingInfo {
-    pricingModel?: string;
-    pricePerUnitUsd?: number;
-    trialMinutes?: number
+/**
+ * Price for a single event in a specific tier.
+ */
+export interface TieredEventPrice {
+    tieredEventPriceUsd: number;
 }
 
-export interface ActorStorePruned {
-    id: string;
-    name: string;
-    username: string;
-    actorFullName?: string;
-    title?: string;
-    description?: string;
-    stats: ActorStats;
-    currentPricingInfo: PricingInfo;
-    url: string;
-    totalStars?: number | null;
+/**
+ * Allowed pricing tiers for tiered event pricing.
+ */
+export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
+
+/**
+ * Describes a single chargeable event for an Actor.
+ * Supports either flat pricing (eventPriceUsd) or tiered pricing (eventTieredPricingUsd).
+ */
+export interface ActorChargeEvent {
+    eventTitle: string;
+    eventDescription: string;
+    /** Flat price per event in USD (if not tiered) */
+    eventPriceUsd?: number;
+    /** Tiered pricing per event, by tier name (FREE, BRONZE, etc.) */
+    eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
 }
+
+/**
+ * Pricing per event for an Actor, supporting both flat and tiered pricing.
+ */
+export interface PricingPerEvent {
+    actorChargeEvents: Record<string, ActorChargeEvent>;
+}
+
+export type ExtendedPricingInfo = PricingInfo & {
+    pricePerUnitUsd?: number;
+    trialMinutes?: number;
+    unitName?: string; // Name of the unit for the pricing model
+    pricingPerEvent: PricingPerEvent;
+    tieredPricing?: Partial<Record<PricingTier, { tieredPricePerUnitUsd: number }>>;
+};
 
 /**
  * Interface for internal tools - tools implemented directly in the MCP server.
@@ -214,3 +235,9 @@ export interface ActorInfo {
     webServerMcpPath: string | null; // To determined if the Actor is an MCP server
     actorDefinitionPruned: ActorDefinitionPruned;
 }
+
+export type ExtendedActorStoreList = ActorStoreList & {
+    categories?: string[];
+    bookmarkCount?: number;
+    actorReviewRating?: number;
+};

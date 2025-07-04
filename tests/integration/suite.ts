@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { defaults, HelperTools } from '../../src/const.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
+import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
@@ -142,7 +143,8 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should remove Actor from tools list', async () => {
+        // TODO: disabled for now, remove tools is disabled and might be removed in the future
+        it.runIf(false)('should remove Actor from tools list', async () => {
             const actor = ACTOR_PYTHON_EXAMPLE;
             const selectedToolName = actorNameToToolName(actor);
             const client = await createClientFn({
@@ -197,12 +199,16 @@ export function createIntegrationTestsSuite(
                 },
             });
             const content = result.content as {text: string}[];
-            const actors = content.map((item) => JSON.parse(item.text));
+            expect(content.length).toBe(1);
+            const resultJson = JSON.parse(content[0].text) as ISearchActorsResult;
+            const { actors } = resultJson;
+            expect(actors.length).toBe(resultJson.total);
             expect(actors.length).toBeGreaterThan(0);
 
             // Check that no rental Actors are present
             for (const actor of actors) {
-                expect(actor.currentPricingInfo.pricingModel).not.toBe('FLAT_PRICE_PER_MONTH');
+                // Since we now return the pricingInfo as a string, we need to check if it contains the string
+                expect(actor.pricingInfo).not.toContain('This Actor is rental');
             }
 
             await client.close();
