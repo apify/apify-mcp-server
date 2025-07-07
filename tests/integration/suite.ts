@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { defaults, HelperTools } from '../../src/const.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
+import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
@@ -39,14 +40,18 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     type ContentItem = { text: string; type: string };
     const content = result.content as ContentItem[];
     // The result is { content: [ ... ] }, and the last content is the sum
-    expect(content[content.length - 1]).toEqual({
+    const expected = {
         text: JSON.stringify({
             first_number: 1,
             second_number: 2,
             sum: 3,
         }),
         type: 'text',
-    });
+    };
+    // Parse the JSON to compare objects regardless of property order
+    const actual = content[content.length - 1];
+    expect(JSON.parse(actual.text)).toEqual(JSON.parse(expected.text));
+    expect(actual.type).toBe(expected.type);
 }
 
 export function createIntegrationTestsSuite(
@@ -131,7 +136,7 @@ export function createIntegrationTestsSuite(
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actorName: ACTOR_PYTHON_EXAMPLE } });
+            await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
             // Check if tools was added
             const namesAfterAdd = getToolNames(await client.listTools());
@@ -142,7 +147,8 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should remove Actor from tools list', async () => {
+        // TODO: disabled for now, remove tools is disabled and might be removed in the future
+        it.skip('should remove Actor from tools list', async () => {
             const actor = ACTOR_PYTHON_EXAMPLE;
             const selectedToolName = actorNameToToolName(actor);
             const client = await createClientFn({
@@ -197,12 +203,16 @@ export function createIntegrationTestsSuite(
                 },
             });
             const content = result.content as {text: string}[];
-            const actors = content.map((item) => JSON.parse(item.text));
+            expect(content.length).toBe(1);
+            const resultJson = JSON.parse(content[0].text) as ISearchActorsResult;
+            const { actors } = resultJson;
+            expect(actors.length).toBe(resultJson.total);
             expect(actors.length).toBeGreaterThan(0);
 
             // Check that no rental Actors are present
             for (const actor of actors) {
-                expect(actor.currentPricingInfo.pricingModel).not.toBe('FLAT_PRICE_PER_MONTH');
+                // Since we now return the pricingInfo as a string, we need to check if it contains the string
+                expect(actor.pricingInfo).not.toContain('This Actor is rental');
             }
 
             await client.close();
@@ -220,7 +230,7 @@ export function createIntegrationTestsSuite(
                 }
             });
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actorName: ACTOR_PYTHON_EXAMPLE } });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_PYTHON_EXAMPLE } });
 
             expect(hasReceivedNotification).toBe(true);
 

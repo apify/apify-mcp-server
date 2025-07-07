@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Ajv } from 'ajv';
-import type { ActorCallOptions, ActorRun, Dataset, PaginatedList } from 'apify-client';
+import type { ActorCallOptions, ActorRun, PaginatedList } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -10,14 +10,15 @@ import { ApifyClient } from '../apify-client.js';
 import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
-    ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS,
     HelperTools,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorInfo, InternalTool, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, InternalTool, ToolEntry } from '../types.js';
+import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
+import { getValuesByDotKeys } from '../utils/generic.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
@@ -34,8 +35,6 @@ const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
-    actorRun: ActorRun;
-    datasetInfo: Dataset | undefined;
     items: PaginatedList<Record<string, unknown>>;
 };
 
@@ -50,7 +49,6 @@ export type CallActorGetDatasetResult = {
  * @param {ActorCallOptions} callOptions - The options to pass to the actor.
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
- * @param {number} limit - The maximum number of items to retrieve from the dataset.
  * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
@@ -59,7 +57,6 @@ export async function callActorGetDataset(
     input: unknown,
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
-    limit = ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS,
 ): Promise<CallActorGetDatasetResult> {
     try {
         log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
@@ -69,13 +66,24 @@ export async function callActorGetDataset(
 
         const actorRun: ActorRun = await actorClient.call(input, callOptions);
         const dataset = client.dataset(actorRun.defaultDatasetId);
-        const [datasetInfo, items] = await Promise.all([
-            dataset.get(),
-            dataset.listItems({ limit }),
+        // const dataset = client.dataset('Ehtn0Y4wIKviFT2WB');
+        const [items, defaultBuild] = await Promise.all([
+            dataset.listItems(),
+            (await actorClient.defaultBuild()).get(),
         ]);
-        log.info(`Actor ${actorName} finished with ${datasetInfo?.itemCount} items`);
 
-        return { actorRun, datasetInfo, items };
+        // Get important properties from storage view definitions and if available return only those properties
+        const storageDefinition = defaultBuild?.actorDefinition?.storages?.dataset as ActorDefinitionStorage | undefined;
+        const importantProperties = getActorDefinitionStorageFieldNames(storageDefinition || {});
+        if (importantProperties.length > 0) {
+            items.items = items.items.map((item) => {
+                return getValuesByDotKeys(item, importantProperties);
+            });
+        }
+
+        log.info(`Actor ${actorName} finished with ${items.count} items`);
+
+        return { items };
     } catch (error) {
         log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
         throw new Error(`Error calling Actor: ${error}`);
@@ -115,6 +123,18 @@ export async function getNormalActorsAsTools(
         if (actorDefinitionPruned) {
             const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
             if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
+                // Filter non-required properties except integers if `required` is defined in the input schema and not empty.
+                const { required } = actorDefinitionPruned.input;
+                if (Array.isArray(required) && required.length > 0) {
+                    actorDefinitionPruned.input.properties = Object.fromEntries(
+                        Object.entries(actorDefinitionPruned.input.properties)
+                            // Keep all integer properties, as these include
+                            // properties related to output item counts that users
+                            // might want to change if they need more results than the default limit.
+                            .filter(([key, value]) => required.includes(key) || value.type === 'integer'),
+                    );
+                }
+
                 actorDefinitionPruned.input.properties = markInputPropertiesAsRequired(actorDefinitionPruned.input);
                 actorDefinitionPruned.input.properties = buildNestedProperties(actorDefinitionPruned.input.properties);
                 actorDefinitionPruned.input.properties = filterSchemaProperties(actorDefinitionPruned.input.properties);
@@ -132,7 +152,13 @@ export async function getNormalActorsAsTools(
                         name: actorNameToToolName(actorDefinitionPruned.actorFullName),
                         actorFullName: actorDefinitionPruned.actorFullName,
                         description: `${actorDefinitionPruned.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
-                        inputSchema: actorDefinitionPruned.input || {},
+                        inputSchema: actorDefinitionPruned.input
+                        // So Actor without input schema works - MCP client expects JSON schema valid output
+                        || {
+                            type: 'object',
+                            properties: {},
+                            required: [],
+                        },
                         ajvValidate: fixedAjvCompile(ajv, actorDefinitionPruned.input || {}),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },

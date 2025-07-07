@@ -47,13 +47,7 @@ export const ACTOR_OUTPUT_MAX_CHARS_PER_ITEM = 5_000;
 export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it will not fit into context.`
     + `There is no reason to call this tool again! You can use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.`;
 
-export const ACTOR_ADDITIONAL_INSTRUCTIONS = `Never call/execute tool/Actor unless confirmed by the user.
-     Workflow: When an Actor runs, it processes data and stores results in Apify storage,
-     Datasets (for structured/tabular data) and Key-Value Store (for various data types like JSON, images, HTML).
-     Each Actor run produces a dataset ID and key-value store ID for accessing the results.
-     By default, the number of items returned from an Actor run is limited to ${ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS}.
-     You can always use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.
-     Actor run input is always stored in the key-value store, recordKey: INPUT.`;
+export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
 
 export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
