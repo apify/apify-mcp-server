@@ -241,9 +241,11 @@ export async function getActorsAsTools(
         }),
     );
 
+    const clonedActors = structuredClone(actorsInfo);
+
     // Filter out nulls and separate Actors with MCP servers and normal Actors
-    const actorMCPServersInfo = actorsInfo.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
-    const normalActorsInfo = actorsInfo.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
+    const actorMCPServersInfo = clonedActors.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
+    const normalActorsInfo = clonedActors.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),
@@ -315,7 +317,6 @@ export const callActor: ToolEntry = {
                 throw new Error('APIFY_TOKEN environment variable is not set.');
             }
             try {
-                // FIXME: Bug, every call add "**REQUIRED**" to the description of the input properties
                 const [actor] = await getActorsAsTools([actorName], apifyToken);
 
                 if (!actor) {
@@ -338,7 +339,7 @@ export const callActor: ToolEntry = {
                     }
                 }
 
-                const { actorRun, datasetInfo, items } = await callActorGetDataset(
+                const { items } = await callActorGetDataset(
                     actorName,
                     input,
                     apifyToken,
@@ -346,11 +347,10 @@ export const callActor: ToolEntry = {
                 );
 
                 return {
-                    content: [
-                        { type: 'text', text: `Actor run ID: ${actorRun.id}` },
-                        { type: 'text', text: `Dataset ID: ${datasetInfo?.id}` },
-                        { type: 'text', text: `Items count: ${items.total}` },
-                    ],
+                    content: items.items.map((item: Record<string, unknown>) => ({
+                        type: 'text',
+                        text: JSON.stringify(item),
+                    })),
                 };
             } catch (error) {
                 console.error(`Error calling Actor: ${error}`);
