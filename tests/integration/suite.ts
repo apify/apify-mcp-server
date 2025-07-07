@@ -148,7 +148,7 @@ export function createIntegrationTestsSuite(
         });
 
         // TODO: disabled for now, remove tools is disabled and might be removed in the future
-        it.runIf(false)('should remove Actor from tools list', async () => {
+        it.skip('should remove Actor from tools list', async () => {
             const actor = ACTOR_PYTHON_EXAMPLE;
             const selectedToolName = actorNameToToolName(actor);
             const client = await createClientFn({
