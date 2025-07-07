@@ -261,3 +261,79 @@ export const getActor: ToolEntry = {
         },
     } as InternalTool,
 };
+
+const callActorArgs = z.object({
+    actorName: z.string()
+        .describe('The name of the Actor to call.'),
+    input: z.any()
+        .describe('The input to pass to the Actor.'),
+    callOptions: z.object({
+        memory: z.number().optional(),
+        timeout: z.number().optional(),
+    }).optional()
+        .describe('Optional call options for the Actor.'),
+});
+
+export const callActor: ToolEntry = {
+    type: 'internal',
+    tool: {
+        name: HelperTools.ACTOR_CALL,
+        actorFullName: HelperTools.ACTOR_CALL,
+        description: 'Call Actor and get dataset id. Call without input and result response with requred input properties.',
+        inputSchema: zodToJsonSchema(callActorArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
+        call: async (toolArgs) => {
+            const { args, apifyToken } = toolArgs;
+            const { actorName, input, callOptions } = callActorArgs.parse(args);
+            if (!apifyToken) {
+                throw new Error('APIFY_TOKEN environment variable is not set.');
+            }
+            try {
+                // FIXME: Bug, every call add "**REQUIRED**" to the description of the input properties
+                const [actor] = await getActorsAsTools([actorName], apifyToken);
+
+                if (!actor) {
+                    return {
+                        content: [
+                            { type: 'text', text: `Actor '${actorName}' not found.` },
+                        ],
+                    };
+                }
+
+                if (!actor.tool.ajvValidate(input)) {
+                    const { errors } = actor.tool.ajvValidate;
+                    if (errors && errors.length > 0) {
+                        return {
+                            content: [
+                                { type: 'text', text: `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}` },
+                                { type: 'json', json: actor.tool.inputSchema },
+                            ],
+                        };
+                    }
+                }
+
+                const { actorRun, datasetInfo, items } = await callActorGetDataset(
+                    actorName,
+                    input,
+                    apifyToken,
+                    callOptions,
+                );
+
+                return {
+                    content: [
+                        { type: 'text', text: `Actor run ID: ${actorRun.id}` },
+                        { type: 'text', text: `Dataset ID: ${datasetInfo?.id}` },
+                        { type: 'text', text: `Items count: ${items.total}` },
+                    ],
+                };
+            } catch (error) {
+                console.error(`Error calling Actor: ${error}`);
+                return {
+                    content: [
+                        { type: 'text', text: `Error calling Actor: ${error instanceof Error ? error.message : String(error)}` },
+                    ],
+                };
+            }
+        },
+    },
+};

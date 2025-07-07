@@ -1,5 +1,5 @@
 // Import specific tools that are being used
-import { callActorGetDataset, getActor, getActorsAsTools } from './actor.js';
+import { callActor, callActorGetDataset, getActor, getActorsAsTools } from './actor.js';
 import { actorDefinitionTool } from './build.js';
 import { getDataset, getDatasetItems } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
@@ -13,6 +13,7 @@ import { searchActors } from './store_collection.js';
 export const defaultTools = [
     abortActorRun,
     actorDefinitionTool,
+    callActor,
     getActor,
     getActorLog,
     getActorRun,
