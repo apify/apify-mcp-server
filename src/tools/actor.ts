@@ -265,8 +265,8 @@ export const getActor: ToolEntry = {
 const callActorArgs = z.object({
     actorName: z.string()
         .describe('The name of the Actor to call.'),
-    input: z.any()
-        .describe('The input to pass to the Actor.'),
+    input: z.object({}).passthrough()
+        .describe('The input JSON to pass to the Actor.'),
     callOptions: z.object({
         memory: z.number().optional(),
         timeout: z.number().optional(),
