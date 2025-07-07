@@ -48,7 +48,8 @@ export const getActorDetailsTool: ToolEntry = {
         name: HelperTools.ACTOR_GET_DETAILS,
         description: `Retrieve information about an Actor by its ID or full name.
 The Actor name is always composed of "username/name", for example, "apify/rag-web-browser".
-This tool returns information about the Actor, including whether it is public or deprecated, when it was created or modified, the categories in which the Actor is listed, a description, a README (the Actor's documentation), the input schema, and usage statistics—such as how many users are using it and the number of failed runs of the Actor.`,
+This tool returns information about the Actor, including whether it is public or deprecated, when it was created or modified, the categories in which the Actor is listed, a description, a README (the Actor's documentation), the input schema, and usage statistics—such as how many users are using it and the number of failed runs of the Actor.
+For example, use this tool when a user wants to know more about a specific Actor or wants to use optional or advanced parameters of the Actor that are not listed in the default Actor tool input schema - so you know the details and how to pass them.`,
         inputSchema: zodToJsonSchema(getActorDetailsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorDetailsToolArgsSchema)),
         call: async (toolArgs) => {

@@ -136,7 +136,7 @@ export function createIntegrationTestsSuite(
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actorName: ACTOR_PYTHON_EXAMPLE } });
+            await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
             // Check if tools was added
             const namesAfterAdd = getToolNames(await client.listTools());
@@ -230,7 +230,7 @@ export function createIntegrationTestsSuite(
                 }
             });
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actorName: ACTOR_PYTHON_EXAMPLE } });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_PYTHON_EXAMPLE } });
 
             expect(hasReceivedNotification).toBe(true);
 

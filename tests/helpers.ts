@@ -116,13 +116,13 @@ export async function createMcpStdioClient(
 /**
  * Adds an Actor as a tool using the ADD_ACTOR helper tool.
  * @param client - MCP client instance
- * @param actorName - Name of the Actor to add
+ * @param actor - Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".
  */
-export async function addActor(client: Client, actorName: string): Promise<void> {
+export async function addActor(client: Client, actor: string): Promise<void> {
     await client.callTool({
         name: HelperTools.ACTOR_ADD,
         arguments: {
-            actorName,
+            actor,
         },
     });
 }
