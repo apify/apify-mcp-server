@@ -311,11 +311,28 @@ export const callActor: ToolEntry = {
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { apifyMcpServer, args, apifyToken } = toolArgs;
             const { actorName, input, callOptions } = callActorArgs.parse(args);
-            if (!apifyToken) {
-                throw new Error('APIFY_TOKEN environment variable is not set.');
+
+            const actors = apifyMcpServer.listActorToolNames();
+            if (!actors.includes(actorName)) {
+                const toolsText = actors.length > 0 ? `Added Actors are: ${actors.join(', ')}` : 'Not added Actors yet.';
+                if (apifyMcpServer.tools.has(HelperTools.ACTOR_ADD)) {
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: `Actor '${actorName}' is not added. Add it with tool '${HelperTools.ACTOR_ADD}'. ${toolsText}`,
+                        }],
+                    };
+                }
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Actor '${actorName}' is not added. ${toolsText}`,
+                    }],
+                };
             }
+
             try {
                 const [actor] = await getActorsAsTools([actorName], apifyToken);
 

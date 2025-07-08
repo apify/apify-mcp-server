@@ -130,7 +130,7 @@ export class ActorsMcpServer {
      * Returns the list of all currently loaded Actor tool IDs.
      * @returns {string[]} - Array of loaded Actor tool IDs (e.g., 'apify/rag-web-browser')
      */
-    private listActorToolNames(): string[] {
+    public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
             .filter((tool) => tool.type === 'actor')
             .map((tool) => (tool.tool as ActorTool).actorFullName);
