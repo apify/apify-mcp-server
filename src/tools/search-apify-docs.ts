@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
-import { searchApifyDocs } from '../utils/apify-docs.js';
+import { searchApifyDocsCached } from '../utils/apify-docs.js';
 
 const searchApifyDocsToolArgsSchema = z.object({
     query: z.string()
@@ -42,7 +42,7 @@ Use this tool when a user asks for help with Apify documentation or when you nee
             const parsed = searchApifyDocsToolArgsSchema.parse(args);
             const query = parsed.query.trim();
 
-            const resultsRaw = await searchApifyDocs(query);
+            const resultsRaw = await searchApifyDocsCached(query);
             const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
             if (results.length === 0) {

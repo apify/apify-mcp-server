@@ -50,8 +50,11 @@ export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it w
 
 export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
 
+// Cache
 export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
+export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
+export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental actors */

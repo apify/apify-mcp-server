@@ -8,6 +8,7 @@
 import { algoliasearch } from 'algoliasearch';
 
 import { ALGOLIA } from '../const.js';
+import { searchApifyDocsCache } from '../state.js';
 import type { ApifyDocsSearchResult } from '../types.js';
 
 /**
@@ -42,7 +43,7 @@ export async function searchApifyDocs(query: string): Promise<ApifyDocsSearchRes
         requests: [
             {
                 indexName: ALGOLIA.indexName,
-                query,
+                query: query.trim(),
                 filters: 'version:latest',
             },
         ],
@@ -51,7 +52,6 @@ export async function searchApifyDocs(query: string): Promise<ApifyDocsSearchRes
     const results = response.results as unknown as AlgoliaResult[];
 
     const searchResults: ApifyDocsSearchResult[] = [];
-
     for (const result of results) {
         if (result.hits && result.hits.length > 0) {
             for (const hit of result.hits) {
@@ -71,4 +71,25 @@ export async function searchApifyDocs(query: string): Promise<ApifyDocsSearchRes
     }
 
     return searchResults;
+}
+
+/**
+ * Searches the Apify documentation using Algolia and caches the results.
+ *
+ * If the query has been previously searched, it returns cached results.
+ * Otherwise, it performs a new search and caches the results for future use.
+ *
+ * @param {string} query - The search query string.
+ * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL, optional fragment, and content.
+ */
+export async function searchApifyDocsCached(query: string): Promise<ApifyDocsSearchResult[]> {
+    const normalizedQuery = query.trim();
+    const cachedResults = searchApifyDocsCache.get(normalizedQuery);
+    if (cachedResults) {
+        return cachedResults;
+    }
+
+    const results = await searchApifyDocs(normalizedQuery);
+    searchApifyDocsCache.set(normalizedQuery, results);
+    return results;
 }
