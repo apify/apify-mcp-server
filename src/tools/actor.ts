@@ -241,9 +241,11 @@ export async function getActorsAsTools(
         }),
     );
 
+    const clonedActors = structuredClone(actorsInfo);
+
     // Filter out nulls and separate Actors with MCP servers and normal Actors
-    const actorMCPServersInfo = actorsInfo.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
-    const normalActorsInfo = actorsInfo.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
+    const actorMCPServersInfo = clonedActors.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
+    const normalActorsInfo = clonedActors.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),
@@ -286,4 +288,100 @@ export const getActor: ToolEntry = {
             return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
         },
     } as InternalTool,
+};
+
+const callActorArgs = z.object({
+    actor: z.string()
+        .describe('The name of the Actor to call.'),
+    input: z.object({}).passthrough()
+        .describe('The input JSON to pass to the Actor.'),
+    callOptions: z.object({
+        memory: z.number().optional(),
+        timeout: z.number().optional(),
+    }).optional()
+        .describe('Optional call options for the Actor.'),
+});
+
+export const callActor: ToolEntry = {
+    type: 'internal',
+    tool: {
+        name: HelperTools.ACTOR_CALL,
+        actorFullName: HelperTools.ACTOR_CALL,
+        description: `Call Actor and get dataset results. Call without input and result response with requred input properties. Actor MUST be added before calling, use ${HelperTools.ACTOR_ADD} tool before.`,
+        inputSchema: zodToJsonSchema(callActorArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
+        call: async (toolArgs) => {
+            const { apifyMcpServer, args, apifyToken } = toolArgs;
+            const { actor: actorName, input, callOptions } = callActorArgs.parse(args);
+
+            const actors = apifyMcpServer.listActorToolNames();
+            if (!actors.includes(actorName)) {
+                const toolsText = actors.length > 0 ? `Available Actors are: ${actors.join(', ')}` : 'Not added Actors yet.';
+                if (apifyMcpServer.tools.has(HelperTools.ACTOR_ADD)) {
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: `Actor '${actorName}' is not added. Add it with tool '${HelperTools.ACTOR_ADD}'. ${toolsText}`,
+                        }],
+                    };
+                }
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Actor '${actorName}' is not added. ${toolsText}
+To use this MCP server, specify the actors with the parameter, for example:
+?actors=apify/instagram-scraper,apify/website-content-crawler
+or with the CLI:
+--actors "apify/instagram-scraper,apify/website-content-crawler"
+You can only use actors that are included in the list; actors not in the list cannot be used.`,
+                    }],
+                };
+            }
+
+            try {
+                const [actor] = await getActorsAsTools([actorName], apifyToken);
+
+                if (!actor) {
+                    return {
+                        content: [
+                            { type: 'text', text: `Actor '${actorName}' not found.` },
+                        ],
+                    };
+                }
+
+                if (!actor.tool.ajvValidate(input)) {
+                    const { errors } = actor.tool.ajvValidate;
+                    if (errors && errors.length > 0) {
+                        return {
+                            content: [
+                                { type: 'text', text: `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}` },
+                                { type: 'json', json: actor.tool.inputSchema },
+                            ],
+                        };
+                    }
+                }
+
+                const { items } = await callActorGetDataset(
+                    actorName,
+                    input,
+                    apifyToken,
+                    callOptions,
+                );
+
+                return {
+                    content: items.items.map((item: Record<string, unknown>) => ({
+                        type: 'text',
+                        text: JSON.stringify(item),
+                    })),
+                };
+            } catch (error) {
+                log.error(`Error calling Actor: ${error}`);
+                return {
+                    content: [
+                        { type: 'text', text: `Error calling Actor: ${error instanceof Error ? error.message : String(error)}` },
+                    ],
+                };
+            }
+        },
+    },
 };

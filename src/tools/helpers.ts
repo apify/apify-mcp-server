@@ -39,7 +39,14 @@ export const addTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_ADD,
-        description: `Add an Actor or MCP server to the available tools of the Apify MCP server. A tool is an Actor or MCP server that can be called by the user. Do not execute the tool, only add it and list it in the available tools. For example, when a user wants to scrape a website, first search for relevant Actors using ${HelperTools.STORE_SEARCH} tool, and once the user selects one they want to use, add it as a tool to the Apify MCP server.`,
+        description:
+            `Add an Actor or MCP server to the available tools of the Apify MCP server. 
+A tool is an Actor or MCP server that can be called by the user. 
+Do not execute the tool, only add it and list it in the available tools. 
+For example, when a user wants to scrape a website, first search for relevant Actors
+using ${HelperTools.STORE_SEARCH} tool, and once the user selects one they want to use, 
+add it as a tool to the Apify MCP server.
+If added tools is not available, use generic tool ${HelperTools.ACTOR_CALL} to call added Actor directly.`,
         inputSchema: zodToJsonSchema(addToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
