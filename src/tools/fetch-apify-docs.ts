@@ -7,7 +7,7 @@ import { HelperTools } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
-import { turndown } from '../utils/turndown.js';
+import { htmlToMarkdown } from '../utils/html-to-md.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
     url: z.string()
@@ -55,7 +55,7 @@ export const fetchApifyDocsTool: ToolEntry = {
                         };
                     }
                     const html = await response.text();
-                    markdown = turndown.turndown(html);
+                    markdown = htmlToMarkdown(html);
                     // Cache the processed Markdown content
                     // Use the URL without fragment as the key to avoid caching same page with different fragments
                     fetchApifyDocsCache.set(urlWithoutFragment, markdown);

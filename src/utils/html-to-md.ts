@@ -1,6 +1,6 @@
 import TurndownService from 'turndown';
 
-export const turndown = new TurndownService();
+const turndown = new TurndownService();
 
 // Remove non-visible elements
 turndown.remove('script');
@@ -30,3 +30,10 @@ turndown.remove('object');
 turndown.remove('aside');
 turndown.remove('nav');
 turndown.remove('footer');
+
+/**
+ * Converts HTML content to Markdown format using Turndown.
+ */
+export function htmlToMarkdown(html: string): string {
+    return turndown.turndown(html);
+}
