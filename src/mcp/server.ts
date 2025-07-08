@@ -348,7 +348,8 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
             // eslint-disable-next-line prefer-const
-            let { name, arguments: args } = request.params;
+            let { name, arguments: args, _meta: meta } = request.params;
+            const { progressToken } = meta || {};
             const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
 
@@ -433,24 +434,28 @@ export class ActorsMcpServer {
                     try {
                         client = await connectMCPClient(serverTool.serverUrl, apifyToken);
 
-                        // TODO: for some reason the client does not receive notifications
-                        // we need to investigate this
-                        // Set up notification handlers for the client
-                        for (const schema of ServerNotificationSchema.options) {
-                            const method = schema.shape.method.value;
-                            // Forward notifications from the proxy client to the server
-                            client.setNotificationHandler(schema, async (notification) => {
-                                log.info('Sending MCP notification', {
-                                    method,
-                                    notification,
+                        // Only set up notification handlers if progressToken is provided by the client
+                        if (progressToken) {
+                            // Set up notification handlers for the client
+                            for (const schema of ServerNotificationSchema.options) {
+                                const method = schema.shape.method.value;
+                                // Forward notifications from the proxy client to the server
+                                client.setNotificationHandler(schema, async (notification) => {
+                                    log.info('Sending MCP notification', {
+                                        method,
+                                        notification,
+                                    });
+                                    await extra.sendNotification(notification);
                                 });
-                                await extra.sendNotification(notification);
-                            });
+                            }
                         }
 
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
+                            _meta: {
+                                progressToken,
+                            },
                         }, CallToolResultSchema, {
                             timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
                         });
