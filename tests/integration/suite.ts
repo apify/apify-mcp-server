@@ -268,6 +268,50 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should search Apify documentation', async () => {
+            const client = await createClientFn();
+            const toolName = HelperTools.DOCS_SEARCH;
+
+            const query = 'standby actor';
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    query,
+                    limit: 5,
+                    offset: 0,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            // At least one result should contain the standby actor docs URL
+            const standbyDocUrl = 'https://docs.apify.com/platform/actors/running/standby';
+            expect(content.some((item) => item.text.includes(standbyDocUrl))).toBe(true);
+
+            await client.close();
+        });
+
+        it('should fetch Apify documentation page', async () => {
+            const client = await createClientFn();
+            const toolName = HelperTools.DOCS_FETCH;
+
+            const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    url: documentUrl,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            expect(content[0].text).toContain(documentUrl);
+
+            await client.close();
+        });
+
         // Session termination is only possible for streamable HTTP transport.
         it.runIf(options.transport === 'streamable-http')('should successfully terminate streamable session', async () => {
             const client = await createClientFn();

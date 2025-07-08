@@ -1,7 +1,9 @@
 // Import specific tools that are being used
 import { callActorGetDataset, getActorsAsTools } from './actor.js';
+import { fetchApifyDocsTool } from './fetch-apify-docs.js';
 import { getActorDetailsTool } from './get-actor-details.js';
 import { addTool, helpTool } from './helpers.js';
+import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
 export const defaultTools = [
@@ -21,6 +23,8 @@ export const defaultTools = [
     getActorDetailsTool,
     helpTool,
     searchActors,
+    searchApifyDocsTool,
+    fetchApifyDocsTool,
 ];
 
 export const addRemoveTools = [

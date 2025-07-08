@@ -33,10 +33,13 @@
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
     "@modelcontextprotocol/sdk": "^1.13.2",
+    "@types/turndown": "^5.0.5",
     "ajv": "^8.17.1",
+    "algoliasearch": "^5.31.0",
     "apify": "^3.4.2",
     "apify-client": "^2.12.6",
     "express": "^4.21.2",
+    "turndown": "^7.2.0",
     "yargs": "^17.7.2",
     "zod": "^3.24.1",
     "zod-to-json-schema": "^3.24.1"
