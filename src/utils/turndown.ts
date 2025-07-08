@@ -1,4 +1,4 @@
-import TurndownService from "turndown";
+import TurndownService from 'turndown';
 
 export const turndown = new TurndownService();
 
