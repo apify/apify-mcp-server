@@ -127,7 +127,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should add Actor dynamically and call it', async () => {
+        it('should add Actor dynamically and call it directly', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
@@ -143,6 +143,82 @@ export function createIntegrationTestsSuite(
             expect(namesAfterAdd.length).toEqual(numberOfTools + 1);
             expect(namesAfterAdd).toContain(selectedToolName);
             await callPythonExampleActor(client, selectedToolName);
+
+            await client.close();
+        });
+
+        it('should add Actor dynamically and call it via generic call-actor tool', async () => {
+            const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
+            const client = await createClientFn({ enableAddingActors: true });
+            const names = getToolNames(await client.listTools());
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+            expect(names.length).toEqual(numberOfTools);
+            // Check that the Actor is not in the tools list
+            expect(names).not.toContain(selectedToolName);
+            // Add Actor dynamically
+            await addActor(client, ACTOR_PYTHON_EXAMPLE);
+
+            // Check if tools was added
+            const namesAfterAdd = getToolNames(await client.listTools());
+            expect(namesAfterAdd.length).toEqual(numberOfTools + 1);
+            expect(namesAfterAdd).toContain(selectedToolName);
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: {
+                        first_number: 1,
+                        second_number: 2,
+                    },
+                },
+            });
+
+            expect(result).toEqual(
+                {
+                    content: [
+                        {
+                            text: `{"sum":3,"first_number":1,"second_number":2}`,
+                            type: 'text',
+                        },
+                    ],
+                },
+            );
+
+            await client.close();
+        });
+
+        it('should not call Actor via call-actor tool if it is not added', async () => {
+            const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
+            const client = await createClientFn({ enableAddingActors: true });
+            const names = getToolNames(await client.listTools());
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+            expect(names.length).toEqual(numberOfTools);
+            // Check that the Actor is not in the tools list
+            expect(names).not.toContain(selectedToolName);
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: {
+                        first_number: 1,
+                        second_number: 2,
+                    },
+                },
+            });
+
+            // TODO: make some more change-tolerant assertion, it's hard to verify text message result without exact match
+            expect(result).toEqual(
+                {
+                    content: [
+                        {
+                            text: "Actor 'apify/python-example' is not added. Add it with tool 'add-actor'. Available Actors are: apify/rag-web-browser",
+                            type: 'text',
+                        },
+                    ],
+                },
+            );
 
             await client.close();
         });

@@ -291,7 +291,7 @@ export const getActor: ToolEntry = {
 };
 
 const callActorArgs = z.object({
-    actorName: z.string()
+    actor: z.string()
         .describe('The name of the Actor to call.'),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor.'),
@@ -312,7 +312,7 @@ export const callActor: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
             const { apifyMcpServer, args, apifyToken } = toolArgs;
-            const { actorName, input, callOptions } = callActorArgs.parse(args);
+            const { actor: actorName, input, callOptions } = callActorArgs.parse(args);
 
             const actors = apifyMcpServer.listActorToolNames();
             if (!actors.includes(actorName)) {
