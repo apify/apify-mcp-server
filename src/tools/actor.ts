@@ -307,7 +307,7 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: 'Call Actor and get dataset id. Call without input and result response with requred input properties.',
+        description: `Call Actor and get dataset results. Call without input and result response with requred input properties. Actor MUST be added before calling, use ${HelperTools.ACTOR_ADD} tool before.`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
