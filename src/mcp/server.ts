@@ -172,7 +172,7 @@ export class ActorsMcpServer {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([...defaultTools, ...addRemoveTools].map((tool) => [tool.tool.name, tool]));
+        const internalToolMap = new Map([...defaultTools, ...addRemoveTools, ...betaTools].map((tool) => [tool.tool.name, tool]));
 
         for (const tool of toolNames) {
             // Skip if the tool is already loaded
