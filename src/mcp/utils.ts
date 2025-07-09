@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
 import { processInput } from '../input.js';
-import { addRemoveTools, getActorsAsTools } from '../tools/index.js';
+import { addRemoveTools, betaTools, getActorsAsTools } from '../tools/index.js';
 import type { Input, ToolEntry } from '../types.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
@@ -49,6 +49,9 @@ export async function processParamsGetTools(url: string, apifyToken: string) {
     }
     if (input.enableAddingActors) {
         tools.push(...addRemoveTools);
+    }
+    if (input.beta) {
+        tools.push(...betaTools);
     }
     return tools;
 }

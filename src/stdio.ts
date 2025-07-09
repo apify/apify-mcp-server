@@ -36,6 +36,7 @@ interface CliArgs {
     enableAddingActors: boolean;
     /** @deprecated */
     enableActorAutoLoading: boolean;
+    beta: boolean;
 }
 
 // Configure logging, set to ERROR
@@ -60,6 +61,11 @@ const argv = yargs(hideBin(process.argv))
         hidden: true,
         describe: 'Deprecated: use enable-adding-actors instead',
     })
+    .option('beta', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enable beta features',
+    })
     .help('help')
     .alias('h', 'help')
     .version(false)
@@ -73,6 +79,7 @@ const argv = yargs(hideBin(process.argv))
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
 const actors = argv.actors as string || '';
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
+const enableBeta = argv.beta;
 
 // Validate environment
 if (!process.env.APIFY_TOKEN) {
@@ -81,7 +88,7 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
+    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false, enableBeta });
     const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
     mcpServer.upsertTools(tools);
 

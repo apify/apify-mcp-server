@@ -223,6 +223,8 @@ export type Input = {
     maxActorMemoryBytes?: number;
     debugActor?: string;
     debugActorInput?: unknown;
+    /** Enable beta features flag */
+    beta?: boolean | string;
 };
 
 // Utility type to get a union of values from an object type

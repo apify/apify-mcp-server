@@ -29,5 +29,8 @@ export function processInput(originalInput: Partial<Input>): Input {
     } else {
         input.enableAddingActors = input.enableAddingActors === true || input.enableAddingActors === 'true';
     }
+
+    // If beta present, set input.beta to true
+    input.beta = input.beta !== undefined && (input.beta !== false && input.beta !== 'false');
     return input;
 }

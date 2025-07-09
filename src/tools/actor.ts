@@ -292,9 +292,9 @@ export const getActor: ToolEntry = {
 
 const callActorArgs = z.object({
     actor: z.string()
-        .describe('The name of the Actor to call.'),
+        .describe('The name of the Actor to call. For example, "apify/instagram-scraper".'),
     input: z.object({}).passthrough()
-        .describe('The input JSON to pass to the Actor.'),
+        .describe('The input JSON to pass to the Actor. For example, {"query": "apify", "maxItems": 10}.'),
     callOptions: z.object({
         memory: z.number().optional(),
         timeout: z.number().optional(),
@@ -307,7 +307,7 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: `Call Actor and get dataset results. Call without input and result response with requred input properties. Actor MUST be added before calling, use ${HelperTools.ACTOR_ADD} tool before.`,
+        description: `Call an Actor and get the Actor run results. If you are not sure about the Actor input, you MUST get the Actor details first, which also returns the input schema using ${HelperTools.ACTOR_GET_DETAILS}. The Actor MUST be added before calling; use the ${HelperTools.ACTOR_ADD} tool first. By default, the Apify MCP server makes newly added Actors available as tools for calling. Use this tool ONLY if you cannot call the newly added tool directly, and NEVER call this tool before first trying to call the tool directly. For example, when you add an Actor "apify/instagram-scraper" using the ${HelperTools.ACTOR_ADD} tool, the Apify MCP server will add a new tool ${actorNameToToolName('apify/instagram-scraper')} that you can call directly. If calling this tool does not work, then and ONLY then MAY you use this tool as a backup.`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
@@ -316,12 +316,12 @@ export const callActor: ToolEntry = {
 
             const actors = apifyMcpServer.listActorToolNames();
             if (!actors.includes(actorName)) {
-                const toolsText = actors.length > 0 ? `Available Actors are: ${actors.join(', ')}` : 'Not added Actors yet.';
+                const toolsText = actors.length > 0 ? `Available Actors are: ${actors.join(', ')}` : 'No Actors have been added yet.';
                 if (apifyMcpServer.tools.has(HelperTools.ACTOR_ADD)) {
                     return {
                         content: [{
                             type: 'text',
-                            text: `Actor '${actorName}' is not added. Add it with tool '${HelperTools.ACTOR_ADD}'. ${toolsText}`,
+                            text: `Actor '${actorName}' is not added. Add it with the '${HelperTools.ACTOR_ADD}' tool. ${toolsText}`,
                         }],
                     };
                 }

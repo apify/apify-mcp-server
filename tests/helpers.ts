@@ -9,6 +9,7 @@ import { HelperTools } from '../src/const.js';
 export interface McpClientOptions {
     actors?: string[];
     enableAddingActors?: boolean;
+    enableBeta?: boolean; // Optional, used for beta features
 }
 
 export async function createMcpSseClient(
@@ -19,12 +20,15 @@ export async function createMcpSseClient(
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors } = options || {};
+    const { actors, enableAddingActors, enableBeta } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
+    }
+    if (enableBeta !== undefined) {
+        url.searchParams.append('beta', enableBeta.toString());
     }
 
     const transport = new SSEClientTransport(
@@ -55,12 +59,15 @@ export async function createMcpStreamableClient(
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors } = options || {};
+    const { actors, enableAddingActors, enableBeta } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
+    }
+    if (enableBeta !== undefined) {
+        url.searchParams.append('beta', enableBeta.toString());
     }
 
     const transport = new StreamableHTTPClientTransport(
@@ -89,13 +96,16 @@ export async function createMcpStdioClient(
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const { actors, enableAddingActors } = options || {};
+    const { actors, enableAddingActors, enableBeta } = options || {};
     const args = ['dist/stdio.js'];
     if (actors) {
         args.push('--actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         args.push('--enable-adding-actors', enableAddingActors.toString());
+    }
+    if (enableBeta !== undefined) {
+        args.push('--beta', enableBeta.toString());
     }
     const transport = new StdioClientTransport({
         command: 'node',

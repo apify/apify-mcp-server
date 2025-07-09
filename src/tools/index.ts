@@ -20,12 +20,15 @@ export const defaultTools = [
     // getUserRunsList,
     // getUserDatasetsList,
     // getUserKeyValueStoresList,
-    callActor,
     getActorDetailsTool,
     helpTool,
     searchActors,
     searchApifyDocsTool,
     fetchApifyDocsTool,
+];
+
+export const betaTools = [
+    callActor,
 ];
 
 export const addRemoveTools = [

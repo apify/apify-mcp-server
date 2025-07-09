@@ -23,7 +23,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
+import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
 import { actorNameToToolName } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { connectMCPClient } from './client.js';
@@ -33,6 +33,7 @@ import { processParamsGetTools } from './utils.js';
 type ActorsMcpServerOptions = {
     enableAddingActors?: boolean;
     enableDefaultActors?: boolean;
+    enableBeta?: boolean; // Enable beta features
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -51,6 +52,7 @@ export class ActorsMcpServer {
         this.options = {
             enableAddingActors: options.enableAddingActors ?? true,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
+            enableBeta: options.enableBeta ?? false, // Disabled by default
         };
         this.server = new Server(
             {
@@ -74,6 +76,10 @@ export class ActorsMcpServer {
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
             this.enableDynamicActorTools();
+        }
+
+        if (this.options.enableBeta) {
+            this.upsertTools(betaTools, false);
         }
 
         // Initialize automatically for backward compatibility

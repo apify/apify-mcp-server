@@ -3,6 +3,7 @@ import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/cl
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { betaTools } from '../../dist/tools/index.js';
 import { defaults, HelperTools } from '../../src/const.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
 import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
@@ -149,9 +150,9 @@ export function createIntegrationTestsSuite(
 
         it('should add Actor dynamically and call it via generic call-actor tool', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true });
+            const client = await createClientFn({ enableAddingActors: true, enableBeta: true });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + betaTools.length;
             expect(names.length).toEqual(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
@@ -190,9 +191,9 @@ export function createIntegrationTestsSuite(
 
         it('should not call Actor via call-actor tool if it is not added', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true });
+            const client = await createClientFn({ enableAddingActors: true, enableBeta: true });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + betaTools.length;
             expect(names.length).toEqual(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
@@ -213,7 +214,7 @@ export function createIntegrationTestsSuite(
                 {
                     content: [
                         {
-                            text: "Actor 'apify/python-example' is not added. Add it with tool 'add-actor'. Available Actors are: apify/rag-web-browser",
+                            text: "Actor 'apify/python-example' is not added. Add it with the 'add-actor' tool. Available Actors are: apify/rag-web-browser",
                             type: 'text',
                         },
                     ],
