@@ -407,7 +407,8 @@ export class ActorsMcpServer {
                     msg,
                 );
             }
-            // Decode dot property names in arguments
+            // Decode dot property names in arguments before validation,
+            // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args);
             log.info(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
             if (!tool.tool.ajvValidate(args)) {
