@@ -79,6 +79,8 @@ export async function searchApifyDocs(query: string): Promise<ApifyDocsSearchRes
  * If the query has been previously searched, it returns cached results.
  * Otherwise, it performs a new search and caches the results for future use.
  *
+ * Note: The query is normalized to lowercase for case-insensitive caching.
+ *
  * @param {string} query - The search query string.
  * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL, optional fragment, and content.
  */
