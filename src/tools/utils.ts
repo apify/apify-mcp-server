@@ -242,3 +242,40 @@ export function shortenProperties(properties: { [key: string]: ISchemaProperties
 
     return properties;
 }
+
+/**
+ * Fixes dot notation in the property names of schema properties.
+ *
+ * Some providers, such as Anthropic, allow only the following characters in property names: `^[a-zA-Z0-9_-]{1,64}$`.
+ *
+ * @param properties - The schema properties to fix.
+ * @returns {Record<string, ISchemaProperties>} The schema properties with fixed names.
+ */
+export function encodeDotPropertyNames(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
+    const encodedProperties: Record<string, ISchemaProperties> = {};
+    for (const [key, value] of Object.entries(properties)) {
+        // Replace dots with '-dot-' to avoid issues with property names
+        const fixedKey = key.replace(/\./g, '-dot-');
+        encodedProperties[fixedKey] = value;
+    }
+    return encodedProperties;
+}
+
+/**
+ * Restores original property names by replacing '-dot-' with '.'.
+ *
+ * This is necessary to decode the property names that were encoded to avoid issues with providers
+ * that do not allow dots in property names.
+ *
+ * @param properties - The schema properties with encoded names.
+ * @returns {Record<string, ISchemaProperties>} The schema properties with restored names.
+ */
+export function decodeDotPropertyNames(properties: Record<string, unknown>): Record<string, unknown> {
+    const decodedProperties: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(properties)) {
+        // Replace '-dot-' with '.' to restore original property names
+        const decodedKey = key.replace(/-dot-/g, '.');
+        decodedProperties[decodedKey] = value;
+    }
+    return decodedProperties;
+}

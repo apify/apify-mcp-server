@@ -24,7 +24,7 @@ import {
     SERVER_VERSION,
 } from '../const.js';
 import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
-import { actorNameToToolName } from '../tools/utils.js';
+import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
@@ -407,6 +407,8 @@ export class ActorsMcpServer {
                     msg,
                 );
             }
+            // Decode dot property names in arguments
+            args = decodeDotPropertyNames(args);
             log.info(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
             if (!tool.tool.ajvValidate(args)) {
                 const msg = `Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`;

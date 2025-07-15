@@ -24,6 +24,7 @@ import {
     actorNameToToolName,
     addEnumsToDescriptionsWithExamples,
     buildNestedProperties,
+    encodeDotPropertyNames,
     filterSchemaProperties,
     fixedAjvCompile,
     getToolSchemaID,
@@ -128,6 +129,7 @@ export async function getNormalActorsAsTools(
                 actorDefinitionPruned.input.properties = filterSchemaProperties(actorDefinitionPruned.input.properties);
                 actorDefinitionPruned.input.properties = shortenProperties(actorDefinitionPruned.input.properties);
                 actorDefinitionPruned.input.properties = addEnumsToDescriptionsWithExamples(actorDefinitionPruned.input.properties);
+                actorDefinitionPruned.input.properties = encodeDotPropertyNames(actorDefinitionPruned.input.properties);
                 // Add schema $id, each valid JSON schema should have a unique $id
                 // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
                 actorDefinitionPruned.input.$id = schemaID;
