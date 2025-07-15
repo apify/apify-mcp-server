@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
-import { buildNestedProperties, markInputPropertiesAsRequired, shortenProperties } from '../../src/tools/utils.js';
+import { buildNestedProperties, decodeDotPropertyNames, encodeDotPropertyNames,
+    markInputPropertiesAsRequired, shortenProperties } from '../../src/tools/utils.js';
 import type { IActorInputSchema, ISchemaProperties } from '../../src/types.js';
 
 describe('buildNestedProperties', () => {
@@ -315,5 +316,55 @@ describe('shortenProperties', () => {
 
         // Check that properties were not modified
         expect(result).toEqual(properties);
+    });
+});
+
+describe('encodeDotPropertyNames', () => {
+    it('should replace dots in property names with -dot-', () => {
+        const input = {
+            'foo.bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
+            baz: { type: 'number', title: 'Baz', description: 'desc2' },
+            'a.b.c': { type: 'boolean', title: 'A B C', description: 'desc3' },
+        };
+        const result = encodeDotPropertyNames(input);
+        expect(result['foo-dot-bar']).toBeDefined();
+        expect(result['a-dot-b-dot-c']).toBeDefined();
+        expect(result.baz).toBeDefined();
+        expect(result['foo.bar']).toBeUndefined();
+        expect(result['a.b.c']).toBeUndefined();
+    });
+
+    it('should not modify property names without dots', () => {
+        const input = {
+            foo: { type: 'string', title: 'Foo', description: 'desc' },
+            bar: { type: 'number', title: 'Bar', description: 'desc2' },
+        };
+        const result = encodeDotPropertyNames(input);
+        expect(result).toEqual(input);
+    });
+});
+
+describe('decodeDotPropertyNames', () => {
+    it('should replace -dot- in property names with dots', () => {
+        const input = {
+            'foo-dot-bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
+            baz: { type: 'number', title: 'Baz', description: 'desc2' },
+            'a-dot-b-dot-c': { type: 'boolean', title: 'A B C', description: 'desc3' },
+        };
+        const result = decodeDotPropertyNames(input);
+        expect(result['foo.bar']).toBeDefined();
+        expect(result['a.b.c']).toBeDefined();
+        expect(result.baz).toBeDefined();
+        expect(result['foo-dot-bar']).toBeUndefined();
+        expect(result['a-dot-b-dot-c']).toBeUndefined();
+    });
+
+    it('should not modify property names without -dot-', () => {
+        const input = {
+            foo: { type: 'string', title: 'Foo', description: 'desc' },
+            bar: { type: 'number', title: 'Bar', description: 'desc2' },
+        };
+        const result = decodeDotPropertyNames(input);
+        expect(result).toEqual(input);
     });
 });
