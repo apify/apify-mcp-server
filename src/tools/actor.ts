@@ -123,18 +123,6 @@ export async function getNormalActorsAsTools(
         if (actorDefinitionPruned) {
             const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
             if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
-                // Filter non-required properties except integers if `required` is defined in the input schema and not empty.
-                const { required } = actorDefinitionPruned.input;
-                if (Array.isArray(required) && required.length > 0) {
-                    actorDefinitionPruned.input.properties = Object.fromEntries(
-                        Object.entries(actorDefinitionPruned.input.properties)
-                            // Keep all integer properties, as these include
-                            // properties related to output item counts that users
-                            // might want to change if they need more results than the default limit.
-                            .filter(([key, value]) => required.includes(key) || value.type === 'integer'),
-                    );
-                }
-
                 actorDefinitionPruned.input.properties = markInputPropertiesAsRequired(actorDefinitionPruned.input);
                 actorDefinitionPruned.input.properties = buildNestedProperties(actorDefinitionPruned.input.properties);
                 actorDefinitionPruned.input.properties = filterSchemaProperties(actorDefinitionPruned.input.properties);
