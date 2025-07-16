@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/apify-actors-mcp-server-badge.png)](https://mseep.ai/app/apify-actors-mcp-server)
+
 # Apify Model Context Protocol (MCP) Server
 
 [![Actors MCP Server](https://apify.com/actor-badge?actor=apify/actors-mcp-server)](https://apify.com/apify/actors-mcp-server)
