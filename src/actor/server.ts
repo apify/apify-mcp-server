@@ -13,25 +13,8 @@ import log from '@apify/log';
 
 import { ActorsMcpServer } from '../mcp/server.js';
 import { parseInputParamsFromUrl } from '../mcp/utils.js';
-import { getActorsAsTools } from '../tools/actor.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
 import { getActorRunData } from './utils.js';
-
-/**
- * Helper function to load tools and actors based on input parameters
- * @param mcpServer The MCP server instance
- * @param url The request URL to parse parameters from
- * @param apifyToken The Apify token for authentication
- */
-async function loadToolsAndActors(mcpServer: ActorsMcpServer, url: string, apifyToken: string): Promise<void> {
-    const input = parseInputParamsFromUrl(url);
-    if (input.actors || input.enableAddingActors) {
-        await mcpServer.loadToolsFromUrl(url, apifyToken);
-    }
-    if (!input.actors) {
-        await mcpServer.loadDefaultActors(apifyToken);
-    }
-}
 
 export function createExpressApp(
     host: string,
@@ -85,13 +68,21 @@ export function createExpressApp(
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
             const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
-            // Load tools from Actor input for backwards compatibility
-            if (mcpServerOptions.actors && mcpServerOptions.actors.length > 0) {
-                const tools = await getActorsAsTools(mcpServerOptions.actors, process.env.APIFY_TOKEN as string);
-                mcpServer.upsertTools(tools);
-            }
-            await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
+
+            // Load MCP server tools
+            const apifyToken = process.env.APIFY_TOKEN as string;
+            const input = parseInputParamsFromUrl(req.url);
+            if (input.actors || input.enableAddingActors || input.beta || input.tools) {
+                log.debug('[SSE] Loading tools from URL', { sessionId: transport.sessionId });
+                await mcpServer.loadToolsFromUrl(req.url, apifyToken);
+            }
+            // Load default tools if no actors are specified
+            if (!input.actors) {
+                log.debug('[SSE] Loading default tools', { sessionId: transport.sessionId });
+                await mcpServer.loadDefaultActors(apifyToken);
+            }
+
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
             await mcpServer.connect(transport);
@@ -164,13 +155,20 @@ export function createExpressApp(
                     enableJsonResponse: false, // Use SSE response mode
                 });
                 const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
-                // Load tools from Actor input for backwards compatibility
-                if (mcpServerOptions.actors && mcpServerOptions.actors.length > 0) {
-                    const tools = await getActorsAsTools(mcpServerOptions.actors, process.env.APIFY_TOKEN as string);
-                    mcpServer.upsertTools(tools);
-                }
+
                 // Load MCP server tools
-                await loadToolsAndActors(mcpServer, req.url, process.env.APIFY_TOKEN as string);
+                const apifyToken = process.env.APIFY_TOKEN as string;
+                const input = parseInputParamsFromUrl(req.url);
+                if (input.actors || input.enableAddingActors || input.beta || input.tools) {
+                    log.debug('[Streamable] Loading tools from URL', { sessionId: transport.sessionId });
+                    await mcpServer.loadToolsFromUrl(req.url, apifyToken);
+                }
+                // Load default tools if no actors are specified
+                if (!input.actors) {
+                    log.debug('[Streamable] Loading default tools', { sessionId: transport.sessionId });
+                    await mcpServer.loadDefaultActors(apifyToken);
+                }
+
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
 

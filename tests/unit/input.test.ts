@@ -86,4 +86,40 @@ describe('processInput', () => {
         const processed = processInput(input);
         expect(processed.beta).toBe(true);
     });
+
+    it('should keep tools as array of valid featureTools keys', async () => {
+        const input: Partial<Input> = {
+            actors: ['actor1'],
+            tools: ['docs', 'runs'],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual(['docs', 'runs']);
+    });
+
+    it('should handle empty tools array', async () => {
+        const input: Partial<Input> = {
+            actors: ['actor1'],
+            tools: [],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual([]);
+    });
+
+    it('should handle missing tools field (undefined)', async () => {
+        const input: Partial<Input> = {
+            actors: ['actor1'],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toBeUndefined();
+    });
+
+    it('should include all keys, even invalid ones', async () => {
+        const input: Partial<Input> = {
+            actors: ['actor1'],
+            // @ts-expect-error: purposely invalid key for test
+            tools: ['docs', 'invalidKey', 'storage'],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual(['docs', 'invalidKey', 'storage']);
+    });
 });

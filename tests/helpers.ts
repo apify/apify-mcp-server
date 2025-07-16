@@ -5,11 +5,13 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
+import type { FeatureToolKey } from '../src/types.js';
 
 export interface McpClientOptions {
     actors?: string[];
     enableAddingActors?: boolean;
     enableBeta?: boolean; // Optional, used for beta features
+    tools?: FeatureToolKey[]; // Optional, used for feature tools
 }
 
 export async function createMcpSseClient(
@@ -20,7 +22,7 @@ export async function createMcpSseClient(
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, enableBeta } = options || {};
+    const { actors, enableAddingActors, enableBeta, tools } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -29,6 +31,9 @@ export async function createMcpSseClient(
     }
     if (enableBeta !== undefined) {
         url.searchParams.append('beta', enableBeta.toString());
+    }
+    if (tools && tools.length > 0) {
+        url.searchParams.append('tools', tools.join(','));
     }
 
     const transport = new SSEClientTransport(
@@ -59,7 +64,7 @@ export async function createMcpStreamableClient(
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, enableBeta } = options || {};
+    const { actors, enableAddingActors, enableBeta, tools } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -68,6 +73,9 @@ export async function createMcpStreamableClient(
     }
     if (enableBeta !== undefined) {
         url.searchParams.append('beta', enableBeta.toString());
+    }
+    if (tools && tools.length > 0) {
+        url.searchParams.append('tools', tools.join(','));
     }
 
     const transport = new StreamableHTTPClientTransport(
@@ -96,7 +104,7 @@ export async function createMcpStdioClient(
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const { actors, enableAddingActors, enableBeta } = options || {};
+    const { actors, enableAddingActors, enableBeta, tools } = options || {};
     const args = ['dist/stdio.js'];
     if (actors) {
         args.push('--actors', actors.join(','));
@@ -107,6 +115,10 @@ export async function createMcpStdioClient(
     if (enableBeta !== undefined) {
         args.push('--beta', enableBeta.toString());
     }
+    if (tools && tools.length > 0) {
+        args.push('--tools', tools.join(','));
+    }
+
     const transport = new StdioClientTransport({
         command: 'node',
         args,

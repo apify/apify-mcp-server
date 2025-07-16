@@ -3,7 +3,7 @@
  */
 import log from '@apify/log';
 
-import type { Input } from './types.js';
+import type { FeatureToolKey, Input } from './types.js';
 
 /**
  * Process input parameters, split Actors string into an array
@@ -32,5 +32,9 @@ export function processInput(originalInput: Partial<Input>): Input {
 
     // If beta present, set input.beta to true
     input.beta = input.beta !== undefined && (input.beta !== false && input.beta !== 'false');
+
+    if (input.tools && typeof input.tools === 'string') {
+        input.tools = input.tools.split(',').map((tool: string) => tool.trim()) as FeatureToolKey[];
+    }
     return input;
 }

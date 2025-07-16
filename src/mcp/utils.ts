@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
 import { processInput } from '../input.js';
-import { addRemoveTools, betaTools, getActorsAsTools } from '../tools/index.js';
-import type { Input, ToolEntry } from '../types.js';
+import { addRemoveTools, betaTools, featureTools, getActorsAsTools } from '../tools/index.js';
+import type { FeatureToolKey, Input, ToolEntry } from '../types.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
@@ -52,6 +52,14 @@ export async function processParamsGetTools(url: string, apifyToken: string) {
     }
     if (input.beta) {
         tools.push(...betaTools);
+    }
+    if (input.tools) {
+        for (const toolKey of input.tools) {
+            // Get tools by feature key
+            const keyTools = featureTools[toolKey as FeatureToolKey] || [];
+            // Push them into the tools array
+            tools.push(...keyTools);
+        }
     }
     return tools;
 }

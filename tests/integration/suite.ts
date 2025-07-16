@@ -3,11 +3,12 @@ import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/cl
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { betaTools } from '../../dist/tools/index.js';
+import { betaTools, featureTools } from '../../dist/tools/index.js';
 import { defaults, HelperTools } from '../../src/const.js';
 import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
 import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
+import type { FeatureToolKey } from '../../src/types.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 
@@ -346,7 +347,9 @@ export function createIntegrationTestsSuite(
         });
 
         it('should search Apify documentation', async () => {
-            const client = await createClientFn();
+            const client = await createClientFn({
+                tools: ['docs'],
+            });
             const toolName = HelperTools.DOCS_SEARCH;
 
             const query = 'standby actor';
@@ -370,7 +373,9 @@ export function createIntegrationTestsSuite(
         });
 
         it('should fetch Apify documentation page', async () => {
-            const client = await createClientFn();
+            const client = await createClientFn({
+                tools: ['docs'],
+            });
             const toolName = HelperTools.DOCS_FETCH;
 
             const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
@@ -385,6 +390,50 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(documentUrl);
+
+            await client.close();
+        });
+
+        it('should load correct tools for each feature tools key', async () => {
+            for (const key of Object.keys(featureTools)) {
+                const client = await createClientFn({
+                    tools: [key as FeatureToolKey],
+                });
+
+                const loadedTools = await client.listTools();
+                const toolNames = getToolNames(loadedTools);
+
+                const expectedTools = featureTools[key as FeatureToolKey];
+                const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+                expect(toolNames.length).toEqual(expectedTools.length + defaultTools.length + defaults.actors.length + addRemoveTools.length);
+                for (const expectedToolName of expectedToolNames) {
+                    expect(toolNames).toContain(expectedToolName);
+                }
+
+                await client.close();
+            }
+        });
+
+        it('should handle multiple feature keys input correctly', async () => {
+            const client = await createClientFn({
+                tools: ['docs', 'runs', 'storage'],
+            });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            const expectedTools = [
+                ...featureTools.docs,
+                ...featureTools.runs,
+                ...featureTools.storage,
+            ];
+            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+            expect(toolNames.length).toEqual(expectedTools.length + defaultTools.length + defaults.actors.length + addRemoveTools.length);
+            for (const expectedToolName of expectedToolNames) {
+                expect(toolNames).toContain(expectedToolName);
+            }
 
             await client.close();
         });

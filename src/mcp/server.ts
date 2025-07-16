@@ -23,9 +23,9 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
+import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, featureTools, getActorsAsTools } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import type { ActorMcpTool, ActorTool, FeatureToolKey, HelperTool, ToolEntry } from '../types.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -173,6 +173,13 @@ export class ActorsMcpServer {
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
         const internalToolMap = new Map([...defaultTools, ...addRemoveTools, ...betaTools].map((tool) => [tool.tool.name, tool]));
+        // Add all feature tools
+        for (const key of Object.keys(featureTools)) {
+            const tools = featureTools[key as FeatureToolKey];
+            for (const tool of tools) {
+                internalToolMap.set(tool.tool.name, tool);
+            }
+        }
 
         for (const tool of toolNames) {
             // Skip if the tool is already loaded
