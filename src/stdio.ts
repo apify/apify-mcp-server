@@ -22,10 +22,10 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { defaults } from './const.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { featureTools, getActorsAsTools } from './tools/index.js';
-import type { FeatureToolKey } from './types.js';
+import { featureTools } from './tools/index.js';
+import type { FeatureToolKey, Input } from './types.js';
+import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -108,14 +108,18 @@ if (!process.env.APIFY_TOKEN) {
 
 async function main() {
     const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false, enableBeta });
-    const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
-    // Add feature tools based on the command line arguments
-    if (featureToolKeys.length > 0) {
-        for (const key of featureToolKeys) {
-            const featureToolsList = featureTools[key as FeatureToolKey] || [];
-            tools.push(...featureToolsList);
-        }
-    }
+
+    // Create an Input object from CLI arguments
+    const input: Input = {
+        actors: actorList.length ? actorList : [],
+        enableAddingActors,
+        beta: enableBeta,
+        tools: featureToolKeys as FeatureToolKey[],
+    };
+
+    // Use the shared tools loading logic
+    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);
+
     mcpServer.upsertTools(tools);
 
     // Start server
