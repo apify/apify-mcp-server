@@ -19,6 +19,7 @@ import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, InternalTool, ToolEntry } from '../types.js';
 import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
 import { getValuesByDotKeys } from '../utils/generic.js';
+import type { ProgressTracker } from '../utils/progress.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
@@ -50,6 +51,7 @@ export type CallActorGetDatasetResult = {
  * @param {ActorCallOptions} callOptions - The options to pass to the actor.
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
+ * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
  * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
@@ -58,6 +60,7 @@ export async function callActorGetDataset(
     input: unknown,
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
+    progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
     try {
         log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
@@ -65,9 +68,18 @@ export async function callActorGetDataset(
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
-        const actorRun: ActorRun = await actorClient.call(input, callOptions);
-        const dataset = client.dataset(actorRun.defaultDatasetId);
-        // const dataset = client.dataset('Ehtn0Y4wIKviFT2WB');
+        // Start the actor run but don't wait for completion
+        const actorRun: ActorRun = await actorClient.start(input, callOptions);
+
+        // Start progress tracking if tracker is provided
+        if (progressTracker) {
+            progressTracker.startActorRunUpdates(actorRun.id, apifyToken, actorName);
+        }
+
+        // Wait for the actor to complete
+        const completedRun = await client.run(actorRun.id).waitForFinish();
+
+        const dataset = client.dataset(completedRun.defaultDatasetId);
         const [items, defaultBuild] = await Promise.all([
             dataset.listItems(),
             (await actorClient.defaultBuild()).get(),
@@ -356,6 +368,7 @@ You can only use actors that are included in the list; actors not in the list ca
                     input,
                     apifyToken,
                     callOptions,
+                    null,
                 );
 
                 return {

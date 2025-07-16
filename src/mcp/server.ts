@@ -26,6 +26,7 @@ import {
 import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import { createProgressTracker } from '../utils/progress.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -425,6 +426,16 @@ export class ActorsMcpServer {
                 // Handle internal tool
                 if (tool.type === 'internal') {
                     const internalTool = tool.tool as HelperTool;
+
+                    // Only create progress tracker for call-actor tool
+                    const progressTracker = internalTool.name === 'call-actor'
+                        ? createProgressTracker(progressToken, extra.sendNotification)
+                        : null;
+
+                    if (progressTracker) {
+                        await progressTracker.updateProgress(0, `Starting: ${internalTool.name}`);
+                    }
+
                     const res = await internalTool.call({
                         args,
                         extra,
@@ -433,6 +444,10 @@ export class ActorsMcpServer {
                         apifyToken,
                         userRentedActorIds,
                     }) as object;
+
+                    if (progressTracker) {
+                        await progressTracker.complete(`Completed: ${internalTool.name}`);
+                    }
 
                     return { ...res };
                 }
@@ -479,21 +494,37 @@ export class ActorsMcpServer {
                 if (tool.type === 'actor') {
                     const actorTool = tool.tool as ActorTool;
 
+                    // Create progress tracker if progressToken is available
+                    const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
+
                     const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
-                    const { items } = await callActorGetDataset(
-                        actorTool.actorFullName,
-                        args,
-                        apifyToken as string,
-                        callOptions,
-                    );
-                    return {
-                        content: items.items.map((item: Record<string, unknown>) => {
-                            return {
-                                type: 'text',
-                                text: JSON.stringify(item),
-                            };
-                        }),
-                    };
+
+                    try {
+                        const { items } = await callActorGetDataset(
+                            actorTool.actorFullName,
+                            args,
+                            apifyToken as string,
+                            callOptions,
+                            progressTracker,
+                        );
+
+                        if (progressTracker) {
+                            await progressTracker.complete(`Completed: ${actorTool.actorFullName}`);
+                        }
+
+                        return {
+                            content: items.items.map((item: Record<string, unknown>) => {
+                                return {
+                                    type: 'text',
+                                    text: JSON.stringify(item),
+                                };
+                            }),
+                        };
+                    } finally {
+                        if (progressTracker) {
+                            progressTracker.stopPeriodicUpdates();
+                        }
+                    }
                 }
             } catch (error) {
                 if (error instanceof ApifyApiError) {
