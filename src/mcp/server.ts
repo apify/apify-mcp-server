@@ -25,7 +25,7 @@ import {
 } from '../const.js';
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorMcpTool, ActorTool, HelperTool, ToolCategory, ToolEntry } from '../types.js';
+import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -166,14 +166,11 @@ export class ActorsMcpServer {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([...defaultTools, ...addRemoveTools].map((tool) => [tool.tool.name, tool]));
-        // Add all category tools
-        for (const key of Object.keys(toolCategories)) {
-            const tools = toolCategories[key as ToolCategory];
-            for (const tool of tools) {
-                internalToolMap.set(tool.tool.name, tool);
-            }
-        }
+        const internalToolMap = new Map([
+            ...defaultTools,
+            ...addRemoveTools,
+            ...Object.values(toolCategories).flat(),
+        ].map((tool) => [tool.tool.name, tool]));
 
         for (const tool of toolNames) {
             // Skip if the tool is already loaded
