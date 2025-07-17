@@ -23,9 +23,9 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, featureTools, getActorsAsTools } from '../tools/index.js';
+import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorMcpTool, ActorTool, FeatureToolKey, HelperTool, ToolEntry } from '../types.js';
+import type { ActorMcpTool, ActorTool, HelperTool, ToolCategory, ToolEntry } from '../types.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -33,7 +33,6 @@ import { processParamsGetTools } from './utils.js';
 type ActorsMcpServerOptions = {
     enableAddingActors?: boolean;
     enableDefaultActors?: boolean;
-    enableBeta?: boolean; // Enable beta features
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -52,7 +51,6 @@ export class ActorsMcpServer {
         this.options = {
             enableAddingActors: options.enableAddingActors ?? true,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
-            enableBeta: options.enableBeta ?? false, // Disabled by default
         };
         this.server = new Server(
             {
@@ -76,10 +74,6 @@ export class ActorsMcpServer {
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
             this.enableDynamicActorTools();
-        }
-
-        if (this.options.enableBeta) {
-            this.upsertTools(betaTools, false);
         }
 
         // Initialize automatically for backward compatibility
@@ -172,10 +166,10 @@ export class ActorsMcpServer {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([...defaultTools, ...addRemoveTools, ...betaTools].map((tool) => [tool.tool.name, tool]));
-        // Add all feature tools
-        for (const key of Object.keys(featureTools)) {
-            const tools = featureTools[key as FeatureToolKey];
+        const internalToolMap = new Map([...defaultTools, ...addRemoveTools].map((tool) => [tool.tool.name, tool]));
+        // Add all category tools
+        for (const key of Object.keys(toolCategories)) {
+            const tools = toolCategories[key as ToolCategory];
             for (const tool of tools) {
                 internalToolMap.set(tool.tool.name, tool);
             }

@@ -47,46 +47,6 @@ describe('processInput', () => {
         expect(processed.enableAddingActors).toBe(true);
     });
 
-    it('should disable beta features by default', async () => {
-        const input: Partial<Input> = {
-            beta: undefined,
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(false);
-    });
-
-    it('should disable beta features when beta is false', async () => {
-        const input: Partial<Input> = {
-            beta: false,
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(false);
-    });
-
-    it('should disable beta when beta is "false"', async () => {
-        const input: Partial<Input> = {
-            beta: 'false',
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(false);
-    });
-
-    it('should enable beta features when beta non empty string', async () => {
-        const input: Partial<Input> = {
-            beta: '1',
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(true);
-    });
-
-    it('should enable beta features when beta is true', async () => {
-        const input: Partial<Input> = {
-            beta: true,
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(true);
-    });
-
     it('should keep tools as array of valid featureTools keys', async () => {
         const input: Partial<Input> = {
             actors: ['actor1'],

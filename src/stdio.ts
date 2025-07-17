@@ -23,8 +23,8 @@ import { hideBin } from 'yargs/helpers';
 import log from '@apify/log';
 
 import { ActorsMcpServer } from './mcp/server.js';
-import { featureTools } from './tools/index.js';
-import type { FeatureToolKey, Input } from './types.js';
+import { toolCategories } from './tools/index.js';
+import type { Input, ToolCategory } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -37,7 +37,7 @@ interface CliArgs {
     enableAddingActors: boolean;
     /** @deprecated */
     enableActorAutoLoading: boolean;
-    beta: boolean;
+    /** Tool categories to include */
     tools?: string;
 }
 
@@ -63,21 +63,17 @@ const argv = yargs(hideBin(process.argv))
         hidden: true,
         describe: 'Deprecated: use enable-adding-actors instead.',
     })
-    .option('beta', {
-        type: 'boolean',
-        default: false,
-        describe: 'Enable beta features.',
-    })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of specific feature tools to enable.
+        describe: `Comma-separated list of specific tool categories to enable.
 
-Available choices: ${Object.keys(featureTools).join(', ')}
+Available choices: ${Object.keys(toolCategories).join(', ')}
 
-Feature tools are categorized as follows:
+Tool categories are as follows:
 - docs: Search and fetch Apify documentation tools.
 - runs: Get Actor runs list, run details, and logs from a specific Actor run.
 - storage: Access datasets, key-value stores, and their records.
+- preview: Experimental tools in preview mode.
 
 Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
 `,
@@ -96,9 +92,8 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
 const actors = argv.actors as string || '';
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
-const enableBeta = argv.beta;
-// Keys of the feature tools to enable
-const featureToolKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
+// Keys of the tool categories to enable
+const toolCategoryKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
 
 // Validate environment
 if (!process.env.APIFY_TOKEN) {
@@ -107,14 +102,13 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false, enableBeta });
+    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
 
     // Create an Input object from CLI arguments
     const input: Input = {
         actors: actorList.length ? actorList : [],
         enableAddingActors,
-        beta: enableBeta,
-        tools: featureToolKeys as FeatureToolKey[],
+        tools: toolCategoryKeys as ToolCategory[],
     };
 
     // Use the shared tools loading logic

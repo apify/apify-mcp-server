@@ -1,4 +1,5 @@
 // Import specific tools that are being used
+import type { ToolCategory } from '../types.js';
 import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
 import { getDataset, getDatasetItems } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
@@ -12,12 +13,7 @@ import { getUserRunsList } from './run_collection.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
-export const defaultTools = [
-    getActorDetailsTool,
-    searchActors,
-];
-
-export const featureTools = {
+export const toolCategories = {
     docs: [
         searchApifyDocsTool,
         fetchApifyDocsTool,
@@ -36,10 +32,19 @@ export const featureTools = {
         getUserDatasetsList,
         getUserKeyValueStoresList,
     ],
+    preview: [
+        callActor,
+    ],
 };
+export const toolCategoriesEnabledByDefault: ToolCategory[] = [
+    'docs',
+];
 
-export const betaTools = [
-    callActor,
+export const defaultTools = [
+    getActorDetailsTool,
+    searchActors,
+    // Add the tools from the enabled categories
+    ...toolCategoriesEnabledByDefault.map((key) => toolCategories[key]).flat(),
 ];
 
 export const addRemoveTools = [

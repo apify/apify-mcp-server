@@ -73,7 +73,7 @@ export function createExpressApp(
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
             const input = parseInputParamsFromUrl(req.url);
-            if (input.actors || input.enableAddingActors || input.beta || input.tools) {
+            if (input.actors || input.enableAddingActors || input.tools) {
                 log.debug('[SSE] Loading tools from URL', { sessionId: transport.sessionId });
                 await mcpServer.loadToolsFromUrl(req.url, apifyToken);
             }
@@ -159,7 +159,7 @@ export function createExpressApp(
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
                 const input = parseInputParamsFromUrl(req.url);
-                if (input.actors || input.enableAddingActors || input.beta || input.tools) {
+                if (input.actors || input.enableAddingActors || input.tools) {
                     log.debug('[Streamable] Loading tools from URL', { sessionId: transport.sessionId });
                     await mcpServer.loadToolsFromUrl(req.url, apifyToken);
                 }

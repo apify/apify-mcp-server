@@ -6,7 +6,7 @@ import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingIn
 
 import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
-import type { featureTools } from './tools/index.js';
+import type { toolCategories } from './tools/index.js';
 
 export interface ISchemaProperties {
     type: string;
@@ -214,7 +214,7 @@ export interface InternalTool extends ToolBase {
     call: (toolArgs: InternalToolArgs) => Promise<object>;
 }
 
-export type FeatureToolKey = keyof typeof featureTools;
+export type ToolCategory = keyof typeof toolCategories;
 
 export type Input = {
     actors: string[] | string;
@@ -226,9 +226,8 @@ export type Input = {
     maxActorMemoryBytes?: number;
     debugActor?: string;
     debugActorInput?: unknown;
-    /** Enable beta features flag */
-    beta?: boolean | string;
-    tools?: FeatureToolKey[] | string;
+    /** Tool categories to include */
+    tools?: ToolCategory[] | string;
 };
 
 // Utility type to get a union of values from an object type

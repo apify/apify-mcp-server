@@ -4,8 +4,8 @@
  */
 
 import { defaults } from '../const.js';
-import { addRemoveTools, betaTools, featureTools, getActorsAsTools } from '../tools/index.js';
-import type { FeatureToolKey, Input, ToolEntry } from '../types.js';
+import { addRemoveTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import type { Input, ToolCategory, ToolEntry } from '../types.js';
 
 /**
  * Load tools based on the provided Input object.
@@ -37,16 +37,11 @@ export async function loadToolsFromInput(
         tools.push(...addRemoveTools);
     }
 
-    // Add beta tools if enabled
-    if (input.beta) {
-        tools.push(...betaTools);
-    }
-
-    // Add feature tools based on the input
+    // Add tools from enabled categories
     if (input.tools) {
         const toolKeys = Array.isArray(input.tools) ? input.tools : [input.tools];
         for (const toolKey of toolKeys) {
-            const keyTools = featureTools[toolKey as FeatureToolKey] || [];
+            const keyTools = toolCategories[toolKey as ToolCategory] || [];
             tools.push(...keyTools);
         }
     }
