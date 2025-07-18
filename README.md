@@ -1,13 +1,25 @@
 <h1 align="center">
-    <a href="https://apify.com">
+    <style>
+      @media (prefers-color-scheme: dark) {
+        .mcp-url { color: #A78BFA !important; }
+        .mcp-desc { color: #FFFFFF !important; }
+      }
+      @media (prefers-color-scheme: light) {
+        .mcp-url { color: #8B5CF6 !important; }
+        .mcp-desc { color: #000000 !important; }
+      }
+    </style>
+    <a href="https://mcp.apify.com">
         <picture>
-          <!-- TODO: Replace with the latest Apify logo once they are released -->
-          <source media="(prefers-color-scheme: dark)" srcset="docs/apify_logo_512px_old.png">
-          <img alt="Apify MCP Server" src="docs/apify_logo_white_512px_old.png" width="500">
+          <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_banner_dark.png">
+          <img alt="Apify MCP Server" src="docs/apify_mcp_server_banner.png" width="500">
         </picture>
     </a>
     <br>
-    <small>Instantly connect AI apps and agents to thousands of ready‑built tools</small>
+    <small>
+      <span class="mcp-url">mcp.apify.com:</span>
+      <span class="mcp-desc">instantly connect AI apps and agents to thousands of ready‑built tools</span>
+    </small>
 </h1>
 
 <p align=center>
@@ -21,20 +33,28 @@
 
 The Apify Model Context Protocol (MCP) Server allows AI applications and agents to connect to Apify’s extensive [library of Actors](https://apify.com/store) as tools to perform web scraping, data extraction, and other automation tasks in real time.
 
+> **🚀 Try the hosted Apify MCP Server!**
+>
+> For the easiest setup and most powerful features, including the ability to find and use any Actor from Apify Store, connect your AI assistant to our hosted server:
+>
+> **[`https://mcp.apify.com`](https://mcp.apify.com)**
+>
+> It supports OAuth, so you can connect from clients like Claude.ai or Visual Studio Code with just the URL.
+
 ![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
 ## Table of Contents
-- [🌐 Introducing the Apify MCP Server](#-introducing-the-apify-mcp-server)
+- [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
-- [🤖 MCP Clients and Examples](#-mcp-clients-and-examples)
-- [🎮 Try Apify MCP Instantly](#-try-apify-mcp-instantly)
-- [🧱 Tools, Resources, and Prompts](#-tools-resources-and-prompts)
-- [🐛 Troubleshooting](#-troubleshooting)
-- [👷🏼 Development](#-development)
-- [👨‍💻 Contributing](#-contributing)
+- [🤖 MCP clients and examples](#-mcp-clients-and-examples)
+- [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
+- [🛠️ Tools, resources, and prompts](#-tools-resources-and-prompts)
+- [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
+- [⚙️ Development](#-development)
+- [🤝 Contributing](#-contributing)
 - [📚 Learn more](#-learn-more)
 
-# 🌐 Introducing the Apify MCP Server
+# 🌐 Introducing the Apify MCP server
 
 The Apify MCP Server allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
 For example, it can:
@@ -52,7 +72,7 @@ https://www.youtube.com/watch?v=BKu8H91uCTg
 
 You can use the Apify MCP Server in two ways:
 
-**HTTPS Endpoint (mcp.apify.com)**: Connect from your MCP client via OAuth or by including the `Authorization: Bearer <APIFY_TOKEN>` header in your requests.
+**HTTPS Endpoint (mcp.apify.com)**: Connect from your MCP client via OAuth or by including the `Authorization: Bearer <APIFY_TOKEN>` header in your requests. This is the recommended method for most use cases. Because it supports OAuth, you can connect from clients like [Claude.ai](https://claude.ai) or [Visual Studio Code](https://code.visualstudio.com/) using just the URL: `https://mcp.apify.com`.
 - `https://mcp.apify.com` (recommended) for streamable transport
 - `https://mcp.apify.com/sse` for legacy SSE transport
 
@@ -62,7 +82,7 @@ You can use the Apify MCP Server in two ways:
 
 You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
 
-# 🤖 MCP Clients and examples
+# 🤖 MCP clients and examples
 
 To interact with the Apify MCP server, you can use various MCP clients, such as:
 - [Claude Desktop](https://claude.ai/download)
@@ -79,7 +99,21 @@ With MCP server integrated, you can ask your AI assistant things like:
 - "Provide a step-by-step guide on using the Model Context Protocol, including source URLs."
 - "What Apify Actors can I use?"
 
-# 🎮 Try Apify MCP Instantly
+### Supported Clients Matrix
+
+The following table outlines the tested MCP clients and their level of support for key features.
+
+| Client | Dynamic Tool Discovery | Notes |
+| --- | --- | --- |
+| **Claude.ai (web)** | ✅ Full | |
+| **Claude Desktop** | 🟡 Partial | Tools may need to be reloaded manually in the client. |
+| **VS Code (Genie)** | ✅ Full | |
+| **LibreChat** | ❓ Untested | |
+| **Apify Tester MCP Client** | ✅ Full | Designed for testing Apify MCP servers. |
+
+*This matrix is a work in progress. If you have tested other clients, please consider contributing to this documentation.*
+
+# 🪄 Try Apify MCP Instantly
 
 Want to try Apify MCP without any setup?
 
@@ -88,7 +122,7 @@ Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-cli
 This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
 Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
-# 🧱 Tools, Resources, and Prompts
+# 🛠️ Tools, resources, and prompts
 
 The MCP server provides a set of tools for interacting with Apify Actors.
 Since the Apify Store is large and growing rapidly, the MCP server provides a way to dynamically discover and use new Actors.
@@ -99,6 +133,7 @@ Any [Apify Actor](https://apify.com/store) can be used as a tool.
 By default, the server is pre-configured with one Actor, `apify/rag-web-browser`, and several helper tools.
 The MCP server loads an Actor's input schema and creates a corresponding MCP tool.
 This allows the AI agent to know exactly what arguments to pass to the Actor and what to expect in return.
+
 
 For example, for the `apify/rag-web-browser` Actor, the input parameters are:
 
@@ -118,10 +153,10 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It gives an AI agent the ability to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- Actor discovery and management: Search for Actors (`search-actors`), view details (`get-actor-details`), and dynamically add them (`add-actor`).
-- Apify documentation: Search Apify documentation (`search-apify-docs`) and fetch specific documents (`fetch-apify-docs`).
-- Actor runs (*): Get a list of your Actor runs (`get-actor-run-list`), specific run details (`get-actor-run`), and logs from a specific Actor run (`get-actor-log`).
-- Apify storage (*): Access datasets (`get-dataset`, `get-dataset-items`, `get-dataset-list`), key-value stores (`get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`, `get-key-value-store-records`), and their records.
+- **Actor discovery and management**: Search for Actors, view their details, and dynamically add or remove them as available tools for the AI.
+- **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
+- **Actor runs (*)**: Get lists of your Actor runs, inspect their details, and retrieve logs.
+- **Apify storage (*)**: Access data from your datasets and key-value stores.
 
 **Note**: Helper tool categories marked with (*) are not enabled by default in the MCP server and must be explicitly enabled using the `tools` argument (either the `--tools` command line argument for the stdio server or the `?tools` URL query parameter for the remote MCP server). The `tools` argument is a comma-separated list of categories with the following possible values:
 
@@ -145,7 +180,7 @@ export APIFY_TOKEN="your-apify-token"
 npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
 ```
 
-# 👷🏼 Development
+# ⚙️ Development
 
 ## Prerequisites
 
@@ -182,7 +217,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 - Make sure the `APIFY_TOKEN` environment variable is set.
 - Always use the latest version of the MCP server by using `@apify/actors-mcp-server@latest`.
 
-## ⓘ Limitations
+## 💡 Limitations
 
 The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
 - **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
@@ -191,8 +226,9 @@ The Actor input schema is processed to be compatible with most MCP clients while
 - **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
 - **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
+- **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from the Apify Store—including rental Actors—connect to the hosted endpoint.
 
-# 👨‍💻 Contributing
+# 🤝 Contributing
 
 We welcome contributions to improve the Apify MCP Server! Here's how you can help:
 
