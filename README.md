@@ -1,24 +1,14 @@
 <h1 align="center">
-    <style>
-      @media (prefers-color-scheme: dark) {
-        .mcp-url { color: #A78BFA !important; }
-        .mcp-desc { color: #FFFFFF !important; }
-      }
-      @media (prefers-color-scheme: light) {
-        .mcp-url { color: #8B5CF6 !important; }
-        .mcp-desc { color: #000000 !important; }
-      }
-    </style>
     <a href="https://mcp.apify.com">
         <picture>
-          <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_banner_dark.png">
-          <img alt="Apify MCP Server" src="docs/apify_mcp_server_banner.png" width="500">
+            <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_banner_dark.png">
+            <img alt="Apify MCP Server" src="docs/apify_mcp_server_banner.png" width="500">
         </picture>
     </a>
     <br>
     <small>
-      <span class="mcp-url">mcp.apify.com:</span>
-      <span class="mcp-desc">instantly connect AI apps and agents to thousands of ready‑built tools</span>
+      <span style="color: #A78BFA;">mcp.apify.com:</span> 
+      <span style="color: #374151;">instantly connect AI apps and agents to thousands of ready‑built tools</span>
     </small>
 </h1>
 
