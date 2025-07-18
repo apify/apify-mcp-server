@@ -6,16 +6,15 @@ describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
         const mockSendNotification = vi.fn();
         const progressToken = 'test-token-123';
-        const tracker = new ProgressTracker(progressToken, mockSendNotification, 100);
+        const tracker = new ProgressTracker(progressToken, mockSendNotification);
 
-        await tracker.updateProgress(25, 'Quarter done');
+        await tracker.updateProgress('Quarter done');
 
         expect(mockSendNotification).toHaveBeenCalledWith({
             method: 'notifications/progress',
             params: {
                 progressToken,
-                progress: 25,
-                total: 100,
+                progress: 1,
                 message: 'Quarter done',
             },
         });
@@ -23,20 +22,19 @@ describe('ProgressTracker', () => {
 
     it('should track actor run status updates', async () => {
         const mockSendNotification = vi.fn();
-        const tracker = new ProgressTracker('test-token', mockSendNotification, 100);
+        const tracker = new ProgressTracker('test-token', mockSendNotification);
 
         // Test with a simple manual update instead of mocking the full actor run flow
-        await tracker.updateProgress(0, 'test-actor: READY');
-        await tracker.updateProgress(50, 'test-actor: RUNNING');
-        await tracker.updateProgress(100, 'test-actor: SUCCEEDED');
+        await tracker.updateProgress('test-actor: READY');
+        await tracker.updateProgress('test-actor: RUNNING');
+        await tracker.updateProgress('test-actor: SUCCEEDED');
 
         expect(mockSendNotification).toHaveBeenCalledTimes(3);
         expect(mockSendNotification).toHaveBeenNthCalledWith(1, {
             method: 'notifications/progress',
             params: {
                 progressToken: 'test-token',
-                progress: 0,
-                total: 100,
+                progress: 1,
                 message: 'test-actor: READY',
             },
         });
@@ -44,26 +42,8 @@ describe('ProgressTracker', () => {
             method: 'notifications/progress',
             params: {
                 progressToken: 'test-token',
-                progress: 100,
-                total: 100,
+                progress: 3,
                 message: 'test-actor: SUCCEEDED',
-            },
-        });
-    });
-
-    it('should complete correctly', async () => {
-        const mockSendNotification = vi.fn();
-        const tracker = new ProgressTracker('test-token', mockSendNotification, 100);
-
-        await tracker.complete('All done!');
-
-        expect(mockSendNotification).toHaveBeenCalledWith({
-            method: 'notifications/progress',
-            params: {
-                progressToken: 'test-token',
-                progress: 100,
-                total: 100,
-                message: 'All done!',
             },
         });
     });
@@ -73,7 +53,7 @@ describe('ProgressTracker', () => {
         const tracker = new ProgressTracker('test-token', mockSendNotification);
 
         // Should not throw
-        await expect(tracker.updateProgress(50, 'Test')).resolves.toBeUndefined();
+        await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
         expect(mockSendNotification).toHaveBeenCalled();
     });
 });

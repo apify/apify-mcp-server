@@ -1,26 +1,24 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import { ApifyClient } from '../apify-client.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 
 export class ProgressTracker {
     private progressToken: string | number;
     private sendNotification: (notification: ProgressNotification) => Promise<void>;
     private currentProgress = 0;
-    private total = 100;
     private intervalId?: NodeJS.Timeout;
 
     constructor(
         progressToken: string | number,
         sendNotification: (notification: ProgressNotification) => Promise<void>,
-        total = 100,
     ) {
         this.progressToken = progressToken;
         this.sendNotification = sendNotification;
-        this.total = total;
     }
 
-    async updateProgress(progress: number, message?: string): Promise<void> {
-        this.currentProgress = Math.min(progress, this.total);
+    async updateProgress(message?: string): Promise<void> {
+        this.currentProgress += 1;
 
         try {
             const notification: ProgressNotification = {
@@ -28,7 +26,6 @@ export class ProgressTracker {
                 params: {
                     progressToken: this.progressToken,
                     progress: this.currentProgress,
-                    total: this.total,
                     ...(message && { message }),
                 },
             };
@@ -40,7 +37,7 @@ export class ProgressTracker {
     }
 
     startActorRunUpdates(runId: string, apifyToken: string, actorName: string): void {
-        this.stopPeriodicUpdates();
+        this.stop();
         const client = new ApifyClient({ token: apifyToken });
         let lastStatus = '';
         let lastStatusMessage = '';
@@ -57,39 +54,28 @@ export class ProgressTracker {
                     lastStatus = status;
                     lastStatusMessage = statusMessage || '';
 
-                    // Calculate progress based on status
-                    let progress = 0;
-                    if (status === 'RUNNING') progress = 50;
-                    else if (status === 'SUCCEEDED') progress = 100;
-                    else if (status === 'FAILED') progress = 100;
-
                     const message = statusMessage
                         ? `${actorName}: ${statusMessage}`
                         : `${actorName}: ${status}`;
 
-                    await this.updateProgress(progress, message);
+                    await this.updateProgress(message);
 
                     // Stop polling if actor finished
                     if (status === 'SUCCEEDED' || status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
-                        this.stopPeriodicUpdates();
+                        this.stop();
                     }
                 }
             } catch {
                 // Silent fail - continue polling
             }
-        }, 5_000);
+        }, PROGRESS_NOTIFICATION_INTERVAL_MS);
     }
 
-    stopPeriodicUpdates(): void {
+    stop(): void {
         if (this.intervalId) {
             clearInterval(this.intervalId);
             this.intervalId = undefined;
         }
-    }
-
-    async complete(message = 'Completed'): Promise<void> {
-        this.stopPeriodicUpdates();
-        await this.updateProgress(this.total, message);
     }
 }
 

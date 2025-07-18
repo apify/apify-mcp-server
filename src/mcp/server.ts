@@ -430,10 +430,6 @@ export class ActorsMcpServer {
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    if (progressTracker) {
-                        await progressTracker.updateProgress(0, `Starting: ${internalTool.name}`);
-                    }
-
                     const res = await internalTool.call({
                         args,
                         extra,
@@ -444,7 +440,7 @@ export class ActorsMcpServer {
                     }) as object;
 
                     if (progressTracker) {
-                        await progressTracker.complete(`Completed: ${internalTool.name}`);
+                        progressTracker.stop();
                     }
 
                     return { ...res };
@@ -506,10 +502,6 @@ export class ActorsMcpServer {
                             progressTracker,
                         );
 
-                        if (progressTracker) {
-                            await progressTracker.complete(`Completed: ${actorTool.actorFullName}`);
-                        }
-
                         return {
                             content: items.items.map((item: Record<string, unknown>) => {
                                 return {
@@ -520,7 +512,7 @@ export class ActorsMcpServer {
                         };
                     } finally {
                         if (progressTracker) {
-                            progressTracker.stopPeriodicUpdates();
+                            progressTracker.stop();
                         }
                     }
                 }
