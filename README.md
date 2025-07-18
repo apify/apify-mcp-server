@@ -6,7 +6,7 @@
         </picture>
     </a>
     <br>
-    <small style="font-size: 0.6em;">mcp.apify.com: instantly connect AI apps and agents to thousands of ready‑built tools</small>
+    <p style="font-size: smaller">mcp.apify.com: instantly connect AI apps and agents to thousands of ready‑built tools</p>
 </h1>
 
 <p align=center>
