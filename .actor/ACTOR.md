@@ -366,3 +366,4 @@ If you need other features or have any feedback, [submit an issue](https://conso
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
 - [Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents Into Claude](https://www.youtube.com/watch?v=BKu8H91uCTg&ab_channel=Apify)
+- [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)

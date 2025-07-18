@@ -1,83 +1,106 @@
+<h1 align="center">
+    <a href="https://apify.com">
+        <picture>
+          <!-- TODO: Replace with the latest Apify logo once they are released -->
+          <source media="(prefers-color-scheme: dark)" srcset="docs/apify_logo_512px_old.png">
+          <img alt="Apify MCP Server" src="docs/apify_logo_white_512px_old.png" width="500">
+        </picture>
+    </a>
+    <br>
+    <small>Instantly connect AI apps and agents to thousands of ready‑built tools</small>
+</h1>
+
+<p align=center>
+    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" alt="NPM latest version" data-canonical-src="https://img.shields.io/npm/v/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
+    <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="Downloads" data-canonical-src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
+    <a href="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml"><img src="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml/badge.svg?branch=master" alt="Build Status" style="max-width: 100%;"></a>
+    <a href="https://apify.com/apify/actors-mcp-server"><img src="https://apify.com/actor-badge?actor=apify/actors-mcp-server" alt="Actor runs" style="max-width: 100%;"></a>
+</p>
+
 # Apify Model Context Protocol (MCP) Server
 
-[![Actors MCP Server](https://apify.com/actor-badge?actor=apify/actors-mcp-server)](https://apify.com/apify/actors-mcp-server)
-
-Implementation of an MCP server for all [Apify Actors](https://apify.com/store).
-This server enables interaction with one or more Apify Actors that can be defined in the MCP Server configuration.
-
-The server can be used in two ways:
-- **🇦 [MCP Server Actor](https://apify.com/apify/actors-mcp-server)** – HTTP server accessible via Server-Sent Events (SSE), see [guide](#-mcp-server-actor)
-- **⾕ MCP Server Stdio** – Local server available via standard input/output (stdio), see [guide](#-mcp-server-at-a-local-host)
-
-You can also interact with the MCP server using a chat-like UI with 💬 [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
-
-# 🎯 What does Apify MCP server do?
-
-The MCP Server Actor allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
-For example, it can:
-- Use [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) to extract data from Facebook posts from multiple pages/profiles
-- Use [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) to extract Google Maps contact details
-- Use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs)
-- Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments
-- Use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content
-
-# MCP Clients
-
-To interact with the Apify MCP server, you can use MCP clients such as:
-- [Claude Desktop](https://claude.ai/download) (only Stdio support)
-- [Visual Studio Code](https://code.visualstudio.com/) (Stdio and SSE support)
-- [LibreChat](https://www.librechat.ai/) (Stdio and SSE support, yet without Authorization header)
-- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) (SSE support with Authorization headers)
-- Other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
-- More clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
-
-When you have Actors integrated with the MCP server, you can ask:
-- "Search the web and summarize recent trends about AI Agents"
-- "Find the top 10 best Italian restaurants in San Francisco"
-- "Find and analyze the Instagram profile of The Rock"
-- "Provide a step-by-step guide on using the Model Context Protocol with source URLs"
-- "What Apify Actors can I use?"
-
-The following image shows how the Apify MCP server interacts with the Apify platform and AI clients:
+The Apify Model Context Protocol (MCP) Server allows AI applications and agents to connect to Apify’s extensive [library of Actors](https://apify.com/store) as tools to perform web scraping, data extraction, and other automation tasks in real time.
 
 ![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
 
-With the MCP Tester client you can load Actors dynamically but this is not yet supported by other MCP clients.
-We also plan to add more features, see [Roadmap](#-roadmap-march-2025) for more details.
+## Table of Contents
+- [🌐 Introducing the Apify MCP Server](#-introducing-the-apify-mcp-server)
+- [🚀 Quickstart](#-quickstart)
+- [🤖 MCP Clients and Examples](#-mcp-clients-and-examples)
+- [🎮 Try Apify MCP Instantly](#-try-apify-mcp-instantly)
+- [🧱 Tools, Resources, and Prompts](#-tools-resources-and-prompts)
+- [🐛 Troubleshooting](#-troubleshooting)
+- [👷🏼 Development](#-development)
+- [👨‍💻 Contributing](#-contributing)
+- [📚 Learn more](#-learn-more)
 
-# 🔄 What is the Model Context Protocol?
+# 🌐 Introducing the Apify MCP Server
 
-The Model Context Protocol (MCP) allows AI applications (and AI agents), such as Claude Desktop, to connect to external tools and data sources.
-MCP is an open protocol that enables secure, controlled interactions between AI applications, AI Agents, and local or remote resources.
+The Apify MCP Server allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
+For example, it can:
+- Use [Facebook Posts Scraper](https://apify.com/apify/facebook-posts-scraper) to extract data from Facebook posts from multiple pages/profiles.
+- Use [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) to extract contact details from Google Maps.
+- Use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs).
+- Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
+- Use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content.
 
-For more information, see the [Model Context Protocol](https://modelcontextprotocol.org/) website or the blog post [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/).
+**Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents with Claude**
 
+https://www.youtube.com/watch?v=BKu8H91uCTg
 
-# 🤖 How is MCP Server related to AI Agents?
+# 🚀 Quickstart
 
-The Apify MCP Server exposes Apify's Actors through the MCP protocol, allowing AI Agents or frameworks that implement the MCP protocol to access all Apify Actors as tools for data extraction, web searching, and other tasks.
+You can use the Apify MCP Server in two ways:
 
-To learn more about AI Agents, explore our blog post: [What are AI Agents?](https://blog.apify.com/what-are-ai-agents/) and browse Apify's curated [AI Agent collection](https://apify.com/store/collections/ai_agents).
-Interested in building and monetizing your own AI agent on Apify? Check out our [step-by-step guide](https://blog.apify.com/how-to-build-an-ai-agent/) for creating, publishing, and monetizing AI agents on the Apify platform.
+**HTTPS Endpoint (mcp.apify.com)**: Connect from your MCP client via OAuth or by including the `Authorization: Bearer <APIFY_TOKEN>` header in your requests.
+- `https://mcp.apify.com` (recommended) for streamable transport
+- `https://mcp.apify.com/sse` for legacy SSE transport
 
-# 🧱 Components
+**Standard Input/Output (stdio)**: Ideal for local integrations and command-line tools like the Claude for Desktop client.
+- Set the MCP client server command to `npx @apify/actors-mcp-server` and the `APIFY_TOKEN` environment variable to your Apify API token.
+- See `npx @apify/actors-mcp-server --help` for more options.
 
-## Tools
+You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
+
+# 🤖 MCP Clients and examples
+
+To interact with the Apify MCP server, you can use various MCP clients, such as:
+- [Claude Desktop](https://claude.ai/download)
+- [Visual Studio Code](https://code.visualstudio.com/)
+- [LibreChat](https://www.librechat.ai/)
+- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+- Other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
+- More clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
+
+With MCP server integrated, you can ask your AI assistant things like:
+- "Search the web and summarize recent trends in AI Agents."
+- "Find the top 10 Italian restaurants in San Francisco."
+- "Find and analyze the Instagram profile of The Rock."
+- "Provide a step-by-step guide on using the Model Context Protocol, including source URLs."
+- "What Apify Actors can I use?"
+
+# 🎮 Try Apify MCP Instantly
+
+Want to try Apify MCP without any setup?
+
+Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+
+This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
+Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
+
+# 🧱 Tools, Resources, and Prompts
+
+The MCP server provides a set of tools for interacting with Apify Actors.
+Since the Apify Store is large and growing rapidly, the MCP server provides a way to dynamically discover and use new Actors.
 
 ### Actors
 
 Any [Apify Actor](https://apify.com/store) can be used as a tool.
-By default, the server is pre-configured with the Actors specified below, but this can be overridden by providing Actor input.
+By default, the server is pre-configured with one Actor, `apify/rag-web-browser`, and several helper tools.
+The MCP server loads an Actor's input schema and creates a corresponding MCP tool.
+This allows the AI agent to know exactly what arguments to pass to the Actor and what to expect in return.
 
-```text
-'apify/rag-web-browser'
-```
-The MCP server loads the Actor input schema and creates MCP tools corresponding to the Actors.
-See this example of input schema for the [RAG Web Browser](https://apify.com/apify/rag-web-browser/input-schema).
-
-The tool name must always be the full Actor name, such as `apify/rag-web-browser`.
-The arguments for an MCP tool represent the input parameters of the Actor.
-For example, for the `apify/rag-web-browser` Actor, the arguments are:
+For example, for the `apify/rag-web-browser` Actor, the input parameters are:
 
 ```json
 {
@@ -85,12 +108,15 @@ For example, for the `apify/rag-web-browser` Actor, the arguments are:
   "maxResults": 3
 }
 ```
-You don't need to specify the input parameters or which Actor to call; everything is managed by an LLM.
+You don't need to manually specify which Actor to call or its input parameters; the LLM handles this automatically.
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
 
 ### Helper tools
-One of the powerful features of MCP with Apify is dynamic actor tooling – the ability for an AI agent to find new tools (Actors) as needed and incorporate them. Here are some special MCP operations and how Apify MCP Server supports them:
+
+One of the most powerful features of using MCP with Apify is dynamic tool discovery.
+It gives an AI agent the ability to find new tools (Actors) as needed and incorporate them.
+Here are some special MCP operations and how the Apify MCP Server supports them:
 
 - Actor discovery and management: Search for Actors (`search-actors`), view details (`get-actor-details`), and dynamically add them (`add-actor`).
 - Apify documentation: Search Apify documentation (`search-apify-docs`) and fetch specific documents (`fetch-apify-docs`).
@@ -100,272 +126,22 @@ One of the powerful features of MCP with Apify is dynamic actor tooling – the 
 **Note**: Helper tool categories marked with (*) are not enabled by default in the MCP server and must be explicitly enabled using the `tools` argument (either the `--tools` command line argument for the stdio server or the `?tools` URL query parameter for the remote MCP server). The `tools` argument is a comma-separated list of categories with the following possible values:
 
 - `docs`: Search and fetch Apify documentation tools.
-- `runs`: Get Actor runs list, run details, and logs from a specific Actor run.
+- `runs`: Get Actor run lists, run details, and logs from a specific Actor run.
 - `storage`: Access datasets, key-value stores, and their records.
 - `preview`: Experimental tools in preview mode.
 
 For example, to enable all tools, use `npx @apify/actors-mcp-server --tools docs,runs,storage,preview` or `https://mcp.apify.com/?tools=docs,runs,storage,preview`.
 
-## Prompt & Resources
+### Prompt & Resources
 
-The server does not provide any resources and prompts.
-We plan to add [Apify's dataset](https://docs.apify.com/platform/storage/dataset) and [key-value store](https://docs.apify.com/platform/storage/key-value-store) as resources in the future.
+The server does not yet provide any resources or prompts.
 
-# ⚙️ Usage
-
-The Apify MCP Server can be used in two ways: **as an Apify Actor** running on the Apify platform
-or as a **local server** running on your machine.
-
-## 🇦 MCP Server Actor
-
-### Standby web server
-
-The Actor runs in [**Standby mode**](https://docs.apify.com/platform/actors/running/standby) with an HTTP web server that receives and processes requests.
-
-To start the server with default Actors, send an HTTP GET request with your [Apify API token](https://console.apify.com/settings/integrations) to the following URL:
-```
-https://actors-mcp-server.apify.actor?token=<APIFY_TOKEN>
-```
-It is also possible to start the MCP server with a different set of Actors.
-To do this, create a [task](https://docs.apify.com/platform/actors/running/tasks) and specify the list of Actors you want to use.
-
-Then, run the task in Standby mode with the selected Actors:
-```shell
-https://USERNAME--actors-mcp-server-task.apify.actor?token=<APIFY_TOKEN>
-```
-
-You can find a list of all available Actors in the [Apify Store](https://apify.com/store).
-
-#### 💬 Interact with the MCP Server over SSE
-
-Once the server is running, you can interact with Server-Sent Events (SSE) to send messages to the server and receive responses.
-The easiest way is to use [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) on Apify.
-
-[Claude Desktop](https://claude.ai/download) currently lacks SSE support, but you can use it with Stdio transport; see [MCP Server at a local host](#-mcp-server-at-a-local-host) for more details.
-Note: The free version of Claude Desktop may experience intermittent connection issues with the server.
-
-In the client settings, you need to provide server configuration:
-```json
-{
-    "mcpServers": {
-        "apify": {
-            "type": "sse",
-            "url": "https://actors-mcp-server.apify.actor/sse",
-            "env": {
-                "APIFY_TOKEN": "your-apify-token"
-            }
-        }
-    }
-}
-```
-
-## ⾕ MCP Server at a local host
-
-You can run the Apify MCP Server on your local machine by configuring it with Claude Desktop or any other [MCP client](https://modelcontextprotocol.io/clients).
-You can also use [Smithery](https://smithery.ai/server/@apify/actors-mcp-server) to install the server automatically.
-
-### Prerequisites
-
-- MacOS or Windows
-- The latest version of Claude Desktop must be installed (or another MCP client)
-- [Node.js](https://nodejs.org/en) (v18 or higher)
-- [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_TOKEN`)
-
-Make sure you have the `node` and `npx` installed properly:
-```bash
-node -v
-npx -v
-```
-If not, follow this guide to install Node.js: [Downloading and installing Node.js and npm](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm).
-
-#### Claude Desktop
-
-To configure Claude Desktop to work with the MCP server, follow these steps. For a detailed guide, refer to the [Claude Desktop Users Guide](https://modelcontextprotocol.io/quickstart/user) or watch the [video tutorial](https://youtu.be/gf5WXeqydUU?t=440).
-
-1. Download Claude for desktop
-   - Available for Windows and macOS.
-   - For Linux users, you can build a Debian package using this [unofficial build script](https://github.com/aaddrick/claude-desktop-debian).
-2. Open the Claude Desktop app and enable **Developer Mode** from the top-left menu bar.
-3. Once enabled, open **Settings** (also from the top-left menu bar) and navigate to the **Developer Option**, where you'll find the **Edit Config** button.
-4. Open the configuration file and edit the following file:
-
-    - On macOS: `~/Library/Application\ Support/Claude/claude_desktop_config.json`
-    - On Windows: `%APPDATA%/Claude/claude_desktop_config.json`
-    - On Linux: `~/.config/Claude/claude_desktop_config.json`
-
-    ```json
-    {
-     "mcpServers": {
-       "actors-mcp-server": {
-         "command": "npx",
-         "args": ["-y", "@apify/actors-mcp-server"],
-         "env": {
-            "APIFY_TOKEN": "your-apify-token"
-         }
-       }
-     }
-    }
-    ```
-    Alternatively, you can use the `actors` argument to select one or more Apify Actors:
-    ```json
-   {
-    "mcpServers": {
-      "actors-mcp-server": {
-        "command": "npx",
-        "args": [
-          "-y", "@apify/actors-mcp-server",
-          "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
-        ],
-        "env": {
-           "APIFY_TOKEN": "your-apify-token"
-        }
-      }
-    }
-   }
-    ```
-5. Restart Claude Desktop
-
-    - Fully quit Claude Desktop (ensure it's not just minimized or closed).
-    - Restart Claude Desktop.
-    - Look for the 🔌 icon to confirm that the Actors MCP server is connected.
-
-6. Open the Claude Desktop chat and ask "What Apify Actors can I use?"
-
-   ![Claude-desktop-with-Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/claude-desktop.png)
-
-7. Examples
-
-   You can ask Claude to perform tasks, such as:
-    ```text
-    Find and analyze recent research papers about LLMs.
-    Find the top 10 best Italian restaurants in San Francisco.
-    Find and analyze the Instagram profile of The Rock.
-    ```
-
-To understand how to set up and run the MCP server on Claude, you can watch this short video tutorial ▷ on YouTube:
-
-[Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents Into Claude](https://www.youtube.com/watch?v=UOkJm9pTgMw)
-
-#### VS Code
-
-For one-click installation, click one of the install buttons below:
-
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-NPM-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D) [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-NPM-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D&quality=insiders)
-
-##### Manual installation
-
-You can manually install the Apify MCP Server in VS Code. First, click one of the install buttons at the top of this section for a one-click installation.
-
-Alternatively, add the following JSON block to your User Settings (JSON) file in VS Code. You can do this by pressing `Ctrl + Shift + P` and typing `Preferences: Open User Settings (JSON)`.
-
-```json
-{
-  "mcp": {
-    "inputs": [
-      {
-        "type": "promptString",
-        "id": "apify_token",
-        "description": "Apify API Token",
-        "password": true
-      }
-    ],
-    "servers": {
-      "actors-mcp-server": {
-        "command": "npx",
-        "args": ["-y", "@apify/actors-mcp-server"],
-        "env": {
-          "APIFY_TOKEN": "${input:apify_token}"
-        }
-      }
-    }
-  }
-}
-```
-
-Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace - just omit the top-level `mcp {}` key. This will allow you to share the configuration with others.
-
-If you want to specify which Actors to load, you can add the `--actors` argument:
-
-```json
-{
-  "servers": {
-    "actors-mcp-server": {
-      "command": "npx",
-      "args": [
-        "-y", "@apify/actors-mcp-server",
-        "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
-      ],
-      "env": {
-        "APIFY_TOKEN": "${input:apify_token}"
-      }
-    }
-  }
-}
-```
-
-#### VS Code
-
-For one-click installation, click one of the install buttons below:
-
-[![Install with NPX in VS Code](https://img.shields.io/badge/VS_Code-NPM-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D) [![Install with NPX in VS Code Insiders](https://img.shields.io/badge/VS_Code_Insiders-NPM-24bfa5?style=flat-square&logo=visualstudiocode&logoColor=white)](https://insiders.vscode.dev/redirect/mcp/install?name=actors-mcp-server&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22%24%7Binput%3Aapify_token%7D%22%7D%7D&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22apify_token%22%2C%22description%22%3A%22Apify+API+Token%22%2C%22password%22%3Atrue%7D%5D&quality=insiders)
-
-##### Manual installation
-
-You can manually install the Apify MCP Server in VS Code. First, click one of the install buttons at the top of this section for a one-click installation.
-
-Alternatively, add the following JSON block to your User Settings (JSON) file in VS Code. You can do this by pressing `Ctrl + Shift + P` and typing `Preferences: Open User Settings (JSON)`.
-
-```json
-{
-  "mcp": {
-    "inputs": [
-      {
-        "type": "promptString",
-        "id": "apify_token",
-        "description": "Apify API Token",
-        "password": true
-      }
-    ],
-    "servers": {
-      "actors-mcp-server": {
-        "command": "npx",
-        "args": ["-y", "@apify/actors-mcp-server"],
-        "env": {
-          "APIFY_TOKEN": "${input:apify_token}"
-        }
-      }
-    }
-  }
-}
-```
-
-Optionally, you can add it to a file called `.vscode/mcp.json` in your workspace - just omit the top-level `mcp {}` key. This will allow you to share the configuration with others.
-
-If you want to specify which Actors to load, you can add the `--actors` argument:
-
-```json
-{
-  "servers": {
-    "actors-mcp-server": {
-      "command": "npx",
-      "args": [
-        "-y", "@apify/actors-mcp-server",
-        "--actors", "lukaskrivka/google-maps-with-contact-details,apify/instagram-scraper"
-      ],
-      "env": {
-        "APIFY_TOKEN": "${input:apify_token}"
-      }
-    }
-  }
-}
-```
-
-#### Debugging NPM package @apify/actors-mcp-server with @modelcontextprotocol/inspector
+### Debugging the NPM package
 
 To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
 
 ```shell
-export APIFY_TOKEN=your-apify-token
+export APIFY_TOKEN="your-apify-token"
 npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
 ```
 
@@ -374,27 +150,16 @@ npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/en) (v18 or higher)
-- Python 3.9 or higher
 
-Create an environment file `.env` with the following content:
+Create an environment file, `.env`, with the following content:
 ```text
-APIFY_TOKEN=your-apify-token
+APIFY_TOKEN="your-apify-token"
 ```
 
-Build the actor-mcp-server package:
+Build the `actor-mcp-server` package:
 
 ```bash
 npm run build
-```
-
-## Local client (SSE)
-
-To test the server with the SSE transport, you can use the script `examples/clientSse.ts`:
-Currently, the Node.js client does not support establishing a connection to a remote server with custom headers.
-You need to change the URL to your local server URL in the script.
-
-```bash
-node dist/examples/clientSse.js
 ```
 
 ## Debugging
@@ -405,37 +170,38 @@ For the best debugging experience, use the [MCP Inspector](https://github.com/mo
 You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
 
 ```bash
-export APIFY_TOKEN=your-apify-token
+export APIFY_TOKEN="your-apify-token"
 npx @modelcontextprotocol/inspector node ./dist/stdio.js
 ```
 
-Upon launching, the Inspector will display a URL that you can access in your browser to begin debugging.
+Upon launching, the Inspector will display a URL that you can open in your browser to begin debugging.
 
-## ⓘ Limitations and feedback
+# 🐛 Troubleshooting (local MCP server)
+
+- Make sure you have `node` installed by running `node -v`.
+- Make sure the `APIFY_TOKEN` environment variable is set.
+- Always use the latest version of the MCP server by using `@apify/actors-mcp-server@latest`.
+
+## ⓘ Limitations
 
 The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
 - **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
 - **Enum fields** are truncated to a maximum combined length of 200 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
-- **Required fields** are explicitly marked with a "REQUIRED" prefix in their descriptions for compatibility with frameworks that may not handle JSON schema properly.
-- **Nested properties** are built for special cases like proxy configuration and request list sources to ensure correct input structure.
+- **Required fields** are explicitly marked with a `REQUIRED` prefix in their descriptions for compatibility with frameworks that may not handle the JSON schema properly.
+- **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
-- **Enum values and examples** are added to property descriptions to ensure visibility even if the client doesn't fully support JSON schema.
+- **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
 
-Memory for each Actor is limited to 4GB.
-Free users have an 8GB limit, 128MB needs to be allocated for running `Actors-MCP-Server`.
+# 👨‍💻 Contributing
 
-If you need other features or have any feedback, [submit an issue](https://console.apify.com/actors/1lSvMAaRcadrM1Vgv/issues) in Apify Console to let us know.
+We welcome contributions to improve the Apify MCP Server! Here's how you can help:
 
-# 🚀 Roadmap (March 2025)
+- **🐛 Report issues**: Find a bug or have a feature request? [Open an issue](https://github.com/apify/actors-mcp-server/issues).
+- **🔧 Submit pull requests**: Fork the repo and submit pull requests with enhancements or fixes.
+- **📚 Documentation**: Improvements to docs and examples are always welcome.
+- **💡 Share use cases**: Contribute examples to help other users.
 
-- Add Apify's dataset and key-value store as resources.
-- Add tools such as Actor logs and Actor runs for debugging.
-
-# 🐛 Troubleshooting
-
-- Make sure you have the `node` installed by running `node -v`
-- Make sure you have the `APIFY_TOKEN` environment variable set
-- Always use the latest version of the MCP server by setting `@apify/actors-mcp-server@latest`
+For major changes, please open an issue first to discuss your proposal and ensure it aligns with the project's goals.
 
 # 📚 Learn more
 
@@ -444,6 +210,6 @@ If you need other features or have any feedback, [submit an issue](https://conso
 - [What is MCP and why does it matter?](https://blog.apify.com/what-is-model-context-protocol/)
 - [How to use MCP with Apify Actors](https://blog.apify.com/how-to-use-mcp/)
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
-- [AI agent workflow: building an agent to query Apify datasets](https://blog.apify.com/ai-agent-workflow/)
+- [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
 - [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
