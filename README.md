@@ -6,7 +6,7 @@
         </picture>
     </a>
     <br>
-    <p style="font-size: smaller">mcp.apify.com: instantly connect AI apps and agents to thousands of ready‑built tools</p>
+    <small><a href="https://mcp.apify.com">mcp.apify.com</a></small>
 </h1>
 
 <p align=center>
@@ -16,7 +16,7 @@
     <a href="https://apify.com/apify/actors-mcp-server"><img src="https://apify.com/actor-badge?actor=apify/actors-mcp-server" alt="Actor runs" style="max-width: 100%;"></a>
 </p>
 
-The Apify Model Context Protocol (MCP) Server allows AI applications and agents to connect to Apify’s extensive [library of Actors](https://apify.com/store) as tools to perform web scraping, data extraction, and other automation tasks in real time.
+The Apify Model Context Protocol (MCP) Server at **mcp.apify.com** instantly connects AI applications and agents to thousands of ready‑built tools. It allows your AI assistant to use any [Apify Actor](https://apify.com/store) for web scraping, data extraction, and automation tasks in real time.
 
 > **🚀 Try the hosted Apify MCP Server!**
 >
