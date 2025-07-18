@@ -2,8 +2,8 @@ import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
 import { processInput } from '../input.js';
-import { addRemoveTools, betaTools, getActorsAsTools } from '../tools/index.js';
-import type { Input, ToolEntry } from '../types.js';
+import type { Input } from '../types.js';
+import { loadToolsFromInput } from '../utils/tools-loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**
@@ -34,26 +34,14 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
 }
 
 /**
- * Process input parameters and get tools
+ * Process input parameters from URL and get tools
  * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
  * @param url
  * @param apifyToken
  */
 export async function processParamsGetTools(url: string, apifyToken: string) {
     const input = parseInputParamsFromUrl(url);
-    let tools: ToolEntry[] = [];
-    if (input.actors) {
-        const actors = input.actors as string[];
-        // Normal Actors as a tool
-        tools = await getActorsAsTools(actors, apifyToken);
-    }
-    if (input.enableAddingActors) {
-        tools.push(...addRemoveTools);
-    }
-    if (input.beta) {
-        tools.push(...betaTools);
-    }
-    return tools;
+    return await loadToolsFromInput(input, apifyToken);
 }
 
 export function parseInputParamsFromUrl(url: string): Input {

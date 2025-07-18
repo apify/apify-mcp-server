@@ -3,11 +3,11 @@ import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/cl
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { betaTools } from '../../dist/tools/index.js';
 import { defaults, HelperTools } from '../../src/const.js';
-import { addRemoveTools, defaultTools } from '../../src/tools/index.js';
+import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
+import type { ToolCategory } from '../../src/types.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 
@@ -150,9 +150,9 @@ export function createIntegrationTestsSuite(
 
         it('should add Actor dynamically and call it via generic call-actor tool', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true, enableBeta: true });
+            const client = await createClientFn({ enableAddingActors: true, tools: ['preview'] });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + betaTools.length;
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + toolCategories.preview.length;
             expect(names.length).toEqual(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
@@ -191,9 +191,9 @@ export function createIntegrationTestsSuite(
 
         it('should not call Actor via call-actor tool if it is not added', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true, enableBeta: true });
+            const client = await createClientFn({ enableAddingActors: true, tools: ['preview'] });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + betaTools.length;
+            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length + toolCategories.preview.length;
             expect(names.length).toEqual(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
@@ -346,7 +346,9 @@ export function createIntegrationTestsSuite(
         });
 
         it('should search Apify documentation', async () => {
-            const client = await createClientFn();
+            const client = await createClientFn({
+                tools: ['docs'],
+            });
             const toolName = HelperTools.DOCS_SEARCH;
 
             const query = 'standby actor';
@@ -370,7 +372,9 @@ export function createIntegrationTestsSuite(
         });
 
         it('should fetch Apify documentation page', async () => {
-            const client = await createClientFn();
+            const client = await createClientFn({
+                tools: ['docs'],
+            });
             const toolName = HelperTools.DOCS_FETCH;
 
             const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
@@ -385,6 +389,63 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(documentUrl);
+
+            await client.close();
+        });
+
+        it('should load correct tools for each category tools key', async () => {
+            for (const category of Object.keys(toolCategories)) {
+                const client = await createClientFn({
+                    tools: [category as ToolCategory],
+                });
+
+                const loadedTools = await client.listTools();
+                const toolNames = getToolNames(loadedTools);
+
+                // If the category is enabled by default, it should not be loaded again, and its tools
+                // are accounted for in the default tools.
+                const isCategoryInDefault = toolCategoriesEnabledByDefault.includes(category as ToolCategory);
+                const expectedTools = isCategoryInDefault ? [] : toolCategories[category as ToolCategory];
+                const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+                expect(toolNames.length).toEqual(expectedTools.length + defaultTools.length + defaults.actors.length + addRemoveTools.length);
+                for (const expectedToolName of expectedToolNames) {
+                    expect(toolNames).toContain(expectedToolName);
+                }
+
+                await client.close();
+            }
+        });
+
+        it('should handle multiple tool category keys input correctly', async () => {
+            const categories = ['docs', 'runs', 'storage'] as ToolCategory[];
+            const client = await createClientFn({
+                tools: categories,
+            });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            const expectedTools = [
+                ...toolCategories.docs,
+                ...toolCategories.runs,
+                ...toolCategories.storage,
+            ];
+            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+            // Handle case where tools are enabled by default
+            const selectedCategoriesInDefault = categories.filter((key) => toolCategoriesEnabledByDefault.includes(key));
+            const numberOfToolsFromCategoriesInDefault = selectedCategoriesInDefault
+                .map((key) => toolCategories[key])
+                .flat().length;
+
+            const numberOfToolsExpected = defaultTools.length + defaults.actors.length + addRemoveTools.length
+                // Tools from tool categories minus the ones already in default tools
+                + (expectedTools.length - numberOfToolsFromCategoriesInDefault);
+            expect(toolNames.length).toEqual(numberOfToolsExpected);
+            for (const expectedToolName of expectedToolNames) {
+                expect(toolNames).toContain(expectedToolName);
+            }
 
             await client.close();
         });

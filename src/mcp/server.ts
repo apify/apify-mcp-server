@@ -23,7 +23,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import { addRemoveTools, betaTools, callActorGetDataset, defaultTools, getActorsAsTools } from '../tools/index.js';
+import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -34,7 +34,6 @@ import { processParamsGetTools } from './utils.js';
 type ActorsMcpServerOptions = {
     enableAddingActors?: boolean;
     enableDefaultActors?: boolean;
-    enableBeta?: boolean; // Enable beta features
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -53,7 +52,6 @@ export class ActorsMcpServer {
         this.options = {
             enableAddingActors: options.enableAddingActors ?? true,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
-            enableBeta: options.enableBeta ?? false, // Disabled by default
         };
         this.server = new Server(
             {
@@ -77,10 +75,6 @@ export class ActorsMcpServer {
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
             this.enableDynamicActorTools();
-        }
-
-        if (this.options.enableBeta) {
-            this.upsertTools(betaTools, false);
         }
 
         // Initialize automatically for backward compatibility
@@ -173,7 +167,11 @@ export class ActorsMcpServer {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([...defaultTools, ...addRemoveTools, ...betaTools].map((tool) => [tool.tool.name, tool]));
+        const internalToolMap = new Map([
+            ...defaultTools,
+            ...addRemoveTools,
+            ...Object.values(toolCategories).flat(),
+        ].map((tool) => [tool.tool.name, tool]));
 
         for (const tool of toolNames) {
             // Skip if the tool is already loaded

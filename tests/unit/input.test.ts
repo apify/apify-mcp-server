@@ -47,43 +47,39 @@ describe('processInput', () => {
         expect(processed.enableAddingActors).toBe(true);
     });
 
-    it('should disable beta features by default', async () => {
+    it('should keep tools as array of valid featureTools keys', async () => {
         const input: Partial<Input> = {
-            beta: undefined,
+            actors: ['actor1'],
+            tools: ['docs', 'runs'],
         };
         const processed = processInput(input);
-        expect(processed.beta).toBe(false);
+        expect(processed.tools).toEqual(['docs', 'runs']);
     });
 
-    it('should disable beta features when beta is false', async () => {
+    it('should handle empty tools array', async () => {
         const input: Partial<Input> = {
-            beta: false,
+            actors: ['actor1'],
+            tools: [],
         };
         const processed = processInput(input);
-        expect(processed.beta).toBe(false);
+        expect(processed.tools).toEqual([]);
     });
 
-    it('should disable beta when beta is "false"', async () => {
+    it('should handle missing tools field (undefined)', async () => {
         const input: Partial<Input> = {
-            beta: 'false',
+            actors: ['actor1'],
         };
         const processed = processInput(input);
-        expect(processed.beta).toBe(false);
+        expect(processed.tools).toBeUndefined();
     });
 
-    it('should enable beta features when beta non empty string', async () => {
+    it('should include all keys, even invalid ones', async () => {
         const input: Partial<Input> = {
-            beta: '1',
+            actors: ['actor1'],
+            // @ts-expect-error: purposely invalid key for test
+            tools: ['docs', 'invalidKey', 'storage'],
         };
         const processed = processInput(input);
-        expect(processed.beta).toBe(true);
-    });
-
-    it('should enable beta features when beta is true', async () => {
-        const input: Partial<Input> = {
-            beta: true,
-        };
-        const processed = processInput(input);
-        expect(processed.beta).toBe(true);
+        expect(processed.tools).toEqual(['docs', 'invalidKey', 'storage']);
     });
 });

@@ -22,9 +22,10 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { defaults } from './const.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { getActorsAsTools } from './tools/index.js';
+import { toolCategories } from './tools/index.js';
+import type { Input, ToolCategory } from './types.js';
+import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -36,7 +37,8 @@ interface CliArgs {
     enableAddingActors: boolean;
     /** @deprecated */
     enableActorAutoLoading: boolean;
-    beta: boolean;
+    /** Tool categories to include */
+    tools?: string;
 }
 
 // Configure logging, set to ERROR
@@ -47,24 +49,35 @@ const argv = yargs(hideBin(process.argv))
     .usage('Usage: $0 [options]')
     .option('actors', {
         type: 'string',
-        describe: 'Comma-separated list of Actor full names to add to the server',
+        describe: 'Comma-separated list of Actor full names to add to the server.',
         example: 'apify/google-search-scraper,apify/instagram-scraper',
     })
     .option('enable-adding-actors', {
         type: 'boolean',
         default: true,
-        describe: 'Enable dynamically adding Actors as tools based on user requests',
+        describe: 'Enable dynamically adding Actors as tools based on user requests.',
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
         default: true,
         hidden: true,
-        describe: 'Deprecated: use enable-adding-actors instead',
+        describe: 'Deprecated: use enable-adding-actors instead.',
     })
-    .option('beta', {
-        type: 'boolean',
-        default: false,
-        describe: 'Enable beta features',
+    .options('tools', {
+        type: 'string',
+        describe: `Comma-separated list of specific tool categories to enable.
+
+Available choices: ${Object.keys(toolCategories).join(', ')}
+
+Tool categories are as follows:
+- docs: Search and fetch Apify documentation tools.
+- runs: Get Actor runs list, run details, and logs from a specific Actor run.
+- storage: Access datasets, key-value stores, and their records.
+- preview: Experimental tools in preview mode.
+
+Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
+`,
+        example: 'docs,runs,storage',
     })
     .help('help')
     .alias('h', 'help')
@@ -73,13 +86,14 @@ const argv = yargs(hideBin(process.argv))
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
         + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
-    .epilogue('For more information, visit https://github.com/apify/actors-mcp-server')
+    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
     .parseSync() as CliArgs;
 
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
 const actors = argv.actors as string || '';
 const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
-const enableBeta = argv.beta;
+// Keys of the tool categories to enable
+const toolCategoryKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
 
 // Validate environment
 if (!process.env.APIFY_TOKEN) {
@@ -88,8 +102,18 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false, enableBeta });
-    const tools = await getActorsAsTools(actorList.length ? actorList : defaults.actors, process.env.APIFY_TOKEN as string);
+    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
+
+    // Create an Input object from CLI arguments
+    const input: Input = {
+        actors: actorList.length ? actorList : [],
+        enableAddingActors,
+        tools: toolCategoryKeys as ToolCategory[],
+    };
+
+    // Use the shared tools loading logic
+    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);
+
     mcpServer.upsertTools(tools);
 
     // Start server

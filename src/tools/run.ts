@@ -59,7 +59,7 @@ const GetRunLogArgs = z.object({
  * https://docs.apify.com/api/v2/actor-run-get
  *  /v2/actor-runs/{runId}/log{?token}
  */
-export const getActorLog: ToolEntry = {
+export const getActorRunLog: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_LOG,
