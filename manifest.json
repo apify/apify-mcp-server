@@ -2,7 +2,7 @@
     "dxt_version": "0.1",
     "name": "apify-actors-mcp-server",
     "version": "0.0.0",
-    "description": "A simple MCP extension",
+    "description": "The Apify Model Context Protocol (MCP) Server at mcp.apify.com instantly connects AI applications and agents to thousands of ready‑built tools. It allows your AI assistant to use any Apify Actor for web scraping, data extraction, and automation tasks in real time.",
     "keywords": [
         "apify",
         "actors",
