@@ -1,0 +1,70 @@
+{
+    "dxt_version": "0.1",
+    "name": "apify-actors-mcp-server",
+    "version": "0.0.0",
+    "description": "A simple MCP extension",
+    "keywords": [
+        "apify",
+        "actors",
+        "dataset",
+        "mcp",
+        "automation",
+        "web",
+        "web scraping",
+        "web automation",
+        "web scraper",
+        "web crawler",
+        "scraping",
+        "data extraction",
+        "API"
+    ],
+    "author": {
+        "name": "Apify Technologies s.r.o.",
+        "url": "https://apify.com"
+    },
+    "license": "Apache-2.0",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/apify/actors-mcp-server"
+    },
+    "homepage": "https://mcp.apify.com",
+    "support": "https://github.com/apify/actors-mcp-server/issues",
+    "icon": "docs/apify-logo.png",
+    "screenshots": [
+        "docs/actors-mcp-server.png"
+    ],
+    "server": {
+        "type": "node",
+        "entry_point": "dist/stdio.js",
+        "mcp_config": {
+            "command": "node",
+            "args": [
+                "${__dirname}/dist/stdio.js"
+            ],
+            "env": {
+                "APIFY_TOKEN": "${user_config.apify_token}"
+            }
+        }
+    },
+    "tools_generated": true,
+    "user_config": {
+        "apify_token": {
+            "type": "string",
+            "title": "Apify token",
+            "description": "Your Apify API token for authentication",
+            "sensitive": true,
+            "required": true
+        }
+    },
+    "compatibility": {
+        "claude_desktop": ">=0.2.16",
+        "platforms": [
+            "darwin",
+            "win32",
+            "linux"
+        ],
+        "runtimes": {
+            "node": ">=20.0.0"
+        }
+    }
+}
