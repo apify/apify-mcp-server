@@ -49,9 +49,9 @@ For example, it can:
 - Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
 - Use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content.
 
-**Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents with Claude**
+**Video tutorial: Integrate 5,000+ Apify Actors and Agents with Claude**
 
-https://www.youtube.com/watch?v=BKu8H91uCTg
+[![Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents with Claude](https://img.youtube.com/vi/BKu8H91uCTg/hqdefault.jpg)](https://www.youtube.com/watch?v=BKu8H91uCTg)
 
 # 🚀 Quickstart
 
