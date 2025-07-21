@@ -313,7 +313,7 @@ export const callActor: ToolEntry = {
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { apifyMcpServer, args, apifyToken } = toolArgs;
+            const { apifyMcpServer, args, apifyToken, progressTracker } = toolArgs;
             const { actor: actorName, input, callOptions } = callActorArgs.parse(args);
 
             const actors = apifyMcpServer.listActorToolNames();
@@ -368,7 +368,7 @@ You can only use actors that are included in the list; actors not in the list ca
                     input,
                     apifyToken,
                     callOptions,
-                    null,
+                    progressTracker,
                 );
 
                 return {

@@ -47,7 +47,7 @@ if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
 
     app.listen(PORT, () => {
-        log.info(`The Actor web server is listening for user requests at ${HOST}`);
+        log.info(`The Actor web server is listening for user requests at ${HOST}:${PORT}`);
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');

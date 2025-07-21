@@ -7,6 +7,7 @@ import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingIn
 import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
+import type { ProgressTracker } from './utils/progress.js';
 
 export interface ISchemaProperties {
     type: string;
@@ -105,6 +106,8 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
+    /** Optional progress tracker for long running internal tools, like call-actor */
+    progressTracker?: ProgressTracker | null;
 }
 
 /**

@@ -437,6 +437,7 @@ export class ActorsMcpServer {
                         mcpServer: this.server,
                         apifyToken,
                         userRentedActorIds,
+                        progressTracker,
                     }) as object;
 
                     if (progressTracker) {
