@@ -7,6 +7,11 @@
     "node": ">=18.0.0"
   },
   "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./internals": "./dist/index-internals.js",
+    "./internals.js": "./dist/index-internals.js"
+  },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
   },
