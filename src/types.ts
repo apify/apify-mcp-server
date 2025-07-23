@@ -1,6 +1,6 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { Notification, Prompt, Request } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 
@@ -275,3 +275,14 @@ export interface ApifyDocsSearchResult {
     /** Piece of content that matches the search query from Algolia */
     content: string;
 }
+
+export type PromptBase = Prompt & {
+    /**
+     * AJV validation function for the prompt arguments.
+     */
+    ajvValidate: ValidateFunction;
+    /**
+     * Function to render the prompt with given arguments
+     */
+    render: (args: Record<string, string>) => string;
+};

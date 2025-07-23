@@ -436,8 +436,7 @@ export function createIntegrationTestsSuite(
             // Handle case where tools are enabled by default
             const selectedCategoriesInDefault = categories.filter((key) => toolCategoriesEnabledByDefault.includes(key));
             const numberOfToolsFromCategoriesInDefault = selectedCategoriesInDefault
-                .map((key) => toolCategories[key])
-                .flat().length;
+                .flatMap((key) => toolCategories[key]).length;
 
             const numberOfToolsExpected = defaultTools.length + defaults.actors.length + addRemoveTools.length
                 // Tools from tool categories minus the ones already in default tools
@@ -446,6 +445,31 @@ export function createIntegrationTestsSuite(
             for (const expectedToolName of expectedToolNames) {
                 expect(toolNames).toContain(expectedToolName);
             }
+
+            await client.close();
+        });
+
+        it('should list all prompts', async () => {
+            const client = await createClientFn();
+            const prompts = await client.listPrompts();
+            expect(prompts.prompts.length).toBeGreaterThan(0);
+            await client.close();
+        });
+
+        it('should be able to get prompt by name', async () => {
+            const client = await createClientFn();
+
+            const username = 'apify';
+            const prompt = await client.getPrompt({
+                name: 'LatestInstagramPostPrompt',
+                arguments: {
+                    username,
+                },
+            });
+
+            const message = prompt.messages[0];
+            expect(message).toBeDefined();
+            expect(message.content.text).toContain(username);
 
             await client.close();
         });

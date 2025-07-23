@@ -9,6 +9,8 @@ import {
     CallToolRequestSchema,
     CallToolResultSchema,
     ErrorCode,
+    GetPromptRequestSchema,
+    ListPromptsRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ServerNotificationSchema,
@@ -23,6 +25,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
+import { prompts } from '../prompts/index.js';
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
@@ -61,6 +64,7 @@ export class ActorsMcpServer {
             {
                 capabilities: {
                     tools: { listChanged: true },
+                    prompts: { },
                     logging: {},
                 },
             },
@@ -68,6 +72,7 @@ export class ActorsMcpServer {
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
         this.setupToolHandlers();
+        this.setupPromptHandlers();
 
         // Add default tools
         this.upsertTools(defaultTools);
@@ -332,6 +337,50 @@ export class ActorsMcpServer {
             process.once('SIGINT', handler);
             this.sigintHandler = handler; // Store the actual handler
         }
+    }
+
+    /**
+     * Sets up MCP request handlers for prompts.
+     */
+    private setupPromptHandlers(): void {
+        /**
+         * Handles the prompts/list request.
+         */
+        this.server.setRequestHandler(ListPromptsRequestSchema, () => {
+            return { prompts };
+        });
+
+        /**
+         * Handles the prompts/get request.
+         */
+        this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
+            const { name, arguments: args } = request.params;
+            const prompt = prompts.find((p) => p.name === name);
+            if (!prompt) {
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Prompt ${name} not found. Available prompts: ${prompts.map((p) => p.name).join(', ')}`,
+                );
+            }
+            if (!prompt.ajvValidate(args)) {
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Invalid arguments for prompt ${name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(prompt.ajvValidate.errors)}`,
+                );
+            }
+            return {
+                description: prompt.description,
+                messages: [
+                    {
+                        role: 'user',
+                        content: {
+                            type: 'text',
+                            text: prompt.render(args || {}),
+                        },
+                    },
+                ],
+            };
+        });
     }
 
     private setupToolHandlers(): void {
