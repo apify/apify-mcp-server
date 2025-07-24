@@ -4,6 +4,7 @@ import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/typ
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
+import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
 import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
@@ -459,17 +460,17 @@ export function createIntegrationTestsSuite(
         it('should be able to get prompt by name', async () => {
             const client = await createClientFn();
 
-            const username = 'apify';
+            const topic = 'apify';
             const prompt = await client.getPrompt({
-                name: 'LatestInstagramPostPrompt',
+                name: latestNewsOnTopicPrompt.name,
                 arguments: {
-                    username,
+                    topic,
                 },
             });
 
             const message = prompt.messages[0];
             expect(message).toBeDefined();
-            expect(message.content.text).toContain(username);
+            expect(message.content.text).toContain(topic);
 
             await client.close();
         });
