@@ -1,7 +1,7 @@
 // Import specific tools that are being used
 import type { ToolCategory } from '../types.js';
 import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
-import { getDataset, getDatasetItems } from './dataset.js';
+import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
 import { fetchApifyDocsTool } from './fetch-apify-docs.js';
 import { getActorDetailsTool } from './get-actor-details.js';
@@ -26,6 +26,7 @@ export const toolCategories = {
     storage: [
         getDataset,
         getDatasetItems,
+        getDatasetSchema,
         getKeyValueStore,
         getKeyValueStoreKeys,
         getKeyValueStoreRecord,

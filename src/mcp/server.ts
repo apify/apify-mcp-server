@@ -495,22 +495,22 @@ export class ActorsMcpServer {
                     const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
 
                     try {
-                        const { items } = await callActorGetDataset(
+                        const { runId, datasetId, items } = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
                             apifyToken as string,
                             callOptions,
                             progressTracker,
                         );
+                        const content = [
+                            { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
+                        ];
 
-                        return {
-                            content: items.items.map((item: Record<string, unknown>) => {
-                                return {
-                                    type: 'text',
-                                    text: JSON.stringify(item),
-                                };
-                            }),
-                        };
+                        const itemContents = items.items.map((item: Record<string, unknown>) => {
+                            return { type: 'text', text: JSON.stringify(item) };
+                        });
+                        content.push(...itemContents);
+                        return { content };
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();

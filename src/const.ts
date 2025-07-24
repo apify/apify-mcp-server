@@ -28,6 +28,7 @@ export enum HelperTools {
     DATASET_GET = 'get-dataset',
     DATASET_LIST_GET = 'get-dataset-list',
     DATASET_GET_ITEMS = 'get-dataset-items',
+    DATASET_SCHEMA_GET = 'get-dataset-schema',
     KEY_VALUE_STORE_LIST_GET = 'get-key-value-store-list',
     KEY_VALUE_STORE_GET = 'get-key-value-store',
     KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
@@ -43,11 +44,6 @@ export const defaults = {
         'apify/rag-web-browser',
     ],
 };
-
-// Actor output const
-export const ACTOR_OUTPUT_MAX_CHARS_PER_ITEM = 5_000;
-export const ACTOR_OUTPUT_TRUNCATED_MESSAGE = `Output was truncated because it will not fit into context.`
-    + `There is no reason to call this tool again! You can use ${HelperTools.DATASET_GET_ITEMS} tool to get more items from the dataset.`;
 
 export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
 

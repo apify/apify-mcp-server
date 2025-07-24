@@ -37,6 +37,8 @@ const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
+    runId: string;
+    datasetId: string;
     items: PaginatedList<Record<string, unknown>>;
 };
 
@@ -95,8 +97,7 @@ export async function callActorGetDataset(
         }
 
         log.info(`Actor ${actorName} finished with ${items.count} items`);
-
-        return { items };
+        return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
     } catch (error) {
         log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
         throw new Error(`Error calling Actor: ${error}`);
@@ -120,9 +121,8 @@ export async function callActorGetDataset(
  * 4. Properties are shortened using shortenProperties()
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
- * @param {string[]} actors - An array of actor IDs or Actor full names.
- * @param {string} apifyToken - The Apify token to use for authentication.
- * @returns {Promise<Tool[]>} - A promise that resolves to an array of MCP tools.
+ * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath and actorDefinitionPruned.
+ * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],

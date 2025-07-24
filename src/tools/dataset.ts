@@ -1,4 +1,5 @@
 import { Ajv } from 'ajv';
+import toJsonSchema from 'to-json-schema';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -109,6 +110,135 @@ export const getDatasetItems: ToolEntry = {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+        },
+    } as InternalTool,
+};
+
+/**
+ * Function to recursively remove empty arrays from an object
+ */
+function removeEmptyArrays(obj: unknown): unknown {
+    if (Array.isArray(obj)) {
+        // If the item is an array, recursively call removeEmptyArrays on each element.
+        return obj.map((item) => removeEmptyArrays(item));
+    }
+
+    if (typeof obj !== 'object' || obj === null) {
+        // Return primitives and null values as is.
+        return obj;
+    }
+
+    // Use reduce to build a new object, excluding keys with empty arrays.
+    return Object.entries(obj).reduce((acc, [key, value]) => {
+        const processedValue = removeEmptyArrays(value);
+
+        // Exclude the key if the processed value is an empty array.
+        if (Array.isArray(processedValue) && processedValue.length === 0) {
+            return acc;
+        }
+
+        acc[key] = processedValue;
+        return acc;
+    }, {} as Record<string, unknown>);
+}
+
+const getDatasetSchemaArgs = z.object({
+    datasetId: z.string()
+        .min(1)
+        .describe('Dataset ID or username~dataset-name.'),
+    limit: z.number().optional()
+        .describe('Maximum number of items to use for schema generation. Default is 5.')
+        .default(5),
+    clean: z.boolean().optional()
+        .describe('If true, uses only non-empty items and skips hidden fields (starting with #). Default is true.')
+        .default(true),
+    arrayMode: z.enum(['first', 'all']).optional()
+        .describe('Strategy for handling arrays. "first" uses first item as template, "all" merges all items. Default is "all".')
+        .default('all'),
+    additionalProperties: z.boolean().optional()
+        .describe('If true, allows additional properties in objects. Default is true.')
+        .default(true),
+});
+
+/**
+ * Generates a JSON schema from dataset items
+ */
+export const getDatasetSchema: ToolEntry = {
+    type: 'internal',
+    tool: {
+        name: HelperTools.DATASET_SCHEMA_GET,
+        actorFullName: HelperTools.DATASET_SCHEMA_GET,
+        description: 'Generates a JSON schema from dataset items. '
+            + 'The schema describes the structure of the data in the dataset, which can be used for validation, documentation, or data processing.'
+            + 'Since the dataset can be large it is convenient to understand the structure of the dataset before getting dataset items.',
+        inputSchema: zodToJsonSchema(getDatasetSchemaArgs),
+        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
+        call: async (toolArgs) => {
+            const { args, apifyToken } = toolArgs;
+            const parsed = getDatasetSchemaArgs.parse(args);
+            const client = new ApifyClient({ token: apifyToken });
+
+            try {
+                // Get dataset items
+                const datasetResponse = await client.dataset(parsed.datasetId).listItems({
+                    clean: parsed.clean,
+                    limit: parsed.limit,
+                });
+
+                if (!datasetResponse) {
+                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+                }
+
+                const datasetItems = datasetResponse.items;
+
+                if (datasetItems.length === 0) {
+                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' is empty.` }] };
+                }
+
+                // Clean the dataset items by removing empty arrays
+                const cleanedDatasetItems = datasetItems.map((item) => removeEmptyArrays(item));
+
+                try {
+                    // Generate schema with options to handle arrays better
+                    const schema = toJsonSchema(cleanedDatasetItems, {
+                        arrays: { mode: parsed.arrayMode },
+                        objects: { additionalProperties: parsed.additionalProperties },
+                        // strings: { detectFormat: false },
+                    });
+
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: JSON.stringify(schema),
+                        }],
+                    };
+                } catch (schemaError) {
+                    // Fallback: try with a simpler approach
+                    try {
+                        const fallbackSchema = toJsonSchema(cleanedDatasetItems, {
+                            arrays: { mode: 'first' },
+                        });
+
+                        return {
+                            content: [{ type: 'text', text: JSON.stringify(fallbackSchema) }],
+                        };
+                    } catch (fallbackError) {
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: `Error generating schema: ${(schemaError as Error).message}. Fallback also failed: ${(fallbackError as Error).message}`,
+                            }],
+                        };
+                    }
+                }
+            } catch (error) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Error generating schema: ${(error as Error).message}`,
+                    }],
+                };
+            }
         },
     } as InternalTool,
 };

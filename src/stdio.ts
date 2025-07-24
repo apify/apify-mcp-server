@@ -95,6 +95,14 @@ const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
 // Keys of the tool categories to enable
 const toolCategoryKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
 
+// Propagate log.error to console.error for easier debugging
+const originalError = log.error.bind(log);
+log.error = (...args: Parameters<typeof log.error>) => {
+    originalError(...args);
+    // eslint-disable-next-line no-console
+    console.error(...args);
+};
+
 // Validate environment
 if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
