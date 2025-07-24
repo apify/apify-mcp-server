@@ -152,9 +152,13 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 
 For example, to enable all tools, use `npx @apify/actors-mcp-server --tools docs,runs,storage,preview` or `https://mcp.apify.com/?tools=docs,runs,storage,preview`.
 
-### Prompt & Resources
+### Prompts
 
-The server does not yet provide any resources or prompts.
+The server provides a set of predefined example prompts to help you get started interacting with Apify through MCP. For example, there is a `GetLatestNewsOnTopic` prompt that allows you to easily retrieve the latest news on a specific topic using the [RAG Web Browser](https://apify.com/apify/rag-web-browser) Actor.
+
+### Resources
+
+The server does not yet provide any resources.
 
 ### Debugging the NPM package
 
