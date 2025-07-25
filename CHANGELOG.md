@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.16](https://github.com/apify/actors-mcp-server/releases/tag/v0.2.16) (2025-07-24)
+## [0.3.1](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.1) (2025-07-24)
 
 ### 🚀 Features
 
