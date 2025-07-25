@@ -1,8 +1,8 @@
 <h1 align="center">
     <a href="https://mcp.apify.com">
         <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_banner_dark.png">
-            <img alt="Apify MCP Server" src="docs/apify_mcp_server_banner.png" width="500">
+            <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_dark_background.png">
+            <img alt="Apify MCP Server" src="docs/apify_mcp_server_white_background.png" width="500">
         </picture>
     </a>
     <br>
@@ -26,7 +26,7 @@ The Apify Model Context Protocol (MCP) Server at **mcp.apify.com** instantly con
 >
 > It supports OAuth, so you can connect from clients like Claude.ai or Visual Studio Code with just the URL.
 
-![Actors-MCP-server](https://raw.githubusercontent.com/apify/actors-mcp-server/refs/heads/master/docs/actors-mcp-server.png)
+![Actors-MCP-server](docs/actors-mcp-server.png)
 
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)

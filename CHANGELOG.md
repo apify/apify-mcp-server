@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.3.2 - **not yet released**
+
+### 🚀 Features
+
+- Add images with a new Apify logo ([#191](https://github.com/apify/actors-mcp-server/pull/191)) ([cc5ded9](https://github.com/apify/actors-mcp-server/commit/cc5ded9e6f1b5f325dd4010c67b1ba920aa3350e)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
+
 ## [0.3.1](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.1) (2025-07-24)
 
 ### 🚀 Features
