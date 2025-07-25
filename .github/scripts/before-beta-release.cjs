@@ -8,6 +8,7 @@ const pkgJson = require(PKG_JSON_PATH); // eslint-disable-line import/no-dynamic
 
 const PACKAGE_NAME = pkgJson.name;
 const VERSION = pkgJson.version;
+console.log(`before-deploy: Current version is ${VERSION}`); // eslint-disable-line no-console
 
 const nextVersion = getNextVersion(VERSION);
 console.log(`before-deploy: Setting version to ${nextVersion}`); // eslint-disable-line no-console
