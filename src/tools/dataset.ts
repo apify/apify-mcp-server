@@ -178,65 +178,46 @@ export const getDatasetSchema: ToolEntry = {
             const parsed = getDatasetSchemaArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
 
+            // Get dataset items
+            const datasetResponse = await client.dataset(parsed.datasetId).listItems({
+                clean: parsed.clean,
+                limit: parsed.limit,
+            });
+
+            if (!datasetResponse) {
+                return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            }
+
+            const datasetItems = datasetResponse.items;
+
+            if (datasetItems.length === 0) {
+                return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' is empty.` }] };
+            }
+
+            // Clean the dataset items by removing empty arrays
+            const cleanedDatasetItems = datasetItems.map((item) => removeEmptyArrays(item));
+
+            // Try to generate schema with full options first
             try {
-                // Get dataset items
-                const datasetResponse = await client.dataset(parsed.datasetId).listItems({
-                    clean: parsed.clean,
-                    limit: parsed.limit,
+                const schema = toJsonSchema(cleanedDatasetItems, {
+                    arrays: { mode: parsed.arrayMode },
+                    objects: { additionalProperties: parsed.additionalProperties },
                 });
 
-                if (!datasetResponse) {
-                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
-                }
-
-                const datasetItems = datasetResponse.items;
-
-                if (datasetItems.length === 0) {
-                    return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' is empty.` }] };
-                }
-
-                // Clean the dataset items by removing empty arrays
-                const cleanedDatasetItems = datasetItems.map((item) => removeEmptyArrays(item));
-
-                try {
-                    // Generate schema with options to handle arrays better
-                    const schema = toJsonSchema(cleanedDatasetItems, {
-                        arrays: { mode: parsed.arrayMode },
-                        objects: { additionalProperties: parsed.additionalProperties },
-                        // strings: { detectFormat: false },
-                    });
-
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: JSON.stringify(schema),
-                        }],
-                    };
-                } catch (schemaError) {
-                    // Fallback: try with a simpler approach
-                    try {
-                        const fallbackSchema = toJsonSchema(cleanedDatasetItems, {
-                            arrays: { mode: 'first' },
-                        });
-
-                        return {
-                            content: [{ type: 'text', text: JSON.stringify(fallbackSchema) }],
-                        };
-                    } catch (fallbackError) {
-                        return {
-                            content: [{
-                                type: 'text',
-                                text: `Error generating schema: ${(schemaError as Error).message}. Fallback also failed: ${(fallbackError as Error).message}`,
-                            }],
-                        };
-                    }
-                }
-            } catch (error) {
                 return {
                     content: [{
                         type: 'text',
-                        text: `Error generating schema: ${(error as Error).message}`,
+                        text: JSON.stringify(schema),
                     }],
+                };
+            } catch {
+                // Fallback: try with simpler approach
+                const fallbackSchema = toJsonSchema(cleanedDatasetItems, {
+                    arrays: { mode: 'first' },
+                });
+
+                return {
+                    content: [{ type: 'text', text: JSON.stringify(fallbackSchema) }],
                 };
             }
         },
