@@ -186,12 +186,21 @@ Build the `actor-mcp-server` package:
 npm run build
 ```
 
-## Debugging
+## Start HTTP streamable MCP server
 
-Since MCP servers operate over standard input/output (stdio), debugging can be challenging.
-For the best debugging experience, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector).
+Run using Apify CLI:
 
-You can launch the MCP Inspector via [`npm`](https://docs.npmjs.com/downloading-and-installing-node-js-and-npm) with this command:
+```bash
+export APIFY_TOKEN="your-apify-token"
+export APIFY_META_ORIGIN=STANDBY
+apify run -p
+```
+
+Once the server is running, you can use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) to debug the server exposed at `http://localhost:3001`.
+
+## Start standard input/output (stdio) MCP server
+
+You can launch the MCP Inspector with this command:
 
 ```bash
 export APIFY_TOKEN="your-apify-token"
