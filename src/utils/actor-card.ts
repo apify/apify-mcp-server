@@ -62,6 +62,18 @@ export function formatActorToActorCard(
             statsParts.push(`${stats.totalUsers.toLocaleString()} total users, ${stats.totalUsers30Days.toLocaleString()} monthly users`);
         }
 
+        // Add success rate for last 30 days if available
+        if ('publicActorRunStats30Days' in stats && stats.publicActorRunStats30Days) {
+            const runStats = stats.publicActorRunStats30Days as {
+                SUCCEEDED: number;
+                TOTAL: number;
+            };
+            if (runStats.TOTAL > 0) {
+                const successRate = ((runStats.SUCCEEDED / runStats.TOTAL) * 100).toFixed(1);
+                statsParts.push(`Runs succeeded: ${successRate}%`);
+            }
+        }
+
         // Add bookmark count if available (ActorStoreList only)
         if ('bookmarkCount' in actor && actor.bookmarkCount) {
             statsParts.push(`${actor.bookmarkCount} bookmarks`);

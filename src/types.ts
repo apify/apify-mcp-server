@@ -157,13 +157,6 @@ export interface ToolEntry {
     tool: ActorTool | HelperTool | ActorMcpTool;
 }
 
-//  ActorStoreList for actor-search tool
-export interface ActorStats {
-    totalRuns: number;
-    totalUsers30Days: number;
-    publicActorRunStats30Days: unknown;
-}
-
 /**
  * Price for a single event in a specific tier.
  */
