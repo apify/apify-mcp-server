@@ -330,12 +330,12 @@ export const callActor: ToolEntry = {
                 return {
                     content: [{
                         type: 'text',
-                        text: `Actor '${actorName}' is not added. ${toolsText}
-To use this MCP server, specify the actors with the parameter, for example:
-?actors=apify/instagram-scraper,apify/website-content-crawler
-or with the CLI:
---actors "apify/instagram-scraper,apify/website-content-crawler"
-You can only use actors that are included in the list; actors not in the list cannot be used.`,
+                        text: `Actor '${actorName}' is not added. ${toolsText}\n`
+                            + 'To use this MCP server, specify the actors with the parameter, for example:\n'
+                            + '?actors=apify/instagram-scraper,apify/website-content-crawler\n'
+                            + 'or with the CLI:\n'
+                            + '--actors "apify/instagram-scraper,apify/website-content-crawler"\n'
+                            + 'You can only use actors that are included in the list; actors not in the list cannot be used.',
                     }],
                 };
             }

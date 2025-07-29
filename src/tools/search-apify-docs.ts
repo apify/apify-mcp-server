@@ -30,9 +30,12 @@ export const searchApifyDocsTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DOCS_SEARCH,
-        description: `Apify documentation search tool. This tool allows you to search the Apify documentation using Algolia's full-text search.
-You can use it to find relevant documentation pages based on keywords. The results will include the URL of the documentation page, a fragment identifier (if available), and a limited piece of content that matches the search query. You can then fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
-Use this tool when a user asks for help with Apify documentation or when you need to find relevant documentation pages based on keywords. For example, when a user wants to build an Apify Actor, you can search "How to build Actors" to find relevant guidance.`,
+        description: `Apify documentation search tool. This tool allows you to search the Apify documentation using Algolia's full-text search.\n`
+            + 'You can use it to find relevant documentation pages based on keywords. The results will include the URL of the documentation page, '
+            + 'a fragment identifier (if available), and a limited piece of content that matches the search query. '
+            + `You can then fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.\n`
+            + 'Use this tool when a user asks for help with Apify documentation or when you need to find relevant documentation pages based on keywords. '
+            + 'For example, when a user wants to build an Apify Actor, you can search "How to build Actors" to find relevant guidance.',
         args: searchApifyDocsToolArgsSchema,
         inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),

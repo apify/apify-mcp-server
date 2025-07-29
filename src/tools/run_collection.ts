@@ -32,9 +32,9 @@ export const getUserRunsList: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_RUN_LIST_GET,
         actorFullName: HelperTools.ACTOR_RUN_LIST_GET,
-        description: `Gets a paginated list of Actor runs with run details, datasetId, and keyValueStoreId.
-           Filter by status: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed),
-           TIMING-OUT (timing out), TIMED-OUT (timed out), ABORTING (being aborted), ABORTED (aborted).`,
+        description: `Gets a paginated list of Actor runs with run details, datasetId, and keyValueStoreId.\n`
+            + 'Filter by status: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed),\n'
+            + 'TIMING-OUT (timing out), TIMED-OUT (timed out), ABORTING (being aborted), ABORTED (aborted).',
         inputSchema: zodToJsonSchema(getUserRunsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
         call: async (toolArgs) => {

@@ -97,13 +97,14 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,
-        description: `Discover available Actors or MCP servers (which are also considered Actors in the context of Apify) in the Apify Store.
-This tool uses full-text search, so you MUST use simple space-separated keywords, such as "web scraping", "data extraction", or "playwright browser mcp".
-This tool returns a list of Actors with basic information, including descriptions, pricing models, usage statistics, and user ratings.
-Prefer Actors with more users, stars, and runs.
-You may need to use this tool several times to find the right Actor.
-Limit the number of results returned, but ensure that relevant results are included.
-This is not a general search tool; it is designed specifically to search for Actors in the Apify Store.`,
+        description: `Discover available Actors or MCP servers (which are also considered Actors in the context of Apify) in the Apify Store.\n`
+            + 'This tool uses full-text search, so you MUST use simple space-separated keywords, such as "web scraping", '
+            + '"data extraction", or "playwright browser mcp".\n'
+            + 'This tool returns a list of Actors with basic information, including descriptions, pricing models, usage statistics, and user ratings.\n'
+            + 'Prefer Actors with more users, stars, and runs.\n'
+            + 'You may need to use this tool several times to find the right Actor.\n'
+            + 'Limit the number of results returned, but ensure that relevant results are included.\n'
+            + 'This is not a general search tool; it is designed specifically to search for Actors in the Apify Store.',
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {

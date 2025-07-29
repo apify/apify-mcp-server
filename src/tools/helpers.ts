@@ -39,13 +39,12 @@ export const addTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_ADD,
-        description:
-            `Add an Actor or MCP server to the available tools of the Apify MCP server. 
-A tool is an Actor or MCP server that can be called by the user. 
-Do not execute the tool, only add it and list it in the available tools. 
-For example, when a user wants to scrape a website, first search for relevant Actors
-using ${HelperTools.STORE_SEARCH} tool, and once the user selects one they want to use, 
-add it as a tool to the Apify MCP server.`,
+        description: `Add an Actor or MCP server to the available tools of the Apify MCP server.\n`
+            + 'A tool is an Actor or MCP server that can be called by the user.\n'
+            + 'Do not execute the tool, only add it and list it in the available tools.\n'
+            + 'For example, when a user wants to scrape a website, first search for relevant Actors\n'
+            + `using ${HelperTools.STORE_SEARCH} tool, and once the user selects one they want to use,\n`
+            + 'add it as a tool to the Apify MCP server.',
         inputSchema: zodToJsonSchema(addToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
@@ -120,9 +119,10 @@ export const helpTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.APIFY_MCP_HELP_TOOL,
-        description: `Helper tool to get information on how to use and troubleshoot the Apify MCP server.
-This tool always returns the same help message with information about the server and how to use it.
-ALWAYS CALL THIS TOOL AT THE BEGINNING OF THE CONVERSATION SO THAT YOU HAVE INFORMATION ABOUT THE APIFY MCP SERVER IN CONTEXT, OR WHEN YOU ENCOUNTER ANY ISSUES WITH THE MCP SERVER OR ITS TOOLS.`,
+        description: `Helper tool to get information on how to use and troubleshoot the Apify MCP server.\n`
+            + 'This tool always returns the same help message with information about the server and how to use it.\n'
+            + 'ALWAYS CALL THIS TOOL AT THE BEGINNING OF THE CONVERSATION SO THAT YOU HAVE INFORMATION ABOUT THE APIFY MCP SERVER IN CONTEXT, '
+            + 'OR WHEN YOU ENCOUNTER ANY ISSUES WITH THE MCP SERVER OR ITS TOOLS.',
         inputSchema: zodToJsonSchema(helpToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(helpToolArgsSchema)),
         call: async () => {
