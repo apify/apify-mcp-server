@@ -98,8 +98,8 @@ export function formatActorsListToActorCard(actors: (Actor | ExtendedActorStoreL
     if (actors.length === 0) {
         return [];
     }
-    return actors.map((actor, index) => {
+    return actors.map((actor) => {
         const card = formatActorToActorCard(actor);
-        return `${index + 1}. ${card}`;
+        return `- ${card}`;
     });
 }
