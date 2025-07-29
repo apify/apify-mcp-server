@@ -6,7 +6,6 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import { defaults, HelperTools } from '../../src/const.js';
 import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
 import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
-import type { ISearchActorsResult } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory } from '../../src/types.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
@@ -282,7 +281,7 @@ export function createIntegrationTestsSuite(
             });
             const content = result.content as {text: string}[];
             expect(content.length).toBe(1);
-            const resultJson = JSON.parse(content[0].text) as ISearchActorsResult;
+            const resultJson = JSON.parse(content[0].text);
             const { actors } = resultJson;
             expect(actors.length).toBe(resultJson.total);
             expect(actors.length).toBeGreaterThan(0);

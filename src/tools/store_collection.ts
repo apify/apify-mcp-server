@@ -5,8 +5,8 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
-import type { ActorPricingModel, ExtendedActorStoreList, ExtendedPricingInfo, HelperTool, ToolEntry } from '../types.js';
-import { pricingInfoToString } from '../utils/pricing-info.js';
+import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
+import { formatActorsListToActorCard } from '../utils/actor-card.js';
 
 export async function searchActorsByKeywords(
     search: string,
@@ -41,31 +41,6 @@ Do not use complex queries, AND/OR operators, or other advanced syntax, as this 
         .default('')
         .describe('Filter the results by the specified category.'),
 });
-
-export interface ISearchActorsResult {
-    total: number;
-    actors: {
-        actorFullName: string;
-
-        categories?: string[];
-        description: string;
-
-        actorRating: string; // We convert the star (out of 5) rating into a string representation (e.g., "4.5 out of 5")
-        bookmarkCount: string; // We convert the bookmark count into a string representation (e.g., "100 users bookmarked this Actor")
-
-        pricingInfo: string; // We convert the pricing info into a string representation
-
-        usageStatistics: {
-            totalUsers: {
-                allTime: number;
-                last7Days: number;
-                last30Days: number;
-                last90Days: number;
-            };
-            failedRunsInLast30Days: number | string; // string for 'unknown' case
-        }
-    }[];
-}
 
 /**
  * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors),
@@ -117,45 +92,13 @@ export const searchActors: ToolEntry = {
                 parsed.offset,
             );
             actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-
-            const result: ISearchActorsResult = {
-                total: actors.length,
-                actors: actors.map((actor) => {
-                    return {
-                        actorFullName: `${actor.username}/${actor.name}`,
-
-                        categories: actor.categories,
-                        description: actor.description || 'No description provided.',
-
-                        actorRating: actor.actorReviewRating
-                            ? `${actor.actorReviewRating.toFixed(2)} out of 5`
-                            : 'unknown',
-                        bookmarkCount: actor.bookmarkCount
-                            ? `${actor.bookmarkCount} users have bookmarked this Actor`
-                            : 'unknown',
-
-                        pricingInfo: pricingInfoToString(actor.currentPricingInfo as ExtendedPricingInfo),
-
-                        usageStatistics: {
-                            totalUsers: {
-                                allTime: actor.stats.totalUsers,
-                                last7Days: actor.stats.totalUsers7Days,
-                                last30Days: actor.stats.totalUsers30Days,
-                                last90Days: actor.stats.totalUsers90Days,
-                            },
-                            failedRunsInLast30Days: (
-                                'publicActorRunStats30Days' in actor.stats && 'FAILED' in (actor.stats.publicActorRunStats30Days as object)
-                            ) ? (actor.stats.publicActorRunStats30Days as { FAILED: number }).FAILED : 'unknown',
-                        },
-                    };
-                }),
-            };
-
+            const actorCards = formatActorsListToActorCard(actors);
             return {
-                content: [{
-                    type: 'text',
-                    text: JSON.stringify(result),
-                }],
+                content: [
+                    { type: 'text', text: `**Search query:** ${parsed.search}` },
+                    { type: 'text', text: `**Number of Actors found:** ${actorCards.length}` },
+                    { type: 'text', text: actorCards.join('\n\n') },
+                ],
             };
         },
     } as HelperTool,
