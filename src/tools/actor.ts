@@ -16,7 +16,7 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, InternalTool, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, ToolEntry } from '../types.js';
 import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
 import { getValuesByDotKeys } from '../utils/generic.js';
 import type { ProgressTracker } from '../utils/progress.js';
@@ -256,41 +256,6 @@ export async function getActorsAsTools(
 
     return [...normalTools, ...mcpServerTools];
 }
-
-const getActorArgs = z.object({
-    actorId: z.string()
-        .min(1)
-        .describe('Actor ID or a tilde-separated owner\'s username and Actor name.'),
-});
-
-/**
- * https://docs.apify.com/api/v2/act-get
- */
-export const getActor: ToolEntry = {
-    type: 'internal',
-    tool: {
-        name: HelperTools.ACTOR_GET,
-        actorFullName: HelperTools.ACTOR_GET,
-        description: 'Gets an object that contains all the details about a specific Actor.'
-            + 'Actor basic information (ID, name, owner, description)'
-            + 'Statistics (number of runs, users, etc.)'
-            + 'Available versions, and configuration details'
-            + 'Use Actor ID or Actor full name, separated by tilde username~name.',
-        inputSchema: zodToJsonSchema(getActorArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorArgs)),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const { actorId } = getActorArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            // Get Actor - contains a lot of irrelevant information
-            const actor = await client.actor(actorId).get();
-            if (!actor) {
-                return { content: [{ type: 'text', text: `Actor '${actorId}' not found.` }] };
-            }
-            return { content: [{ type: 'text', text: JSON.stringify(actor) }] };
-        },
-    } as InternalTool,
-};
 
 const callActorArgs = z.object({
     actor: z.string()
