@@ -102,9 +102,12 @@ export const searchActors: ToolEntry = {
             const actorCards = formatActorsListToActorCard(actors);
             return {
                 content: [
-                    { type: 'text', text: `**Search query:** ${parsed.search}` },
-                    { type: 'text', text: `**Number of Actors found:** ${actorCards.length}` },
-                    { type: 'text', text: `**Actor cards:**\n${actorCards.join('\n\n')}` },
+                    { 
+                        type: 'text', 
+                        text: `**Search query:** ${parsed.search}\n\n` +
+                              `**Number of Actors found:** ${actorCards.length}\n\n` +
+                              `**Actor cards:**\n${actorCards.join('\n\n')}` 
+                    },
                 ],
             };
         },
