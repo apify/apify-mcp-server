@@ -74,10 +74,10 @@ export const searchActors: ToolEntry = {
         name: HelperTools.STORE_SEARCH,
         description: `Search for Actors or Model Context Protocol (MCP) servers in the Apify Store using keywords.\n`
             + `This tool returns a list of Actors with title, description, pricing model, usage statistics, and user ratings.\n`
-            + `Use simple space-separated keywords for best results, such as "web scraping", "data extraction", or "playwright browser mcp".\n`
+            + `Use simple space-separated keywords for best results, such as "web scraping", "data extraction", or "playwright mcp".\n`
             + `You may need to use this tool several times to find the right Actor.\n`
             + `Limit the number of results returned, but ensure that relevant results are included.\n`
-            + `Always present the results in a user-friendly format as an Actor cards.\n`
+            + `Always present the results in a user-friendly format as an Actor cards.\n\n`
             + `USAGE:\n`
             + `- Use when user wants to find Actors for a specific task or technology\n`
             + `- Use when user asks about available Actors in the Apify Store\n`
