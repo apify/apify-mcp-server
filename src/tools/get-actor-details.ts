@@ -22,7 +22,7 @@ export const getActorDetailsTool: ToolEntry = {
         description: `Get detailed information about an Actor by its ID or full name.\n`
             + `This tool returns title, description, URL, README (Actor's documentation), input schema, and usage statistics. \n`
             + `The Actor name is always composed of "username/name", for example, "apify/rag-web-browser".\n`
-            + `Returns Actor information which must be displayed in the same format.\n`
+            + `Present Actor information in user-friendly format as an Actor card.\n`
             + `USAGE:\n`
             + `- Use when user asks about an Actor its details, description, input schema, etc.\n`
             + `EXAMPLES:\n`
@@ -59,7 +59,7 @@ export const getActorDetailsTool: ToolEntry = {
 
             return {
                 content: [
-                    { type: 'text', text: actorCard },
+                    { type: 'text', text: `**Actor card**:\n${actorCard}` },
                     { type: 'text', text: `**README:**\n${buildInfo.actorDefinition.readme || 'No README provided.'}` },
                     { type: 'text', text: `**Input Schema:**\n${JSON.stringify(inputSchema, null, 0)}` },
                 ],

@@ -72,14 +72,21 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,
-        description: `Discover available Actors or MCP servers (which are also considered Actors in the context of Apify) in the Apify Store.\n`
-            + 'This tool uses full-text search, so you MUST use simple space-separated keywords, such as "web scraping", '
-            + '"data extraction", or "playwright browser mcp".\n'
-            + 'This tool returns a list of Actors with basic information, including descriptions, pricing models, usage statistics, and user ratings.\n'
-            + 'Prefer Actors with more users, stars, and runs.\n'
-            + 'You may need to use this tool several times to find the right Actor.\n'
-            + 'Limit the number of results returned, but ensure that relevant results are included.\n'
-            + 'This is not a general search tool; it is designed specifically to search for Actors in the Apify Store.',
+        description: `Search for Actors or Model Context Protocol (MCP) servers in the Apify Store using keywords.\n`
+            + `This tool returns a list of Actors with title, description, pricing model, usage statistics, and user ratings.\n`
+            + `Use simple space-separated keywords for best results, such as "web scraping", "data extraction", or "playwright browser mcp".\n`
+            + `You may need to use this tool several times to find the right Actor.\n`
+            + `Limit the number of results returned, but ensure that relevant results are included.\n`
+            + `Always present the results in a user-friendly format as an Actor cards.\n`
+            + `USAGE:\n`
+            + `- Use when user wants to find Actors for a specific task or technology\n`
+            + `- Use when user asks about available Actors in the Apify Store\n`
+            + `- Use when user needs to discover MCP servers or automation tools\n`
+            + `EXAMPLES:\n`
+            + `- user_input: Find Actors for web scraping\n`
+            + `- user_input: Search for MCP servers\n`
+            + `- user_input: What Actors are available for data extraction\n`
+            + `- user_input: Show me Actors that use Playwright`,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
@@ -97,7 +104,7 @@ export const searchActors: ToolEntry = {
                 content: [
                     { type: 'text', text: `**Search query:** ${parsed.search}` },
                     { type: 'text', text: `**Number of Actors found:** ${actorCards.length}` },
-                    { type: 'text', text: actorCards.join('\n\n') },
+                    { type: 'text', text: `**Actor cards:**\n${actorCards.join('\n\n')}` },
                 ],
             };
         },
