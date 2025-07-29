@@ -152,6 +152,30 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 
 For example, to enable all tools, use `npx @apify/actors-mcp-server --tools docs,runs,storage,preview` or `https://mcp.apify.com/?tools=docs,runs,storage,preview`.
 
+### Overview of available tools
+
+Here is a brief list of all the tools provided by the Apify MCP Server. For more details, visit the [Apify MCP Server tools page](https://mcp.apify.com/tools).
+
+| Tool name | Category | Description | Enabled by default |
+| :--- | :--- | :--- | :---: |
+| `get-actor-details` | default | Retrieve detailed information about a specific Actor. | ✅ |
+| `search-actors` | default | Search for Actors in the Apify Store. | ✅ |
+| `add-actor` | default | Add an Actor as a new tool for the user to call. | ✅ |
+| [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | default | An Actor tool to browse the web. | ✅ |
+| `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
+| `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
+| `call-actor` | preview | Call an Actor and get its run results. | ❌ |
+| `get-actor-run` | runs | Get detailed information about a specific Actor run. | ❌ |
+| `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. | ❌ |
+| `get-actor-log` | runs | Retrieve the logs for a specific Actor run. | ❌ |
+| `get-dataset` | storage | Get metadata about a specific dataset. | ❌ |
+| `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ❌ |
+| `get-key-value-store` | storage | Get metadata about a specific key-value store. | ❌ |
+| `get-key-value-store-keys`| storage | List the keys within a specific key-value store. | ❌ |
+| `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ❌ |
+| `get-dataset-list` | storage | List all available datasets for the user. | ❌ |
+| `get-key-value-store-list`| storage | List all available key-value stores for the user. | ❌ |
+
 ### Prompts
 
 The server provides a set of predefined example prompts to help you get started interacting with Apify through MCP. For example, there is a `GetLatestNewsOnTopic` prompt that allows you to easily retrieve the latest news on a specific topic using the [RAG Web Browser](https://apify.com/apify/rag-web-browser) Actor.
