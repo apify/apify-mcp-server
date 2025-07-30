@@ -61,12 +61,26 @@ export function addGlobsProperties(property: ISchemaProperties): ISchemaProperti
                 glob: {
                     type: 'string',
                     title: 'Glob',
-                    description: 'Glob pattern string',
+                    description: `Glob pattern string. Globs are patterns that specify sets of URLs using wildcards, such as * (matches any character except / one or more times), ** (matches any character one or more times), ? (matches any character), or [abc] (matches selected characters).`,
+                    examples: [
+                        'http://www.example.com/pages/*',
+                    ],
                 },
                 method: {
                     type: 'string',
                     title: 'HTTP Method',
                     description: 'HTTP method for the request',
+                    enum: [
+                        'GET',
+                        'POST',
+                        'PUT',
+                        'DELETE',
+                        'PATCH',
+                        'HEAD',
+                        'OPTIONS',
+                        'CONNECT',
+                        'TRACE',
+                    ],
                 },
                 payload: {
                     type: 'string',
