@@ -173,6 +173,11 @@ export function addProxyProperties(property: ISchemaProperties): ISchemaProperti
         ...property,
         properties: {
             ...property.properties,
+            /**
+             * We are not adding the Apify proxy country list field since that requires a MongoDB connection,
+             * which is not possible for the local stdio server, and an API endpoint for that is not available.
+             * So currently, there is no way for the user to select countries for the Apify proxy.
+             */
             useApifyProxy: {
                 title: 'Use Apify Proxy',
                 type: 'boolean',
