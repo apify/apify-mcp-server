@@ -1,5 +1,8 @@
 import type { ISchemaProperties } from '../types.js';
 
+const USER_DATA_DESCRIPTION = `User data object. A JSON object with custom user data that will be passed in the userData property of the Request object for each URL`;
+const HEADERS_DESCRIPTION = `Headers object. A JSON object whose properties and values contain HTTP headers that will sent with the request.`;
+
 /**
  * Adds resource picker schema structure to array properties with editor === 'resourcePicker'.
  * The resource picker allows users to select resources from their Apify account.
@@ -43,9 +46,6 @@ export function addKeyValueProperties(property: ISchemaProperties): ISchemaPrope
     };
 }
 
-const USER_DATA_DESCRIPTION = `User data object. A JSON object with custom user data that will be passed in the userData property of the Request object for each URL`;
-const HEADERS_DESCRIPTION = `Headers object. A JSON object whose properties and values contain HTTP headers that will sent with the request.`;
-
 /**
  * Adds globs schema structure to array properties with editor === 'globs'.
  */
@@ -81,6 +81,7 @@ export function addGlobsProperties(property: ISchemaProperties): ISchemaProperti
                         'CONNECT',
                         'TRACE',
                     ],
+                    default: 'GET',
                 },
                 payload: {
                     type: 'string',
@@ -140,6 +141,7 @@ export function addPseudoUrlsProperties(property: ISchemaProperties): ISchemaPro
                         'CONNECT',
                         'TRACE',
                     ],
+                    default: 'GET',
                 },
                 payload: {
                     type: 'string',
@@ -227,6 +229,40 @@ export function addRequestListSourcesProperties(property: ISchemaProperties): IS
                     title: 'URL',
                     type: 'string',
                     description: 'URL of the request list source',
+                },
+                method: {
+                    title: 'HTTP Method',
+                    type: 'string',
+                    description: 'HTTP method for the request list source',
+                    enum: [
+                        'GET',
+                        'POST',
+                        'PUT',
+                        'DELETE',
+                        'PATCH',
+                        'HEAD',
+                        'OPTIONS',
+                        'CONNECT',
+                        'TRACE',
+                    ],
+                    default: 'GET',
+                },
+                payload: {
+                    title: 'Payload',
+                    type: 'string',
+                    description: 'Payload for the request list source',
+                },
+                userData: {
+                    type: 'object',
+                    title: 'User Data',
+                    description: USER_DATA_DESCRIPTION,
+                    properties: {},
+                },
+                headers: {
+                    type: 'object',
+                    title: 'Headers',
+                    description: HEADERS_DESCRIPTION,
+                    properties: {},
                 },
             },
         },
