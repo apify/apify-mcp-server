@@ -1,5 +1,9 @@
 import type { ISchemaProperties } from '../types.js';
 
+/**
+ * Adds resource picker schema structure to array properties with editor === 'resourcePicker'.
+ * The resource picker allows users to select resources from their Apify account.
+ */
 export function addResourcePickerProperties(property: ISchemaProperties): ISchemaProperties {
     return {
         ...property,
@@ -39,16 +43,12 @@ export function addKeyValueProperties(property: ISchemaProperties): ISchemaPrope
     };
 }
 
-/**
- * Adds globs schema structure to array properties with editor === 'globs'.
- */
-/**
- * Adds pseudoUrls schema structure to array properties with items.editor === 'pseudoUrls'.
- */
-
 const USER_DATA_DESCRIPTION = `User data object. A JSON object with custom user data that will be passed in the userData property of the Request object for each URL`;
 const HEADERS_DESCRIPTION = `Headers object. A JSON object whose properties and values contain HTTP headers that will sent with the request.`;
 
+/**
+ * Adds globs schema structure to array properties with editor === 'globs'.
+ */
 export function addGlobsProperties(property: ISchemaProperties): ISchemaProperties {
     return {
         ...property,
@@ -90,6 +90,9 @@ export function addGlobsProperties(property: ISchemaProperties): ISchemaProperti
     };
 }
 
+/**
+ * Adds pseudoUrls schema structure to array properties with items.editor === 'pseudoUrls'.
+ */
 export function addPseudoUrlsProperties(property: ISchemaProperties): ISchemaProperties {
     return {
         ...property,

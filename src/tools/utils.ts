@@ -80,14 +80,6 @@ export function buildApifySpecificProperties(properties: Record<string, ISchemaP
 
 /**
  * Filters schema properties to include only the necessary fields.
- *
- * This is done to reduce the size of the input schema and to make it more readable.
- *
- * @param properties
- */
-
-/**
- * Filters schema properties to include only the necessary fields.
  * This is done to reduce the size of the input schema and to make it more readable.
  * @param properties
  */

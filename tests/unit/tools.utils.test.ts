@@ -374,13 +374,13 @@ describe('shortenProperties', () => {
             expect(result.prop1.enum.length).toBeLessThan(30);
             const totalEnumLen = result.prop1.enum.reduce((sum, v) => sum + v.length, 0);
             expect(totalEnumLen).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
+
+            // Calculate total character length of enum values
+            const totalLength = result.prop1.enum.reduce((sum, val) => sum + val.length, 0);
+            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
         } else {
             expect(result.prop1.enum).toBeUndefined();
         }
-
-        // Calculate total character length of enum values
-        const totalLength = result.prop1.enum!.reduce((sum, val) => sum + val.length, 0);
-        expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
     });
 
     it('should shorten items.enum values if they exceed the limit', () => {
@@ -408,13 +408,12 @@ describe('shortenProperties', () => {
             expect(result.prop1.items.enum.length).toBeLessThan(enumValues.length);
             const totalLength = result.prop1.items.enum.reduce((sum, val) => sum + val.length, 0);
             expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
+
+            // Calculate total character length of enum values
+            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
         } else {
             expect(result.prop1.items?.enum).toBeUndefined();
         }
-
-        // Calculate total character length of enum values
-        const totalLength = result.prop1.items!.enum!.reduce((sum, val) => sum + val.length, 0);
-        expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
     });
 
     it('should handle properties without enum or items.enum', () => {
