@@ -2,7 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
-import type { IActorInputSchema, ISchemaProperties } from '../types.js';
+import type { ActorInputSchemaProperties, IActorInputSchema, ISchemaProperties } from '../types.js';
 
 export function actorNameToToolName(actorName: string): string {
     return actorName
@@ -97,6 +97,12 @@ export function buildNestedProperties(properties: Record<string, ISchemaProperti
  *
  * @param properties
  */
+
+/**
+ * Filters schema properties to include only the necessary fields.
+ * This is done to reduce the size of the input schema and to make it more readable.
+ * @param properties
+ */
 export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): {
     [key: string]: ISchemaProperties
 } {
@@ -113,19 +119,31 @@ export function filterSchemaProperties(properties: { [key: string]: ISchemaPrope
             items: property.items,
             required: property.required,
         };
+    }
+    return filteredProperties;
+}
+
+/**
+ * For array properties missing items.type, infers and sets the type using inferArrayItemType.
+ * @param properties
+ */
+export function inferArrayItemsTypeIfMissing(properties: { [key: string]: ISchemaProperties }): {
+    [key: string]: ISchemaProperties
+} {
+    for (const [, property] of Object.entries(properties)) {
         if (property.type === 'array' && !property.items?.type) {
             const itemsType = inferArrayItemType(property);
             if (itemsType) {
-                filteredProperties[key].items = {
-                    ...filteredProperties[key].items,
-                    title: filteredProperties[key].title ?? 'Item',
-                    description: filteredProperties[key].description ?? 'Item',
+                property.items = {
+                    ...property.items,
+                    title: property.title ?? 'Item',
+                    description: property.description ?? 'Item',
                     type: itemsType,
                 };
             }
         }
     }
-    return filteredProperties;
+    return properties;
 }
 
 /**
@@ -278,4 +296,17 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
         decodedProperties[decodedKey] = value;
     }
     return decodedProperties;
+}
+
+export function transformActorInputSchemaProperties(input: IActorInputSchema): ActorInputSchemaProperties {
+    // Deep clone input to avoid mutating the original object
+    const inputClone: IActorInputSchema = JSON.parse(JSON.stringify(input));
+    let transformedProperties = markInputPropertiesAsRequired(inputClone);
+    transformedProperties = buildNestedProperties(transformedProperties);
+    transformedProperties = filterSchemaProperties(transformedProperties);
+    transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
+    transformedProperties = shortenProperties(transformedProperties);
+    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+    transformedProperties = encodeDotPropertyNames(transformedProperties);
+    return transformedProperties;
 }

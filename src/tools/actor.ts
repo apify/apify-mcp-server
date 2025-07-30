@@ -23,14 +23,9 @@ import type { ProgressTracker } from '../utils/progress.js';
 import { getActorDefinition } from './build.js';
 import {
     actorNameToToolName,
-    addEnumsToDescriptionsWithExamples,
-    buildNestedProperties,
-    encodeDotPropertyNames,
-    filterSchemaProperties,
     fixedAjvCompile,
     getToolSchemaID,
-    markInputPropertiesAsRequired,
-    shortenProperties,
+    transformActorInputSchemaProperties,
 } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -136,12 +131,7 @@ export async function getNormalActorsAsTools(
         if (actorDefinitionPruned) {
             const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
             if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
-                actorDefinitionPruned.input.properties = markInputPropertiesAsRequired(actorDefinitionPruned.input);
-                actorDefinitionPruned.input.properties = buildNestedProperties(actorDefinitionPruned.input.properties);
-                actorDefinitionPruned.input.properties = filterSchemaProperties(actorDefinitionPruned.input.properties);
-                actorDefinitionPruned.input.properties = shortenProperties(actorDefinitionPruned.input.properties);
-                actorDefinitionPruned.input.properties = addEnumsToDescriptionsWithExamples(actorDefinitionPruned.input.properties);
-                actorDefinitionPruned.input.properties = encodeDotPropertyNames(actorDefinitionPruned.input.properties);
+                actorDefinitionPruned.input.properties = transformActorInputSchemaProperties(actorDefinitionPruned.input);
                 // Add schema $id, each valid JSON schema should have a unique $id
                 // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
                 actorDefinitionPruned.input.$id = schemaID;

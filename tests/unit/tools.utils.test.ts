@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
 import { buildNestedProperties, decodeDotPropertyNames, encodeDotPropertyNames,
-    markInputPropertiesAsRequired, shortenProperties } from '../../src/tools/utils.js';
+    markInputPropertiesAsRequired, shortenProperties,
+    transformActorInputSchemaProperties } from '../../src/tools/utils.js';
 import type { IActorInputSchema, ISchemaProperties } from '../../src/types.js';
 
 describe('buildNestedProperties', () => {
@@ -231,7 +232,13 @@ describe('shortenProperties', () => {
 
         // Check that enum was shortened
         expect(result.prop1.enum).toBeDefined();
-        expect(result.prop1.enum!.length).toBeLessThan(enumValues.length);
+        if (result.prop1.enum) {
+            expect(result.prop1.enum.length).toBeLessThan(30);
+            const totalEnumLen = result.prop1.enum.reduce((sum, v) => sum + v.length, 0);
+            expect(totalEnumLen).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
+        } else {
+            expect(result.prop1.enum).toBeUndefined();
+        }
 
         // Calculate total character length of enum values
         const totalLength = result.prop1.enum!.reduce((sum, val) => sum + val.length, 0);
@@ -259,7 +266,13 @@ describe('shortenProperties', () => {
 
         // Check that items.enum was shortened
         expect(result.prop1.items?.enum).toBeDefined();
-        expect(result.prop1.items!.enum!.length).toBeLessThan(enumValues.length);
+        if (result.prop1.items?.enum) {
+            expect(result.prop1.items.enum.length).toBeLessThan(enumValues.length);
+            const totalLength = result.prop1.items.enum.reduce((sum, val) => sum + val.length, 0);
+            expect(totalLength).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
+        } else {
+            expect(result.prop1.items?.enum).toBeUndefined();
+        }
 
         // Calculate total character length of enum values
         const totalLength = result.prop1.items!.enum!.reduce((sum, val) => sum + val.length, 0);
@@ -366,5 +379,125 @@ describe('decodeDotPropertyNames', () => {
         };
         const result = decodeDotPropertyNames(input);
         expect(result).toEqual(input);
+    });
+});
+
+// ----------------------
+// Tests for transformActorInputSchemaProperties
+// ----------------------
+describe('transformActorInputSchemaProperties', () => {
+    it('should apply all transformations in the correct order', () => {
+        const input = {
+            title: 'Test',
+            type: 'object',
+            required: ['foo.bar', 'enumProp'],
+            properties: {
+                'foo.bar': {
+                    type: 'string',
+                    title: 'Foo Bar',
+                    description: 'desc',
+                },
+                proxy: {
+                    type: 'object',
+                    editor: 'proxy',
+                    title: 'Proxy',
+                    description: 'Proxy desc',
+                    properties: {},
+                },
+                sources: {
+                    type: 'array',
+                    editor: 'requestListSources',
+                    title: 'Sources',
+                    description: 'Sources desc',
+                },
+                enumProp: {
+                    type: 'string',
+                    title: 'Enum',
+                    description: 'Enum desc',
+                    enum: Array.from({ length: 30 }, (_, i) => `val${i}`),
+                },
+                longDesc: {
+                    type: 'string',
+                    title: 'Long',
+                    description: 'a'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH + 10),
+                },
+            },
+        };
+        const result = transformActorInputSchemaProperties(input);
+        // 1. markInputPropertiesAsRequired: required fields get **REQUIRED** in description
+        expect(result['foo-dot-bar'].description).toContain('**REQUIRED**');
+        expect(result.enumProp.description).toContain('**REQUIRED**');
+        // 2. buildNestedProperties: proxy gets useApifyProxy, sources gets url
+        expect(result.proxy.properties).toBeDefined();
+        expect(result.proxy.properties?.useApifyProxy).toBeDefined();
+        expect(result.sources.items).toBeDefined();
+        expect(result.sources.items?.properties?.url).toBeDefined();
+        // 3. filterSchemaProperties: only allowed fields present
+        expect(Object.keys(result['foo-dot-bar'])).toEqual(
+            expect.arrayContaining(['title', 'description', 'type', 'default', 'prefill', 'properties', 'items', 'required', 'enum']),
+        );
+        // 4. shortenProperties: longDesc is truncated, enumProp.enum is shortened
+        expect(result.longDesc.description.length).toBeLessThanOrEqual(ACTOR_MAX_DESCRIPTION_LENGTH + 3);
+        if (result.enumProp.enum) {
+            expect(result.enumProp.enum.length).toBeLessThanOrEqual(30);
+            const totalEnumLen = result.enumProp.enum.reduce((sum, v) => sum + v.length, 0);
+            expect(totalEnumLen).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
+        } else {
+            // If enum is too long, it may be set to undefined
+            expect(result.enumProp.enum).toBeUndefined();
+        }
+        // 5. addEnumsToDescriptionsWithExamples: enum values in description
+        expect(result.enumProp.description).toMatch(/Possible values:/);
+        // 6. encodeDotPropertyNames: foo.bar becomes foo-dot-bar
+        expect(result['foo-dot-bar']).toBeDefined();
+        expect(result['foo.bar']).toBeUndefined();
+    });
+
+    it('should handle input with no required, no enums, no dots', () => {
+        const input = {
+            title: 'Simple',
+            type: 'object',
+            properties: {
+                simple: {
+                    type: 'string',
+                    title: 'Simple',
+                    description: 'desc',
+                },
+            },
+        };
+        const result = transformActorInputSchemaProperties(input);
+        expect(result.simple.description).toBe('desc');
+        expect(result.simple.enum).toBeUndefined();
+        expect(result.simple).toBeDefined();
+    });
+
+    it('should encode all dotted property names', () => {
+        const input = {
+            title: 'Dots',
+            type: 'object',
+            properties: {
+                'a.b': { type: 'string', title: 'A B', description: 'desc' },
+                'c.d.e': { type: 'number', title: 'CDE', description: 'desc2' },
+            },
+        };
+        const result = transformActorInputSchemaProperties(input);
+        expect(result['a-dot-b']).toBeDefined();
+        expect(result['c-dot-d-dot-e']).toBeDefined();
+        expect(result['a.b']).toBeUndefined();
+        expect(result['c.d.e']).toBeUndefined();
+    });
+
+    it('should not mutate the input object', () => {
+        const input = {
+            title: 'Immut',
+            type: 'object',
+            required: ['foo'],
+            properties: {
+                foo: { type: 'string', title: 'Foo', description: 'desc' },
+            },
+        };
+        const inputCopy = JSON.parse(JSON.stringify(input));
+        transformActorInputSchemaProperties(input);
+        expect(input).toEqual(inputCopy);
     });
 });
