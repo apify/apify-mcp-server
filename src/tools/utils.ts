@@ -10,7 +10,7 @@ import {
     addPseudoUrlsProperties,
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
-} from './apify-properties.js';
+} from '../utils/apify-properties.js';
 
 export function actorNameToToolName(actorName: string): string {
     return actorName
