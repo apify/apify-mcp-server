@@ -154,7 +154,7 @@ For example, to enable all tools, use `npx @apify/actors-mcp-server --tools docs
 
 ### Overview of available tools
 
-Here is a brief list of all the tools provided by the Apify MCP Server. For more details, visit the [Apify MCP Server tools page](https://mcp.apify.com/tools).
+Here is an overview list of all the tools provided by the Apify MCP Server.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
