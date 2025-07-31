@@ -279,9 +279,9 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-export function transformActorInputSchemaProperties(input: IActorInputSchema): ActorInputSchemaProperties {
+export function transformActorInputSchemaProperties(input: Readonly<IActorInputSchema>): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
-    const inputClone: IActorInputSchema = JSON.parse(JSON.stringify(input));
+    const inputClone: IActorInputSchema = structuredClone(input);
     let transformedProperties = markInputPropertiesAsRequired(inputClone);
     transformedProperties = buildApifySpecificProperties(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
