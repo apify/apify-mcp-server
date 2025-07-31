@@ -30,6 +30,7 @@ import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, to
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { createProgressTracker } from '../utils/progress.js';
+import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -390,7 +391,7 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => (tool.tool));
+            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool.tool));
             return { tools };
         });
 
