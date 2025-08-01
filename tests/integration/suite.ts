@@ -281,16 +281,14 @@ export function createIntegrationTestsSuite(
             });
             const content = result.content as {text: string}[];
             expect(content.length).toBe(1);
-            const resultJson = JSON.parse(content[0].text);
-            const { actors } = resultJson;
-            expect(actors.length).toBe(resultJson.total);
-            expect(actors.length).toBeGreaterThan(0);
+            const outputText = content[0].text;
 
+            // Check to ensure that the output string format remains the same.
+            // If someone changes the output format, this test may stop working
+            // without actually failing.
+            expect(outputText).toContain('This Actor');
             // Check that no rental Actors are present
-            for (const actor of actors) {
-                // Since we now return the pricingInfo as a string, we need to check if it contains the string
-                expect(actor.pricingInfo).not.toContain('This Actor is rental');
-            }
+            expect(outputText).not.toContain('This Actor is rental');
 
             await client.close();
         });
