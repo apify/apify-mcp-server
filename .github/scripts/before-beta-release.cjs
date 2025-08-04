@@ -1,4 +1,3 @@
-/* eslint-disable no-console */
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -12,7 +11,6 @@ function execCommand(command, options = {}) {
         console.error(`Command failed: ${command}`);
         console.error(error.message);
         process.exit(1);
-        return null; // Ensure a return value for all code paths
     }
 }
 
@@ -21,7 +19,7 @@ function getPackageInfo() {
     return {
         name: pkgJson.name,
         version: pkgJson.version,
-        pkgJson,
+        pkgJson
     };
 }
 
@@ -38,67 +36,101 @@ function getBaseVersionFromGit() {
     }
 }
 
+function incrementVersion(version, type = 'patch') {
+    const [major, minor, patch] = version.split('.').map(Number);
+    
+    switch (type) {
+        case 'major':
+            return `${major + 1}.0.0`;
+        case 'minor':
+            return `${major}.${minor + 1}.0`;
+        case 'patch':
+        default:
+            return `${major}.${minor}.${patch + 1}`;
+    }
+}
+
+function findNextAvailableVersion(packageName, baseVersion) {
+    console.log(`Finding next available version starting from: ${baseVersion}`);
+    
+    try {
+        const versionString = execCommand(`npm show ${packageName} versions --json`);
+        const versions = JSON.parse(versionString);
+        
+        let currentVersion = baseVersion;
+        
+        // Keep incrementing patch version until we find one that doesn't exist
+        while (versions.includes(currentVersion)) {
+            console.log(`Version ${currentVersion} already exists as stable, incrementing...`);
+            currentVersion = incrementVersion(currentVersion, 'patch');
+        }
+        
+        console.log(`Next available base version: ${currentVersion}`);
+        return currentVersion;
+    } catch (error) {
+        console.log('Could not check NPM versions, using provided base version');
+        return baseVersion;
+    }
+}
+
 function getNextBetaVersion(packageName, baseVersion) {
     console.log(`Calculating next beta version for base: ${baseVersion}`);
-
+    
     // Validate base version format
     if (!/^\d+\.\d+\.\d+$/.test(baseVersion)) {
         console.error(`Invalid base version format: ${baseVersion}`);
         process.exit(1);
     }
 
+    // Find the next available base version if current one exists as stable
+    const availableBaseVersion = findNextAvailableVersion(packageName, baseVersion);
+    
     let npmBetaNumber = 0;
     let gitBetaNumber = 0;
 
-    // Check NPM for existing beta versions
+    // Check NPM for existing beta versions of the available base version
     try {
         const versionString = execCommand(`npm show ${packageName} versions --json`);
         const versions = JSON.parse(versionString);
 
-        // Check if base version already exists as stable
-        if (versions.includes(baseVersion)) {
-            console.error(`Base version ${baseVersion} already exists as stable on NPM!`);
-            process.exit(1);
-        }
-
-        const versionPrefix = `${baseVersion}-beta.`;
+        const versionPrefix = `${availableBaseVersion}-beta.`;
         const npmBetas = versions
-            .filter((v) => v.startsWith(versionPrefix))
-            .map((v) => {
+            .filter(v => v.startsWith(versionPrefix))
+            .map(v => {
                 const match = v.match(/^.+-beta\.(\d+)$/);
                 return match ? parseInt(match[1], 10) : 0;
             });
-
+        
         npmBetaNumber = npmBetas.length > 0 ? Math.max(...npmBetas) : 0;
-        console.log(`Latest beta on NPM: ${npmBetaNumber}`);
-    } catch {
-        console.log('No existing versions found on NPM');
+        console.log(`Latest beta on NPM for ${availableBaseVersion}: ${npmBetaNumber}`);
+    } catch (error) {
+        console.log('No existing beta versions found on NPM');
     }
 
-    // Check Git tags for existing beta versions
+    // Check Git tags for existing beta versions of the available base version
     try {
-        const tagPattern = `v${baseVersion}-beta.*`;
+        const tagPattern = `v${availableBaseVersion}-beta.*`;
         const tags = execCommand(`git tag -l "${tagPattern}" --sort=-version:refname`);
-
+        
         if (tags) {
-            const tagList = tags.split('\n').filter((tag) => tag.trim());
+            const tagList = tags.split('\n').filter(tag => tag.trim());
             if (tagList.length > 0) {
                 const latestTag = tagList[0];
                 const match = latestTag.match(/v\d+\.\d+\.\d+-beta\.(\d+)$/);
                 if (match) {
                     gitBetaNumber = parseInt(match[1], 10);
-                    console.log(`Latest beta in Git: ${gitBetaNumber}`);
+                    console.log(`Latest beta in Git for ${availableBaseVersion}: ${gitBetaNumber}`);
                 }
             }
         }
-    } catch {
+    } catch (error) {
         console.log('No existing beta tags found in Git');
     }
 
     // Use the higher number to avoid conflicts
     const nextBetaNumber = Math.max(npmBetaNumber, gitBetaNumber) + 1;
-    const nextVersion = `${baseVersion}-beta.${nextBetaNumber}`;
-
+    const nextVersion = `${availableBaseVersion}-beta.${nextBetaNumber}`;
+    
     console.log(`Next beta version: ${nextVersion}`);
     return nextVersion;
 }
@@ -106,25 +138,25 @@ function getNextBetaVersion(packageName, baseVersion) {
 function updatePackageVersion(newVersion) {
     const { pkgJson } = getPackageInfo();
     pkgJson.version = newVersion;
-    fs.writeFileSync(PKG_JSON_PATH, `${JSON.stringify(pkgJson, null, 2)}\n`);
+    fs.writeFileSync(PKG_JSON_PATH, JSON.stringify(pkgJson, null, 2) + '\n');
     console.log(`Updated package.json to ${newVersion}`);
 }
 
 function main() {
     console.log('🚀 Starting beta version calculation...');
-
+    
     const { name: packageName } = getPackageInfo();
-
+    
     // Get the base version from Git (what was committed by release_metadata)
     const baseVersion = getBaseVersionFromGit();
     console.log(`Base version from Git: ${baseVersion}`);
-
-    // Calculate next beta version
+    
+    // Calculate next beta version (will auto-increment if base version exists as stable)
     const nextBetaVersion = getNextBetaVersion(packageName, baseVersion);
-
+    
     // Update package.json with the beta version
     updatePackageVersion(nextBetaVersion);
-
+    
     console.log('✅ Beta version preparation completed!');
     console.log(`Package will be published as: ${nextBetaVersion}`);
 }

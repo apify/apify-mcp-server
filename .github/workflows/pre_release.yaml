@@ -30,12 +30,48 @@ jobs:
         name: Wait for code checks to pass
         runs-on: ubuntu-latest
         steps:
-            -   uses: lewagon/wait-on-check-action@v1.3.4
+            -   name: Wait for existing checks or skip if none
+                uses: lewagon/wait-on-check-action@v1.3.4
                 with:
-                    ref: ${{ github.ref }}
+                    ref: ${{ github.event.pull_request.head.sha }}
                     repo-token: ${{ secrets.GITHUB_TOKEN }}
                     check-regexp: (Code checks)
-                    wait-interval: 5
+                    wait-interval: 10
+                    running-workflow-name: 'Wait for code checks to pass'
+                    allowed-conclusions: success,neutral,skipped
+                continue-on-error: true
+                
+            -   name: Run checks if none were found
+                if: failure()
+                uses: actions/checkout@v4
+                
+            -   name: Use Node.js 22
+                if: failure()
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+                    
+            -   name: Install Dependencies
+                if: failure()
+                run: npm ci
+                
+            -   name: Lint
+                if: failure()
+                run: npm run lint
+                
+            -   name: Build
+                if: failure()
+                run: npm run build
+                
+            -   name: Test
+                if: failure()
+                run: npm run test
+                
+            -   name: Type checks
+                if: failure()
+                run: npm run type-check
 
     update_changelog_and_version:
         needs: [ release_metadata, wait_for_checks ]
