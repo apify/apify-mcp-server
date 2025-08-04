@@ -106,7 +106,7 @@ jobs:
                 id: beta_version
                 run: |
                     # Use the improved beta script to calculate version only
-                    node ./.github/scripts/before-beta-release.cjs --calculate-only
+                    node ./.github/scripts/before-beta-release.cjs
                     # The script will output the beta version without updating package.json
                     BETA_VERSION=$(cat /tmp/beta_version.txt)
                     echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
