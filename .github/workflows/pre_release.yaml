@@ -73,19 +73,17 @@ jobs:
                 if: failure()
                 run: npm run type-check
 
-    update_changelog_and_version:
+    calculate_beta_version:
         needs: [ release_metadata, wait_for_checks ]
-        name: Update changelog and prepare beta version
+        name: Calculate beta version
         runs-on: ubuntu-latest
         outputs:
-            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
             beta_version: ${{ steps.beta_version.outputs.version }}
 
         steps:
             -   name: Checkout repository
                 uses: actions/checkout@v4
                 with:
-                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
                     ref: ${{ github.event.pull_request.head.ref }}
                     repository: ${{ github.event.pull_request.head.repo.full_name }}
 
@@ -112,36 +110,22 @@ jobs:
                     echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
                     echo "Beta version calculated: $BETA_VERSION"
 
-            -   name: Update CHANGELOG.md only
-                uses: DamianReeves/write-file-action@master
-                with:
-                    path: CHANGELOG.md
-                    write-mode: overwrite
-                    contents: ${{ needs.release_metadata.outputs.changelog }}
-
-            -   name: Commit changelog only
-                id: commit
-                uses: EndBug/add-and-commit@v9
-                with:
-                    author_name: Apify Release Bot
-                    author_email: noreply@apify.com
-                    message: "chore(release): Update changelog for ${{ steps.beta_version.outputs.version }} [skip ci]"
-                    add: 'CHANGELOG.md'
-                    push: true
-
             -   name: Create and push beta tag
                 run: |
                     git tag "v${{ steps.beta_version.outputs.version }}"
                     git push origin "v${{ steps.beta_version.outputs.version }}"
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
     publish_to_npm:
         name: Publish to NPM
-        needs: [ update_changelog_and_version ]
+        needs: [ calculate_beta_version ]
         runs-on: ubuntu-latest
         steps:
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog_and_version.outputs.changelog_commitish }}
+                    ref: ${{ github.event.pull_request.head.ref }}
+                    repository: ${{ github.event.pull_request.head.repo.full_name }}
                     
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
@@ -158,14 +142,14 @@ jobs:
                     
             -   name: Set beta version in package.json
                 run: |
-                    BETA_VERSION="${{ needs.update_changelog_and_version.outputs.beta_version }}"
+                    BETA_VERSION="${{ needs.calculate_beta_version.outputs.beta_version }}"
                     echo "Setting package.json version to: $BETA_VERSION"
                     npm version --no-git-tag-version --allow-same-version "$BETA_VERSION"
                     
             -   name: Verify version is set correctly
                 run: |
                     PACKAGE_VERSION=$(node -p "require('./package.json').version")
-                    EXPECTED_VERSION="${{ needs.update_changelog_and_version.outputs.beta_version }}"
+                    EXPECTED_VERSION="${{ needs.calculate_beta_version.outputs.beta_version }}"
                     if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
                         echo "Version mismatch! Package: $PACKAGE_VERSION, Expected: $EXPECTED_VERSION"
                         exit 1
