@@ -1,13 +1,9 @@
 name: Create a pre-release
 
 on:
-    workflow_dispatch:
-    # Push to master will deploy a beta version
-    push:
-        branches:
-            - master
-        tags-ignore:
-            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+    # Only trigger on PRs with "beta" label
+    pull_request:
+        types: [labeled, synchronize, reopened]
 
 concurrency:
     group: release
@@ -15,7 +11,8 @@ concurrency:
 
 jobs:
     release_metadata:
-        if: "!startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci') && startsWith(github.repository, 'apify/')"
+        # Run ONLY when PR has the "beta" label
+        if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Prepare release metadata
         runs-on: ubuntu-latest
         outputs:
@@ -40,12 +37,13 @@ jobs:
                     check-regexp: (Code checks)
                     wait-interval: 5
 
-    update_changelog:
+    update_changelog_and_version:
         needs: [ release_metadata, wait_for_checks ]
-        name: Update changelog
+        name: Update changelog and prepare beta version
         runs-on: ubuntu-latest
         outputs:
             changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
+            beta_version: ${{ steps.beta_version.outputs.version }}
 
         steps:
             -   name: Checkout repository
@@ -57,9 +55,24 @@ jobs:
                 uses: actions/setup-node@v4
                 with:
                     node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
 
-            -   name: Update package version in package.json
+            -   name: Install dependencies
+                run: npm ci
+
+            -   name: Update package version to base version
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
+
+            -   name: Calculate and set beta version
+                id: beta_version
+                run: |
+                    # Use the improved beta script
+                    node ./.github/scripts/before-beta-release.cjs
+                    # Output the version for later jobs
+                    BETA_VERSION=$(node -p "require('./package.json').version")
+                    echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
+                    echo "Beta version: $BETA_VERSION"
 
             -   name: Update CHANGELOG.md
                 uses: DamianReeves/write-file-action@master
@@ -74,32 +87,48 @@ jobs:
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update changelog and package version [skip ci]"
+                    message: "chore(release): Update to ${{ steps.beta_version.outputs.version }} [skip ci]"
+
+            -   name: Create and push beta tag
+                run: |
+                    git tag "v${{ steps.beta_version.outputs.version }}"
+                    git push origin "v${{ steps.beta_version.outputs.version }}"
 
     publish_to_npm:
         name: Publish to NPM
-        needs: [ release_metadata, wait_for_checks ]
+        needs: [ update_changelog_and_version ]
         runs-on: ubuntu-latest
         steps:
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
+                    ref: ${{ needs.update_changelog_and_version.outputs.changelog_commitish }}
+                    
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
                 with:
                     node-version: 22
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
+                    
             -   name: Install dependencies
                 run: |
                     echo "access=public" >> .npmrc
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
                     npm ci
-            - # Check version consistency and increment pre-release version number for beta only.
-                name: Bump pre-release version
-                run: node ./.github/scripts/before-beta-release.cjs
+                    
+            -   name: Verify version consistency
+                run: |
+                    PACKAGE_VERSION=$(node -p "require('./package.json').version")
+                    EXPECTED_VERSION="${{ needs.update_changelog_and_version.outputs.beta_version }}"
+                    if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
+                        echo "Version mismatch! Package: $PACKAGE_VERSION, Expected: $EXPECTED_VERSION"
+                        exit 1
+                    fi
+                    echo "Version verified: $PACKAGE_VERSION"
+                    
             -   name: Build module
                 run: npm run build
+                    
             -   name: Publish to NPM
                 run: npm publish --tag beta
 
