@@ -60,7 +60,7 @@ export async function callActorGetDataset(
     progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
     try {
-        log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
+        log.debug(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
 
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
@@ -91,7 +91,7 @@ export async function callActorGetDataset(
             });
         }
 
-        log.info(`Actor ${actorName} finished with ${items.count} items`);
+        log.debug(`Actor ${actorName} finished with ${items.count} items`);
         return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
     } catch (error) {
         log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
@@ -182,7 +182,7 @@ async function getMCPServersAsTools(
             actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
         );
-        log.info('Retrieved MCP server URL for Actor', {
+        log.debug('Retrieved MCP server URL for Actor', {
             actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
             actorId,
             mcpServerUrl,
