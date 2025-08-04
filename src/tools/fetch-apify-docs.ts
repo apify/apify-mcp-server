@@ -60,7 +60,7 @@ export const fetchApifyDocsTool: ToolEntry = {
                     // Use the URL without fragment as the key to avoid caching same page with different fragments
                     fetchApifyDocsCache.set(urlWithoutFragment, markdown);
                 } catch (error) {
-                    log.error(`Failed to fetch the documentation page at ${url}.`, { error });
+                    log.error(`Failed to fetch the documentation page`, { url, error });
                     return {
                         content: [{
                             type: 'text',

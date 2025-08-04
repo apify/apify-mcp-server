@@ -85,7 +85,9 @@ export class ActorsMcpServer {
 
         // Initialize automatically for backward compatibility
         this.initialize().catch((error) => {
-            log.error('Failed to initialize server:', error);
+            log.error('Failed to initialize server', {
+                error,
+            });
         });
     }
 
@@ -569,14 +571,20 @@ export class ActorsMcpServer {
                 }
             } catch (error) {
                 if (error instanceof ApifyApiError) {
-                    log.error(`Apify API error calling tool ${name}: ${error.message}`);
+                    log.error('Apify API error calling tool', {
+                        name,
+                        message: error.message,
+                    });
                     return {
                         content: [
                             { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },
                         ],
                     };
                 }
-                log.error(`Error calling tool ${name}: ${error}`);
+                log.error('Error calling tool', {
+                    name,
+                    error,
+                });
                 throw new McpError(
                     ErrorCode.InternalError,
                     `An error occurred while calling the tool.`,

@@ -94,7 +94,11 @@ export async function callActorGetDataset(
         log.debug(`Actor ${actorName} finished with ${items.count} items`);
         return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
     } catch (error) {
-        log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
+        log.error('Error calling Actor', {
+            actorName,
+            input,
+            error,
+        });
         throw new Error(`Error calling Actor: ${error}`);
     }
 }
@@ -157,7 +161,11 @@ export async function getNormalActorsAsTools(
                 };
                 tools.push(tool);
             } catch (validationError) {
-                log.error(`Failed to compile AJV schema for Actor: ${actorDefinitionPruned.actorFullName}. Error: ${validationError}`);
+                log.error('Failed to compile AJV schema for Actor', {
+                    actorFullName: actorDefinitionPruned.actorFullName,
+                    actorId: actorDefinitionPruned.id,
+                    error: validationError,
+                });
             }
         }
     }
