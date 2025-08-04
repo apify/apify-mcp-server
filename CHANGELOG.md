@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.3.3 - **not yet released**
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.3.2](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.2) (2025-08-01)
 
 ### 🚀 Features
