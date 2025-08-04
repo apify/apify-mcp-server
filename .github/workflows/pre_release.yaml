@@ -86,6 +86,8 @@ jobs:
                 uses: actions/checkout@v4
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    ref: ${{ github.event.pull_request.head.ref }}
+                    repository: ${{ github.event.pull_request.head.repo.full_name }}
 
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
@@ -124,6 +126,7 @@ jobs:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
                     message: "chore(release): Update to ${{ steps.beta_version.outputs.version }} [skip ci]"
+                    push: true
 
             -   name: Create and push beta tag
                 run: |
