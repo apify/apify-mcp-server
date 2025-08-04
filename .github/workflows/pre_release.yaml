@@ -102,30 +102,31 @@ jobs:
             -   name: Update package version to base version
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
 
-            -   name: Calculate and set beta version
+            -   name: Calculate beta version (without updating package.json)
                 id: beta_version
                 run: |
-                    # Use the improved beta script
-                    node ./.github/scripts/before-beta-release.cjs
-                    # Output the version for later jobs
-                    BETA_VERSION=$(node -p "require('./package.json').version")
+                    # Use the improved beta script to calculate version only
+                    node ./.github/scripts/before-beta-release.cjs --calculate-only
+                    # The script will output the beta version without updating package.json
+                    BETA_VERSION=$(cat /tmp/beta_version.txt)
                     echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
-                    echo "Beta version: $BETA_VERSION"
+                    echo "Beta version calculated: $BETA_VERSION"
 
-            -   name: Update CHANGELOG.md
+            -   name: Update CHANGELOG.md only
                 uses: DamianReeves/write-file-action@master
                 with:
                     path: CHANGELOG.md
                     write-mode: overwrite
                     contents: ${{ needs.release_metadata.outputs.changelog }}
 
-            -   name: Commit changes
+            -   name: Commit changelog only
                 id: commit
                 uses: EndBug/add-and-commit@v9
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update to ${{ steps.beta_version.outputs.version }} [skip ci]"
+                    message: "chore(release): Update changelog for ${{ steps.beta_version.outputs.version }} [skip ci]"
+                    add: 'CHANGELOG.md'
                     push: true
 
             -   name: Create and push beta tag
@@ -155,7 +156,13 @@ jobs:
                     echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
                     npm ci
                     
-            -   name: Verify version consistency
+            -   name: Set beta version in package.json
+                run: |
+                    BETA_VERSION="${{ needs.update_changelog_and_version.outputs.beta_version }}"
+                    echo "Setting package.json version to: $BETA_VERSION"
+                    npm version --no-git-tag-version --allow-same-version "$BETA_VERSION"
+                    
+            -   name: Verify version is set correctly
                 run: |
                     PACKAGE_VERSION=$(node -p "require('./package.json').version")
                     EXPECTED_VERSION="${{ needs.update_changelog_and_version.outputs.beta_version }}"

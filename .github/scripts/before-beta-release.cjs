@@ -5,6 +5,9 @@ const path = require('node:path');
 
 const PKG_JSON_PATH = path.join(__dirname, '..', '..', 'package.json');
 
+// Check if we're in calculate-only mode
+const CALCULATE_ONLY = process.argv.includes('--calculate-only');
+
 function execCommand(command, options = {}) {
     try {
         return execSync(command, { encoding: 'utf8', ...options }).trim();
@@ -145,6 +148,12 @@ function updatePackageVersion(newVersion) {
     console.log(`Updated package.json to ${newVersion}`);
 }
 
+function saveBetaVersionToFile(version) {
+    // Save version to temporary file for workflow to read
+    fs.writeFileSync('/tmp/beta_version.txt', version);
+    console.log(`Saved beta version to /tmp/beta_version.txt: ${version}`);
+}
+
 function main() {
     console.log('🚀 Starting beta version calculation...');
 
@@ -157,11 +166,17 @@ function main() {
     // Calculate next beta version (will auto-increment if base version exists as stable)
     const nextBetaVersion = getNextBetaVersion(packageName, baseVersion);
 
-    // Update package.json with the beta version
-    updatePackageVersion(nextBetaVersion);
-
-    console.log('✅ Beta version preparation completed!');
-    console.log(`Package will be published as: ${nextBetaVersion}`);
+    if (CALCULATE_ONLY) {
+        // Only calculate and save to file, don't update package.json
+        saveBetaVersionToFile(nextBetaVersion);
+        console.log('✅ Beta version calculation completed (calculate-only mode)!');
+        console.log(`Beta version calculated: ${nextBetaVersion}`);
+    } else {
+        // Update package.json with the beta version (legacy behavior)
+        updatePackageVersion(nextBetaVersion);
+        console.log('✅ Beta version preparation completed!');
+        console.log(`Package will be published as: ${nextBetaVersion}`);
+    }
 }
 
 main();
