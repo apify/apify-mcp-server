@@ -5,8 +5,6 @@ const path = require('node:path');
 
 const PKG_JSON_PATH = path.join(__dirname, '..', '..', 'package.json');
 
-// Check if we're in calculate-only mode
-
 function execCommand(command, options = {}) {
     try {
         return execSync(command, { encoding: 'utf8', ...options }).trim();
