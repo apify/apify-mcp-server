@@ -1,0 +1,8 @@
+{
+    "input": "Use Apify to find me latest instagram post featuring @therock",
+    "requirements": [
+       "6 tool calls used at maximum",
+       "needs to find appropriate Actor for instagram scraping",
+       "needs to show details of the post, such as number of likes, comments, etc."
+    ]
+}

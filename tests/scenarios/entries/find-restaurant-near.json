@@ -1,0 +1,10 @@
+{
+    "input": "Use Apify to find me a nice 4+ stars restaurant near Vencveslas Square in Prague.",
+    "requirements": [
+       "15 tool calls used at maximum",
+       "needs to find appropriate Actors for the job",
+       "needs to find restaurants by location and rating",
+       "if appropriate needs to do additional research about the restaurant",
+       "needs to show details of the restaurant, such as name, address, rating, etc."
+    ]
+}

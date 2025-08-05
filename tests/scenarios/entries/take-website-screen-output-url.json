@@ -1,0 +1,8 @@
+{
+    "input": "Use Apify to take a screenshot of apify.com/about and give me the link to the image.",
+    "requirements": [
+        "6 tool calls used at maximum",
+        "needs to find appropriate Actor for screenshot browser taking",
+        "give the user actual link to the image"
+    ]
+}

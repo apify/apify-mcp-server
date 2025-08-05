@@ -1,0 +1,9 @@
+{
+    "input": "Use Apify to show me latest post about Apify on Twitter/X.com.",
+    "requirements": [
+       "6 tool calls used at maximum",
+       "needs to find appropriate Actor for Twitter/X.com scraping",
+       "needs present the posts to the user"
+    ]
+}
+
