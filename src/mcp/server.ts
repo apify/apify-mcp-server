@@ -239,7 +239,7 @@ export class ActorsMcpServer {
         const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingActors, apifyToken);
         if (tools.length > 0) {
-            log.info('Loading default tools...');
+            log.debug('Loading default tools...');
             this.upsertTools(tools);
         }
     }
@@ -262,7 +262,7 @@ export class ActorsMcpServer {
     public async loadToolsFromUrl(url: string, apifyToken: string) {
         const tools = await processParamsGetTools(url, apifyToken);
         if (tools.length > 0) {
-            log.info('Loading tools from query parameters...');
+            log.debug('Loading tools from query parameters...');
             this.upsertTools(tools, false);
         }
     }
@@ -320,7 +320,7 @@ export class ActorsMcpServer {
     private removeToolByName(toolName: string): boolean {
         if (this.tools.has(toolName)) {
             this.tools.delete(toolName);
-            log.info(`Deleted tool: ${toolName}`);
+            log.debug(`Deleted tool: ${toolName}`);
             return true;
         }
         return false;
@@ -429,7 +429,7 @@ export class ActorsMcpServer {
             if (name.startsWith('local__')) {
                 // we split the name by '__' and take the last part, which is the actual Actor name
                 const parts = name.split('__');
-                log.info(`Tool name with prefix detected: ${name}, using last part: ${parts[parts.length - 1]}`);
+                log.debug(`Tool name with prefix detected: ${name}, using last part: ${parts[parts.length - 1]}`);
                 if (parts.length > 1) {
                     name = parts[parts.length - 1];
                 }
@@ -459,7 +459,7 @@ export class ActorsMcpServer {
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args);
-            log.info(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
+            log.debug(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
             if (!tool.tool.ajvValidate(args)) {
                 const msg = `Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`;
                 log.error(msg);
@@ -510,7 +510,7 @@ export class ActorsMcpServer {
                                 const method = schema.shape.method.value;
                                 // Forward notifications from the proxy client to the server
                                 client.setNotificationHandler(schema, async (notification) => {
-                                    log.info('Sending MCP notification', {
+                                    log.debug('Sending MCP notification', {
                                         method,
                                         notification,
                                     });
