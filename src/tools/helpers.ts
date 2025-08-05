@@ -60,6 +60,19 @@ export const addTool: ToolEntry = {
                 };
             }
             const tools = await getActorsAsTools([parsed.actor], apifyToken);
+            /**
+             * If no tools were found, return a message that the Actor was not found
+             * instead of returning that non existent tool was added since the
+             * getActorsAsTools function returns an empty array and does not throw an error.
+             */
+            if (tools.length === 0) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Actor ${parsed.actor} not found, no tools were added.`,
+                    }],
+                };
+            }
             const toolsAdded = apifyMcpServer.upsertTools(tools, true);
             await sendNotification({ method: 'notifications/tools/list_changed' });
 

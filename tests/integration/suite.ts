@@ -312,6 +312,20 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should return no tools were added when adding a non-existent actor', async () => {
+            const client = await createClientFn({ enableAddingActors: true });
+            const nonExistentActor = 'apify/this-actor-does-not-exist';
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_ADD,
+                arguments: { actor: nonExistentActor },
+            });
+            expect(result).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            expect(content[0].text).toContain('no tools were added');
+            await client.close();
+        });
+
         it('should be able to add and call Actorized MCP server', async () => {
             const client = await createClientFn({ enableAddingActors: true });
 
