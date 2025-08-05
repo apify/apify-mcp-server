@@ -210,25 +210,20 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorDefinitionPrunedCached = actorDefinitionPrunedCache.get(actorIdOrName);
-            if (actorDefinitionPrunedCached) {
-                return {
-                    actorDefinitionPruned: actorDefinitionPrunedCached,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPrunedCached),
-
-                } as ActorInfo;
+            let actorDefinition = actorDefinitionPrunedCache.get(actorIdOrName);
+            if (!actorDefinition) {
+                actorDefinition = await getActorDefinition(actorIdOrName, apifyToken);
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
-            if (!actorDefinitionPruned) {
-                log.error('Actor not found or definition is not available', { actorIdOrName });
+            if (!actorDefinition) {
                 return null;
             }
+
             // Cache the pruned Actor definition
-            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
+            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinition);
             return {
-                actorDefinitionPruned,
-                webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
+                actorDefinitionPruned: actorDefinition,
+                webServerMcpPath: getActorMCPServerPath(actorDefinition),
             } as ActorInfo;
         }),
     );
@@ -263,7 +258,6 @@ export const callActor: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_CALL,
-        actorFullName: HelperTools.ACTOR_CALL,
         description: `Call an Actor and get the Actor run results. If you are not sure about the Actor input, you MUST get the Actor details first, which also returns the input schema using ${HelperTools.ACTOR_GET_DETAILS}. The Actor MUST be added before calling; use the ${HelperTools.ACTOR_ADD} tool first. By default, the Apify MCP server makes newly added Actors available as tools for calling. Use this tool ONLY if you cannot call the newly added tool directly, and NEVER call this tool before first trying to call the tool directly. For example, when you add an Actor "apify/instagram-scraper" using the ${HelperTools.ACTOR_ADD} tool, the Apify MCP server will add a new tool ${actorNameToToolName('apify/instagram-scraper')} that you can call directly. If calling this tool does not work, then and ONLY then MAY you use this tool as a backup.`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),

@@ -26,6 +26,9 @@ export interface ISchemaProperties {
 
     properties?: Record<string, ISchemaProperties>;
     required?: string[];
+
+    sectionCaption?: string; // Optional section caption for grouping properties
+    sectionDescription?: string; // Optional section description for grouping properties
 }
 
 export interface IActorInputSchema {
@@ -142,20 +145,27 @@ export interface ActorMcpTool extends ToolBase {
 }
 
 /**
- * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
- */
-export type ToolType = 'internal' | 'actor' | 'actor-mcp';
-
-/**
  * Wrapper interface that combines a tool with its type discriminator.
  * Used to store and manage tools of different types uniformly.
  */
-export interface ToolEntry {
-    /** Type of the tool (internal or actor) */
-    type: ToolType;
-    /** The tool instance */
-    tool: ActorTool | HelperTool | ActorMcpTool;
-}
+export type ToolEntry =
+    | {
+        type: 'internal';
+        tool: HelperTool;
+    }
+    | {
+        type: 'actor';
+        tool: ActorTool;
+    }
+    | {
+        type: 'actor-mcp';
+        tool: ActorMcpTool;
+    };
+
+/**
+ * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
+ */
+export type ToolType = ToolEntry['type'];
 
 /**
  * Price for a single event in a specific tier.

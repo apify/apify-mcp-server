@@ -1,4 +1,5 @@
 import { Ajv } from 'ajv';
+import type { Actor, ActorDefinition } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -45,14 +46,7 @@ export async function getActorDefinition(
         const buildDetails = await defaultBuildClient.get();
 
         if (buildDetails?.actorDefinition) {
-            const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
-            // We set actorDefinition ID to Actor ID
-            actorDefinitions.id = actor.id;
-            actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
-            actorDefinitions.description = actor.description || '';
-            actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
-            actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
-            return pruneActorDefinition(actorDefinitions);
+            return processActorDefinition(actor, buildDetails.actorDefinition, limit);
         }
         return null;
     } catch (error) {
@@ -61,24 +55,52 @@ export async function getActorDefinition(
         throw new Error(errorMessage);
     }
 }
-function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
+export function processActorDefinition(actor: Actor, definition: ActorDefinition, limit: number): ActorDefinitionPruned {
     return {
-        id: response.id,
-        actorFullName: response.actorFullName || '',
-        buildTag: response?.buildTag || '',
-        readme: response?.readme || '',
-        input: response?.input && 'type' in response.input && 'properties' in response.input
-            ? {
-                ...response.input,
-                type: response.input.type as string,
-                properties: response.input.properties as Record<string, ISchemaProperties>,
-            }
+        id: actor.id,
+        actorFullName: `${actor.username}/${actor.name}`,
+        buildTag: definition?.buildTag || '',
+        readme: truncateActorReadme(definition.readme || '', limit),
+        input: definition?.input && 'type' in definition.input && 'properties' in definition.input
+            ? separateAdvancedInputs({
+                ...definition.input,
+                type: definition.input.type as string,
+                properties: definition.input.properties as Record<string, ISchemaProperties>,
+            })
             : undefined,
-        description: response.description,
-        defaultRunOptions: response.defaultRunOptions,
-        webServerMcpPath: 'webServerMcpPath' in response ? response.webServerMcpPath as string : undefined,
+        description: actor.description || '',
+        defaultRunOptions: actor.defaultRunOptions,
+        webServerMcpPath: 'webServerMcpPath' in definition ? definition.webServerMcpPath as string : undefined,
     };
 }
+
+function separateAdvancedInputs(input: ActorDefinitionWithDesc['input']): ActorDefinitionPruned['input'] {
+    if (!input || !input.properties) {
+        return input;
+    }
+
+    const properties = Object.entries(input.properties);
+    const firstSectionCaptionIndex = properties.findIndex(([_key, value]) => value.sectionCaption);
+    if (firstSectionCaptionIndex === -1) {
+        // No advanced inputs, return the input as is
+        return input;
+    }
+
+    // Separate advanced inputs from the main section
+    const mainInputs = properties.slice(0, firstSectionCaptionIndex);
+    const advancedInputs = properties.slice(firstSectionCaptionIndex);
+
+    const propObject = Object.fromEntries(mainInputs);
+    propObject.advancedInputs = {
+        type: 'object',
+        title: 'Advanced Inputs',
+        description: 'These inputs are considered advanced and are not required for basic functionality.',
+        properties: Object.fromEntries(advancedInputs),
+    };
+
+    return { ...input, properties: propObject };
+}
+
 /** Prune Actor README if it is too long
  * If the README is too long
  * - We keep the README as it is up to the limit.
