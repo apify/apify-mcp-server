@@ -1,7 +1,7 @@
 name: Create a pre-release
 
 on:
-    # Only trigger on PRs with "beta" label ci test
+    # Only trigger on PRs with "beta" label
     pull_request:
         types: [labeled, synchronize, reopened]
 
@@ -11,8 +11,8 @@ concurrency:
 
 jobs:
     wait_for_checks:
-        # Run ONLY when PR has the "beta" label and commit message does not start with "docs" or "ci"
-        if: contains(github.event.pull_request.labels.*.name, 'beta') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')
+        # Run ONLY when PR has the "beta" label
+        if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Wait for code checks to pass
         runs-on: ubuntu-latest
         steps:
@@ -25,40 +25,8 @@ jobs:
                     wait-interval: 10
                     running-workflow-name: 'Wait for code checks to pass'
                     allowed-conclusions: success,neutral,skipped
-                continue-on-error: true
+                continue-on-error: false
                 
-            -   name: Run checks if none were found
-                if: failure()
-                uses: actions/checkout@v4
-                
-            -   name: Use Node.js 22
-                if: failure()
-                uses: actions/setup-node@v4
-                with:
-                    node-version: 22
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-                    
-            -   name: Install Dependencies
-                if: failure()
-                run: npm ci
-                
-            -   name: Lint
-                if: failure()
-                run: npm run lint
-                
-            -   name: Build
-                if: failure()
-                run: npm run build
-                
-            -   name: Test
-                if: failure()
-                run: npm run test
-                
-            -   name: Type checks
-                if: failure()
-                run: npm run type-check
-
     push_pkg_pr_new:
         needs: [ wait_for_checks ]
         name: Push to pkg.pr.new
