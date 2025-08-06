@@ -2,7 +2,7 @@
     "dxt_version": "0.1",
     "name": "apify-actors-mcp-server",
     "version": "0.0.0",
-    "description": "Apify Model Context Protocol (MCP) Server at mcp.apify.com instantly connects AI applications and agents to thousands of ready‑built tools. It allows your AI assistant to use any Apify Actor for web scraping, data extraction, and automation tasks in real time.",
+    "description": "Apify is the world’s largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
     "keywords": [
         "apify",
         "actors",
