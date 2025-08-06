@@ -60,8 +60,6 @@ export async function callActorGetDataset(
     progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
     try {
-        log.debug(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
-
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
@@ -91,10 +89,10 @@ export async function callActorGetDataset(
             });
         }
 
-        log.debug(`Actor ${actorName} finished with ${items.count} items`);
+        log.debug('Actor finished', { actorName, itemCount: items.count });
         return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
     } catch (error) {
-        log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
+        log.error('Error calling actor', { error, actorName, input });
         throw new Error(`Error calling Actor: ${error}`);
     }
 }
@@ -157,7 +155,7 @@ export async function getNormalActorsAsTools(
                 };
                 tools.push(tool);
             } catch (validationError) {
-                log.error(`Failed to compile AJV schema for Actor: ${actorDefinitionPruned.actorFullName}. Error: ${validationError}`);
+                log.error('Failed to compile AJV schema for Actor', { actorName: actorDefinitionPruned.actorFullName, error: validationError });
             }
         }
     }
@@ -205,8 +203,7 @@ export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
-    log.debug(`Fetching actors as tools...`);
-    log.debug(`Actors: ${actorIdsOrNames}`);
+    log.debug('Fetching actors as tools', { actorIdsOrNames });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -333,7 +330,7 @@ export const callActor: ToolEntry = {
                     })),
                 };
             } catch (error) {
-                log.error(`Error calling Actor: ${error}`);
+                log.error('Error calling Actor', { error });
                 return {
                     content: [
                         { type: 'text', text: `Error calling Actor: ${error instanceof Error ? error.message : String(error)}` },

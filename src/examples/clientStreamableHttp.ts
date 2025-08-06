@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
     // Set up notification handlers for server-initiated messages
     client.setNotificationHandler(LoggingMessageNotificationSchema, (notification) => {
-        log.debug(`Notification received: ${notification.params.level} - ${notification.params.data}`);
+        log.debug('Notification received', { level: notification.params.level, data: notification.params.data });
     });
 
     // List and call tools
@@ -50,15 +50,15 @@ async function listTools(client: Client): Promise<void> {
             params: {},
         };
         const toolsResult = await client.request(toolsRequest, ListToolsResultSchema);
-        log.debug(`Tools available, count: ${toolsResult.tools.length}`);
+        log.debug('Tools available', { count: toolsResult.tools.length });
         for (const tool of toolsResult.tools) {
-            log.debug(`Tool: ${tool.name}, Description: ${tool.description}`);
+            log.debug('Tool detail', { name: tool.name, description: tool.description });
         }
         if (toolsResult.tools.length === 0) {
             log.debug('No tools available from the server');
         }
     } catch (error) {
-        log.error(`Tools not supported by this server (${error})`);
+        log.error('Tools not supported by this server', { error });
     }
 }
 
@@ -76,11 +76,11 @@ async function callSearchTool(client: Client): Promise<void> {
         const resultContent = searchResult.content || [];
         resultContent.forEach((item) => {
             if (item.type === 'text') {
-                log.debug(`\t${item.text}`);
+                log.debug('Search result item', { text: item.text });
             }
         });
     } catch (error) {
-        log.error(`Error calling greet tool: ${error}`);
+        log.error('Error calling greet tool', { error });
     }
 }
 
@@ -99,15 +99,15 @@ async function callActor(client: Client): Promise<void> {
         const resultContent = actorResult.content || [];
         resultContent.forEach((item) => {
             if (item.type === 'text') {
-                log.debug(`- ${item.text}`);
+                log.debug('Actor result item', { text: item.text });
             }
         });
     } catch (error) {
-        log.error(`Error calling Actor: ${error}`);
+        log.error('Error calling Actor', { error });
     }
 }
 
 main().catch((error: unknown) => {
-    log.error(`Error running MCP client: ${error as Error}`);
+    log.error('Error running MCP client', { error: error as Error });
     process.exit(1);
 });

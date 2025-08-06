@@ -3,6 +3,11 @@
  */
 export const HEADER_READINESS_PROBE = 'x-apify-container-server-readiness-probe';
 
+export enum TransportType {
+    HTTP = 'HTTP',
+    SSE = 'SSE',
+}
+
 export enum Routes {
     ROOT = '/',
     MCP = '/mcp',

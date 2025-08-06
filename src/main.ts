@@ -26,7 +26,7 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
-log.info(`Loaded input: ${JSON.stringify(input)} `);
+log.info('Loaded input', { input: JSON.stringify(input) });
 
 if (STANDBY_MODE) {
     let actorsToLoad: string[] = [];
@@ -47,7 +47,7 @@ if (STANDBY_MODE) {
     log.info('Actor is running in the STANDBY mode.');
 
     app.listen(PORT, () => {
-        log.info(`The Actor web server is listening for user requests at ${HOST}:${PORT}`);
+        log.info('Actor web server listening', { host: HOST, port: PORT });
     });
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
@@ -59,7 +59,7 @@ if (STANDBY_MODE) {
     const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
 
     await Actor.pushData(items);
-    log.info(`Pushed ${items.count} items to the dataset`);
+    log.info('Pushed items to dataset', { itemCount: items.count });
     await Actor.exit();
 }
 

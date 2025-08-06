@@ -13,7 +13,7 @@ import log from '@apify/log';
 
 import { ActorsMcpServer } from '../mcp/server.js';
 import { parseInputParamsFromUrl } from '../mcp/utils.js';
-import { getHelpMessage, HEADER_READINESS_PROBE, Routes } from './const.js';
+import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
@@ -30,7 +30,7 @@ export function createExpressApp(
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
-        log.error(`${logMessage}: ${error}`);
+        log.error('Error in request', { logMessage, error });
         if (!res.headersSent) {
             res.status(statusCode).json({
                 jsonrpc: '2.0',
@@ -50,7 +50,11 @@ export function createExpressApp(
             return;
         }
         try {
-            log.info(`Received GET message at: ${Routes.ROOT}`);
+            log.info('MCP API', {
+                mth: req.method,
+                rt: Routes.ROOT,
+                tr: TransportType.HTTP,
+            });
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
             res.setHeader('Connection', 'keep-alive');
@@ -66,7 +70,11 @@ export function createExpressApp(
 
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
-            log.info(`Received GET message at: ${Routes.SSE}`);
+            log.info('MCP API', {
+                mth: req.method,
+                rt: Routes.SSE,
+                tr: TransportType.SSE,
+            });
             const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -101,7 +109,11 @@ export function createExpressApp(
 
     app.post(Routes.MESSAGE, async (req: Request, res: Response) => {
         try {
-            log.info(`Received POST message at: ${Routes.MESSAGE}`);
+            log.info('MCP API', {
+                mth: req.method,
+                rt: Routes.MESSAGE,
+                tr: TransportType.HTTP,
+            });
             const sessionId = new URL(req.url, `http://${req.headers.host}`).searchParams.get('sessionId');
             if (!sessionId) {
                 log.error('No session ID provided in POST request');
@@ -213,7 +225,12 @@ export function createExpressApp(
 
         const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
         if (transport) {
-            log.info(`Deleting MCP session with ID: ${sessionId}`);
+            log.info('MCP API', {
+                mth: req.method,
+                rt: Routes.MESSAGE,
+                tr: TransportType.HTTP,
+                sessionId,
+            });
             await transport.handleRequest(req, res, req.body);
             return;
         }
