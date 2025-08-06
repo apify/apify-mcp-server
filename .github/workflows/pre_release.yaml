@@ -10,22 +10,6 @@ concurrency:
     cancel-in-progress: false
 
 jobs:
-    release_metadata:
-        # Run ONLY when PR has the "beta" label
-        if: contains(github.event.pull_request.labels.*.name, 'beta')
-        name: Prepare release metadata
-        runs-on: ubuntu-latest
-        outputs:
-            version_number: ${{ steps.release_metadata.outputs.version_number }}
-            changelog: ${{ steps.release_metadata.outputs.changelog }}
-        steps:
-            -   uses: apify/workflows/git-cliff-release@main
-                name: Prepare release metadata
-                id: release_metadata
-                with:
-                    release_type: prerelease
-                    existing_changelog_path: CHANGELOG.md
-
     wait_for_checks:
         # Run ONLY when PR has the "beta" label
         if: contains(github.event.pull_request.labels.*.name, 'beta')
@@ -75,12 +59,10 @@ jobs:
                 if: failure()
                 run: npm run type-check
 
-    calculate_beta_version:
-        needs: [ release_metadata, wait_for_checks ]
-        name: Calculate beta version
+    push_pkg_pr_new:
+        needs: [ wait_for_checks ]
+        name: Push to pkg.pr.new
         runs-on: ubuntu-latest
-        outputs:
-            beta_version: ${{ steps.beta_version.outputs.version }}
 
         steps:
             -   name: Checkout repository
@@ -98,72 +80,8 @@ jobs:
 
             -   name: Install dependencies
                 run: npm ci
-
-            -   name: Update package version to base version
-                run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
-
-            -   name: Calculate beta version (without updating package.json)
-                id: beta_version
-                run: |
-                    # Use the improved beta script to calculate version only
-                    node ./.github/scripts/before-beta-release.cjs
-                    # The script will output the beta version without updating package.json
-                    BETA_VERSION=$(cat /tmp/beta_version.txt)
-                    echo "version=$BETA_VERSION" >> $GITHUB_OUTPUT
-                    echo "Beta version calculated: $BETA_VERSION"
-
-            -   name: Create and push beta tag
-                run: |
-                    git tag "v${{ steps.beta_version.outputs.version }}"
-                    git push origin "v${{ steps.beta_version.outputs.version }}"
-                env:
-                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    publish_to_npm:
-        name: Publish to NPM
-        needs: [ calculate_beta_version ]
-        runs-on: ubuntu-latest
-        steps:
-            -   uses: actions/checkout@v4
-                with:
-                    ref: ${{ github.event.pull_request.head.ref }}
-                    repository: ${{ github.event.pull_request.head.repo.full_name }}
-                    
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
-                with:
-                    node-version: 22
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-                    
-            -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
-                    
-            -   name: Set beta version in package.json
-                run: |
-                    BETA_VERSION="${{ needs.calculate_beta_version.outputs.beta_version }}"
-                    echo "Setting package.json version to: $BETA_VERSION"
-                    npm version --no-git-tag-version --allow-same-version "$BETA_VERSION"
-                    
-            -   name: Verify version is set correctly
-                run: |
-                    PACKAGE_VERSION=$(node -p "require('./package.json').version")
-                    EXPECTED_VERSION="${{ needs.calculate_beta_version.outputs.beta_version }}"
-                    if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
-                        echo "Version mismatch! Package: $PACKAGE_VERSION, Expected: $EXPECTED_VERSION"
-                        exit 1
-                    fi
-                    echo "Version verified: $PACKAGE_VERSION"
-                    
-            -   name: Build module
+                
+            -   name: Build
                 run: npm run build
-                    
-            -   name: Publish to NPM
-                run: npm publish --tag beta
 
-env:
-    NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
-    NPM_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
+            -   run: npx -y pkg-pr-new publish
