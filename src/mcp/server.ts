@@ -480,7 +480,7 @@ export class ActorsMcpServer {
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    log.info('Calling internal tool', { input: args });
+                    log.info('Calling internal tool', { name: internalTool.name, input: args });
                     const res = await internalTool.call({
                         args,
                         extra,

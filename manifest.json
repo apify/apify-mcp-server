@@ -20,7 +20,7 @@
     ],
     "author": {
         "name": "Apify Technologies s.r.o.",
-        "url": "https://apify.com"
+        "url": "https://github.com/apify/actors-mcp-server"
     },
     "license": "Apache-2.0",
     "repository": {
