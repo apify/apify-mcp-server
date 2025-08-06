@@ -1,7 +1,7 @@
 name: Create a pre-release
 
 on:
-    # Only trigger on PRs with "beta" label
+    # Only trigger on PRs with "beta" label ci test
     pull_request:
         types: [labeled, synchronize, reopened]
 
