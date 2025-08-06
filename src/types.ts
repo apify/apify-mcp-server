@@ -29,6 +29,8 @@ export interface ISchemaProperties {
 
     sectionCaption?: string; // Optional section caption for grouping properties
     sectionDescription?: string; // Optional section description for grouping properties
+
+    additionalProperties?: boolean;
 }
 
 export interface IActorInputSchema {
