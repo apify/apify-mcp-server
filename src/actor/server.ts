@@ -82,12 +82,12 @@ export function createExpressApp(
             const apifyToken = process.env.APIFY_TOKEN as string;
             const input = parseInputParamsFromUrl(req.url);
             if (input.actors || input.enableAddingActors || input.tools) {
-                log.debug('[SSE] Loading tools from URL', { sessionId: transport.sessionId });
+                log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
                 await mcpServer.loadToolsFromUrl(req.url, apifyToken);
             }
             // Load default tools if no actors are specified
             if (!input.actors) {
-                log.debug('[SSE] Loading default tools', { sessionId: transport.sessionId });
+                log.debug('Loading default tools', { sessionId: transport.sessionId, tr: TransportType.SSE });
                 await mcpServer.loadDefaultActors(apifyToken);
             }
 
@@ -172,12 +172,12 @@ export function createExpressApp(
                 const apifyToken = process.env.APIFY_TOKEN as string;
                 const input = parseInputParamsFromUrl(req.url);
                 if (input.actors || input.enableAddingActors || input.tools) {
-                    log.debug('[Streamable] Loading tools from URL', { sessionId: transport.sessionId });
+                    log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
                     await mcpServer.loadToolsFromUrl(req.url, apifyToken);
                 }
                 // Load default tools if no actors are specified
                 if (!input.actors) {
-                    log.debug('[Streamable] Loading default tools', { sessionId: transport.sessionId });
+                    log.debug('Loading default tools', { sessionId: transport.sessionId, tr: TransportType.HTTP });
                     await mcpServer.loadDefaultActors(apifyToken);
                 }
 

@@ -50,9 +50,9 @@ async function listTools(client: Client): Promise<void> {
             params: {},
         };
         const toolsResult = await client.request(toolsRequest, ListToolsResultSchema);
-        log.debug('Tools available', { count: toolsResult.tools.length });
+        log.debug('Tools available', { itemCount: toolsResult.tools.length });
         for (const tool of toolsResult.tools) {
-            log.debug('Tool detail', { name: tool.name, description: tool.description });
+            log.debug('Tool detail', { toolName: tool.name, description: tool.description });
         }
         if (toolsResult.tools.length === 0) {
             log.debug('No tools available from the server');

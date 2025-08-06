@@ -37,7 +37,7 @@ export async function getActorDefinition(
         // Fetch actor details
         const actor = await actorClient.get();
         if (!actor) {
-            log.error('Failed to fetch input schema for Actor', { actorIdOrName });
+            log.error('Failed to fetch input schema for Actor', { actorName: actorIdOrName });
             return null;
         }
 

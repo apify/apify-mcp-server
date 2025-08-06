@@ -85,7 +85,7 @@ export class ActorsMcpServer {
 
         // Initialize automatically for backward compatibility
         this.initialize().catch((error) => {
-            log.error('Failed to initialize server:', error);
+            log.error('Failed to initialize server', { error });
         });
     }
 
@@ -239,7 +239,7 @@ export class ActorsMcpServer {
         const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingActors, apifyToken);
         if (tools.length > 0) {
-            log.debug('Loading default tools...');
+            log.debug('Loading default tools');
             this.upsertTools(tools);
         }
     }
@@ -262,7 +262,7 @@ export class ActorsMcpServer {
     public async loadToolsFromUrl(url: string, apifyToken: string) {
         const tools = await processParamsGetTools(url, apifyToken);
         if (tools.length > 0) {
-            log.debug('Loading tools from query parameters...');
+            log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
     }
@@ -459,7 +459,7 @@ export class ActorsMcpServer {
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args);
-            log.debug('Validate arguments for tool', { toolName: tool.tool.name, arguments: args });
+            log.debug('Validate arguments for tool', { toolName: tool.tool.name, input: args });
             if (!tool.tool.ajvValidate(args)) {
                 const msg = `Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`;
                 log.error(msg);
@@ -572,7 +572,7 @@ export class ActorsMcpServer {
                 }
             } catch (error) {
                 if (error instanceof ApifyApiError) {
-                    log.error('Apify API error calling tool', { toolName: name, error: error.message });
+                    log.error('Apify API error calling tool', { toolName: name, error });
                     return {
                         content: [
                             { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },

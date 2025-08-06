@@ -203,7 +203,7 @@ export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
-    log.debug('Fetching actors as tools', { actorIdsOrNames });
+    log.debug('Fetching actors as tools', { actorNames: actorIdsOrNames });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -218,7 +218,7 @@ export async function getActorsAsTools(
 
             const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
             if (!actorDefinitionPruned) {
-                log.error('Actor not found or definition is not available', { actorIdOrName });
+                log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
             }
             // Cache the pruned Actor definition
