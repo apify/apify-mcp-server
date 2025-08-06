@@ -11,8 +11,8 @@ concurrency:
 
 jobs:
     wait_for_checks:
-        # Run ONLY when PR has the "beta" label
-        if: contains(github.event.pull_request.labels.*.name, 'beta')
+        # Run ONLY when PR has the "beta" label and commit message does not start with "docs" or "ci"
+        if: contains(github.event.pull_request.labels.*.name, 'beta') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'ci')
         name: Wait for code checks to pass
         runs-on: ubuntu-latest
         steps:
