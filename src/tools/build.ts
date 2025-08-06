@@ -6,7 +6,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
+import { ACTOR_README_MAX_LENGTH, ADVANCED_INPUT_KEY, HelperTools } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
@@ -91,7 +91,7 @@ function separateAdvancedInputs(input: ActorDefinitionWithDesc['input']): ActorD
     const advancedInputs = properties.slice(firstSectionCaptionIndex);
 
     const propObject = Object.fromEntries(mainInputs);
-    propObject.advancedInputs = {
+    propObject[ADVANCED_INPUT_KEY] = {
         type: 'object',
         title: 'Advanced Inputs',
         description: 'These inputs are considered advanced and are not required for basic functionality.',

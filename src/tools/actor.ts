@@ -10,6 +10,7 @@ import { ApifyClient } from '../apify-client.js';
 import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
+    ADVANCED_INPUT_KEY,
     HelperTools,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
@@ -46,7 +47,7 @@ export type CallActorGetDatasetResult = {
  *
  * @param {string} actorName - The name of the actor to call.
  * @param {ActorCallOptions} callOptions - The options to pass to the actor.
- * @param {unknown} input - The input to pass to the actor.
+ * @param {ActorInput} simplifiedInput - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
  * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
@@ -54,11 +55,17 @@ export type CallActorGetDatasetResult = {
  */
 export async function callActorGetDataset(
     actorName: string,
-    input: unknown,
+    simplifiedInput: Record<string, unknown>,
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
+    let input = simplifiedInput;
+    if (input[ADVANCED_INPUT_KEY]) {
+        const { [ADVANCED_INPUT_KEY]: advancedInput, ...rest } = input;
+        input = { ...advancedInput, ...rest };
+    }
+
     try {
         log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
 

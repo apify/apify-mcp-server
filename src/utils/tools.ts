@@ -1,3 +1,4 @@
+import { ADVANCED_INPUT_KEY } from '../const.js';
 import type { IActorInputSchema, ToolBase } from '../types.js';
 
 /**
@@ -18,7 +19,7 @@ function simplifiedSchema(schema: IActorInputSchema): IActorInputSchema {
             ...schema,
             properties: {
                 ...schema.properties,
-                advancedInputs: {
+                [ADVANCED_INPUT_KEY]: {
                     ...schema.properties.advancedInputs,
                     properties: {},
                     additionalProperties: true,
