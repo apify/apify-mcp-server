@@ -59,7 +59,7 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            const tools = await getActorsAsTools([parsed.actor], apifyToken);
+            const tools = await getActorsAsTools([parsed.actor], apifyToken, apifyMcpServer.options.fullActorSchema);
             const toolsAdded = apifyMcpServer.upsertTools(tools, true);
             await sendNotification({ method: 'notifications/tools/list_changed' });
 

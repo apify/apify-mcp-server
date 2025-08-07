@@ -31,6 +31,7 @@ export async function getActorDefinition(
     actorIdOrName: string,
     apifyToken: string,
     limit: number = ACTOR_README_MAX_LENGTH,
+    fullActorSchema = true,
 ): Promise<ActorDefinitionPruned | null> {
     const client = new ApifyClient({ token: apifyToken });
     const actorClient = client.actor(actorIdOrName);
@@ -46,7 +47,7 @@ export async function getActorDefinition(
         const buildDetails = await defaultBuildClient.get();
 
         if (buildDetails?.actorDefinition) {
-            return processActorDefinition(actor, buildDetails.actorDefinition, limit);
+            return processActorDefinition(actor, buildDetails.actorDefinition, limit, fullActorSchema);
         }
         return null;
     } catch (error) {
@@ -55,18 +56,30 @@ export async function getActorDefinition(
         throw new Error(errorMessage);
     }
 }
-export function processActorDefinition(actor: Actor, definition: ActorDefinition, limit: number): ActorDefinitionPruned {
+export function processActorDefinition(
+    actor: Actor,
+    definition: ActorDefinition,
+    limit: number,
+    fullActorSchema: boolean,
+): ActorDefinitionPruned {
     return {
         id: actor.id,
         actorFullName: `${actor.username}/${actor.name}`,
         buildTag: definition?.buildTag || '',
         readme: truncateActorReadme(definition.readme || '', limit),
         input: definition?.input && 'type' in definition.input && 'properties' in definition.input
-            ? separateAdvancedInputs({
-                ...definition.input,
-                type: definition.input.type as string,
-                properties: definition.input.properties as Record<string, ISchemaProperties>,
-            })
+            ? (!fullActorSchema
+                ? {
+                    ...definition.input,
+                    type: definition.input.type as string,
+                    properties: definition.input.properties as Record<string, ISchemaProperties>,
+                }
+                : separateAdvancedInputs({
+                    ...definition.input,
+                    type: definition.input.type as string,
+                    properties: definition.input.properties as Record<string, ISchemaProperties>,
+                })
+            )
             : undefined,
         description: actor.description || '',
         defaultRunOptions: actor.defaultRunOptions,

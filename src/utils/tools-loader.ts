@@ -27,10 +27,10 @@ export async function loadToolsFromInput(
     // Load actors as tools
     if (input.actors && (Array.isArray(input.actors) ? input.actors.length > 0 : input.actors)) {
         const actors = Array.isArray(input.actors) ? input.actors : [input.actors];
-        tools = await getActorsAsTools(actors, apifyToken);
+        tools = await getActorsAsTools(actors, apifyToken, input.fullActorSchema);
     } else if (useDefaultActors) {
         // Use default actors if no actors are specified and useDefaultActors is true
-        tools = await getActorsAsTools(defaults.actors, apifyToken);
+        tools = await getActorsAsTools(defaults.actors, apifyToken, input.fullActorSchema);
     }
 
     // Add tools for adding/removing actors if enabled

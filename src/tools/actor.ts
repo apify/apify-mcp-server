@@ -10,6 +10,7 @@ import { ApifyClient } from '../apify-client.js';
 import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
+    ACTOR_README_MAX_LENGTH,
     ADVANCED_INPUT_KEY,
     HelperTools,
 } from '../const.js';
@@ -211,6 +212,7 @@ async function getMCPServersAsTools(
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyToken: string,
+    fullActorSchema = false,
 ): Promise<ToolEntry[]> {
     log.debug(`Fetching actors as tools...`);
     log.debug(`Actors: ${actorIdsOrNames}`);
@@ -219,7 +221,7 @@ export async function getActorsAsTools(
         actorIdsOrNames.map(async (actorIdOrName) => {
             let actorDefinition = actorDefinitionPrunedCache.get(actorIdOrName);
             if (!actorDefinition) {
-                actorDefinition = await getActorDefinition(actorIdOrName, apifyToken);
+                actorDefinition = await getActorDefinition(actorIdOrName, apifyToken, ACTOR_README_MAX_LENGTH, fullActorSchema);
             }
 
             if (!actorDefinition) {

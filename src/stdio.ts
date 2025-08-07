@@ -111,8 +111,6 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
-
     // Create an Input object from CLI arguments
     const input: McpOptions = {
         actors: actorList.length ? actorList : [],
@@ -120,6 +118,8 @@ async function main() {
         tools: toolCategoryKeys as ToolCategory[],
         fullActorSchema: false,
     };
+
+    const mcpServer = new ActorsMcpServer(input);
 
     // Use the shared tools loading logic
     const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);

@@ -25,6 +25,7 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
+import type { McpOptions } from '../input.js';
 import { prompts } from '../prompts/index.js';
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
@@ -35,8 +36,7 @@ import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
 
-type ActorsMcpServerOptions = {
-    enableAddingActors?: boolean;
+type ActorsMcpServerOptions = McpOptions & {
     enableDefaultActors?: boolean;
 };
 
@@ -48,14 +48,14 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
 export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolEntry>;
-    private options: ActorsMcpServerOptions;
+    public readonly options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
 
-    constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
+    constructor(options: ActorsMcpServerOptions, setupSigintHandler = true) {
         this.options = {
-            enableAddingActors: options.enableAddingActors ?? true,
             enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
+            ...options,
         };
         this.server = new Server(
             {
@@ -195,7 +195,7 @@ export class ActorsMcpServer {
         }
 
         if (actorsToLoad.length > 0) {
-            const actorTools = await getActorsAsTools(actorsToLoad, apifyToken);
+            const actorTools = await getActorsAsTools(actorsToLoad, apifyToken, this.options.fullActorSchema);
             if (actorTools.length > 0) {
                 this.upsertTools(actorTools);
             }
@@ -237,7 +237,7 @@ export class ActorsMcpServer {
      */
     public async loadDefaultActors(apifyToken: string): Promise<void> {
         const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
-        const tools = await getActorsAsTools(missingActors, apifyToken);
+        const tools = await getActorsAsTools(missingActors, apifyToken, this.options.fullActorSchema);
         if (tools.length > 0) {
             log.info('Loading default tools...');
             this.upsertTools(tools);
