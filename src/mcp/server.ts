@@ -520,7 +520,7 @@ export class ActorsMcpServer {
                             }
                         }
 
-                        log.info('Calling Actor-MCP', { actorName: serverTool.originToolName, input: args });
+                        log.info('Calling Actor-MCP', { actorId: serverTool.actorId, toolName: serverTool.originToolName, input: args });
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
