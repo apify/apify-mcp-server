@@ -18,11 +18,6 @@ import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,
-    mcpServerOptions: {
-        enableAddingActors?: boolean;
-        enableDefaultActors?: boolean;
-        actors?: string[];
-    },
 ): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
@@ -67,12 +62,12 @@ export function createExpressApp(
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
             log.info(`Received GET message at: ${Routes.SSE}`);
-            const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+            const input = parseInputParamsFromUrl(req.url);
+            const mcpServer = new ActorsMcpServer(input, false);
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
-            const input = parseInputParamsFromUrl(req.url);
             if (input.actors || input.enableAddingActors || input.tools) {
                 log.debug('[SSE] Loading tools from URL', { sessionId: transport.sessionId });
                 await mcpServer.loadToolsFromUrl(req.url, apifyToken);
@@ -154,11 +149,11 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+                const input = parseInputParamsFromUrl(req.url);
+                const mcpServer = new ActorsMcpServer(input, false);
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
-                const input = parseInputParamsFromUrl(req.url);
                 if (input.actors || input.enableAddingActors || input.tools) {
                     log.debug('[Streamable] Loading tools from URL', { sessionId: transport.sessionId });
                     await mcpServer.loadToolsFromUrl(req.url, apifyToken);

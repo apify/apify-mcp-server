@@ -5,7 +5,8 @@
 
 import { defaults } from '../const.js';
 import { addRemoveTools, getActorsAsTools, toolCategories } from '../tools/index.js';
-import type { Input, ToolCategory, ToolEntry } from '../types.js';
+import type { McpOptions } from '../input.js';
+import type { ToolCategory, ToolEntry } from '../types.js';
 
 /**
  * Load tools based on the provided Input object.
@@ -17,7 +18,7 @@ import type { Input, ToolCategory, ToolEntry } from '../types.js';
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
-    input: Input,
+    input: McpOptions,
     apifyToken: string,
     useDefaultActors = false,
 ): Promise<ToolEntry[]> {

@@ -24,7 +24,8 @@ import log from '@apify/log';
 
 import { ActorsMcpServer } from './mcp/server.js';
 import { toolCategories } from './tools/index.js';
-import type { Input, ToolCategory } from './types.js';
+import type { ToolCategory } from './types.js';
+import type { McpOptions } from './input.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -113,10 +114,11 @@ async function main() {
     const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
 
     // Create an Input object from CLI arguments
-    const input: Input = {
+    const input: McpOptions = {
         actors: actorList.length ? actorList : [],
         enableAddingActors,
         tools: toolCategoryKeys as ToolCategory[],
+        fullActorSchema: false,
     };
 
     // Use the shared tools loading logic
