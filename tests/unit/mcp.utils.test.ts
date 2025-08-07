@@ -18,7 +18,7 @@ describe('parseInputParamsFromUrl', () => {
     it('should handle URL without query params', () => {
         const url = 'https://actors-mcp-server.apify.actor';
         const result = parseInputParamsFromUrl(url);
-        expect(result.actors).toBeUndefined();
+        expect(result.actors).toEqual([]);
     });
 
     it('should parse enableActorAutoLoading flag', () => {

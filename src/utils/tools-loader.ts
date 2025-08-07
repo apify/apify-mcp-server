@@ -1,5 +1,5 @@
 /**
- * Shared logic for loading tools based on Input type.
+ * Shared logic for loading tools based on McpOptions type.
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
@@ -9,10 +9,10 @@ import type { McpOptions } from '../input.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 
 /**
- * Load tools based on the provided Input object.
+ * Load tools based on the provided McpOptions object.
  * This function is used by both the stdio.ts and the processParamsGetTools function.
  *
- * @param input The processed Input object
+ * @param input The processed McpOptions object
  * @param apifyToken The Apify API token
  * @param useDefaultActors Whether to use default actors if no actors are specified
  * @returns An array of tool entries
