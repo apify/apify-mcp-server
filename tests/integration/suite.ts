@@ -110,10 +110,16 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors, without add/remove tools', async () => {
             const client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+            expect(names).toMatchInlineSnapshot(`
+              [
+                "get-actor-details",
+                "search-actors",
+                "search-apify-docs",
+                "fetch-apify-docs",
+                "apify-slash-rag-web-browser",
+              ]
+            `);
 
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
-            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             await client.close();
         });
 
@@ -121,9 +127,16 @@ export function createIntegrationTestsSuite(
             const actors = ['apify/website-content-crawler', 'apify/instagram-scraper'];
             const client = await createClientFn({ actors, enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + actors.length);
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
-            expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
+            expect(names).toMatchInlineSnapshot(`
+              [
+                "get-actor-details",
+                "search-actors",
+                "search-apify-docs",
+                "fetch-apify-docs",
+                "apify-slash-website-content-crawler",
+                "apify-slash-instagram-scraper",
+              ]
+            `);
 
             await client.close();
         });

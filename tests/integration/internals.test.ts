@@ -15,7 +15,13 @@ beforeAll(() => {
 
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
-        const actorsMcpServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
+        const actorsMcpServer = new ActorsMcpServer({
+            actors: [],
+            tools: [],
+            fullActorSchema: false,
+            enableAddingActors: true,
+            enableDefaultActors: true,
+        }, false);
         await actorsMcpServer.initialize();
 
         // Load new tool
@@ -44,7 +50,13 @@ describe('MCP server internals integration tests', () => {
     });
 
     it('should reset and restore tool state with default tools', async () => {
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
+        const actorsMCPServer = new ActorsMcpServer({
+            actors: [],
+            tools: [],
+            fullActorSchema: false,
+            enableAddingActors: true,
+            enableDefaultActors: true,
+        }, false);
         await actorsMCPServer.initialize();
 
         const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
@@ -76,7 +88,13 @@ describe('MCP server internals integration tests', () => {
             toolNotificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
+        const actorsMCPServer = new ActorsMcpServer({
+            actors: [],
+            tools: [],
+            fullActorSchema: false,
+            enableAddingActors: true,
+            enableDefaultActors: true,
+        }, false);
         await actorsMCPServer.initialize();
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
@@ -120,7 +138,13 @@ describe('MCP server internals integration tests', () => {
             notificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
+        const actorsMCPServer = new ActorsMcpServer({
+            actors: [],
+            tools: [],
+            fullActorSchema: false,
+            enableAddingActors: true,
+            enableDefaultActors: true,
+        }, false);
         await actorsMCPServer.initialize();
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 

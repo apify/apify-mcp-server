@@ -5,11 +5,8 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { toolCategories } from './tools/index.js';
+import { defaults } from './const.js';
 import type { ToolCategory } from './types.js';
-
-const toolCategoryKeys = Object.keys(toolCategories) as [ToolCategory];
-const ToolCategoryEnum = z.enum(toolCategoryKeys);
 
 const parseCommaSeparatedItems = (val: unknown): string[] | undefined => {
     if (typeof val === 'string') {
@@ -33,6 +30,7 @@ const parseBoolean = (val: unknown): boolean | undefined => {
     return undefined;
 };
 
+const toolCategoriesArray = ['docs', 'runs', 'storage', 'preview'] as const;
 const mcpOptionsSchema = z.preprocess((originalInput) => {
     if (typeof originalInput === 'object' && originalInput !== null) {
         const inputObject = { ...(originalInput as Record<string, unknown>) };
@@ -47,19 +45,20 @@ const mcpOptionsSchema = z.preprocess((originalInput) => {
     }
     return originalInput;
 }, z.object({
-    actors: z.preprocess(parseCommaSeparatedItems, z.array(z.string()).default([])),
+    actors: z.preprocess(parseCommaSeparatedItems, z.array(z.string()).default(defaults.actors)),
     enableAddingActors: z.preprocess(parseBoolean, z.boolean().default(true)),
+    enableDefaultActors: z.preprocess(parseBoolean, z.boolean().default(false)),
     tools: z.preprocess((val) => {
         const items = parseCommaSeparatedItems(val);
         if (!items) return items;
-        const validSet = new Set(toolCategoryKeys as unknown as string[]);
         // Ignore invalid tool keys by filtering them out
-        const invalid = items.filter((s) => !validSet.has(s));
+        // const toolCategoriesArray = Object.keys(toolCategories) as [ToolCategory];
+        const invalid = items.filter((s) => !toolCategoriesArray.includes(s as ToolCategory));
         if (invalid.length > 0) {
-            log.warning(`Ignoring unknown tool categories: ${invalid.join(', ')}. Valid categories are: ${toolCategoryKeys.join(', ')}`);
+            log.warning(`Ignoring unknown tool categories: ${invalid.join(', ')}. Valid categories are: ${toolCategoriesArray.join(', ')}`);
         }
-        return items.filter((s) => validSet.has(s));
-    }, z.array(ToolCategoryEnum).default([])),
+        return items.filter((s) => toolCategoriesArray.includes(s as ToolCategory));
+    }, z.array(z.enum(toolCategoriesArray)).default([])),
     fullActorSchema: z.boolean().default(false),
 }));
 

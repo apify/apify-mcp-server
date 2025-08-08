@@ -4,7 +4,8 @@
 
 import { defaults, HelperTools } from './const.js';
 import { parseInputParamsFromUrl, processParamsGetTools } from './mcp/utils.js';
-import { addRemoveTools, defaultTools, getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from './tools/index.js';
+import { getActorsAsTools } from './tools/actor.js';
+import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ToolCategory } from './types.js';
 import { getToolPublicFieldOnly } from './utils/tools.js';
