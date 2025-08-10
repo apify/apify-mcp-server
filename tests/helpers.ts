@@ -92,12 +92,12 @@ export async function createMcpStreamableClient(
 }
 
 export async function createMcpStdioClient(
-    options?: McpClientOptions,
+    options?: Partial<McpOptions>,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const { actors, enableAddingActors, tools } = options || {};
+    const { actors, enableAddingActors, tools, fullActorSchema } = options || {};
     const args = ['dist/stdio.js'];
     if (actors) {
         args.push('--actors', actors.join(','));
@@ -107,6 +107,9 @@ export async function createMcpStdioClient(
     }
     if (tools && tools.length > 0) {
         args.push('--tools', tools.join(','));
+    }
+    if (fullActorSchema !== undefined) {
+        args.push('--full-actor-schema', fullActorSchema.toString());
     }
 
     const transport = new StdioClientTransport({

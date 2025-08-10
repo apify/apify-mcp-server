@@ -22,10 +22,10 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
+import type { McpOptions } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { toolCategories } from './tools/index.js';
 import type { ToolCategory } from './types.js';
-import type { McpOptions } from './input.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -40,6 +40,7 @@ interface CliArgs {
     enableActorAutoLoading: boolean;
     /** Tool categories to include */
     tools?: string;
+    fullActorSchema: boolean;
 }
 
 // Configure logging, set to ERROR
@@ -80,6 +81,11 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
 `,
         example: 'docs,runs,storage',
     })
+    .option('full-actor-schema', {
+        type: 'boolean',
+        default: false,
+        describe: 'Enable full Actor schema for all Actors.',
+    })
     .help('help')
     .alias('h', 'help')
     .version(false)
@@ -116,7 +122,8 @@ async function main() {
         actors: actorList.length ? actorList : [],
         enableAddingActors,
         tools: toolCategoryKeys as ToolCategory[],
-        fullActorSchema: false,
+        enableDefaultActors: false,
+        fullActorSchema: argv.fullActorSchema,
     };
 
     const mcpServer = new ActorsMcpServer(input);

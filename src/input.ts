@@ -59,7 +59,7 @@ const mcpOptionsSchema = z.preprocess((originalInput) => {
         }
         return items.filter((s) => toolCategoriesArray.includes(s as ToolCategory));
     }, z.array(z.enum(toolCategoriesArray)).default([])),
-    fullActorSchema: z.boolean().default(false),
+    fullActorSchema: z.preprocess(parseBoolean, z.boolean().default(false)),
 }));
 
 export type McpOptions = z.infer<typeof mcpOptionsSchema>;

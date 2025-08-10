@@ -3,18 +3,19 @@ import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/cl
 import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { defaults, HelperTools } from '../../src/const.js';
+import { ADVANCED_INPUT_KEY, defaults, HelperTools } from '../../src/const.js';
+import type { McpOptions } from '../../src/input.js';
 import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
 import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory } from '../../src/types.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
-import { addActor, type McpClientOptions } from '../helpers.js';
+import { addActor } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
     transport: 'sse' | 'streamable-http' | 'stdio';
-    createClientFn: (options?: McpClientOptions) => Promise<Client>;
+    createClientFn: (options?: Partial<McpOptions>) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
@@ -273,7 +274,7 @@ export function createIntegrationTestsSuite(
                     limit: 5,
                 },
             });
-            const content = result.content as {text: string}[];
+            const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes(ACTOR_PYTHON_EXAMPLE))).toBe(true);
 
             await client.close();
@@ -292,7 +293,7 @@ export function createIntegrationTestsSuite(
                     limit: 100,
                 },
             });
-            const content = result.content as {text: string}[];
+            const content = result.content as { text: string }[];
             expect(content.length).toBe(1);
             const outputText = content[0].text;
 
@@ -482,6 +483,37 @@ export function createIntegrationTestsSuite(
             expect(message).toBeDefined();
             expect(message.content.text).toContain(topic);
 
+            await client.close();
+        });
+
+        it(`should make ${ADVANCED_INPUT_KEY} in Actor properties available`, async () => {
+            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: true });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
+            // Get input type for actor 'compass-slash-crawler-google-places'
+            const tools = await client.listTools();
+            const googlePlacesTool = tools.tools.find((tool) => tool.name === 'compass-slash-crawler-google-places');
+            const properties = googlePlacesTool!.inputSchema.properties as Record<string, unknown>;
+            expect(Object.keys(properties)).toMatchInlineSnapshot(`
+              [
+                "searchStringsArray",
+                "locationQuery",
+                "maxCrawledPlacesPerSearch",
+                "language",
+                "advancedInput",
+              ]
+            `);
+            expect(Object.keys((properties[ADVANCED_INPUT_KEY] as { properties: Record<string, unknown> }).properties).length).toBeGreaterThan(0);
+
+            await client.close();
+        });
+
+        it(`should not create ${ADVANCED_INPUT_KEY} if is disabled`, async () => {
+            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: false });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
+            const tools = await client.listTools();
+            const googlePlacesTool = tools.tools.find((tool) => tool.name === 'compass-slash-crawler-google-places');
+            const properties = googlePlacesTool!.inputSchema.properties as Record<string, unknown>;
+            expect(Object.keys(properties)).not.toContain(ADVANCED_INPUT_KEY);
             await client.close();
         });
 

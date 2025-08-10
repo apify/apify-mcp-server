@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { defaults } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 
 describe('parseInputParamsFromUrl', () => {
@@ -18,7 +19,7 @@ describe('parseInputParamsFromUrl', () => {
     it('should handle URL without query params', () => {
         const url = 'https://actors-mcp-server.apify.actor';
         const result = parseInputParamsFromUrl(url);
-        expect(result.actors).toEqual([]);
+        expect(result.actors).toEqual(defaults.actors);
     });
 
     it('should parse enableActorAutoLoading flag', () => {
@@ -43,5 +44,11 @@ describe('parseInputParamsFromUrl', () => {
         const url = 'https://actors-mcp-server.apify.actor?actors=apify/rag-web-browser';
         const result = parseInputParamsFromUrl(url);
         expect(result.actors).toEqual(['apify/rag-web-browser']);
+    });
+
+    it('should parse fullActorSchema flag', () => {
+        const url = 'https://actors-mcp-server.apify.actor?fullActorSchema=true';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.fullActorSchema).toBe(true);
     });
 });
