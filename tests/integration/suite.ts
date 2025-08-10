@@ -73,7 +73,7 @@ export function createIntegrationTestsSuite(
         beforeAll(beforeAllFn);
     }
     if (afterAllFn) {
-        afterAll(afterAllFn);
+        afterAll(afterAllFn, 60000);
     }
     if (beforeEachFn) {
         beforeEach(beforeEachFn);
@@ -487,7 +487,7 @@ export function createIntegrationTestsSuite(
         });
 
         it(`should make ${ADVANCED_INPUT_KEY} in Actor properties available`, async () => {
-            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: true });
+            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: false });
             await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
             // Get input type for actor 'compass-slash-crawler-google-places'
             const tools = await client.listTools();
@@ -508,7 +508,7 @@ export function createIntegrationTestsSuite(
         });
 
         it(`should not create ${ADVANCED_INPUT_KEY} if is disabled`, async () => {
-            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: false });
+            const client = await createClientFn({ enableAddingActors: true, fullActorSchema: true });
             await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
             const tools = await client.listTools();
             const googlePlacesTool = tools.tools.find((tool) => tool.name === 'compass-slash-crawler-google-places');

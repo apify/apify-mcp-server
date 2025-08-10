@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
-import { McpOptions, processInput } from '../input.js';
+import { type McpOptions, processInput } from '../input.js';
 import { loadToolsFromInput } from '../utils/tools-loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 

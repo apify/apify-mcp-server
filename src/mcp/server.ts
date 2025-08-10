@@ -53,10 +53,7 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
 
     constructor(options: ActorsMcpServerOptions, setupSigintHandler = true) {
-        this.options = {
-            enableDefaultActors: options.enableDefaultActors ?? false, // Default to true for backward compatibility
-            ...options,
-        };
+        this.options = options;
         this.server = new Server(
             {
                 name: SERVER_NAME,

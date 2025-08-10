@@ -5,23 +5,17 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { ToolCategory } from '../src/types.js';
-
-export interface McpClientOptions {
-    actors?: string[];
-    enableAddingActors?: boolean;
-    tools?: ToolCategory[]; // Tool categories to include
-}
+import type { McpOptions } from '../src/input.js';
 
 export async function createMcpSseClient(
     serverUrl: string,
-    options?: McpClientOptions,
+    options?: Partial<McpOptions>,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
+    const { actors, enableAddingActors, tools, fullActorSchema } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -30,6 +24,9 @@ export async function createMcpSseClient(
     }
     if (tools && tools.length > 0) {
         url.searchParams.append('tools', tools.join(','));
+    }
+    if (fullActorSchema !== undefined) {
+        url.searchParams.append('fullActorSchema', fullActorSchema.toString());
     }
 
     const transport = new SSEClientTransport(
@@ -54,13 +51,13 @@ export async function createMcpSseClient(
 
 export async function createMcpStreamableClient(
     serverUrl: string,
-    options?: McpClientOptions,
+    options?: Partial<McpOptions>,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
+    const { actors, enableAddingActors, tools, fullActorSchema } = options || {};
     if (actors) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -69,6 +66,9 @@ export async function createMcpStreamableClient(
     }
     if (tools && tools.length > 0) {
         url.searchParams.append('tools', tools.join(','));
+    }
+    if (fullActorSchema !== undefined) {
+        url.searchParams.append('fullActorSchema', fullActorSchema.toString());
     }
 
     const transport = new StreamableHTTPClientTransport(

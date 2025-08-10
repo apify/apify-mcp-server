@@ -62,25 +62,23 @@ export function processActorDefinition(
     limit: number,
     fullActorSchema: boolean,
 ): ActorDefinitionPruned {
+    let input;
+    if (definition?.input && 'type' in definition.input && 'properties' in definition.input) {
+        input = {
+            ...definition.input,
+            type: definition.input.type as string,
+            properties: definition.input.properties as Record<string, ISchemaProperties>,
+        };
+        if (!fullActorSchema) {
+            input = separateAdvancedInputs(input);
+        }
+    }
     return {
         id: actor.id,
         actorFullName: `${actor.username}/${actor.name}`,
         buildTag: definition?.buildTag || '',
         readme: truncateActorReadme(definition.readme || '', limit),
-        input: definition?.input && 'type' in definition.input && 'properties' in definition.input
-            ? (!fullActorSchema
-                ? {
-                    ...definition.input,
-                    type: definition.input.type as string,
-                    properties: definition.input.properties as Record<string, ISchemaProperties>,
-                }
-                : separateAdvancedInputs({
-                    ...definition.input,
-                    type: definition.input.type as string,
-                    properties: definition.input.properties as Record<string, ISchemaProperties>,
-                })
-            )
-            : undefined,
+        input,
         description: actor.description || '',
         defaultRunOptions: actor.defaultRunOptions,
         webServerMcpPath: 'webServerMcpPath' in definition ? definition.webServerMcpPath as string : undefined,
