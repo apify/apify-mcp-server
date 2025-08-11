@@ -224,6 +224,21 @@ export interface InternalTool extends ToolBase {
 
 export type ToolCategory = keyof typeof toolCategories;
 
+export type Input = {
+    actors: string[] | string;
+    /**
+    * @deprecated Use `enableAddingActors` instead.
+    */
+    enableActorAutoLoading?: boolean | string;
+    enableAddingActors?: boolean | string;
+    maxActorMemoryBytes?: number;
+    debugActor?: string;
+    debugActorInput?: unknown;
+    /** Tool categories to include */
+    tools?: ToolCategory[] | string;
+    fullActorSchema?: boolean | string;
+};
+
 // Utility type to get a union of values from an object type
 export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
 

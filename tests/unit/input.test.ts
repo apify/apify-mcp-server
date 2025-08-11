@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { processInput } from '../../src/input.js';
+import type { Input } from '../../src/types.js';
 
 describe('processInput', () => {
     it('should handle string actors input and convert to array', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: 'actor1, actor2,actor3',
         };
         const processed = processInput(input);
@@ -12,7 +13,7 @@ describe('processInput', () => {
     });
 
     it('should keep array actors input unchanged', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1', 'actor2', 'actor3'],
         };
         const processed = processInput(input);
@@ -20,7 +21,7 @@ describe('processInput', () => {
     });
 
     it('should handle enableActorAutoLoading to set enableAddingActors', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1'],
             enableActorAutoLoading: true,
         };
@@ -29,7 +30,7 @@ describe('processInput', () => {
     });
 
     it('should not override existing enableAddingActors with enableActorAutoLoading', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1'],
             enableActorAutoLoading: true,
             enableAddingActors: false,
@@ -39,7 +40,7 @@ describe('processInput', () => {
     });
 
     it('should default enableAddingActors to true when not provided', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1'],
         };
         const processed = processInput(input);
@@ -47,7 +48,7 @@ describe('processInput', () => {
     });
 
     it('should keep tools as array of valid featureTools keys', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1'],
             tools: ['docs', 'runs'],
         };
@@ -56,7 +57,7 @@ describe('processInput', () => {
     });
 
     it('should handle empty tools array', async () => {
-        const input = {
+        const input: Partial<Input> = {
             actors: ['actor1'],
             tools: [],
         };
@@ -64,20 +65,21 @@ describe('processInput', () => {
         expect(processed.tools).toEqual([]);
     });
 
-    it('should default missing tools field to empty array', async () => {
-        const input = {
+    it('should handle missing tools field (undefined)', async () => {
+        const input: Partial<Input> = {
             actors: ['actor1'],
         };
         const processed = processInput(input);
-        expect(processed.tools).toEqual([]);
+        expect(processed.tools).toBeUndefined();
     });
 
-    it('should ignore invalid tool keys', async () => {
-        const input = {
+    it('should include all keys, even invalid ones', async () => {
+        const input: Partial<Input> = {
             actors: ['actor1'],
+            // @ts-expect-error: purposely invalid key for test
             tools: ['docs', 'invalidKey', 'storage'],
         };
         const processed = processInput(input);
-        expect(processed.tools).toEqual(['docs', 'storage']);
+        expect(processed.tools).toEqual(['docs', 'invalidKey', 'storage']);
     });
 });

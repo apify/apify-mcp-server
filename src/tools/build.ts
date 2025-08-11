@@ -1,5 +1,4 @@
 import { Ajv } from 'ajv';
-import type { Actor, ActorDefinition } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -7,7 +6,13 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
-import type { ActorDefinitionPruned, InternalTool, ISchemaProperties, ToolEntry } from '../types.js';
+import type {
+    ActorDefinitionPruned,
+    ActorDefinitionWithDesc,
+    InternalTool,
+    ISchemaProperties,
+    ToolEntry,
+} from '../types.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -40,7 +45,14 @@ export async function getActorDefinition(
         const buildDetails = await defaultBuildClient.get();
 
         if (buildDetails?.actorDefinition) {
-            return processActorDefinition(actor, buildDetails.actorDefinition, limit);
+            const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
+            // We set actorDefinition ID to Actor ID
+            actorDefinitions.id = actor.id;
+            actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
+            actorDefinitions.description = actor.description || '';
+            actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
+            actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
+            return pruneActorDefinition(actorDefinitions);
         }
         return null;
     } catch (error) {
@@ -49,31 +61,24 @@ export async function getActorDefinition(
         throw new Error(errorMessage);
     }
 }
-export function processActorDefinition(
-    actor: Actor,
-    definition: ActorDefinition,
-    limit: number,
-): ActorDefinitionPruned {
-    let input;
-    if (definition?.input && 'type' in definition.input && 'properties' in definition.input) {
-        input = {
-            ...definition.input,
-            type: definition.input.type as string,
-            properties: definition.input.properties as Record<string, ISchemaProperties>,
-        };
-    }
+function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
     return {
-        id: actor.id,
-        actorFullName: `${actor.username}/${actor.name}`,
-        buildTag: definition?.buildTag || '',
-        readme: truncateActorReadme(definition.readme || '', limit),
-        input,
-        description: actor.description || '',
-        defaultRunOptions: actor.defaultRunOptions,
-        webServerMcpPath: 'webServerMcpPath' in definition ? definition.webServerMcpPath as string : undefined,
+        id: response.id,
+        actorFullName: response.actorFullName || '',
+        buildTag: response?.buildTag || '',
+        readme: response?.readme || '',
+        input: response?.input && 'type' in response.input && 'properties' in response.input
+            ? {
+                ...response.input,
+                type: response.input.type as string,
+                properties: response.input.properties as Record<string, ISchemaProperties>,
+            }
+            : undefined,
+        description: response.description,
+        defaultRunOptions: response.defaultRunOptions,
+        webServerMcpPath: 'webServerMcpPath' in response ? response.webServerMcpPath as string : undefined,
     };
 }
-
 /** Prune Actor README if it is too long
  * If the README is too long
  * - We keep the README as it is up to the limit.

@@ -5,12 +5,13 @@
 
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
-import { z } from 'zod';
 
 import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
+import { processInput } from './input.js';
 import { callActorGetDataset } from './tools/index.js';
+import type { Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
@@ -24,8 +25,25 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
+const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
+log.info('Loaded input', { input: JSON.stringify(input) });
+
 if (STANDBY_MODE) {
-    const app = createExpressApp(HOST);
+    let actorsToLoad: string[] = [];
+    // TODO: in standby mode the input loading does not actually work,
+    // we should remove this since we are using the URL query parameters to load Actors
+    // Load only Actors specified in the input
+    // If you wish to start without any Actor, create a task and leave the input empty
+    if (input.actors && input.actors.length > 0) {
+        const { actors } = input;
+        actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
+    }
+    // Include Actors to load in the MCP server options for backwards compatibility
+    const app = createExpressApp(HOST, {
+        enableAddingActors: Boolean(input.enableAddingActors),
+        enableDefaultActors: false,
+        actors: actorsToLoad,
+    });
     log.info('Actor is running in the STANDBY mode.');
 
     app.listen(PORT, () => {
@@ -34,17 +52,11 @@ if (STANDBY_MODE) {
 } else {
     log.info('Actor is not designed to run in the NORMAL model (use this mode only for debugging purposes)');
 
-    const inputSchema = z.object({
-        maxActorMemoryBytes: z.number().int().min(0).max(4096),
-        debugActor: z.string(),
-        debugActorInput: z.record(z.string(), z.unknown()),
-    });
-    const input = inputSchema.parse(await Actor.getInput());
-
-    log.info(`Loaded input: ${JSON.stringify(input)} `);
-
+    if (input && !input.debugActor && !input.debugActorInput) {
+        await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
+    }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const { items } = await callActorGetDataset(input.debugActor, input.debugActorInput, process.env.APIFY_TOKEN, options);
+    const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput as Record<string, unknown>, process.env.APIFY_TOKEN, options);
 
     await Actor.pushData(items);
     log.info('Pushed items to dataset', { itemCount: items.count });

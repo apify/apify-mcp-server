@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
-import { type McpOptions, processInput } from '../input.js';
+import { processInput } from '../input.js';
+import type { Input } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools-loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
@@ -43,8 +44,8 @@ export async function processParamsGetTools(url: string, apifyToken: string) {
     return await loadToolsFromInput(input, apifyToken);
 }
 
-export function parseInputParamsFromUrl(url: string): McpOptions {
+export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
-    const params = parse(query);
+    const params = parse(query) as unknown as Input;
     return processInput(params);
 }

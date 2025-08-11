@@ -4,18 +4,17 @@ import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/typ
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ADVANCED_INPUT_KEY, defaults, HelperTools } from '../../src/const.js';
-import type { McpOptions } from '../../src/input.js';
 import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
 import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory } from '../../src/types.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
-import { addActor } from '../helpers.js';
+import { addActor, type McpClientOptions } from '../helpers.js';
 
 interface IntegrationTestsSuiteOptions {
     suiteName: string;
     transport: 'sse' | 'streamable-http' | 'stdio';
-    createClientFn: (options?: Partial<McpOptions>) => Promise<Client>;
+    createClientFn: (options?: McpClientOptions) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
@@ -73,7 +72,7 @@ export function createIntegrationTestsSuite(
         beforeAll(beforeAllFn);
     }
     if (afterAllFn) {
-        afterAll(afterAllFn, 60000);
+        afterAll(afterAllFn);
     }
     if (beforeEachFn) {
         beforeEach(beforeEachFn);

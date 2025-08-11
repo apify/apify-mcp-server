@@ -21,7 +21,12 @@ createIntegrationTestsSuite({
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
 
-        app = createExpressApp(httpServerHost);
+        // Create an express app using the proper server setup
+        const mcpServerOptions = {
+            enableAddingActors: false,
+            enableDefaultActors: false,
+        };
+        app = createExpressApp(httpServerHost, mcpServerOptions);
 
         // Start a test server
         await new Promise<void>((resolve) => {

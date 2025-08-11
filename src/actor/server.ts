@@ -18,6 +18,11 @@ import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,
+    mcpServerOptions: {
+        enableAddingActors?: boolean;
+        enableDefaultActors?: boolean;
+        actors?: string[];
+    },
 ): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
@@ -71,7 +76,7 @@ export function createExpressApp(
                 tr: TransportType.SSE,
             });
             const input = parseInputParamsFromUrl(req.url);
-            const mcpServer = new ActorsMcpServer(input, false);
+            const mcpServer = new ActorsMcpServer({ ...mcpServerOptions, fullActorSchema: !!input.fullActorSchema }, false);
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
@@ -162,7 +167,7 @@ export function createExpressApp(
                     enableJsonResponse: false, // Use SSE response mode
                 });
                 const input = parseInputParamsFromUrl(req.url);
-                const mcpServer = new ActorsMcpServer(input, false);
+                const mcpServer = new ActorsMcpServer({ ...mcpServerOptions, fullActorSchema: !!input.fullActorSchema }, false);
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;

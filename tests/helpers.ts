@@ -5,11 +5,18 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { McpOptions } from '../src/input.js';
+import type { ToolCategory } from '../src/types.js';
+
+export interface McpClientOptions {
+    actors?: string[];
+    enableAddingActors?: boolean;
+    tools?: ToolCategory[]; // Tool categories to include
+    fullActorSchema?: boolean;
+}
 
 export async function createMcpSseClient(
     serverUrl: string,
-    options?: Partial<McpOptions>,
+    options?: McpClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
@@ -51,7 +58,7 @@ export async function createMcpSseClient(
 
 export async function createMcpStreamableClient(
     serverUrl: string,
-    options?: Partial<McpOptions>,
+    options?: McpClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
@@ -92,7 +99,7 @@ export async function createMcpStreamableClient(
 }
 
 export async function createMcpStdioClient(
-    options?: Partial<McpOptions>,
+    options?: McpClientOptions,
 ): Promise<Client> {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');

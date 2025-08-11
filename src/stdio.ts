@@ -22,10 +22,9 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import type { McpOptions } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { toolCategories } from './tools/index.js';
-import type { ToolCategory } from './types.js';
+import type { Input, ToolCategory } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -117,16 +116,14 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
+    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false, fullActorSchema: argv.fullActorSchema });
+
     // Create an Input object from CLI arguments
-    const input: McpOptions = {
+    const input: Input = {
         actors: actorList.length ? actorList : [],
         enableAddingActors,
         tools: toolCategoryKeys as ToolCategory[],
-        enableDefaultActors: false,
-        fullActorSchema: argv.fullActorSchema,
     };
-
-    const mcpServer = new ActorsMcpServer(input);
 
     // Use the shared tools loading logic
     const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);

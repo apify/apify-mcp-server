@@ -25,7 +25,6 @@ import {
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
-import type { McpOptions } from '../input.js';
 import { prompts } from '../prompts/index.js';
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
@@ -36,8 +35,10 @@ import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
 
-type ActorsMcpServerOptions = McpOptions & {
+type ActorsMcpServerOptions = {
+    enableAddingActors?: boolean;
     enableDefaultActors?: boolean;
+    fullActorSchema?: boolean;
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -52,8 +53,12 @@ export class ActorsMcpServer {
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
 
-    constructor(options: ActorsMcpServerOptions, setupSigintHandler = true) {
-        this.options = options;
+    constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
+        this.options = {
+            enableAddingActors: options.enableAddingActors ?? true,
+            enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
+            fullActorSchema: options.fullActorSchema ?? false,
+        };
         this.server = new Server(
             {
                 name: SERVER_NAME,
