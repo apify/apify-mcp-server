@@ -17,7 +17,7 @@ export async function connectMCPClient(
         return await createMCPStreamableClient(url, token);
     } catch {
         // If streamable HTTP transport fails, fall back to SSE transport
-        log.info('Streamable HTTP transport failed, falling back to SSE transport', {
+        log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
             url,
         });
         return await createMCPSSEClient(url, token);

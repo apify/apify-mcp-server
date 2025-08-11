@@ -68,8 +68,6 @@ export async function callActorGetDataset(
     }
 
     try {
-        log.info(`Calling Actor ${actorName} with input: ${JSON.stringify(input)}`);
-
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
@@ -99,10 +97,10 @@ export async function callActorGetDataset(
             });
         }
 
-        log.info(`Actor ${actorName} finished with ${items.count} items`);
+        log.debug('Actor finished', { actorName, itemCount: items.count });
         return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
     } catch (error) {
-        log.error(`Error calling actor: ${error}. Actor: ${actorName}, input: ${JSON.stringify(input)}`);
+        log.error('Error calling actor', { error, actorName, input });
         throw new Error(`Error calling Actor: ${error}`);
     }
 }
@@ -169,7 +167,7 @@ export async function getNormalActorsAsTools(
                 };
                 tools.push(tool);
             } catch (validationError) {
-                log.error(`Failed to compile AJV schema for Actor: ${actorDefinitionPruned.actorFullName}. Error: ${validationError}`);
+                log.error('Failed to compile AJV schema for Actor', { actorName: actorDefinitionPruned.actorFullName, error: validationError });
             }
         }
     }
@@ -194,7 +192,7 @@ async function getMCPServersAsTools(
             actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
         );
-        log.info('Retrieved MCP server URL for Actor', {
+        log.debug('Retrieved MCP server URL for Actor', {
             actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
             actorId,
             mcpServerUrl,
@@ -218,8 +216,7 @@ export async function getActorsAsTools(
     apifyToken: string,
     fullActorSchema = false,
 ): Promise<ToolEntry[]> {
-    log.debug(`Fetching actors as tools...`);
-    log.debug(`Actors: ${actorIdsOrNames}`);
+    log.debug('Fetching actors as tools', { actorNames: actorIdsOrNames });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -234,16 +231,18 @@ export async function getActorsAsTools(
                 );
             }
 
-            if (!actorDefinition) {
+            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
+            if (!actorDefinitionPruned) {
+                log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
             }
 
             // Cache canonical full schema without mutation
-            actorDefinitionPrunedCache.set(cacheKey, actorDefinition);
+            actorDefinitionPrunedCache.set(cacheKey, actorDefinitionPruned);
 
             return {
                 actorDefinitionPruned: actorDefinition,
-                webServerMcpPath: getActorMCPServerPath(actorDefinition),
+                webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
             } as ActorInfo;
         }),
     );
@@ -347,7 +346,7 @@ export const callActor: ToolEntry = {
                     })),
                 };
             } catch (error) {
-                log.error(`Error calling Actor: ${error}`);
+                log.error('Error calling Actor', { error });
                 return {
                     content: [
                         { type: 'text', text: `Error calling Actor: ${error instanceof Error ? error.message : String(error)}` },

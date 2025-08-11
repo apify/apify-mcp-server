@@ -82,7 +82,7 @@ export class ActorsMcpServer {
 
         // Initialize automatically for backward compatibility
         this.initialize().catch((error) => {
-            log.error('Failed to initialize server:', error);
+            log.error('Failed to initialize server', { error });
         });
     }
 
@@ -236,7 +236,7 @@ export class ActorsMcpServer {
         const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
         const tools = await getActorsAsTools(missingActors, apifyToken, this.options.fullActorSchema);
         if (tools.length > 0) {
-            log.info('Loading default tools...');
+            log.debug('Loading default tools');
             this.upsertTools(tools);
         }
     }
@@ -259,7 +259,7 @@ export class ActorsMcpServer {
     public async loadToolsFromUrl(url: string, apifyToken: string) {
         const tools = await processParamsGetTools(url, apifyToken);
         if (tools.length > 0) {
-            log.info('Loading tools from query parameters...');
+            log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
     }
@@ -317,7 +317,7 @@ export class ActorsMcpServer {
     private removeToolByName(toolName: string): boolean {
         if (this.tools.has(toolName)) {
             this.tools.delete(toolName);
-            log.info(`Deleted tool: ${toolName}`);
+            log.debug('Deleted tool', { toolName });
             return true;
         }
         return false;
@@ -426,7 +426,7 @@ export class ActorsMcpServer {
             if (name.startsWith('local__')) {
                 // we split the name by '__' and take the last part, which is the actual Actor name
                 const parts = name.split('__');
-                log.info(`Tool name with prefix detected: ${name}, using last part: ${parts[parts.length - 1]}`);
+                log.debug('Tool name with prefix detected', { toolName: name, lastPart: parts[parts.length - 1] });
                 if (parts.length > 1) {
                     name = parts[parts.length - 1];
                 }
@@ -456,7 +456,7 @@ export class ActorsMcpServer {
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args);
-            log.info(`Validate arguments for tool: ${tool.tool.name} with arguments: ${JSON.stringify(args)}`);
+            log.debug('Validate arguments for tool', { toolName: tool.tool.name, input: args });
             if (!tool.tool.ajvValidate(args)) {
                 const msg = `Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`;
                 log.error(msg);
@@ -477,6 +477,7 @@ export class ActorsMcpServer {
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
+                    log.info('Calling internal tool', { name: internalTool.name, input: args });
                     const res = await internalTool.call({
                         args,
                         extra,
@@ -507,7 +508,7 @@ export class ActorsMcpServer {
                                 const method = schema.shape.method.value;
                                 // Forward notifications from the proxy client to the server
                                 client.setNotificationHandler(schema, async (notification) => {
-                                    log.info('Sending MCP notification', {
+                                    log.debug('Sending MCP notification', {
                                         method,
                                         notification,
                                     });
@@ -516,6 +517,7 @@ export class ActorsMcpServer {
                             }
                         }
 
+                        log.info('Calling Actor-MCP', { actorId: serverTool.actorId, toolName: serverTool.originToolName, input: args });
                         const res = await client.callTool({
                             name: serverTool.originToolName,
                             arguments: args,
@@ -542,6 +544,7 @@ export class ActorsMcpServer {
                     const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
 
                     try {
+                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
                         const { runId, datasetId, items } = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
@@ -566,14 +569,14 @@ export class ActorsMcpServer {
                 }
             } catch (error) {
                 if (error instanceof ApifyApiError) {
-                    log.error(`Apify API error calling tool ${name}: ${error.message}`);
+                    log.error('Apify API error calling tool', { toolName: name, error });
                     return {
                         content: [
                             { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },
                         ],
                     };
                 }
-                log.error(`Error calling tool ${name}: ${error}`);
+                log.error('Error calling tool', { toolName: name, error });
                 throw new McpError(
                     ErrorCode.InternalError,
                     `An error occurred while calling the tool.`,

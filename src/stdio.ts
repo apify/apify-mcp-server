@@ -139,6 +139,6 @@ async function main() {
 }
 
 main().catch((error) => {
-    log.error(`Server error: ${error}`);
+    log.error('Server error', { error });
     process.exit(1);
 });

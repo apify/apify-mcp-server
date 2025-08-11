@@ -107,6 +107,8 @@ Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-cli
 This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
 Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
+Or use the Anthropic Desktop extension file (dxt) for one-click installation: [Apify MCP server dxt file](https://github.com/apify/actors-mcp-server/releases/latest/download/actors-mcp-server.dxt)
+
 # 🛠️ Tools, resources, and prompts
 
 The MCP server provides a set of tools for interacting with Apify Actors.
@@ -232,6 +234,12 @@ npx @modelcontextprotocol/inspector node ./dist/stdio.js
 ```
 
 Upon launching, the Inspector will display a URL that you can open in your browser to begin debugging.
+
+## 🐦 Canary PR releases
+
+Due to the current architecture where Apify MCP is split across two repositories, this one containing the core MCP logic and the private [apify-mcp-server](https://github.com/apify/apify-mcp-server) repository that handles the actual server implementation for [mcp.apify.com](https://mcp.apify.com), development can be challenging as changes need to be synchronized between both repositories.
+
+You can create a canary release from your PR branch by adding the `beta` tag. This will test the code and publish the package to [pkg.pr.new](https://pkg.pr.new/) which you can then use, for example, in a staging environment to test before actually merging the changes. This way we do not need to create new NPM releases and keep the NPM versions cleaner. The workflow runs whenever you commit to a PR branch that has the `beta` tag or when you add the `beta` tag to an already existing PR. For more details check out [the workflow file](.github/workflows/pre_release.yaml).
 
 # 🐛 Troubleshooting (local MCP server)
 

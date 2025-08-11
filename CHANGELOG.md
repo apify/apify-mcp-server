@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.8](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.8) (2025-08-08)
+
+### 🐛 Bug Fixes
+
+- Change log message for actor-mcp ([#211](https://github.com/apify/actors-mcp-server/pull/211)) ([3697b9f](https://github.com/apify/actors-mcp-server/commit/3697b9f48ab3c3b51dfe773375f6493197df7fa9)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.3.7](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.7) (2025-08-07)
+
+### 🐛 Bug Fixes
+
+- Change description in DXT file ([#209](https://github.com/apify/actors-mcp-server/pull/209)) ([4608963](https://github.com/apify/actors-mcp-server/commit/460896398d4f5999f8154bb51d09c254552d6224)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.3.6](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.6) (2025-08-06)
+
+### 🚀 Features
+
+- Update dxt file ([#208](https://github.com/apify/actors-mcp-server/pull/208)) ([1bedc59](https://github.com/apify/actors-mcp-server/commit/1bedc59cb4a0e3bf5abd493298ec4fecb9c40fef)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.3.5](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.5) (2025-08-06)
+
+### 🐛 Bug Fixes
+
+- Adding non existent Actor ([#205](https://github.com/apify/actors-mcp-server/pull/205)) ([b82fb1b](https://github.com/apify/actors-mcp-server/commit/b82fb1b15a734a556dad171ed428d4440c6176f1)) by [@MQ37](https://github.com/MQ37)
+
+
+## [0.3.4](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.4) (2025-08-06)
+
+### 🚀 Features
+
+- Change logs to structured format ([#207](https://github.com/apify/actors-mcp-server/pull/207)) ([3f30e1d](https://github.com/apify/actors-mcp-server/commit/3f30e1dcb5c70767ddbbe375ef7ae8ba06a29e66)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.3.3](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.3) (2025-08-05)
+
+### 🚀 Features
+
+- Change info logs to debug ([#204](https://github.com/apify/actors-mcp-server/pull/204)) ([1f45d7f](https://github.com/apify/actors-mcp-server/commit/1f45d7fb45dbd18e69687eeb89fb098969a6228d)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.3.2](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.2) (2025-08-01)
 
 ### 🚀 Features
