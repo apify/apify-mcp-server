@@ -7,7 +7,7 @@ import { HelperTools } from '../const.js';
 import type { IActorInputSchema, InternalTool, ToolEntry } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
-import { filterSchemaProperties, shortenProperties } from './utils.js';
+import { transformActorInputForGetDetails } from './utils.js';
 
 const getActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -31,7 +31,7 @@ export const getActorDetailsTool: ToolEntry = {
         inputSchema: zodToJsonSchema(getActorDetailsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorDetailsToolArgsSchema)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, apifyToken, apifyMcpServer } = toolArgs;
 
             const parsed = getActorDetailsToolArgsSchema.parse(args);
             const client = new ApifyClient({ token: apifyToken });
@@ -47,12 +47,13 @@ export const getActorDetailsTool: ToolEntry = {
                 };
             }
 
-            const inputSchema = (buildInfo.actorDefinition.input || {
-                type: 'object',
-                properties: {},
-            }) as IActorInputSchema;
-            inputSchema.properties = filterSchemaProperties(inputSchema.properties);
-            inputSchema.properties = shortenProperties(inputSchema.properties);
+            const inputSchema = transformActorInputForGetDetails(
+                (buildInfo.actorDefinition.input || {
+                    type: 'object',
+                    properties: {},
+                }) as IActorInputSchema,
+                { separateAdvancedInputs: !apifyMcpServer.options.fullActorSchema },
+            );
 
             // Use the actor formatter to get the main actor details
             const actorCard = formatActorToActorCard(actorInfo);

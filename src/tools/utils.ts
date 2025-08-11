@@ -279,42 +279,15 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-export function transformActorInputSchemaProperties(
-    input: Readonly<IActorInputSchema>,
-    options?: { separateAdvancedInputs?: boolean },
-): ActorInputSchemaProperties {
-    // Deep clone input to avoid mutating the original object
-    const inputClone: IActorInputSchema = structuredClone(input);
-
-    // Optionally separate advanced inputs section into a single ADVANCED_INPUT_KEY object
-    if (options?.separateAdvancedInputs) {
-        const separated = separateAdvancedInputsInSchema(inputClone);
-        inputClone.properties = separated;
-    }
-
-    let transformedProperties = markInputPropertiesAsRequired(inputClone);
-    transformedProperties = buildApifySpecificProperties(transformedProperties);
-    transformedProperties = filterSchemaProperties(transformedProperties);
-    transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
-    transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
-    transformedProperties = encodeDotPropertyNames(transformedProperties);
-    return transformedProperties;
-}
-
 /**
  * Separates advanced inputs into a dedicated ADVANCED_INPUT_KEY object based on the first section-captioned property.
  * The properties from the first section-captioned property onwards are grouped under the advanced input object.
  */
-export function separateAdvancedInputsInSchema(input: IActorInputSchema): Record<string, ISchemaProperties> {
-    if (!input || !input.properties) {
-        return input.properties ?? {};
-    }
-
-    const propertiesEntries = Object.entries(input.properties);
+export function separateAdvancedInputsInSchema(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
+    const propertiesEntries = Object.entries(properties);
     const firstSectionCaptionIndex = propertiesEntries.findIndex(([_key, value]) => value.sectionCaption);
     if (firstSectionCaptionIndex === -1) {
-        return input.properties;
+        return properties;
     }
 
     const mainInputs = propertiesEntries.slice(0, firstSectionCaptionIndex);
@@ -330,4 +303,55 @@ export function separateAdvancedInputsInSchema(input: IActorInputSchema): Record
     } as unknown as ISchemaProperties;
 
     return propObject;
+}
+
+export function transformActorInputSchemaProperties(
+    input: Readonly<IActorInputSchema>,
+    options?: { separateAdvancedInputs?: boolean },
+): ActorInputSchemaProperties {
+    // Deep clone input to avoid mutating the original object
+    const inputClone: IActorInputSchema = structuredClone(input);
+
+    if (options?.separateAdvancedInputs) {
+        inputClone.properties = separateAdvancedInputsInSchema(inputClone.properties);
+        if (inputClone.properties.advancedInput) {
+            // Recursively transform the advanced input properties
+            inputClone.properties.advancedInput.properties = transformActorInputSchemaProperties(
+                inputClone.properties.advancedInput as IActorInputSchema,
+                { separateAdvancedInputs: false },
+            );
+        }
+    }
+
+    let transformedProperties = markInputPropertiesAsRequired(inputClone);
+    transformedProperties = buildApifySpecificProperties(transformedProperties);
+    transformedProperties = filterSchemaProperties(transformedProperties);
+    transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
+    transformedProperties = shortenProperties(transformedProperties);
+    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+    transformedProperties = encodeDotPropertyNames(transformedProperties);
+    return transformedProperties;
+}
+
+export function transformActorInputForGetDetails(
+    input: Readonly<IActorInputSchema>,
+    options?: { separateAdvancedInputs?: boolean },
+) {
+    // Deep clone input to avoid mutating the original object
+    const inputClone = structuredClone(input) as IActorInputSchema;
+
+    if (options?.separateAdvancedInputs) {
+        inputClone.properties = separateAdvancedInputsInSchema(inputClone.properties);
+        if (inputClone.properties.advancedInput) {
+            // Recursively transform the advanced input properties
+            inputClone.properties.advancedInput = transformActorInputForGetDetails(
+                inputClone.properties.advancedInput as IActorInputSchema,
+                { separateAdvancedInputs: false },
+            ) as ISchemaProperties;
+        }
+    }
+
+    inputClone.properties = filterSchemaProperties(inputClone.properties);
+    inputClone.properties = shortenProperties(inputClone.properties);
+    return inputClone;
 }

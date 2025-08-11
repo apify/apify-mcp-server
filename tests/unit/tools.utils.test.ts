@@ -786,4 +786,57 @@ describe('transformActorInputSchemaProperties', () => {
         transformActorInputSchemaProperties(input);
         expect(input).toEqual(inputCopy);
     });
+
+    it('should separate advanced inputs', () => {
+        const input = {
+            title: 'Test',
+            type: 'object',
+            required: ['query'],
+            properties: {
+                query: {
+                    type: 'string',
+                    title: 'Query',
+                    description: 'Query desc',
+                },
+                special: {
+                    type: 'string',
+                    title: 'Special',
+                    description: 'Special desc',
+                    sectionCaption: 'Special',
+                },
+                another: {
+                    type: 'string',
+                    title: 'Another',
+                    description: 'Another desc',
+                },
+            },
+        };
+        const result = transformActorInputSchemaProperties(input, { separateAdvancedInputs: true });
+        expect(JSON.stringify(result, null, 2)).toMatchInlineSnapshot(`
+          "{
+            "query": {
+              "title": "Query",
+              "description": "**REQUIRED** Query desc",
+              "type": "string"
+            },
+            "advancedInput": {
+              "title": "Advanced Inputs",
+              "description": "These inputs are considered advanced and are not required for basic functionality.",
+              "type": "object",
+              "properties": {
+                "special": {
+                  "title": "Special",
+                  "description": "Special desc",
+                  "type": "string"
+                },
+                "another": {
+                  "title": "Another",
+                  "description": "Another desc",
+                  "type": "string"
+                }
+              }
+            }
+          }"
+        `);
+    });
 });
