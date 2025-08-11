@@ -279,9 +279,19 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-export function transformActorInputSchemaProperties(input: Readonly<IActorInputSchema>): ActorInputSchemaProperties {
+export function transformActorInputSchemaProperties(
+    input: Readonly<IActorInputSchema>,
+    options?: { separateAdvancedInputs?: boolean },
+): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
     const inputClone: IActorInputSchema = structuredClone(input);
+
+    // Optionally separate advanced inputs section into a single ADVANCED_INPUT_KEY object
+    if (options?.separateAdvancedInputs) {
+        const separated = separateAdvancedInputsInSchema(inputClone);
+        inputClone.properties = separated;
+    }
+
     let transformedProperties = markInputPropertiesAsRequired(inputClone);
     transformedProperties = buildApifySpecificProperties(transformedProperties);
     transformedProperties = filterSchemaProperties(transformedProperties);
@@ -290,4 +300,34 @@ export function transformActorInputSchemaProperties(input: Readonly<IActorInputS
     transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
     return transformedProperties;
+}
+
+/**
+ * Separates advanced inputs into a dedicated ADVANCED_INPUT_KEY object based on the first section-captioned property.
+ * The properties from the first section-captioned property onwards are grouped under the advanced input object.
+ */
+export function separateAdvancedInputsInSchema(input: IActorInputSchema): Record<string, ISchemaProperties> {
+    if (!input || !input.properties) {
+        return input.properties ?? {};
+    }
+
+    const propertiesEntries = Object.entries(input.properties);
+    const firstSectionCaptionIndex = propertiesEntries.findIndex(([_key, value]) => value.sectionCaption);
+    if (firstSectionCaptionIndex === -1) {
+        return input.properties;
+    }
+
+    const mainInputs = propertiesEntries.slice(0, firstSectionCaptionIndex);
+    const advancedInputs = propertiesEntries.slice(firstSectionCaptionIndex);
+
+    const propObject: Record<string, ISchemaProperties> = Object.fromEntries(mainInputs);
+    // Use a basic object container here; additional details (like title/description) are not required at this stage
+    propObject.advancedInput = {
+        type: 'object',
+        title: 'Advanced Inputs',
+        description: 'These inputs are considered advanced and are not required for basic functionality.',
+        properties: Object.fromEntries(advancedInputs),
+    } as unknown as ISchemaProperties;
+
+    return propObject;
 }

@@ -129,6 +129,7 @@ export async function callActorGetDataset(
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
+    fullActorSchema: boolean,
 ): Promise<ToolEntry[]> {
     const tools: ToolEntry[] = [];
 
@@ -139,7 +140,10 @@ export async function getNormalActorsAsTools(
         if (actorDefinitionPruned) {
             const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
             if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
-                actorDefinitionPruned.input.properties = transformActorInputSchemaProperties(actorDefinitionPruned.input);
+                actorDefinitionPruned.input.properties = transformActorInputSchemaProperties(
+                    actorDefinitionPruned.input,
+                    { separateAdvancedInputs: !fullActorSchema },
+                );
                 // Add schema $id, each valid JSON schema should have a unique $id
                 // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
                 actorDefinitionPruned.input.$id = schemaID;
@@ -219,17 +223,24 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            let actorDefinition = actorDefinitionPrunedCache.get(actorIdOrName);
+            // Always cache the full schema version under a stable key
+            const cacheKey = actorIdOrName;
+            let actorDefinition = actorDefinitionPrunedCache.get(cacheKey);
             if (!actorDefinition) {
-                actorDefinition = await getActorDefinition(actorIdOrName, apifyToken, ACTOR_README_MAX_LENGTH, fullActorSchema);
+                actorDefinition = await getActorDefinition(
+                    actorIdOrName,
+                    apifyToken,
+                    ACTOR_README_MAX_LENGTH,
+                );
             }
 
             if (!actorDefinition) {
                 return null;
             }
 
-            // Cache the pruned Actor definition
-            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinition);
+            // Cache canonical full schema without mutation
+            actorDefinitionPrunedCache.set(cacheKey, actorDefinition);
+
             return {
                 actorDefinitionPruned: actorDefinition,
                 webServerMcpPath: getActorMCPServerPath(actorDefinition),
@@ -244,7 +255,7 @@ export async function getActorsAsTools(
     const normalActorsInfo = clonedActors.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo),
+        getNormalActorsAsTools(normalActorsInfo, fullActorSchema),
         getMCPServersAsTools(actorMCPServersInfo, apifyToken),
     ]);
 

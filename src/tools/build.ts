@@ -6,14 +6,8 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_README_MAX_LENGTH, ADVANCED_INPUT_KEY, HelperTools } from '../const.js';
-import type {
-    ActorDefinitionPruned,
-    ActorDefinitionWithDesc,
-    InternalTool,
-    ISchemaProperties,
-    ToolEntry,
-} from '../types.js';
+import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
+import type { ActorDefinitionPruned, InternalTool, ISchemaProperties, ToolEntry } from '../types.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -31,7 +25,6 @@ export async function getActorDefinition(
     actorIdOrName: string,
     apifyToken: string,
     limit: number = ACTOR_README_MAX_LENGTH,
-    fullActorSchema = true,
 ): Promise<ActorDefinitionPruned | null> {
     const client = new ApifyClient({ token: apifyToken });
     const actorClient = client.actor(actorIdOrName);
@@ -47,7 +40,7 @@ export async function getActorDefinition(
         const buildDetails = await defaultBuildClient.get();
 
         if (buildDetails?.actorDefinition) {
-            return processActorDefinition(actor, buildDetails.actorDefinition, limit, fullActorSchema);
+            return processActorDefinition(actor, buildDetails.actorDefinition, limit);
         }
         return null;
     } catch (error) {
@@ -60,7 +53,6 @@ export function processActorDefinition(
     actor: Actor,
     definition: ActorDefinition,
     limit: number,
-    fullActorSchema: boolean,
 ): ActorDefinitionPruned {
     let input;
     if (definition?.input && 'type' in definition.input && 'properties' in definition.input) {
@@ -69,9 +61,6 @@ export function processActorDefinition(
             type: definition.input.type as string,
             properties: definition.input.properties as Record<string, ISchemaProperties>,
         };
-        if (!fullActorSchema) {
-            input = separateAdvancedInputs(input);
-        }
     }
     return {
         id: actor.id,
@@ -83,33 +72,6 @@ export function processActorDefinition(
         defaultRunOptions: actor.defaultRunOptions,
         webServerMcpPath: 'webServerMcpPath' in definition ? definition.webServerMcpPath as string : undefined,
     };
-}
-
-function separateAdvancedInputs(input: ActorDefinitionWithDesc['input']): ActorDefinitionPruned['input'] {
-    if (!input || !input.properties) {
-        return input;
-    }
-
-    const properties = Object.entries(input.properties);
-    const firstSectionCaptionIndex = properties.findIndex(([_key, value]) => value.sectionCaption);
-    if (firstSectionCaptionIndex === -1) {
-        // No advanced inputs, return the input as is
-        return input;
-    }
-
-    // Separate advanced inputs from the main section
-    const mainInputs = properties.slice(0, firstSectionCaptionIndex);
-    const advancedInputs = properties.slice(firstSectionCaptionIndex);
-
-    const propObject = Object.fromEntries(mainInputs);
-    propObject[ADVANCED_INPUT_KEY] = {
-        type: 'object',
-        title: 'Advanced Inputs',
-        description: 'These inputs are considered advanced and are not required for basic functionality.',
-        properties: Object.fromEntries(advancedInputs),
-    };
-
-    return { ...input, properties: propObject };
 }
 
 /** Prune Actor README if it is too long

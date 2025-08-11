@@ -4,8 +4,8 @@
  */
 
 import { defaults } from '../const.js';
-import { addRemoveTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import type { McpOptions } from '../input.js';
+import { addRemoveTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 
 /**
