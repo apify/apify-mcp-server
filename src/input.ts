@@ -15,7 +15,10 @@ export function processInput(originalInput: Partial<Input>): Input {
 
     // actors can be a string or an array of strings
     if (input.actors && typeof input.actors === 'string') {
-        input.actors = input.actors.split(',').map((format: string) => format.trim()) as string[];
+        /**
+         * Filter out empty strings to prevent invalid Actor API error.
+         */
+        input.actors = input.actors.split(',').map((format: string) => format.trim()).filter((actor) => actor !== '') as string[];
     }
     /**
      * Replace empty string with empty array to prevent invalid Actor API error.
@@ -37,7 +40,10 @@ export function processInput(originalInput: Partial<Input>): Input {
     }
 
     if (input.tools && typeof input.tools === 'string') {
-        input.tools = input.tools.split(',').map((tool: string) => tool.trim()) as ToolCategory[];
+        /**
+         * Filter out empty strings just in case.
+         */
+        input.tools = input.tools.split(',').map((tool: string) => tool.trim()).filter((tool) => tool !== '') as ToolCategory[];
     }
     return input;
 }
