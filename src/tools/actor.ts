@@ -10,7 +10,6 @@ import { ApifyClient } from '../apify-client.js';
 import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
-    ACTOR_README_MAX_LENGTH,
     ADVANCED_INPUT_KEY,
     HelperTools,
 } from '../const.js';
@@ -62,6 +61,7 @@ export async function callActorGetDataset(
     progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
     let input = simplifiedInput;
+    // Moves the advances input properties into the root object
     if (input[ADVANCED_INPUT_KEY]) {
         const { [ADVANCED_INPUT_KEY]: advancedInput, ...rest } = input;
         input = { ...advancedInput, ...rest };
@@ -220,15 +220,13 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            // Always cache the full schema version under a stable key
-            const cacheKey = actorIdOrName;
-            let actorDefinition = actorDefinitionPrunedCache.get(cacheKey);
-            if (!actorDefinition) {
-                actorDefinition = await getActorDefinition(
-                    actorIdOrName,
-                    apifyToken,
-                    ACTOR_README_MAX_LENGTH,
-                );
+            const actorDefinitionPrunedCached = actorDefinitionPrunedCache.get(actorIdOrName);
+            if (actorDefinitionPrunedCached) {
+                return {
+                    actorDefinitionPruned: actorDefinitionPrunedCached,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPrunedCached),
+
+                } as ActorInfo;
             }
 
             const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
@@ -236,12 +234,10 @@ export async function getActorsAsTools(
                 log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
             }
-
-            // Cache canonical full schema without mutation
-            actorDefinitionPrunedCache.set(cacheKey, actorDefinitionPruned);
-
+            // Cache the pruned Actor definition
+            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
             return {
-                actorDefinitionPruned: actorDefinition,
+                actorDefinitionPruned,
                 webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
             } as ActorInfo;
         }),

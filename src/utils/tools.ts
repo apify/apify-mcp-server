@@ -9,18 +9,19 @@ export function getToolPublicFieldOnly(tool: ToolBase) {
     return {
         name: tool.name,
         description: tool.description,
-        inputSchema: simplifiedSchema(tool.inputSchema as IActorInputSchema),
+        inputSchema: clearAdvancedInputProperties(tool.inputSchema as IActorInputSchema),
     };
 }
 
-function simplifiedSchema(schema: IActorInputSchema): IActorInputSchema {
-    if (schema.properties && 'advancedInputs' in schema.properties) {
+/** Removes properties under ADVANCED_INPUT_KEY from the schema */
+function clearAdvancedInputProperties(schema: IActorInputSchema): IActorInputSchema {
+    if (schema.properties && ADVANCED_INPUT_KEY in schema.properties) {
         return {
             ...schema,
             properties: {
                 ...schema.properties,
                 [ADVANCED_INPUT_KEY]: {
-                    ...schema.properties.advancedInputs,
+                    ...schema.properties[ADVANCED_INPUT_KEY],
                     properties: {},
                     additionalProperties: true,
                 },

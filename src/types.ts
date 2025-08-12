@@ -165,11 +165,6 @@ export type ToolEntry =
     };
 
 /**
- * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
- */
-export type ToolType = ToolEntry['type'];
-
-/**
  * Price for a single event in a specific tier.
  */
 export interface TieredEventPrice {
