@@ -134,6 +134,10 @@ You don't need to manually specify which Actor to call or its input parameters; 
 When a tool is called, the arguments are automatically passed to the Actor by the LLM.
 You can refer to the specific Actor's documentation for a list of available arguments.
 
+#### Simplified schema
+
+By default, Actors use a simplified input schema. Any inputs that appear in sectioned UI groups in the Apify Console are treated as advanced and moved under `advancedInput`. Advanced input properties are hidden in the tool list but can still be provided when calling the tool. To view all available parameters for an Actor—including advanced ones—use the `get-actor-details` tool. To disable the simplified schema and use the full Actor schema, set `?fullActorSchema=true` (or pass `--full-actor-schema` via the CLI).
+
 ### Helper tools
 
 One of the most powerful features of using MCP with Apify is dynamic tool discovery.
