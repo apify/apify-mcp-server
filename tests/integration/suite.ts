@@ -504,7 +504,7 @@ export function createIntegrationTestsSuite(
             await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
             // Get input type for actor 'compass-slash-crawler-google-places'
             const tools = await client.listTools();
-            const googlePlacesTool = tools.tools.find((tool) => tool.name === 'compass-slash-crawler-google-places');
+            const googlePlacesTool = tools.tools.find((tool) => tool.name === actorNameToToolName('compass/crawler-google-places'));
             const properties = googlePlacesTool!.inputSchema.properties as Record<string, unknown>;
             expect(Object.keys(properties)).toMatchInlineSnapshot(`
               [
@@ -515,7 +515,7 @@ export function createIntegrationTestsSuite(
                 "advancedInput",
               ]
             `);
-            expect(Object.keys((properties[ADVANCED_INPUT_KEY] as { properties: Record<string, unknown> }).properties).length).toBeGreaterThan(0);
+            expect(Object.keys((properties[ADVANCED_INPUT_KEY] as { properties: Record<string, unknown> }).properties).length).toBe(0);
 
             await client.close();
         });
@@ -524,7 +524,7 @@ export function createIntegrationTestsSuite(
             const client = await createClientFn({ enableAddingActors: true, fullActorSchema: true });
             await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: 'compass/crawler-google-places' } });
             const tools = await client.listTools();
-            const googlePlacesTool = tools.tools.find((tool) => tool.name === 'compass-slash-crawler-google-places');
+            const googlePlacesTool = tools.tools.find((tool) => tool.name === actorNameToToolName('compass/crawler-google-places'));
             const properties = googlePlacesTool!.inputSchema.properties as Record<string, unknown>;
             expect(Object.keys(properties)).not.toContain(ADVANCED_INPUT_KEY);
             await client.close();

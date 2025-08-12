@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
-import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
+import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, ADVANCED_INPUT_KEY } from '../const.js';
 import type { ActorInputSchemaProperties, IActorInputSchema, ISchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
@@ -312,46 +312,47 @@ export function transformActorInputSchemaProperties(
     // Deep clone input to avoid mutating the original object
     const inputClone: IActorInputSchema = structuredClone(input);
 
+    const transform = (transformInput: IActorInputSchema) => {
+        let transformedProperties = markInputPropertiesAsRequired(transformInput);
+        transformedProperties = buildApifySpecificProperties(transformedProperties);
+        transformedProperties = filterSchemaProperties(transformedProperties);
+        transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
+        transformedProperties = shortenProperties(transformedProperties);
+        transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
+        transformedProperties = encodeDotPropertyNames(transformedProperties);
+        return transformedProperties;
+    };
+
     if (options?.separateAdvancedInputs) {
         inputClone.properties = separateAdvancedInputsInSchema(inputClone.properties);
-        if (inputClone.properties.advancedInput) {
-            // Recursively transform the advanced input properties
-            inputClone.properties.advancedInput.properties = transformActorInputSchemaProperties(
-                inputClone.properties.advancedInput as IActorInputSchema,
-                { separateAdvancedInputs: false },
-            );
+        if (inputClone.properties[ADVANCED_INPUT_KEY]) {
+            inputClone.properties[ADVANCED_INPUT_KEY].properties = transform(inputClone.properties[ADVANCED_INPUT_KEY] as IActorInputSchema);
         }
     }
 
-    let transformedProperties = markInputPropertiesAsRequired(inputClone);
-    transformedProperties = buildApifySpecificProperties(transformedProperties);
-    transformedProperties = filterSchemaProperties(transformedProperties);
-    transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
-    transformedProperties = shortenProperties(transformedProperties);
-    transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
-    transformedProperties = encodeDotPropertyNames(transformedProperties);
-    return transformedProperties;
+    return transform(inputClone);
 }
 
 export function transformActorInputForGetDetails(
     input: Readonly<IActorInputSchema>,
     options?: { separateAdvancedInputs?: boolean },
-) {
+): IActorInputSchema {
     // Deep clone input to avoid mutating the original object
     const inputClone = structuredClone(input) as IActorInputSchema;
 
+    const transform = (transformInput: IActorInputSchema) => {
+        let transformedProperties = filterSchemaProperties(transformInput.properties);
+        transformedProperties = shortenProperties(transformedProperties);
+        return transformedProperties;
+    };
+
     if (options?.separateAdvancedInputs) {
         inputClone.properties = separateAdvancedInputsInSchema(inputClone.properties);
-        if (inputClone.properties.advancedInput) {
-            // Recursively transform the advanced input properties
-            inputClone.properties.advancedInput = transformActorInputForGetDetails(
-                inputClone.properties.advancedInput as IActorInputSchema,
-                { separateAdvancedInputs: false },
-            ) as ISchemaProperties;
+        if (inputClone.properties[ADVANCED_INPUT_KEY]) {
+            inputClone.properties[ADVANCED_INPUT_KEY].properties = transform(inputClone.properties[ADVANCED_INPUT_KEY] as IActorInputSchema);
         }
     }
 
-    inputClone.properties = filterSchemaProperties(inputClone.properties);
-    inputClone.properties = shortenProperties(inputClone.properties);
+    inputClone.properties = transform(inputClone);
     return inputClone;
 }
