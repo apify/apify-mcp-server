@@ -821,7 +821,7 @@ describe('transformActorInputSchemaProperties', () => {
             },
             "advancedInput": {
               "title": "Advanced Inputs",
-              "description": "These inputs are considered advanced and are not required for basic functionality.",
+              "description": "Universal object for advanced inputs. Full definition is available in tool get-actor-detail. These inputs are considered advanced and are not required for basic functionality.",
               "type": "object",
               "properties": {
                 "special": {
