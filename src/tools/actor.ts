@@ -47,7 +47,7 @@ export type CallActorGetDatasetResult = {
  *
  * @param {string} actorName - The name of the actor to call.
  * @param {ActorCallOptions} callOptions - The options to pass to the actor.
- * @param {ActorInput} simplifiedInput - The input to pass to the actor.
+ * @param {Record<string, unknown>} simplifiedInput - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
  * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
@@ -123,6 +123,7 @@ export async function callActorGetDataset(
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath and actorDefinitionPruned.
+ * @param {boolean} fullActorSchema - If true, the full Actor input schema is exposed.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
