@@ -22,13 +22,13 @@ export async function createMcpSseClient(
     }
     const url = new URL(serverUrl);
     const { actors, enableAddingActors, tools } = options || {};
-    if (actors) {
+    if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
 
@@ -61,13 +61,13 @@ export async function createMcpStreamableClient(
     }
     const url = new URL(serverUrl);
     const { actors, enableAddingActors, tools } = options || {};
-    if (actors) {
+    if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
 
@@ -99,13 +99,13 @@ export async function createMcpStdioClient(
     }
     const { actors, enableAddingActors, tools } = options || {};
     const args = ['dist/stdio.js'];
-    if (actors) {
+    if (actors !== undefined) {
         args.push('--actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         args.push('--enable-adding-actors', enableAddingActors.toString());
     }
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
         args.push('--tools', tools.join(','));
     }
 

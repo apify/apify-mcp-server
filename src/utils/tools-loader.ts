@@ -4,8 +4,9 @@
  */
 
 import { defaults } from '../const.js';
-import { addRemoveTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { addRemoveTools, getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import type { Input, ToolCategory, ToolEntry } from '../types.js';
+import { getExpectedToolsByCategories } from './tools.js';
 
 /**
  * Load tools based on the provided Input object.
@@ -13,22 +14,20 @@ import type { Input, ToolCategory, ToolEntry } from '../types.js';
  *
  * @param input The processed Input object
  * @param apifyToken The Apify API token
- * @param useDefaultActors Whether to use default actors if no actors are specified
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
     apifyToken: string,
-    useDefaultActors = false,
 ): Promise<ToolEntry[]> {
     let tools: ToolEntry[] = [];
 
     // Load actors as tools
-    if (input.actors && (Array.isArray(input.actors) ? input.actors.length > 0 : input.actors)) {
+    if (input.actors !== undefined) {
         const actors = Array.isArray(input.actors) ? input.actors : [input.actors];
         tools = await getActorsAsTools(actors, apifyToken);
-    } else if (useDefaultActors) {
-        // Use default actors if no actors are specified and useDefaultActors is true
+    } else {
+        // Use default actors if no actors are specified
         tools = await getActorsAsTools(defaults.actors, apifyToken);
     }
 
@@ -38,12 +37,14 @@ export async function loadToolsFromInput(
     }
 
     // Add tools from enabled categories
-    if (input.tools) {
+    if (input.tools !== undefined) {
         const toolKeys = Array.isArray(input.tools) ? input.tools : [input.tools];
         for (const toolKey of toolKeys) {
             const keyTools = toolCategories[toolKey as ToolCategory] || [];
             tools.push(...keyTools);
         }
+    } else {
+        tools.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
     }
 
     return tools;

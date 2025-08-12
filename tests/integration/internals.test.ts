@@ -5,8 +5,8 @@ import log from '@apify/log';
 import { actorNameToToolName } from '../../dist/tools/utils.js';
 import { defaults } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { addRemoveTools, defaultTools, getActorsAsTools } from '../../src/tools/index.js';
-import { ACTOR_PYTHON_EXAMPLE, DEFAULT_TOOL_NAMES } from '../const.js';
+import { addRemoveTools, getActorsAsTools } from '../../src/tools/index.js';
+import { ACTOR_PYTHON_EXAMPLE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
 
 beforeAll(() => {
@@ -25,7 +25,6 @@ describe('MCP server internals integration tests', () => {
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
         const expectedToolNames = [
-            ...DEFAULT_TOOL_NAMES,
             ...defaults.actors,
             ...addRemoveTools.map((tool) => tool.tool.name),
             ...[ACTOR_PYTHON_EXAMPLE],
@@ -47,7 +46,7 @@ describe('MCP server internals integration tests', () => {
         const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
         await actorsMCPServer.initialize();
 
-        const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+        const numberOfTools = addRemoveTools.length + defaults.actors.length;
         const toolList = actorsMCPServer.listAllToolNames();
         expect(toolList.length).toEqual(numberOfTools);
         // Add a new Actor
@@ -68,7 +67,7 @@ describe('MCP server internals integration tests', () => {
 
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+        const numberOfTools = addRemoveTools.length + defaults.actors.length;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -89,7 +88,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(1);
         expect(latestTools.length).toBe(numberOfTools + 1);
         expect(latestTools).toContain(actor);
-        for (const tool of [...defaultTools, ...addRemoveTools]) {
+        for (const tool of [...addRemoveTools]) {
             expect(latestTools).toContain(tool.tool.name);
         }
         for (const tool of defaults.actors) {
@@ -103,7 +102,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(2);
         expect(latestTools.length).toBe(numberOfTools);
         expect(latestTools).not.toContain(actor);
-        for (const tool of [...defaultTools, ...addRemoveTools]) {
+        for (const tool of [...addRemoveTools]) {
             expect(latestTools).toContain(tool.tool.name);
         }
         for (const tool of defaults.actors) {
@@ -114,7 +113,7 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
+        const numberOfTools = addRemoveTools.length + defaults.actors.length;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;

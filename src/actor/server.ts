@@ -12,7 +12,6 @@ import express from 'express';
 import log from '@apify/log';
 
 import { ActorsMcpServer } from '../mcp/server.js';
-import { parseInputParamsFromUrl } from '../mcp/utils.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -80,16 +79,8 @@ export function createExpressApp(
 
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
-            const input = parseInputParamsFromUrl(req.url);
-            if (input.actors || input.enableAddingActors || input.tools) {
-                log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
-                await mcpServer.loadToolsFromUrl(req.url, apifyToken);
-            }
-            // Load default tools if no actors are specified
-            if (!input.actors) {
-                log.debug('Loading default tools', { sessionId: transport.sessionId, tr: TransportType.SSE });
-                await mcpServer.loadDefaultActors(apifyToken);
-            }
+            log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
+            await mcpServer.loadToolsFromUrl(req.url, apifyToken);
 
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
@@ -170,16 +161,8 @@ export function createExpressApp(
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
-                const input = parseInputParamsFromUrl(req.url);
-                if (input.actors || input.enableAddingActors || input.tools) {
-                    log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
-                    await mcpServer.loadToolsFromUrl(req.url, apifyToken);
-                }
-                // Load default tools if no actors are specified
-                if (!input.actors) {
-                    log.debug('Loading default tools', { sessionId: transport.sessionId, tr: TransportType.HTTP });
-                    await mcpServer.loadDefaultActors(apifyToken);
-                }
+                log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
+                await mcpServer.loadToolsFromUrl(req.url, apifyToken);
 
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);

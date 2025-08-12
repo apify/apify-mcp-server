@@ -75,9 +75,6 @@ export class ActorsMcpServer {
         this.setupToolHandlers();
         this.setupPromptHandlers();
 
-        // Add default tools
-        this.upsertTools(defaultTools);
-
         // Add tools to dynamically load Actors
         if (this.options.enableAddingActors) {
             this.enableDynamicActorTools();
@@ -213,7 +210,6 @@ export class ActorsMcpServer {
         if (this.toolsChangedHandler) {
             this.unregisterToolsChangedHandler();
         }
-        this.upsertTools(defaultTools);
         if (this.options.enableAddingActors) {
             this.enableDynamicActorTools();
         }
@@ -242,14 +238,6 @@ export class ActorsMcpServer {
             log.debug('Loading default tools');
             this.upsertTools(tools);
         }
-    }
-
-    /**
-     * @deprecated Use `loadDefaultActors` instead.
-     * Loads default tools if not already loaded.
-     */
-    public async loadDefaultTools(apifyToken: string) {
-        await this.loadDefaultActors(apifyToken);
     }
 
     /**

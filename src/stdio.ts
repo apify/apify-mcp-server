@@ -90,10 +90,14 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
     .parseSync() as CliArgs;
 
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
-const actors = argv.actors as string || '';
-const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
-// Keys of the tool categories to enable
-const toolCategoryKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
+// Split actors argument, trim whitespace, and filter out empty strings
+const actorList = argv.actors !== undefined
+    ? argv.actors.split(',').map((a: string) => a.trim()).filter((a: string) => a.length > 0)
+    : undefined;
+// Split tools argument, trim whitespace, and filter out empty strings
+const toolCategoryKeys = argv.tools !== undefined
+    ? argv.tools.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
+    : undefined;
 
 // Propagate log.error to console.error for easier debugging
 const originalError = log.error.bind(log);
@@ -114,13 +118,13 @@ async function main() {
 
     // Create an Input object from CLI arguments
     const input: Input = {
-        actors: actorList.length ? actorList : [],
+        actors: actorList,
         enableAddingActors,
         tools: toolCategoryKeys as ToolCategory[],
     };
 
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);
+    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string);
 
     mcpServer.upsertTools(tools);
 
