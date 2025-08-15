@@ -72,7 +72,7 @@
         "enabled_actors": {
             "type": "string",
             "title": "Enabled Actors",
-            "description": "Enter a comma-separated list of full Actor names to add to the server on startup (e.g., apify/rag-web-browser).",
+            "description": "A comma-separated list of full Actor names to add to the server on startup (e.g., apify/rag-web-browser).",
             "required": false,
             "default": "apify/rag-web-browser"
         },
