@@ -42,11 +42,11 @@
             "args": [
                 "${__dirname}/dist/stdio.js",
                 "--tools",
-                "${user_config.enabled_tools}",
+                "${user_config.tools}",
                 "--actors",
-                "${user_config.enabled_actors}",
+                "${user_config.actors}",
                 "--enable-adding-actors",
-                "${user_config.enable_dynamic_actors}"
+                "${user_config.enable-adding-actors}"
             ],
             "env": {
                 "APIFY_TOKEN": "${user_config.apify_token}"
@@ -62,21 +62,21 @@
             "sensitive": true,
             "required": true
         },
-        "enabled_tools": {
+        "tools": {
             "type": "string",
             "title": "Enabled Tool Categories",
             "description": "A comma-separated list of tool categories to enable. Available options: docs, runs, storage, preview.",
             "required": false,
             "default": "docs"
         },
-        "enabled_actors": {
+        "actors": {
             "type": "string",
             "title": "Enabled Actors",
             "description": "A comma-separated list of full Actor names to add to the server on startup (e.g., apify/rag-web-browser).",
             "required": false,
             "default": "apify/rag-web-browser"
         },
-        "enable_dynamic_actors": {
+        "enable-adding-actors": {
             "type": "boolean",
             "title": "Enable Dynamic Actor Adding",
             "description": "Allow dynamically adding Actors as tools based on user requests during a session.",
