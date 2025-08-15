@@ -160,10 +160,10 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
-| `get-actor-details` | default | Retrieve detailed information about a specific Actor. | ✅ |
-| `search-actors` | default | Search for Actors in the Apify Store. | ✅ |
-| `add-actor` | default | Add an Actor as a new tool for the user to call. | ✅ |
-| [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | default | An Actor tool to browse the web. | ✅ |
+| `get-actor-details` | actor-discovery | Retrieve detailed information about a specific Actor. | ✅ |
+| `search-actors` | actor-discovery | Search for Actors in the Apify Store. | ✅ |
+| `add-actor` | default (see note below) | Add an Actor as a new tool for the user to call. | ✅ |
+| [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see note below) | An Actor tool to browse the web. | ✅ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | `call-actor` | preview | Call an Actor and get its run results. |  |
@@ -177,6 +177,10 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
+
+> **Note:**
+> The `add-actor` tool is always enabled by default and does not explicitly belong to any category. Currently, it can be disabled by setting `?enableAddingActors=false` or `--enable-adding-actors false`.
+> The `apify-slash-rag-web-browser` is an Apify Actor tool loaded by default. You can disable it by loading a different set of Actors using `?actors=other/actor` or `--actors other/actor`, or you can disable pre-loading of Actors by setting `?actors=` or `--actors=` (to an empty string).
 
 ### Prompts
 
