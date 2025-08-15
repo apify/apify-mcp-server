@@ -64,7 +64,7 @@
         },
         "tools": {
             "type": "string",
-            "title": "Enabled Tool Categories",
+            "title": "Enabled tool categories",
             "description": "A comma-separated list of tool categories to enable. Available options: docs, runs, storage, preview.",
             "required": false,
             "default": "docs"
