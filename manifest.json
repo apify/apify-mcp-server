@@ -78,7 +78,7 @@
         },
         "enable-adding-actors": {
             "type": "boolean",
-            "title": "Enable Dynamic Actor Adding",
+            "title": "Enable dynamic Actor adding",
             "description": "Allow dynamically adding Actors as tools based on user requests during a session.",
             "default": true
         }
