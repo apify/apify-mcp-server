@@ -66,11 +66,17 @@ const argv = yargs(hideBin(process.argv))
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of specific tool categories to enable. Can also be set via TOOLS environment variable.\n\nAvailable choices: ${Object.keys(toolCategories).join(', ')}\n\nTool categories are as follows:
+        describe: `Comma-separated list of specific tool categories to enable. Can also be set via TOOLS environment variable.
+
+Available choices: ${Object.keys(toolCategories).join(', ')}
+
+Tool categories are as follows:
 - docs: Search and fetch Apify documentation tools.
 - runs: Get Actor runs list, run details, and logs from a specific Actor run.
 - storage: Access datasets, key-value stores, and their records.
-- preview: Experimental tools in preview mode.\n\nNote: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
+- preview: Experimental tools in preview mode.
+
+Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
 `,
         example: 'docs,runs,storage',
     })
