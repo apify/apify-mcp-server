@@ -11,6 +11,7 @@ export interface McpClientOptions {
     actors?: string[];
     enableAddingActors?: boolean;
     tools?: ToolCategory[]; // Tool categories to include
+    useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
 }
 
 export async function createMcpSseClient(
@@ -97,24 +98,40 @@ export async function createMcpStdioClient(
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const { actors, enableAddingActors, tools } = options || {};
+    const { actors, enableAddingActors, tools, useEnv } = options || {};
     const args = ['dist/stdio.js'];
-    if (actors) {
-        args.push('--actors', actors.join(','));
-    }
-    if (enableAddingActors !== undefined) {
-        args.push('--enable-adding-actors', enableAddingActors.toString());
-    }
-    if (tools && tools.length > 0) {
-        args.push('--tools', tools.join(','));
+    const env: Record<string, string> = {
+        APIFY_TOKEN: process.env.APIFY_TOKEN as string,
+    };
+
+    // Set environment variables instead of command line arguments when useEnv is true
+    if (useEnv) {
+        if (actors) {
+            env.ACTORS = actors.join(',');
+        }
+        if (enableAddingActors !== undefined) {
+            env.ENABLE_ADDING_ACTORS = enableAddingActors.toString();
+        }
+        if (tools && tools.length > 0) {
+            env.TOOLS = tools.join(',');
+        }
+    } else {
+        // Use command line arguments as before
+        if (actors) {
+            args.push('--actors', actors.join(','));
+        }
+        if (enableAddingActors !== undefined) {
+            args.push('--enable-adding-actors', enableAddingActors.toString());
+        }
+        if (tools && tools.length > 0) {
+            args.push('--tools', tools.join(','));
+        }
     }
 
     const transport = new StdioClientTransport({
         command: 'node',
         args,
-        env: {
-            APIFY_TOKEN: process.env.APIFY_TOKEN as string,
-        },
+        env,
     });
     const client = new Client({
         name: 'stdio-client',

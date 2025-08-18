@@ -47,15 +47,16 @@ log.setLevel(log.LEVELS.ERROR);
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
     .usage('Usage: $0 [options]')
+    .env()
     .option('actors', {
         type: 'string',
-        describe: 'Comma-separated list of Actor full names to add to the server.',
+        describe: 'Comma-separated list of Actor full names to add to the server. Can also be set via ACTORS environment variable.',
         example: 'apify/google-search-scraper,apify/instagram-scraper',
     })
     .option('enable-adding-actors', {
         type: 'boolean',
         default: true,
-        describe: 'Enable dynamically adding Actors as tools based on user requests.',
+        describe: 'Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.',
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
@@ -65,17 +66,11 @@ const argv = yargs(hideBin(process.argv))
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of specific tool categories to enable.
-
-Available choices: ${Object.keys(toolCategories).join(', ')}
-
-Tool categories are as follows:
+        describe: `Comma-separated list of specific tool categories to enable. Can also be set via TOOLS environment variable.\n\nAvailable choices: ${Object.keys(toolCategories).join(', ')}\n\nTool categories are as follows:
 - docs: Search and fetch Apify documentation tools.
 - runs: Get Actor runs list, run details, and logs from a specific Actor run.
 - storage: Access datasets, key-value stores, and their records.
-- preview: Experimental tools in preview mode.
-
-Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
+- preview: Experimental tools in preview mode.\n\nNote: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
 `,
         example: 'docs,runs,storage',
     })

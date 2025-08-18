@@ -493,5 +493,58 @@ export function createIntegrationTestsSuite(
             await (client.transport as StreamableHTTPClientTransport).terminateSession();
             await client.close();
         });
+
+        // Environment variable tests - only applicable to stdio transport
+        it.runIf(options.transport === 'stdio')('should load actors from ACTORS environment variable', async () => {
+            const actors = ['apify/python-example', 'apify/rag-web-browser'];
+            const client = await createClientFn({ actors, useEnv: true });
+            const names = getToolNames(await client.listTools());
+            expect(names.length).toEqual(defaultTools.length + actors.length + addRemoveTools.length);
+            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
+            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
+
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'stdio')('should respect ENABLE_ADDING_ACTORS environment variable', async () => {
+            // Test with enableAddingActors = false via env var
+            const client = await createClientFn({ enableAddingActors: false, useEnv: true });
+            const names = getToolNames(await client.listTools());
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+
+            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'stdio')('should load tool categories from TOOLS environment variable', async () => {
+            const categories = ['docs', 'runs'] as ToolCategory[];
+            const client = await createClientFn({ tools: categories, useEnv: true });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            const expectedTools = [
+                ...toolCategories.docs,
+                ...toolCategories.runs,
+            ];
+            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+            // Handle case where tools are enabled by default
+            const selectedCategoriesInDefault = categories.filter((key) => toolCategoriesEnabledByDefault.includes(key));
+            const numberOfToolsFromCategoriesInDefault = selectedCategoriesInDefault
+                .flatMap((key) => toolCategories[key]).length;
+
+            const numberOfToolsExpected = defaultTools.length + defaults.actors.length + addRemoveTools.length
+                // Tools from tool categories minus the ones already in default tools
+                + (expectedTools.length - numberOfToolsFromCategoriesInDefault);
+            expect(toolNames.length).toEqual(numberOfToolsExpected);
+            for (const expectedToolName of expectedToolNames) {
+                expect(toolNames).toContain(expectedToolName);
+            }
+
+            await client.close();
+        });
     });
 }
