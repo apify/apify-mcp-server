@@ -1,5 +1,5 @@
-import { toolCategoriesEnabledByDefault } from '../dist/index-internals.js';
 import { defaults } from '../src/const.js';
+import { toolCategoriesEnabledByDefault } from '../src/tools/index.js';
 import { actorNameToToolName } from '../src/tools/utils.js';
 import { getExpectedToolNamesByCategories } from '../src/utils/tools.js';
 

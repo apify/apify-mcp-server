@@ -22,9 +22,10 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
+import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { toolCategories } from './tools/index.js';
-import type { Input, ToolCategory } from './types.js';
+import type { Input, ToolSelector } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -70,10 +71,11 @@ const argv = yargs(hideBin(process.argv))
 Available choices: ${Object.keys(toolCategories).join(', ')}
 
 Tool categories are as follows:
+- actors: Actor discovery and calling utilities.
 - docs: Search and fetch Apify documentation tools.
 - runs: Get Actor runs list, run details, and logs from a specific Actor run.
 - storage: Access datasets, key-value stores, and their records.
-- preview: Experimental tools in preview mode.
+- experimental: Experimental tools in preview mode.
 
 Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
 `,
@@ -120,11 +122,14 @@ async function main() {
     const input: Input = {
         actors: actorList,
         enableAddingActors,
-        tools: toolCategoryKeys as ToolCategory[],
+        tools: toolCategoryKeys as ToolSelector[],
     };
 
+    // Normalize (merges actors into tools for backward compatibility)
+    const normalized = processInput(input);
+
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string);
+    const tools = await loadToolsFromInput(normalized, process.env.APIFY_TOKEN as string);
 
     mcpServer.upsertTools(tools);
 

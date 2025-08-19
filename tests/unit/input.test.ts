@@ -49,7 +49,6 @@ describe('processInput', () => {
 
     it('should keep tools as array of valid featureTools keys', async () => {
         const input: Partial<Input> = {
-            actors: ['actor1'],
             tools: ['docs', 'runs'],
         };
         const processed = processInput(input);
@@ -58,7 +57,6 @@ describe('processInput', () => {
 
     it('should handle empty tools array', async () => {
         const input: Partial<Input> = {
-            actors: ['actor1'],
             tools: [],
         };
         const processed = processInput(input);
@@ -75,11 +73,43 @@ describe('processInput', () => {
 
     it('should include all keys, even invalid ones', async () => {
         const input: Partial<Input> = {
-            actors: ['actor1'],
-            // @ts-expect-error: purposely invalid key for test
             tools: ['docs', 'invalidKey', 'storage'],
         };
         const processed = processInput(input);
         expect(processed.tools).toEqual(['docs', 'invalidKey', 'storage']);
+    });
+
+    it('should merge actors into tools selectors for backward compatibility', async () => {
+        const input: Partial<Input> = {
+            actors: ['apify/website-content-crawler', 'apify/instagram-scraper'],
+            tools: ['docs'],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual([
+            'docs',
+            'apify/website-content-crawler',
+            'apify/instagram-scraper',
+        ]);
+    });
+
+    it('should merge actors into tools when tools is a string', async () => {
+        const input: Partial<Input> = {
+            actors: ['apify/instagram-scraper'],
+            tools: 'runs',
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual([
+            'runs',
+            'apify/instagram-scraper',
+        ]);
+    });
+
+    it('should not modify tools if actors is empty array', async () => {
+        const input: Partial<Input> = {
+            actors: [],
+            tools: ['docs'],
+        };
+        const processed = processInput(input);
+        expect(processed.tools).toEqual(['docs']);
     });
 });

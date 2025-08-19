@@ -3,7 +3,7 @@
  */
 import log from '@apify/log';
 
-import type { Input, ToolCategory } from './types.js';
+import type { Input, ToolSelector } from './types.js';
 
 /**
  * Process input parameters, split Actors string into an array
@@ -43,7 +43,21 @@ export function processInput(originalInput: Partial<Input>): Input {
         /**
          * Filter out empty strings just in case.
          */
-        input.tools = input.tools.split(',').map((tool: string) => tool.trim()).filter((tool) => tool !== '') as ToolCategory[];
+        input.tools = input.tools.split(',').map((tool: string) => tool.trim()).filter((tool) => tool !== '') as ToolSelector[];
+    }
+    // Normalize explicit empty string to empty array (signals no internal tools)
+    if (input.tools === '') {
+        input.tools = [] as unknown as ToolSelector[];
+    }
+
+    // Backward compatibility: if tools is explicitly specified, merge also actors into tools selectors
+    // This keeps previous semantics when tools is undefined (defaults categories apply).
+    if (input.tools !== undefined && Array.isArray(input.actors) && input.actors.length > 0) {
+        let currentTools: ToolSelector[] = [];
+        if (input.tools !== undefined) {
+            currentTools = Array.isArray(input.tools) ? input.tools : [input.tools as ToolSelector];
+        }
+        input.tools = [...currentTools, ...input.actors] as ToolSelector[];
     }
     return input;
 }

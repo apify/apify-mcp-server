@@ -15,13 +15,13 @@ import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
 export const toolCategories = {
-    'actor-discovery': [
+    experimental: [
+        addTool,
+    ],
+    actors: [
         getActorDetailsTool,
         searchActors,
-        /**
-         * TODO: we should add the add-actor tool here but we would need to change the configuraton
-         * interface around the ?enableAddingActors
-         */
+        callActor,
     ],
     docs: [
         searchApifyDocsTool,
@@ -42,23 +42,13 @@ export const toolCategories = {
         getUserDatasetsList,
         getUserKeyValueStoresList,
     ],
-    preview: [
-        callActor,
-    ],
 };
 export const toolCategoriesEnabledByDefault: ToolCategory[] = [
-    'actor-discovery',
+    'actors',
     'docs',
 ];
 
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
-
-/**
- * Tools related to `enableAddingActors` param for dynamic Actor adding.
- */
-export const addRemoveTools = [
-    addTool,
-];
 
 // Export only the tools that are being used
 export {

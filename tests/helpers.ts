@@ -10,7 +10,7 @@ import type { ToolCategory } from '../src/types.js';
 export interface McpClientOptions {
     actors?: string[];
     enableAddingActors?: boolean;
-    tools?: ToolCategory[]; // Tool categories to include
+    tools?: (ToolCategory | string)[]; // Tool categories or specific tool names to include
 }
 
 export async function createMcpSseClient(
