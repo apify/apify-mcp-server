@@ -67,7 +67,7 @@
             "title": "Enabled tool categories",
             "description": "A comma-separated list of tool categories to enable. Available options: docs, runs, storage, preview.",
             "required": false,
-            "default": "docs"
+            "default": "actor-discovery,docs"
         },
         "actors": {
             "type": "string",
@@ -80,7 +80,8 @@
             "type": "boolean",
             "title": "Enable dynamic Actor adding",
             "description": "Allow dynamically adding Actors as tools based on user requests during a session.",
-            "default": true
+            "required": false,
+            "default": false
         }
     },
     "compatibility": {
