@@ -284,8 +284,8 @@ export function transformActorInputSchemaProperties(input: Readonly<IActorInputS
     const inputClone: IActorInputSchema = structuredClone(input);
     let transformedProperties = markInputPropertiesAsRequired(inputClone);
     transformedProperties = buildApifySpecificProperties(transformedProperties);
-    transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);
+    transformedProperties = filterSchemaProperties(transformedProperties);
     transformedProperties = shortenProperties(transformedProperties);
     transformedProperties = addEnumsToDescriptionsWithExamples(transformedProperties);
     transformedProperties = encodeDotPropertyNames(transformedProperties);
