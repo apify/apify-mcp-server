@@ -21,24 +21,18 @@ import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 import log from '@apify/log';
 
 import {
-    defaults,
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
-import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
+import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
 import { processParamsGetTools } from './utils.js';
-
-type ActorsMcpServerOptions = {
-    enableAddingActors?: boolean;
-    enableDefaultActors?: boolean;
-};
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -48,15 +42,10 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
 export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolEntry>;
-    private options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
 
-    constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
-        this.options = {
-            enableAddingActors: options.enableAddingActors ?? true,
-            enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
-        };
+    constructor(setupSigintHandler = true) {
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -74,16 +63,6 @@ export class ActorsMcpServer {
         this.setupErrorHandling(setupSigintHandler);
         this.setupToolHandlers();
         this.setupPromptHandlers();
-
-        // Add tools to dynamically load Actors
-        if (this.options.enableAddingActors) {
-            this.enableDynamicActorTools();
-        }
-
-        // Initialize automatically for backward compatibility
-        this.initialize().catch((error) => {
-            log.error('Failed to initialize server', { error });
-        });
     }
 
     /**
@@ -200,47 +179,6 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Resets the server to the default state.
-    * This method clears all tools and loads the default tools.
-    * Used primarily for testing purposes.
-    */
-    public async reset(): Promise<void> {
-        this.tools.clear();
-        // Unregister the tools changed handler
-        if (this.toolsChangedHandler) {
-            this.unregisterToolsChangedHandler();
-        }
-        if (this.options.enableAddingActors) {
-            this.enableDynamicActorTools();
-        }
-        // Initialize automatically for backward compatibility
-        await this.initialize();
-    }
-
-    /**
-     * Initialize the server with default tools if enabled
-     */
-    public async initialize(): Promise<void> {
-        if (this.options.enableDefaultActors) {
-            await this.loadDefaultActors(process.env.APIFY_TOKEN as string);
-        }
-    }
-
-    /**
-     * Loads default tools if not already loaded.
-     * @param apifyToken - Apify API token for authentication
-     * @returns {Promise<void>} - A promise that resolves when the tools are loaded
-     */
-    public async loadDefaultActors(apifyToken: string): Promise<void> {
-        const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
-        const tools = await getActorsAsTools(missingActors, apifyToken);
-        if (tools.length > 0) {
-            log.debug('Loading default tools');
-            this.upsertTools(tools);
-        }
-    }
-
-    /**
      * Loads tools from URL params.
      *
      * This method also handles enabling of Actor autoloading via the processParamsGetTools.
@@ -255,18 +193,8 @@ export class ActorsMcpServer {
         }
     }
 
-    /**
-     * Add Actors to server dynamically
-     */
-    public enableDynamicActorTools() {
-        this.options.enableAddingActors = true;
-        this.upsertTools(addRemoveTools, false);
-    }
-
-    public disableDynamicActorTools() {
-        this.options.enableAddingActors = false;
-        this.removeToolsByName(addRemoveTools.map((tool) => tool.tool.name));
-    }
+    // Methods for toggling dynamic tools have been removed; add/remove helper tools
+    // should be managed via the unified input loader.
 
     /** Delete tools from the server and notify the handler.
      */

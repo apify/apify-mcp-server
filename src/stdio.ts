@@ -114,7 +114,7 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
+    const mcpServer = new ActorsMcpServer();
 
     // Create an Input object from CLI arguments
     const input: Input = {

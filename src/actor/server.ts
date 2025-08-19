@@ -17,11 +17,6 @@ import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,
-    mcpServerOptions: {
-        enableAddingActors?: boolean;
-        enableDefaultActors?: boolean;
-        actors?: string[];
-    },
 ): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
@@ -74,7 +69,7 @@ export function createExpressApp(
                 rt: Routes.SSE,
                 tr: TransportType.SSE,
             });
-            const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+            const mcpServer = new ActorsMcpServer(false);
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
@@ -157,7 +152,7 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer(mcpServerOptions, false);
+                const mcpServer = new ActorsMcpServer(false);
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;

@@ -5,7 +5,9 @@ import log from '@apify/log';
 import { actorNameToToolName } from '../../dist/tools/utils.js';
 import { defaults } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { addRemoveTools, getActorsAsTools } from '../../src/tools/index.js';
+import { addRemoveTools, defaultTools, getActorsAsTools } from '../../src/tools/index.js';
+import type { Input } from '../../src/types.js';
+import { loadToolsFromInput } from '../../src/utils/tools-loader.js';
 import { ACTOR_PYTHON_EXAMPLE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
 
@@ -15,8 +17,11 @@ beforeAll(() => {
 
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
-        const actorsMcpServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
-        await actorsMcpServer.initialize();
+        const actorsMcpServer = new ActorsMcpServer(false);
+        const initialTools = await loadToolsFromInput({
+            enableAddingActors: true,
+        } as Input, process.env.APIFY_TOKEN as string);
+        actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
         const newTool = await getActorsAsTools([ACTOR_PYTHON_EXAMPLE], process.env.APIFY_TOKEN as string);
@@ -27,7 +32,8 @@ describe('MCP server internals integration tests', () => {
         const expectedToolNames = [
             ...defaults.actors,
             ...addRemoveTools.map((tool) => tool.tool.name),
-            ...[ACTOR_PYTHON_EXAMPLE],
+            ...defaultTools.map((tool) => tool.tool.name),
+            ACTOR_PYTHON_EXAMPLE,
         ];
         expectArrayWeakEquals(expectedToolNames, names);
 
@@ -42,32 +48,9 @@ describe('MCP server internals integration tests', () => {
         expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
     });
 
-    it('should reset and restore tool state with default tools', async () => {
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
-        await actorsMCPServer.initialize();
-
-        const numberOfTools = addRemoveTools.length + defaults.actors.length;
-        const toolList = actorsMCPServer.listAllToolNames();
-        expect(toolList.length).toEqual(numberOfTools);
-        // Add a new Actor
-        const newTool = await getActorsAsTools([ACTOR_PYTHON_EXAMPLE], process.env.APIFY_TOKEN as string);
-        actorsMCPServer.upsertTools(newTool);
-
-        // Store the tool name list
-        const toolListWithActor = actorsMCPServer.listAllToolNames();
-        expect(toolListWithActor.length).toEqual(numberOfTools + 1); // + 1 for the added Actor
-
-        // Remove all tools
-        await actorsMCPServer.reset();
-        // We connect second client so that the default tools are loaded
-        // if no specific list of Actors is provided
-        const toolListAfterReset = actorsMCPServer.listAllToolNames();
-        expect(toolListAfterReset.length).toEqual(numberOfTools);
-    });
-
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        const numberOfTools = addRemoveTools.length + defaults.actors.length;
+        const numberOfTools = addRemoveTools.length + defaults.actors.length + defaultTools.length;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -75,8 +58,9 @@ describe('MCP server internals integration tests', () => {
             toolNotificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
-        await actorsMCPServer.initialize();
+        const actorsMCPServer = new ActorsMcpServer(false);
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, process.env.APIFY_TOKEN as string);
+        actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
@@ -113,14 +97,15 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        const numberOfTools = addRemoveTools.length + defaults.actors.length;
+        const numberOfTools = addRemoveTools.length + defaults.actors.length + defaultTools.length;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ enableDefaultActors: true, enableAddingActors: true }, false);
-        await actorsMCPServer.initialize();
+        const actorsMCPServer = new ActorsMcpServer(false);
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, process.env.APIFY_TOKEN as string);
+        actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
