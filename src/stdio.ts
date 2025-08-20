@@ -110,6 +110,10 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
+console.error("Starting with token", {
+    token: process.env.APIFY_TOKEN,
+});
+
 async function main() {
     const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
 
