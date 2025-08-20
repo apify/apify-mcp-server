@@ -192,9 +192,6 @@ export class ActorsMcpServer {
         }
     }
 
-    // Methods for toggling dynamic tools have been removed; add/remove helper tools
-    // should be managed via the unified input loader.
-
     /** Delete tools from the server and notify the handler.
      */
     public removeToolsByName(toolNames: string[], shouldNotifyToolsChangedHandler = false): string[] {
@@ -404,6 +401,7 @@ export class ActorsMcpServer {
                         apifyToken,
                         userRentedActorIds,
                         progressTracker,
+                        // Passing as argument to prevent circular dependency
                         getActorsAsTools,
                     }) as object;
 

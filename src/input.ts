@@ -27,7 +27,7 @@ export function processInput(originalInput: Partial<Input>): Input {
         input.actors = [];
     }
 
-    // enableAddingActors is deprecated, use enableActorAutoLoading instead
+    // enableActorAutoLoading is deprecated, use enableAddingActors instead
     if (input.enableAddingActors === undefined) {
         if (input.enableActorAutoLoading !== undefined) {
             log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
