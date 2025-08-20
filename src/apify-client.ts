@@ -31,6 +31,7 @@ export class ApifyClient extends _ApifyClient {
          * for server start and listing of tools.
          */
         if (options.token?.toLowerCase() === 'your-apify-token') {
+            // eslint-disable-next-line no-param-reassign
             delete options.token;
         }
 
