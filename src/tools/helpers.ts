@@ -4,7 +4,6 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types';
-import { getActorsAsTools } from './actor.js';
 import { actorNameToToolName } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -49,7 +48,7 @@ export const addTool: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
+            const { apifyMcpServer, apifyToken, args, extra: { sendNotification }, getActorsAsTools } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
             if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
                 return {
@@ -58,6 +57,9 @@ export const addTool: ToolEntry = {
                         text: `Actor ${parsed.actor} is already available. No new tools were added.`,
                     }],
                 };
+            }
+            if (!getActorsAsTools) {
+                throw new Error('Internal configuration error: getActorsAsTools must be passed via InternalToolArgs from the MCP server');
             }
             const tools = await getActorsAsTools([parsed.actor], apifyToken);
             /**

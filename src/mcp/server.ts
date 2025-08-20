@@ -404,6 +404,7 @@ export class ActorsMcpServer {
                         apifyToken,
                         userRentedActorIds,
                         progressTracker,
+                        getActorsAsTools,
                     }) as object;
 
                     if (progressTracker) {
