@@ -24,6 +24,12 @@ export function getApifyAPIBaseUrl(): string {
 
 export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
+        // Remove dummy token for to prevent Dockerhub build task
+        // that also starts the server to list tools failing
+        if (options.token?.toLowerCase() === 'your-apify-token') {
+            delete options.token;
+        }
+
         super({
             ...options,
             baseUrl: getApifyAPIBaseUrl(),
