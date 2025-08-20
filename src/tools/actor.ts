@@ -58,13 +58,44 @@ export async function callActorGetDataset(
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
+    abortSignal?: AbortSignal,
 ): Promise<CallActorGetDatasetResult> {
     try {
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
+        // Cancellation wiring
+        let startedRunId: string | undefined;
+        let cancelRequested = abortSignal?.aborted ?? false;
+        let abortIssued = false;
+
+        const abortIfPossible = async () => {
+            if (abortIssued) return;
+            if (!startedRunId) return;
+            abortIssued = true;
+            try {
+                await client.run(startedRunId).abort({ gracefully: true });
+            } catch (e) {
+                // Best effort; swallow errors to not break the main flow
+                log.debug('Error aborting Actor run on cancellation', { error: e, runId: startedRunId });
+            }
+        };
+
+        if (abortSignal) {
+            abortSignal.addEventListener('abort', async () => {
+                cancelRequested = true;
+                await abortIfPossible();
+            }, { once: true });
+        }
+
         // Start the actor run but don't wait for completion
         const actorRun: ActorRun = await actorClient.start(input, callOptions);
+
+        // Notify caller as soon as the run starts so they can attach cancellation logic
+        startedRunId = actorRun.id;
+        if (cancelRequested) {
+            await abortIfPossible();
+        }
 
         // Start progress tracking if tracker is provided
         if (progressTracker) {

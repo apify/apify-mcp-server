@@ -66,7 +66,7 @@ export class ActorsMcpServer {
                 capabilities: {
                     tools: { listChanged: true },
                     prompts: { },
-                    logging: {},
+                    // logging: {}, // Because of error in inspector `Server declares logging capability but doesn't implement method: "logging/setLevel"`
                 },
             },
         );
@@ -554,6 +554,7 @@ export class ActorsMcpServer {
                             apifyToken as string,
                             callOptions,
                             progressTracker,
+                            extra.signal,
                         );
                         const content = [
                             { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
