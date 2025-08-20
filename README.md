@@ -160,7 +160,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
-| `get-actor-details` | actor-discovery | Retrieve detailed information about a specific Actor. | ✅ |
+| `fetch-actor-details` | actor-discovery | Retrieve detailed information about a specific Actor. | ✅ |
 | `search-actors` | actor-discovery | Search for Actors in the Apify Store. | ✅ |
 | `add-actor` | default (see note below) | Add an Actor as a new tool for the user to call. | ✅ |
 | [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see note below) | An Actor tool to browse the web. | ✅ |

@@ -188,9 +188,9 @@ export function createIntegrationTestsSuite(
         });
 
         it('should load only a specific tool when tools includes a tool name', async () => {
-            const client = await createClientFn({ tools: ['get-actor-details'], actors: [] });
+            const client = await createClientFn({ tools: ['fetch-actor-details'], actors: [] });
             const names = getToolNames(await client.listTools());
-            expect(names).toEqual(['get-actor-details']);
+            expect(names).toEqual(['fetch-actor-details']);
             await client.close();
         });
 

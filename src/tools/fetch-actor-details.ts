@@ -9,13 +9,13 @@ import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
-const getActorDetailsToolArgsSchema = z.object({
+const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
 });
 
-export const getActorDetailsTool: ToolEntry = {
+export const fetchActorDetailsTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_GET_DETAILS,
@@ -28,12 +28,12 @@ export const getActorDetailsTool: ToolEntry = {
             + `EXAMPLES:\n`
             + `- user_input: How to use apify/rag-web-browser\n`
             + `- user_input: What is the input schema for apify/rag-web-browser`,
-        inputSchema: zodToJsonSchema(getActorDetailsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorDetailsToolArgsSchema)),
+        inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema),
+        ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
 
-            const parsed = getActorDetailsToolArgsSchema.parse(args);
+            const parsed = fetchActorDetailsToolArgsSchema.parse(args);
             const client = new ApifyClient({ token: apifyToken });
 
             const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
