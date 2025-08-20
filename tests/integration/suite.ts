@@ -530,19 +530,14 @@ export function createIntegrationTestsSuite(
             const actId = actor!.id as string;
 
             // Poll up to 30s for the latest run for this actor to reach ABORTED/ABORTING
-            let observedStatus = '';
-
             await vi.waitUntil(async () => {
                 const runsList = await api.runs().list({ limit: 5, desc: true });
                 const run = runsList.items.find((r) => r.actId === actId);
                 if (run) {
-                    observedStatus = run.status;
-                    return observedStatus === 'ABORTED' || observedStatus === 'ABORTING';
+                    return run.status === 'ABORTED' || run.status === 'ABORTING';
                 }
                 return false;
-            }, { timeout: 30000, interval: 500 });
-
-            expect(observedStatus === 'ABORTED' || observedStatus === 'ABORTING').toBe(true);
+            }, { timeout: 30000, interval: 1000 });
 
             await client.close();
         });

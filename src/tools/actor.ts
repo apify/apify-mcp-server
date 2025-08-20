@@ -49,7 +49,7 @@ export type CallActorGetDatasetResult = {
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
- * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
+ * @returns {Promise<CallActorGetDatasetResult>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
 export async function callActorGetDataset(
@@ -64,47 +64,40 @@ export async function callActorGetDataset(
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
-        // Cancellation wiring
-        let startedRunId: string | undefined;
-        let cancelRequested = abortSignal?.aborted ?? false;
-        let abortIssued = false;
-
-        const abortIfPossible = async () => {
-            if (abortIssued) return;
-            if (!startedRunId) return;
-            abortIssued = true;
-            try {
-                await client.run(startedRunId).abort({ gracefully: true });
-            } catch (e) {
-                // Best effort; swallow errors to not break the main flow
-                log.debug('Error aborting Actor run on cancellation', { error: e, runId: startedRunId });
-            }
-        };
-
-        if (abortSignal) {
-            abortSignal.addEventListener('abort', async () => {
-                cancelRequested = true;
-                await abortIfPossible();
-            }, { once: true });
+        // Check if already aborted
+        if (abortSignal?.aborted) {
+            throw new Error('Operation cancelled');
         }
 
-        // Start the actor run but don't wait for completion
+        // Start the actor run
         const actorRun: ActorRun = await actorClient.start(input, callOptions);
-
-        // Notify caller as soon as the run starts so they can attach cancellation logic
-        startedRunId = actorRun.id;
-        if (cancelRequested) {
-            await abortIfPossible();
-        }
 
         // Start progress tracking if tracker is provided
         if (progressTracker) {
             progressTracker.startActorRunUpdates(actorRun.id, apifyToken, actorName);
         }
 
-        // Wait for the actor to complete
-        const completedRun = await client.run(actorRun.id).waitForFinish();
+        // Create abort promise that handles both API abort and race rejection
+        const abortPromise = async () => new Promise<never>((_, reject) => {
+            abortSignal?.addEventListener('abort', async () => {
+                // Abort the actor run via API
+                try {
+                    await client.run(actorRun.id).abort({ gracefully: true });
+                } catch (e) {
+                    log.debug('Error aborting Actor run', { error: e, runId: actorRun.id });
+                }
+                // Reject to stop waiting
+                reject(new Error('Operation cancelled'));
+            }, { once: true });
+        });
 
+        // Wait for completion or cancellation
+        const completedRun = await Promise.race([
+            client.run(actorRun.id).waitForFinish(),
+            ...(abortSignal ? [abortPromise()] : []),
+        ]);
+
+        // Process the completed run
         const dataset = client.dataset(completedRun.defaultDatasetId);
         const [items, defaultBuild] = await Promise.all([
             dataset.listItems(),
@@ -361,6 +354,11 @@ export const callActor: ToolEntry = {
                     })),
                 };
             } catch (error) {
+                if (error instanceof Error && error.message === 'Operation cancelled') {
+                    // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                    // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+                    return { };
+                }
                 log.error('Error calling Actor', { error });
                 return {
                     content: [
