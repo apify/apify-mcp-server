@@ -71,15 +71,23 @@ export async function loadToolsFromInput(
     }
 
     let actorNamesToLoad: string[] = [];
+    const toolSelectorsProvided = toolSelectors !== undefined;
+    const toolSelectorsIsEmpty = Array.isArray(toolSelectors) && toolSelectors.length === 0;
+    const addActorEnabled = input.enableAddingActors === true;
     if (actorsFromInputField !== undefined) {
         actorNamesToLoad = actorsFromInputField;
     } else if (actorSelectorsFromTools.length > 0) {
         // If no explicit `actors` were provided, but `tools` includes actor names,
         // load exactly those instead of defaults
         actorNamesToLoad = actorSelectorsFromTools;
+    } else if (!toolSelectorsProvided) {
+        // Tools not provided
+        // If add-actor is enabled and nothing else specified, do not load default actors
+        actorNamesToLoad = addActorEnabled ? [] : defaults.actors;
     } else {
-        // Use default actors if nothing specified anywhere
-        actorNamesToLoad = defaults.actors;
+        // Tools are provided (non-empty) but do not specify any actor names
+        // => do not load default actors
+        actorNamesToLoad = [];
     }
 
     // If both fields specify actors, merge them
@@ -93,20 +101,34 @@ export async function loadToolsFromInput(
         tools = await getActorsAsTools(actorNamesToLoad, apifyToken);
     }
 
-    // Add tool for dynamically adding actors if enabled
-    if (input.enableAddingActors) {
+    // Add tool for dynamically adding actors if enabled.
+    // Respect explicit empty tools array or explicitly empty actors list
+    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
+    if (addActorEnabled && !toolSelectorsIsEmpty && !actorsExplicitlyEmpty) {
         tools.push(addTool);
     }
 
     // Add internal tools from categories/tool names or defaults when `tools` unspecified
     if (toolSelectors !== undefined) {
-        // Respect disable flag: do not include add-actor even if explicitly requested
-        const filteredInternal = input.enableAddingActors
+        // Respect disable flag, but if 'experimental' category is explicitly requested,
+        // or the add-actor tool is selected directly, include add-actor even when enableAddingActors=false
+        const list = toolSelectors as (string | ToolCategory)[];
+        const experimentalExplicitlySelected = Array.isArray(list)
+            && list.includes('experimental');
+        const addActorSelectedDirectly = Array.isArray(list)
+            && list.includes(addTool.tool.name);
+        const allowAddActor = addActorEnabled || experimentalExplicitlySelected || addActorSelectedDirectly;
+        const filteredInternal = allowAddActor
             ? internalCategoryEntries
             : internalCategoryEntries.filter((entry) => entry.tool.name !== addTool.tool.name);
         tools.push(...filteredInternal);
     } else {
-        tools.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
+        // When tools are not provided:
+        // - If add-actor is enabled: do not include default internal categories
+        // - If actors are explicitly empty: do not include defaults either
+        if (!addActorEnabled && !actorsExplicitlyEmpty) {
+            tools.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
+        }
     }
 
     // De-duplicate by tool name

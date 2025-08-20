@@ -55,12 +55,12 @@ const argv = yargs(hideBin(process.argv))
     })
     .option('enable-adding-actors', {
         type: 'boolean',
-        default: true,
+        default: false,
         describe: 'Enable dynamically adding Actors as tools based on user requests.',
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
-        default: true,
+        default: false,
         hidden: true,
         describe: 'Deprecated: use enable-adding-actors instead.',
     })
@@ -91,7 +91,8 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
     .parseSync() as CliArgs;
 
-const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
+// Respect either the new flag or the deprecated one
+const enableAddingActors = Boolean(argv.enableAddingActors || argv.enableActorAutoLoading);
 // Split actors argument, trim whitespace, and filter out empty strings
 const actorList = argv.actors !== undefined
     ? argv.actors.split(',').map((a: string) => a.trim()).filter((a: string) => a.length > 0)

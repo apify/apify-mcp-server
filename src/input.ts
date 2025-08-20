@@ -33,7 +33,8 @@ export function processInput(originalInput: Partial<Input>): Input {
             log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
             input.enableAddingActors = input.enableActorAutoLoading === true || input.enableActorAutoLoading === 'true';
         } else {
-            input.enableAddingActors = true;
+            // Default: do NOT enable add-actor unless explicitly requested
+            input.enableAddingActors = false;
         }
     } else {
         input.enableAddingActors = input.enableAddingActors === true || input.enableAddingActors === 'true';
@@ -50,14 +51,20 @@ export function processInput(originalInput: Partial<Input>): Input {
         input.tools = [] as unknown as ToolSelector[];
     }
 
-    // Backward compatibility: if tools is explicitly specified, merge also actors into tools selectors
-    // This keeps previous semantics when tools is undefined (defaults categories apply).
-    if (input.tools !== undefined && Array.isArray(input.actors) && input.actors.length > 0) {
-        let currentTools: ToolSelector[] = [];
-        if (input.tools !== undefined) {
-            currentTools = Array.isArray(input.tools) ? input.tools : [input.tools as ToolSelector];
+    // Merge actors into tools selectors so that specifying only actors disables
+    // default internal tools/categories. If tools are not provided, treat actors
+    // as the only tool selectors. If tools are provided, append actors to tools.
+    if (Array.isArray(input.actors) && input.actors.length > 0) {
+        if (input.tools === undefined) {
+            input.tools = [...input.actors] as ToolSelector[];
+            // Treat as if only tools were specified; clear actors to avoid duplicate semantics
+            input.actors = undefined as unknown as string[];
+        } else {
+            const currentTools: ToolSelector[] = Array.isArray(input.tools)
+                ? input.tools
+                : [input.tools as ToolSelector];
+            input.tools = [...currentTools, ...input.actors] as ToolSelector[];
         }
-        input.tools = [...currentTools, ...input.actors] as ToolSelector[];
     }
     return input;
 }

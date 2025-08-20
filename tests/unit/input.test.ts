@@ -4,20 +4,22 @@ import { processInput } from '../../src/input.js';
 import type { Input } from '../../src/types.js';
 
 describe('processInput', () => {
-    it('should handle string actors input and convert to array', async () => {
+    it('should handle string actors input and convert to tools selectors', async () => {
         const input: Partial<Input> = {
             actors: 'actor1, actor2,actor3',
         };
         const processed = processInput(input);
-        expect(processed.actors).toEqual(['actor1', 'actor2', 'actor3']);
+        expect(processed.tools).toEqual(['actor1', 'actor2', 'actor3']);
+        expect(processed.actors).toBeUndefined();
     });
 
-    it('should keep array actors input unchanged', async () => {
+    it('should move array actors input into tools selectors', async () => {
         const input: Partial<Input> = {
             actors: ['actor1', 'actor2', 'actor3'],
         };
         const processed = processInput(input);
-        expect(processed.actors).toEqual(['actor1', 'actor2', 'actor3']);
+        expect(processed.tools).toEqual(['actor1', 'actor2', 'actor3']);
+        expect(processed.actors).toBeUndefined();
     });
 
     it('should handle enableActorAutoLoading to set enableAddingActors', async () => {
@@ -39,12 +41,12 @@ describe('processInput', () => {
         expect(processed.enableAddingActors).toBe(false);
     });
 
-    it('should default enableAddingActors to true when not provided', async () => {
+    it('should default enableAddingActors to false when not provided', async () => {
         const input: Partial<Input> = {
             actors: ['actor1'],
         };
         const processed = processInput(input);
-        expect(processed.enableAddingActors).toBe(true);
+        expect(processed.enableAddingActors).toBe(false);
     });
 
     it('should keep tools as array of valid featureTools keys', async () => {
@@ -63,12 +65,13 @@ describe('processInput', () => {
         expect(processed.tools).toEqual([]);
     });
 
-    it('should handle missing tools field (undefined)', async () => {
+    it('should handle missing tools field (undefined) by moving actors into tools', async () => {
         const input: Partial<Input> = {
             actors: ['actor1'],
         };
         const processed = processInput(input);
-        expect(processed.tools).toBeUndefined();
+        expect(processed.tools).toEqual(['actor1']);
+        expect(processed.actors).toBeUndefined();
     });
 
     it('should include all keys, even invalid ones', async () => {

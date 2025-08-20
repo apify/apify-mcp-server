@@ -30,10 +30,9 @@ describe('MCP server internals integration tests', () => {
 
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
+        // With enableAddingActors=true and no tools/actors, we should only have add-actor initially
         const expectedToolNames = [
-            ...defaults.actors,
             addTool.tool.name,
-            ...defaultTools.map((tool) => tool.tool.name),
             ACTOR_PYTHON_EXAMPLE,
         ];
         expectArrayWeakEquals(expectedToolNames, names);
@@ -51,7 +50,8 @@ describe('MCP server internals integration tests', () => {
 
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        const numberOfTools = 1 + defaults.actors.length + defaultTools.length;
+        // With enableAddingActors=true and no tools/actors, seeded set contains only add-actor
+        const numberOfTools = 1;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -74,9 +74,7 @@ describe('MCP server internals integration tests', () => {
         expect(latestTools.length).toBe(numberOfTools + 1);
         expect(latestTools).toContain(actor);
         expect(latestTools).toContain(addTool.tool.name);
-        for (const tool of defaults.actors) {
-            expect(latestTools).toContain(tool);
-        }
+        // No default actors are present when only add-actor is enabled by default
 
         // Remove the Actor
         actorsMCPServer.removeToolsByName([actorNameToToolName(actor)], true);
@@ -86,15 +84,13 @@ describe('MCP server internals integration tests', () => {
         expect(latestTools.length).toBe(numberOfTools);
         expect(latestTools).not.toContain(actor);
         expect(latestTools).toContain(addTool.tool.name);
-        for (const tool of defaults.actors) {
-            expect(latestTools).toContain(tool);
-        }
+        // No default actors are present by default in this mode
     });
 
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        const numberOfTools = 1 + defaults.actors.length + defaultTools.length;
+        const numberOfTools = 1;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;

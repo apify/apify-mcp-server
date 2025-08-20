@@ -97,14 +97,11 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list all default tools and Actors, with add/remove tools', async () => {
+        it('should list only add-actor when add/remove tools are enabled and no tools/actors specified', async () => {
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
-
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
-            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expectToolNamesToContain(names, [addTool.tool.name]);
+            expect(names.length).toEqual(1);
+            expect(names).toContain(addTool.tool.name);
             await client.close();
         });
 
@@ -157,11 +154,10 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.only('should load only specified Actors via tools selectors when actors param omitted', async () => {
+        it('should load only specified Actors via tools selectors when actors param omitted', async () => {
             const actors = ['apify/python-example'];
             const client = await createClientFn({ tools: actors });
             const names = getToolNames(await client.listTools());
-            console.log(names);
             // Only the Actor should be loaded
             expect(names).toHaveLength(actors.length);
             expect(names).toContain(actorNameToToolName(actors[0]));
@@ -198,11 +194,10 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should not add any internal tools when tools param is empty', async () => {
+        it('should not add any tools when tools param is empty and actors omitted', async () => {
             const client = await createClientFn({ tools: [] });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaults.actors.length);
-            expectToolNamesToContain(names, defaults.actors.map((actor) => actorNameToToolName(actor)));
+            expect(names.length).toEqual(0);
             await client.close();
         });
 
@@ -453,7 +448,7 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should NOT include add-actor when disabled even if experimental category is selected', async () => {
+        it('should include add-actor when experimental category is selected even if add/remove tools are disabled', async () => {
             const client = await createClientFn({
                 enableAddingActors: false,
                 tools: ['experimental'],
@@ -462,18 +457,12 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            // Default actors still load when actors are omitted
-            const expectedActorNames = defaults.actors.map((actor) => actorNameToToolName(actor));
-            for (const n of expectedActorNames) {
-                expect(toolNames).toContain(n);
-            }
-            // Must not include add-actor
-            expect(toolNames).not.toContain(addTool.tool.name);
+            expect(toolNames).toContain(addTool.tool.name);
 
             await client.close();
         });
 
-        it('should NOT include add-actor when disabled even if tool is selected directly', async () => {
+        it('should include add-actor when enableAddingActors disabled and tool add-actor selected directly', async () => {
             const client = await createClientFn({
                 enableAddingActors: false,
                 tools: [addTool.tool.name],
@@ -482,13 +471,8 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            // Default actors still load when actors are omitted
-            const expectedActorNames = defaults.actors.map((actor) => actorNameToToolName(actor));
-            for (const n of expectedActorNames) {
-                expect(toolNames).toContain(n);
-            }
-            // Must not include add-actor
-            expect(toolNames).not.toContain(addTool.tool.name);
+            // Must include add-actor since it was selected directly
+            expect(toolNames).toContain(addTool.tool.name);
 
             await client.close();
         });
