@@ -25,7 +25,6 @@ import {
     SERVER_VERSION,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
-import { addTool } from '../tools/helpers.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
@@ -152,7 +151,6 @@ export class ActorsMcpServer {
         const toolsToLoad: ToolEntry[] = [];
         const internalToolMap = new Map([
             ...defaultTools,
-            addTool,
             ...Object.values(toolCategories).flat(),
         ].map((tool) => [tool.tool.name, tool]));
 
