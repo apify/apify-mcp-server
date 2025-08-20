@@ -9,6 +9,18 @@ import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from
 import type { Input, ToolCategory, ToolEntry } from '../types.js';
 import { getExpectedToolsByCategories } from './tools.js';
 
+// Lazily-computed cache of internal tools by name to avoid circular init issues.
+let INTERNAL_TOOL_BY_NAME_CACHE: Map<string, ToolEntry> | null = null;
+function getInternalToolByNameMap(): Map<string, ToolEntry> {
+    if (!INTERNAL_TOOL_BY_NAME_CACHE) {
+        const allInternal = getExpectedToolsByCategories(Object.keys(toolCategories) as ToolCategory[]);
+        INTERNAL_TOOL_BY_NAME_CACHE = new Map<string, ToolEntry>(
+            allInternal.map((entry) => [entry.tool.name, entry]),
+        );
+    }
+    return INTERNAL_TOOL_BY_NAME_CACHE;
+}
+
 /**
  * Load tools based on the provided Input object.
  * This function is used by both the stdio.ts and the processParamsGetTools function.
@@ -21,124 +33,90 @@ export async function loadToolsFromInput(
     input: Input,
     apifyToken: string,
 ): Promise<ToolEntry[]> {
-    let tools: ToolEntry[] = [];
+    // Helpers for readability
+    const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
+        if (value === undefined) return undefined;
+        return (Array.isArray(value) ? value : [value]).map(String).map((s) => s.trim()).filter((s) => s !== '');
+    };
 
-    // Prepare lists for actor and internal tool/category selectors from `tools`
-    let toolSelectors: (string | ToolCategory)[] | undefined;
-    if (input.tools === undefined) {
-        toolSelectors = undefined;
-    } else if (Array.isArray(input.tools)) {
-        toolSelectors = input.tools.filter((s) => String(s).trim() !== '');
-    } else {
-        toolSelectors = [input.tools].filter((s) => String(s).trim() !== '');
-    }
+    const selectors = normalizeSelectors(input.tools);
+    const selectorsProvided = selectors !== undefined;
+    const selectorsExplicitEmpty = selectorsProvided && (selectors as string[]).length === 0;
+    const addActorEnabled = input.enableAddingActors === true;
+    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
 
-    // Build a name -> tool entry map for all known internal (category) tools
-    const allCategoryTools: ToolEntry[] = getExpectedToolsByCategories(Object.keys(toolCategories) as ToolCategory[]);
-    const toolNameMap = new Map<string, ToolEntry>();
-    for (const entry of allCategoryTools) {
-        toolNameMap.set(entry.tool.name, entry);
-    }
-
-    // Classify selectors from `tools` into categories/internal tools and actor names
-    const internalCategoryEntries: ToolEntry[] = [];
+    // Partition selectors into internal picks (by category or by name) and actor names
+    const internalSelections: ToolEntry[] = [];
     const actorSelectorsFromTools: string[] = [];
-    if (toolSelectors !== undefined) {
-        for (const selector of toolSelectors) {
+    if (selectorsProvided && !selectorsExplicitEmpty) {
+        for (const selector of selectors as (string | ToolCategory)[]) {
             const categoryTools = toolCategories[selector as ToolCategory];
-            if (categoryTools && Array.isArray(categoryTools)) {
-                internalCategoryEntries.push(...categoryTools);
+            if (categoryTools) {
+                internalSelections.push(...categoryTools);
                 continue;
             }
-            const internalByName = toolNameMap.get(String(selector));
+            const internalByName = getInternalToolByNameMap().get(String(selector));
             if (internalByName) {
-                internalCategoryEntries.push(internalByName);
+                internalSelections.push(internalByName);
                 continue;
             }
-            // Treat unknown selectors as Actor IDs/full names
+            // Treat unknown selectors as Actor IDs/full names.
+            // Potential heuristic (future): if (String(selector).includes('/')) => definitely an Actor.
             actorSelectorsFromTools.push(String(selector));
         }
     }
 
-    // Resolve actor list to load
-    let actorsFromInputField: string[] | undefined;
-    if (input.actors === undefined) {
-        actorsFromInputField = undefined; // use defaults later unless overridden by tools
-    } else if (Array.isArray(input.actors)) {
-        actorsFromInputField = input.actors;
-    } else {
-        actorsFromInputField = [input.actors];
-    }
+    // Decide which Actors to load
+    const actorsFromField: string[] | undefined = input.actors === undefined
+        ? undefined
+        : Array.isArray(input.actors)
+            ? input.actors
+            : [input.actors];
 
     let actorNamesToLoad: string[] = [];
-    const toolSelectorsProvided = toolSelectors !== undefined;
-    const toolSelectorsIsEmpty = Array.isArray(toolSelectors) && toolSelectors.length === 0;
-    const addActorEnabled = input.enableAddingActors === true;
-    if (actorsFromInputField !== undefined) {
-        actorNamesToLoad = actorsFromInputField;
+    if (actorsFromField !== undefined) {
+        actorNamesToLoad = actorsFromField;
     } else if (actorSelectorsFromTools.length > 0) {
-        // If no explicit `actors` were provided, but `tools` includes actor names,
-        // load exactly those instead of defaults
         actorNamesToLoad = actorSelectorsFromTools;
-    } else if (!toolSelectorsProvided) {
-        // Tools not provided
-        // If add-actor is enabled and nothing else specified, do not load default actors
+    } else if (!selectorsProvided) {
+        // No selectors supplied: use defaults unless add-actor mode is enabled
         actorNamesToLoad = addActorEnabled ? [] : defaults.actors;
+    } // else: selectors provided but none are actors => do not load defaults
+
+    // Compose final tool list
+    const result: ToolEntry[] = [];
+
+    // Internal tools
+    if (selectorsProvided) {
+        result.push(...internalSelections);
+        // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
+        if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
+            const hasAddActor = result.some((e) => e.tool.name === addTool.tool.name);
+            if (!hasAddActor) result.push(addTool);
+        }
     } else {
-        // Tools are provided (non-empty) but do not specify any actor names
-        // => do not load default actors
-        actorNamesToLoad = [];
-    }
-
-    // If both fields specify actors, merge them
-    if (actorsFromInputField !== undefined && actorSelectorsFromTools.length > 0) {
-        const merged = new Set<string>([...actorNamesToLoad, ...actorSelectorsFromTools]);
-        actorNamesToLoad = Array.from(merged);
-    }
-
-    // Load actor tools (if any)
-    if (actorNamesToLoad.length > 0) {
-        tools = await getActorsAsTools(actorNamesToLoad, apifyToken);
-    }
-
-    // Add tool for dynamically adding actors if enabled.
-    // Respect explicit empty tools array or explicitly empty actors list
-    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
-    if (addActorEnabled && !toolSelectorsIsEmpty && !actorsExplicitlyEmpty) {
-        tools.push(addTool);
-    }
-
-    // Add internal tools from categories/tool names or defaults when `tools` unspecified
-    if (toolSelectors !== undefined) {
-        // Respect disable flag, but if 'experimental' category is explicitly requested,
-        // or the add-actor tool is selected directly, include add-actor even when enableAddingActors=false
-        const list = toolSelectors as (string | ToolCategory)[];
-        const experimentalExplicitlySelected = Array.isArray(list)
-            && list.includes('experimental');
-        const addActorSelectedDirectly = Array.isArray(list)
-            && list.includes(addTool.tool.name);
-        const allowAddActor = addActorEnabled || experimentalExplicitlySelected || addActorSelectedDirectly;
-        const filteredInternal = allowAddActor
-            ? internalCategoryEntries
-            : internalCategoryEntries.filter((entry) => entry.tool.name !== addTool.tool.name);
-        tools.push(...filteredInternal);
-    } else {
-        // When tools are not provided:
-        // - If add-actor is enabled: do not include default internal categories
-        // - If actors are explicitly empty: do not include defaults either
-        if (!addActorEnabled && !actorsExplicitlyEmpty) {
-            tools.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
+        // No selectors: either expose only add-actor (when enabled), or default categories
+        if (addActorEnabled && !actorsExplicitlyEmpty) {
+            result.push(addTool);
+        } else if (!actorsExplicitlyEmpty) {
+            result.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
         }
     }
 
-    // De-duplicate by tool name
+    // Actor tools (if any)
+    if (actorNamesToLoad.length > 0) {
+        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyToken);
+        result.push(...actorTools);
+    }
+
+    // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    tools = tools.filter((entry) => {
-        const { name } = entry.tool;
+    const deduped = result.filter((entry) => {
+        const name = entry.tool.name;
         if (seen.has(name)) return false;
         seen.add(name);
         return true;
     });
 
-    return tools;
+    return deduped;
 }

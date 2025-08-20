@@ -1,64 +1,67 @@
 /*
  * Actor input processing.
+ *
+ * Normalizes raw inputs (CLI/env/HTTP) into a consistent `Input` shape.
+ * No tool-loading is done here; we only canonicalize values and preserve
+ * intent via `undefined` (use defaults later) vs empty (explicitly none).
  */
 import log from '@apify/log';
 
 import type { Input, ToolSelector } from './types.js';
 
 /**
- * Process input parameters, split Actors string into an array
- * @param originalInput
- * @returns input
+ * Normalize user-provided input into a canonical `Input`.
+ *
+ * Responsibilities:
+ * - Coerce `actors`, `tools` from string/array into trimmed arrays ('' → []).
+ * - Normalize booleans (including legacy `enableActorAutoLoading`).
+ * - Merge `actors` into `tools` so selection lives in one place.
+ *
+ * Semantics passed to the loader:
+ * - `undefined` → use defaults; `[]` → explicitly none.
  */
 export function processInput(originalInput: Partial<Input>): Input {
-    const input = originalInput as Input;
+    const input = { ...originalInput } as Input;
 
-    // actors can be a string or an array of strings
-    if (input.actors && typeof input.actors === 'string') {
-        /**
-         * Filter out empty strings to prevent invalid Actor API error.
-         */
-        input.actors = input.actors.split(',').map((format: string) => format.trim()).filter((actor) => actor !== '') as string[];
-    }
-    /**
-     * Replace empty string with empty array to prevent invalid Actor API error.
-     */
-    if (input.actors === '') {
-        input.actors = [];
-    }
+    // Helpers
+    // Normalize booleans that may arrive as strings or be undefined.
+    const toBoolean = (value: unknown, defaultValue: boolean): boolean => {
+        if (value === undefined) return defaultValue;
+        if (typeof value === 'boolean') return value;
+        if (typeof value === 'string') return value.toLowerCase() === 'true';
+        return defaultValue;
+    };
+    // Normalize lists from comma-separated strings or arrays.
+    const normalizeList = (value: string | string[] | undefined): string[] | undefined => {
+        if (value === undefined) return undefined;
+        if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter((s) => s !== '');
+        const trimmed = String(value).trim();
+        if (trimmed === '') return [];
+        return trimmed.split(',').map((s) => s.trim()).filter((s) => s !== '');
+    };
 
-    // enableActorAutoLoading is deprecated, use enableAddingActors instead
-    if (input.enableAddingActors === undefined) {
-        if (input.enableActorAutoLoading !== undefined) {
-            log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
-            input.enableAddingActors = input.enableActorAutoLoading === true || input.enableActorAutoLoading === 'true';
-        } else {
-            // Default: do NOT enable add-actor unless explicitly requested
-            input.enableAddingActors = false;
-        }
+    // Normalize actors (strings and arrays) to a clean array or undefined
+    input.actors = normalizeList(input.actors) as unknown as string[] | undefined;
+
+    // Map deprecated flag to the new one and normalize both to boolean.
+    if (input.enableAddingActors === undefined && input.enableActorAutoLoading !== undefined) {
+        log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
+        input.enableAddingActors = toBoolean(input.enableActorAutoLoading, false);
     } else {
-        input.enableAddingActors = input.enableAddingActors === true || input.enableAddingActors === 'true';
+        input.enableAddingActors = toBoolean(input.enableAddingActors, false);
     }
 
-    if (input.tools && typeof input.tools === 'string') {
-        /**
-         * Filter out empty strings just in case.
-         */
-        input.tools = input.tools.split(',').map((tool: string) => tool.trim()).filter((tool) => tool !== '') as ToolSelector[];
-    }
-    // Normalize explicit empty string to empty array (signals no internal tools)
-    if (input.tools === '') {
-        input.tools = [] as unknown as ToolSelector[];
-    }
+    // Normalize tools (strings/arrays) to a clean array or undefined
+    input.tools = normalizeList(input.tools as string | string[] | undefined) as unknown as ToolSelector[] | undefined;
 
-    // Merge actors into tools selectors so that specifying only actors disables
-    // default internal tools/categories. If tools are not provided, treat actors
-    // as the only tool selectors. If tools are provided, append actors to tools.
+    // Merge actors into tools. If tools undefined → tools = actors, then remove actors;
+    // otherwise append actors to tools.
+    // NOTE (future): Actor names contain '/', unlike internal tool names or categories.
     if (Array.isArray(input.actors) && input.actors.length > 0) {
         if (input.tools === undefined) {
             input.tools = [...input.actors] as ToolSelector[];
             // Treat as if only tools were specified; clear actors to avoid duplicate semantics
-            input.actors = undefined as unknown as string[];
+            delete (input as Record<string, unknown>).actors;
         } else {
             const currentTools: ToolSelector[] = Array.isArray(input.tools)
                 ? input.tools
