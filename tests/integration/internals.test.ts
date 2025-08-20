@@ -3,10 +3,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import log from '@apify/log';
 
 import { actorNameToToolName } from '../../dist/tools/utils.js';
-import { defaults } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { addTool } from '../../src/tools/helpers.js';
-import { defaultTools, getActorsAsTools } from '../../src/tools/index.js';
+import { getActorsAsTools } from '../../src/tools/index.js';
 import type { Input } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools-loader.js';
 import { ACTOR_PYTHON_EXAMPLE } from '../const.js';

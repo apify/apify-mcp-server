@@ -114,7 +114,7 @@ export function createIntegrationTestsSuite(
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             await client.close();
         });
-        
+
         it('should override enableAddingActors false with experimental tool category', async () => {
             const client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
             const names = getToolNames(await client.listTools());

@@ -67,11 +67,14 @@ export async function loadToolsFromInput(
     }
 
     // Decide which Actors to load
-    const actorsFromField: string[] | undefined = input.actors === undefined
-        ? undefined
-        : Array.isArray(input.actors)
-            ? input.actors
-            : [input.actors];
+    let actorsFromField: string[] | undefined;
+    if (input.actors === undefined) {
+        actorsFromField = undefined;
+    } else if (Array.isArray(input.actors)) {
+        actorsFromField = input.actors;
+    } else {
+        actorsFromField = [input.actors];
+    }
 
     let actorNamesToLoad: string[] = [];
     if (actorsFromField !== undefined) {
@@ -94,13 +97,11 @@ export async function loadToolsFromInput(
             const hasAddActor = result.some((e) => e.tool.name === addTool.tool.name);
             if (!hasAddActor) result.push(addTool);
         }
-    } else {
+    } else if (addActorEnabled && !actorsExplicitlyEmpty) {
         // No selectors: either expose only add-actor (when enabled), or default categories
-        if (addActorEnabled && !actorsExplicitlyEmpty) {
-            result.push(addTool);
-        } else if (!actorsExplicitlyEmpty) {
-            result.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
-        }
+        result.push(addTool);
+    } else if (!actorsExplicitlyEmpty) {
+        result.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
     }
 
     // Actor tools (if any)
@@ -112,7 +113,7 @@ export async function loadToolsFromInput(
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
     const deduped = result.filter((entry) => {
-        const name = entry.tool.name;
+        const { name } = entry.tool;
         if (seen.has(name)) return false;
         seen.add(name);
         return true;
