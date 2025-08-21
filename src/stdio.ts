@@ -24,7 +24,6 @@ import log from '@apify/log';
 
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { toolCategories } from './tools/index.js';
 import type { Input, ToolSelector } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
@@ -47,16 +46,19 @@ log.setLevel(log.LEVELS.ERROR);
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
+    .wrap(null) // Disable automatic wrapping to avoid issues with long lines and links
     .usage('Usage: $0 [options]')
     .option('actors', {
         type: 'string',
-        describe: 'Comma-separated list of Actor full names to add to the server.',
+        describe: `Comma-separated list of Actor full names to add to the server.
+Deprecated: use tools instead.`,
         example: 'apify/google-search-scraper,apify/instagram-scraper',
     })
     .option('enable-adding-actors', {
         type: 'boolean',
         default: false,
-        describe: 'Enable dynamically adding Actors as tools based on user requests.',
+        describe: `Enable dynamically adding Actors as tools based on user requests.
+Deprecated: use tools experimental category instead.`,
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
@@ -66,20 +68,10 @@ const argv = yargs(hideBin(process.argv))
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of specific tool categories to enable.
+        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser.
 
-Available choices: ${Object.keys(toolCategories).join(', ')}
-
-Tool categories are as follows:
-- actors: Actor discovery and calling utilities.
-- docs: Search and fetch Apify documentation tools.
-- runs: Get Actor runs list, run details, and logs from a specific Actor run.
-- storage: Access datasets, key-value stores, and their records.
-- experimental: Experimental tools in preview mode.
-
-Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
-`,
-        example: 'docs,runs,storage',
+For more details visit https://github.com/apify/actors-mcp-server`,
+        example: 'actors,docs,apify/rag-web-browser',
     })
     .help('help')
     .alias('h', 'help')
