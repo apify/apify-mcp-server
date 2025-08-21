@@ -97,6 +97,26 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should match spec default: actors,docs,apify/rag-web-browser when no params provided', async () => {
+            const client = await createClientFn();
+            const tools = await client.listTools();
+            const names = getToolNames(tools);
+            
+            // Should be equivalent to tools=actors,docs,apify/rag-web-browser
+            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
+            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
+            const expectedActors = ['apify-slash-rag-web-browser'];
+            
+            const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
+            expect(names).toHaveLength(expectedTotal.length);
+            
+            expectedActorsTools.forEach(tool => expect(names).toContain(tool));
+            expectedDocsTools.forEach(tool => expect(names).toContain(tool));
+            expectedActors.forEach(actor => expect(names).toContain(actor));
+            
+            await client.close();
+        });
+
         it('should list only add-actor when enableAddingActors is true and no tools/actors are specified', async () => {
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
@@ -164,6 +184,22 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should treat selectors with slashes as Actor names', async () => {
+            const client = await createClientFn({ 
+                tools: ['docs', 'apify/python-example'] 
+            });
+            const names = getToolNames(await client.listTools());
+            
+            // Should include docs category
+            expect(names).toContain('search-apify-docs');
+            expect(names).toContain('fetch-apify-docs');
+            
+            // Should include actor (if it exists/is valid)
+            expect(names).toContain('apify-slash-python-example');
+            
+            await client.close();
+        });
+
         it('should merge actors param into tools selectors (backward compatibility)', async () => {
             const actors = ['apify/python-example'];
             const categories = ['docs'] as ToolCategory[];
@@ -174,6 +210,25 @@ export function createIntegrationTestsSuite(
             expect(names).toHaveLength(expected.length);
             const containsExpected = expected.every((n) => names.includes(n));
             expect(containsExpected).toBe(true);
+            await client.close();
+        });
+
+        it('should handle mixed categories and specific tools in tools param', async () => {
+            const client = await createClientFn({ 
+                tools: ['docs', 'fetch-actor-details', 'add-actor'] 
+            });
+            const names = getToolNames(await client.listTools());
+            
+            // Should include: docs category + specific tools
+            expect(names).toContain('search-apify-docs'); // from docs category
+            expect(names).toContain('fetch-apify-docs');  // from docs category
+            expect(names).toContain('fetch-actor-details'); // specific tool
+            expect(names).toContain('add-actor'); // specific tool
+            
+            // Should NOT include other actors category tools
+            expect(names).not.toContain('search-actors');
+            expect(names).not.toContain('call-actor');
+            
             await client.close();
         });
 
@@ -266,6 +321,38 @@ export function createIntegrationTestsSuite(
                 },
             );
 
+            await client.close();
+        });
+
+        it('should enforce two-step process for call-actor tool', async () => {
+            const client = await createClientFn({ tools: ['actors'] });
+            
+            // Step 1: Get info (should work)
+            const infoResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'info'
+                }
+            });
+            
+            expect(infoResult.content).toBeDefined();
+            const content = infoResult.content as { text: string }[];
+            expect(content.some(item => item.text.includes('Actor card'))).toBe(true);
+            expect(content.some(item => item.text.includes('Input Schema'))).toBe(true);
+            
+            // Step 2: Call with proper input (should work)
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
+                    input: { first_number: 1, second_number: 2 }
+                }
+            });
+            
+            expect(callResult.content).toBeDefined();
+            
             await client.close();
         });
 
