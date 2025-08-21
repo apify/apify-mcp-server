@@ -153,6 +153,25 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('should load only specified actors when actors param is provided (no other tools)', async () => {
+            const actors = ['apify/python-example'];
+            const client = await createClientFn({ actors });
+            const names = getToolNames(await client.listTools());
+
+            // Should only load the specified actor, no default tools or categories
+            expect(names.length).toEqual(actors.length);
+            expect(names).toContain(actorNameToToolName(actors[0]));
+
+            // Should NOT include any default category tools
+            expect(names).not.toContain('search-actors');
+            expect(names).not.toContain('fetch-actor-details');
+            expect(names).not.toContain('call-actor');
+            expect(names).not.toContain('search-apify-docs');
+            expect(names).not.toContain('fetch-apify-docs');
+
+            await client.close();
+        });
+
         it('should not load any tools when enableAddingActors is true and tools param is empty', async () => {
             const client = await createClientFn({ enableAddingActors: true, tools: [] });
             const names = getToolNames(await client.listTools());
