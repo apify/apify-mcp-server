@@ -97,7 +97,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list only add-actor when add/remove tools are enabled and no tools/actors specified', async () => {
+        it('should list only add-actor when enableAddingActors is true and no tools/actors are specified', async () => {
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(1);
@@ -105,7 +105,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list all default tools and Actors, without add/remove tools', async () => {
+        it('should list all default tools and Actors when enableAddingActors is false', async () => {
             const client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
@@ -133,21 +133,21 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should not add any tools if tools param is empty', async () => {
+        it('should not load any tools when enableAddingActors is true and tools param is empty', async () => {
             const client = await createClientFn({ enableAddingActors: true, tools: [] });
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(0);
             await client.close();
         });
 
-        it('should not load any tools when actors param empty', async () => {
+        it('should not load any tools when enableAddingActors is true and actors param is empty', async () => {
             const client = await createClientFn({ enableAddingActors: true, actors: [] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
             await client.close();
         });
 
-        it('should not load any tools if everything is disabled', async () => {
+        it('should not load any tools when enableAddingActors is false and no tools/actors are specified', async () => {
             const client = await createClientFn({ enableAddingActors: false, tools: [], actors: [] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
@@ -194,14 +194,14 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should not add any tools when tools param is empty and actors omitted', async () => {
+        it('should not load any tools when tools param is empty and actors omitted', async () => {
             const client = await createClientFn({ tools: [] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
             await client.close();
         });
 
-        it('should not add any internal tools when tools param is empty and use custom Actor if specified', async () => {
+        it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
             const client = await createClientFn({ tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(1);
@@ -448,7 +448,7 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should include add-actor when experimental category is selected even if add/remove tools are disabled', async () => {
+        it('should include add-actor when experimental category is selected even if enableAddingActors is false', async () => {
             const client = await createClientFn({
                 enableAddingActors: false,
                 tools: ['experimental'],
@@ -462,7 +462,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should include add-actor when enableAddingActors disabled and tool add-actor selected directly', async () => {
+        it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
             const client = await createClientFn({
                 enableAddingActors: false,
                 tools: [addTool.tool.name],

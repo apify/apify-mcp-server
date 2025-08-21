@@ -56,7 +56,7 @@ export function processInput(originalInput: Partial<Input>): Input {
 
     // Merge actors into tools. If tools undefined → tools = actors, then remove actors;
     // otherwise append actors to tools.
-    // NOTE (future): Actor names contain '/', unlike internal tool names or categories.
+    // NOTE (future): Actor names contain '/', unlike internal tool names or categories. We could use that to differentiate between the two.
     if (Array.isArray(input.actors) && input.actors.length > 0) {
         if (input.tools === undefined) {
             input.tools = [...input.actors] as ToolSelector[];
