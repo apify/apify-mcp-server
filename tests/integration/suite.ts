@@ -229,7 +229,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should add Actor dynamically and call it via generic call-actor tool', async () => {
+        it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             const client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
@@ -238,18 +238,12 @@ export function createIntegrationTestsSuite(
             expect(names).toHaveLength(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
-            // Add Actor dynamically
-            await addActor(client, ACTOR_PYTHON_EXAMPLE);
-
-            // Check if tools was added
-            const namesAfterAdd = getToolNames(await client.listTools());
-            expect(namesAfterAdd).toHaveLength(numberOfTools + 1);
-            expect(namesAfterAdd).toContain(selectedToolName);
 
             const result = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
                     input: {
                         first_number: 1,
                         second_number: 2,
@@ -260,6 +254,10 @@ export function createIntegrationTestsSuite(
             expect(result).toEqual(
                 {
                     content: [
+                        {
+                            text: expect.stringMatching(/^Actor finished with runId: .+, datasetId .+$/),
+                            type: 'text',
+                        },
                         {
                             text: `{"sum":3,"first_number":1,"second_number":2}`,
                             type: 'text',
