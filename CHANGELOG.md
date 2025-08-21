@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.9](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.9) (2025-08-21)
+
+
+## [0.3.9](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.9) (2025-08-21)
+
+### 🚀 Features
+
+- **dxt:** Add mcp tool configuration options ([#221](https://github.com/apify/actors-mcp-server/pull/221)) ([5b305c5](https://github.com/apify/actors-mcp-server/commit/5b305c5239ae515a966c055b356d0bc3b90ee301)) by [@MQ37](https://github.com/MQ37), closes [#219](https://github.com/apify/actors-mcp-server/issues/219)
+- Prepare for dockerhub integration, prepare dockerfile, add support for reading config from env vars for stdio ([#224](https://github.com/apify/actors-mcp-server/pull/224)) ([08c62be](https://github.com/apify/actors-mcp-server/commit/08c62be284032bc1d5f4ccb25301129fc1ea2c58)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Improve beta release cicd ([#202](https://github.com/apify/actors-mcp-server/pull/202)) ([2bd1ad7](https://github.com/apify/actors-mcp-server/commit/2bd1ad74e2aec01d7ae37750846abe3fbf66a4e7)) by [@MQ37](https://github.com/MQ37), closes [#80](https://github.com/apify/actors-mcp-server/issues/80)
+- Actor input transform array items type inference ([#225](https://github.com/apify/actors-mcp-server/pull/225)) ([eb38160](https://github.com/apify/actors-mcp-server/commit/eb381603edd00c82678c89a2fa6aa31720295e99)) by [@MQ37](https://github.com/MQ37), closes [#217](https://github.com/apify/actors-mcp-server/issues/217)
+- Dockerhub init unauth server start and tool list ([#227](https://github.com/apify/actors-mcp-server/pull/227)) ([87b2f2c](https://github.com/apify/actors-mcp-server/commit/87b2f2c470e1bddc92a568e8e826fc2ed8bfc1a9)) by [@MQ37](https://github.com/MQ37)
+- Dxt rename sever to apify-mcp-server ([#232](https://github.com/apify/actors-mcp-server/pull/232)) ([c5e51df](https://github.com/apify/actors-mcp-server/commit/c5e51df79c3a6dd037f114d4aa4bd3ecf7db8641)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.3.8](https://github.com/apify/actors-mcp-server/releases/tag/v0.3.8) (2025-08-08)
 
 ### 🐛 Bug Fixes
