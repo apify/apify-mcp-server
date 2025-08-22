@@ -20,7 +20,7 @@ describe('smithery entrypoint barrier behavior', () => {
         const loadSpy = vi.spyOn(toolsLoader, 'loadToolsFromInput').mockResolvedValue([]);
 
         // Act
-        const server = smithery({ config: { apifyToken: 'TEST_TOKEN', enableAddingActors: true } });
+        const server = smithery({ config: { apifyToken: 'TEST_TOKEN', enableAddingActors: true, enableActorAutoLoading: true } });
 
         // Assert
         expect(server).toBeTruthy();
