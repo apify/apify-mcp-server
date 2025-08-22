@@ -548,7 +548,7 @@ export class ActorsMcpServer {
 
                     try {
                         log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
-                        const { runId, datasetId, items } = await callActorGetDataset(
+                        const result = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
                             apifyToken as string,
@@ -556,6 +556,13 @@ export class ActorsMcpServer {
                             progressTracker,
                             extra.signal,
                         );
+
+                        if (!result) {
+                            // If the actor was aborted by the client, we don't want to return anything
+                            return { };
+                        }
+
+                        const { runId, datasetId, items } = result;
 
                         const content = [
                             { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },

@@ -49,9 +49,25 @@ export type CallActorGetDatasetResult = {
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
- * @returns {Promise<CallActorGetDatasetResult>} - A promise that resolves to an object containing the actor run and dataset items.
+ * @param {AbortSignal} abortSignal - Optional abort signal to cancel the actor run.
+ * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
+export async function callActorGetDataset(
+    actorName: string,
+    input: unknown,
+    apifyToken: string,
+    callOptions: ActorCallOptions | undefined,
+    progressTracker?: ProgressTracker | null,
+): Promise<CallActorGetDatasetResult>; // Without abort signal Result or Error is returned
+export async function callActorGetDataset(
+    actorName: string,
+    input: unknown,
+    apifyToken: string,
+    callOptions: ActorCallOptions | undefined,
+    progressTracker: ProgressTracker | null,
+    abortSignal: AbortSignal,
+): Promise<CallActorGetDatasetResult | null>; // With abort signal, null is returned if the actor was aborted by the client
 export async function callActorGetDataset(
     actorName: string,
     input: unknown,
@@ -59,15 +75,11 @@ export async function callActorGetDataset(
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
     abortSignal?: AbortSignal,
-): Promise<CallActorGetDatasetResult> {
+): Promise<CallActorGetDatasetResult | null> {
+    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
     try {
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
-
-        // Check if already aborted
-        if (abortSignal?.aborted) {
-            throw new Error('Operation cancelled');
-        }
 
         // Start the actor run
         const actorRun: ActorRun = await actorClient.start(input, callOptions);
@@ -78,24 +90,30 @@ export async function callActorGetDataset(
         }
 
         // Create abort promise that handles both API abort and race rejection
-        const abortPromise = async () => new Promise<never>((_, reject) => {
+        const abortPromise = async () => new Promise<typeof CLIENT_ABORT>((resolve) => {
             abortSignal?.addEventListener('abort', async () => {
                 // Abort the actor run via API
                 try {
                     await client.run(actorRun.id).abort({ gracefully: true });
                 } catch (e) {
-                    log.debug('Error aborting Actor run', { error: e, runId: actorRun.id });
+                    log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
                 }
                 // Reject to stop waiting
-                reject(new Error('Operation cancelled'));
+                resolve(CLIENT_ABORT);
             }, { once: true });
         });
 
         // Wait for completion or cancellation
-        const completedRun = await Promise.race([
+        const potentialAbortedRun = await Promise.race([
             client.run(actorRun.id).waitForFinish(),
             ...(abortSignal ? [abortPromise()] : []),
         ]);
+
+        if (potentialAbortedRun === CLIENT_ABORT) {
+            log.info('Actor run aborted by client', { actorName, input });
+            return null;
+        }
+        const completedRun = potentialAbortedRun as ActorRun;
 
         // Process the completed run
         const dataset = client.dataset(completedRun.defaultDatasetId);
