@@ -11,6 +11,7 @@ import { ActorsMcpServer } from './mcp/server.js';
 import type { Input, ToolCategory } from './types';
 import { serverConfigSchemaSmithery as configSchema } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
+import { PLACEHOLDER_APIFY_TOKEN } from './const.js';
 
 // Export the config schema for Smithery. The export must be named configSchema
 export { configSchema };
@@ -21,20 +22,14 @@ export { configSchema };
  */
 export default function ({ config: _config }: { config: z.infer<typeof configSchema> }) {
     try {
-        const apifyToken = _config.apifyToken || process.env.APIFY_TOKEN || '';
+        let apifyToken = _config.apifyToken || process.env.APIFY_TOKEN || '';
         const enableAddingActors = _config.enableAddingActors ?? true;
         const actors = _config.actors || '';
         const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
         const toolCategoryKeys = _config.tools ? _config.tools.split(',').map((t: string) => t.trim()) : [];
 
-        // Validate environment
-        if (!apifyToken) {
-            // eslint-disable-next-line no-console
-            console.warn('APIFY_TOKEN is required but not set in the environment variables or config. Some tools may not work properly.');
-        } else {
-            process.env.APIFY_TOKEN = apifyToken; // Ensure token is set in the environment
-        }
-
+        console.log(`Apify token ${apifyToken}`)
+        process.env.APIFY_TOKEN = apifyToken; // Ensure token is set in the environment
         const server = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
 
         const input: Input = {
@@ -43,21 +38,27 @@ export default function ({ config: _config }: { config: z.infer<typeof configSch
             tools: toolCategoryKeys as ToolCategory[],
         };
 
-        // NOTE: This is a workaround for Smithery's requirement of a synchronous function
-        // We load tools asynchronously and attach the promise to the server
-        // However, this approach is NOT 99% reliable - the external library may still
-        // try to use the server before tools are fully loaded
-        loadToolsFromInput(input, apifyToken, actorList.length === -1)
-            .then((tools) => {
+        // Start async tools loading and gate the first listTools (Smithery-only)
+        // See docs/smithery.md for a brief overview of how this entrypoint works with Smithery
+        const loadPromise = (async () => {
+            try {
+                const tools = await loadToolsFromInput(input, apifyToken, actorList.length === 0);
                 server.upsertTools(tools);
-                return true;
-            })
-            .catch((error) => {
+            } catch (error) {
                 // eslint-disable-next-line no-console
-                console.error('Failed to load tools:', error);
-                return false;
-            });
+                console.error('Failed to load tools with provided token. Retrying with placeholder token, error', error);
+                try {
+                    const tools = await loadToolsFromInput(input, PLACEHOLDER_APIFY_TOKEN, actorList.length === 0);
+                    server.upsertTools(tools);
+                } catch (retryError) {
+                    // eslint-disable-next-line no-console
+                    console.error('Retry failed to load tools with placeholder token, error:', retryError);
+                }
+            }
+        })();
+        server.blockListToolsUntil(loadPromise);
         return server.server;
+
     } catch (e) {
         // eslint-disable-next-line no-console
         console.error(e);

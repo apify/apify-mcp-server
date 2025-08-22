@@ -51,6 +51,11 @@ export class ActorsMcpServer {
     private options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
+    // Barrier to gate the first listTools until initial load settles.
+    // NOTE: This mechanism is intended to be used ONLY by the Smithery entrypoint
+    // (see src/smithery.ts). Other server entrypoints (stdio/SSE/HTTP) do not
+    // use this and are unaffected.
+    private listToolsBarrier: Promise<void> | null = null;
 
     constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
         this.options = {
@@ -87,6 +92,20 @@ export class ActorsMcpServer {
         this.initialize().catch((error) => {
             log.error('Failed to initialize server', { error });
         });
+    }
+
+    /**
+     * Block the first listTools request until the provided promise settles or a timeout elapses.
+     * Subsequent listTools calls are not blocked unless this method is invoked again.
+     *
+     * This is used exclusively by the Smithery entrypoint to satisfy its synchronous
+     * factory requirement while ensuring initial tools are available on the first
+     * listTools call. Other entrypoints should not rely on this.
+     */
+    public blockListToolsUntil(promise: Promise<unknown>, timeoutMs = 8_000) {
+        const done = Promise.resolve(promise).then(() => undefined).catch(() => undefined);
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+        this.listToolsBarrier = Promise.race([done, timeout]).then(() => undefined);
     }
 
     /**
@@ -391,6 +410,10 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+            if (this.listToolsBarrier) {
+                await this.listToolsBarrier;
+                this.listToolsBarrier = null;
+            }
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool.tool));
             return { tools };
         });

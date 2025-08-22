@@ -2,7 +2,7 @@ import type { ApifyClientOptions } from 'apify';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
-import { USER_AGENT_ORIGIN } from './const.js';
+import { PLACEHOLDER_APIFY_TOKEN, USER_AGENT_ORIGIN } from './const.js';
 
 /**
  * Adds a User-Agent header to the request config.
@@ -25,12 +25,14 @@ export function getApifyAPIBaseUrl(): string {
 export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
         /**
-         * In order to publish to DockerHub, we need to run their build task to validate our MCP server.
-         * This was failing since we were sending this dummy token to Apify in order to build the Actor tools.
-         * So if we encounter this dummy value, we remove it to use Apify client as unauthenticated, which is sufficient
-         * for server start and listing of tools.
+         * Placeholder token handling (Smithery/Docker Hub).
+         *
+         * We use a placeholder token to allow non-interactive environments (Smithery scans,
+         * Docker Hub builds) to traverse tool-loading paths without real secrets. The placeholder
+         * does not authorize any API calls. If detected here, we drop it and run unauthenticated,
+         * which is enough for server startup and listing tools (where possible).
          */
-        if (options.token?.toLowerCase() === 'your-apify-token') {
+        if (options.token?.toLowerCase() === PLACEHOLDER_APIFY_TOKEN) {
             // eslint-disable-next-line no-param-reassign
             delete options.token;
         }

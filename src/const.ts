@@ -80,3 +80,13 @@ export const ALGOLIA = {
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 
 export const APIFY_STORE_URL = 'https://apify.com';
+
+/**
+ * Placeholder token used during non-interactive environments (e.g., Docker Hub builds, Smithery scans)
+ * to allow tool-loading code paths to execute without failing hard when a real APIFY_TOKEN is unavailable.
+ *
+ * IMPORTANT: This token does not authorize any API calls. It is only a sentinel to:
+ * - Unblock Smithery's initial tool scan so tools can be listed after deployment
+ * - Avoid crashes in Docker Hub image builds where secrets are not present
+ */
+export const PLACEHOLDER_APIFY_TOKEN = 'your-apify-token';
