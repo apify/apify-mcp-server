@@ -24,22 +24,8 @@ import log from '@apify/log';
 
 import { ActorsMcpServer } from './mcp/server.js';
 import { toolCategories } from './tools/index.js';
-import type { Input, ToolCategory } from './types.js';
+import type { Input, ServerConfigCli, ToolCategory } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
-
-// Keeping this interface here and not types.ts since
-// it is only relevant to the CLI/STDIO transport in this file
-/**
- * Interface for command line arguments
- */
-interface CliArgs {
-    actors?: string;
-    enableAddingActors: boolean;
-    /** @deprecated */
-    enableActorAutoLoading: boolean;
-    /** Tool categories to include */
-    tools?: string;
-}
 
 // Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
@@ -88,7 +74,7 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
         + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
-    .parseSync() as CliArgs;
+    .parseSync() as ServerConfigCli;
 
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
 const actors = argv.actors as string || '';

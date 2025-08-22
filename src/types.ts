@@ -3,11 +3,40 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { Notification, Prompt, Request } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
+import { z } from 'zod';
 
 import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
+
+export const serverConfigSchemaCli = z.object({
+    actors: z
+        .string()
+        .optional()
+        .describe('Comma-separated list of Actor full names to add to the server'),
+    enableAddingActors: z
+        .boolean()
+        .default(true)
+        .describe('Enable dynamically adding Actors as tools based on user requests'),
+    tools: z
+        .string()
+        .optional()
+        .describe('Comma-separated list of specific tool categories to enable (docs,runs,storage,preview)'),
+    /** @deprecated */
+    enableActorAutoLoading: z
+        .boolean()
+        .default(true)
+        .describe('Deprecated: use enable-adding-actors instead.'),
+});
+
+export const serverConfigSchemaSmithery = serverConfigSchemaCli.extend({
+    apifyToken: z
+        .string()
+        .describe('Apify token, learn more: https://docs.apify.com/platform/integrations/api#api-token'),
+});
+
+export type ServerConfigCli = z.infer<typeof serverConfigSchemaCli>;
 
 export interface ISchemaProperties {
     type: string;
