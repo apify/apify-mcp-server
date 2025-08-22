@@ -2,7 +2,7 @@
   "name": "@apify/actors-mcp-server",
   "version": "0.3.9",
   "type": "module",
-  "description": "Model Context Protocol Server for Apify",
+  "description": "Apify MCP Server",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -21,12 +21,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/apify/actors-mcp-server.git"
+    "url": "https://github.com/apify/apify-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/apify/actors-mcp-server/issues"
+    "url": "https://github.com/apify/apify-mcp-server/issues"
   },
-  "homepage": "https://apify.com/apify/actors-mcp-server",
+  "homepage": "https://mcp.apify.com",
   "keywords": [
     "apify",
     "mcp",

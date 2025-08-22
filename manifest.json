@@ -21,15 +21,15 @@
     ],
     "author": {
         "name": "Apify Technologies s.r.o.",
-        "url": "https://github.com/apify/actors-mcp-server"
+        "url": "https://github.com/apify/apify-mcp-server"
     },
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/apify/actors-mcp-server"
+        "url": "https://github.com/apify/apify-mcp-server"
     },
     "homepage": "https://mcp.apify.com",
-    "support": "https://github.com/apify/actors-mcp-server/issues",
+    "support": "https://github.com/apify/apify-mcp-server/issues",
     "icon": "docs/apify-logo.png",
     "screenshots": [
         "docs/actors-mcp-server.png"
