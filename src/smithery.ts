@@ -7,28 +7,28 @@
 */
 import type { z } from 'zod';
 
+import { PLACEHOLDER_APIFY_TOKEN } from './const.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import type { Input, ToolCategory } from './types';
 import { serverConfigSchemaSmithery as configSchema } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
-import { PLACEHOLDER_APIFY_TOKEN } from './const.js';
 
 // Export the config schema for Smithery. The export must be named configSchema
 export { configSchema };
 
 /**
- * Main entrypoint for Smithery deployment do not change signature of this function.
+ * The Main entrypoint for Smithery deployment do not change signature of this function.
  * @returns
  */
+// eslint-disable-next-line import/no-default-export
 export default function ({ config: _config }: { config: z.infer<typeof configSchema> }) {
     try {
-        let apifyToken = _config.apifyToken || process.env.APIFY_TOKEN || '';
+        const apifyToken = _config.apifyToken || process.env.APIFY_TOKEN || '';
         const enableAddingActors = _config.enableAddingActors ?? true;
         const actors = _config.actors || '';
         const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
         const toolCategoryKeys = _config.tools ? _config.tools.split(',').map((t: string) => t.trim()) : [];
 
-        console.log(`Apify token ${apifyToken}`)
         process.env.APIFY_TOKEN = apifyToken; // Ensure token is set in the environment
         const server = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
 
@@ -58,7 +58,6 @@ export default function ({ config: _config }: { config: z.infer<typeof configSch
         })();
         server.blockListToolsUntil(loadPromise);
         return server.server;
-
     } catch (e) {
         // eslint-disable-next-line no-console
         console.error(e);

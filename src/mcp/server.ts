@@ -104,7 +104,7 @@ export class ActorsMcpServer {
      */
     public blockListToolsUntil(promise: Promise<unknown>, timeoutMs = 8_000) {
         const done = Promise.resolve(promise).then(() => undefined).catch(() => undefined);
-        const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+        const timeout = new Promise<void>((resolve) => { setTimeout(resolve, timeoutMs); });
         this.listToolsBarrier = Promise.race([done, timeout]).then(() => undefined);
     }
 

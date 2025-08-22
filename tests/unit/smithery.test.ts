@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import log from '@apify/log';
 
-import * as toolsLoader from '../../src/utils/tools-loader.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import smithery from '../../src/smithery.js';
+import * as toolsLoader from '../../src/utils/tools-loader.js';
 
 // Silence logs in unit tests
 log.setLevel(log.LEVELS.OFF);
@@ -16,11 +16,11 @@ describe('smithery entrypoint barrier behavior', () => {
 
     it('calls blockListToolsUntil', async () => {
         // Arrange
-        const blockSpy = vi.spyOn(ActorsMcpServer.prototype as any, 'blockListToolsUntil');
+        const blockSpy = vi.spyOn(ActorsMcpServer.prototype, 'blockListToolsUntil');
         const loadSpy = vi.spyOn(toolsLoader, 'loadToolsFromInput').mockResolvedValue([]);
 
         // Act
-        const server = smithery({ config: { apifyToken: 'TEST_TOKEN', enableAddingActors: true } as any });
+        const server = smithery({ config: { apifyToken: 'TEST_TOKEN', enableAddingActors: true } });
 
         // Assert
         expect(server).toBeTruthy();
