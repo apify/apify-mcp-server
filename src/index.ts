@@ -4,5 +4,8 @@
  The ActorsMcpServer should be the only class exported from the package
 */
 import { ActorsMcpServer } from './mcp/server.js';
+import smithery from './smithery.js';
 
 export { ActorsMcpServer };
+
+export default smithery;
