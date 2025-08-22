@@ -87,7 +87,7 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
         + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
-    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
+    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
 const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
