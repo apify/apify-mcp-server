@@ -1,1 +1,6 @@
-runtime: typescript
+runtime: "container"
+build:
+  dockerfile: "Dockerfile.smithery"
+  dockerBuildPath: "."
+startCommand:
+  type: "stdio"
