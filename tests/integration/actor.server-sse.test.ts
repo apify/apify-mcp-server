@@ -15,7 +15,7 @@ const httpServerHost = `http://localhost:${httpServerPort}`;
 const mcpUrl = `${httpServerHost}/sse`;
 
 createIntegrationTestsSuite({
-    suiteName: 'Actors MCP Server SSE',
+    suiteName: 'Apify MCP Server SSE',
     transport: 'sse',
     createClientFn: async (options) => await createMcpSseClient(mcpUrl, options),
     beforeAllFn: async () => {
