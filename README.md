@@ -237,7 +237,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 
 ## 🐦 Canary PR releases
 
-Apify MCP is split across two repositories: this one for core MCP logic and the private `apify-mcp-serverinternal` for the hosted server.
+Apify MCP is split across two repositories: this one for core MCP logic and the private `apify-mcp-server-internal` for the hosted server.
 Changes must be synchronized between both.
 
 To create a canary release, add the `beta` tag to your PR branch.
