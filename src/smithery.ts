@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 /*
- This file provides essential functions and tools for MCP servers, serving as a library.
- The ActorsMcpServer should be the only class exported from the package
-
- Also, it serves as the main entry point for smithery deployment.
+ This file serves as the main entry point for smithery deployment.
 */
 import type { z } from 'zod';
 
