@@ -17,3 +17,10 @@ npx @smithery/cli dev
 Notes:
 - The barrier is used only by Smithery; stdio/SSE/HTTP flows are unaffected.
 - We use a placeholder token (`your-apify-token`) in non-interactive environments (Smithery scans) to allow tool-loading paths to run without real secrets. It does not grant access; when detected, the client runs unauthenticated to let the server start and list tools where possible.
+
+## Deployment
+
+- Publishing to Smithery uses a personal account due to group account functionality issues.
+- Publication happens through a repository fork at https://github.com/apify-projects/apify-mcp-server since Smithery requires repository write access, which cannot be granted to the main Apify account (https://github.com/apify/apify-mcp-server).
+- The fork requires manual synchronization to stay current, as automatic syncing is not configured.
+- As of August 22nd, Smithery supports external server publishing with the requirement of an `/mcp` endpoint.
