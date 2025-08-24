@@ -210,6 +210,23 @@ https://mcp.apify.com?tools=apify/my-actor
 
 This setup exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
 
+### Backward compatibility
+
+The v2 configuration preserves backward compatibility with v1 usage. Notes:
+
+- `actors` param (URL) and `--actors` flag (CLI) are still supported.
+  - Internally they are merged into `tools` selectors.
+  - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
+- `enable-adding-actors` (CLI) and `enableAddingActors` (URL) are supported but deprecated.
+  - Prefer `tools=experimental` or including the specific tool `tools=add-actor`.
+  - Behavior remains: when enabled with no `tools` specified, the server exposes only `add-actor`; when categories/tools are selected, `add-actor` is also included.
+- `enableActorAutoLoading` remains as a legacy alias for `enableAddingActors` and is mapped automatically.
+- Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
+  - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
+- `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
+
+Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
+
 ### Prompts
 
 The server provides a set of predefined example prompts to help you get started interacting with Apify through MCP. For example, there is a `GetLatestNewsOnTopic` prompt that allows you to easily retrieve the latest news on a specific topic using the [RAG Web Browser](https://apify.com/apify/rag-web-browser) Actor.
