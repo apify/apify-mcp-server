@@ -35,8 +35,9 @@ export default function ({ config: _config }: { config: z.infer<typeof configSch
             tools: toolCategoryKeys as ToolCategory[],
         };
 
-        // Start async tools loading and gate the first listTools (Smithery-only)
-        // See docs/smithery.md for a brief overview of how this entrypoint works with Smithery
+        // Load tools asynchronously and block initial listTools call (Smithery-specific behavior)
+        // Refer to docs/smithery.md for details on how this entrypoint integrates with Smithery
+        // Smithery uses an unknown token during deployment, requiring this fallback approach
         const loadPromise = (async () => {
             try {
                 const tools = await loadToolsFromInput(input, apifyToken, actorList.length === 0);
