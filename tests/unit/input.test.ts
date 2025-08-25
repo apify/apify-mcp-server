@@ -13,7 +13,7 @@ describe('processInput', () => {
         expect(processed.actors).toBeUndefined();
     });
 
-    it('should move array actors input into tools selectors', async () => {
+    it('should move array actors input into tools', async () => {
         const input: Partial<Input> = {
             actors: ['actor1', 'actor2', 'actor3'],
         };
