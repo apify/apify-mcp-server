@@ -4,7 +4,6 @@ import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/typ
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
-import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
 import { addTool } from '../../src/tools/helpers.js';
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
@@ -609,7 +608,7 @@ export function createIntegrationTestsSuite(
 
             const topic = 'apify';
             const prompt = await client.getPrompt({
-                name: latestNewsOnTopicPrompt.name,
+                name: 'GetLatestNewsOnTopic',
                 arguments: {
                     topic,
                 },
