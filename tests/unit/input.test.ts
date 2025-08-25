@@ -82,7 +82,7 @@ describe('processInput', () => {
         expect(processed.tools).toEqual(['docs', 'invalidKey', 'storage']);
     });
 
-    it('should merge actors into tools selectors for backward compatibility', async () => {
+    it('should merge actors into tools for backward compatibility', async () => {
         const input: Partial<Input> = {
             actors: ['apify/website-content-crawler', 'apify/instagram-scraper'],
             tools: ['docs'],
