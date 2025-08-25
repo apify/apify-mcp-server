@@ -357,7 +357,6 @@ export function createIntegrationTestsSuite(
 
             expect(infoResult.content).toBeDefined();
             const content = infoResult.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Actor card'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input Schema'))).toBe(true);
 
             // Step 2: Call with proper input (should work)

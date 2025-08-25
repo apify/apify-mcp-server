@@ -108,13 +108,6 @@ export type InternalToolArgs = {
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
-    /**
-     * Injected dependency for turning Actor names/IDs into tools.
-     * Passing it from the server avoids a stdio-only circular import that made the
-     * add-actor tool null during module initialization.
-     */
-    // eslint-disable-next-line no-use-before-define
-    getActorsAsTools?: (actorIdsOrNames: string[], apifyToken: string) => Promise<ToolEntry[]>;
 }
 
 /**

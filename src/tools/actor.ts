@@ -307,8 +307,6 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     }
                     return {
                         content: [
-                            { type: 'text', text: `**Actor card**:\n${details.actorCard}` },
-                            { type: 'text', text: `**README:**\n${details.readme}` },
                             { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
                         ],
                     };

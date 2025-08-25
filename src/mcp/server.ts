@@ -170,11 +170,23 @@ export class ActorsMcpServer {
         }
 
         if (actorsToLoad.length > 0) {
-            const actorTools = await getActorsAsTools(actorsToLoad, apifyToken);
-            if (actorTools.length > 0) {
-                this.upsertTools(actorTools);
-            }
+            await this.loadActorsAsTools(actorsToLoad, apifyToken);
         }
+    }
+
+    /**
+     * Load actors as tools, upsert them to the server, and return the tool entries.
+     * This is a public method that wraps getActorsAsTools and handles the upsert operation.
+     * @param actorIdsOrNames - Array of actor IDs or names to load as tools
+     * @param apifyToken - Apify API token for authentication
+     * @returns Promise<ToolEntry[]> - Array of loaded tool entries
+     */
+    public async loadActorsAsTools(actorIdsOrNames: string[], apifyToken: string): Promise<ToolEntry[]> {
+        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyToken);
+        if (actorTools.length > 0) {
+            this.upsertTools(actorTools, true);
+        }
+        return actorTools;
     }
 
     /**
@@ -401,8 +413,6 @@ export class ActorsMcpServer {
                         apifyToken,
                         userRentedActorIds,
                         progressTracker,
-                        // Passing as argument to prevent circular dependency
-                        getActorsAsTools,
                     }) as object;
 
                     if (progressTracker) {

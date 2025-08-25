@@ -48,7 +48,7 @@ export const addTool: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, apifyToken, args, extra: { sendNotification }, getActorsAsTools } = toolArgs;
+            const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
             if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
                 return {
@@ -58,14 +58,12 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            if (!getActorsAsTools) {
-                throw new Error('Internal configuration error: getActorsAsTools must be passed via InternalToolArgs from the MCP server');
-            }
-            const tools = await getActorsAsTools([parsed.actor], apifyToken);
+
+            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyToken);
             /**
              * If no tools were found, return a message that the Actor was not found
              * instead of returning that non existent tool was added since the
-             * getActorsAsTools function returns an empty array and does not throw an error.
+             * loadActorsAsTools method returns an empty array and does not throw an error.
              */
             if (tools.length === 0) {
                 return {
@@ -75,14 +73,14 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            const toolsAdded = apifyMcpServer.upsertTools(tools, true);
+
             await sendNotification({ method: 'notifications/tools/list_changed' });
 
             return {
                 content: [{
                     type: 'text',
                     text: `Actor ${parsed.actor} has been added. Newly available tools: ${
-                        toolsAdded.map(
+                        tools.map(
                             (t) => `${t.tool.name}`,
                         ).join(', ')
                     }.`,

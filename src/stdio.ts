@@ -70,7 +70,7 @@ Deprecated: use tools experimental category instead.`,
         type: 'string',
         describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser.
 
-For more details visit https://github.com/apify/actors-mcp-server`,
+For more details visit https://mcp.apify.com`,
         example: 'actors,docs,apify/rag-web-browser',
     })
     .help('help')

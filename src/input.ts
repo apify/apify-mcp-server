@@ -11,7 +11,7 @@ import type { Input, ToolSelector } from './types.js';
 
 // Helpers
 // Normalize booleans that may arrive as strings or be undefined.
-function toBoolean(value: unknown, defaultValue: boolean): boolean {
+export function toBoolean(value: unknown, defaultValue: boolean): boolean {
     if (value === undefined) return defaultValue;
     if (typeof value === 'boolean') return value;
     if (typeof value === 'string') return value.toLowerCase() === 'true';
@@ -19,7 +19,7 @@ function toBoolean(value: unknown, defaultValue: boolean): boolean {
 }
 
 // Normalize lists from comma-separated strings or arrays.
-function normalizeList(value: string | string[] | undefined): string[] | undefined {
+export function normalizeList(value: string | unknown[] | undefined): string[] | undefined {
     if (value === undefined) return undefined;
     if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter((s) => s !== '');
     const trimmed = String(value).trim();

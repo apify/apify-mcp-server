@@ -180,35 +180,49 @@ When no query parameters are provided, the MCP server loads the following `tools
 - `docs`
 - `apify/rag-web-browser`
 
-It is thus the same as if you configured the `tools` parameter like this:
+If the tools parameter is specified, only the listed tools or categories will be enabled - no default tools will be included.
 
-**For the hosted server:**
+> **Easy configuration:**
+>
+> Use the [UI configurator](https://mcp.apify.com/) to configure your server, then copy the configuration to your client.
+
+**Configuring the hosted server:**
+
+The hosted server can be configured using query parameters in the URL. For example, to load the default tools, use:
+
 ```
 https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser
 ```
 
-**For the CLI:**
-```bash
-npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser
-```
-
-If the tools parameter is specified, only the listed tools or categories will be enabled - no default tools will be included.
-
-> **⚠️ Important recommendation**
-> 
-> **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
-> 
-> **For production use and stable interfaces, always explicitly specify the `tools` parameter** to ensure your configuration remains consistent across updates.
-
-**Minimal configuration**
-
-For example, to use only a single Actor tool - without any discovery or generic calling tools, the server can be configured like this:
+For minimal configuration, if you want to use only a single Actor tool - without any discovery or generic calling tools, the server can be configured as follows:
 
 ```
 https://mcp.apify.com?tools=apify/my-actor
 ```
 
 This setup exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
+
+**Configuring the CLI:**
+
+The CLI can be configured using command-line flags. For example, to load the same tools as in the hosted server configuration, use:
+
+```bash
+npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser
+```
+
+The minimal configuration is similar to the hosted server configuration:
+
+```bash
+npx @apify/actors-mcp-server --tools apify/my-actor
+```
+
+As above, this exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
+
+> **⚠️ Important recommendation**
+> 
+> **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
+> 
+> **For production use and stable interfaces, always explicitly specify the `tools` parameter** to ensure your configuration remains consistent across updates.
 
 ### Backward compatibility
 
