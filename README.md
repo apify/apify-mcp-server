@@ -194,7 +194,7 @@ npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser
 
 If the tools parameter is specified, only the listed tools or categories will be enabled - no default tools will be included.
 
-> **⚠️ Important Recommendation**
+> **⚠️ Important recommendation**
 > 
 > **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
 > 
