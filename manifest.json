@@ -1,7 +1,7 @@
 {
     "dxt_version": "0.1",
     "name": "apify-mcp-server",
-    "version": "0.3.9",
+    "version": "0.4.0",
     "description": "Extract data from any site with Apify Store, home to thousands of web scrapers.",
     "long_description": "Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
     "keywords": [
@@ -42,11 +42,7 @@
             "args": [
                 "${__dirname}/dist/stdio.js",
                 "--tools",
-                "${user_config.tools}",
-                "--actors",
-                "${user_config.actors}",
-                "--enable-adding-actors",
-                "${user_config.enable-adding-actors}"
+                "${user_config.tools}"
             ],
             "env": {
                 "APIFY_TOKEN": "${user_config.apify_token}"
@@ -64,24 +60,10 @@
         },
         "tools": {
             "type": "string",
-            "title": "Enabled tool categories",
-            "description": "A comma-separated list of tool categories to enable. Available options: docs, runs, storage, preview.",
+            "title": "Enabled tools",
+            "description": "Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: \"actors,docs,apify/rag-web-browser\". For more details visit https://mcp.apify.com.",
             "required": false,
-            "default": "actor-discovery,docs"
-        },
-        "actors": {
-            "type": "string",
-            "title": "Enabled Actors",
-            "description": "A comma-separated list of full Actor names to add to the server on startup (e.g., apify/rag-web-browser).",
-            "required": false,
-            "default": "apify/rag-web-browser"
-        },
-        "enable-adding-actors": {
-            "type": "boolean",
-            "title": "Enable dynamic Actor adding",
-            "description": "Allow dynamically adding Actors as tools based on user requests during a session.",
-            "required": false,
-            "default": false
+            "default": "actors,docs,apify/rag-web-browser"
         }
     },
     "compatibility": {
