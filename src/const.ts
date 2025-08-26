@@ -19,7 +19,7 @@ export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
     ACTOR_GET = 'get-actor',
-    ACTOR_GET_DETAILS = 'get-actor-details',
+    ACTOR_GET_DETAILS = 'fetch-actor-details',
     ACTOR_REMOVE = 'remove-actor',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',

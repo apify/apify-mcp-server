@@ -140,19 +140,10 @@ One of the most powerful features of using MCP with Apify is dynamic tool discov
 It gives an AI agent the ability to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
-- **Actor discovery and management**: Search for Actors, view their details, and dynamically add or remove them as available tools for the AI.
+- **Apify Actors**: Search for Actors, view their details, and use them as tools for the AI.
 - **Apify documentation**: Search the Apify documentation and fetch specific documents to provide context to the AI.
-- **Actor runs (*)**: Get lists of your Actor runs, inspect their details, and retrieve logs.
-- **Apify storage (*)**: Access data from your datasets and key-value stores.
-
-**Note**: Helper tool categories marked with (*) are not enabled by default in the MCP server and must be explicitly enabled using the `tools` argument (either the `--tools` command line argument for the stdio server or the `?tools` URL query parameter for the remote MCP server). The `tools` argument is a comma-separated list of categories with the following possible values:
-
-- `docs`: Search and fetch Apify documentation tools.
-- `runs`: Get Actor run lists, run details, and logs from a specific Actor run.
-- `storage`: Access datasets, key-value stores, and their records.
-- `preview`: Experimental tools in preview mode.
-
-For example, to enable all tools, use `npx @apify/actors-mcp-server --tools docs,runs,storage,preview` or `https://mcp.apify.com/?tools=docs,runs,storage,preview`.
+- **Actor runs**: Get lists of your Actor runs, inspect their details, and retrieve logs.
+- **Apify storage**: Access data from your datasets and key-value stores.
 
 ### Overview of available tools
 
@@ -160,27 +151,95 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
-| `get-actor-details` | actor-discovery | Retrieve detailed information about a specific Actor. | ✅ |
-| `search-actors` | actor-discovery | Search for Actors in the Apify Store. | ✅ |
-| `add-actor` | default (see note below) | Add an Actor as a new tool for the user to call. | ✅ |
-| [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see note below) | An Actor tool to browse the web. | ✅ |
+| `search-actors` | actors | Search for Actors in the Apify Store. | ✅ |
+| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor. | ✅ |
+| `call-actor` | actors | Call an Actor and get its run results. | ✅ |
+| [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
-| `call-actor` | preview | Call an Actor and get its run results. |  |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. |  |
 | `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. |  |
 | `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
 | `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. |  |
+| `get-dataset-schema` | storage | Generate a JSON schema from dataset items. |  |
 | `get-key-value-store` | storage | Get metadata about a specific key-value store. |  |
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
 | `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
+| `add-actor` | experimental | Add an Actor as a new tool for the user to call. |  |
 
-> **Note:**
-> The `add-actor` tool is always enabled by default and does not explicitly belong to any category. Currently, it can be disabled by setting `?enableAddingActors=false` or `--enable-adding-actors false`.
-> The `apify-slash-rag-web-browser` is an Apify Actor tool loaded by default. You can disable it by loading a different set of Actors using `?actors=other/actor` or `--actors other/actor`, or you can disable pre-loading of Actors by setting `?actors=` or `--actors=` (to an empty string).
+### Tools configuration
+
+The `tools` configuration parameter is used to specify loaded tools - either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=add-actor` loads just one tool.
+
+When no query parameters are provided, the MCP server loads the following `tools` by default:
+
+- `actors`
+- `docs`
+- `apify/rag-web-browser`
+
+If the tools parameter is specified, only the listed tools or categories will be enabled - no default tools will be included.
+
+> **Easy configuration:**
+>
+> Use the [UI configurator](https://mcp.apify.com/) to configure your server, then copy the configuration to your client.
+
+**Configuring the hosted server:**
+
+The hosted server can be configured using query parameters in the URL. For example, to load the default tools, use:
+
+```
+https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser
+```
+
+For minimal configuration, if you want to use only a single Actor tool - without any discovery or generic calling tools, the server can be configured as follows:
+
+```
+https://mcp.apify.com?tools=apify/my-actor
+```
+
+This setup exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
+
+**Configuring the CLI:**
+
+The CLI can be configured using command-line flags. For example, to load the same tools as in the hosted server configuration, use:
+
+```bash
+npx @apify/actors-mcp-server --tools actors,docs,apify/rag-web-browser
+```
+
+The minimal configuration is similar to the hosted server configuration:
+
+```bash
+npx @apify/actors-mcp-server --tools apify/my-actor
+```
+
+As above, this exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
+
+> **⚠️ Important recommendation**
+> 
+> **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
+> 
+> **For production use and stable interfaces, always explicitly specify the `tools` parameter** to ensure your configuration remains consistent across updates.
+
+### Backward compatibility
+
+The v2 configuration preserves backward compatibility with v1 usage. Notes:
+
+- `actors` param (URL) and `--actors` flag (CLI) are still supported.
+  - Internally they are merged into `tools` selectors.
+  - Examples: `?actors=apify/rag-web-browser` ≡ `?tools=apify/rag-web-browser`; `--actors apify/rag-web-browser` ≡ `--tools apify/rag-web-browser`.
+- `enable-adding-actors` (CLI) and `enableAddingActors` (URL) are supported but deprecated.
+  - Prefer `tools=experimental` or including the specific tool `tools=add-actor`.
+  - Behavior remains: when enabled with no `tools` specified, the server exposes only `add-actor`; when categories/tools are selected, `add-actor` is also included.
+- `enableActorAutoLoading` remains as a legacy alias for `enableAddingActors` and is mapped automatically.
+- Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
+  - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
+- `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
+
+Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 
 ### Prompts
 

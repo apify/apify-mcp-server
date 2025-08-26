@@ -211,6 +211,10 @@ export interface InternalTool extends ToolBase {
 }
 
 export type ToolCategory = keyof typeof toolCategories;
+/**
+ * Selector for tools input - can be a category key or a specific tool name.
+ */
+export type ToolSelector = ToolCategory | string;
 
 export type Input = {
     /**
@@ -228,12 +232,12 @@ export type Input = {
     debugActor?: string;
     debugActorInput?: unknown;
     /**
-     * Tool categories to include
-     * When `tools` is undefined that means the default tools categories should be loaded.
-     * If it as empty string or empty array then no tools should be loaded.
-     * Otherwise the specified tools categories should be loaded.
+     * Tool selectors to include (category keys or concrete tool names).
+     * When `tools` is undefined that means the default tool categories should be loaded.
+     * If it is an empty string or empty array then no internal tools should be loaded.
+     * Otherwise the specified categories and/or concrete tool names should be loaded.
      */
-    tools?: ToolCategory[] | string;
+    tools?: ToolSelector[] | string;
 };
 
 // Utility type to get a union of values from an object type

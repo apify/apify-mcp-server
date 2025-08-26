@@ -4,8 +4,8 @@ import { getExpectedToolsByCategories } from '../utils/tools.js';
 import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
+import { fetchActorDetailsTool } from './fetch-actor-details.js';
 import { fetchApifyDocsTool } from './fetch-apify-docs.js';
-import { getActorDetailsTool } from './get-actor-details.js';
 import { addTool } from './helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './key_value_store.js';
 import { getUserKeyValueStoresList } from './key_value_store_collection.js';
@@ -15,13 +15,13 @@ import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
 export const toolCategories = {
-    'actor-discovery': [
-        getActorDetailsTool,
+    experimental: [
+        addTool,
+    ],
+    actors: [
+        fetchActorDetailsTool,
         searchActors,
-        /**
-         * TODO: we should add the add-actor tool here but we would need to change the configuraton
-         * interface around the ?enableAddingActors
-         */
+        callActor,
     ],
     docs: [
         searchApifyDocsTool,
@@ -42,23 +42,13 @@ export const toolCategories = {
         getUserDatasetsList,
         getUserKeyValueStoresList,
     ],
-    preview: [
-        callActor,
-    ],
 };
 export const toolCategoriesEnabledByDefault: ToolCategory[] = [
-    'actor-discovery',
+    'actors',
     'docs',
 ];
 
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
-
-/**
- * Tools related to `enableAddingActors` param for dynamic Actor adding.
- */
-export const addRemoveTools = [
-    addTool,
-];
 
 // Export only the tools that are being used
 export {

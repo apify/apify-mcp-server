@@ -4,8 +4,8 @@ import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/typ
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
-import { latestNewsOnTopicPrompt } from '../../src/prompts/latest-news-on-topic.js';
-import { addRemoveTools, defaultTools, toolCategories, toolCategoriesEnabledByDefault } from '../../src/tools/index.js';
+import { addTool } from '../../src/tools/helpers.js';
+import { defaultTools, toolCategories } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tools.js';
@@ -88,27 +88,43 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors', async () => {
             const client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + addRemoveTools.length);
+            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length);
 
             const names = getToolNames(tools);
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
             await client.close();
         });
 
-        it('should list all default tools and Actors, with add/remove tools', async () => {
+        it('should match spec default: actors,docs,apify/rag-web-browser when no params provided', async () => {
+            const client = await createClientFn();
+            const tools = await client.listTools();
+            const names = getToolNames(tools);
+
+            // Should be equivalent to tools=actors,docs,apify/rag-web-browser
+            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
+            const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
+            const expectedActors = ['apify-slash-rag-web-browser'];
+
+            const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
+            expect(names).toHaveLength(expectedTotal.length);
+
+            expectedActorsTools.forEach((tool) => expect(names).toContain(tool));
+            expectedDocsTools.forEach((tool) => expect(names).toContain(tool));
+            expectedActors.forEach((actor) => expect(names).toContain(actor));
+
+            await client.close();
+        });
+
+        it('should list only add-actor when enableAddingActors is true and no tools/actors are specified', async () => {
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + addRemoveTools.length);
-
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
-            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
+            expect(names.length).toEqual(1);
+            expect(names).toContain(addTool.tool.name);
             await client.close();
         });
 
-        it('should list all default tools and Actors, without add/remove tools', async () => {
+        it('should list all default tools and Actors when enableAddingActors is false', async () => {
             const client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
@@ -118,46 +134,125 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list all default tools and two loaded Actors', async () => {
-            const actors = ['apify/website-content-crawler', 'apify/instagram-scraper'];
+        it('should override enableAddingActors false with experimental tool category', async () => {
+            const client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
+            const names = getToolNames(await client.listTools());
+            expect(names).toHaveLength(toolCategories.experimental.length);
+            expect(names).toContain(addTool.tool.name);
+            await client.close();
+        });
+
+        it('should list two loaded Actors', async () => {
+            const actors = ['apify/python-example', 'apify/rag-web-browser'];
             const client = await createClientFn({ actors, enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + actors.length);
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expect(names.length).toEqual(actors.length);
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
 
             await client.close();
         });
 
-        it('should not add any tools from categories if tools param is empty', async () => {
+        it('should load only specified actors when actors param is provided (no other tools)', async () => {
+            const actors = ['apify/python-example'];
+            const client = await createClientFn({ actors });
+            const names = getToolNames(await client.listTools());
+
+            // Should only load the specified actor, no default tools or categories
+            expect(names.length).toEqual(actors.length);
+            expect(names).toContain(actorNameToToolName(actors[0]));
+
+            // Should NOT include any default category tools
+            expect(names).not.toContain('search-actors');
+            expect(names).not.toContain('fetch-actor-details');
+            expect(names).not.toContain('call-actor');
+            expect(names).not.toContain('search-apify-docs');
+            expect(names).not.toContain('fetch-apify-docs');
+
+            await client.close();
+        });
+
+        it('should not load any tools when enableAddingActors is true and tools param is empty', async () => {
             const client = await createClientFn({ enableAddingActors: true, tools: [] });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(addRemoveTools.length + defaults.actors.length);
-            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
-            expectToolNamesToContain(names, defaults.actors.map((actor) => actorNameToToolName(actor)));
+            expect(names).toHaveLength(0);
             await client.close();
         });
 
-        it('should not load any Actors when param empty', async () => {
+        it('should not load any tools when enableAddingActors is true and actors param is empty', async () => {
             const client = await createClientFn({ enableAddingActors: true, actors: [] });
             const names = getToolNames(await client.listTools());
-            const expectedCategoryNames = getExpectedToolNamesByCategories(toolCategoriesEnabledByDefault);
-            expect(names.length).toEqual(addRemoveTools.length + expectedCategoryNames.length);
-            expectToolNamesToContain(names, addRemoveTools.map((tool) => tool.tool.name));
-            expectToolNamesToContain(names, expectedCategoryNames);
+            expect(names.length).toEqual(0);
             await client.close();
         });
 
-        it('should not load any tools if everything is disabled', async () => {
+        it('should not load any tools when enableAddingActors is false and no tools/actors are specified', async () => {
             const client = await createClientFn({ enableAddingActors: false, tools: [], actors: [] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(0);
             await client.close();
         });
 
+        it('should load only specified Actors via tools selectors when actors param omitted', async () => {
+            const actors = ['apify/python-example'];
+            const client = await createClientFn({ tools: actors });
+            const names = getToolNames(await client.listTools());
+            // Only the Actor should be loaded
+            expect(names).toHaveLength(actors.length);
+            expect(names).toContain(actorNameToToolName(actors[0]));
+            await client.close();
+        });
+
+        it('should treat selectors with slashes as Actor names', async () => {
+            const client = await createClientFn({
+                tools: ['docs', 'apify/python-example'],
+            });
+            const names = getToolNames(await client.listTools());
+
+            // Should include docs category
+            expect(names).toContain('search-apify-docs');
+            expect(names).toContain('fetch-apify-docs');
+
+            // Should include actor (if it exists/is valid)
+            expect(names).toContain('apify-slash-python-example');
+
+            await client.close();
+        });
+
+        it('should merge actors param into tools selectors (backward compatibility)', async () => {
+            const actors = ['apify/python-example'];
+            const categories = ['docs'] as ToolCategory[];
+            const client = await createClientFn({ tools: categories, actors });
+            const names = getToolNames(await client.listTools());
+            const docsToolNames = getExpectedToolNamesByCategories(categories);
+            const expected = [...docsToolNames, actorNameToToolName(actors[0])];
+            expect(names).toHaveLength(expected.length);
+            const containsExpected = expected.every((n) => names.includes(n));
+            expect(containsExpected).toBe(true);
+            await client.close();
+        });
+
+        it('should handle mixed categories and specific tools in tools param', async () => {
+            const client = await createClientFn({
+                tools: ['docs', 'fetch-actor-details', 'add-actor'],
+            });
+            const names = getToolNames(await client.listTools());
+
+            // Should include: docs category + specific tools
+            expect(names).toContain('search-apify-docs'); // from docs category
+            expect(names).toContain('fetch-apify-docs'); // from docs category
+            expect(names).toContain('fetch-actor-details'); // specific tool
+            expect(names).toContain('add-actor'); // specific tool
+
+            // Should NOT include other actors category tools
+            expect(names).not.toContain('search-actors');
+            expect(names).not.toContain('call-actor');
+
+            await client.close();
+        });
+
         it('should load only docs tools', async () => {
             const categories = ['docs'] as ToolCategory[];
-            const client = await createClientFn({ enableAddingActors: false, tools: categories, actors: [] });
+            const client = await createClientFn({ tools: categories, actors: [] });
             const names = getToolNames(await client.listTools());
             const expected = getExpectedToolNamesByCategories(categories);
             expect(names.length).toEqual(expected.length);
@@ -165,16 +260,22 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should not add any internal tools when tools param is empty and enableAddingActors is disabled', async () => {
-            const client = await createClientFn({ enableAddingActors: false, tools: [] });
+        it('should load only a specific tool when tools includes a tool name', async () => {
+            const client = await createClientFn({ tools: ['fetch-actor-details'], actors: [] });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaults.actors.length);
-            expectToolNamesToContain(names, defaults.actors.map((actor) => actorNameToToolName(actor)));
+            expect(names).toEqual(['fetch-actor-details']);
             await client.close();
         });
 
-        it('should not add any internal tools when tools param is empty and enableAddingActors is disabled and use custom Actor if specified', async () => {
-            const client = await createClientFn({ enableAddingActors: false, tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
+        it('should not load any tools when tools param is empty and actors omitted', async () => {
+            const client = await createClientFn({ tools: [] });
+            const names = getToolNames(await client.listTools());
+            expect(names.length).toEqual(0);
+            await client.close();
+        });
+
+        it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
+            const client = await createClientFn({ tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(1);
             expect(names).toContain(actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
@@ -185,42 +286,37 @@ export function createIntegrationTestsSuite(
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             const client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = defaultTools.length + addRemoveTools.length + defaults.actors.length;
-            expect(names.length).toEqual(numberOfTools);
-            // Check that the Actor is not in the tools list
+            // Only the add tool should be added
+            expect(names).toHaveLength(1);
+            expect(names).toContain('add-actor');
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
             await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
             // Check if tools was added
             const namesAfterAdd = getToolNames(await client.listTools());
-            expect(namesAfterAdd.length).toEqual(numberOfTools + 1);
+            expect(namesAfterAdd.length).toEqual(2);
             expect(namesAfterAdd).toContain(selectedToolName);
             await callPythonExampleActor(client, selectedToolName);
 
             await client.close();
         });
 
-        it('should add Actor dynamically and call it via generic call-actor tool', async () => {
+        it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true, tools: ['preview'] });
+            const client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
-            const numberOfTools = addRemoveTools.length + defaults.actors.length + toolCategories.preview.length;
-            expect(names.length).toEqual(numberOfTools);
+            // Only the actors category and add-actor should be loaded
+            const numberOfTools = toolCategories.actors.length + 1;
+            expect(names).toHaveLength(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
-            // Add Actor dynamically
-            await addActor(client, ACTOR_PYTHON_EXAMPLE);
-
-            // Check if tools was added
-            const namesAfterAdd = getToolNames(await client.listTools());
-            expect(namesAfterAdd.length).toEqual(numberOfTools + 1);
-            expect(namesAfterAdd).toContain(selectedToolName);
 
             const result = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
                     input: {
                         first_number: 1,
                         second_number: 2,
@@ -231,6 +327,10 @@ export function createIntegrationTestsSuite(
             expect(result).toEqual(
                 {
                     content: [
+                        {
+                            text: expect.stringMatching(/^Actor finished with runId: .+, datasetId .+$/),
+                            type: 'text',
+                        },
                         {
                             text: `{"sum":3,"first_number":1,"second_number":2}`,
                             type: 'text',
@@ -242,60 +342,33 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should not call Actor via call-actor tool if it is not added', async () => {
-            const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
-            const client = await createClientFn({ enableAddingActors: true, tools: ['preview'] });
-            const names = getToolNames(await client.listTools());
-            const numberOfTools = addRemoveTools.length + defaults.actors.length + toolCategories.preview.length;
-            expect(names.length).toEqual(numberOfTools);
-            // Check that the Actor is not in the tools list
-            expect(names).not.toContain(selectedToolName);
+        it('should enforce two-step process for call-actor tool', async () => {
+            const client = await createClientFn({ tools: ['actors'] });
 
-            const result = await client.callTool({
+            // Step 1: Get info (should work)
+            const infoResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    input: {
-                        first_number: 1,
-                        second_number: 2,
-                    },
+                    step: 'info',
                 },
             });
 
-            // TODO: make some more change-tolerant assertion, it's hard to verify text message result without exact match
-            expect(result).toEqual(
-                {
-                    content: [
-                        {
-                            text: "Actor 'apify/python-example' is not added. Add it with the 'add-actor' tool. Available Actors are: apify/rag-web-browser",
-                            type: 'text',
-                        },
-                    ],
+            expect(infoResult.content).toBeDefined();
+            const content = infoResult.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('Input Schema'))).toBe(true);
+
+            // Step 2: Call with proper input (should work)
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
+                    input: { first_number: 1, second_number: 2 },
                 },
-            );
-
-            await client.close();
-        });
-
-        // TODO: disabled for now, remove tools is disabled and might be removed in the future
-        it.skip('should remove Actor from tools list', async () => {
-            const actor = ACTOR_PYTHON_EXAMPLE;
-            const selectedToolName = actorNameToToolName(actor);
-            const client = await createClientFn({
-                actors: [actor],
-                enableAddingActors: true,
             });
 
-            // Verify actor is in the tools list
-            const namesBefore = getToolNames(await client.listTools());
-            expect(namesBefore).toContain(selectedToolName);
-
-            // Remove the actor
-            await client.callTool({ name: HelperTools.ACTOR_REMOVE, arguments: { toolName: selectedToolName } });
-
-            // Verify actor is removed
-            const namesAfter = getToolNames(await client.listTools());
-            expect(namesAfter).not.toContain(selectedToolName);
+            expect(callResult.content).toBeDefined();
 
             await client.close();
         });
@@ -384,14 +457,14 @@ export function createIntegrationTestsSuite(
 
             const toolNamesBefore = getToolNames(await client.listTools());
             const searchToolCountBefore = toolNamesBefore.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
-            expect(searchToolCountBefore).toBe(1);
+            expect(searchToolCountBefore).toBe(0);
 
             // Add self as an Actorized MCP server
             await addActor(client, ACTOR_MCP_SERVER_ACTOR_NAME);
 
             const toolNamesAfter = getToolNames(await client.listTools());
             const searchToolCountAfter = toolNamesAfter.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
-            expect(searchToolCountAfter).toBe(2);
+            expect(searchToolCountAfter).toBe(1);
 
             // Find the search tool from the Actorized MCP server
             const actorizedMCPSearchTool = toolNamesAfter.find(
@@ -467,16 +540,43 @@ export function createIntegrationTestsSuite(
                 const loadedTools = await client.listTools();
                 const toolNames = getToolNames(loadedTools);
 
-                const expectedTools = toolCategories[category as ToolCategory];
-                const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
-
-                expect(toolNames.length).toEqual(expectedTools.length + defaults.actors.length + addRemoveTools.length);
+                const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
+                // Only assert that all tools from the selected category are present.
                 for (const expectedToolName of expectedToolNames) {
                     expect(toolNames).toContain(expectedToolName);
                 }
 
                 await client.close();
             }
+        });
+
+        it('should include add-actor when experimental category is selected even if enableAddingActors is false', async () => {
+            const client = await createClientFn({
+                enableAddingActors: false,
+                tools: ['experimental'],
+            });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            expect(toolNames).toContain(addTool.tool.name);
+
+            await client.close();
+        });
+
+        it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
+            const client = await createClientFn({
+                enableAddingActors: false,
+                tools: [addTool.tool.name],
+            });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            // Must include add-actor since it was selected directly
+            expect(toolNames).toContain(addTool.tool.name);
+
+            await client.close();
         });
 
         it('should handle multiple tool category keys input correctly', async () => {
@@ -488,18 +588,10 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            const expectedTools = [
-                ...toolCategories.docs,
-                ...toolCategories.runs,
-                ...toolCategories.storage,
-            ];
-            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
-
-            const numberOfToolsExpected = defaults.actors.length + addRemoveTools.length + expectedTools.length;
-            expect(toolNames.length).toEqual(numberOfToolsExpected);
-            for (const expectedToolName of expectedToolNames) {
-                expect(toolNames).toContain(expectedToolName);
-            }
+            const expectedToolNames = getExpectedToolNamesByCategories(categories);
+            expect(toolNames).toHaveLength(expectedToolNames.length);
+            const containsExpectedTools = toolNames.every((name) => expectedToolNames.includes(name));
+            expect(containsExpectedTools).toBe(true);
 
             await client.close();
         });
@@ -516,7 +608,7 @@ export function createIntegrationTestsSuite(
 
             const topic = 'apify';
             const prompt = await client.getPrompt({
-                name: latestNewsOnTopicPrompt.name,
+                name: 'GetLatestNewsOnTopic',
                 arguments: {
                     topic,
                 },

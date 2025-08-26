@@ -18,15 +18,11 @@ import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, ToolEntry } from '../types.js';
 import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
+import { fetchActorDetails } from '../utils/actor-details.js';
 import { getValuesByDotKeys } from '../utils/generic.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import { getActorDefinition } from './build.js';
-import {
-    actorNameToToolName,
-    fixedAjvCompile,
-    getToolSchemaID,
-    transformActorInputSchemaProperties,
-} from './utils.js';
+import { actorNameToToolName, fixedAjvCompile, getToolSchemaID, transformActorInputSchemaProperties } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -141,7 +137,9 @@ export async function getNormalActorsAsTools(
                     tool: {
                         name: actorNameToToolName(actorDefinitionPruned.actorFullName),
                         actorFullName: actorDefinitionPruned.actorFullName,
-                        description: `${actorDefinitionPruned.description} Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
+                        description: `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results. Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests to use this specific Actor.
+Actor description: ${actorDefinitionPruned.description}
+Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                         inputSchema: actorDefinitionPruned.input
                         // So Actor without input schema works - MCP client expects JSON schema valid output
                         || {
@@ -246,14 +244,25 @@ export async function getActorsAsTools(
 
 const callActorArgs = z.object({
     actor: z.string()
-        .describe('The name of the Actor to call. For example, "apify/instagram-scraper".'),
+        .describe('The name of the Actor to call. For example, "apify/rag-web-browser".'),
+    step: z.enum(['info', 'call'])
+        .default('info')
+        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to execute the Actor (only after getting info).`),
     input: z.object({}).passthrough()
-        .describe('The input JSON to pass to the Actor. For example, {"query": "apify", "maxItems": 10}.'),
+        .optional()
+        .describe(`The input JSON to pass to the Actor. For example, {"query": "apify", "maxResults": 5, "outputFormats": ["markdown"]}. Required only when step is "call".`),
     callOptions: z.object({
-        memory: z.number().optional(),
-        timeout: z.number().optional(),
+        memory: z.number()
+            .min(128, 'Memory must be at least 128 MB')
+            .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
+            .optional()
+            .describe(`Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768). Minimum: 128 MB, Maximum: 32768 MB (32 GB).`),
+        timeout: z.number()
+            .min(0, 'Timeout must be 0 or greater')
+            .optional()
+            .describe(`Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated. Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).`),
     }).optional()
-        .describe('Optional call options for the Actor.'),
+        .describe('Optional call options for the Actor run configuration.'),
 });
 
 export const callActor: ToolEntry = {
@@ -261,38 +270,56 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: `Call an Actor and get the Actor run results. If you are not sure about the Actor input, you MUST get the Actor details first, which also returns the input schema using ${HelperTools.ACTOR_GET_DETAILS}. The Actor MUST be added before calling; use the ${HelperTools.ACTOR_ADD} tool first. By default, the Apify MCP server makes newly added Actors available as tools for calling. Use this tool ONLY if you cannot call the newly added tool directly, and NEVER call this tool before first trying to call the tool directly. For example, when you add an Actor "apify/instagram-scraper" using the ${HelperTools.ACTOR_ADD} tool, the Apify MCP server will add a new tool ${actorNameToToolName('apify/instagram-scraper')} that you can call directly. If calling this tool does not work, then and ONLY then MAY you use this tool as a backup.`,
+        description: `Call Any Actor from Apify Store - Two-Step Process
+
+This tool uses a mandatory two-step process to safely call any Actor from the Apify store.
+
+USAGE:
+• ONLY for Actors that are NOT available as dedicated tools
+• If a dedicated tool exists (e.g., ${actorNameToToolName('apify/rag-web-browser')}), use that instead
+
+MANDATORY TWO-STEP WORKFLOW:
+
+Step 1: Get Actor Info (step="info", default)
+• First call this tool with step="info" to get Actor details and input schema
+• This returns the Actor description, documentation, and required input schema
+• You MUST do this step first - it's required to understand how to call the Actor
+
+Step 2: Call Actor (step="call") 
+• Only after step 1, call again with step="call" and proper input based on the schema
+• This executes the Actor and returns the results
+
+The step parameter enforces this workflow - you cannot call an Actor without first getting its info.`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { apifyMcpServer, args, apifyToken, progressTracker } = toolArgs;
-            const { actor: actorName, input, callOptions } = callActorArgs.parse(args);
-
-            const actors = apifyMcpServer.listActorToolNames();
-            if (!actors.includes(actorName)) {
-                const toolsText = actors.length > 0 ? `Available Actors are: ${actors.join(', ')}` : 'No Actors have been added yet.';
-                if (apifyMcpServer.tools.has(HelperTools.ACTOR_ADD)) {
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: `Actor '${actorName}' is not added. Add it with the '${HelperTools.ACTOR_ADD}' tool. ${toolsText}`,
-                        }],
-                    };
-                }
-                return {
-                    content: [{
-                        type: 'text',
-                        text: `Actor '${actorName}' is not added. ${toolsText}\n`
-                            + 'To use this MCP server, specify the actors with the parameter, for example:\n'
-                            + '?actors=apify/instagram-scraper,apify/website-content-crawler\n'
-                            + 'or with the CLI:\n'
-                            + '--actors "apify/instagram-scraper,apify/website-content-crawler"\n'
-                            + 'You can only use actors that are included in the list; actors not in the list cannot be used.',
-                    }],
-                };
-            }
+            const { args, apifyToken, progressTracker } = toolArgs;
+            const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
             try {
+                if (step === 'info') {
+                    // Step 1: Return actor card and schema directly
+                    const details = await fetchActorDetails(apifyToken, actorName);
+                    if (!details) {
+                        return {
+                            content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
+                        };
+                    }
+                    return {
+                        content: [
+                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                        ],
+                    };
+                }
+                // Step 2: Call the Actor
+                if (!input) {
+                    return {
+                        content: [
+                            { type: 'text', text: `Input is required when step="call". Please provide the input parameter based on the Actor's input schema.` },
+                        ],
+                    };
+                }
+
                 const [actor] = await getActorsAsTools([actorName], apifyToken);
 
                 if (!actor) {
@@ -315,7 +342,7 @@ export const callActor: ToolEntry = {
                     }
                 }
 
-                const { items } = await callActorGetDataset(
+                const { runId, datasetId, items } = await callActorGetDataset(
                     actorName,
                     input,
                     apifyToken,
@@ -323,17 +350,22 @@ export const callActor: ToolEntry = {
                     progressTracker,
                 );
 
-                return {
-                    content: items.items.map((item: Record<string, unknown>) => ({
-                        type: 'text',
-                        text: JSON.stringify(item),
-                    })),
-                };
+                const content = [
+                    { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
+                ];
+
+                const itemContents = items.items.map((item: Record<string, unknown>) => ({
+                    type: 'text',
+                    text: JSON.stringify(item),
+                }));
+                content.push(...itemContents);
+
+                return { content };
             } catch (error) {
-                log.error('Error calling Actor', { error });
+                log.error('Error with Actor operation', { error, actorName, step });
                 return {
                     content: [
-                        { type: 'text', text: `Error calling Actor: ${error instanceof Error ? error.message : String(error)}` },
+                        { type: 'text', text: `Error with Actor operation: ${error instanceof Error ? error.message : String(error)}` },
                     ],
                 };
             }
