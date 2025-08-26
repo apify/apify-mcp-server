@@ -24,6 +24,17 @@ export function getApifyAPIBaseUrl(): string {
 
 export class ApifyClient extends _ApifyClient {
     constructor(options: ApifyClientOptions) {
+        /**
+         * In order to publish to DockerHub, we need to run their build task to validate our MCP server.
+         * This was failing since we were sending this dummy token to Apify in order to build the Actor tools.
+         * So if we encounter this dummy value, we remove it to use Apify client as unauthenticated, which is sufficient
+         * for server start and listing of tools.
+         */
+        if (options.token?.toLowerCase() === 'your-apify-token') {
+            // eslint-disable-next-line no-param-reassign
+            delete options.token;
+        }
+
         super({
             ...options,
             baseUrl: getApifyAPIBaseUrl(),

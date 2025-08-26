@@ -48,16 +48,16 @@ log.setLevel(log.LEVELS.ERROR);
 const argv = yargs(hideBin(process.argv))
     .wrap(null) // Disable automatic wrapping to avoid issues with long lines and links
     .usage('Usage: $0 [options]')
+    .env()
     .option('actors', {
         type: 'string',
-        describe: `Comma-separated list of Actor full names to add to the server.
-Deprecated: use tools instead.`,
+        describe: 'Comma-separated list of Actor full names to add to the server. Can also be set via ACTORS environment variable.',
         example: 'apify/google-search-scraper,apify/instagram-scraper',
     })
     .option('enable-adding-actors', {
         type: 'boolean',
         default: false,
-        describe: `Enable dynamically adding Actors as tools based on user requests.
+        describe: `Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.
 Deprecated: use tools experimental category instead.`,
     })
     .option('enableActorAutoLoading', {
@@ -68,7 +68,7 @@ Deprecated: use tools experimental category instead.`,
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser.
+        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser. Can also be set via TOOLS environment variable.
 
 For more details visit https://mcp.apify.com`,
         example: 'actors,docs,apify/rag-web-browser',
@@ -80,7 +80,7 @@ For more details visit https://mcp.apify.com`,
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
         + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
-    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
+    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
 // Respect either the new flag or the deprecated one

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
 import { buildApifySpecificProperties, decodeDotPropertyNames, encodeDotPropertyNames,
-    markInputPropertiesAsRequired, shortenProperties,
+    inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, shortenEnum, shortenProperties,
     transformActorInputSchemaProperties } from '../../src/tools/utils.js';
 import type { IActorInputSchema, ISchemaProperties } from '../../src/types.js';
 
@@ -785,5 +785,119 @@ describe('transformActorInputSchemaProperties', () => {
         const inputCopy = JSON.parse(JSON.stringify(input));
         transformActorInputSchemaProperties(input);
         expect(input).toEqual(inputCopy);
+    });
+
+    it('should build array items property correctly for stringList editor with place IDs', () => {
+        const input: IActorInputSchema = {
+            type: 'object',
+            schemaVersion: 1,
+            properties: {
+                placeIds: {
+                    title: '🗃 Place IDs',
+                    type: 'array',
+                    description: 'List of place IDs.',
+                    editor: 'stringList',
+                },
+            },
+        };
+
+        const result = transformActorInputSchemaProperties(input);
+
+        // Verify that array items type was correctly inferred and set
+        expect(result.placeIds.type).toBe('array');
+        expect(result.placeIds.items).toBeDefined();
+        expect(result.placeIds.items?.type).toBe('string');
+        expect(result.placeIds.items?.title).toBe('🗃 Place IDs');
+        expect(result.placeIds.items?.description).toBe(input.properties.placeIds.description);
+
+        // Verify that the property name was encoded (dots replaced with -dot-)
+        expect(result.placeIds).toBeDefined();
+
+        // Verify that other transformations were applied
+        expect(result.placeIds.title).toBe('🗃 Place IDs');
+        expect(result.placeIds.description).toBe(input.properties.placeIds.description);
+    });
+});
+
+describe('inferArrayItemType', () => {
+    it('infers array item type from editor', () => {
+        const property = {
+            type: 'array',
+            editor: 'stringList',
+            title: '',
+            description: '',
+            enum: [],
+            default: '',
+            prefill: '',
+        };
+        expect(inferArrayItemType(property)).toBe('string');
+    });
+
+    it('infers string type for stringList editor with place IDs input', () => {
+        const property: ISchemaProperties = {
+            title: 'Place IDs',
+            type: 'array',
+            description: 'List of place IDs.',
+            editor: 'stringList',
+        };
+
+        expect(inferArrayItemType(property)).toBe('string');
+    });
+});
+
+describe('inferArrayItemsTypeIfMissing', () => {
+    it('should infer and set items type for array property with stringList editor', () => {
+        const properties: { [key: string]: ISchemaProperties } = {
+            placeIds: {
+                title: '🗃 Place IDs',
+                type: 'array',
+                description: 'List of place IDs.',
+                editor: 'stringList',
+            },
+        };
+
+        const result = inferArrayItemsTypeIfMissing(properties);
+
+        expect(result.placeIds.items).toBeDefined();
+        expect(result.placeIds.items?.type).toBe('string');
+        expect(result.placeIds.items?.title).toBe('🗃 Place IDs');
+        expect(result.placeIds.items?.description).toBe(properties.placeIds.description);
+    });
+
+    it('should not modify array properties that already have items.type defined', () => {
+        const properties: { [key: string]: ISchemaProperties } = {
+            existingArray: {
+                title: 'Existing Array',
+                type: 'array',
+                description: 'Array with existing items type',
+                items: {
+                    type: 'number',
+                    title: 'Number Item',
+                    description: 'A number item',
+                },
+            },
+        };
+
+        const result = inferArrayItemsTypeIfMissing(properties);
+
+        expect(result.existingArray.items?.type).toBe('number');
+        expect(result.existingArray.items?.title).toBe('Number Item');
+        expect(result.existingArray.items?.description).toBe('A number item');
+    });
+});
+
+describe('shortenEnum', () => {
+    it('shorten enum list', () => {
+        const enumList: string[] = [];
+        const wordLength = 10;
+        const wordCount = 30;
+
+        for (let i = 0; i < wordCount; i++) {
+            enumList.push('a'.repeat(wordLength));
+        }
+
+        const shortenedList = shortenEnum(enumList);
+
+        expect(shortenedList?.length || 0).toBe(ACTOR_ENUM_MAX_LENGTH / wordLength);
     });
 });

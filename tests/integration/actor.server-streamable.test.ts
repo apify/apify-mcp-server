@@ -15,7 +15,7 @@ const httpServerHost = `http://localhost:${httpServerPort}`;
 const mcpUrl = `${httpServerHost}/mcp`;
 
 createIntegrationTestsSuite({
-    suiteName: 'Actors MCP Server Streamable HTTP',
+    suiteName: 'Apify MCP Server Streamable HTTP',
     transport: 'streamable-http',
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {

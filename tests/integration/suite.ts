@@ -628,5 +628,56 @@ export function createIntegrationTestsSuite(
             await (client.transport as StreamableHTTPClientTransport).terminateSession();
             await client.close();
         });
+
+        // Environment variable tests - only applicable to stdio transport
+        it.runIf(options.transport === 'stdio')('should load actors from ACTORS environment variable', async () => {
+            const actors = ['apify/python-example', 'apify/rag-web-browser'];
+            const client = await createClientFn({ actors, useEnv: true });
+            const names = getToolNames(await client.listTools());
+            expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
+
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'stdio')('should respect ENABLE_ADDING_ACTORS environment variable', async () => {
+            // Test with enableAddingActors = false via env var
+            const client = await createClientFn({ enableAddingActors: false, useEnv: true });
+            const names = getToolNames(await client.listTools());
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+
+            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'stdio')('should respect ENABLE_ADDING_ACTORS environment variable and load only add-actor tool when true', async () => {
+            // Test with enableAddingActors = false via env var
+            const client = await createClientFn({ enableAddingActors: true, useEnv: true });
+            const names = getToolNames(await client.listTools());
+            expect(names).toEqual(['add-actor']);
+
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'stdio')('should load tool categories from TOOLS environment variable', async () => {
+            const categories = ['docs', 'runs'] as ToolCategory[];
+            const client = await createClientFn({ tools: categories, useEnv: true });
+
+            const loadedTools = await client.listTools();
+            const toolNames = getToolNames(loadedTools);
+
+            const expectedTools = [
+                ...toolCategories.docs,
+                ...toolCategories.runs,
+            ];
+            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+
+            expect(toolNames).toHaveLength(expectedToolNames.length);
+            for (const expectedToolName of expectedToolNames) {
+                expect(toolNames).toContain(expectedToolName);
+            }
+
+            await client.close();
+        });
     });
 }
