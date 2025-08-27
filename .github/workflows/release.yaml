@@ -111,7 +111,7 @@ jobs:
         steps:
             -   name: Validate commit SHA
                 run: |
-                    COMMIT_SHA="${{ needs.update_changelog.changelog_commitish }}"
+                    COMMIT_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
                     if [ -z "$COMMIT_SHA" ]; then
                         echo "ERROR: changelog_commitish is empty!"
                         exit 1
@@ -119,11 +119,11 @@ jobs:
                     echo "Using commit SHA: $COMMIT_SHA"
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
             -   name: Log current commit SHA
                 run: |
                     CURRENT_SHA=$(git rev-parse HEAD)
-                    EXPECTED_SHA="${{ needs.update_changelog.changelog_commitish }}"
+                    EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
                     echo "Expected commit SHA: $EXPECTED_SHA"
                     echo "Actual checked out SHA: $CURRENT_SHA"
                     if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
@@ -136,11 +136,11 @@ jobs:
                     EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
                     ACTUAL_VERSION=$(jq -r '.version' manifest.json)
 
-                    echo "Expected version: $EXPECTED_VERSION"
-                    echo "Actual version in manifest.json: $ACTUAL_VERSION"
-                    echo "Current commit SHA: ${{ needs.update_changelog.changelog_commitish }}"
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in manifest.json: $ACTUAL_VERSION"
+                     echo "Current commit SHA: ${{ needs.update_changelog.outputs.changelog_commitish }}"
 
-                    if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
                         echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in manifest.json"
                         exit 1
                     fi
@@ -186,7 +186,7 @@ jobs:
     #    steps:
     #        -   uses: actions/checkout@v4
     #            with:
-    #                ref: ${{ needs.update_changelog.changelog_commitish }}
+    #                ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
     #        -   name: Use Node.js 22
     #            uses: actions/setup-node@v4
     #            with:
