@@ -50,6 +50,7 @@
     }
   },
   "tools_generated": true,
+  "prompts_generated": true,
   "user_config": {
     "apify_token": {
       "type": "string",
