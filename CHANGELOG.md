@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.2) (2025-08-27)
+
+### Temp
+
+- Do not push to npm for testing ([6040d12](https://github.com/apify/apify-mcp-server/commit/6040d1292a1207a95e3469a5898ed65f29f96fa8))
+
+
 ## [0.4.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.1) (2025-08-27)
 
 ### 🚀 Features
