@@ -37,7 +37,7 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
-    "@modelcontextprotocol/sdk": "^1.13.2",
+    "@modelcontextprotocol/sdk": "^1.17.4",
     "@types/turndown": "^5.0.5",
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
