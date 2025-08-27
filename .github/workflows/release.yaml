@@ -125,29 +125,29 @@ jobs:
                     files: |
                         actors-mcp-server.dxt
 
-    publish_to_npm:
-        name: Publish to NPM
-        needs: [ update_changelog ]
-        runs-on: ubuntu-latest
-        steps:
-            -   uses: actions/checkout@v4
-                with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
-                with:
-                    node-version: 22
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
-            -   name: Build module
-                run: npm run build
-            -   name: Publish to NPM
-                run: npm publish --tag latest
+    #publish_to_npm:
+    #    name: Publish to NPM
+    #    needs: [ update_changelog ]
+    #    runs-on: ubuntu-latest
+    #    steps:
+    #        -   uses: actions/checkout@v4
+    #            with:
+    #                ref: ${{ needs.update_changelog.changelog_commitish }}
+    #        -   name: Use Node.js 22
+    #            uses: actions/setup-node@v4
+    #            with:
+    #                node-version: 22
+    #                cache: 'npm'
+    #                cache-dependency-path: 'package-lock.json'
+    #        -   name: Install dependencies
+    #            run: |
+    #                echo "access=public" >> .npmrc
+    #                echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+    #                npm ci
+    #        -   name: Build module
+    #            run: npm run build
+    #        -   name: Publish to NPM
+    #            run: npm publish --tag latest
 
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
