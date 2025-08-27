@@ -48,7 +48,7 @@ jobs:
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:
-            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
+            changelog_commitish: ${{ steps.get_sha.outputs.commit_sha }}
 
         steps:
             -   name: Checkout repository
@@ -91,7 +91,16 @@ jobs:
 
             -   name: Get commit SHA
                 id: get_sha
-                run: echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+                run: |
+                    COMMIT_SHA=$(git rev-parse HEAD)
+                    echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+                    echo "Captured SHA: $COMMIT_SHA"
+
+            -   name: Debug final SHA
+                run: |
+                    echo "Final changelog_commitish: ${{ steps.get_sha.outputs.commit_sha }}"
+                    echo "Commit action SHA: ${{ steps.commit.outputs.commit_long_sha }}"
+                    echo "Git HEAD: $(git rev-parse HEAD)"
 
     create_github_release:
         name: Create github release
@@ -110,7 +119,7 @@ jobs:
                     echo "Using commit SHA: $COMMIT_SHA"
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish || github.sha }}
+                    ref: ${{ needs.update_changelog.changelog_commitish }}
             -   name: Log current commit SHA
                 run: |
                     CURRENT_SHA=$(git rev-parse HEAD)
