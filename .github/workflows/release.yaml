@@ -48,7 +48,7 @@ jobs:
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:
-            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
+            changelog_commitish: ${{ steps.get_sha.outputs.commit_sha }}
 
         steps:
             -   name: Checkout repository
@@ -81,6 +81,10 @@ jobs:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
                     message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
+
+            -   name: Get commit SHA
+                id: get_sha
+                run: echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     create_github_release:
         name: Create github release
