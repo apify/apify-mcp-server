@@ -48,7 +48,7 @@ jobs:
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:
-            changelog_commitish: ${{ steps.get_sha.outputs.commit_sha || steps.commit.outputs.commit_long_sha || github.sha }}
+            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
 
         steps:
             -   name: Checkout repository
@@ -91,7 +91,6 @@ jobs:
 
             -   name: Get commit SHA
                 id: get_sha
-                if: steps.commit.outputs.commit_long_sha != ''
                 run: echo "commit_sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
     create_github_release:
@@ -101,9 +100,17 @@ jobs:
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         steps:
+            -   name: Validate commit SHA
+                run: |
+                    COMMIT_SHA="${{ needs.update_changelog.changelog_commitish }}"
+                    if [ -z "$COMMIT_SHA" ]; then
+                        echo "ERROR: changelog_commitish is empty!"
+                        exit 1
+                    fi
+                    echo "Using commit SHA: $COMMIT_SHA"
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
+                    ref: ${{ needs.update_changelog.changelog_commitish || github.sha }}
             -   name: Log current commit SHA
                 run: |
                     CURRENT_SHA=$(git rev-parse HEAD)
