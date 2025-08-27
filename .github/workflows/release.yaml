@@ -142,15 +142,18 @@ jobs:
                     cp manifest.json dxt/manifest.json
             - name: Create DXT package
               run: npx -y @anthropic-ai/dxt pack dxt/ actors-mcp-server.dxt
-            -   name: Create release
-                uses: softprops/action-gh-release@v2
-                with:
-                    tag_name: ${{ needs.release_metadata.outputs.tag_name }}
-                    name: ${{ needs.release_metadata.outputs.version_number }}
-                    target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
-                    body: ${{ needs.release_metadata.outputs.release_notes }}
-                    files: |
-                        actors-mcp-server.dxt
+            - name: Copy DXT package
+              run: cp actors-mcp-server.dxt apify-mcp-server.dxt
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+                  name: ${{ needs.release_metadata.outputs.version_number }}
+                  target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
+                  body: ${{ needs.release_metadata.outputs.release_notes }}
+                  files: |
+                       actors-mcp-server.dxt
+                       apify-mcp-server.dxt
 
     publish_to_npm:
         name: Publish to NPM
