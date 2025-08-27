@@ -275,7 +275,7 @@ export class ActorsMcpServer {
         // Proxy sendLoggingMessage to filter logs
         this.server.sendLoggingMessage = async (params: { level: string; data?: unknown; [key: string]: unknown }) => {
             const messageLevelValue = LOG_LEVEL_MAP[params.level] ?? -1; // Unknown levels get -1, discard
-            const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? 1; // Default to info if invalid
+            const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info; // Default to info if invalid
             if (messageLevelValue >= currentLevelValue) {
                 await originalSendLoggingMessage(params as Parameters<typeof originalSendLoggingMessage>[0]);
             }
