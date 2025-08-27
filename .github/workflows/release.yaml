@@ -64,6 +64,9 @@ jobs:
             -   name: Update package version in package.json
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
 
+            -   name: Update manifest.json version
+                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json
+
             -   name: Update CHANGELOG.md
                 uses: DamianReeves/write-file-action@master
                 with:
@@ -77,7 +80,7 @@ jobs:
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update changelog and package version [skip ci]"
+                    message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
 
     create_github_release:
         name: Create github release
