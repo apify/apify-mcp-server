@@ -89,25 +89,18 @@ jobs:
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         steps:
-            -   name: Validate commit SHA
-                run: |
-                    COMMIT_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
-                    if [ -z "$COMMIT_SHA" ]; then
-                        echo "ERROR: changelog_commitish is empty!"
-                        exit 1
-                    fi
-                    echo "Using commit SHA: $COMMIT_SHA"
             -   uses: actions/checkout@v4
                 with:
                     ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-            -   name: Log current commit SHA
+            -   name: Verify commit SHA
                 run: |
                     CURRENT_SHA=$(git rev-parse HEAD)
                     EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
                     echo "Expected commit SHA: $EXPECTED_SHA"
                     echo "Actual checked out SHA: $CURRENT_SHA"
                     if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
-                        echo "WARNING: Checked out SHA differs from expected!"
+                        echo "ERROR: Checked out SHA differs from expected!"
+                        exit 1
                     else
                         echo "✓ Commit SHA matches expected"
                     fi
@@ -159,29 +152,56 @@ jobs:
                     files: |
                         actors-mcp-server.dxt
 
-    #publish_to_npm:
-    #    name: Publish to NPM
-    #    needs: [ update_changelog ]
-    #    runs-on: ubuntu-latest
-    #    steps:
-    #        -   uses: actions/checkout@v4
-    #            with:
-    #                ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    #        -   name: Use Node.js 22
-    #            uses: actions/setup-node@v4
-    #            with:
-    #                node-version: 22
-    #                cache: 'npm'
-    #                cache-dependency-path: 'package-lock.json'
-    #        -   name: Install dependencies
-    #            run: |
-    #                echo "access=public" >> .npmrc
-    #                echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-    #                npm ci
-    #        -   name: Build module
-    #            run: npm run build
-    #        -   name: Publish to NPM
-    #            run: npm publish --tag latest
+    publish_to_npm:
+        name: Publish to NPM
+        needs: [ release_metadata, update_changelog ]
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Verify commit SHA
+                run: |
+                    CURRENT_SHA=$(git rev-parse HEAD)
+                    EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
+                    echo "Expected commit SHA: $EXPECTED_SHA"
+                    echo "Actual checked out SHA: $CURRENT_SHA"
+                    if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
+                        echo "ERROR: Checked out SHA differs from expected!"
+                        exit 1
+                    else
+                        echo "✓ Commit SHA matches expected"
+                    fi
+            -   name: Verify manifest.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    ACTUAL_VERSION=$(jq -r '.version' manifest.json)
+
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in manifest.json: $ACTUAL_VERSION"
+                     echo "Current commit SHA: ${{ needs.update_changelog.outputs.changelog_commitish }}"
+
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                        echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in manifest.json"
+                        exit 1
+                     fi
+
+                     echo "✓ Version check passed: manifest.json has correct version $ACTUAL_VERSION"
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install dependencies
+                run: |
+                    echo "access=public" >> .npmrc
+                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+                    npm ci
+            -   name: Build module
+                run: npm run build
+            -   name: Publish to NPM
+                run: npm publish --tag latest
 
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
