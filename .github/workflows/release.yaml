@@ -82,25 +82,11 @@ jobs:
                     author_email: noreply@apify.com
                     message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
 
-            -   name: Debug commit info
-                run: |
-                    echo "Commit long SHA: ${{ steps.commit.outputs.commit_long_sha }}"
-                    echo "Current HEAD: $(git rev-parse HEAD)"
-                    echo "Git log (last 2 commits):"
-                    git log --oneline -2
-
             -   name: Get commit SHA
                 id: get_sha
                 run: |
                     COMMIT_SHA=$(git rev-parse HEAD)
                     echo "commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-                    echo "Captured SHA: $COMMIT_SHA"
-
-            -   name: Debug final SHA
-                run: |
-                    echo "Final changelog_commitish: ${{ steps.get_sha.outputs.commit_sha }}"
-                    echo "Commit action SHA: ${{ steps.commit.outputs.commit_long_sha }}"
-                    echo "Git HEAD: $(git rev-parse HEAD)"
 
     create_github_release:
         name: Create github release
@@ -179,29 +165,29 @@ jobs:
                     files: |
                         actors-mcp-server.dxt
 
-    #publish_to_npm:
-    #    name: Publish to NPM
-    #    needs: [ update_changelog ]
-    #    runs-on: ubuntu-latest
-    #    steps:
-    #        -   uses: actions/checkout@v4
-    #            with:
-    #                ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
-    #        -   name: Use Node.js 22
-    #            uses: actions/setup-node@v4
-    #            with:
-    #                node-version: 22
-    #                cache: 'npm'
-    #                cache-dependency-path: 'package-lock.json'
-    #        -   name: Install dependencies
-    #            run: |
-    #                echo "access=public" >> .npmrc
-    #                echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-    #                npm ci
-    #        -   name: Build module
-    #            run: npm run build
-    #        -   name: Publish to NPM
-    #            run: npm publish --tag latest
+    publish_to_npm:
+        name: Publish to NPM
+        needs: [ update_changelog ]
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install dependencies
+                run: |
+                    echo "access=public" >> .npmrc
+                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
+                    npm ci
+            -   name: Build module
+                run: npm run build
+            -   name: Publish to NPM
+                run: npm publish --tag latest
 
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
