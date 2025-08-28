@@ -11,6 +11,8 @@ import {
     ErrorCode,
     GetPromptRequestSchema,
     ListPromptsRequestSchema,
+    ListResourcesRequestSchema,
+    ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ServerNotificationSchema,
@@ -56,6 +58,11 @@ export class ActorsMcpServer {
             {
                 capabilities: {
                     tools: { listChanged: true },
+                    /**
+                     * Declaring prompts even though we are not using them
+                     * to prevent clients like Claude desktop from failing.
+                     */
+                    resources: { },
                     prompts: { },
                     logging: {},
                 },
@@ -67,6 +74,10 @@ export class ActorsMcpServer {
         this.setupLoggingHandlers();
         this.setupToolHandlers();
         this.setupPromptHandlers();
+        /**
+         * We need to handle resource requests to prevent clients like Claude desktop from failing.
+         */
+        this.setupResourceHandlers();
     }
 
     /**
@@ -290,6 +301,18 @@ export class ActorsMcpServer {
             }
             // Sending empty result based on MCP spec
             return {};
+        });
+    }
+
+    private setupResourceHandlers(): void {
+        this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+            // No resources available, return empty response
+            return { resources: [] };
+        });
+
+        this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+            // No resource templates available, return empty response
+            return { resourceTemplates: [] };
         });
     }
 
