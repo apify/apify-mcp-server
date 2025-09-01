@@ -219,9 +219,9 @@ npx @apify/actors-mcp-server --tools apify/my-actor
 As above, this exposes only the specified Actor (`apify/my-actor`) as a tool. No other tools will be available.
 
 > **⚠️ Important recommendation**
-> 
+>
 > **The default tools configuration may change in future versions.** When no `tools` parameter is specified, the server currently loads default tools, but this behavior is subject to change.
-> 
+>
 > **For production use and stable interfaces, always explicitly specify the `tools` parameter** to ensure your configuration remains consistent across updates.
 
 ### Backward compatibility
@@ -238,6 +238,7 @@ The v2 configuration preserves backward compatibility with v1 usage. Notes:
 - Defaults remain compatible: when no `tools` are specified, the server loads `actors`, `docs`, and `apify/rag-web-browser`.
   - If any `tools` are specified, the defaults are not added (same as v1 intent for explicit selection).
 - `call-actor` is now included by default via the `actors` category (additive change). To exclude it, specify an explicit `tools` list without `actors`.
+- `preview` category is deprecated and removed. Use specific tool names instead.
 
 Existing URLs and commands using `?actors=...` or `--actors` continue to work unchanged.
 

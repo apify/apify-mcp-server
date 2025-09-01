@@ -3,7 +3,10 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
+import log from '@apify/log';
+
 import { defaults } from '../const.js';
+import { callActor } from '../tools/actor.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import type { Input, ToolCategory, ToolEntry } from '../types.js';
@@ -36,7 +39,10 @@ export async function loadToolsFromInput(
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
         if (value === undefined) return undefined;
-        return (Array.isArray(value) ? value : [value]).map(String).map((s) => s.trim()).filter((s) => s !== '');
+        return (Array.isArray(value) ? value : [value])
+            .map(String)
+            .map((s) => s.trim())
+            .filter((s) => s !== '');
     };
 
     const selectors = normalizeSelectors(input.tools);
@@ -45,11 +51,18 @@ export async function loadToolsFromInput(
     const addActorEnabled = input.enableAddingActors === true;
     const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
 
-    // Partition selectors into internal picks (by category or by name) and actor names
+    // Partition selectors into internal picks (by category or by name) and Actor names
     const internalSelections: ToolEntry[] = [];
     const actorSelectorsFromTools: string[] = [];
     if (selectorsProvided && !selectorsExplicitEmpty) {
         for (const selector of selectors as (string | ToolCategory)[]) {
+            if (selector === 'preview') {
+                // 'preview' category is deprecated. It contained `call-actor` which is now default
+                log.warning('Tool category "preview" is deprecated');
+                internalSelections.push(callActor);
+                continue;
+            }
+
             const categoryTools = toolCategories[selector as ToolCategory];
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
@@ -112,12 +125,5 @@ export async function loadToolsFromInput(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    const deduped = result.filter((entry) => {
-        const { name } = entry.tool;
-        if (seen.has(name)) return false;
-        seen.add(name);
-        return true;
-    });
-
-    return deduped;
+    return result.filter((entry) => !seen.has(entry.tool.name) && seen.add(entry.tool.name));
 }
