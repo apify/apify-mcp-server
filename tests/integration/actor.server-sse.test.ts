@@ -7,12 +7,13 @@ import log from '@apify/log';
 import { createExpressApp } from '../../src/actor/server.js';
 import { createMcpSseClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
+import { getAvailablePort } from './utils/port.js';
 
 let app: Express;
 let httpServer: HttpServer;
-const httpServerPort = 50000;
-const httpServerHost = `http://localhost:${httpServerPort}`;
-const mcpUrl = `${httpServerHost}/sse`;
+let httpServerPort: number;
+let httpServerHost: string;
+let mcpUrl: string;
 
 createIntegrationTestsSuite({
     suiteName: 'Apify MCP Server SSE',
@@ -20,6 +21,11 @@ createIntegrationTestsSuite({
     createClientFn: async (options) => await createMcpSseClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
+
+        // Get an available port
+        httpServerPort = await getAvailablePort();
+        httpServerHost = `http://localhost:${httpServerPort}`;
+        mcpUrl = `${httpServerHost}/sse`;
 
         // Create an express app
         app = createExpressApp(httpServerHost);

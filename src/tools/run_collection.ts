@@ -38,9 +38,9 @@ export const getUserRunsList: ToolEntry = {
         inputSchema: zodToJsonSchema(getUserRunsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, authToken } = toolArgs;
             const parsed = getUserRunsListArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
+            const client = new ApifyClient({ authToken });
             const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
             return { content: [{ type: 'text', text: JSON.stringify(runs) }] };
         },

@@ -30,7 +30,7 @@ import {
 import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import type { ActorMcpTool, ActorTool, AuthToken, HelperTool, ToolEntry } from '../types.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
@@ -160,7 +160,7 @@ export class ActorsMcpServer {
     * @param toolNames - Array of tool names to ensure are loaded
     * @param apifyToken - Apify API token for authentication
     */
-    public async loadToolsByName(toolNames: string[], apifyToken: string) {
+    public async loadToolsByName(toolNames: string[], authToken: AuthToken) {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
@@ -185,7 +185,7 @@ export class ActorsMcpServer {
         }
 
         if (actorsToLoad.length > 0) {
-            await this.loadActorsAsTools(actorsToLoad, apifyToken);
+            await this.loadActorsAsTools(actorsToLoad, authToken);
         }
     }
 
@@ -196,8 +196,8 @@ export class ActorsMcpServer {
      * @param apifyToken - Apify API token for authentication
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
-    public async loadActorsAsTools(actorIdsOrNames: string[], apifyToken: string): Promise<ToolEntry[]> {
-        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyToken);
+    public async loadActorsAsTools(actorIdsOrNames: string[], authToken: AuthToken): Promise<ToolEntry[]> {
+        const actorTools = await getActorsAsTools(actorIdsOrNames, authToken);
         if (actorTools.length > 0) {
             this.upsertTools(actorTools, true);
         }
@@ -211,8 +211,8 @@ export class ActorsMcpServer {
      *
      * Used primarily for SSE.
      */
-    public async loadToolsFromUrl(url: string, apifyToken: string) {
-        const tools = await processParamsGetTools(url, apifyToken);
+    public async loadToolsFromUrl(url: string, authToken: AuthToken) {
+        const tools = await processParamsGetTools(url, authToken);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -381,17 +381,28 @@ export class ActorsMcpServer {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = request.params;
             const { progressToken } = meta || {};
-            const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
+            // Extract auth token with fallback to APIFY_TOKEN environment variable
+            let authToken: AuthToken | undefined = request.params.authToken as AuthToken;
+
+            // Fallback to APIFY_TOKEN environment variable for local development
+            if (!authToken && process.env.APIFY_TOKEN) {
+                authToken = {
+                    value: process.env.APIFY_TOKEN,
+                    type: 'apify', // Environment variable is always an Apify token
+                };
+            }
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
 
-            // Remove apifyToken from request.params just in case
-            delete request.params.apifyToken;
+            // Remove authToken from request.params only if it was provided in params
+            if (request.params.authToken) {
+                delete request.params.authToken;
+            }
             // Remove other custom params passed from apify-mcp-server
             delete request.params.userRentedActorIds;
 
-            // Validate token
-            if (!apifyToken) {
-                const msg = 'APIFY_TOKEN is required. It must be set in the environment variables or passed as a parameter in the body.';
+            // Validate auth token
+            if (!authToken || !authToken.value) {
+                const msg = 'Valid authentication token required. It must be provided either in the authToken parameter or APIFY_TOKEN environment variable.';
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -462,7 +473,7 @@ export class ActorsMcpServer {
                         extra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
-                        apifyToken,
+                        authToken,
                         userRentedActorIds,
                         progressTracker,
                     }) as object;
@@ -478,7 +489,7 @@ export class ActorsMcpServer {
                     const serverTool = tool.tool as ActorMcpTool;
                     let client: Client | undefined;
                     try {
-                        client = await connectMCPClient(serverTool.serverUrl, apifyToken);
+                        client = await connectMCPClient(serverTool.serverUrl, authToken.value);
 
                         // Only set up notification handlers if progressToken is provided by the client
                         if (progressToken) {
@@ -527,7 +538,7 @@ export class ActorsMcpServer {
                         const { runId, datasetId, items } = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
-                            apifyToken as string,
+                            authToken,
                             callOptions,
                             progressTracker,
                         );

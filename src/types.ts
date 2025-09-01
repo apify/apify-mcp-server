@@ -84,6 +84,14 @@ export interface ActorTool extends ToolBase {
     memoryMbytes?: number;
 }
 
+export type AuthTokenType = 'apify' | 'skyfire';
+
+export interface AuthToken {
+    value: string;
+    type: AuthTokenType;
+    userId?: string;
+}
+
 /**
  * Arguments passed to internal tool calls.
  * Contains both the tool arguments and server references.
@@ -102,8 +110,8 @@ export type InternalToolArgs = {
     apifyMcpServer: ActorsMcpServer;
     /** Reference to the MCP server instance */
     mcpServer: Server;
-    /** Apify API token */
-    apifyToken: string;
+    /** Authentication token containing value, type, and optional userId */
+    authToken: AuthToken;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */

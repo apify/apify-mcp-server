@@ -48,7 +48,7 @@ export const addTool: ToolEntry = {
         ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
-            const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
+            const { apifyMcpServer, authToken, args, extra: { sendNotification } } = toolArgs;
             const parsed = addToolArgsSchema.parse(args);
             if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
                 return {
@@ -59,7 +59,7 @@ export const addTool: ToolEntry = {
                 };
             }
 
-            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyToken);
+            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], authToken);
             /**
              * If no tools were found, return a message that the Actor was not found
              * instead of returning that non existent tool was added since the

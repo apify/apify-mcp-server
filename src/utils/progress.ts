@@ -2,7 +2,9 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import { ApifyClient } from '../apify-client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
+import type { AuthToken } from '../types.js';
 
+// TODO: we should write actual integration test to verify this works in production using real token.
 export class ProgressTracker {
     private progressToken: string | number;
     private sendNotification: (notification: ProgressNotification) => Promise<void>;
@@ -36,9 +38,9 @@ export class ProgressTracker {
         }
     }
 
-    startActorRunUpdates(runId: string, apifyToken: string, actorName: string): void {
+    startActorRunUpdates(runId: string, authToken: AuthToken, actorName: string): void {
         this.stop();
-        const client = new ApifyClient({ token: apifyToken });
+        const client = new ApifyClient({ authToken });
         let lastStatus = '';
         let lastStatusMessage = '';
 

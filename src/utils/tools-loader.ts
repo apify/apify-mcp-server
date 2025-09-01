@@ -6,7 +6,7 @@
 import { defaults } from '../const.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { Input, ToolCategory, ToolEntry } from '../types.js';
+import type { AuthToken, Input, ToolCategory, ToolEntry } from '../types.js';
 import { getExpectedToolsByCategories } from './tools.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -26,12 +26,12 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  * This function is used by both the stdio.ts and the processParamsGetTools function.
  *
  * @param input The processed Input object
- * @param apifyToken The Apify API token
+ * @param authToken The authentication token
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
-    apifyToken: string,
+    authToken: AuthToken,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -106,7 +106,7 @@ export async function loadToolsFromInput(
 
     // Actor tools (if any)
     if (actorNamesToLoad.length > 0) {
-        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyToken);
+        const actorTools = await getActorsAsTools(actorNamesToLoad, authToken);
         result.push(...actorTools);
     }
 

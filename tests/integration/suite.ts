@@ -1,6 +1,6 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import { ProgressNotificationSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { defaults, HelperTools } from '../../src/const.js';
@@ -434,6 +434,36 @@ export function createIntegrationTestsSuite(
             await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_PYTHON_EXAMPLE } });
 
             expect(hasReceivedNotification).toBe(true);
+
+            await client.close();
+        });
+
+        it('should send progress notifications when calling rag-web-browser actor', { timeout: 60000 }, async () => {
+            const client = await createClientFn({ tools: ['actors'] });
+
+            let progressReceived = false;
+            client.setNotificationHandler(ProgressNotificationSchema, async (notification) => {
+                if (notification.method === 'notifications/progress') {
+                    progressReceived = true;
+                }
+            });
+
+            await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: 'apify/rag-web-browser',
+                    step: 'call',
+                    input: {
+                        query: 'What is Apify?',
+                        maxResults: 1,
+                    },
+                },
+                _meta: {
+                    progressToken: 'test-progress-token',
+                },
+            });
+
+            expect(progressReceived).toBe(true);
 
             await client.close();
         });

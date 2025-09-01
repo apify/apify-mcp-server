@@ -28,9 +28,9 @@ export const getKeyValueStore: ToolEntry = {
         inputSchema: zodToJsonSchema(getKeyValueStoreArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, authToken } = toolArgs;
             const parsed = getKeyValueStoreArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
+            const client = new ApifyClient({ authToken });
             const store = await client.keyValueStore(parsed.storeId).get();
             return { content: [{ type: 'text', text: JSON.stringify(store) }] };
         },
@@ -65,9 +65,9 @@ export const getKeyValueStoreKeys: ToolEntry = {
         inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, authToken } = toolArgs;
             const parsed = getKeyValueStoreKeysArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
+            const client = new ApifyClient({ authToken });
             const keys = await client.keyValueStore(parsed.storeId).listKeys({
                 exclusiveStartKey: parsed.exclusiveStartKey,
                 limit: parsed.limit,
@@ -102,9 +102,9 @@ export const getKeyValueStoreRecord: ToolEntry = {
         inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, authToken } = toolArgs;
             const parsed = getKeyValueStoreRecordArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
+            const client = new ApifyClient({ authToken });
             const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
             return { content: [{ type: 'text', text: JSON.stringify(record) }] };
         },

@@ -11,7 +11,7 @@ import log from '@apify/log';
 import { createExpressApp } from './actor/server.js';
 import { processInput } from './input.js';
 import { callActorGetDataset } from './tools/index.js';
-import type { Input } from './types.js';
+import type { AuthToken, Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
@@ -24,6 +24,11 @@ if (!process.env.APIFY_TOKEN) {
     log.error('APIFY_TOKEN is required but not set in the environment variables.');
     process.exit(1);
 }
+
+const authToken: AuthToken = {
+    value: process.env.APIFY_TOKEN,
+    type: 'apify',
+};
 
 const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as Input));
 log.info('Loaded input', { input: JSON.stringify(input) });
@@ -44,7 +49,7 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
+    const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, authToken, options);
 
     await Actor.pushData(items);
     log.info('Pushed items to dataset', { itemCount: items.count });
