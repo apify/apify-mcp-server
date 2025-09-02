@@ -9,7 +9,7 @@ import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
-    AuthToken,
+    AuthInfo,
     InternalTool,
     ISchemaProperties,
     ToolEntry,
@@ -23,16 +23,16 @@ const ajv = new Ajv({ coerceTypes: 'array', strict: false });
  * First, fetch the Actor details to get the default build tag and buildId.
  * Then, fetch the build details and return actorName, description, and input schema.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
- * @param {AuthToken} authToken - Authentication token.
+ * @param {AuthInfo} authInfo - Authentication info.
  * @param {number} limit - Truncate the README to this limit.
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
-    authToken: AuthToken,
+    authInfo: AuthInfo,
     limit: number = ACTOR_README_MAX_LENGTH,
 ): Promise<ActorDefinitionPruned | null> {
-    const client = new ApifyClient({ authToken });
+    const client = new ApifyClient({ authInfo });
     const actorClient = client.actor(actorIdOrName);
     try {
         // Fetch actor details
@@ -124,10 +124,10 @@ export const actorDefinitionTool: ToolEntry = {
         inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
 
             const parsed = getActorDefinitionArgsSchema.parse(args);
-            const v = await getActorDefinition(parsed.actorName, authToken, parsed.limit);
+            const v = await getActorDefinition(parsed.actorName, authInfo, parsed.limit);
             if (!v) {
                 return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
             }

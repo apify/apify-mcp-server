@@ -2,7 +2,7 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import { ApifyClient } from '../apify-client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
-import type { AuthToken } from '../types.js';
+import type { AuthInfo } from '../types.js';
 
 export class ProgressTracker {
     private progressToken: string | number;
@@ -37,9 +37,9 @@ export class ProgressTracker {
         }
     }
 
-    startActorRunUpdates(runId: string, authToken: AuthToken, actorName: string): void {
+    startActorRunUpdates(runId: string, authInfo: AuthInfo, actorName: string): void {
         this.stop();
-        const client = new ApifyClient({ authToken });
+        const client = new ApifyClient({ authInfo });
         let lastStatus = '';
         let lastStatusMessage = '';
 

@@ -16,7 +16,7 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, AuthToken, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, AuthInfo, ToolEntry } from '../types.js';
 import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { getValuesByDotKeys } from '../utils/generic.js';
@@ -43,7 +43,7 @@ export type CallActorGetDatasetResult = {
  * @param {string} actorName - The name of the actor to call.
  * @param {ActorCallOptions} callOptions - The options to pass to the actor.
  * @param {unknown} input - The input to pass to the actor.
- * @param {AuthToken} authToken - The authentication token to use.
+ * @param {AuthInfo} authInfo - The authentication info to use.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
  * @returns {Promise<{ actorRun: any, items: object[] }>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the authentication token is not valid
@@ -51,12 +51,12 @@ export type CallActorGetDatasetResult = {
 export async function callActorGetDataset(
     actorName: string,
     input: unknown,
-    authToken: AuthToken,
+    authInfo: AuthInfo,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
 ): Promise<CallActorGetDatasetResult> {
     try {
-        const client = new ApifyClient({ authToken });
+        const client = new ApifyClient({ authInfo });
         const actorClient = client.actor(actorName);
 
         // Start the actor run but don't wait for completion
@@ -64,7 +64,7 @@ export async function callActorGetDataset(
 
         // Start progress tracking if tracker is provided
         if (progressTracker) {
-            progressTracker.startActorRunUpdates(actorRun.id, authToken, actorName);
+            progressTracker.startActorRunUpdates(actorRun.id, authInfo, actorName);
         }
 
         // Wait for the actor to complete
@@ -162,7 +162,7 @@ Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
 
 async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
-    authToken: AuthToken,
+    authInfo: AuthInfo,
 ): Promise<ToolEntry[]> {
     const actorsMCPServerTools: ToolEntry[] = [];
     for (const actorInfo of actorsInfo) {
@@ -186,7 +186,7 @@ async function getMCPServersAsTools(
 
         let client: Client | undefined;
         try {
-            client = await connectMCPClient(mcpServerUrl, authToken.value);
+            client = await connectMCPClient(mcpServerUrl, authInfo.value);
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
             actorsMCPServerTools.push(...serverTools);
         } finally {
@@ -199,7 +199,7 @@ async function getMCPServersAsTools(
 
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
-    authToken: AuthToken,
+    authInfo: AuthInfo,
 ): Promise<ToolEntry[]> {
     log.debug('Fetching actors as tools', { actorNames: actorIdsOrNames });
 
@@ -214,7 +214,7 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, authToken);
+            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, authInfo);
             if (!actorDefinitionPruned) {
                 log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
@@ -236,7 +236,7 @@ export async function getActorsAsTools(
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),
-        getMCPServersAsTools(actorMCPServersInfo, authToken),
+        getMCPServersAsTools(actorMCPServersInfo, authInfo),
     ]);
 
     return [...normalTools, ...mcpServerTools];
@@ -293,13 +293,13 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { args, authToken, progressTracker } = toolArgs;
+            const { args, authInfo, progressTracker } = toolArgs;
             const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
             try {
                 if (step === 'info') {
                     // Step 1: Return actor card and schema directly
-                    const details = await fetchActorDetails(authToken, actorName);
+                    const details = await fetchActorDetails(authInfo, actorName);
                     if (!details) {
                         return {
                             content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
@@ -320,7 +320,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     };
                 }
 
-                const [actor] = await getActorsAsTools([actorName], authToken);
+                const [actor] = await getActorsAsTools([actorName], authInfo);
 
                 if (!actor) {
                     return {
@@ -345,7 +345,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                 const { runId, datasetId, items } = await callActorGetDataset(
                     actorName,
                     input,
-                    authToken,
+                    authInfo,
                     callOptions,
                     progressTracker,
                 );

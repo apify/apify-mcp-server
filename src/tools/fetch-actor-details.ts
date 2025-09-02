@@ -28,9 +28,9 @@ export const fetchActorDetailsTool: ToolEntry = {
         inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-            const details = await fetchActorDetails(authToken, parsed.actor);
+            const details = await fetchActorDetails(authInfo, parsed.actor);
             if (!details) {
                 return {
                     content: [{ type: 'text', text: `Actor information for '${parsed.actor}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],

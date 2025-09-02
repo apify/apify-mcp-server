@@ -55,9 +55,9 @@ export const getDataset: ToolEntry = {
         inputSchema: zodToJsonSchema(getDatasetArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getDatasetArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const v = await client.dataset(parsed.datasetId).get();
             if (!v) {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
@@ -88,9 +88,9 @@ export const getDatasetItems: ToolEntry = {
         inputSchema: zodToJsonSchema(getDatasetItemsArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getDatasetItemsArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
 
             // Convert comma-separated strings to arrays
             const fields = parsed.fields?.split(',').map((f) => f.trim());
@@ -174,9 +174,9 @@ export const getDatasetSchema: ToolEntry = {
         inputSchema: zodToJsonSchema(getDatasetSchemaArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getDatasetSchemaArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
 
             // Get dataset items
             const datasetResponse = await client.dataset(parsed.datasetId).listItems({

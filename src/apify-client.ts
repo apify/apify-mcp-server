@@ -3,7 +3,7 @@ import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
 import { USER_AGENT_ORIGIN } from './const.js';
-import type { AuthToken } from './types.js';
+import type { AuthInfo } from './types.js';
 
 /**
  * Adds a User-Agent header to the request config.
@@ -26,20 +26,20 @@ export function getApifyAPIBaseUrl(): string {
 /**
  * Adds Skyfire header to the request config if needed.
  * @param config
- * @param authToken
+ * @param authInfo
  * @private
  */
-function addSkyfireHeader(config: AxiosRequestConfig, authToken: AuthToken): AxiosRequestConfig {
+function addSkyfireHeader(config: AxiosRequestConfig, authInfo: AuthInfo): AxiosRequestConfig {
     const updatedConfig = { ...config };
     updatedConfig.headers = updatedConfig.headers ?? {};
-    updatedConfig.headers['skyfire-pay-id'] = authToken.value;
+    updatedConfig.headers['skyfire-pay-id'] = authInfo.value;
     return updatedConfig;
 }
 
 export class ApifyClient extends _ApifyClient {
-    constructor(options: ApifyClientOptions & { authToken?: AuthToken }) {
-        // Destructure to separate authToken from other options
-        const { authToken, ...clientOptions } = options;
+    constructor(options: ApifyClientOptions & { authInfo?: AuthInfo }) {
+        // Destructure to separate authInfo from other options
+        const { authInfo, ...clientOptions } = options;
 
         /**
          * In order to publish to DockerHub, we need to run their build task to validate our MCP server.
@@ -51,26 +51,26 @@ export class ApifyClient extends _ApifyClient {
             delete clientOptions.token;
         }
 
-        // Handle authToken if provided
-        if (authToken) {
-            if (authToken.type === 'skyfire') {
+        // Handle authInfo if provided
+        if (authInfo) {
+            if (authInfo.type === 'skyfire') {
                 // For Skyfire tokens: DO NOT set as bearer token
                 // Only add the skyfire-pay-id header via request interceptor
                 // Remove any existing token to ensure no bearer auth
                 delete clientOptions.token;
             } else {
                 // For Apify tokens: Use as regular bearer token (existing behavior)
-                clientOptions.token = authToken.value;
+                clientOptions.token = authInfo.value;
             }
         }
 
         const requestInterceptors = [addUserAgent];
-        if (authToken?.type === 'skyfire') {
-            requestInterceptors.push((config) => addSkyfireHeader(config, authToken));
+        if (authInfo?.type === 'skyfire') {
+            requestInterceptors.push((config) => addSkyfireHeader(config, authInfo));
         }
 
         super({
-            ...clientOptions, // safe to spread without authToken
+            ...clientOptions, // safe to spread without authInfo
             baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors,
         });

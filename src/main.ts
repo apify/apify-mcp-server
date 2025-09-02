@@ -11,7 +11,7 @@ import log from '@apify/log';
 import { createExpressApp } from './actor/server.js';
 import { processInput } from './input.js';
 import { callActorGetDataset } from './tools/index.js';
-import type { AuthToken, Input } from './types.js';
+import type { AuthInfo, Input } from './types.js';
 
 const STANDBY_MODE = Actor.getEnv().metaOrigin === 'STANDBY';
 
@@ -25,7 +25,7 @@ if (!process.env.APIFY_TOKEN) {
     process.exit(1);
 }
 
-const authToken: AuthToken = {
+const authInfo: AuthInfo = {
     value: process.env.APIFY_TOKEN,
     type: 'apify',
 };
@@ -49,7 +49,7 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, authToken, options);
+    const { items } = await callActorGetDataset(input.debugActor!, input.debugActorInput!, authInfo, options);
 
     await Actor.pushData(items);
     log.info('Pushed items to dataset', { itemCount: items.count });

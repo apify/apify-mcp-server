@@ -41,9 +41,9 @@ export const getUserDatasetsList: ToolEntry = {
         inputSchema: zodToJsonSchema(getUserDatasetsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getUserDatasetsListArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const datasets = await client.datasets().list({
                 limit: parsed.limit,
                 offset: parsed.offset,

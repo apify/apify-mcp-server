@@ -35,9 +35,9 @@ export const getActorRun: ToolEntry = {
         inputSchema: zodToJsonSchema(getActorRunArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getActorRunArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const v = await client.run(parsed.runId).get();
             if (!v) {
                 return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
@@ -69,9 +69,9 @@ export const getActorRunLog: ToolEntry = {
         inputSchema: zodToJsonSchema(GetRunLogArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = GetRunLogArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const v = await client.run(parsed.runId).log().get() ?? '';
             const lines = v.split('\n');
             const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
@@ -94,9 +94,9 @@ export const abortActorRun: ToolEntry = {
         inputSchema: zodToJsonSchema(abortRunArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = abortRunArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
             return { content: [{ type: 'text', text: JSON.stringify(v) }] };
         },

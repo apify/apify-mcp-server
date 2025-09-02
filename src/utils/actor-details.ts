@@ -2,7 +2,7 @@ import type { Actor, Build } from 'apify-client';
 
 import { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { AuthToken, IActorInputSchema } from '../types.js';
+import type { AuthInfo, IActorInputSchema } from '../types.js';
 import { formatActorToActorCard } from './actor-card.js';
 
 // Keep the interface here since it is a self contained module
@@ -14,8 +14,8 @@ export interface ActorDetailsResult {
     readme: string;
 }
 
-export async function fetchActorDetails(authToken: AuthToken, actorName: string): Promise<ActorDetailsResult | null> {
-    const client = new ApifyClient({ authToken });
+export async function fetchActorDetails(authInfo: AuthInfo, actorName: string): Promise<ActorDetailsResult | null> {
+    const client = new ApifyClient({ authInfo });
     const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
         client.actor(actorName).get(),
         client.actor(actorName).defaultBuild().then(async (build) => build.get()),

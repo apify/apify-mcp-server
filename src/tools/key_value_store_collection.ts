@@ -41,9 +41,9 @@ export const getUserKeyValueStoresList: ToolEntry = {
         inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
         call: async (toolArgs) => {
-            const { args, authToken } = toolArgs;
+            const { args, authInfo } = toolArgs;
             const parsed = getUserKeyValueStoresListArgs.parse(args);
-            const client = new ApifyClient({ authToken });
+            const client = new ApifyClient({ authInfo });
             const stores = await client.keyValueStores().list({
                 limit: parsed.limit,
                 offset: parsed.offset,

@@ -5,16 +5,16 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
-import type { ActorPricingModel, AuthToken, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
+import type { ActorPricingModel, AuthInfo, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
 import { formatActorsListToActorCard } from '../utils/actor-card.js';
 
 export async function searchActorsByKeywords(
     search: string,
-    authToken: AuthToken,
+    authInfo: AuthInfo,
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
 ): Promise<ExtendedActorStoreList[]> {
-    const client = new ApifyClient({ authToken });
+    const client = new ApifyClient({ authInfo });
     const results = await client.store().list({ search, limit, offset });
     return results.items;
 }
@@ -90,11 +90,11 @@ export const searchActors: ToolEntry = {
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
-            const { args, authToken, userRentedActorIds } = toolArgs;
+            const { args, authInfo, userRentedActorIds } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
             let actors = await searchActorsByKeywords(
                 parsed.search,
-                authToken,
+                authInfo,
                 parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
             );

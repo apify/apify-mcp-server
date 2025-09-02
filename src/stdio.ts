@@ -24,7 +24,7 @@ import log from '@apify/log';
 
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import type { AuthToken, Input, ToolSelector } from './types.js';
+import type { AuthInfo, Input, ToolSelector } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -122,11 +122,11 @@ async function main() {
     const normalized = processInput(input);
 
     // Use the shared tools loading logic
-    const authToken: AuthToken = {
+    const authInfo: AuthInfo = {
         value: process.env.APIFY_TOKEN as string,
         type: 'apify',
     };
-    const tools = await loadToolsFromInput(normalized, authToken);
+    const tools = await loadToolsFromInput(normalized, authInfo);
 
     mcpServer.upsertTools(tools);
 
