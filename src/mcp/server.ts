@@ -64,7 +64,7 @@ export class ActorsMcpServer {
                      */
                     resources: { },
                     prompts: { },
-                    // logging: {}, // Because of error in inspector `Server declares logging capability but doesn't implement method: "logging/setLevel"`
+                    logging: {},
                 },
             },
         );
