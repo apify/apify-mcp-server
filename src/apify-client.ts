@@ -29,14 +29,11 @@ export function getApifyAPIBaseUrl(): string {
  * @param authToken
  * @private
  */
-function addSkyfireHeader(config: AxiosRequestConfig, authToken?: AuthToken): AxiosRequestConfig {
-    if (authToken?.type === 'skyfire') {
-        const updatedConfig = { ...config };
-        updatedConfig.headers = updatedConfig.headers ?? {};
-        updatedConfig.headers['skyfire-pay-id'] = authToken.value;
-        return updatedConfig;
-    }
-    return config;
+function addSkyfireHeader(config: AxiosRequestConfig, authToken: AuthToken): AxiosRequestConfig {
+    const updatedConfig = { ...config };
+    updatedConfig.headers = updatedConfig.headers ?? {};
+    updatedConfig.headers['skyfire-pay-id'] = authToken.value;
+    return updatedConfig;
 }
 
 export class ApifyClient extends _ApifyClient {

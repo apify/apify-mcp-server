@@ -158,7 +158,7 @@ export class ActorsMcpServer {
     * Loads missing toolNames from a provided list of tool names.
     * Skips toolNames that are already loaded and loads only the missing ones.
     * @param toolNames - Array of tool names to ensure are loaded
-    * @param apifyToken - Apify API token for authentication
+    * @param authToken - Token for Apify service authentication
     */
     public async loadToolsByName(toolNames: string[], authToken: AuthToken) {
         const loadedTools = this.listAllToolNames();
@@ -193,7 +193,7 @@ export class ActorsMcpServer {
      * Load actors as tools, upsert them to the server, and return the tool entries.
      * This is a public method that wraps getActorsAsTools and handles the upsert operation.
      * @param actorIdsOrNames - Array of actor IDs or names to load as tools
-     * @param apifyToken - Apify API token for authentication
+     * @param authToken - Token for Apify service authentication
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
     public async loadActorsAsTools(actorIdsOrNames: string[], authToken: AuthToken): Promise<ToolEntry[]> {
