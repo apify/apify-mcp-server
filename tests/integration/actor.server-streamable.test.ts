@@ -15,18 +15,14 @@ const httpServerHost = `http://localhost:${httpServerPort}`;
 const mcpUrl = `${httpServerHost}/mcp`;
 
 createIntegrationTestsSuite({
-    suiteName: 'Actors MCP Server Streamable HTTP',
+    suiteName: 'Apify MCP Server Streamable HTTP',
     transport: 'streamable-http',
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
 
-        // Create an express app using the proper server setup
-        const mcpServerOptions = {
-            enableAddingActors: false,
-            enableDefaultActors: false,
-        };
-        app = createExpressApp(httpServerHost, mcpServerOptions);
+        // Create an express app
+        app = createExpressApp(httpServerHost);
 
         // Start a test server
         await new Promise<void>((resolve) => {

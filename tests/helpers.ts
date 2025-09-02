@@ -10,7 +10,7 @@ import type { ToolCategory } from '../src/types.js';
 export interface McpClientOptions {
     actors?: string[];
     enableAddingActors?: boolean;
-    tools?: ToolCategory[]; // Tool categories to include
+    tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
 }
 
@@ -23,13 +23,13 @@ export async function createMcpSseClient(
     }
     const url = new URL(serverUrl);
     const { actors, enableAddingActors, tools } = options || {};
-    if (actors) {
+    if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
 
@@ -62,13 +62,13 @@ export async function createMcpStreamableClient(
     }
     const url = new URL(serverUrl);
     const { actors, enableAddingActors, tools } = options || {};
-    if (actors) {
+    if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
     if (enableAddingActors !== undefined) {
         url.searchParams.append('enableAddingActors', enableAddingActors.toString());
     }
-    if (tools && tools.length > 0) {
+    if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
 
@@ -106,24 +106,24 @@ export async function createMcpStdioClient(
 
     // Set environment variables instead of command line arguments when useEnv is true
     if (useEnv) {
-        if (actors) {
+        if (actors !== undefined) {
             env.ACTORS = actors.join(',');
         }
         if (enableAddingActors !== undefined) {
             env.ENABLE_ADDING_ACTORS = enableAddingActors.toString();
         }
-        if (tools && tools.length > 0) {
+        if (tools !== undefined) {
             env.TOOLS = tools.join(',');
         }
     } else {
         // Use command line arguments as before
-        if (actors) {
+        if (actors !== undefined) {
             args.push('--actors', actors.join(','));
         }
         if (enableAddingActors !== undefined) {
             args.push('--enable-adding-actors', enableAddingActors.toString());
         }
-        if (tools && tools.length > 0) {
+        if (tools !== undefined) {
             args.push('--tools', tools.join(','));
         }
     }

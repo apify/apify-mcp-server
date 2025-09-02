@@ -11,9 +11,12 @@ import {
     ErrorCode,
     GetPromptRequestSchema,
     ListPromptsRequestSchema,
+    ListResourcesRequestSchema,
+    ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ServerNotificationSchema,
+    SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions, ApifyApiError } from 'apify-client';
@@ -21,24 +24,18 @@ import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 import log from '@apify/log';
 
 import {
-    defaults,
     SERVER_NAME,
     SERVER_VERSION,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
-import { addRemoveTools, callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
-import { actorNameToToolName, decodeDotPropertyNames } from '../tools/utils.js';
+import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC } from './const.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { processParamsGetTools } from './utils.js';
-
-type ActorsMcpServerOptions = {
-    enableAddingActors?: boolean;
-    enableDefaultActors?: boolean;
-};
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -48,15 +45,11 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
 export class ActorsMcpServer {
     public readonly server: Server;
     public readonly tools: Map<string, ToolEntry>;
-    private options: ActorsMcpServerOptions;
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
+    private currentLogLevel = 'info';
 
-    constructor(options: ActorsMcpServerOptions = {}, setupSigintHandler = true) {
-        this.options = {
-            enableAddingActors: options.enableAddingActors ?? true,
-            enableDefaultActors: options.enableDefaultActors ?? true, // Default to true for backward compatibility
-        };
+    constructor(setupSigintHandler = true) {
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -65,28 +58,26 @@ export class ActorsMcpServer {
             {
                 capabilities: {
                     tools: { listChanged: true },
+                    /**
+                     * Declaring prompts even though we are not using them
+                     * to prevent clients like Claude desktop from failing.
+                     */
+                    resources: { },
                     prompts: { },
                     // logging: {}, // Because of error in inspector `Server declares logging capability but doesn't implement method: "logging/setLevel"`
                 },
             },
         );
+        this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
+        this.setupLoggingHandlers();
         this.setupToolHandlers();
         this.setupPromptHandlers();
-
-        // Add default tools
-        this.upsertTools(defaultTools);
-
-        // Add tools to dynamically load Actors
-        if (this.options.enableAddingActors) {
-            this.enableDynamicActorTools();
-        }
-
-        // Initialize automatically for backward compatibility
-        this.initialize().catch((error) => {
-            log.error('Failed to initialize server', { error });
-        });
+        /**
+         * We need to handle resource requests to prevent clients like Claude desktop from failing.
+         */
+        this.setupResourceHandlers();
     }
 
     /**
@@ -175,7 +166,6 @@ export class ActorsMcpServer {
         const toolsToLoad: ToolEntry[] = [];
         const internalToolMap = new Map([
             ...defaultTools,
-            ...addRemoveTools,
             ...Object.values(toolCategories).flat(),
         ].map((tool) => [tool.tool.name, tool]));
 
@@ -195,61 +185,23 @@ export class ActorsMcpServer {
         }
 
         if (actorsToLoad.length > 0) {
-            const actorTools = await getActorsAsTools(actorsToLoad, apifyToken);
-            if (actorTools.length > 0) {
-                this.upsertTools(actorTools);
-            }
+            await this.loadActorsAsTools(actorsToLoad, apifyToken);
         }
     }
 
     /**
-    * Resets the server to the default state.
-    * This method clears all tools and loads the default tools.
-    * Used primarily for testing purposes.
-    */
-    public async reset(): Promise<void> {
-        this.tools.clear();
-        // Unregister the tools changed handler
-        if (this.toolsChangedHandler) {
-            this.unregisterToolsChangedHandler();
-        }
-        this.upsertTools(defaultTools);
-        if (this.options.enableAddingActors) {
-            this.enableDynamicActorTools();
-        }
-        // Initialize automatically for backward compatibility
-        await this.initialize();
-    }
-
-    /**
-     * Initialize the server with default tools if enabled
-     */
-    public async initialize(): Promise<void> {
-        if (this.options.enableDefaultActors) {
-            await this.loadDefaultActors(process.env.APIFY_TOKEN as string);
-        }
-    }
-
-    /**
-     * Loads default tools if not already loaded.
+     * Load actors as tools, upsert them to the server, and return the tool entries.
+     * This is a public method that wraps getActorsAsTools and handles the upsert operation.
+     * @param actorIdsOrNames - Array of actor IDs or names to load as tools
      * @param apifyToken - Apify API token for authentication
-     * @returns {Promise<void>} - A promise that resolves when the tools are loaded
+     * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
-    public async loadDefaultActors(apifyToken: string): Promise<void> {
-        const missingActors = defaults.actors.filter((name) => !this.tools.has(actorNameToToolName(name)));
-        const tools = await getActorsAsTools(missingActors, apifyToken);
-        if (tools.length > 0) {
-            log.debug('Loading default tools');
-            this.upsertTools(tools);
+    public async loadActorsAsTools(actorIdsOrNames: string[], apifyToken: string): Promise<ToolEntry[]> {
+        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyToken);
+        if (actorTools.length > 0) {
+            this.upsertTools(actorTools, true);
         }
-    }
-
-    /**
-     * @deprecated Use `loadDefaultActors` instead.
-     * Loads default tools if not already loaded.
-     */
-    public async loadDefaultTools(apifyToken: string) {
-        await this.loadDefaultActors(apifyToken);
+        return actorTools;
     }
 
     /**
@@ -265,19 +217,6 @@ export class ActorsMcpServer {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
-    }
-
-    /**
-     * Add Actors to server dynamically
-     */
-    public enableDynamicActorTools() {
-        this.options.enableAddingActors = true;
-        this.upsertTools(addRemoveTools, false);
-    }
-
-    public disableDynamicActorTools() {
-        this.options.enableAddingActors = false;
-        this.removeToolsByName(addRemoveTools.map((tool) => tool.tool.name));
     }
 
     /** Delete tools from the server and notify the handler.
@@ -338,6 +277,43 @@ export class ActorsMcpServer {
             process.once('SIGINT', handler);
             this.sigintHandler = handler; // Store the actual handler
         }
+    }
+
+    private setupLoggingProxy(): void {
+        // Store original sendLoggingMessage
+        const originalSendLoggingMessage = this.server.sendLoggingMessage.bind(this.server);
+
+        // Proxy sendLoggingMessage to filter logs
+        this.server.sendLoggingMessage = async (params: { level: string; data?: unknown; [key: string]: unknown }) => {
+            const messageLevelValue = LOG_LEVEL_MAP[params.level] ?? -1; // Unknown levels get -1, discard
+            const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info; // Default to info if invalid
+            if (messageLevelValue >= currentLevelValue) {
+                await originalSendLoggingMessage(params as Parameters<typeof originalSendLoggingMessage>[0]);
+            }
+        };
+    }
+
+    private setupLoggingHandlers(): void {
+        this.server.setRequestHandler(SetLevelRequestSchema, (request) => {
+            const { level } = request.params;
+            if (LOG_LEVEL_MAP[level] !== undefined) {
+                this.currentLogLevel = level;
+            }
+            // Sending empty result based on MCP spec
+            return {};
+        });
+    }
+
+    private setupResourceHandlers(): void {
+        this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+            // No resources available, return empty response
+            return { resources: [] };
+        });
+
+        this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
+            // No resource templates available, return empty response
+            return { resourceTemplates: [] };
+        });
     }
 
     /**

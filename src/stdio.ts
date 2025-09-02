@@ -22,9 +22,9 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
+import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { toolCategories } from './tools/index.js';
-import type { Input, ToolCategory } from './types.js';
+import type { Input, ToolSelector } from './types.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -46,6 +46,7 @@ log.setLevel(log.LEVELS.ERROR);
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
+    .wrap(null) // Disable automatic wrapping to avoid issues with long lines and links
     .usage('Usage: $0 [options]')
     .env()
     .option('actors', {
@@ -55,30 +56,22 @@ const argv = yargs(hideBin(process.argv))
     })
     .option('enable-adding-actors', {
         type: 'boolean',
-        default: true,
-        describe: 'Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.',
+        default: false,
+        describe: `Enable dynamically adding Actors as tools based on user requests. Can also be set via ENABLE_ADDING_ACTORS environment variable.
+Deprecated: use tools experimental category instead.`,
     })
     .option('enableActorAutoLoading', {
         type: 'boolean',
-        default: true,
+        default: false,
         hidden: true,
         describe: 'Deprecated: use enable-adding-actors instead.',
     })
     .options('tools', {
         type: 'string',
-        describe: `Comma-separated list of specific tool categories to enable. Can also be set via TOOLS environment variable.
+        describe: `Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: --tools actors,docs,apify/rag-web-browser. Can also be set via TOOLS environment variable.
 
-Available choices: ${Object.keys(toolCategories).join(', ')}
-
-Tool categories are as follows:
-- docs: Search and fetch Apify documentation tools.
-- runs: Get Actor runs list, run details, and logs from a specific Actor run.
-- storage: Access datasets, key-value stores, and their records.
-- preview: Experimental tools in preview mode.
-
-Note: Tools that enable you to search Actors from the Apify Store and get their details are always enabled by default.
-`,
-        example: 'docs,runs,storage',
+For more details visit https://mcp.apify.com`,
+        example: 'actors,docs,apify/rag-web-browser',
     })
     .help('help')
     .alias('h', 'help')
@@ -87,14 +80,19 @@ Note: Tools that enable you to search Actors from the Apify Store and get their 
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
         + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
-    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/actors-mcp-server')
+    .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
 
-const enableAddingActors = argv.enableAddingActors && argv.enableActorAutoLoading;
-const actors = argv.actors as string || '';
-const actorList = actors ? actors.split(',').map((a: string) => a.trim()) : [];
-// Keys of the tool categories to enable
-const toolCategoryKeys = argv.tools ? argv.tools.split(',').map((t: string) => t.trim()) : [];
+// Respect either the new flag or the deprecated one
+const enableAddingActors = Boolean(argv.enableAddingActors || argv.enableActorAutoLoading);
+// Split actors argument, trim whitespace, and filter out empty strings
+const actorList = argv.actors !== undefined
+    ? argv.actors.split(',').map((a: string) => a.trim()).filter((a: string) => a.length > 0)
+    : undefined;
+// Split tools argument, trim whitespace, and filter out empty strings
+const toolCategoryKeys = argv.tools !== undefined
+    ? argv.tools.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
+    : undefined;
 
 // Propagate log.error to console.error for easier debugging
 const originalError = log.error.bind(log);
@@ -111,17 +109,20 @@ if (!process.env.APIFY_TOKEN) {
 }
 
 async function main() {
-    const mcpServer = new ActorsMcpServer({ enableAddingActors, enableDefaultActors: false });
+    const mcpServer = new ActorsMcpServer();
 
     // Create an Input object from CLI arguments
     const input: Input = {
-        actors: actorList.length ? actorList : [],
+        actors: actorList,
         enableAddingActors,
-        tools: toolCategoryKeys as ToolCategory[],
+        tools: toolCategoryKeys as ToolSelector[],
     };
 
+    // Normalize (merges actors into tools for backward compatibility)
+    const normalized = processInput(input);
+
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(input, process.env.APIFY_TOKEN as string, actorList.length === 0);
+    const tools = await loadToolsFromInput(normalized, process.env.APIFY_TOKEN as string);
 
     mcpServer.upsertTools(tools);
 

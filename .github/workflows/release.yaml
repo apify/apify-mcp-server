@@ -64,6 +64,9 @@ jobs:
             -   name: Update package version in package.json
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
 
+            -   name: Update manifest.json version
+                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json
+
             -   name: Update CHANGELOG.md
                 uses: DamianReeves/write-file-action@master
                 with:
@@ -77,7 +80,7 @@ jobs:
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update changelog and package version [skip ci]"
+                    message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
 
     create_github_release:
         name: Create github release
@@ -88,7 +91,34 @@ jobs:
         steps:
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Verify commit SHA
+                run: |
+                    CURRENT_SHA=$(git rev-parse HEAD)
+                    EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
+                    echo "Expected commit SHA: $EXPECTED_SHA"
+                    echo "Actual checked out SHA: $CURRENT_SHA"
+                    if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
+                        echo "ERROR: Checked out SHA differs from expected!"
+                        exit 1
+                    else
+                        echo "✓ Commit SHA matches expected"
+                    fi
+            -   name: Verify manifest.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    ACTUAL_VERSION=$(jq -r '.version' manifest.json)
+
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in manifest.json: $ACTUAL_VERSION"
+                     echo "Current commit SHA: ${{ needs.update_changelog.outputs.changelog_commitish }}"
+
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                        echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in manifest.json"
+                        exit 1
+                    fi
+
+                    echo "✓ Version check passed: manifest.json has correct version $ACTUAL_VERSION"
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
                 with:
@@ -112,24 +142,54 @@ jobs:
                     cp manifest.json dxt/manifest.json
             - name: Create DXT package
               run: npx -y @anthropic-ai/dxt pack dxt/ actors-mcp-server.dxt
-            -   name: Create release
-                uses: softprops/action-gh-release@v2
-                with:
-                    tag_name: ${{ needs.release_metadata.outputs.tag_name }}
-                    name: ${{ needs.release_metadata.outputs.version_number }}
-                    target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
-                    body: ${{ needs.release_metadata.outputs.release_notes }}
-                    files: |
-                        actors-mcp-server.dxt
+            - name: Copy DXT package
+              run: cp actors-mcp-server.dxt apify-mcp-server.dxt
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+                  name: ${{ needs.release_metadata.outputs.version_number }}
+                  target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
+                  body: ${{ needs.release_metadata.outputs.release_notes }}
+                  files: |
+                       actors-mcp-server.dxt
+                       apify-mcp-server.dxt
 
     publish_to_npm:
         name: Publish to NPM
-        needs: [ update_changelog ]
+        needs: [ release_metadata, update_changelog ]
         runs-on: ubuntu-latest
         steps:
             -   uses: actions/checkout@v4
                 with:
-                    ref: ${{ needs.update_changelog.changelog_commitish }}
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Verify commit SHA
+                run: |
+                    CURRENT_SHA=$(git rev-parse HEAD)
+                    EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
+                    echo "Expected commit SHA: $EXPECTED_SHA"
+                    echo "Actual checked out SHA: $CURRENT_SHA"
+                    if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
+                        echo "ERROR: Checked out SHA differs from expected!"
+                        exit 1
+                    else
+                        echo "✓ Commit SHA matches expected"
+                    fi
+            -   name: Verify package.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    ACTUAL_VERSION=$(jq -r '.version' package.json)
+
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in package.json: $ACTUAL_VERSION"
+                     echo "Current commit SHA: ${{ needs.update_changelog.outputs.changelog_commitish }}"
+
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                        echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in package.json"
+                        exit 1
+                     fi
+
+                     echo "✓ Version check passed: package.json has correct version $ACTUAL_VERSION"
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
                 with:

@@ -15,18 +15,14 @@ const httpServerHost = `http://localhost:${httpServerPort}`;
 const mcpUrl = `${httpServerHost}/sse`;
 
 createIntegrationTestsSuite({
-    suiteName: 'Actors MCP Server SSE',
+    suiteName: 'Apify MCP Server SSE',
     transport: 'sse',
     createClientFn: async (options) => await createMcpSseClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
 
-        // Create an express app using the proper server setup
-        const mcpServerOptions = {
-            enableAddingActors: false,
-            enableDefaultActors: false,
-        };
-        app = createExpressApp(httpServerHost, mcpServerOptions);
+        // Create an express app
+        app = createExpressApp(httpServerHost);
 
         // Start a test server
         await new Promise<void>((resolve) => {

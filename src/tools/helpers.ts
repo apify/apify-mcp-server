@@ -4,7 +4,6 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types';
-import { getActorsAsTools } from './actor.js';
 import { actorNameToToolName } from './utils.js';
 
 const ajv = new Ajv({ coerceTypes: 'array', strict: false });
@@ -59,11 +58,12 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            const tools = await getActorsAsTools([parsed.actor], apifyToken);
+
+            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyToken);
             /**
              * If no tools were found, return a message that the Actor was not found
              * instead of returning that non existent tool was added since the
-             * getActorsAsTools function returns an empty array and does not throw an error.
+             * loadActorsAsTools method returns an empty array and does not throw an error.
              */
             if (tools.length === 0) {
                 return {
@@ -73,14 +73,14 @@ export const addTool: ToolEntry = {
                     }],
                 };
             }
-            const toolsAdded = apifyMcpServer.upsertTools(tools, true);
+
             await sendNotification({ method: 'notifications/tools/list_changed' });
 
             return {
                 content: [{
                     type: 'text',
                     text: `Actor ${parsed.actor} has been added. Newly available tools: ${
-                        toolsAdded.map(
+                        tools.map(
                             (t) => `${t.tool.name}`,
                         ).join(', ')
                     }.`,

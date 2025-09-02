@@ -29,21 +29,9 @@ const input = processInput((await Actor.getInput<Partial<Input>>()) ?? ({} as In
 log.info('Loaded input', { input: JSON.stringify(input) });
 
 if (STANDBY_MODE) {
-    let actorsToLoad: string[] = [];
-    // TODO: in standby mode the input loading does not actually work,
-    // we should remove this since we are using the URL query parameters to load Actors
-    // Load only Actors specified in the input
-    // If you wish to start without any Actor, create a task and leave the input empty
-    if (input.actors && input.actors.length > 0) {
-        const { actors } = input;
-        actorsToLoad = Array.isArray(actors) ? actors : actors.split(',');
-    }
-    // Include Actors to load in the MCP server options for backwards compatibility
-    const app = createExpressApp(HOST, {
-        enableAddingActors: Boolean(input.enableAddingActors),
-        enableDefaultActors: false,
-        actors: actorsToLoad,
-    });
+    // In standby mode, actors and tools are provided via URL query params per request
+    // Start express app
+    const app = createExpressApp(HOST);
     log.info('Actor is running in the STANDBY mode.');
 
     app.listen(PORT, () => {
