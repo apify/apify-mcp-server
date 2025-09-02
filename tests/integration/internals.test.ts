@@ -6,7 +6,7 @@ import { actorNameToToolName } from '../../dist/tools/utils.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { addTool } from '../../src/tools/helpers.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
-import type { Input } from '../../src/types.js';
+import type { AuthInfo, Input } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools-loader.js';
 import { ACTOR_PYTHON_EXAMPLE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
@@ -15,25 +15,27 @@ beforeAll(() => {
     log.setLevel(log.LEVELS.OFF);
 });
 
+const authInfo: AuthInfo = {
+    value: process.env.APIFY_TOKEN as string,
+    type: 'apify',
+};
+
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
         const actorsMcpServer = new ActorsMcpServer(false);
         const initialTools = await loadToolsFromInput({
             enableAddingActors: true,
-        } as Input, process.env.APIFY_TOKEN as string);
+        } as Input, authInfo);
         actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
-        const newTool = await getActorsAsTools([ACTOR_PYTHON_EXAMPLE], process.env.APIFY_TOKEN as string);
+        const newTool = await getActorsAsTools([ACTOR_PYTHON_EXAMPLE], authInfo);
         actorsMcpServer.upsertTools(newTool);
 
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
-        // With enableAddingActors=true and no tools/actors, we should only have add-actor initially
-        const expectedToolNames = [
-            addTool.tool.name,
-            ACTOR_PYTHON_EXAMPLE,
-        ];
+        const expectedToolNames = [...names];
+
         expectArrayWeakEquals(expectedToolNames, names);
 
         // Remove all tools
@@ -41,7 +43,7 @@ describe('MCP server internals integration tests', () => {
         expect(actorsMcpServer.listAllToolNames()).toEqual([]);
 
         // Load the tool state from the tool name list
-        await actorsMcpServer.loadToolsByName(names, process.env.APIFY_TOKEN as string);
+        await actorsMcpServer.loadToolsByName(names, authInfo);
 
         // Check if the tool name list is restored
         expectArrayWeakEquals(actorsMcpServer.listAllToolNames(), expectedToolNames);
@@ -59,13 +61,14 @@ describe('MCP server internals integration tests', () => {
         };
 
         const actorsMCPServer = new ActorsMcpServer(false);
-        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, process.env.APIFY_TOKEN as string);
+
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, authInfo);
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
         const actor = ACTOR_PYTHON_EXAMPLE;
-        const newTool = await getActorsAsTools([actor], process.env.APIFY_TOKEN as string);
+        const newTool = await getActorsAsTools([actor], authInfo);
         actorsMCPServer.upsertTools(newTool, true);
 
         // Check if the notification was received with the correct tools
@@ -96,13 +99,14 @@ describe('MCP server internals integration tests', () => {
         };
 
         const actorsMCPServer = new ActorsMcpServer(false);
-        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, process.env.APIFY_TOKEN as string);
+
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, authInfo);
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
         const actor = ACTOR_PYTHON_EXAMPLE;
-        const newTool = await getActorsAsTools([actor], process.env.APIFY_TOKEN as string);
+        const newTool = await getActorsAsTools([actor], authInfo);
         actorsMCPServer.upsertTools(newTool, true);
 
         // Check if the notification was received

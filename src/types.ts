@@ -84,6 +84,21 @@ export interface ActorTool extends ToolBase {
     memoryMbytes?: number;
 }
 
+export type AuthInfoType = 'apify' | 'skyfire';
+
+/**
+ * Interface representing an authentication info used throughout the MCP server.
+ * This info is used to authenticate API calls to Apify services.
+ */
+export interface AuthInfo {
+    /** The actual token string value used for authentication */
+    value: string;
+    /** The type of authentication info, determining how it's processed */
+    type: AuthInfoType;
+    /** Optional user ID associated with the info, typically populated for 'apify' type info via IAM validation */
+    userId?: string;
+}
+
 /**
  * Arguments passed to internal tool calls.
  * Contains both the tool arguments and server references.
@@ -102,8 +117,8 @@ export type InternalToolArgs = {
     apifyMcpServer: ActorsMcpServer;
     /** Reference to the MCP server instance */
     mcpServer: Server;
-    /** Apify API token */
-    apifyToken: string;
+    /** Authentication info containing value, type, and optional userId */
+    authInfo: AuthInfo;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
