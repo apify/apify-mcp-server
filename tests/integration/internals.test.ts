@@ -15,13 +15,14 @@ beforeAll(() => {
     log.setLevel(log.LEVELS.OFF);
 });
 
+const authToken: AuthToken = {
+    value: process.env.APIFY_TOKEN as string,
+    type: 'apify',
+};
+
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
         const actorsMcpServer = new ActorsMcpServer(false);
-        const authToken: AuthToken = {
-            value: process.env.APIFY_TOKEN as string,
-            type: 'apify',
-        };
         const initialTools = await loadToolsFromInput({
             enableAddingActors: true,
         } as Input, authToken);
@@ -60,10 +61,7 @@ describe('MCP server internals integration tests', () => {
         };
 
         const actorsMCPServer = new ActorsMcpServer(false);
-        const authToken: AuthToken = {
-            value: process.env.APIFY_TOKEN as string,
-            type: 'apify',
-        };
+
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, authToken);
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
@@ -101,10 +99,7 @@ describe('MCP server internals integration tests', () => {
         };
 
         const actorsMCPServer = new ActorsMcpServer(false);
-        const authToken: AuthToken = {
-            value: process.env.APIFY_TOKEN as string,
-            type: 'apify',
-        };
+
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, authToken);
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);

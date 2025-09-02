@@ -73,7 +73,7 @@ export class ApifyClient extends _ApifyClient {
         }
 
         super({
-            ...clientOptions, // Now safe to spread without authToken
+            ...clientOptions, // safe to spread without authToken
             baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors,
         });

@@ -4,7 +4,6 @@ import { ApifyClient } from '../apify-client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 import type { AuthToken } from '../types.js';
 
-// TODO: we should write actual integration test to verify this works in production using real token.
 export class ProgressTracker {
     private progressToken: string | number;
     private sendNotification: (notification: ProgressNotification) => Promise<void>;

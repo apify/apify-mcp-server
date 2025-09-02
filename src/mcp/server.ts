@@ -402,7 +402,7 @@ export class ActorsMcpServer {
 
             // Validate auth token
             if (!authToken || !authToken.value) {
-                const msg = 'Valid authentication token required. It must be provided either in the authToken parameter or APIFY_TOKEN environment variable.';
+                const msg = `Valid authentication token required. It must be provided either in the Bearer Authorization header, APIFY_TOKEN environment variable or skyfire-pay-id header as Skyfire payment token.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(

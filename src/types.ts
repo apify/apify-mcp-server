@@ -86,9 +86,16 @@ export interface ActorTool extends ToolBase {
 
 export type AuthTokenType = 'apify' | 'skyfire';
 
+/**
+ * Interface representing an authentication token used throughout the MCP server.
+ * This token is used to authenticate API calls to Apify services.
+ */
 export interface AuthToken {
+    /** The actual token string value used for authentication */
     value: string;
+    /** The type of authentication token, determining how it's processed */
     type: AuthTokenType;
+    /** Optional user ID associated with the token, typically populated for 'apify' type tokens via IAM validation */
     userId?: string;
 }
 
