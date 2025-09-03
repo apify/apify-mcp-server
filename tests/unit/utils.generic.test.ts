@@ -43,4 +43,10 @@ describe('getValuesByDotKeys', () => {
         const result = getValuesByDotKeys(obj, ['a', 'b.c']);
         expect(result).toEqual({ a: undefined, 'b.c': undefined });
     });
+
+    it('should return whole object', () => {
+        const obj = { nested: { a: 1, b: 2 } };
+        const result = getValuesByDotKeys(obj, ['nested']);
+        expect(result).toEqual({ nested: { a: 1, b: 2 } });
+    });
 });

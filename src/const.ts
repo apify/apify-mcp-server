@@ -8,6 +8,15 @@ export const ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS = 5;
 // Actor run const
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
 
+// Tool output
+/**
+ * Usual tool output limit is 25k tokens, let's use 20k
+ * just in case where 1 token =~ 4 characters thus 80k chars.
+ * This is primarily used for Actor tool call output, but we can then
+ * reuse this in other tools as well.
+ */
+export const TOOL_MAX_OUTPUT_CHARS = 80000;
+
 // MCP Server
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_VERSION = '1.0.0';
@@ -20,6 +29,7 @@ export enum HelperTools {
     ACTOR_CALL = 'call-actor',
     ACTOR_GET = 'get-actor',
     ACTOR_GET_DETAILS = 'fetch-actor-details',
+    ACTOR_OUTPUT_GET = 'get-actor-output',
     ACTOR_REMOVE = 'remove-actor',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',
@@ -54,12 +64,12 @@ export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
 export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export const ACTOR_PRICING_MODEL = {
-    /** Rental actors */
+    /** Rental Actors */
     FLAT_PRICE_PER_MONTH: 'FLAT_PRICE_PER_MONTH',
     FREE: 'FREE',
-    /** Pay per result (PPR) actors */
+    /** Pay per result (PPR) Actors */
     PRICE_PER_DATASET_ITEM: 'PRICE_PER_DATASET_ITEM',
-    /** Pay per event (PPE) actors */
+    /** Pay per event (PPE) Actors */
     PAY_PER_EVENT: 'PAY_PER_EVENT',
 } as const;
 

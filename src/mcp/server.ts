@@ -31,6 +31,7 @@ import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import { buildActorResponseContent } from '../utils/actor-response.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
@@ -524,21 +525,15 @@ export class ActorsMcpServer {
 
                     try {
                         log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
-                        const { runId, datasetId, items } = await callActorGetDataset(
+                        const callResult = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
                             apifyToken as string,
                             callOptions,
                             progressTracker,
                         );
-                        const content = [
-                            { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
-                        ];
 
-                        const itemContents = items.items.map((item: Record<string, unknown>) => {
-                            return { type: 'text', text: JSON.stringify(item) };
-                        });
-                        content.push(...itemContents);
+                        const content = buildActorResponseContent(actorTool.actorFullName, callResult);
                         return { content };
                     } finally {
                         if (progressTracker) {

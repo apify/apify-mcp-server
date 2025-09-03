@@ -6,6 +6,7 @@ import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
 import { fetchActorDetailsTool } from './fetch-actor-details.js';
 import { fetchApifyDocsTool } from './fetch-apify-docs.js';
+import { getActorOutput } from './get-actor-output.js';
 import { addTool } from './helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './key_value_store.js';
 import { getUserKeyValueStoresList } from './key_value_store_collection.js';
@@ -36,6 +37,7 @@ export const toolCategories = {
         getDataset,
         getDatasetItems,
         getDatasetSchema,
+        getActorOutput,
         getKeyValueStore,
         getKeyValueStoreKeys,
         getKeyValueStoreRecord,

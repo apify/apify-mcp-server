@@ -1,4 +1,3 @@
-import { Ajv } from 'ajv';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -13,9 +12,8 @@ import type {
     ISchemaProperties,
     ToolEntry,
 } from '../types.js';
+import { ajv } from '../utils/ajv.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
-
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 /**
  * Get Actor input schema by Actor name.
