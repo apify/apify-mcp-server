@@ -531,7 +531,14 @@ export class ActorsMcpServer {
                             apifyToken as string,
                             callOptions,
                             progressTracker,
+                            extra.signal,
                         );
+
+                        if (!callResult) {
+                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+                            return { };
+                        }
 
                         const content = buildActorResponseContent(actorTool.actorFullName, callResult);
                         return { content };

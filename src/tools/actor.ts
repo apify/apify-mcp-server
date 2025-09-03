@@ -50,7 +50,8 @@ export type CallActorGetDatasetResult = {
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
- * @returns {Promise<CallActorGetDatasetResult>} - A promise that resolves to metadata about the Actor run and dataset.
+ * @param {AbortSignal} abortSignal - Optional abort signal to cancel the actor run.
+ * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
 export async function callActorGetDataset(
@@ -59,12 +60,14 @@ export async function callActorGetDataset(
     apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
-): Promise<CallActorGetDatasetResult> {
+    abortSignal?: AbortSignal,
+): Promise<CallActorGetDatasetResult | null> {
+    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
     try {
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
 
-        // Start the Actor run but don't wait for completion
+        // Start the actor run
         const actorRun: ActorRun = await actorClient.start(input, callOptions);
 
         // Start progress tracking if tracker is provided
@@ -72,9 +75,33 @@ export async function callActorGetDataset(
             progressTracker.startActorRunUpdates(actorRun.id, apifyToken, actorName);
         }
 
-        // Wait for the actor to complete
-        const completedRun = await client.run(actorRun.id).waitForFinish();
+        // Create abort promise that handles both API abort and race rejection
+        const abortPromise = async () => new Promise<typeof CLIENT_ABORT>((resolve) => {
+            abortSignal?.addEventListener('abort', async () => {
+                // Abort the actor run via API
+                try {
+                    await client.run(actorRun.id).abort({ gracefully: false });
+                } catch (e) {
+                    log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
+                }
+                // Reject to stop waiting
+                resolve(CLIENT_ABORT);
+            }, { once: true });
+        });
 
+        // Wait for completion or cancellation
+        const potentialAbortedRun = await Promise.race([
+            client.run(actorRun.id).waitForFinish(),
+            ...(abortSignal ? [abortPromise()] : []),
+        ]);
+
+        if (potentialAbortedRun === CLIENT_ABORT) {
+            log.info('Actor run aborted by client', { actorName, input });
+            return null;
+        }
+        const completedRun = potentialAbortedRun as ActorRun;
+
+        // Process the completed run
         const dataset = client.dataset(completedRun.defaultDatasetId);
         const [datasetItems, defaultBuild] = await Promise.all([
             dataset.listItems(),
@@ -309,7 +336,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken, progressTracker } = toolArgs;
+            const { args, apifyToken, progressTracker, extra } = toolArgs;
             const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
             try {
@@ -364,7 +391,14 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     apifyToken,
                     callOptions,
                     progressTracker,
+                    extra.signal,
                 );
+
+                if (!callResult) {
+                    // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                    // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+                    return { };
+                }
 
                 const content = buildActorResponseContent(actorName, callResult);
 
