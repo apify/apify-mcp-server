@@ -398,11 +398,6 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
 
                 return { content };
             } catch (error) {
-                if (error instanceof Error && error.message === 'Operation cancelled') {
-                    // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                    // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                    return { };
-                }
                 log.error('Error with Actor operation', { error, actorName, step });
                 return {
                     content: [
