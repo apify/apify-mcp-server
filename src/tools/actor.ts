@@ -53,21 +53,6 @@ export async function callActorGetDataset(
     actorName: string,
     input: unknown,
     apifyToken: string,
-    callOptions: ActorCallOptions | undefined,
-    progressTracker?: ProgressTracker | null,
-): Promise<CallActorGetDatasetResult>; // Without abort signal Result or Error is returned
-export async function callActorGetDataset(
-    actorName: string,
-    input: unknown,
-    apifyToken: string,
-    callOptions: ActorCallOptions | undefined,
-    progressTracker: ProgressTracker | null,
-    abortSignal: AbortSignal,
-): Promise<CallActorGetDatasetResult | null>; // With abort signal, null is returned if the actor was aborted by the client
-export async function callActorGetDataset(
-    actorName: string,
-    input: unknown,
-    apifyToken: string,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
     abortSignal?: AbortSignal,
@@ -90,7 +75,7 @@ export async function callActorGetDataset(
             abortSignal?.addEventListener('abort', async () => {
                 // Abort the actor run via API
                 try {
-                    await client.run(actorRun.id).abort({ gracefully: true });
+                    await client.run(actorRun.id).abort({ gracefully: false });
                 } catch (e) {
                     log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
                 }
@@ -335,7 +320,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
         call: async (toolArgs) => {
-            const { args, apifyToken, progressTracker } = toolArgs;
+            const { args, apifyToken, progressTracker, extra } = toolArgs;
             const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
             try {
@@ -384,13 +369,22 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     }
                 }
 
-                const { runId, datasetId, items } = await callActorGetDataset(
+                const result = await callActorGetDataset(
                     actorName,
                     input,
                     apifyToken,
                     callOptions,
                     progressTracker,
+                    extra.signal,
                 );
+
+                if (!result) {
+                    // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                    // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+                    return { };
+                }
+
+                const { runId, datasetId, items } = result;
 
                 const content = [
                     { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },

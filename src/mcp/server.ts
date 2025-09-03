@@ -534,7 +534,8 @@ export class ActorsMcpServer {
                         );
 
                         if (!result) {
-                            // If the actor was aborted by the client, we don't want to return anything
+                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
                         }
 
@@ -549,12 +550,6 @@ export class ActorsMcpServer {
                         });
                         content.push(...itemContents);
                         return { content };
-                    } catch (error) {
-                        if (error instanceof Error && error.message === 'Operation cancelled') {
-                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                            return { };
-                        }
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();
