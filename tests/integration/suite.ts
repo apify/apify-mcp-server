@@ -910,5 +910,35 @@ export function createIntegrationTestsSuite(
             expect(output[0]).toHaveProperty('second_number', input.second_number);
             expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
         });
+
+        it('should return Actor details both for full Actor name and ID', async () => {
+            const actorName = 'apify/python-example';
+            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await apifyClient.actor(actorName).get();
+            expect(actor).toBeDefined();
+            const actorId = actor!.id as string;
+            
+            client = await createClientFn();
+            
+            // Fetch by full Actor name
+            const resultByName = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: actorName },
+            });
+            expect(resultByName.content).toBeDefined();
+            const contentByName = resultByName.content as { text: string }[];
+            expect(contentByName[0].text).toContain(actorName);
+            
+            // Fetch by Actor ID only
+            const resultById = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: actorId },
+            });
+            expect(resultById.content).toBeDefined();
+            const contentById = resultById.content as { text: string }[];
+            expect(contentById[0].text).toContain(actorName);
+
+            await client.close();
+        });
     });
 }
