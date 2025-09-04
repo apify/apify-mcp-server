@@ -32,11 +32,9 @@ Actor output data schema:
 ${JSON.stringify(displaySchema, null, 2)}
 \`\`\`
 
-Below this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).
+Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
 
-If you need to retrieve additional data, use the "get-actor-output" tool with:
-    datasetId: "${datasetId}"
-Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be and they might exceed the output limits.
+If you need to retrieve additional data, use the "get-actor-output" tool with: datasetId: "${datasetId}". Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.
 `;
 
     const itemsPreviewText = result.previewItems.length > 0
@@ -45,8 +43,11 @@ Be sure to limit the number of results when using the "get-actor-output" tool, s
 
     // Build content array
     const content: ({ type: 'text'; text: string })[] = [
-        { type: 'text', text: textContent },
         { type: 'text', text: itemsPreviewText },
+        /**
+         * The metadata and instructions text must be at the end otherwise the LLM does not acknowledge it.
+         */
+        { type: 'text', text: textContent },
     ];
 
     return content;
