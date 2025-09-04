@@ -102,11 +102,14 @@ You also can retrieve only specific fields from the output if needed. Use this t
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
 
+            let { items } = response;
             // Apply field selection if specified
-            const processedItems = response.items.map((item) => getValuesByDotKeys(item, fieldsArray));
+            if (fieldsArray.length > 0) {
+                items = items.map((item) => getValuesByDotKeys(item, fieldsArray));
+            }
 
             // Clean empty properties
-            const cleanedItems = processedItems
+            const cleanedItems = items
                 .map((item) => cleanEmptyProperties(item))
                 .filter((item) => item !== undefined);
 

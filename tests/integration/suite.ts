@@ -870,5 +870,45 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+
+        it('should call apify/python-example and retrieve the full dataset using get-actor-output tool', async () => {
+            client = await createClientFn({ actors: ['apify/python-example'] });
+            const selectedToolName = actorNameToToolName('apify/python-example');
+            const input = { first_number: 5, second_number: 7 };
+
+            const result = await client.callTool({
+                name: selectedToolName,
+                arguments: input,
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; type: string }[];
+            expect(content.length).toBe(2); // Call step returns text summary with embedded schema
+
+            // First content: text summary
+            const runText = content[0].text;
+
+            // Extract datasetId from the text
+            const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
+            expect(runIdMatch).toBeTruthy();
+            const datasetId = runIdMatch![2];
+
+            // Retrieve full dataset using get-actor-output tool
+            const outputResult = await client.callTool({
+                name: HelperTools.ACTOR_OUTPUT_GET,
+                arguments: {
+                    datasetId,
+                },
+            });
+
+            expect(outputResult.content).toBeDefined();
+            const outputContent = outputResult.content as { text: string; type: string }[];
+            const output = JSON.parse(outputContent[0].text);
+            expect(Array.isArray(output)).toBe(true);
+            expect(output.length).toBe(1);
+            expect(output[0]).toHaveProperty('first_number', input.first_number);
+            expect(output[0]).toHaveProperty('second_number', input.second_number);
+            expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
+        });
     });
 }

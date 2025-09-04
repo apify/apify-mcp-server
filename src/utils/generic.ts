@@ -8,7 +8,7 @@
  * const value = getValuesByDotKeys(obj, ['a.b.c', 'a.b.d', 'nested']);
  * value; // { 'a.b.c': 42, 'a.b.d': undefined, 'nested': { d: 100 } }
  */
-export function getValuesByDotKeys<T extends object>(obj: T, keys: string[]): Record<string, unknown> {
+export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const key of keys) {
         const path = key.split('.');

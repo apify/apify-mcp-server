@@ -39,16 +39,24 @@ export function ensureOutputWithinCharLimit(items: DatasetItem[], importantField
         return items;
     }
 
+    /**
+     * Items used for the final fallback - removing items until within the limit.
+     * If important fields are defined, use only those fields for that fallback step.
+     */
+    let sourceItems = items;
     // Try only the important fields
-    const importantItems = items.map((item) => getValuesByDotKeys(item, importantFields));
-    const importantItemsString = JSON.stringify(importantItems);
-    if (importantItemsString.length <= charLimit) {
-        return importantItems;
+    if (importantFields.length > 0) {
+        const importantItems = items.map((item) => getValuesByDotKeys(item, importantFields));
+        const importantItemsString = JSON.stringify(importantItems);
+        if (importantItemsString.length <= charLimit) {
+            return importantItems;
+        }
+        sourceItems = importantItems;
     }
 
     // Start removing items until within the limit
     const result: DatasetItem[] = [];
-    for (const item of importantItems) {
+    for (const item of sourceItems) {
         if (JSON.stringify(result.concat(item)).length > charLimit) {
             break;
         }
