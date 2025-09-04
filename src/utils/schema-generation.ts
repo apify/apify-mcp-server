@@ -95,16 +95,15 @@ export function generateSchemaFromItems(
             arrays: { mode: arrayMode },
         }) as JsonSchemaArray;
         return schema;
-    } catch {
-        // Fallback: try with simpler approach
-        try {
-            const fallbackSchema = toJsonSchema(processedItems, {
-                arrays: { mode: 'first' },
-            }) as JsonSchemaArray;
-            return fallbackSchema;
-        } catch {
-            // If all attempts fail, return null
-            return null;
-        }
-    }
+    } catch { /* ignore */ }
+
+    try {
+        const fallbackSchema = toJsonSchema(processedItems, {
+            arrays: { mode: 'first' },
+        }) as JsonSchemaArray;
+        return fallbackSchema;
+    } catch { /* ignore */ }
+
+    // If all attempts fail, return null
+    return null;
 }
