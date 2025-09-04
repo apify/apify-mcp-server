@@ -5,7 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
-import { getValuesByDotKeys } from '../utils/generic.js';
+import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -78,12 +78,7 @@ You also can retrieve only specific fields from the output if needed. Use this t
             const client = new ApifyClient({ token: apifyToken });
 
             // Parse fields into array
-            const fieldsArray = parsed.fields
-                ? parsed.fields
-                    .split(',')
-                    .map((field) => field.trim())
-                    .filter((field) => field.length > 0)
-                : [];
+            const fieldsArray = parseCommaSeparatedList(parsed.fields);
 
             // TODO: we can optimize the API level field filtering in future
             /**

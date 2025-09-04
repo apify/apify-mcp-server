@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { parseCommaSeparatedList } from '../utils/generic.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 
 const getDatasetArgs = z.object({
@@ -91,9 +92,9 @@ export const getDatasetItems: ToolEntry = {
             const client = new ApifyClient({ token: apifyToken });
 
             // Convert comma-separated strings to arrays
-            const fields = parsed.fields?.split(',').map((f) => f.trim());
-            const omit = parsed.omit?.split(',').map((f) => f.trim());
-            const flatten = parsed.flatten?.split(',').map((f) => f.trim());
+            const fields = parseCommaSeparatedList(parsed.fields);
+            const omit = parseCommaSeparatedList(parsed.omit);
+            const flatten = parseCommaSeparatedList(parsed.flatten);
 
             const v = await client.dataset(parsed.datasetId).listItems({
                 clean: parsed.clean,

@@ -8,6 +8,23 @@
  * const value = getValuesByDotKeys(obj, ['a.b.c', 'a.b.d', 'nested']);
  * value; // { 'a.b.c': 42, 'a.b.d': undefined, 'nested': { d: 100 } }
  */
+/**
+ * Parses a comma-separated string into an array of trimmed strings.
+ * Empty strings are filtered out after trimming.
+ *
+ * @param input - The comma-separated string to parse. If undefined, returns an empty array.
+ * @returns An array of trimmed, non-empty strings.
+ * @example
+ * parseCommaSeparatedList("a, b, c"); // ["a", "b", "c"]
+ * parseCommaSeparatedList("a, , b"); // ["a", "b"]
+ */
+export function parseCommaSeparatedList(input?: string): string[] {
+    if (!input) {
+        return [];
+    }
+    return input.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+}
+
 export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const key of keys) {
