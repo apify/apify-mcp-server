@@ -917,9 +917,9 @@ export function createIntegrationTestsSuite(
             const actor = await apifyClient.actor(actorName).get();
             expect(actor).toBeDefined();
             const actorId = actor!.id as string;
-            
+
             client = await createClientFn();
-            
+
             // Fetch by full Actor name
             const resultByName = await client.callTool({
                 name: 'fetch-actor-details',
@@ -928,7 +928,7 @@ export function createIntegrationTestsSuite(
             expect(resultByName.content).toBeDefined();
             const contentByName = resultByName.content as { text: string }[];
             expect(contentByName[0].text).toContain(actorName);
-            
+
             // Fetch by Actor ID only
             const resultById = await client.callTool({
                 name: 'fetch-actor-details',
