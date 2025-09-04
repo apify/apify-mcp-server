@@ -52,7 +52,7 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
         type: 'text',
     };
     // Parse the JSON to compare objects regardless of property order
-    const actual = content[content.length - 1];
+    const actual = content[0];
     expect(JSON.parse(actual.text)).toEqual(JSON.parse(expected.text));
     expect(actual.type).toBe(expected.type);
 }
@@ -344,7 +344,7 @@ export function createIntegrationTestsSuite(
 
             const content = result.content as { text: string }[];
 
-            expect(content[content.length - 1]).toEqual(
+            expect(content[0]).toEqual(
                 {
                     text: JSON.stringify([{
                         first_number: 1,
@@ -772,7 +772,7 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2); // Call step returns text summary with embedded schema
 
             // First content: text summary
-            const runText = content[0].text;
+            const runText = content[1].text;
 
             // Extract datasetId from the text
             const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
@@ -828,7 +828,7 @@ export function createIntegrationTestsSuite(
             expect(result.content).toBeDefined();
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
-            const { text } = content[0];
+            const { text } = content[1];
 
             // Extract datasetId from the response text
             const runIdMatch = text.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
@@ -886,7 +886,7 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2); // Call step returns text summary with embedded schema
 
             // First content: text summary
-            const runText = content[0].text;
+            const runText = content[1].text;
 
             // Extract datasetId from the text
             const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
