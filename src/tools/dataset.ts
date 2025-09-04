@@ -1,13 +1,12 @@
-import { Ajv } from 'ajv';
-import toJsonSchema from 'to-json-schema';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
-
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+import { ajv } from '../utils/ajv.js';
+import { parseCommaSeparatedList } from '../utils/generic.js';
+import { generateSchemaFromItems } from '../utils/schema-generation.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -93,9 +92,9 @@ export const getDatasetItems: ToolEntry = {
             const client = new ApifyClient({ token: apifyToken });
 
             // Convert comma-separated strings to arrays
-            const fields = parsed.fields?.split(',').map((f) => f.trim());
-            const omit = parsed.omit?.split(',').map((f) => f.trim());
-            const flatten = parsed.flatten?.split(',').map((f) => f.trim());
+            const fields = parseCommaSeparatedList(parsed.fields);
+            const omit = parseCommaSeparatedList(parsed.omit);
+            const flatten = parseCommaSeparatedList(parsed.flatten);
 
             const v = await client.dataset(parsed.datasetId).listItems({
                 clean: parsed.clean,
@@ -114,34 +113,6 @@ export const getDatasetItems: ToolEntry = {
     } as InternalTool,
 };
 
-/**
- * Function to recursively remove empty arrays from an object
- */
-function removeEmptyArrays(obj: unknown): unknown {
-    if (Array.isArray(obj)) {
-        // If the item is an array, recursively call removeEmptyArrays on each element.
-        return obj.map((item) => removeEmptyArrays(item));
-    }
-
-    if (typeof obj !== 'object' || obj === null) {
-        // Return primitives and null values as is.
-        return obj;
-    }
-
-    // Use reduce to build a new object, excluding keys with empty arrays.
-    return Object.entries(obj).reduce((acc, [key, value]) => {
-        const processedValue = removeEmptyArrays(value);
-
-        // Exclude the key if the processed value is an empty array.
-        if (Array.isArray(processedValue) && processedValue.length === 0) {
-            return acc;
-        }
-
-        acc[key] = processedValue;
-        return acc;
-    }, {} as Record<string, unknown>);
-}
-
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string()
         .min(1)
@@ -155,9 +126,6 @@ const getDatasetSchemaArgs = z.object({
     arrayMode: z.enum(['first', 'all']).optional()
         .describe('Strategy for handling arrays. "first" uses first item as template, "all" merges all items. Default is "all".')
         .default('all'),
-    additionalProperties: z.boolean().optional()
-        .describe('If true, allows additional properties in objects. Default is true.')
-        .default(true),
 });
 
 /**
@@ -194,32 +162,23 @@ export const getDatasetSchema: ToolEntry = {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' is empty.` }] };
             }
 
-            // Clean the dataset items by removing empty arrays
-            const cleanedDatasetItems = datasetItems.map((item) => removeEmptyArrays(item));
+            // Generate schema using the shared utility
+            const schema = generateSchemaFromItems(datasetItems, {
+                limit: parsed.limit,
+                clean: parsed.clean,
+                arrayMode: parsed.arrayMode,
+            });
 
-            // Try to generate schema with full options first
-            try {
-                const schema = toJsonSchema(cleanedDatasetItems, {
-                    arrays: { mode: parsed.arrayMode },
-                    objects: { additionalProperties: parsed.additionalProperties },
-                });
-
-                return {
-                    content: [{
-                        type: 'text',
-                        text: JSON.stringify(schema),
-                    }],
-                };
-            } catch {
-                // Fallback: try with simpler approach
-                const fallbackSchema = toJsonSchema(cleanedDatasetItems, {
-                    arrays: { mode: 'first' },
-                });
-
-                return {
-                    content: [{ type: 'text', text: JSON.stringify(fallbackSchema) }],
-                };
+            if (!schema) {
+                return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }] };
             }
+
+            return {
+                content: [{
+                    type: 'text',
+                    text: JSON.stringify(schema),
+                }],
+            };
         },
     } as InternalTool,
 };

@@ -7,6 +7,7 @@ import log from '@apify/log';
 
 import { defaults } from '../const.js';
 import { callActor } from '../tools/actor.js';
+import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import type { Input, ToolCategory, ToolEntry } from '../types.js';
@@ -121,6 +122,17 @@ export async function loadToolsFromInput(
     if (actorNamesToLoad.length > 0) {
         const actorTools = await getActorsAsTools(actorNamesToLoad, apifyToken);
         result.push(...actorTools);
+    }
+
+    /**
+     * If there is any tool that in some way, even indirectly (like add-actor), allows calling
+     * Actor, then we need to ensure the get-actor-output tool is available.
+     */
+    const hasCallActor = result.some((entry) => entry.tool.name === 'call-actor');
+    const hasActorTools = result.some((entry) => entry.type === 'actor');
+    const hasAddActorTool = result.some((entry) => entry.tool.name === 'add-actor');
+    if (hasCallActor || hasActorTools || hasAddActorTool) {
+        result.push(getActorOutput);
     }
 
     // De-duplicate by tool name for safety

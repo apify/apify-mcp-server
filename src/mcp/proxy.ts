@@ -1,8 +1,8 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import Ajv from 'ajv';
 
 import { fixedAjvCompile } from '../tools/utils.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
+import { ajv } from '../utils/ajv.js';
 import { getMCPServerID, getProxyMCPServerToolName } from './utils.js';
 
 export async function getMCPServerTools(
@@ -13,8 +13,6 @@ export async function getMCPServerTools(
 ): Promise<ToolEntry[]> {
     const res = await client.listTools();
     const { tools } = res;
-
-    const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
     const compiledTools: ToolEntry[] = [];
     for (const tool of tools) {

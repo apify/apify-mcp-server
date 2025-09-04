@@ -1,12 +1,10 @@
-import { Ajv } from 'ajv';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
-
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+import { ajv } from '../utils/ajv.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()

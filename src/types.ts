@@ -295,3 +295,4 @@ export type PromptBase = Prompt & {
 };
 
 export type ActorInputSchemaProperties = Record<string, ISchemaProperties>;
+export type DatasetItem = Record<number | string, unknown>;

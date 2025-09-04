@@ -1,6 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { Ajv } from 'ajv';
-import type { ActorCallOptions, ActorRun, PaginatedList } from 'apify-client';
+import type { ActorCallOptions, ActorRun } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
@@ -11,37 +10,43 @@ import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
+    TOOL_MAX_OUTPUT_CHARS,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, ToolEntry } from '../types.js';
-import { getActorDefinitionStorageFieldNames } from '../utils/actor.js';
+import type { ActorDefinitionStorage, ActorInfo, DatasetItem, ToolEntry } from '../types.js';
+import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
-import { getValuesByDotKeys } from '../utils/generic.js';
+import { buildActorResponseContent } from '../utils/actor-response.js';
+import { ajv } from '../utils/ajv.js';
 import type { ProgressTracker } from '../utils/progress.js';
+import type { JsonSchemaProperty } from '../utils/schema-generation.js';
+import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
 import { actorNameToToolName, fixedAjvCompile, getToolSchemaID, transformActorInputSchemaProperties } from './utils.js';
-
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
     runId: string;
     datasetId: string;
-    items: PaginatedList<Record<string, unknown>>;
+    itemCount: number;
+    schema: JsonSchemaProperty;
+    previewItems: DatasetItem[];
 };
 
 /**
- * Calls an Apify actor and retrieves the dataset items.
+ * Calls an Apify Actor and retrieves metadata about the dataset results.
  *
+ * This function executes an Actor and returns summary information instead with a result items preview of the full dataset
+ * to prevent overwhelming responses. The actual data can be retrieved using the get-actor-output tool.
  *
  * It requires the `APIFY_TOKEN` environment variable to be set.
  * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
  *
- * @param {string} actorName - The name of the actor to call.
- * @param {ActorCallOptions} callOptions - The options to pass to the actor.
+ * @param {string} actorName - The name of the Actor to call.
+ * @param {ActorCallOptions} callOptions - The options to pass to the Actor.
  * @param {unknown} input - The input to pass to the actor.
  * @param {string} apifyToken - The Apify token to use for authentication.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
@@ -58,6 +63,7 @@ export async function callActorGetDataset(
     abortSignal?: AbortSignal,
 ): Promise<CallActorGetDatasetResult | null> {
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
+    // TODO: we should remove this throw, we are just catching and then rethrowing with generic message
     try {
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
@@ -98,24 +104,35 @@ export async function callActorGetDataset(
 
         // Process the completed run
         const dataset = client.dataset(completedRun.defaultDatasetId);
-        const [items, defaultBuild] = await Promise.all([
+        const [datasetItems, defaultBuild] = await Promise.all([
             dataset.listItems(),
             (await actorClient.defaultBuild()).get(),
         ]);
 
-        // Get important properties from storage view definitions and if available return only those properties
+        // Generate schema using the shared utility
+        const generatedSchema = generateSchemaFromItems(datasetItems.items, {
+            clean: true,
+            arrayMode: 'all',
+        });
+        const schema = generatedSchema || { type: 'object', properties: {} };
+
+        /**
+         * Get important fields that are using in any dataset view as they MAY be used in filtering to ensure the output fits
+         * the tool output limits. Client has to use the get-actor-output tool to retrieve the full dataset or filtered out fields.
+         */
         const storageDefinition = defaultBuild?.actorDefinition?.storages?.dataset as ActorDefinitionStorage | undefined;
         const importantProperties = getActorDefinitionStorageFieldNames(storageDefinition || {});
-        if (importantProperties.length > 0) {
-            items.items = items.items.map((item) => {
-                return getValuesByDotKeys(item, importantProperties);
-            });
-        }
+        const previewItems = ensureOutputWithinCharLimit(datasetItems.items, importantProperties, TOOL_MAX_OUTPUT_CHARS);
 
-        log.debug('Actor finished', { actorName, itemCount: items.count });
-        return { runId: actorRun.id, datasetId: completedRun.defaultDatasetId, items };
+        return {
+            runId: actorRun.id,
+            datasetId: completedRun.defaultDatasetId,
+            itemCount: datasetItems.count,
+            schema,
+            previewItems,
+        };
     } catch (error) {
-        log.error('Error calling actor', { error, actorName, input });
+        log.error('Error calling Actor', { error, actorName, input });
         throw new Error(`Error calling Actor: ${error}`);
     }
 }
@@ -123,9 +140,9 @@ export async function callActorGetDataset(
 /**
  * This function is used to fetch normal non-MCP server Actors as a tool.
  *
- * Fetches actor input schemas by Actor IDs or Actor full names and creates MCP tools.
+ * Fetches Actor input schemas by Actor IDs or Actor full names and creates MCP tools.
  *
- * This function retrieves the input schemas for the specified actors and compiles them into MCP tools.
+ * This function retrieves the input schemas for the specified Actors and compiles them into MCP tools.
  * It uses the AJV library to validate the input schemas.
  *
  * Tool name can't contain /, so it is replaced with _
@@ -228,7 +245,7 @@ export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
-    log.debug('Fetching actors as tools', { actorNames: actorIdsOrNames });
+    log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -325,7 +342,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
 
             try {
                 if (step === 'info') {
-                    // Step 1: Return actor card and schema directly
+                    // Step 1: Return Actor card and schema directly
                     const details = await fetchActorDetails(apifyToken, actorName);
                     if (!details) {
                         return {
@@ -369,7 +386,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     }
                 }
 
-                const result = await callActorGetDataset(
+                const callResult = await callActorGetDataset(
                     actorName,
                     input,
                     apifyToken,
@@ -378,23 +395,13 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     extra.signal,
                 );
 
-                if (!result) {
+                if (!callResult) {
                     // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                     // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                     return { };
                 }
 
-                const { runId, datasetId, items } = result;
-
-                const content = [
-                    { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
-                ];
-
-                const itemContents = items.items.map((item: Record<string, unknown>) => ({
-                    type: 'text',
-                    text: JSON.stringify(item),
-                }));
-                content.push(...itemContents);
+                const content = buildActorResponseContent(actorName, callResult);
 
                 return { content };
             } catch (error) {

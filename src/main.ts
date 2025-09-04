@@ -44,11 +44,11 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const result = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
+    const callResult = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
 
-    if (result && result.items) {
-        await Actor.pushData(result.items);
-        log.info('Pushed items to dataset', { itemCount: result.items.count });
+    if (callResult && callResult.previewItems.length > 0) {
+        await Actor.pushData(callResult.previewItems);
+        log.info('Pushed items to dataset', { itemCount: callResult.previewItems.length });
     }
     await Actor.exit();
 }

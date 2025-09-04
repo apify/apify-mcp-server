@@ -3,6 +3,7 @@ import type { ActorDefinition } from 'apify-client';
 import { ApifyClient } from '../apify-client.js';
 import { MCP_STREAMABLE_ENDPOINT } from '../const.js';
 import type { ActorDefinitionPruned } from '../types.js';
+import { parseCommaSeparatedList } from '../utils/generic.js';
 
 /**
  * Returns the MCP server path for the given Actor ID.
@@ -13,7 +14,7 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
     if ('webServerMcpPath' in actorDefinition && typeof actorDefinition.webServerMcpPath === 'string') {
         const webServerMcpPath = actorDefinition.webServerMcpPath.trim();
 
-        const paths = webServerMcpPath.split(',').map((path) => path.trim());
+        const paths = parseCommaSeparatedList(webServerMcpPath);
         // If there is only one path, return it directly
         if (paths.length === 1) {
             return paths[0];

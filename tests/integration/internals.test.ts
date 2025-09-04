@@ -33,6 +33,7 @@ describe('MCP server internals integration tests', () => {
         const expectedToolNames = [
             addTool.tool.name,
             ACTOR_PYTHON_EXAMPLE,
+            'get-actor-output',
         ];
         expectArrayWeakEquals(expectedToolNames, names);
 
@@ -50,7 +51,7 @@ describe('MCP server internals integration tests', () => {
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
         // With enableAddingActors=true and no tools/actors, seeded set contains only add-actor
-        const numberOfTools = 1;
+        const numberOfTools = 2;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -89,7 +90,7 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        const numberOfTools = 1;
+        const numberOfTools = 2;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;

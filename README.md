@@ -169,6 +169,11 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
 | `add-actor` | experimental | Add an Actor as a new tool for the user to call. |  |
+| `get-actor-output`* | - | Retrieve the output from an Actor call which is not included in the output preview of the Actor tool. | ✅ |
+
+> **Note:**
+>
+> The `get-actor-output` tool is automatically included with any Actor-related tool, such as `call-actor`, `add-actor`, or any specific Actor tool like `apify-slash-rag-web-browser`. When you call an Actor - either through the `call-actor` tool or directly via an Actor tool (e.g., `apify-slash-rag-web-browser`) - you receive a preview of the output. The preview depends on the Actor's output format and length; for some Actors and runs, it may include the entire output, while for others, only a limited version is returned to avoid overwhelming the LLM. To retrieve the full output of an Actor run, use the `get-actor-output` tool (supports limit, offset, and field filtering) with the `datasetId` provided by the Actor call.
 
 ### Tools configuration
 

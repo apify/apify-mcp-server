@@ -25,6 +25,7 @@ import log from '@apify/log';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import type { Input, ToolSelector } from './types.js';
+import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
 // Keeping this interface here and not types.ts since
@@ -86,13 +87,9 @@ For more details visit https://mcp.apify.com`,
 // Respect either the new flag or the deprecated one
 const enableAddingActors = Boolean(argv.enableAddingActors || argv.enableActorAutoLoading);
 // Split actors argument, trim whitespace, and filter out empty strings
-const actorList = argv.actors !== undefined
-    ? argv.actors.split(',').map((a: string) => a.trim()).filter((a: string) => a.length > 0)
-    : undefined;
+const actorList = argv.actors !== undefined ? parseCommaSeparatedList(argv.actors) : undefined;
 // Split tools argument, trim whitespace, and filter out empty strings
-const toolCategoryKeys = argv.tools !== undefined
-    ? argv.tools.split(',').map((t: string) => t.trim()).filter((t: string) => t.length > 0)
-    : undefined;
+const toolCategoryKeys = argv.tools !== undefined ? parseCommaSeparatedList(argv.tools) : undefined;
 
 // Propagate log.error to console.error for easier debugging
 const originalError = log.error.bind(log);

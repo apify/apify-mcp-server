@@ -31,6 +31,7 @@ import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import { buildActorResponseContent } from '../utils/actor-response.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
@@ -524,7 +525,7 @@ export class ActorsMcpServer {
 
                     try {
                         log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
-                        const result = await callActorGetDataset(
+                        const callResult = await callActorGetDataset(
                             actorTool.actorFullName,
                             args,
                             apifyToken as string,
@@ -533,22 +534,13 @@ export class ActorsMcpServer {
                             extra.signal,
                         );
 
-                        if (!result) {
+                        if (!callResult) {
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
                         }
 
-                        const { runId, datasetId, items } = result;
-
-                        const content = [
-                            { type: 'text', text: `Actor finished with runId: ${runId}, datasetId ${datasetId}` },
-                        ];
-
-                        const itemContents = items.items.map((item: Record<string, unknown>) => {
-                            return { type: 'text', text: JSON.stringify(item) };
-                        });
-                        content.push(...itemContents);
+                        const content = buildActorResponseContent(actorTool.actorFullName, callResult);
                         return { content };
                     } finally {
                         if (progressTracker) {
