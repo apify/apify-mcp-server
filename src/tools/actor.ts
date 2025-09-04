@@ -63,6 +63,7 @@ export async function callActorGetDataset(
     abortSignal?: AbortSignal,
 ): Promise<CallActorGetDatasetResult | null> {
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
+    // TODO: we should remove this throw, we are just catching and then rethrowing with generic message
     try {
         const client = new ApifyClient({ token: apifyToken });
         const actorClient = client.actor(actorName);
