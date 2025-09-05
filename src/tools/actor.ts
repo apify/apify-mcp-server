@@ -363,7 +363,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                         return {
                             content: [
                                 { type: 'text', text: `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}` },
-                                { type: 'json', json: actor.tool.inputSchema },
+                                { type: 'text', text: `Input Schema:\n${JSON.stringify(actor.tool.inputSchema, null, 2)}` },
                             ],
                         };
                     }
