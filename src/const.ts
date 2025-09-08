@@ -27,10 +27,8 @@ export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
-    ACTOR_GET = 'get-actor',
     ACTOR_GET_DETAILS = 'fetch-actor-details',
     ACTOR_OUTPUT_GET = 'get-actor-output',
-    ACTOR_REMOVE = 'remove-actor',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',
     ACTOR_RUNS_LOG = 'get-actor-log',
@@ -43,7 +41,6 @@ export enum HelperTools {
     KEY_VALUE_STORE_GET = 'get-key-value-store',
     KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
     KEY_VALUE_STORE_RECORD_GET = 'get-key-value-store-record',
-    APIFY_MCP_HELP_TOOL = 'apify-actor-help-tool',
     STORE_SEARCH = 'search-actors',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',

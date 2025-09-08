@@ -1,7 +1,16 @@
 import type { CallActorGetDatasetResult } from '../tools/actor';
 
 /**
- * Builds the response content for actor tool calls.
+ * Builds the response content for Actor tool calls.
+ * Includes Actor run metadata, output schema, and a preview of output items.
+ *
+ * The response starts with a preview of Actor output items, if available.
+ * This must come first. Metadata and instructions for the LLM are provided last.
+ * The LLM may ignore metadata and instructions if it is not at the end of the response.
+ *
+ * If the preview is limited and does not show all items, the response informs the LLM.
+ * This is important because the LLM may assume it has all data and hallucinate missing items.
+ *
  * @param actorName - The name of the actor.
  * @param result - The result from callActorGetDataset.
  * @returns The content array for the tool response.
@@ -42,13 +51,11 @@ If you need to retrieve additional data, use the "get-actor-output" tool with: d
         : `No items available for preview—either the Actor did not return any items or they are too large for preview. In this case, use the "get-actor-output" tool.`;
 
     // Build content array
-    const content: ({ type: 'text'; text: string })[] = [
+    return [
         { type: 'text', text: itemsPreviewText },
         /**
          * The metadata and instructions text must be at the end otherwise the LLM does not acknowledge it.
          */
         { type: 'text', text: textContent },
     ];
-
-    return content;
 }
