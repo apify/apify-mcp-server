@@ -64,19 +64,3 @@ export async function getRealActorID(actorIdOrName: string, apifyToken: string):
 export async function getActorStandbyURL(realActorId: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
     return `https://${realActorId}.${standbyBaseUrl}`;
 }
-
-export async function getActorDefinition(actorID: string, apifyToken: string): Promise<ActorDefinition> {
-    const apifyClient = new ApifyClient({ token: apifyToken });
-    const actor = apifyClient.actor(actorID);
-    const defaultBuildClient = await actor.defaultBuild();
-    const buildInfo = await defaultBuildClient.get();
-    if (!buildInfo) {
-        throw new Error(`Default build for Actor ${actorID} not found`);
-    }
-    const { actorDefinition } = buildInfo;
-    if (!actorDefinition) {
-        throw new Error(`Actor default build ${actorID} does not have Actor definition`);
-    }
-
-    return actorDefinition;
-}

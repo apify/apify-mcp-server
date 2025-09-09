@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
+import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -35,7 +36,8 @@ export const addTool: ToolEntry = {
                 };
             }
 
-            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyToken);
+            const apifyClient = new ApifyClient({ token: apifyToken });
+            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
             /**
              * If no tools were found, return a message that the Actor was not found
              * instead of returning that non existent tool was added since the

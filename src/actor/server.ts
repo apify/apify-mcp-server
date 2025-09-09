@@ -11,6 +11,7 @@ import express from 'express';
 
 import log from '@apify/log';
 
+import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
@@ -69,13 +70,14 @@ export function createExpressApp(
                 rt: Routes.SSE,
                 tr: TransportType.SSE,
             });
-            const mcpServer = new ActorsMcpServer(false);
+            const mcpServer = new ActorsMcpServer({ setupSigintHandler: false });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
             log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
-            await mcpServer.loadToolsFromUrl(req.url, apifyToken);
+            const apifyClient = new ApifyClient({ token: apifyToken });
+            await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
@@ -152,12 +154,13 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer(false);
+                const mcpServer = new ActorsMcpServer({ setupSigintHandler: false });
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
                 log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
-                await mcpServer.loadToolsFromUrl(req.url, apifyToken);
+                const apifyClient = new ApifyClient({ token: apifyToken });
+                await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);

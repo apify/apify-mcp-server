@@ -1,6 +1,6 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
-import { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify-client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 
 export class ProgressTracker {
@@ -36,15 +36,14 @@ export class ProgressTracker {
         }
     }
 
-    startActorRunUpdates(runId: string, apifyToken: string, actorName: string): void {
+    startActorRunUpdates(runId: string, apifyClient: ApifyClient, actorName: string): void {
         this.stop();
-        const client = new ApifyClient({ token: apifyToken });
         let lastStatus = '';
         let lastStatusMessage = '';
 
         this.intervalId = setInterval(async () => {
             try {
-                const run = await client.run(runId).get();
+                const run = await apifyClient.run(runId).get();
                 if (!run) return;
 
                 const { status, statusMessage } = run;

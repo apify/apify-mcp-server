@@ -26,11 +26,10 @@ import { filterSchemaProperties, shortenProperties } from './utils.js';
  */
 export async function getActorDefinition(
     actorIdOrName: string,
-    apifyToken: string,
+    apifyClient: ApifyClient,
     limit: number = ACTOR_README_MAX_LENGTH,
 ): Promise<ActorDefinitionPruned | null> {
-    const client = new ApifyClient({ token: apifyToken });
-    const actorClient = client.actor(actorIdOrName);
+    const actorClient = apifyClient.actor(actorIdOrName);
     try {
         // Fetch actor details
         const actor = await actorClient.get();
@@ -123,7 +122,8 @@ export const actorDefinitionTool: ToolEntry = {
             const { args, apifyToken } = toolArgs;
 
             const parsed = getActorDefinitionArgsSchema.parse(args);
-            const v = await getActorDefinition(parsed.actorName, apifyToken, parsed.limit);
+            const apifyClient = new ApifyClient({ token: apifyToken });
+            const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
             if (!v) {
                 return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
             }

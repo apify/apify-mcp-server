@@ -53,6 +53,11 @@ export const defaults = {
 };
 
 export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
+export const SKYFIRE_MIN_CHARGE_USD = 0.5;
+
+export const SKYFIRE_PAY_ID_MISSING_STRING = `To run the Actor, you need to provide a Skyfire payment ID in the \`skyfire-pay-id\` input property. You first need to create the Skyfire PAY token by calling the \`create-pay-token\` tool from the Skyfire MCP server and then provide the created token in the \`skyfire-pay-id\` input property when calling the \`call-actor\` tool. The Skyfire PAY token is used for billing purposes and needs to be charged with at least ${SKYFIRE_MIN_CHARGE_USD} USD.`;
+
+export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire payment ID for the Actor run. Used for billing purposes. The PAY token needs to be charged with at least ${SKYFIRE_MIN_CHARGE_USD} USD. If you do not have the Skyfire payment ID, you can create it by calling the \`create-pay-token\` tool from the Skyfire MCP server.`;
 
 // Cache
 export const ACTOR_CACHE_MAX_SIZE = 500;
