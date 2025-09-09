@@ -2,6 +2,28 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.7) (2025-09-09)
+
+### 🚀 Features
+
+- Improve actor tool output ([#260](https://github.com/apify/apify-mcp-server/pull/260)) ([7ef726d](https://github.com/apify/apify-mcp-server/commit/7ef726d59c49355dc5caa48def838a0f5ebf97c8)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Error when content type is json ([#265](https://github.com/apify/apify-mcp-server/pull/265)) ([279293f](https://github.com/apify/apify-mcp-server/commit/279293f2ee0ca7ddf1bb935b1c6135747e79ede3)) by [@MichalKalita](https://github.com/MichalKalita), closes [#264](https://github.com/apify/apify-mcp-server/issues/264)
+
+
+## [0.4.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.5) (2025-09-04)
+
+### 🚀 Features
+
+- Cancellable Actor run ([#228](https://github.com/apify/apify-mcp-server/pull/228)) ([9fc9094](https://github.com/apify/apify-mcp-server/commit/9fc9094f65c5ac70ec8f3d8d6a43ac7839b34cb1)) by [@MichalKalita](https://github.com/MichalKalita), closes [#160](https://github.com/apify/apify-mcp-server/issues/160)
+
+### 🐛 Bug Fixes
+
+- Handle deprecated tool preview ([#251](https://github.com/apify/apify-mcp-server/pull/251)) ([ff565f7](https://github.com/apify/apify-mcp-server/commit/ff565f7a77b57dd847411466c961f427ba56c371)) by [@jirispilka](https://github.com/jirispilka), closes [#252](https://github.com/apify/apify-mcp-server/issues/252)
+
+
 ## [0.4.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.4) (2025-08-28)
 
 ### 🐛 Bug Fixes
