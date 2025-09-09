@@ -21,7 +21,7 @@ createIntegrationTestsSuite({
     createClientFn: async (options) => await createMcpSseClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
-        
+
         // Get an available port
         httpServerPort = await getAvailablePort();
         httpServerHost = `http://localhost:${httpServerPort}`;

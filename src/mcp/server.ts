@@ -14,8 +14,8 @@ import {
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
-    ReadResourceRequestSchema,
     McpError,
+    ReadResourceRequestSchema,
     ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -28,9 +28,9 @@ import { ApifyClient } from '../apify-client.js';
 import {
     SERVER_NAME,
     SERVER_VERSION,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
+    SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
@@ -332,14 +332,13 @@ export class ActorsMcpServer {
                         {
                             uri: 'file://readme.md',
                             name: 'readme',
-                            description: 'Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.',
+                            description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
                             mimeType: 'text/markdown',
                         },
                     ],
                 };
-            } else {
-                return { resources: [] };
             }
+            return { resources: [] };
         });
 
         if (this.options.skyfireMode) {
@@ -348,16 +347,16 @@ export class ActorsMcpServer {
                 if (uri === 'file://readme.md') {
                     return {
                         contents: [{
-                                uri: 'file://readme.md',
-                                mimeType: 'text/markdown',
-                                text: SKYFIRE_README_CONTENT,
-                            }],
-                        };
+                            uri: 'file://readme.md',
+                            mimeType: 'text/markdown',
+                            text: SKYFIRE_README_CONTENT,
+                        }],
+                    };
                 }
                 return {
                     contents: [{
                         uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
-                    }]
+                    }],
                 };
             });
         }
@@ -606,7 +605,7 @@ export class ActorsMcpServer {
                     /**
                      * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
                      */
-                    const {'skyfire-pay-id': skyfirePayId, ...actorArgs} = args as Record<string, unknown>;
+                    const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                     const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
                         ? new ApifyClient({ skyfirePayId })
                         : new ApifyClient({ token: apifyToken });
