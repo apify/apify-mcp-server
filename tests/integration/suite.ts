@@ -44,15 +44,15 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     const content = result.content as ContentItem[];
     // The result is { content: [ ... ] }, and the last content is the sum
     const expected = {
-        text: JSON.stringify({
+        text: JSON.stringify([{
             first_number: 1,
             second_number: 2,
             sum: 3,
-        }),
+        }]),
         type: 'text',
     };
     // Parse the JSON to compare objects regardless of property order
-    const actual = content[content.length - 1];
+    const actual = content[0];
     expect(JSON.parse(actual.text)).toEqual(JSON.parse(expected.text));
     expect(actual.type).toBe(expected.type);
 }
@@ -95,11 +95,13 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length);
+            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
             const names = getToolNames(tools);
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            expect(names).toContain('get-actor-output');
+            await client.close();
         });
 
         it('should match spec default: actors,docs,apify/rag-web-browser when no params provided', async () => {
@@ -113,42 +115,57 @@ export function createIntegrationTestsSuite(
             const expectedActors = ['apify-slash-rag-web-browser'];
 
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
-            expect(names).toHaveLength(expectedTotal.length);
+            expect(names).toHaveLength(expectedTotal.length + 1);
 
-            expectedActorsTools.forEach((tool) => expect(names).toContain(tool));
-            expectedDocsTools.forEach((tool) => expect(names).toContain(tool));
-            expectedActors.forEach((actor) => expect(names).toContain(actor));
+            expectToolNamesToContain(names, expectedActorsTools);
+            expectToolNamesToContain(names, expectedDocsTools);
+            expectToolNamesToContain(names, expectedActors);
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should list only add-actor when enableAddingActors is true and no tools/actors are specified', async () => {
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(1);
-            expect(names).toContain(addTool.tool.name);
+            expect(names.length).toEqual(2);
+            expect(names).toContain('add-actor');
+            expect(names).toContain('get-actor-output');
+            await client.close();
         });
 
         it('should list all default tools and Actors when enableAddingActors is false', async () => {
             client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should override enableAddingActors false with experimental tool category', async () => {
             client = await createClientFn({ enableAddingActors: false, tools: ['experimental'] });
+
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(toolCategories.experimental.length);
-            expect(names).toContain(addTool.tool.name);
+            expect(names).toHaveLength(2);
+            expect(names).toContain('add-actor');
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should list two loaded Actors', async () => {
             const actors = ['apify/python-example', 'apify/rag-web-browser'];
             client = await createClientFn({ actors, enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(actors.length);
+            expect(names.length).toEqual(actors.length + 1);
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should load only specified actors when actors param is provided (no other tools)', async () => {
@@ -157,8 +174,9 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(await client.listTools());
 
             // Should only load the specified actor, no default tools or categories
-            expect(names.length).toEqual(actors.length);
+            expect(names.length).toEqual(actors.length + 1);
             expect(names).toContain(actorNameToToolName(actors[0]));
+            expect(names).toContain('get-actor-output');
 
             // Should NOT include any default category tools
             expect(names).not.toContain('search-actors');
@@ -191,8 +209,11 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ tools: actors });
             const names = getToolNames(await client.listTools());
             // Only the Actor should be loaded
-            expect(names).toHaveLength(actors.length);
+            expect(names).toHaveLength(actors.length + 1);
             expect(names).toContain(actorNameToToolName(actors[0]));
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should treat selectors with slashes as Actor names', async () => {
@@ -212,13 +233,19 @@ export function createIntegrationTestsSuite(
         it('should merge actors param into tools selectors (backward compatibility)', async () => {
             const actors = ['apify/python-example'];
             const categories = ['docs'] as ToolCategory[];
+
             client = await createClientFn({ tools: categories, actors });
+
             const names = getToolNames(await client.listTools());
             const docsToolNames = getExpectedToolNamesByCategories(categories);
             const expected = [...docsToolNames, actorNameToToolName(actors[0])];
-            expect(names).toHaveLength(expected.length);
+            expect(names).toHaveLength(expected.length + 1);
+
             const containsExpected = expected.every((n) => names.includes(n));
             expect(containsExpected).toBe(true);
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should handle mixed categories and specific tools in tools param', async () => {
@@ -227,11 +254,14 @@ export function createIntegrationTestsSuite(
             });
             const names = getToolNames(await client.listTools());
 
+            expect(names).toHaveLength(5);
+
             // Should include: docs category + specific tools
             expect(names).toContain('search-apify-docs'); // from docs category
             expect(names).toContain('fetch-apify-docs'); // from docs category
             expect(names).toContain('fetch-actor-details'); // specific tool
             expect(names).toContain('add-actor'); // specific tool
+            expect(names).toContain('get-actor-output');
 
             // Should NOT include other actors category tools
             expect(names).not.toContain('search-actors');
@@ -261,9 +291,13 @@ export function createIntegrationTestsSuite(
 
         it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
             client = await createClientFn({ tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
+
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(1);
+            expect(names.length).toEqual(2);
             expect(names).toContain(actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it('should add Actor dynamically and call it directly', async () => {
@@ -271,16 +305,18 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
             // Only the add tool should be added
-            expect(names).toHaveLength(1);
+            expect(names).toHaveLength(2);
             expect(names).toContain('add-actor');
+            expect(names).toContain('get-actor-output');
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
             await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
             // Check if tools was added
             const namesAfterAdd = getToolNames(await client.listTools());
-            expect(namesAfterAdd.length).toEqual(2);
+            expect(namesAfterAdd.length).toEqual(3);
             expect(namesAfterAdd).toContain(selectedToolName);
+            expect(namesAfterAdd).toContain('get-actor-output');
             await callPythonExampleActor(client, selectedToolName);
         });
 
@@ -288,8 +324,8 @@ export function createIntegrationTestsSuite(
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
-            // Only the actors category and add-actor should be loaded
-            const numberOfTools = toolCategories.actors.length + 1;
+            // Only the actors category, get-actor-output and add-actor should be loaded
+            const numberOfTools = toolCategories.actors.length + 2;
             expect(names).toHaveLength(numberOfTools);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
@@ -306,18 +342,16 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result).toEqual(
+            const content = result.content as { text: string }[];
+
+            expect(content[0]).toEqual(
                 {
-                    content: [
-                        {
-                            text: expect.stringMatching(/^Actor finished with runId: .+, datasetId .+$/),
-                            type: 'text',
-                        },
-                        {
-                            text: `{"sum":3,"first_number":1,"second_number":2}`,
-                            type: 'text',
-                        },
-                    ],
+                    text: JSON.stringify([{
+                        first_number: 1,
+                        second_number: 2,
+                        sum: 3,
+                    }]),
+                    type: 'text',
                 },
             );
         });
@@ -683,17 +717,22 @@ export function createIntegrationTestsSuite(
             // Test with enableAddingActors = false via env var
             client = await createClientFn({ enableAddingActors: false, useEnv: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length);
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
             expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
+            expect(names).toContain('get-actor-output');
+
+            await client.close();
         });
 
         it.runIf(options.transport === 'stdio')('should respect ENABLE_ADDING_ACTORS environment variable and load only add-actor tool when true', async () => {
             // Test with enableAddingActors = false via env var
             client = await createClientFn({ enableAddingActors: true, useEnv: true });
             const names = getToolNames(await client.listTools());
-            expect(names).toEqual(['add-actor']);
+            expectToolNamesToContain(names, ['add-actor', 'get-actor-output']);
+
+            await client.close();
         });
 
         it.runIf(options.transport === 'stdio')('should load tool categories from TOOLS environment variable', async () => {
@@ -713,6 +752,193 @@ export function createIntegrationTestsSuite(
             for (const expectedToolName of expectedToolNames) {
                 expect(toolNames).toContain(expectedToolName);
             }
+        });
+
+        it('should call rag-web-browser actor and retrieve metadata.title and crawl object from dataset', async () => {
+            client = await createClientFn({ tools: ['actors', 'storage'] });
+
+            const callResult = await client.callTool({
+                name: 'call-actor',
+                arguments: {
+                    actor: 'apify/rag-web-browser',
+                    step: 'call',
+                    input: { query: 'https://apify.com' },
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string; type: string }[];
+
+            expect(content.length).toBe(2); // Call step returns text summary with embedded schema
+
+            // First content: text summary
+            const runText = content[1].text;
+
+            // Extract datasetId from the text
+            const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
+            expect(runIdMatch).toBeTruthy();
+            const datasetId = runIdMatch![2];
+
+            // Check for JSON schema in the text (in a code block)
+            const schemaMatch = runText.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+            expect(schemaMatch).toBeTruthy();
+            if (schemaMatch) {
+                const schemaText = schemaMatch[1];
+                const schema = JSON.parse(schemaText);
+                expect(schema).toHaveProperty('type');
+                expect(schema.type).toBe('object');
+                expect(schema).toHaveProperty('properties');
+                expect(schema.properties).toHaveProperty('metadata');
+                expect(schema.properties.metadata).toHaveProperty('type', 'object');
+                expect(schema.properties).toHaveProperty('crawl');
+                expect(schema.properties.crawl).toHaveProperty('type', 'object');
+            }
+
+            const outputResult = await client.callTool({
+                name: HelperTools.ACTOR_OUTPUT_GET,
+                arguments: {
+                    datasetId,
+                    fields: 'metadata.title,crawl',
+                },
+            });
+
+            expect(outputResult.content).toBeDefined();
+            const outputContent = outputResult.content as { text: string; type: string }[];
+            const output = JSON.parse(outputContent[0].text);
+            expect(Array.isArray(output)).toBe(true);
+            expect(output.length).toBeGreaterThan(0);
+            expect(output[0]).toHaveProperty('metadata.title');
+            expect(typeof output[0]['metadata.title']).toBe('string');
+            expect(output[0]).toHaveProperty('crawl');
+            expect(typeof output[0].crawl).toBe('object');
+
+            await client.close();
+        });
+
+        it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
+            client = await createClientFn({ actors: ['apify/rag-web-browser'] });
+
+            // Call the dedicated apify-slash-rag-web-browser tool
+            const result = await client.callTool({
+                name: actorNameToToolName('apify/rag-web-browser'),
+                arguments: { query: 'https://apify.com' },
+            });
+
+            // Validate the response has 1 content item with text summary and embedded schema
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; type: string }[];
+            expect(content.length).toBe(2);
+            const { text } = content[1];
+
+            // Extract datasetId from the response text
+            const runIdMatch = text.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
+            expect(runIdMatch).toBeTruthy();
+            const datasetId = runIdMatch![2];
+
+            // Check for JSON schema in the text (in a code block)
+            const schemaMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+            expect(schemaMatch).toBeTruthy();
+            if (schemaMatch) {
+                const schemaText = schemaMatch[1];
+                const schema = JSON.parse(schemaText);
+                expect(schema).toHaveProperty('type');
+                expect(schema.type).toBe('object');
+                expect(schema).toHaveProperty('properties');
+                expect(schema.properties).toHaveProperty('metadata');
+                expect(schema.properties.metadata).toHaveProperty('type', 'object');
+                expect(schema.properties).toHaveProperty('crawl');
+                expect(schema.properties.crawl).toHaveProperty('type', 'object');
+            }
+
+            // Call get-actor-output with fields: 'metadata.title'
+            const outputResult = await client.callTool({
+                name: HelperTools.ACTOR_OUTPUT_GET,
+                arguments: {
+                    datasetId,
+                    fields: 'metadata.title',
+                },
+            });
+
+            // Validate the output contains the expected structure with metadata.title
+            expect(outputResult.content).toBeDefined();
+            const outputContent = outputResult.content as { text: string; type: string }[];
+            const output = JSON.parse(outputContent[0].text);
+            expect(Array.isArray(output)).toBe(true);
+            expect(output.length).toBeGreaterThan(0);
+            expect(output[0]).toHaveProperty('metadata.title');
+            expect(typeof output[0]['metadata.title']).toBe('string');
+
+            await client.close();
+        });
+
+        it('should call apify/python-example and retrieve the full dataset using get-actor-output tool', async () => {
+            client = await createClientFn({ actors: ['apify/python-example'] });
+            const selectedToolName = actorNameToToolName('apify/python-example');
+            const input = { first_number: 5, second_number: 7 };
+
+            const result = await client.callTool({
+                name: selectedToolName,
+                arguments: input,
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; type: string }[];
+            expect(content.length).toBe(2); // Call step returns text summary with embedded schema
+
+            // First content: text summary
+            const runText = content[1].text;
+
+            // Extract datasetId from the text
+            const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
+            expect(runIdMatch).toBeTruthy();
+            const datasetId = runIdMatch![2];
+
+            // Retrieve full dataset using get-actor-output tool
+            const outputResult = await client.callTool({
+                name: HelperTools.ACTOR_OUTPUT_GET,
+                arguments: {
+                    datasetId,
+                },
+            });
+
+            expect(outputResult.content).toBeDefined();
+            const outputContent = outputResult.content as { text: string; type: string }[];
+            const output = JSON.parse(outputContent[0].text);
+            expect(Array.isArray(output)).toBe(true);
+            expect(output.length).toBe(1);
+            expect(output[0]).toHaveProperty('first_number', input.first_number);
+            expect(output[0]).toHaveProperty('second_number', input.second_number);
+            expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
+        });
+
+        it('should return Actor details both for full Actor name and ID', async () => {
+            const actorName = 'apify/python-example';
+            const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await apifyClient.actor(actorName).get();
+            expect(actor).toBeDefined();
+            const actorId = actor!.id as string;
+
+            client = await createClientFn();
+
+            // Fetch by full Actor name
+            const resultByName = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: actorName },
+            });
+            expect(resultByName.content).toBeDefined();
+            const contentByName = resultByName.content as { text: string }[];
+            expect(contentByName[0].text).toContain(actorName);
+
+            // Fetch by Actor ID only
+            const resultById = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: { actor: actorId },
+            });
+            expect(resultById.content).toBeDefined();
+            const contentById = resultById.content as { text: string }[];
+            expect(contentById[0].text).toContain(actorName);
+
+            await client.close();
         });
     });
 }

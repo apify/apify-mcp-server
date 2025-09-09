@@ -1,4 +1,3 @@
-import { Ajv } from 'ajv';
 import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
@@ -7,6 +6,7 @@ import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
 import { formatActorsListToActorCard } from '../utils/actor-card.js';
+import { ajv } from '../utils/ajv.js';
 
 export async function searchActorsByKeywords(
     search: string,
@@ -19,7 +19,6 @@ export async function searchActorsByKeywords(
     return results.items;
 }
 
-const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 export const searchActorsArgsSchema = z.object({
     limit: z.number()
         .int()
