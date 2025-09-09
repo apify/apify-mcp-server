@@ -363,11 +363,19 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                             content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
                         };
                     }
-                    return {
-                        content: [
-                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
-                        ],
-                    };
+                    const content = [
+                        { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                    ];
+                    /**
+                     * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
+                     */
+                    if (apifyMcpServer.options.skyfireMode) {
+                        content.push({
+                            type: 'text',
+                            text: SKYFIRE_TOOL_INSTRUCTIONS,
+                        });
+                    }
+                    return { content };
                 }
 
                 /**
