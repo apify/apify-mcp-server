@@ -7,12 +7,13 @@ import log from '@apify/log';
 import { createExpressApp } from '../../src/actor/server.js';
 import { createMcpStreamableClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
+import { getAvailablePort } from './utils/port.js';
 
 let app: Express;
 let httpServer: HttpServer;
-const httpServerPort = 50001;
-const httpServerHost = `http://localhost:${httpServerPort}`;
-const mcpUrl = `${httpServerHost}/mcp`;
+let httpServerPort: number;
+let httpServerHost: string;
+let mcpUrl: string;
 
 createIntegrationTestsSuite({
     suiteName: 'Apify MCP Server Streamable HTTP',
@@ -20,6 +21,11 @@ createIntegrationTestsSuite({
     createClientFn: async (options) => await createMcpStreamableClient(mcpUrl, options),
     beforeAllFn: async () => {
         log.setLevel(log.LEVELS.OFF);
+        
+        // Get an available port
+        httpServerPort = await getAvailablePort();
+        httpServerHost = `http://localhost:${httpServerPort}`;
+        mcpUrl = `${httpServerHost}/mcp`;
 
         // Create an express app
         app = createExpressApp(httpServerHost);
