@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.4.5",
+  "version": "0.4.7",
   "type": "module",
   "description": "Apify MCP Server",
   "engines": {
