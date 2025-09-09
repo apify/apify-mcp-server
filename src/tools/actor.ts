@@ -10,7 +10,7 @@ import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
-    SKYFIRE_PAY_ID_MISSING_STRING,
+    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
@@ -380,7 +380,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     return {
                         content: [{
                             type: 'text',
-                            text: SKYFIRE_PAY_ID_MISSING_STRING,
+                            text: SKYFIRE_TOOL_INSTRUCTIONS,
                         }],
                     };
                 }

@@ -14,6 +14,7 @@ import {
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
+    ReadResourceRequestSchema,
     McpError,
     ServerNotificationSchema,
     SetLevelRequestSchema,
@@ -27,8 +28,9 @@ import { ApifyClient } from '../apify-client.js';
 import {
     SERVER_NAME,
     SERVER_VERSION,
-    SKYFIRE_PAY_ID_MISSING_STRING,
+    SKYFIRE_TOOL_INSTRUCTIONS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
+    SKYFIRE_README_CONTENT,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
@@ -321,9 +323,44 @@ export class ActorsMcpServer {
 
     private setupResourceHandlers(): void {
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-            // No resources available, return empty response
-            return { resources: [] };
+            /**
+             * Return the usage guide resource only if Skyfire mode is enabled. No resources otherwise for normal mode.
+             */
+            if (this.options.skyfireMode) {
+                return {
+                    resources: [
+                        {
+                            uri: 'file://readme.md',
+                            name: 'readme',
+                            description: 'Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.',
+                            mimeType: 'text/markdown',
+                        },
+                    ],
+                };
+            } else {
+                return { resources: [] };
+            }
         });
+
+        if (this.options.skyfireMode) {
+            this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+                const { uri } = request.params;
+                if (uri === 'file://readme.md') {
+                    return {
+                        contents: [{
+                                uri: 'file://readme.md',
+                                mimeType: 'text/markdown',
+                                text: SKYFIRE_README_CONTENT,
+                            }],
+                        };
+                }
+                return {
+                    contents: [{
+                        uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
+                    }]
+                };
+            });
+        }
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
             // No resource templates available, return empty response
@@ -396,7 +433,7 @@ export class ActorsMcpServer {
                             };
                         }
                         // Update description to include Skyfire instructions
-                        toolEntry.tool.description = `${SKYFIRE_PAY_ID_MISSING_STRING}\n\n${toolEntry.tool.description}`;
+                        toolEntry.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
                     }
                 }
             }
@@ -554,7 +591,7 @@ export class ActorsMcpServer {
                         return {
                             content: [{
                                 type: 'text',
-                                text: SKYFIRE_PAY_ID_MISSING_STRING,
+                                text: SKYFIRE_TOOL_INSTRUCTIONS,
                             }],
                         };
                     }
@@ -569,15 +606,16 @@ export class ActorsMcpServer {
                     /**
                      * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
                      */
-                    const apifyClient = this.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
-                        ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
+                    const {'skyfire-pay-id': skyfirePayId, ...actorArgs} = args as Record<string, unknown>;
+                    const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
+                        ? new ApifyClient({ skyfirePayId })
                         : new ApifyClient({ token: apifyToken });
 
                     try {
-                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
+                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: actorArgs });
                         const callResult = await callActorGetDataset(
                             actorTool.actorFullName,
-                            args,
+                            actorArgs,
                             apifyClient,
                             callOptions,
                             progressTracker,
