@@ -45,6 +45,7 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
+
     const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
     const callResult = await callActorGetDataset(input.debugActor!, input.debugActorInput!, apifyClient, options);
 
