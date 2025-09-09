@@ -69,7 +69,9 @@ export const getActorOutput: ToolEntry = {
         name: HelperTools.ACTOR_OUTPUT_GET,
         actorFullName: HelperTools.ACTOR_OUTPUT_GET,
         description: `Retrieves the output of a specific Actor execution based on its dataset ID.
-You also can retrieve only specific fields from the output if needed. Use this tool to get Actor output data outside of the Actor dataset output preview, or to access fields from the Actor output dataset schema that are not included in the preview.`,
+You can also retrieve only specific fields from the output if needed. Use this tool to get Actor output data outside of the Actor dataset output preview, or to access fields from the Actor output dataset schema that are not included in the preview.
+
+Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g. \`apify-slash-rag-web-browser\`) or tools that can interact with Actors (e.g. \`call-actor\`, \`add-actor\`).`,
         inputSchema: zodToJsonSchema(getActorOutputArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorOutputArgs)),
         call: async (toolArgs) => {
