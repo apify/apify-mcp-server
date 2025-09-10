@@ -26,6 +26,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
+    HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
@@ -420,11 +421,13 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             /**
              * Hack for the Skyfire agentic payments, we check if Skyfire mode is enabled we ad-hoc add
-             * the `skyfire-pay-id` input property to all Actor tools and `call-actor` tool.
+             * the `skyfire-pay-id` input property to all Actor tools and `call-actor` and `get-actor-output` tool.
              */
             if (this.options.skyfireMode) {
                 for (const toolEntry of this.tools.values()) {
-                    if (toolEntry.type === 'actor' || (toolEntry.type === 'internal' && toolEntry.tool.name === 'call-actor')) {
+                    if (toolEntry.type === 'actor'
+                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_CALL)
+                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
                         if (toolEntry.tool.inputSchema && 'properties' in toolEntry.tool.inputSchema) {
                             (toolEntry.tool.inputSchema.properties as Record<string, unknown>)['skyfire-pay-id'] = {
                                 type: 'string',
