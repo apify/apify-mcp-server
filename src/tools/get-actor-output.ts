@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
+import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
@@ -73,11 +73,35 @@ You can also retrieve only specific fields from the output if needed. Use this t
 
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g. \`apify-slash-rag-web-browser\`) or tools that can interact with Actors (e.g. \`call-actor\`, \`add-actor\`).`,
         inputSchema: zodToJsonSchema(getActorOutputArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorOutputArgs)),
+        /**
+         * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+         */
+        ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorOutputArgs), additionalProperties: true }),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args, apifyToken, apifyMcpServer } = toolArgs;
+
+            /**
+             * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+             * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+             */
+            if (apifyMcpServer.options.skyfireMode
+                && args['skyfire-pay-id'] === undefined
+            ) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: SKYFIRE_TOOL_INSTRUCTIONS,
+                    }],
+                };
+            }
+
+            /**
+             * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+             */
+            const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
+                ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
+                : new ApifyClient({ token: apifyToken });
             const parsed = getActorOutputArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
 
             // Parse fields into array
             const fieldsArray = parseCommaSeparatedList(parsed.fields);
@@ -88,7 +112,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
              * If a dot is present, filtering is done here and not at the API level.
              */
             const hasDot = fieldsArray.some((field) => field.includes('.'));
-            const response = await client.dataset(parsed.datasetId).listItems({
+            const response = await apifyClient.dataset(parsed.datasetId).listItems({
                 offset: parsed.offset,
                 limit: parsed.limit,
                 fields: fieldsArray.length > 0 && !hasDot ? fieldsArray : undefined,
