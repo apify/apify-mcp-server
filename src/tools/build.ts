@@ -3,7 +3,8 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify-client.js';
+import { resolveApifyClient } from '../apify-client-factory.js';
 import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
 import type {
     ActorDefinitionPruned,
@@ -21,7 +22,7 @@ import { filterSchemaProperties, shortenProperties } from './utils.js';
  * Then, fetch the build details and return actorName, description, and input schema.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {number} limit - Truncate the README to this limit.
- * @param {string} apifyToken
+ * @param {string} apifyClient
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 export async function getActorDefinition(
@@ -119,10 +120,10 @@ export const actorDefinitionTool: ToolEntry = {
         inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args } = toolArgs;
 
             const parsed = getActorDefinitionArgsSchema.parse(args);
-            const apifyClient = new ApifyClient({ token: apifyToken });
+            const apifyClient = resolveApifyClient({ token: null });
             const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
             if (!v) {
                 return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };

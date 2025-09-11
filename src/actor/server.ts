@@ -11,7 +11,7 @@ import express from 'express';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import { resolveApifyClient } from '../apify-client-factory.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
@@ -74,9 +74,8 @@ export function createExpressApp(
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
-            const apifyToken = process.env.APIFY_TOKEN as string;
             log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
-            const apifyClient = new ApifyClient({ token: apifyToken });
+            const apifyClient = resolveApifyClient({ token: null }, { sessionId: transport.sessionId });
             await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
             transportsSSE[transport.sessionId] = transport;
@@ -159,7 +158,7 @@ export function createExpressApp(
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
                 log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
-                const apifyClient = new ApifyClient({ token: apifyToken });
+                const apifyClient = resolveApifyClient({ token: apifyToken }, { sessionId: transport.sessionId });
                 await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
                 // Connect the transport to the MCP server BEFORE handling the request

@@ -6,6 +6,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
+import { resolveApifyClient } from '../apify-client-factory.js';
 import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
@@ -246,9 +247,11 @@ async function getMCPServersAsTools(
 
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
-    apifyClient: ApifyClient,
+    apifyClient?: ApifyClient,
 ): Promise<ToolEntry[]> {
     log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames });
+
+    const client = apifyClient ?? resolveApifyClient({ token: null });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -261,7 +264,7 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
+            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, client);
             if (!actorDefinitionPruned) {
                 log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
@@ -283,7 +286,7 @@ export async function getActorsAsTools(
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token),
+        getMCPServersAsTools(actorMCPServersInfo, (client as ApifyClient).token),
     ]);
 
     return [...normalTools, ...mcpServerTools];
@@ -332,7 +335,7 @@ Step 1: Get Actor Info (step="info", default)
 • This returns the Actor description, documentation, and required input schema
 • You MUST do this step first - it's required to understand how to call the Actor
 
-Step 2: Call Actor (step="call") 
+Step 2: Call Actor (step="call")
 • Only after step 1, call again with step="call" and proper input based on the schema
 • This executes the Actor and returns the results
 
@@ -349,9 +352,8 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
 
             try {
                 if (step === 'info') {
-                    const apifyClient = new ApifyClient({ token: apifyToken });
-                    // Step 1: Return Actor card and schema directly
-                    const details = await fetchActorDetails(apifyClient, actorName);
+                    // Step 1: Return Actor card and schema directly (no token needed)
+                    const details = await fetchActorDetails(actorName);
                     if (!details) {
                         return {
                             content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],

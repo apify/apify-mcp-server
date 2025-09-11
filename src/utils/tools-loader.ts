@@ -3,10 +3,10 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
-import type { ApifyClient } from 'apify';
-
 import log from '@apify/log';
 
+import type { ApifyClient } from '../apify-client.js';
+import { resolveApifyClient } from '../apify-client-factory.js';
 import { defaults } from '../const.js';
 import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
@@ -32,12 +32,12 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  * This function is used by both the stdio.ts and the processParamsGetTools function.
  *
  * @param input The processed Input object
- * @param apifyToken The Apify API token
+ * @param apifyClient
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
-    apifyClient: ApifyClient,
+    apifyClient?: ApifyClient,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -122,7 +122,8 @@ export async function loadToolsFromInput(
 
     // Actor tools (if any)
     if (actorNamesToLoad.length > 0) {
-        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient);
+        const client = apifyClient ?? resolveApifyClient({ token: null });
+        const actorTools = await getActorsAsTools(actorNamesToLoad, client);
         result.push(...actorTools);
     }
 

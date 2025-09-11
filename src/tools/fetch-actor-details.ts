@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
@@ -29,10 +28,9 @@ export const fetchActorDetailsTool: ToolEntry = {
         inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
         call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+            const { args } = toolArgs;
             const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-            const apifyClient = new ApifyClient({ token: apifyToken });
-            const details = await fetchActorDetails(apifyClient, parsed.actor);
+            const details = await fetchActorDetails(parsed.actor);
             if (!details) {
                 return {
                     content: [{ type: 'text', text: `Actor information for '${parsed.actor}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
