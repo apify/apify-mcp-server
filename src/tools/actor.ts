@@ -228,9 +228,13 @@ async function getMCPServersAsTools(
             mcpServerUrl,
         });
 
-        let client: Client | undefined;
+        let client: Client | null = null;
         try {
             client = await connectMCPClient(mcpServerUrl, apifyToken);
+            if (!client) {
+                // Skip this Actor, connectMCPClient will log the error
+                continue;
+            }
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
             actorsMCPServerTools.push(...serverTools);
         } finally {

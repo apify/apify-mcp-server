@@ -477,9 +477,19 @@ export class ActorsMcpServer {
 
                 if (tool.type === 'actor-mcp') {
                     const serverTool = tool.tool as ActorMcpTool;
-                    let client: Client | undefined;
+                    let client: Client | null = null;
                     try {
                         client = await connectMCPClient(serverTool.serverUrl, apifyToken);
+                        if (!client) {
+                            const msg = `Failed to connect to MCP server ${serverTool.serverUrl}`;
+                            log.error(msg);
+                            await this.server.sendLoggingMessage({ level: 'error', data: msg });
+                            return {
+                                content: [
+                                    { type: 'text', text: msg },
+                                ],
+                            };
+                        }
 
                         // Only set up notification handlers if progressToken is provided by the client
                         if (progressToken) {
