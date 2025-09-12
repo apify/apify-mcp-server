@@ -44,11 +44,14 @@ export enum HelperTools {
     STORE_SEARCH = 'search-actors',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
+    GET_HTML_SKELETON = 'get-html-skeleton',
 }
+
+export const ACTOR_RAG_WEB_BROWSER = 'apify/rag-web-browser';
 
 export const defaults = {
     actors: [
-        'apify/rag-web-browser',
+        ACTOR_RAG_WEB_BROWSER,
     ],
 };
 
@@ -59,6 +62,8 @@ export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
 export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
+export const GET_HTML_SKELETON_CACHE_TTL_SECS = 5 * 60; // 5 minutes
+export const GET_HTML_SKELETON_CACHE_MAX_SIZE = 200;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */
