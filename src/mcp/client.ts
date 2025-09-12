@@ -4,7 +4,12 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 import log from '@apify/log';
 
+import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './utils.js';
+
+class TimeoutError extends Error {
+    override readonly name = 'TimeoutError';
+}
 
 /**
  * Creates and connects a ModelContextProtocol client.
@@ -12,16 +17,54 @@ import { getMCPServerID } from './utils.js';
  */
 export async function connectMCPClient(
     url: string, token: string,
-): Promise<Client> {
+): Promise<Client | null> {
+    let client: Client;
     try {
-        return await createMCPStreamableClient(url, token);
-    } catch {
+        client = await createMCPStreamableClient(url, token);
+    } catch (error) {
+        if (error instanceof TimeoutError) {
+            log.warning('Connection to MCP server using streamable HTTP transport timed out', { url });
+            return null;
+        }
+
         // If streamable HTTP transport fails, fall back to SSE transport
         log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
             url,
         });
-        return await createMCPSSEClient(url, token);
     }
+
+    try {
+        client = await createMCPSSEClient(url, token);
+    } catch (error) {
+        if (error instanceof TimeoutError) {
+            log.warning('Connection to MCP server using SSE transport timed out', { url });
+            return null;
+        }
+
+        log.error('Failed to connect to MCP server using SSE transport', { cause: error });
+        throw error;
+    }
+
+    return client;
+}
+
+async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
+    let timeoutPid: NodeJS.Timeout;
+    const timeout = new Promise<never>((_resolve, reject) => {
+        timeoutPid = setTimeout(
+            () => reject(new TimeoutError(`Timed out after ${millis} ms.`)),
+            millis,
+        );
+    });
+
+    return Promise.race([
+        promise,
+        timeout,
+    ]).finally(() => {
+        if (timeoutPid) {
+            clearTimeout(timeoutPid);
+        }
+    });
 }
 
 /**
@@ -56,7 +99,7 @@ async function createMCPSSEClient(
         version: '1.0.0',
     });
 
-    await client.connect(transport);
+    await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
 
     return client;
 }
@@ -82,7 +125,7 @@ async function createMCPStreamableClient(
         version: '1.0.0',
     });
 
-    await client.connect(transport);
+    await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
 
     return client;
 }
