@@ -1,14 +1,4 @@
 /**
- * Recursively gets the value in a nested object for each key in the keys array.
- * Each key can be a dot-separated path (e.g. 'a.b.c').
- * Returns an object mapping each key to its resolved value (or undefined if not found).
- *
- * @example
- * const obj = { a: { b: { c: 42 } }, nested: { d: 100 } };
- * const value = getValuesByDotKeys(obj, ['a.b.c', 'a.b.d', 'nested']);
- * value; // { 'a.b.c': 42, 'a.b.d': undefined, 'nested': { d: 100 } }
- */
-/**
  * Parses a comma-separated string into an array of trimmed strings.
  * Empty strings are filtered out after trimming.
  *
@@ -25,6 +15,16 @@ export function parseCommaSeparatedList(input?: string): string[] {
     return input.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
+/**
+ * Recursively gets the value in a nested object for each key in the keys array.
+ * Each key can be a dot-separated path (e.g. 'a.b.c').
+ * Returns an object mapping each key to its resolved value (or undefined if not found).
+ *
+ * @example
+ * const obj = { a: { b: { c: 42 } }, nested: { d: 100 } };
+ * const value = getValuesByDotKeys(obj, ['a.b.c', 'a.b.d', 'nested']);
+ * value; // { 'a.b.c': 42, 'a.b.d': undefined, 'nested': { d: 100 } }
+ */
 export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[]): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const key of keys) {
@@ -46,4 +46,22 @@ export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[])
         result[key] = current;
     }
     return result;
+}
+
+/**
+ * Validates whether a given string is a well-formed URL.
+ *
+ * Allows only valid HTTP or HTTPS URLs.
+ */
+export function isValidHttpUrl(urlString: string): boolean {
+    if (!urlString.startsWith('http://') && !urlString.startsWith('https://')) {
+        return false;
+    }
+    try {
+        /* eslint-disable no-new */
+        new URL(urlString);
+        return true;
+    } catch {
+        return false;
+    }
 }

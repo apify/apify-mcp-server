@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getValuesByDotKeys, parseCommaSeparatedList } from '../../src/utils/generic.js';
+import { getValuesByDotKeys, isValidHttpUrl, parseCommaSeparatedList } from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
     it('should get value for a key without dot', () => {
@@ -80,5 +80,25 @@ describe('parseCommaSeparatedList', () => {
     it('should handle single item', () => {
         const result = parseCommaSeparatedList(' single ');
         expect(result).toEqual(['single']);
+    });
+});
+
+describe('isValidUrl', () => {
+    it('should validate correct URLs', () => {
+        expect(isValidHttpUrl('http://example.com')).toBe(true);
+        expect(isValidHttpUrl('https://example.com/path?query=string#hash')).toBe(true);
+        expect(isValidHttpUrl('http://localhost:3000')).toBe(true);
+        expect(isValidHttpUrl('http://192.168.1.1')).toBe(true);
+    });
+
+    it('should invalidate incorrect URLs', () => {
+        expect(isValidHttpUrl('ftp://example.com')).toBe(false);
+        expect(isValidHttpUrl('example.com')).toBe(false);
+        expect(isValidHttpUrl('http:/example.com')).toBe(false);
+        expect(isValidHttpUrl('')).toBe(false);
+        expect(isValidHttpUrl('   ')).toBe(false);
+        expect(isValidHttpUrl('http//example.com')).toBe(false);
+        expect(isValidHttpUrl('https//example.com')).toBe(false);
+        expect(isValidHttpUrl('://example.com')).toBe(false);
     });
 });
