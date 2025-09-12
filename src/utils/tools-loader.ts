@@ -3,6 +3,8 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
+import type { ApifyClient } from 'apify';
+
 import log from '@apify/log';
 
 import { defaults } from '../const.js';
@@ -35,7 +37,7 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  */
 export async function loadToolsFromInput(
     input: Input,
-    apifyToken: string,
+    apifyClient: ApifyClient,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -120,7 +122,7 @@ export async function loadToolsFromInput(
 
     // Actor tools (if any)
     if (actorNamesToLoad.length > 0) {
-        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyToken);
+        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient);
         result.push(...actorTools);
     }
 
