@@ -30,10 +30,10 @@ const getHtmlSkeletonArgs = z.object({
         .optional()
         .default(false)
         .describe('Whether to enable JavaScript rendering. Enabling this may increase the time taken to retrieve the HTML skeleton.'),
-    page: z.number()
+    chunk: z.number()
         .optional()
         .default(1)
-        .describe('Page number to retrieve when paginating through content. Used to prevent exceeding the maximum tool output length.'),
+        .describe('Chunk number to retrieve when getting the content. The content is split into chunks to prevent exceeding the maximum tool output length.'),
 });
 
 export const getHtmlSkeleton: ToolEntry = {
@@ -41,7 +41,7 @@ export const getHtmlSkeleton: ToolEntry = {
     tool: {
         name: HelperTools.GET_HTML_SKELETON,
         actorFullName: HelperTools.GET_HTML_SKELETON,
-        description: `Retrieves the HTML skeleton (clean structure) from a given URL by stripping unwanted elements like scripts, styles, and non-essential attributes. This tool keeps only the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic content and provides paginated output to handle large pages. This tool is useful for building web scrapers and data extraction tasks where a clean HTML structure is needed for writing concrete selectors or parsers.`,
+        description: `Retrieves the HTML skeleton (clean structure) from a given URL by stripping unwanted elements like scripts, styles, and non-essential attributes. This tool keeps only the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic content and provides chunked output to handle large HTML. This tool is useful for building web scrapers and data extraction tasks where a clean HTML structure is needed for writing concrete selectors or parsers.`,
         inputSchema: zodToJsonSchema(getHtmlSkeletonArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
         call: async (toolArgs) => {
@@ -86,16 +86,16 @@ export const getHtmlSkeleton: ToolEntry = {
 
             // Pagination logic
             const totalLength = strippedHtml.length;
-            const pageSize = TOOL_MAX_OUTPUT_CHARS;
-            const totalPages = Math.ceil(totalLength / pageSize);
-            const startIndex = (parsed.page - 1) * pageSize;
-            const endIndex = Math.min(startIndex + pageSize, totalLength);
-            const pageContent = strippedHtml.slice(startIndex, endIndex);
-            const hasNextPage = parsed.page < totalPages;
+            const chunkSize = TOOL_MAX_OUTPUT_CHARS;
+            const totalChunks = Math.ceil(totalLength / chunkSize);
+            const startIndex = (parsed.chunk - 1) * chunkSize;
+            const endIndex = Math.min(startIndex + chunkSize, totalLength);
+            const chunkContent = strippedHtml.slice(startIndex, endIndex);
+            const hasNextChunk = parsed.chunk < totalChunks;
 
-            const paginationInfo = `\n\n--- Page ${parsed.page} of ${totalPages} ---\n${hasNextPage ? `Next page: ${parsed.page + 1}` : 'End of content'}`;
+            const chunkInfo = `\n\n--- Chunk ${parsed.chunk} of ${totalChunks} ---\n${hasNextChunk ? `Next chunk: ${parsed.chunk + 1}` : 'End of content'}`;
 
-            return buildMCPResponse([pageContent + paginationInfo]);
+            return buildMCPResponse([chunkContent + chunkInfo]);
         },
     } as InternalTool,
 };
