@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.9) (2025-09-12)
+
+### 🚀 Features
+
+- Agentic payments v2 ([#266](https://github.com/apify/apify-mcp-server/pull/266)) ([2733d4e](https://github.com/apify/apify-mcp-server/commit/2733d4e798a10532430238fd78ffbb69d08dd2c1)) by [@MQ37](https://github.com/MQ37), closes [#263](https://github.com/apify/apify-mcp-server/issues/263)
+
+
 ## [0.4.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.7) (2025-09-09)
 
 ### 🚀 Features
