@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.10) (2025-09-15)
+
+### 🚀 Features
+
+- Add dev get html skeleton tool ([#273](https://github.com/apify/apify-mcp-server/pull/273)) ([29f5cbd](https://github.com/apify/apify-mcp-server/commit/29f5cbd5720462c96fec9c101a813abea5611333)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.9) (2025-09-12)
 
 ### 🚀 Features
