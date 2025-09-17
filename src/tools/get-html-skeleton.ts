@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_RAG_WEB_BROWSER, HelperTools, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
+import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
 import { getHtmlSkeletonCache } from '../state.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -58,7 +58,7 @@ export const getHtmlSkeleton: ToolEntry = {
                 // Not in cache, call the Actor for scraping
                 const client = new ApifyClient({ token: apifyToken });
 
-                const run = await client.actor(ACTOR_RAG_WEB_BROWSER).call({
+                const run = await client.actor(RAG_WEB_BROWSER).call({
                     query: parsed.url,
                     outputFormats: [
                         'html',
@@ -68,16 +68,16 @@ export const getHtmlSkeleton: ToolEntry = {
 
                 const datasetItems = await client.dataset(run.defaultDatasetId).listItems();
                 if (datasetItems.items.length === 0) {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 const firstItem = datasetItems.items[0] as unknown as ScrapedPageItem;
                 if (firstItem.crawl.httpStatusMessage.toLocaleLowerCase() !== 'ok') {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 if (!firstItem.html) {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 strippedHtml = stripHtml(firstItem.html);

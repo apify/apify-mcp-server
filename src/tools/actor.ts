@@ -7,9 +7,10 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
-    ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
+    RAG_WEB_BROWSER,
+    RAG_WEB_BROWSER_ADDITIONAL_DESC,
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
 } from '../const.js';
@@ -26,7 +27,11 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
-import { actorNameToToolName, fixedAjvCompile, getToolSchemaID, transformActorInputSchemaProperties } from './utils.js';
+import {
+    actorNameToToolName,
+    buildActorInputSchema,
+    fixedAjvCompile,
+} from './utils.js';
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
@@ -156,45 +161,48 @@ export async function getNormalActorsAsTools(
 ): Promise<ToolEntry[]> {
     const tools: ToolEntry[] = [];
 
-    // Zip the results with their corresponding actorIDs
     for (const actorInfo of actorsInfo) {
         const { actorDefinitionPruned } = actorInfo;
 
-        if (actorDefinitionPruned) {
-            const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
-            if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
-                actorDefinitionPruned.input.properties = transformActorInputSchemaProperties(actorDefinitionPruned.input);
-                // Add schema $id, each valid JSON schema should have a unique $id
-                // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
-                actorDefinitionPruned.input.$id = schemaID;
-            }
-            try {
-                const memoryMbytes = actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
-                const tool: ToolEntry = {
-                    type: 'actor',
-                    tool: {
-                        name: actorNameToToolName(actorDefinitionPruned.actorFullName),
-                        actorFullName: actorDefinitionPruned.actorFullName,
-                        description: `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results. Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests to use this specific Actor.
-Actor description: ${actorDefinitionPruned.description}
-Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
-                        inputSchema: actorDefinitionPruned.input
-                        // So Actor without input schema works - MCP client expects JSON schema valid output
-                        || {
-                            type: 'object',
-                            properties: {},
-                            required: [],
-                        },
-                        // Additional props true to allow skyfire-pay-id
-                        ajvValidate: fixedAjvCompile(ajv, { ...actorDefinitionPruned.input, additionalProperties: true }),
-                        memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
-                    },
-                };
-                tools.push(tool);
-            } catch (validationError) {
-                log.error('Failed to compile AJV schema for Actor', { actorName: actorDefinitionPruned.actorFullName, error: validationError });
-            }
+        if (!actorDefinitionPruned) continue;
+
+        const isRag = actorDefinitionPruned.actorFullName === RAG_WEB_BROWSER;
+        const { inputSchema } = buildActorInputSchema(actorDefinitionPruned.actorFullName, actorDefinitionPruned.input, isRag);
+
+        let description = `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results.
+Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests this specific Actor.
+Actor description: ${actorDefinitionPruned.description}`;
+        if (isRag) {
+            description += RAG_WEB_BROWSER_ADDITIONAL_DESC;
         }
+
+        const memoryMbytes = Math.min(
+            actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES,
+            ACTOR_MAX_MEMORY_MBYTES,
+        );
+
+        let ajvValidate;
+        try {
+            ajvValidate = fixedAjvCompile(ajv, { ...inputSchema, additionalProperties: true });
+        } catch (e) {
+            log.error('Failed to compile schema', {
+                actorName: actorDefinitionPruned.actorFullName,
+                error: e,
+            });
+            continue;
+        }
+
+        tools.push({
+            type: 'actor',
+            tool: {
+                name: actorNameToToolName(actorDefinitionPruned.actorFullName),
+                actorFullName: actorDefinitionPruned.actorFullName,
+                description,
+                inputSchema,
+                ajvValidate,
+                memoryMbytes,
+            },
+        });
     }
     return tools;
 }
