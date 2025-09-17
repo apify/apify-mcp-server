@@ -44,21 +44,34 @@ export enum HelperTools {
     STORE_SEARCH = 'search-actors',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
+    GET_HTML_SKELETON = 'get-html-skeleton',
 }
+
+export const ACTOR_RAG_WEB_BROWSER = 'apify/rag-web-browser';
 
 export const defaults = {
     actors: [
-        'apify/rag-web-browser',
+        ACTOR_RAG_WEB_BROWSER,
     ],
 };
 
 export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
+export const SKYFIRE_MIN_CHARGE_USD = 5.0;
+export const SKYFIRE_SELLER_ID = process.env.SKYFIRE_SELLER_SERVICE_ID;
+
+export const SKYFIRE_TOOL_INSTRUCTIONS = `To run the Actor, you need to provide a Skyfire payment ID in the \`skyfire-pay-id\` input property. You first need to create the Skyfire PAY token by calling the \`create-pay-token\` tool from the Skyfire MCP server and then provide the created token in the \`skyfire-pay-id\` input property when calling Actor tool. The Skyfire PAY token is used for billing purposes and needs to be charged with at least ${SKYFIRE_MIN_CHARGE_USD} USD.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When retrieving Actor output using the \`get-actor-output\` tool, you also need to provide the same Skyfire PAY token ID in the \`skyfire-pay-id\` input property.`;
+
+export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire PAY token ID used for billing purposes.`;
+
+export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to interact with Apify Actors, storage, and documentation. Before running any Apify Actor, you need to set up a Skyfire PAY token for billing purposes. To set up the PAY token you need to use the create-pay-token tool from the Skyfire MCP server. The PAY token must be charged with a minimum of ${SKYFIRE_MIN_CHARGE_USD} USD to be valid.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When running an Actor using the call-actor tool, you must provide the Skyfire PAY token ID in the \`skyfire-pay-id\` input property. Similarly, when retrieving Actor output using the get-actor-output tool, you must also provide the same Skyfire PAY token ID in the \`skyfire-pay-id\` input property.`;
 
 // Cache
 export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const APIFY_DOCS_CACHE_MAX_SIZE = 500;
 export const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
+export const GET_HTML_SKELETON_CACHE_TTL_SECS = 5 * 60; // 5 minutes
+export const GET_HTML_SKELETON_CACHE_MAX_SIZE = 200;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */

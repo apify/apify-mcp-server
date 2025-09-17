@@ -9,6 +9,7 @@ import type { ActorCallOptions } from 'apify-client';
 import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
+import { ApifyClient } from './apify-client.js';
 import { processInput } from './input.js';
 import { callActorGetDataset } from './tools/index.js';
 import type { Input } from './types.js';
@@ -44,7 +45,9 @@ if (STANDBY_MODE) {
         await Actor.fail('If you need to debug a specific Actor, please provide the debugActor and debugActorInput fields in the input');
     }
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
-    const callResult = await callActorGetDataset(input.debugActor!, input.debugActorInput!, process.env.APIFY_TOKEN, options);
+
+    const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
+    const callResult = await callActorGetDataset(input.debugActor!, input.debugActorInput!, apifyClient, options);
 
     if (callResult && callResult.previewItems.length > 0) {
         await Actor.pushData(callResult.previewItems);

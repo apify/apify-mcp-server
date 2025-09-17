@@ -10,13 +10,14 @@ import {
     ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
+    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
 } from '../const.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, DatasetItem, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, ToolEntry } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
@@ -46,9 +47,9 @@ export type CallActorGetDatasetResult = {
  * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
  *
  * @param {string} actorName - The name of the Actor to call.
- * @param {ActorCallOptions} callOptions - The options to pass to the Actor.
  * @param {unknown} input - The input to pass to the actor.
- * @param {string} apifyToken - The Apify token to use for authentication.
+ * @param {ApifyClient} apifyClient - The Apify client to use for authentication.
+ * @param {ActorCallOptions} callOptions - The options to pass to the Actor.
  * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
  * @param {AbortSignal} abortSignal - Optional abort signal to cancel the actor run.
  * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
@@ -57,84 +58,77 @@ export type CallActorGetDatasetResult = {
 export async function callActorGetDataset(
     actorName: string,
     input: unknown,
-    apifyToken: string,
+    apifyClient: ApifyClient,
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
     abortSignal?: AbortSignal,
 ): Promise<CallActorGetDatasetResult | null> {
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
-    // TODO: we should remove this throw, we are just catching and then rethrowing with generic message
-    try {
-        const client = new ApifyClient({ token: apifyToken });
-        const actorClient = client.actor(actorName);
+    const actorClient = apifyClient.actor(actorName);
 
-        // Start the actor run
-        const actorRun: ActorRun = await actorClient.start(input, callOptions);
+    // Start the actor run
+    const actorRun: ActorRun = await actorClient.start(input, callOptions);
 
-        // Start progress tracking if tracker is provided
-        if (progressTracker) {
-            progressTracker.startActorRunUpdates(actorRun.id, apifyToken, actorName);
-        }
-
-        // Create abort promise that handles both API abort and race rejection
-        const abortPromise = async () => new Promise<typeof CLIENT_ABORT>((resolve) => {
-            abortSignal?.addEventListener('abort', async () => {
-                // Abort the actor run via API
-                try {
-                    await client.run(actorRun.id).abort({ gracefully: false });
-                } catch (e) {
-                    log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
-                }
-                // Reject to stop waiting
-                resolve(CLIENT_ABORT);
-            }, { once: true });
-        });
-
-        // Wait for completion or cancellation
-        const potentialAbortedRun = await Promise.race([
-            client.run(actorRun.id).waitForFinish(),
-            ...(abortSignal ? [abortPromise()] : []),
-        ]);
-
-        if (potentialAbortedRun === CLIENT_ABORT) {
-            log.info('Actor run aborted by client', { actorName, input });
-            return null;
-        }
-        const completedRun = potentialAbortedRun as ActorRun;
-
-        // Process the completed run
-        const dataset = client.dataset(completedRun.defaultDatasetId);
-        const [datasetItems, defaultBuild] = await Promise.all([
-            dataset.listItems(),
-            (await actorClient.defaultBuild()).get(),
-        ]);
-
-        // Generate schema using the shared utility
-        const generatedSchema = generateSchemaFromItems(datasetItems.items, {
-            clean: true,
-            arrayMode: 'all',
-        });
-        const schema = generatedSchema || { type: 'object', properties: {} };
-
-        /**
-         * Get important fields that are using in any dataset view as they MAY be used in filtering to ensure the output fits
-         * the tool output limits. Client has to use the get-actor-output tool to retrieve the full dataset or filtered out fields.
-         */
-        const storageDefinition = defaultBuild?.actorDefinition?.storages?.dataset as ActorDefinitionStorage | undefined;
-        const importantProperties = getActorDefinitionStorageFieldNames(storageDefinition || {});
-        const previewItems = ensureOutputWithinCharLimit(datasetItems.items, importantProperties, TOOL_MAX_OUTPUT_CHARS);
-
-        return {
-            runId: actorRun.id,
-            datasetId: completedRun.defaultDatasetId,
-            itemCount: datasetItems.count,
-            schema,
-            previewItems,
-        };
-    } catch (error) {
-        log.error('Error calling Actor', { error, actorName, input });
-        throw new Error(`Error calling Actor: ${error}`);
+    // Start progress tracking if tracker is provided
+    if (progressTracker) {
+        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
     }
+
+    // Create abort promise that handles both API abort and race rejection
+    const abortPromise = async () => new Promise<typeof CLIENT_ABORT>((resolve) => {
+        abortSignal?.addEventListener('abort', async () => {
+            // Abort the actor run via API
+            try {
+                await apifyClient.run(actorRun.id).abort({ gracefully: false });
+            } catch (e) {
+                log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
+            }
+            // Reject to stop waiting
+            resolve(CLIENT_ABORT);
+        }, { once: true });
+    });
+
+    // Wait for completion or cancellation
+    const potentialAbortedRun = await Promise.race([
+        apifyClient.run(actorRun.id).waitForFinish(),
+        ...(abortSignal ? [abortPromise()] : []),
+    ]);
+
+    if (potentialAbortedRun === CLIENT_ABORT) {
+        log.info('Actor run aborted by client', { actorName, input });
+        return null;
+    }
+    const completedRun = potentialAbortedRun as ActorRun;
+
+    // Process the completed run
+    const dataset = apifyClient.dataset(completedRun.defaultDatasetId);
+    const [datasetItems, defaultBuild] = await Promise.all([
+        dataset.listItems(),
+        (await actorClient.defaultBuild()).get(),
+    ]);
+
+    // Generate schema using the shared utility
+    const generatedSchema = generateSchemaFromItems(datasetItems.items, {
+        clean: true,
+        arrayMode: 'all',
+    });
+    const schema = generatedSchema || { type: 'object', properties: {} };
+
+    /**
+     * Get important fields that are using in any dataset view as they MAY be used in filtering to ensure the output fits
+     * the tool output limits. Client has to use the get-actor-output tool to retrieve the full dataset or filtered out fields.
+     */
+    const storageDefinition = defaultBuild?.actorDefinition?.storages?.dataset as ActorDefinitionStorage | undefined;
+    const importantProperties = getActorDefinitionStorageFieldNames(storageDefinition || {});
+    const previewItems = ensureOutputWithinCharLimit(datasetItems.items, importantProperties, TOOL_MAX_OUTPUT_CHARS);
+
+    return {
+        runId: actorRun.id,
+        datasetId: completedRun.defaultDatasetId,
+        itemCount: datasetItems.count,
+        schema,
+        previewItems,
+    };
 }
 
 /**
@@ -191,7 +185,8 @@ Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                             properties: {},
                             required: [],
                         },
-                        ajvValidate: fixedAjvCompile(ajv, actorDefinitionPruned.input || {}),
+                        // Additional props true to allow skyfire-pay-id
+                        ajvValidate: fixedAjvCompile(ajv, { ...actorDefinitionPruned.input, additionalProperties: true }),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
                     },
                 };
@@ -206,8 +201,16 @@ Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
 
 async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
-    apifyToken: string,
+    apifyToken: ApifyToken,
 ): Promise<ToolEntry[]> {
+    /**
+     * This is case for the Skyfire request without any Apify token, we do not support
+     * standby Actors in this case so we can skip MCP servers since they would fail anyway (they are standby Actors).
+    */
+    if (apifyToken === null || apifyToken === undefined) {
+        return [];
+    }
+
     // Process all actors in parallel
     const actorToolPromises = actorsInfo.map(async (actorInfo) => {
         const actorId = actorInfo.actorDefinitionPruned.id;
@@ -252,7 +255,7 @@ async function getMCPServersAsTools(
 
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
-    apifyToken: string,
+    apifyClient: ApifyClient,
 ): Promise<ToolEntry[]> {
     log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames });
 
@@ -267,7 +270,7 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyToken);
+            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
             if (!actorDefinitionPruned) {
                 log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
                 return null;
@@ -289,7 +292,7 @@ export async function getActorsAsTools(
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),
-        getMCPServersAsTools(actorMCPServersInfo, apifyToken),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token),
     ]);
 
     return [...normalTools, ...mcpServerTools];
@@ -344,26 +347,62 @@ Step 2: Call Actor (step="call")
 
 The step parameter enforces this workflow - you cannot call an Actor without first getting its info.`,
         inputSchema: zodToJsonSchema(callActorArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(callActorArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(callActorArgs),
+            // Additional props true to allow skyfire-pay-id
+            additionalProperties: true,
+        }),
         call: async (toolArgs) => {
-            const { args, apifyToken, progressTracker, extra } = toolArgs;
+            const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
             const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
             try {
                 if (step === 'info') {
+                    const apifyClient = new ApifyClient({ token: apifyToken });
                     // Step 1: Return Actor card and schema directly
-                    const details = await fetchActorDetails(apifyToken, actorName);
+                    const details = await fetchActorDetails(apifyClient, actorName);
                     if (!details) {
                         return {
                             content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
                         };
                     }
+                    const content = [
+                        { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                    ];
+                    /**
+                     * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
+                     */
+                    if (apifyMcpServer.options.skyfireMode) {
+                        content.push({
+                            type: 'text',
+                            text: SKYFIRE_TOOL_INSTRUCTIONS,
+                        });
+                    }
+                    return { content };
+                }
+
+                /**
+                 * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+                 * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+                 */
+                if (apifyMcpServer.options.skyfireMode
+                    && args['skyfire-pay-id'] === undefined
+                ) {
                     return {
-                        content: [
-                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
-                        ],
+                        content: [{
+                            type: 'text',
+                            text: SKYFIRE_TOOL_INSTRUCTIONS,
+                        }],
                     };
                 }
+
+                /**
+                 * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+                 */
+                const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
+                    ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
+                    : new ApifyClient({ token: apifyToken });
+
                 // Step 2: Call the Actor
                 if (!input) {
                     return {
@@ -373,7 +412,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     };
                 }
 
-                const [actor] = await getActorsAsTools([actorName], apifyToken);
+                const [actor] = await getActorsAsTools([actorName], apifyClient);
 
                 if (!actor) {
                     return {
@@ -398,7 +437,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                 const callResult = await callActorGetDataset(
                     actorName,
                     input,
-                    apifyToken,
+                    apifyClient,
                     callOptions,
                     progressTracker,
                     extra.signal,

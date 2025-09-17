@@ -4,6 +4,11 @@ import type { AxiosRequestConfig } from 'axios';
 
 import { USER_AGENT_ORIGIN } from './const.js';
 
+interface ExtendedApifyClientOptions extends Omit<ApifyClientOptions, 'token'> {
+    token?: string | null | undefined;
+    skyfirePayId?: string;
+}
+
 /**
  * Adds a User-Agent header to the request config.
  * @param config
@@ -23,22 +28,37 @@ export function getApifyAPIBaseUrl(): string {
 }
 
 export class ApifyClient extends _ApifyClient {
-    constructor(options: ApifyClientOptions) {
+    constructor(options: ExtendedApifyClientOptions) {
         /**
          * In order to publish to DockerHub, we need to run their build task to validate our MCP server.
          * This was failing since we were sending this dummy token to Apify in order to build the Actor tools.
          * So if we encounter this dummy value, we remove it to use Apify client as unauthenticated, which is sufficient
          * for server start and listing of tools.
          */
-        if (options.token?.toLowerCase() === 'your-apify-token') {
+        if (options.token?.toLowerCase() === 'your-apify-token' || options.token === null) {
             // eslint-disable-next-line no-param-reassign
             delete options.token;
         }
 
+        const { skyfirePayId, ...clientOptions } = options;
+        const requestInterceptors = [addUserAgent];
+        /**
+         * Add skyfire-pay-id header if provided.
+         */
+        if (skyfirePayId) {
+            requestInterceptors.push((config) => {
+                const updatedConfig = { ...config };
+                updatedConfig.headers = updatedConfig.headers ?? {};
+                updatedConfig.headers['skyfire-pay-id'] = skyfirePayId;
+                return updatedConfig;
+            });
+        }
+
         super({
-            ...options,
+            // token null case is handled, we can assert type here
+            ...clientOptions as ApifyClientOptions,
             baseUrl: getApifyAPIBaseUrl(),
-            requestInterceptors: [addUserAgent],
+            requestInterceptors,
         });
     }
 }

@@ -296,3 +296,9 @@ export type PromptBase = Prompt & {
 
 export type ActorInputSchemaProperties = Record<string, ISchemaProperties>;
 export type DatasetItem = Record<number | string, unknown>;
+/**
+ * Apify token type.
+ *
+ * Can be null or undefined in case of Skyfire requests.
+ */
+export type ApifyToken = string | null | undefined;

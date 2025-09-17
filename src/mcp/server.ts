@@ -15,6 +15,7 @@ import {
     ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
     McpError,
+    ReadResourceRequestSchema,
     ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -23,9 +24,14 @@ import { type ActorCallOptions, ApifyApiError } from 'apify-client';
 
 import log from '@apify/log';
 
+import { ApifyClient } from '../apify-client.js';
 import {
+    HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
+    SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
+    SKYFIRE_README_CONTENT,
+    SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
@@ -40,6 +46,14 @@ import { processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
+interface ActorsMcpServerOptions {
+    setupSigintHandler?: boolean;
+    /**
+     * Switch to enable Skyfire agentic payment mode.
+     */
+    skyfireMode?: boolean;
+}
+
 /**
  * Create Apify MCP server
  */
@@ -49,8 +63,11 @@ export class ActorsMcpServer {
     private toolsChangedHandler: ToolsChangedHandler | undefined;
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
+    public readonly options: ActorsMcpServerOptions;
 
-    constructor(setupSigintHandler = true) {
+    constructor(options: ActorsMcpServerOptions = {}) {
+        this.options = options;
+        const { setupSigintHandler = true } = options;
         this.server = new Server(
             {
                 name: SERVER_NAME,
@@ -161,7 +178,7 @@ export class ActorsMcpServer {
     * @param toolNames - Array of tool names to ensure are loaded
     * @param apifyToken - Apify API token for authentication
     */
-    public async loadToolsByName(toolNames: string[], apifyToken: string) {
+    public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = this.listAllToolNames();
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
@@ -186,7 +203,7 @@ export class ActorsMcpServer {
         }
 
         if (actorsToLoad.length > 0) {
-            await this.loadActorsAsTools(actorsToLoad, apifyToken);
+            await this.loadActorsAsTools(actorsToLoad, apifyClient);
         }
     }
 
@@ -197,8 +214,8 @@ export class ActorsMcpServer {
      * @param apifyToken - Apify API token for authentication
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
-    public async loadActorsAsTools(actorIdsOrNames: string[], apifyToken: string): Promise<ToolEntry[]> {
-        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyToken);
+    public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
+        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient);
         if (actorTools.length > 0) {
             this.upsertTools(actorTools, true);
         }
@@ -212,8 +229,8 @@ export class ActorsMcpServer {
      *
      * Used primarily for SSE.
      */
-    public async loadToolsFromUrl(url: string, apifyToken: string) {
-        const tools = await processParamsGetTools(url, apifyToken);
+    public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
+        const tools = await processParamsGetTools(url, apifyClient);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -307,9 +324,43 @@ export class ActorsMcpServer {
 
     private setupResourceHandlers(): void {
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-            // No resources available, return empty response
+            /**
+             * Return the usage guide resource only if Skyfire mode is enabled. No resources otherwise for normal mode.
+             */
+            if (this.options.skyfireMode) {
+                return {
+                    resources: [
+                        {
+                            uri: 'file://readme.md',
+                            name: 'readme',
+                            description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
+                            mimeType: 'text/markdown',
+                        },
+                    ],
+                };
+            }
             return { resources: [] };
         });
+
+        if (this.options.skyfireMode) {
+            this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+                const { uri } = request.params;
+                if (uri === 'file://readme.md') {
+                    return {
+                        contents: [{
+                            uri: 'file://readme.md',
+                            mimeType: 'text/markdown',
+                            text: SKYFIRE_README_CONTENT,
+                        }],
+                    };
+                }
+                return {
+                    contents: [{
+                        uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
+                    }],
+                };
+            });
+        }
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
             // No resource templates available, return empty response
@@ -368,6 +419,26 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+            /**
+             * Hack for the Skyfire agentic payments, we check if Skyfire mode is enabled we ad-hoc add
+             * the `skyfire-pay-id` input property to all Actor tools and `call-actor` and `get-actor-output` tool.
+             */
+            if (this.options.skyfireMode) {
+                for (const toolEntry of this.tools.values()) {
+                    if (toolEntry.type === 'actor'
+                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_CALL)
+                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
+                        if (toolEntry.tool.inputSchema && 'properties' in toolEntry.tool.inputSchema) {
+                            (toolEntry.tool.inputSchema.properties as Record<string, unknown>)['skyfire-pay-id'] = {
+                                type: 'string',
+                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
+                            };
+                        }
+                        // Update description to include Skyfire instructions
+                        toolEntry.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
+                    }
+                }
+            }
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool.tool));
             return { tools };
         });
@@ -391,7 +462,7 @@ export class ActorsMcpServer {
             delete request.params.userRentedActorIds;
 
             // Validate token
-            if (!apifyToken) {
+            if (!apifyToken && !this.options.skyfireMode) {
                 const msg = 'APIFY_TOKEN is required. It must be set in the environment variables or passed as a parameter in the body.';
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
@@ -526,6 +597,17 @@ export class ActorsMcpServer {
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
+                    if (this.options.skyfireMode
+                        && args['skyfire-pay-id'] === undefined
+                    ) {
+                        return {
+                            content: [{
+                                type: 'text',
+                                text: SKYFIRE_TOOL_INSTRUCTIONS,
+                            }],
+                        };
+                    }
+
                     const actorTool = tool.tool as ActorTool;
 
                     // Create progress tracker if progressToken is available
@@ -533,12 +615,20 @@ export class ActorsMcpServer {
 
                     const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
 
+                    /**
+                     * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+                     */
+                    const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                    const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
+                        ? new ApifyClient({ skyfirePayId })
+                        : new ApifyClient({ token: apifyToken });
+
                     try {
-                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: args });
+                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: actorArgs });
                         const callResult = await callActorGetDataset(
                             actorTool.actorFullName,
-                            args,
-                            apifyToken as string,
+                            actorArgs,
+                            apifyClient,
                             callOptions,
                             progressTracker,
                             extra.signal,

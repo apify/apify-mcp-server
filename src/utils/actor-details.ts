@@ -1,6 +1,6 @@
 import type { Actor, Build } from 'apify-client';
 
-import { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { IActorInputSchema } from '../types.js';
 import { formatActorToActorCard } from './actor-card.js';
@@ -14,11 +14,10 @@ export interface ActorDetailsResult {
     readme: string;
 }
 
-export async function fetchActorDetails(apifyToken: string, actorName: string): Promise<ActorDetailsResult | null> {
-    const client = new ApifyClient({ token: apifyToken });
+export async function fetchActorDetails(apifyClient: ApifyClient, actorName: string): Promise<ActorDetailsResult | null> {
     const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
-        client.actor(actorName).get(),
-        client.actor(actorName).defaultBuild().then(async (build) => build.get()),
+        apifyClient.actor(actorName).get(),
+        apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
     ]);
     if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
     const inputSchema = (buildInfo.actorDefinition.input || {

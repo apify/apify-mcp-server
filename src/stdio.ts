@@ -22,6 +22,7 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
+import { ApifyClient } from './apify-client.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import type { Input, ToolSelector } from './types.js';
@@ -118,8 +119,9 @@ async function main() {
     // Normalize (merges actors into tools for backward compatibility)
     const normalized = processInput(input);
 
+    const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalized, process.env.APIFY_TOKEN as string);
+    const tools = await loadToolsFromInput(normalized, apifyClient);
 
     mcpServer.upsertTools(tools);
 
