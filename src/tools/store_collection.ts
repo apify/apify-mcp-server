@@ -71,21 +71,27 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,
-        description: `Search for Actors or Model Context Protocol (MCP) servers in the Apify Store using keywords.\n`
-            + `This tool returns a list of Actors with title, description, pricing model, usage statistics, and user ratings.\n`
-            + `Use simple space-separated keywords for best results, such as "web scraping", "data extraction", or "playwright mcp".\n`
-            + `You may need to use this tool several times to find the right Actor.\n`
-            + `Limit the number of results returned, but ensure that relevant results are included.\n`
-            + `Always present the results in a user-friendly format as an Actor cards.\n\n`
-            + `USAGE:\n`
-            + `- Use when user wants to find Actors for a specific task or technology\n`
-            + `- Use when user asks about available Actors in the Apify Store\n`
-            + `- Use when user needs to discover MCP servers or automation tools\n`
-            + `EXAMPLES:\n`
-            + `- user_input: Find Actors for web scraping\n`
-            + `- user_input: Search for MCP servers\n`
-            + `- user_input: What Actors are available for data extraction\n`
-            + `- user_input: Show me Actors that use Playwright`,
+        description: `Search the Apify Store for Actors or Model Context Protocol (MCP) servers using keywords.
+Apify is the largest platform for web scrapers, AI agents, and automation tools, called Actors.
+The store features solutions for scraping Instagram, Twitter, TikTok, LinkedIn, Bookings, Flights and more.
+All Actors are verified and comply with scraping guidelines.
+
+This tool returns a curated list of Actors, including their title, description, pricing model, usage statistics, and user ratings.
+For best results, use simple space-separated keywords (e.g., "instagram posts", "twitter profile", "playwright mcp").
+You may need to run multiple searches to find the most suitable Actor.
+Limit the number of results to keep responses relevant and concise.
+Results are always presented as user-friendly Actor cards.
+
+USAGE:
+- Use when a user wants to find Actors for a specific task
+- Use when a user asks about specific data and available Actors in the Apify Store
+- Use when a user needs to discover MCP servers or automation tools
+
+EXAMPLES:
+- user_input: Find Actors for scraping e-commerce
+- user_input: Find browserbase MCP server
+- user_input: I need to scrape instagram profiles/comments
+- user_input: I need to get flights and airbnb data`,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {

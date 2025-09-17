@@ -68,10 +68,19 @@ export const getActorOutput: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_OUTPUT_GET,
         actorFullName: HelperTools.ACTOR_OUTPUT_GET,
-        description: `Retrieves the output of a specific Actor execution based on its dataset ID.
-You can also retrieve only specific fields from the output if needed. Use this tool to get Actor output data outside of the Actor dataset output preview, or to access fields from the Actor output dataset schema that are not included in the preview.
+        description: `Fetch the dataset of a specific Actor run based on datasetId.
+You can also retrieve only specific fields from the output if needed.
 
-Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g. \`apify-slash-rag-web-browser\`) or tools that can interact with Actors (e.g. \`call-actor\`, \`add-actor\`).`,
+USAGE:
+- Use this tool to get Actor dataset outside of the preview, or to access fields from the Actor output
+dataset schema that are not included in the preview.
+
+EXAMPLES:
+- user_input: Get data of my last Actor run?
+- user_input: Get number_of_likes from my dataset?
+
+Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools
+ (e.g. "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g. "call-actor", "add-actor").`,
         inputSchema: zodToJsonSchema(getActorOutputArgs),
         /**
          * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.

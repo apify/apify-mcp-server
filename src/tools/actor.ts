@@ -317,8 +317,7 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: `Call Any Actor from Apify Store - Two-Step Process
-
+        description: `Call any Actor from Apify Store - two-step process
 This tool uses a mandatory two-step process to safely call any Actor from the Apify store.
 
 USAGE:
@@ -328,13 +327,14 @@ USAGE:
 MANDATORY TWO-STEP WORKFLOW:
 
 Step 1: Get Actor Info (step="info", default)
-• First call this tool with step="info" to get Actor details and input schema
-• This returns the Actor description, documentation, and required input schema
-• You MUST do this step first - it's required to understand how to call the Actor
+- First call this tool with step="info" to get Actor details and input schema
+- This returns the Actor description, documentation, and required input schema
+- You MUST do this step first - it's required to understand how to call the Actor
 
-Step 2: Call Actor (step="call") 
-• Only after step 1, call again with step="call" and proper input based on the schema
-• This executes the Actor and returns the results
+Step 2: Call Actor (step="call")
+- Only after step 1, call again with step="call" and proper input based on the schema
+- This calls and runs the Actor. It will create an output as an Apify dataset (with datasetId).
+- This step returns a dataset preview, typically JSON-formatted tabular data.
 
 The step parameter enforces this workflow - you cannot call an Actor without first getting its info.`,
         inputSchema: zodToJsonSchema(callActorArgs),
