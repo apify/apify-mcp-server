@@ -208,16 +208,17 @@ async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
     apifyToken: string,
 ): Promise<ToolEntry[]> {
-    const actorsMCPServerTools: ToolEntry[] = [];
-    for (const actorInfo of actorsInfo) {
+    // Process all actors in parallel
+    const actorToolPromises = actorsInfo.map(async (actorInfo) => {
         const actorId = actorInfo.actorDefinitionPruned.id;
         if (!actorInfo.webServerMcpPath) {
             log.warning('Actor does not have a web server MCP path, skipping', {
                 actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
                 actorId,
             });
-            continue;
+            return [];
         }
+
         const mcpServerUrl = await getActorMCPServerURL(
             actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
@@ -233,16 +234,20 @@ async function getMCPServersAsTools(
             client = await connectMCPClient(mcpServerUrl, apifyToken);
             if (!client) {
                 // Skip this Actor, connectMCPClient will log the error
-                continue;
+                return [];
             }
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
-            actorsMCPServerTools.push(...serverTools);
+            return serverTools;
         } finally {
             if (client) await client.close();
         }
-    }
+    });
 
-    return actorsMCPServerTools;
+    // Wait for all actors to be processed in parallel
+    const actorToolsArrays = await Promise.all(actorToolPromises);
+
+    // Flatten the arrays of tools
+    return actorToolsArrays.flat();
 }
 
 export async function getActorsAsTools(
