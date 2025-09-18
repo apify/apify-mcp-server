@@ -7,9 +7,10 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
-    ACTOR_ADDITIONAL_INSTRUCTIONS,
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
+    RAG_WEB_BROWSER,
+    RAG_WEB_BROWSER_ADDITIONAL_DESC,
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
 } from '../const.js';
@@ -26,7 +27,11 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
-import { actorNameToToolName, fixedAjvCompile, getToolSchemaID, transformActorInputSchemaProperties } from './utils.js';
+import {
+    actorNameToToolName,
+    buildActorInputSchema,
+    fixedAjvCompile,
+} from './utils.js';
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
@@ -156,45 +161,48 @@ export async function getNormalActorsAsTools(
 ): Promise<ToolEntry[]> {
     const tools: ToolEntry[] = [];
 
-    // Zip the results with their corresponding actorIDs
     for (const actorInfo of actorsInfo) {
         const { actorDefinitionPruned } = actorInfo;
 
-        if (actorDefinitionPruned) {
-            const schemaID = getToolSchemaID(actorDefinitionPruned.actorFullName);
-            if (actorDefinitionPruned.input && 'properties' in actorDefinitionPruned.input && actorDefinitionPruned.input) {
-                actorDefinitionPruned.input.properties = transformActorInputSchemaProperties(actorDefinitionPruned.input);
-                // Add schema $id, each valid JSON schema should have a unique $id
-                // see https://json-schema.org/understanding-json-schema/basics#declaring-a-unique-identifier
-                actorDefinitionPruned.input.$id = schemaID;
-            }
-            try {
-                const memoryMbytes = actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES;
-                const tool: ToolEntry = {
-                    type: 'actor',
-                    tool: {
-                        name: actorNameToToolName(actorDefinitionPruned.actorFullName),
-                        actorFullName: actorDefinitionPruned.actorFullName,
-                        description: `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results. Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests to use this specific Actor.
-Actor description: ${actorDefinitionPruned.description}
-Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
-                        inputSchema: actorDefinitionPruned.input
-                        // So Actor without input schema works - MCP client expects JSON schema valid output
-                        || {
-                            type: 'object',
-                            properties: {},
-                            required: [],
-                        },
-                        // Additional props true to allow skyfire-pay-id
-                        ajvValidate: fixedAjvCompile(ajv, { ...actorDefinitionPruned.input, additionalProperties: true }),
-                        memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
-                    },
-                };
-                tools.push(tool);
-            } catch (validationError) {
-                log.error('Failed to compile AJV schema for Actor', { actorName: actorDefinitionPruned.actorFullName, error: validationError });
-            }
+        if (!actorDefinitionPruned) continue;
+
+        const isRag = actorDefinitionPruned.actorFullName === RAG_WEB_BROWSER;
+        const { inputSchema } = buildActorInputSchema(actorDefinitionPruned.actorFullName, actorDefinitionPruned.input, isRag);
+
+        let description = `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results.
+Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests this specific Actor.
+Actor description: ${actorDefinitionPruned.description}`;
+        if (isRag) {
+            description += RAG_WEB_BROWSER_ADDITIONAL_DESC;
         }
+
+        const memoryMbytes = Math.min(
+            actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES,
+            ACTOR_MAX_MEMORY_MBYTES,
+        );
+
+        let ajvValidate;
+        try {
+            ajvValidate = fixedAjvCompile(ajv, { ...inputSchema, additionalProperties: true });
+        } catch (e) {
+            log.error('Failed to compile schema', {
+                actorName: actorDefinitionPruned.actorFullName,
+                error: e,
+            });
+            continue;
+        }
+
+        tools.push({
+            type: 'actor',
+            tool: {
+                name: actorNameToToolName(actorDefinitionPruned.actorFullName),
+                actorFullName: actorDefinitionPruned.actorFullName,
+                description,
+                inputSchema,
+                ajvValidate,
+                memoryMbytes,
+            },
+        });
     }
     return tools;
 }
@@ -294,7 +302,7 @@ const callActorArgs = z.object({
         .describe('The name of the Actor to call. For example, "apify/rag-web-browser".'),
     step: z.enum(['info', 'call'])
         .default('info')
-        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to execute the Actor (only after getting info).`),
+        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to run the Actor (only after getting info).`),
     input: z.object({}).passthrough()
         .optional()
         .describe(`The input JSON to pass to the Actor. For example, {"query": "apify", "maxResults": 5, "outputFormats": ["markdown"]}. Required only when step is "call".`),
@@ -317,26 +325,35 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: `Call Any Actor from Apify Store - Two-Step Process
+        description: `Call any Actor from the Apify Store using a mandatory two-step workflow.
+This ensures you first get the Actor’s input schema and details before executing it safely.
 
-This tool uses a mandatory two-step process to safely call any Actor from the Apify store.
+There are two ways to run Actors:
+1. Dedicated Actor tools (e.g., ${actorNameToToolName('apify/rag-web-browser')}): These are pre-configured tools, offering a simpler and more direct experience.
+2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+
+**Important:**
+
+A successful run returns a \`datasetId\` (the Actor's output stored as an Apify dataset) and a short preview of items.
+To fetch the full output, use the ${HelperTools.ACTOR_OUTPUT_GET} tool with the \`datasetId\`.
 
 USAGE:
-• ONLY for Actors that are NOT available as dedicated tools
-• If a dedicated tool exists (e.g., ${actorNameToToolName('apify/rag-web-browser')}), use that instead
+- Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
+- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
 
-MANDATORY TWO-STEP WORKFLOW:
-
+MANDATORY TWO-STEP-WORKFLOW:
 Step 1: Get Actor Info (step="info", default)
-• First call this tool with step="info" to get Actor details and input schema
-• This returns the Actor description, documentation, and required input schema
-• You MUST do this step first - it's required to understand how to call the Actor
+- First call this tool with step="info" to get Actor details and input schema
+- This returns the Actor description, documentation, and required input schema
+- You MUST do this step first - it's required to understand how to call the Actor
 
-Step 2: Call Actor (step="call") 
-• Only after step 1, call again with step="call" and proper input based on the schema
-• This executes the Actor and returns the results
+Step 2: Call Actor (step="call")
+- Only after step 1, call again with step="call" and proper input based on the schema
+- This calls and runs the Actor. It will create an output as an Apify dataset (with datasetId).
+- This step returns a dataset preview, typically JSON-formatted tabular data.
 
-The step parameter enforces this workflow - you cannot call an Actor without first getting its info.`,
+EXAMPLES:
+- user_input: Get instagram posts using apify/instagram-scraper`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile({
             ...zodToJsonSchema(callActorArgs),

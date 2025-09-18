@@ -30,12 +30,25 @@ export const searchApifyDocsTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DOCS_SEARCH,
-        description: `Apify documentation search tool. This tool allows you to search the Apify documentation using Algolia's full-text search.\n`
-            + 'You can use it to find relevant documentation pages based on keywords. The results will include the URL of the documentation page, '
-            + 'a fragment identifier (if available), and a limited piece of content that matches the search query. '
-            + `You can then fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.\n`
-            + 'Use this tool when a user asks for help with Apify documentation or when you need to find relevant documentation pages based on keywords. '
-            + 'For example, when a user wants to build an Apify Actor, you can search "How to build Actors" to find relevant guidance.',
+        description: `Search Apify documentation using full-text search.
+    You can use it to find relevant documentation based on keywords.
+    Apify documentation has information about Apify console, Actors (development
+    (actor.json, input schema, dataset schema, dockerfile), deployment, builds, runs),
+    schedules, storages (datasets, key-value store), Proxy, Integrations,
+    Apify Academy (crawling and webscraping with Crawlee),
+
+    The results will include the URL of the documentation page, a fragment identifier (if available),
+    and a limited piece of content that matches the search query.
+
+    Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
+
+    USAGE:
+    - Use when user asks about Apify documentation, Actor development, Crawlee, or Apify platform.
+
+    EXAMPLES:
+    - query: How to use create Apify Actor?
+    - query: How to define Actor input schema?
+    - query: How scrape with Crawlee?`,
         args: searchApifyDocsToolArgsSchema,
         inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
@@ -59,7 +72,7 @@ export const searchApifyDocsTool: ToolEntry = {
 
             const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
 Search results for "${query}":
-                    
+
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
   Content: ${result.content}`).join('\n\n')}`;
             return {

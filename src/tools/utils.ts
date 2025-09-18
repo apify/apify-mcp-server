@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
-import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../const.js';
+import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
 import type { ActorInputSchemaProperties, IActorInputSchema, ISchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
@@ -149,6 +149,64 @@ export function markInputPropertiesAsRequired(input: IActorInputSchema): Record<
     }
 
     return properties;
+}
+
+/**
+ * Builds the final Actor input schema for MCP tool usage.
+ */
+export function buildActorInputSchema(actorFullName: string, input: IActorInputSchema | undefined, isRag: boolean) {
+    if (!input) {
+        return {
+            inputSchema: {
+                $id: getToolSchemaID(actorFullName),
+                type: 'object',
+                properties: {},
+                required: [],
+            },
+        };
+    }
+
+    // Work on a shallow cloned structure (deep clone only if needed later)
+    const working = structuredClone(input);
+
+    if (working && typeof working === 'object' && 'properties' in working && working.properties) {
+        working.properties = transformActorInputSchemaProperties(working);
+    }
+
+    let finalSchema = working;
+    if (isRag) {
+        finalSchema = pruneSchemaPropertiesByWhitelist(finalSchema, RAG_WEB_BROWSER_WHITELISTED_FIELDS);
+    }
+
+    finalSchema.$id = getToolSchemaID(actorFullName);
+    return { inputSchema: finalSchema };
+}
+
+/**
+ * Returns a shallow-cloned input schema that keeps only whitelisted properties
+ * and filters the required array accordingly. All other top-level fields are preserved.
+ * If properties are missing, the original input is returned unchanged.
+ *
+ * This is used specifically for apify/rag-web-browser where we want to expose
+ * only a subset of input properties to the MCP tool without redefining the schema.
+ */
+export function pruneSchemaPropertiesByWhitelist(
+    input: IActorInputSchema,
+    whitelist: Iterable<string>,
+): IActorInputSchema {
+    if (!input || !input.properties || typeof input.properties !== 'object' || !whitelist) return input;
+
+    const allowed = new Set<string>(Array.from(whitelist));
+    const newProps: Record<string, ISchemaProperties> = {};
+    for (const key of Object.keys(input.properties)) {
+        if (allowed.has(key)) newProps[key] = input.properties[key];
+    }
+
+    const cloned: IActorInputSchema = { ...input, properties: newProps };
+    if (Array.isArray(input.required)) {
+        cloned.required = input.required.filter((k) => allowed.has(k));
+    }
+    return cloned;
 }
 
 /**

@@ -30,9 +30,16 @@ export const getUserRunsList: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_RUN_LIST_GET,
         actorFullName: HelperTools.ACTOR_RUN_LIST_GET,
-        description: `Gets a paginated list of Actor runs with run details, datasetId, and keyValueStoreId.\n`
-            + 'Filter by status: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed),\n'
-            + 'TIMING-OUT (timing out), TIMED-OUT (timed out), ABORTING (being aborted), ABORTED (aborted).',
+        description: `List Actor runs for the authenticated user with optional filtering and sorting.
+The results will include run details (including datasetId and keyValueStoreId) and can be filtered by status.
+Valid statuses: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed), TIMING-OUT, TIMED-OUT, ABORTING, ABORTED.
+
+USAGE:
+- Use when you need to browse or filter recent Actor runs.
+
+EXAMPLES:
+- user_input: List my last 10 runs (newest first)
+- user_input: Show only SUCCEEDED runs`,
         inputSchema: zodToJsonSchema(getUserRunsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
         call: async (toolArgs) => {

@@ -47,15 +47,16 @@ export enum HelperTools {
     GET_HTML_SKELETON = 'get-html-skeleton',
 }
 
-export const ACTOR_RAG_WEB_BROWSER = 'apify/rag-web-browser';
+export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
+export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
+export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `This tool provides general web browsing functionality, for specific sites like e-commerce, social media it is always better to search for a specific Actor`;
 
 export const defaults = {
     actors: [
-        ACTOR_RAG_WEB_BROWSER,
+        RAG_WEB_BROWSER,
     ],
 };
 
-export const ACTOR_ADDITIONAL_INSTRUCTIONS = 'Never call/execute tool/Actor unless confirmed by the user.';
 export const SKYFIRE_MIN_CHARGE_USD = 5.0;
 export const SKYFIRE_SELLER_ID = process.env.SKYFIRE_SELLER_SERVICE_ID;
 
