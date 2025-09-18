@@ -8,7 +8,7 @@ import type { ApifyClient } from 'apify';
 import log from '@apify/log';
 
 import { defaults } from '../const.js';
-import { callActor } from '../tools/call-actor.js';
+import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';

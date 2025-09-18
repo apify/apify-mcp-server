@@ -1,8 +1,7 @@
 // Import specific tools that are being used
 import type { ToolCategory } from '../types.js';
-import { callActorGetDataset, getActorsAsTools } from '../utils/actor.js';
 import { getExpectedToolsByCategories } from '../utils/tools.js';
-import { callActor } from './call-actor.js';
+import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
 import { fetchActorDetailsTool } from './fetch-actor-details.js';
