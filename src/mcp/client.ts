@@ -21,7 +21,9 @@ export async function connectMCPClient(
     let client: Client;
     try {
         client = await createMCPStreamableClient(url, token);
+        return client;
     } catch (error) {
+        // If streamable HTTP transport fails on not timeout error, continue with SSE transport
         if (error instanceof TimeoutError) {
             log.warning('Connection to MCP server using streamable HTTP transport timed out', { url });
             return null;
@@ -35,6 +37,7 @@ export async function connectMCPClient(
 
     try {
         client = await createMCPSSEClient(url, token);
+        return client;
     } catch (error) {
         if (error instanceof TimeoutError) {
             log.warning('Connection to MCP server using SSE transport timed out', { url });
@@ -44,8 +47,6 @@ export async function connectMCPClient(
         log.error('Failed to connect to MCP server using SSE transport', { cause: error });
         throw error;
     }
-
-    return client;
 }
 
 async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {

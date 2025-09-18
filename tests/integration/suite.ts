@@ -940,5 +940,21 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+
+        // Skipping tests, MCP actors are not available in staging environment
+        // TODO: run this tests only for local environment
+        it.skip.for([
+            'mcp-servers/slidespeak-mcp-server',
+            'mcp-servers/brave-search-mcp-server',
+            'jiri.spilka/weather-mcp-server',
+            'apify/actors-mcp-server',
+            'jakub.kopecky/browserbase-mcp-server',
+            'jakub.kopecky/arxiv-mcp-server',
+            'jiri.spilka/playwright-mcp-server',
+        ])('should connect to "%s" MCP server and at least one tool is available', async (mcpServer) => {
+            client = await createClientFn({ tools: [mcpServer] });
+            const tools = await client.listTools();
+            expect(tools.tools.length).toBeGreaterThan(0);
+        });
     });
 }
