@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.12) (2025-09-18)
+
+### 🚀 Features
+
+- Call-actor add support for MCP server Actors ([#274](https://github.com/apify/apify-mcp-server/pull/274)) ([84a8f8f](https://github.com/apify/apify-mcp-server/commit/84a8f8f37aadbbf017c2cc002718a858a09b9190)) by [@MQ37](https://github.com/MQ37), closes [#247](https://github.com/apify/apify-mcp-server/issues/247)
+
+### 🐛 Bug Fixes
+
+- Duplicate skyfire description when listing tools multiple times ([#277](https://github.com/apify/apify-mcp-server/pull/277)) ([aecc147](https://github.com/apify/apify-mcp-server/commit/aecc147e31a01d4fbab90930fd1c5682f96274b6)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.10) (2025-09-15)
 
 ### 🚀 Features
