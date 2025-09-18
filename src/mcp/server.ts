@@ -262,6 +262,29 @@ export class ActorsMcpServer {
         for (const wrap of tools) {
             this.tools.set(wrap.tool.name, wrap);
         }
+        // Handle Skyfire mode modifications once per tool upsert
+        if (this.options.skyfireMode) {
+            for (const wrap of tools) {
+                if (wrap.type === 'actor'
+                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
+                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
+                    // Add Skyfire instructions to description if not already present
+                    if (!wrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
+                        wrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
+                    }
+                    // Add skyfire-pay-id property if not present
+                    if (wrap.tool.inputSchema && 'properties' in wrap.tool.inputSchema) {
+                        const props = wrap.tool.inputSchema.properties as Record<string, unknown>;
+                        if (!props['skyfire-pay-id']) {
+                            props['skyfire-pay-id'] = {
+                                type: 'string',
+                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
+                            };
+                        }
+                    }
+                }
+            }
+        }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
     }
@@ -419,26 +442,6 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            /**
-             * Hack for the Skyfire agentic payments, we check if Skyfire mode is enabled we ad-hoc add
-             * the `skyfire-pay-id` input property to all Actor tools and `call-actor` and `get-actor-output` tool.
-             */
-            if (this.options.skyfireMode) {
-                for (const toolEntry of this.tools.values()) {
-                    if (toolEntry.type === 'actor'
-                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_CALL)
-                        || (toolEntry.type === 'internal' && toolEntry.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
-                        if (toolEntry.tool.inputSchema && 'properties' in toolEntry.tool.inputSchema) {
-                            (toolEntry.tool.inputSchema.properties as Record<string, unknown>)['skyfire-pay-id'] = {
-                                type: 'string',
-                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-                            };
-                        }
-                        // Update description to include Skyfire instructions
-                        toolEntry.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-                    }
-                }
-            }
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool.tool));
             return { tools };
         });
