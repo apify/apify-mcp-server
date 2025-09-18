@@ -302,7 +302,7 @@ const callActorArgs = z.object({
         .describe('The name of the Actor to call. For example, "apify/rag-web-browser".'),
     step: z.enum(['info', 'call'])
         .default('info')
-        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to execute the Actor (only after getting info).`),
+        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to run the Actor (only after getting info).`),
     input: z.object({}).passthrough()
         .optional()
         .describe(`The input JSON to pass to the Actor. For example, {"query": "apify", "maxResults": 5, "outputFormats": ["markdown"]}. Required only when step is "call".`),
@@ -325,15 +325,23 @@ export const callActor: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_CALL,
         actorFullName: HelperTools.ACTOR_CALL,
-        description: `Call any Actor from Apify Store - two-step process
-This tool uses a mandatory two-step process to safely call any Actor from the Apify store.
+        description: `Call any Actor from the Apify Store using a mandatory two-step workflow.
+This ensures you first get the Actor’s input schema and details before executing it safely.
+
+There are two ways to run Actors:
+1. Dedicated Actor tools (e.g., ${actorNameToToolName('apify/rag-web-browser')}): These are pre-configured tools, offering a simpler and more direct experience.
+2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+
+**Important:**
+
+A successful run returns a \`datasetId\` (the Actor's output stored as an Apify dataset) and a short preview of items.
+To fetch the full output, use the ${HelperTools.ACTOR_OUTPUT_GET} tool with the \`datasetId\`.
 
 USAGE:
-• ONLY for Actors that are NOT available as dedicated tools
-• If a dedicated tool exists (e.g., ${actorNameToToolName('apify/rag-web-browser')}), use that instead
+- Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
+- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
 
-MANDATORY TWO-STEP WORKFLOW:
-
+MANDATORY TWO-STEP-WORKFLOW:
 Step 1: Get Actor Info (step="info", default)
 - First call this tool with step="info" to get Actor details and input schema
 - This returns the Actor description, documentation, and required input schema
@@ -344,7 +352,8 @@ Step 2: Call Actor (step="call")
 - This calls and runs the Actor. It will create an output as an Apify dataset (with datasetId).
 - This step returns a dataset preview, typically JSON-formatted tabular data.
 
-The step parameter enforces this workflow - you cannot call an Actor without first getting its info.`,
+EXAMPLES:
+- user_input: Get instagram posts using apify/instagram-scraper`,
         inputSchema: zodToJsonSchema(callActorArgs),
         ajvValidate: ajv.compile({
             ...zodToJsonSchema(callActorArgs),

@@ -46,11 +46,17 @@ export const getDataset: ToolEntry = {
     tool: {
         name: HelperTools.DATASET_GET,
         actorFullName: HelperTools.DATASET_GET,
-        description: 'Dataset is a collection of structured data created by an Actor run. '
-            + 'Returns information about dataset object with metadata (itemCount, schema, fields, stats). '
-            + `Fields describe the structure of the dataset and can be used to filter the data with the ${HelperTools.DATASET_GET_ITEMS} tool. `
-            + 'Note: itemCount updates may have 5s delay.'
-            + 'The dataset can be accessed with the dataset URL: GET: https://api.apify.com/v2/datasets/:datasetId',
+        description: `Get metadata for a dataset (collection of structured data created by an Actor run).
+The results will include dataset details such as itemCount, schema, fields, and stats.
+Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
+Note: itemCount updates may be delayed by up to ~5 seconds.
+
+USAGE:
+- Use when you need dataset metadata to understand its structure before fetching items.
+
+EXAMPLES:
+- user_input: Show info for dataset 8TtYhCwKzQeQk7dJx
+- user_input: What fields does username~my-dataset have?`,
         inputSchema: zodToJsonSchema(getDatasetArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
         call: async (toolArgs) => {
@@ -74,16 +80,18 @@ export const getDatasetItems: ToolEntry = {
     tool: {
         name: HelperTools.DATASET_GET_ITEMS,
         actorFullName: HelperTools.DATASET_GET_ITEMS,
-        description: 'Returns dataset items with pagination support. '
-            + 'Items can be sorted (newest to oldest) and filtered (clean mode skips empty items and hidden fields). '
-            + 'Supports field selection - include specific fields or exclude unwanted ones using comma-separated lists. '
-            + 'For nested objects, you must first flatten them using the flatten parameter before accessing their fields. '
-            + 'Example: To get URLs from items like [{"metadata":{"url":"example.com"}}], '
-            + 'use flatten="metadata" and then fields="metadata.url". '
-            + 'The flattening transforms nested objects into dot-notation format '
-            + '(e.g. {"metadata":{"url":"x"}} becomes {"metadata.url":"x"}). '
-            + 'Retrieve only the fields you need, reducing the response size and improving performance. '
-            + 'The response includes total count, offset, limit, and items array.',
+        description: `Retrieve dataset items with pagination, sorting, and field selection.
+Use clean=true to skip empty items and hidden fields. Include or omit fields using comma-separated lists.
+For nested objects, first flatten them (e.g., flatten="metadata"), then reference nested fields via dot notation (e.g., fields="metadata.url").
+
+The results will include items along with pagination info (limit, offset) and total count.
+
+USAGE:
+- Use when you need to read data from a dataset (all items or only selected fields).
+
+EXAMPLES:
+- user_input: Get first 100 items from dataset 8TtYhCwKzQeQk7dJx
+- user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
         inputSchema: zodToJsonSchema(getDatasetItemsArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
         call: async (toolArgs) => {
@@ -136,9 +144,16 @@ export const getDatasetSchema: ToolEntry = {
     tool: {
         name: HelperTools.DATASET_SCHEMA_GET,
         actorFullName: HelperTools.DATASET_SCHEMA_GET,
-        description: 'Generates a JSON schema from dataset items. '
-            + 'The schema describes the structure of the data in the dataset, which can be used for validation, documentation, or data processing.'
-            + 'Since the dataset can be large it is convenient to understand the structure of the dataset before getting dataset items.',
+        description: `Generate a JSON schema from a sample of dataset items.
+The schema describes the structure of the data and can be used for validation, documentation, or processing.
+Use this to understand the dataset before fetching many items.
+
+USAGE:
+- Use when you need to infer the structure of dataset items for downstream processing or validation.
+
+EXAMPLES:
+- user_input: Generate schema for dataset 8TtYhCwKzQeQk7dJx using 10 items
+- user_input: Show schema of username~my-dataset (clean items only)`,
         inputSchema: zodToJsonSchema(getDatasetSchemaArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
         call: async (toolArgs) => {

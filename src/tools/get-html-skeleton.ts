@@ -41,7 +41,17 @@ export const getHtmlSkeleton: ToolEntry = {
     tool: {
         name: HelperTools.GET_HTML_SKELETON,
         actorFullName: HelperTools.GET_HTML_SKELETON,
-        description: `Retrieves the HTML skeleton (clean structure) from a given URL by stripping unwanted elements like scripts, styles, and non-essential attributes. This tool keeps only the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic content and provides chunked output to handle large HTML. This tool is useful for building web scrapers and data extraction tasks where a clean HTML structure is needed for writing concrete selectors or parsers.`,
+        description: `Retrieve the HTML skeleton (clean structure) of a webpage by stripping scripts, styles, and non-essential attributes.
+This keeps the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic pages.
+
+The results will include a chunked HTML skeleton if the content is large. Use the chunk parameter to paginate through the output.
+
+USAGE:
+- Use when you need a clean HTML structure to design selectors or parsers for scraping.
+
+EXAMPLES:
+- user_input: Get HTML skeleton for https://example.com
+- user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
         inputSchema: zodToJsonSchema(getHtmlSkeletonArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
         call: async (toolArgs) => {

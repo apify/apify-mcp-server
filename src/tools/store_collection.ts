@@ -72,25 +72,20 @@ export const searchActors: ToolEntry = {
     tool: {
         name: HelperTools.STORE_SEARCH,
         description: `Search the Apify Store for Actors or Model Context Protocol (MCP) servers using keywords.
-Apify is the largest platform for web scrapers, AI agents, and automation tools, called Actors.
-The store features solutions for scraping Instagram, Twitter, TikTok, LinkedIn, Bookings, Flights and more.
-All Actors are verified and comply with scraping guidelines.
+Apify Store features solutions for web scraping, automation, and AI agents (e.g., Instagram, TikTok, LinkedIn, flights, bookings).
 
-This tool returns a curated list of Actors, including their title, description, pricing model, usage statistics, and user ratings.
+The results will include curated Actor cards with title, description, pricing model, usage statistics, and ratings.
 For best results, use simple space-separated keywords (e.g., "instagram posts", "twitter profile", "playwright mcp").
-You may need to run multiple searches to find the most suitable Actor.
-Limit the number of results to keep responses relevant and concise.
-Results are always presented as user-friendly Actor cards.
+For detailed information about a specific Actor, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
 
 USAGE:
-- Use when a user wants to find Actors for a specific task
-- Use when a user asks about specific data and available Actors in the Apify Store
-- Use when a user needs to discover MCP servers or automation tools
+- Use when you need to discover Actors for a specific task or find MCP servers.
+- Use to explore available tools in the Apify ecosystem based on keywords.
 
 EXAMPLES:
 - user_input: Find Actors for scraping e-commerce
 - user_input: Find browserbase MCP server
-- user_input: I need to scrape instagram profiles/comments
+- user_input: I need to scrape instagram profiles and comments
 - user_input: I need to get flights and airbnb data`,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
