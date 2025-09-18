@@ -3,6 +3,7 @@
   "version": "0.4.10",
   "type": "module",
   "description": "Apify MCP Server",
+  "mcpName": "com.apify/apify-mcp-server",
   "engines": {
     "node": ">=18.0.0"
   },

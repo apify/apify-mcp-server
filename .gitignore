@@ -19,3 +19,4 @@ storage/key_value_stores/default/*
 .venv
 .env
 .aider*
+

@@ -206,6 +206,43 @@ jobs:
             -   name: Publish to NPM
                 run: npm publish --tag latest
 
+    publish_to_mcp_registry:
+        name: Publish to MCP Registry
+        needs: [ release_metadata, update_changelog, publish_to_npm ]
+        runs-on: ubuntu-latest
+        permissions:
+            id-token: write
+            contents: read
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Verify commit SHA
+                run: |
+                    CURRENT_SHA=$(git rev-parse HEAD)
+                    EXPECTED_SHA="${{ needs.update_changelog.outputs.changelog_commitish }}"
+                    echo "Expected commit SHA: $EXPECTED_SHA"
+                    echo "Actual checked out SHA: $CURRENT_SHA"
+                    if [ "$EXPECTED_SHA" != "$CURRENT_SHA" ]; then
+                        echo "ERROR: Checked out SHA differs from expected!"
+                        exit 1
+                    else
+                        echo "✓ Commit SHA matches expected"
+                    fi
+            -   name: Update server.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    jq --arg version "$EXPECTED_VERSION" '.version = $version | .packages[0].version = $version' server.json > server.json.tmp && mv server.json.tmp server.json
+                    echo "Updated server.json to version $EXPECTED_VERSION"
+            -   name: Install MCP Publisher
+                run: |
+                    curl -L "https://github.com/modelcontextprotocol/publisher/releases/latest/download/mcp-publisher-linux-x64.tar.gz" | tar xz
+                    chmod +x mcp-publisher
+            -   name: Login to MCP Registry
+                run: ./mcp-publisher login github-oidc
+            -   name: Publish to MCP Registry
+                run: ./mcp-publisher publish
+
 env:
     NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
     NPM_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}

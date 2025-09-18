@@ -1,0 +1,31 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "com.apify/apify-mcp-server",
+  "description": "Apify MCP Server providing access to thousands of web scraping and automation tools from Apify Store",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/apify/apify-mcp-server",
+    "source": "github"
+  },
+  "version": "0.4.10",
+  "packages": [
+    {
+      "registry_type": "npm",
+      "registry_base_url": "https://registry.npmjs.org",
+      "identifier": "@apify/actors-mcp-server",
+      "version": "0.4.10",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Apify API token for authentication with Apify platform services",
+          "is_required": false,
+          "format": "string",
+          "is_secret": true,
+          "name": "APIFY_TOKEN"
+        }
+      ]
+    }
+  ]
+}
