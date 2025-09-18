@@ -67,6 +67,12 @@ jobs:
             -   name: Update manifest.json version
                 run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json
 
+            -   name: Update server.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    jq --arg version "$EXPECTED_VERSION" '.version = $version | .packages[0].version = $version' server.json > server.json.tmp && mv server.json.tmp server.json
+                    echo "Updated server.json to version $EXPECTED_VERSION"
+
             -   name: Update CHANGELOG.md
                 uses: DamianReeves/write-file-action@master
                 with:
@@ -80,7 +86,7 @@ jobs:
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
+                    message: "chore(release): Update changelog, server.json, package.json and manifest.json versions [skip ci]"
 
     create_github_release:
         name: Create github release
@@ -229,11 +235,21 @@ jobs:
                     else
                         echo "✓ Commit SHA matches expected"
                     fi
-            -   name: Update server.json version
+            -   name: Verify server.json version
                 run: |
                     EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
-                    jq --arg version "$EXPECTED_VERSION" '.version = $version | .packages[0].version = $version' server.json > server.json.tmp && mv server.json.tmp server.json
-                    echo "Updated server.json to version $EXPECTED_VERSION"
+                    ACTUAL_VERSION=$(jq -r '.version' server.json)
+
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in server.json: $ACTUAL_VERSION"
+                     echo "Current commit SHA: ${{ needs.update_changelog.outputs.changelog_commitish }}"
+
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                        echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in server.json"
+                        exit 1
+                     fi
+
+                     echo "✓ Version check passed: server.json has correct version $ACTUAL_VERSION"
             -   name: Install MCP Publisher
                 run: |
                     curl -L "https://github.com/modelcontextprotocol/publisher/releases/latest/download/mcp-publisher-linux-x64.tar.gz" | tar xz
