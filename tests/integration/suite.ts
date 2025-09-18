@@ -486,6 +486,38 @@ export function createIntegrationTestsSuite(
             expect(result.content).toBeDefined();
         });
 
+        it('should call MCP server Actor via call-actor and invoke fetch-apify-docs tool', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            // Step 1: info - ensure the MCP server Actor lists tools including fetch-apify-docs
+            const infoResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    step: 'info',
+                },
+            });
+
+            expect(infoResult.content).toBeDefined();
+            const infoContent = infoResult.content as { text: string }[];
+            expect(infoContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+
+            // Step 2: call - invoke the MCP tool fetch-apify-docs via actor:tool syntax
+            const DOCS_URL = 'https://docs.apify.com';
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
+                    step: 'call',
+                    input: { url: DOCS_URL },
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const callContent = callResult.content as { text: string }[];
+            expect(callContent.some((item) => item.text.includes(`Fetched content from ${DOCS_URL}`))).toBe(true);
+        });
+
         it('should search Apify documentation', async () => {
             client = await createClientFn({
                 tools: ['docs'],

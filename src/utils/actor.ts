@@ -1,5 +1,36 @@
+import type { ApifyClient } from '../apify-client.js';
+import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
+import { mcpServerCache } from '../state.js';
+import { getActorDefinition } from '../tools/build.js';
 import type { ActorDefinitionStorage, DatasetItem } from '../types.js';
 import { getValuesByDotKeys } from './generic.js';
+
+/**
+ * Resolve and cache the MCP server URL for the given Actor.
+ * - Returns a string URL when the Actor exposes an MCP server
+ * - Returns false when the Actor is not an MCP server
+ * Uses a TTL LRU cache to avoid repeated API calls.
+ */
+export async function getActorMcpUrlCached(
+    actorIdOrName: string,
+    apifyClient: ApifyClient,
+): Promise<string | false> {
+    const cached = mcpServerCache.get(actorIdOrName);
+    if (cached !== null && cached !== undefined) {
+        return cached as string | false;
+    }
+
+    const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
+    const mcpPath = actorDefinitionPruned && getActorMCPServerPath(actorDefinitionPruned);
+    if (actorDefinitionPruned && mcpPath) {
+        const url = await getActorMCPServerURL(actorDefinitionPruned.id, mcpPath);
+        mcpServerCache.set(actorIdOrName, url);
+        return url;
+    }
+
+    mcpServerCache.set(actorIdOrName, false);
+    return false;
+}
 
 /**
  * Returns an array of all field names mentioned in the display.properties
