@@ -8,6 +8,20 @@
     "source": "github"
   },
   "version": "0.4.10",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.apify.com/",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Apify API token for authentication with Apify platform services. For example 'Bearer <apify-api-token>'",
+          "is_required": true,
+          "is_secret": true
+        }
+      ]
+    }
+  ],
   "packages": [
     {
       "registry_type": "npm",
@@ -20,8 +34,8 @@
       "environment_variables": [
         {
           "description": "Apify API token for authentication with Apify platform services",
-          "is_required": false,
           "format": "string",
+          "is_required": true,
           "is_secret": true,
           "name": "APIFY_TOKEN"
         }

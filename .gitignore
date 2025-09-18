@@ -20,3 +20,5 @@ storage/key_value_stores/default/*
 .env
 .aider*
 
+# MCP registry private key
+key.pem
