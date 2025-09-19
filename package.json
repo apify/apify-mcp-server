@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.4.10",
+  "version": "0.4.14",
   "type": "module",
   "description": "Apify MCP Server",
   "engines": {
@@ -37,7 +37,7 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
-    "@modelcontextprotocol/sdk": "^1.17.4",
+    "@modelcontextprotocol/sdk": "^1.18.1",
     "@types/cheerio": "^0.22.35",
     "@types/turndown": "^5.0.5",
     "ajv": "^8.17.1",

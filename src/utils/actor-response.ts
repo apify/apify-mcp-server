@@ -1,4 +1,4 @@
-import type { CallActorGetDatasetResult } from '../tools/actor';
+import type { CallActorGetDatasetResult } from '../tools/actor.js';
 
 /**
  * Builds the response content for Actor tool calls.
