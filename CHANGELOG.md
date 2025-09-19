@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.13) (2025-09-19)
+
+### 🚀 Features
+
+- Update sdk to 1.18.1 to fix write after end ([#279](https://github.com/apify/apify-mcp-server/pull/279)) ([559354a](https://github.com/apify/apify-mcp-server/commit/559354afe513a74a20b5a0bd3efd6f15f909248a)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.12) (2025-09-18)
 
 ### 🚀 Features

@@ -1,7 +1,7 @@
 {
   "dxt_version": "0.1",
   "name": "Apify",
-  "version": "0.4.12",
+  "version": "0.4.13",
   "description": "Extract data from any website using thousands of tools from the Apify Store.",
   "long_description": "Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
   "keywords": [
