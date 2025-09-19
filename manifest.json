@@ -24,6 +24,7 @@
     "url": "https://github.com/apify/apify-mcp-server"
   },
   "license": "MIT",
+  "privacy_policies": ["https://docs.apify.com/legal/privacy-policy", "https://docs.apify.com/legal/gdpr-information", "https://docs.apify.com/legal"],
   "repository": {
     "type": "git",
     "url": "https://github.com/apify/apify-mcp-server"
