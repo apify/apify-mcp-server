@@ -56,12 +56,11 @@ describe('inputSchemaToMarkdown', () => {
           ## \`captionText\` optional boolean default:false
           Extract video transcript (if available).
 
-          ## \`onlyPostsNewerThan\` optional string 
+          ## \`onlyPostsNewerThan\` optional string
           Scrape posts from the provided date to the present day (or date set in 'Older than'). The date should be in YYYY-MM-DD or full ISO absolute format or in relative format e.g. 1 days, 2 months, 3 years.
 
-          ## \`onlyPostsOlderThan\` optional string 
-          Scrape posts from the provided date to the past (or date set in 'Newer than'). The date should be in YYYY-MM-DD or full ISO absolute format or in relative format e.g. 1 days, 2 months, 3 years.
-          "
+          ## \`onlyPostsOlderThan\` optional string
+          Scrape posts from the provided date to the past (or date set in 'Newer than'). The date should be in YYYY-MM-DD or full ISO absolute format or in relative format e.g. 1 days, 2 months, 3 years."
         `);
     });
 
@@ -194,10 +193,10 @@ describe('inputSchemaToMarkdown', () => {
           options: en, af, az, id, ms, bs, ca, cs, da, de, et, es, es-419, eu, fil, fr, gl, hr, zu, is, it, sw, lv, lt, hu, nl, no, uz, pl, pt-BR, pt-PT, ro, sq, sk, sl, fi, sv, vi, tr, el, bg, ky, kk, mk, mn, ru, sr, uk, ka, hy, iw, ur, ar, fa, am, ne, hi, mr, bn, pa, gu, ta, te, kn, ml, si, th, lo, my, km, ko, ja, zh-CN, zh-TW
           Scraping results will show in this language.
 
-          ## \`categoryFilterWords\` optional array 
+          ## \`categoryFilterWords\` optional array
           You can filter places by categories, which Google Maps has <a href='https://api.apify.com/v2/key-value-stores/epxZwNRgmnzzBpNJd/records/categories'>over 4,000</a>. Categories can be general, e.g. <b>beach</b>, which would include all places containing that word e.g. <b>black sand beach</b>, or specific, e.g. <b>beach club</b>. <br><br>⚠️ You can use <b>🎢 Place categories</b> alone or with <b>🔍 Search terms</b>. <b>🔍 Search terms</b> focus on searching, while <b>🎢 Categories</b> filter result...
 
-          ## \`placeMinimumStars\` optional string default:
+          ## \`placeMinimumStars\` optional string default:<empty>
           options: <empty>, two, twoAndHalf, three, threeAndHalf, four, fourAndHalf
           Scrape only places with a rating equal to or above the selected stars. Places without reviews will also be skipped. Keep in mind, filtering by reviews reduces the number of places found per credit spent, as many will be excluded.
 
@@ -212,28 +211,27 @@ describe('inputSchemaToMarkdown', () => {
           ## \`skipClosedPlaces\` optional boolean default:false
           Skip places that are marked as temporary or permanently closed. Ideal for focusing on currently open places.
 
-          ## \`countryCode\` optional string 
+          ## \`countryCode\` optional string
           options: <empty>, us, af, al, dz, as, ad, ao, ai, aq, ag, ar, am, aw, au, at, az, bs, bh, bd, bb, by, be, bz, bj, bm, bt, bo, ba, bw, bv, br, io, bn, bg, bf, bi, kh, cm, ca, cv, ky, cf, td, cl, cn, cx, cc, co, km, cg, cd, ck, cr, ci, hr, cu, cy, cz, dk, dj, dm, do, ec, eg, sv, gq, er, ee, et, fk, fo, fj, fi, fr, gf, pf, tf, ga, gm, ge, de, gh, gi, gr, gl, gd, gp, gu, gt, gn, gw, gy, ht, hm, va, hn, hk, hu, is, in
           Set the country where the data extraction should be carried out, e.g., <b>United States</b>.
 
-          ## \`city\` optional string 
+          ## \`city\` optional string
           Enter the city where the data extraction should be carried out, e.g., <b>Pittsburgh</b>.<br><br>⚠️ <b>Do not include State or Country names here.</b><br><br>⚠️ Automatic City polygons may be smaller than expected (e.g., they don't include agglomeration areas). If you need that, set up the location using Country, State, County, City, or Postal code.<br>For an even more precise location definition (, head over to <b>🛰 Custom search area</b> section to create polygon shapes of the areas you want t...
 
-          ## \`state\` optional string 
+          ## \`state\` optional string
           Set a state where the data extraction should be carried out, e.g., <b>Massachusetts</b> (mainly for the US addresses).
 
-          ## \`county\` optional string 
+          ## \`county\` optional string
           Set the county where the data extraction should be carried out.<br><br>⚠️ Note that <b>county</b> may represent different administrative areas in different countries: a county (e.g., US), regional district (e.g., Canada) or département (e.g., France).
 
-          ## \`postalCode\` optional string 
+          ## \`postalCode\` optional string
           Set the postal code of the area where the data extraction should be carried out, e.g., <b>10001</b>. <br><br>⚠️ <b>Combine Postal code only with 🗺 Country, never with 🌇 City. You can only input one postal code at a time.</b>
 
-          ## \`customGeolocation\` optional object 
+          ## \`customGeolocation\` optional object
           Use this field to define the exact search area if other search area parameters don't work for you. See <a href='https://apify.com/compass/crawler-google-places#custom-search-area' target='_blank' rel='noopener'>readme</a> or <a href='https://blog.apify.com/google-places-api-limits/#1-create-a-custom-area-by-using-pairs-of-coordinates-%F0%9F%93%A1' target='_blank' rel='noopener'>our guide</a> for details.
 
-          ## \`startUrls\` optional array 
-          Max 300 results per search URL. Valid format for URLs contains <code>google.com/maps/</code>. This feature also supports uncommon URL formats such as: <code>google.com?cid=***</code>, <code>goo.gl/maps</code>, and custom place list URL.
-          "
+          ## \`startUrls\` optional array
+          Max 300 results per search URL. Valid format for URLs contains <code>google.com/maps/</code>. This feature also supports uncommon URL formats such as: <code>google.com?cid=***</code>, <code>goo.gl/maps</code>, and custom place list URL."
         `);
     });
 });
