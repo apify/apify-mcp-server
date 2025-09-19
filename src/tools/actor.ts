@@ -180,12 +180,12 @@ export async function getNormalActorsAsTools(
 Actor description: ${actorDefinitionPruned.description}
 Instructions: ${ACTOR_ADDITIONAL_INSTRUCTIONS}`,
                         inputSchema: actorDefinitionPruned.input
-                        // So Actor without input schema works - MCP client expects JSON schema valid output
-                        || {
-                            type: 'object',
-                            properties: {},
-                            required: [],
-                        },
+                            // So Actor without input schema works - MCP client expects JSON schema valid output
+                            || {
+                                type: 'object',
+                                properties: {},
+                                required: [],
+                            },
                         // Additional props true to allow skyfire-pay-id
                         ajvValidate: fixedAjvCompile(ajv, { ...actorDefinitionPruned.input, additionalProperties: true }),
                         memoryMbytes: memoryMbytes > ACTOR_MAX_MEMORY_MBYTES ? ACTOR_MAX_MEMORY_MBYTES : memoryMbytes,
@@ -207,21 +207,22 @@ async function getMCPServersAsTools(
     /**
      * This is case for the Skyfire request without any Apify token, we do not support
      * standby Actors in this case so we can skip MCP servers since they would fail anyway (they are standby Actors).
-     */
+    */
     if (apifyToken === null || apifyToken === undefined) {
         return [];
     }
 
-    const actorsMCPServerTools: ToolEntry[] = [];
-    for (const actorInfo of actorsInfo) {
+    // Process all actors in parallel
+    const actorToolPromises = actorsInfo.map(async (actorInfo) => {
         const actorId = actorInfo.actorDefinitionPruned.id;
         if (!actorInfo.webServerMcpPath) {
             log.warning('Actor does not have a web server MCP path, skipping', {
                 actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
                 actorId,
             });
-            continue;
+            return [];
         }
+
         const mcpServerUrl = await getActorMCPServerURL(
             actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
@@ -232,17 +233,25 @@ async function getMCPServersAsTools(
             mcpServerUrl,
         });
 
-        let client: Client | undefined;
+        let client: Client | null = null;
         try {
             client = await connectMCPClient(mcpServerUrl, apifyToken);
+            if (!client) {
+                // Skip this Actor, connectMCPClient will log the error
+                return [];
+            }
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
-            actorsMCPServerTools.push(...serverTools);
+            return serverTools;
         } finally {
             if (client) await client.close();
         }
-    }
+    });
 
-    return actorsMCPServerTools;
+    // Wait for all actors to be processed in parallel
+    const actorToolsArrays = await Promise.all(actorToolPromises);
+
+    // Flatten the arrays of tools
+    return actorToolsArrays.flat();
 }
 
 export async function getActorsAsTools(
@@ -382,10 +391,13 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     if (isActorMcpServer) {
                         // MCP server: list tools
                         const mcpServerUrl = mcpServerUrlOrFalse;
-                        let client: Client | undefined;
+                        let client: Client | null = null;
                         // Nested try to ensure client is closed
                         try {
                             client = await connectMCPClient(mcpServerUrl, apifyToken);
+                            if (!client) {
+                                return buildMCPResponse([`Failed to connect to MCP server ${mcpServerUrl}`]);
+                            }
                             const toolsResponse = await client.listTools();
 
                             const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput Schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
@@ -451,9 +463,12 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     }
 
                     const mcpServerUrl = mcpServerUrlOrFalse;
-                    let client: Client | undefined;
+                    let client: Client | null = null;
                     try {
                         client = await connectMCPClient(mcpServerUrl, apifyToken);
+                        if (!client) {
+                            return buildMCPResponse([`Failed to connect to MCP server ${mcpServerUrl}`]);
+                        }
 
                         const result = await client.callTool({
                             name: mcpToolName,
@@ -495,7 +510,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                 if (!callResult) {
                     // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                     // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                    return { };
+                    return {};
                 }
 
                 const content = buildActorResponseContent(actorName, callResult);
