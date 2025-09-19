@@ -2,6 +2,9 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-19)
+
+
 ## [0.4.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.13) (2025-09-19)
 
 ### 🚀 Features
