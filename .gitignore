@@ -22,5 +22,9 @@ storage/key_value_stores/default/*
 # Aider coding agent files
 .aider*
 
+
+# MCP registry private key
+key.pem
+
 # Ignore MCP config for Opencode client
 opencode.json

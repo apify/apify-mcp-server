@@ -1,0 +1,45 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "com.apify/apify-mcp-server",
+  "description": "Apify MCP server helps you access the world’s largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/apify/apify-mcp-server",
+    "source": "github"
+  },
+  "version": "0.4.10",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.apify.com/",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Apify API token for authentication with Apify platform services. For example 'Bearer <apify-api-token>'",
+          "is_required": true,
+          "is_secret": true
+        }
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registry_type": "npm",
+      "registry_base_url": "https://registry.npmjs.org",
+      "identifier": "@apify/actors-mcp-server",
+      "version": "0.4.10",
+      "transport": {
+        "type": "stdio"
+      },
+      "environment_variables": [
+        {
+          "description": "Apify API token for authentication with Apify platform services",
+          "format": "string",
+          "is_required": true,
+          "is_secret": true,
+          "name": "APIFY_TOKEN"
+        }
+      ]
+    }
+  ]
+}
