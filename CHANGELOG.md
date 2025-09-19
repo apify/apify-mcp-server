@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.15](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.15) (2025-09-19)
+
+### 🐛 Bug Fixes
+
+- Mcpb&#x2F;dxt release cicd ([0553677](https://github.com/apify/apify-mcp-server/commit/055367712480292078c6b09cbf952fe63c08f33f))
+
+
 ## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-19)
 
 
