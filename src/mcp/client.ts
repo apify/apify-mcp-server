@@ -4,12 +4,9 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 
 import log from '@apify/log';
 
+import { TimeoutError } from '../errors.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './utils.js';
-
-class TimeoutError extends Error {
-    override readonly name = 'TimeoutError';
-}
 
 /**
  * Creates and connects a ModelContextProtocol client.
@@ -91,7 +88,7 @@ async function createMCPSSEClient(
                     headers.set('authorization', `Bearer ${token}`);
                     return fetch(input, { ...init, headers });
                 },
-            // We have to cast to "any" to use it, since it's non-standard
+                // We have to cast to "any" to use it, since it's non-standard
             } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         });
 
