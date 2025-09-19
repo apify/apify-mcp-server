@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
   "name": "com.apify/apify-mcp-server",
-  "description": "Apify MCP Server providing access to thousands of web scraping and automation tools from Apify Store",
+  "description": "Apify MCP server helps you access the world’s largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website",
   "status": "active",
   "repository": {
     "url": "https://github.com/apify/apify-mcp-server",
