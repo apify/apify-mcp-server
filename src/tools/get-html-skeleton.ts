@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_RAG_WEB_BROWSER, HelperTools, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
+import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
 import { getHtmlSkeletonCache } from '../state.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -41,7 +41,17 @@ export const getHtmlSkeleton: ToolEntry = {
     tool: {
         name: HelperTools.GET_HTML_SKELETON,
         actorFullName: HelperTools.GET_HTML_SKELETON,
-        description: `Retrieves the HTML skeleton (clean structure) from a given URL by stripping unwanted elements like scripts, styles, and non-essential attributes. This tool keeps only the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic content and provides chunked output to handle large HTML. This tool is useful for building web scrapers and data extraction tasks where a clean HTML structure is needed for writing concrete selectors or parsers.`,
+        description: `Retrieve the HTML skeleton (clean structure) of a webpage by stripping scripts, styles, and non-essential attributes.
+This keeps the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic pages.
+
+The results will include a chunked HTML skeleton if the content is large. Use the chunk parameter to paginate through the output.
+
+USAGE:
+- Use when you need a clean HTML structure to design selectors or parsers for scraping.
+
+USAGE EXAMPLES:
+- user_input: Get HTML skeleton for https://example.com
+- user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
         inputSchema: zodToJsonSchema(getHtmlSkeletonArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
         call: async (toolArgs) => {
@@ -58,7 +68,7 @@ export const getHtmlSkeleton: ToolEntry = {
                 // Not in cache, call the Actor for scraping
                 const client = new ApifyClient({ token: apifyToken });
 
-                const run = await client.actor(ACTOR_RAG_WEB_BROWSER).call({
+                const run = await client.actor(RAG_WEB_BROWSER).call({
                     query: parsed.url,
                     outputFormats: [
                         'html',
@@ -68,16 +78,16 @@ export const getHtmlSkeleton: ToolEntry = {
 
                 const datasetItems = await client.dataset(run.defaultDatasetId).listItems();
                 if (datasetItems.items.length === 0) {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 const firstItem = datasetItems.items[0] as unknown as ScrapedPageItem;
                 if (firstItem.crawl.httpStatusMessage.toLocaleLowerCase() !== 'ok') {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 if (!firstItem.html) {
-                    return buildMCPResponse([`The scraping Actor (${ACTOR_RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
+                    return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`]);
                 }
 
                 strippedHtml = stripHtml(firstItem.html);

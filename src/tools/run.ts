@@ -27,9 +27,15 @@ export const getActorRun: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_RUNS_GET,
         actorFullName: HelperTools.ACTOR_RUNS_GET,
-        description: 'Gets detailed information about a specific Actor run including its status, status message, metrics, and resources. '
-            + 'The response includes run metadata (ID, status, status message, timestamps), performance stats (CPU, memory, network), '
-            + 'resource IDs (dataset, key-value store, request queue), and configuration options.',
+        description: `Get detailed information about a specific Actor run by runId.
+The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
+
+USAGE:
+- Use when you need to inspect run status or retrieve associated resource IDs (e.g., datasetId for output).
+
+USAGE EXAMPLES:
+- user_input: Show details of run y2h7sK3Wc
+- user_input: What is the datasetId for run y2h7sK3Wc?`,
         inputSchema: zodToJsonSchema(getActorRunArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
         call: async (toolArgs) => {
@@ -62,8 +68,15 @@ export const getActorRunLog: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_RUNS_LOG,
         actorFullName: HelperTools.ACTOR_RUNS_LOG,
-        description: 'Retrieves logs for a specific Actor run. '
-            + 'Returns the log content as plain text.',
+        description: `Retrieve recent log lines for a specific Actor run.
+The results will include the last N lines of the run’s log output (plain text).
+
+USAGE:
+- Use when you need to inspect recent logs to debug or monitor a run.
+
+USAGE EXAMPLES:
+- user_input: Show last 20 lines of logs for run y2h7sK3Wc
+- user_input: Get logs for run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(GetRunLogArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
         call: async (toolArgs) => {
@@ -86,9 +99,16 @@ export const abortActorRun: ToolEntry = {
     tool: {
         name: HelperTools.ACTOR_RUNS_ABORT,
         actorFullName: HelperTools.ACTOR_RUNS_ABORT,
-        description: 'Aborts an Actor run that is currently starting or running. '
-            + 'For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect. '
-            + 'Returns the updated run details after aborting.',
+        description: `Abort an Actor run that is currently starting or running.
+For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.
+The results will include the updated run details after the abort request.
+
+USAGE:
+- Use when you need to stop a run that is taking too long or misconfigured.
+
+USAGE EXAMPLES:
+- user_input: Abort run y2h7sK3Wc
+- user_input: Gracefully abort run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(abortRunArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
         call: async (toolArgs) => {

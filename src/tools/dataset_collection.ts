@@ -30,12 +30,18 @@ export const getUserDatasetsList: ToolEntry = {
     tool: {
         name: HelperTools.DATASET_LIST_GET,
         actorFullName: HelperTools.DATASET_LIST_GET,
-        description: 'Lists datasets (collections of Actor run data). '
-            + 'Actor runs automatically produce unnamed datasets (use unnamed=true to include these). '
-            + 'Users can also create named datasets manually. '
-            + 'Each dataset includes itemCount, access settings, and usage stats (readCount, writeCount). '
-            + 'Results are sorted by createdAt in ascending order (use desc=true for descending). '
-            + 'Supports pagination with limit (max 20) and offset parameters.',
+        description: `List datasets (collections of Actor run data) for the authenticated user.
+Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
+
+The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
+Use limit (max 20), offset, and desc to paginate and sort.
+
+USAGE:
+- Use when you need to browse available datasets (named or unnamed) to locate data.
+
+USAGE EXAMPLES:
+- user_input: List my last 10 datasets (newest first)
+- user_input: List unnamed datasets`,
         inputSchema: zodToJsonSchema(getUserDatasetsListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
         call: async (toolArgs) => {
