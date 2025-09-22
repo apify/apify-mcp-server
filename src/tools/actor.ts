@@ -22,6 +22,7 @@ import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getAc
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonSchemaToMarkdown } from '../utils/json-schema-to-markdown.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
@@ -388,7 +389,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                             client = await connectMCPClient(mcpServerUrl, apifyToken);
                             const toolsResponse = await client.listTools();
 
-                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput Schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\n\n${jsonSchemaToMarkdown(tool.inputSchema)}`,
                             ).join('\n\n');
 
                             return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
@@ -402,7 +403,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                             return buildMCPResponse([`Actor information for '${baseActorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.`]);
                         }
                         const content = [
-                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                            { type: 'text', text: jsonSchemaToMarkdown(details.inputSchema) },
                         ];
                         /**
                          * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
@@ -478,7 +479,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     if (errors && errors.length > 0) {
                         return buildMCPResponse([
                             `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}`,
-                            `Input Schema:\n${JSON.stringify(actor.tool.inputSchema)}`,
+                            jsonSchemaToMarkdown(actor.tool.inputSchema),
                         ]);
                     }
                 }

@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 
 const getKeyValueStoreArgs = z.object({
     storeId: z.string()
@@ -30,7 +31,7 @@ export const getKeyValueStore: ToolEntry = {
             const parsed = getKeyValueStoreArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const store = await client.keyValueStore(parsed.storeId).get();
-            return { content: [{ type: 'text', text: JSON.stringify(store) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(store) }] };
         },
     } as InternalTool,
 };
@@ -70,7 +71,7 @@ export const getKeyValueStoreKeys: ToolEntry = {
                 exclusiveStartKey: parsed.exclusiveStartKey,
                 limit: parsed.limit,
             });
-            return { content: [{ type: 'text', text: JSON.stringify(keys) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(keys) }] };
         },
     } as InternalTool,
 };
@@ -104,7 +105,7 @@ export const getKeyValueStoreRecord: ToolEntry = {
             const parsed = getKeyValueStoreRecordArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
-            return { content: [{ type: 'text', text: JSON.stringify(record) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(record) }] };
         },
     } as InternalTool,
 };

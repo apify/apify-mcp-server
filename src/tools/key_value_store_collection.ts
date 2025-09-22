@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z.number()
@@ -48,7 +49,7 @@ export const getUserKeyValueStoresList: ToolEntry = {
                 desc: parsed.desc,
                 unnamed: parsed.unnamed,
             });
-            return { content: [{ type: 'text', text: JSON.stringify(stores) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(stores) }] };
         },
     } as InternalTool,
 };

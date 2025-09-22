@@ -13,6 +13,7 @@ import type {
     ToolEntry,
 } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonSchemaToMarkdown } from '../utils/json-schema-to-markdown.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
 
 /**
@@ -131,7 +132,7 @@ export const actorDefinitionTool: ToolEntry = {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                 v.input.properties = shortenProperties(properties);
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: jsonSchemaToMarkdown(v.input) }] };
         },
     } as InternalTool,
 };

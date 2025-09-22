@@ -52,7 +52,7 @@ function formatProperty(key: string, value: any, requiredFields: Set<string>, le
     return result;
 }
 
-export function inputSchemaToMarkdown(inputSchema: IActorInputSchema) {
+export function jsonSchemaToMarkdown(inputSchema: IActorInputSchema) {
     const requiredFields = new Set(inputSchema.required || []);
 
     let markdown = '# JSON Schema';

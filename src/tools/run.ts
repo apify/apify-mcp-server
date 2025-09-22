@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()
@@ -40,7 +41,7 @@ export const getActorRun: ToolEntry = {
             if (!v) {
                 return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(v) }] };
         },
     } as InternalTool,
 };
@@ -96,7 +97,7 @@ export const abortActorRun: ToolEntry = {
             const parsed = abortRunArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(v) }] };
         },
     } as InternalTool,
 };

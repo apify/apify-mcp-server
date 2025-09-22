@@ -1,9 +1,9 @@
 /* eslint-disable max-len */
 import { describe, expect, it } from 'vitest';
 
-import { inputSchemaToMarkdown } from '../../src/utils/input-schema-to-markdown.js';
+import { jsonSchemaToMarkdown } from '../../src/utils/json-schema-to-markdown.js';
 
-describe('inputSchemaToMarkdown', () => {
+describe('jsonSchemaToMarkdown', () => {
     it('should format schema for Actor apify/facebook-posts-scraper', () => {
         const schema = { title: 'Input schema for the empty project actor.',
             description: "This scraper will get post and page details from Facebook pages of your choice. To try it out, just paste a Facebook Page URL and click ▷ Start. If you need any guidance, just <a href='https://blog.apify.com/scrape-facebook-posts-data/' target='_blank' rel='noopener'>follow this tutorial</a>.",
@@ -41,7 +41,7 @@ describe('inputSchemaToMarkdown', () => {
             },
             required: ['startUrls'] };
 
-        const result = inputSchemaToMarkdown(schema);
+        const result = jsonSchemaToMarkdown(schema);
         expect(result).toMatchInlineSnapshot(`
           "# JSON Schema
 
@@ -174,7 +174,7 @@ describe('inputSchemaToMarkdown', () => {
             },
         };
 
-        const result = inputSchemaToMarkdown(schema);
+        const result = jsonSchemaToMarkdown(schema);
         expect(result).toMatchInlineSnapshot(`
           "# JSON Schema
 
@@ -276,7 +276,7 @@ describe('inputSchemaToMarkdown', () => {
             },
         };
 
-        const result = inputSchemaToMarkdown(schema);
+        const result = jsonSchemaToMarkdown(schema);
         expect(result).toMatchInlineSnapshot(`
           "# JSON Schema
 

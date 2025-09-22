@@ -6,6 +6,8 @@ import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
+import { jsonSchemaToMarkdown } from '../utils/json-schema-to-markdown.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 
 const getDatasetArgs = z.object({
@@ -61,7 +63,7 @@ export const getDataset: ToolEntry = {
             if (!v) {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(v) }] };
         },
     } as InternalTool,
 };
@@ -108,7 +110,7 @@ export const getDatasetItems: ToolEntry = {
             if (!v) {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(v) }] };
         },
     } as InternalTool,
 };
@@ -176,7 +178,7 @@ export const getDatasetSchema: ToolEntry = {
             return {
                 content: [{
                     type: 'text',
-                    text: JSON.stringify(schema),
+                    text: jsonSchemaToMarkdown(schema),
                 }],
             };
         },

@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 
 const getUserDatasetsListArgs = z.object({
     offset: z.number()
@@ -48,7 +49,7 @@ export const getUserDatasetsList: ToolEntry = {
                 desc: parsed.desc,
                 unnamed: parsed.unnamed,
             });
-            return { content: [{ type: 'text', text: JSON.stringify(datasets) }] };
+            return { content: [{ type: 'text', text: jsonToMarkdown(datasets) }] };
         },
     } as InternalTool,
 };

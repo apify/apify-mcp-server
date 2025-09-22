@@ -6,6 +6,7 @@ import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS } from '.
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
+import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -134,7 +135,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
                 .map((item) => cleanEmptyProperties(item))
                 .filter((item) => item !== undefined);
 
-            let outputText = JSON.stringify(cleanedItems);
+            let outputText = jsonToMarkdown(cleanedItems);
             let truncated = false;
             if (outputText.length > TOOL_MAX_OUTPUT_CHARS) {
                 outputText = outputText.slice(0, TOOL_MAX_OUTPUT_CHARS);
