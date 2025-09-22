@@ -20,9 +20,15 @@ export const getKeyValueStore: ToolEntry = {
     tool: {
         name: HelperTools.KEY_VALUE_STORE_GET,
         actorFullName: HelperTools.KEY_VALUE_STORE_GET,
-        description: 'Gets an object that contains all the details about a specific key-value store. '
-            + 'Returns store metadata including ID, name, owner, access settings, and usage statistics. '
-            + 'Use store ID or username~store-name format to identify the store.',
+        description: `Get details about a key-value store by ID or username~store-name.
+The results will include store metadata (ID, name, owner, access settings) and usage statistics.
+
+USAGE:
+- Use when you need to inspect a store to locate records or understand its properties.
+
+USAGE EXAMPLES:
+- user_input: Show info for key-value store username~my-store
+- user_input: Get details for store 8TtYhCwKzQeQk7dJx`,
         inputSchema: zodToJsonSchema(getKeyValueStoreArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
         call: async (toolArgs) => {
@@ -56,10 +62,16 @@ export const getKeyValueStoreKeys: ToolEntry = {
     tool: {
         name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
         actorFullName: HelperTools.KEY_VALUE_STORE_KEYS_GET,
-        description: 'Returns a list of objects describing keys of a given key-value store, '
-            + 'as well as some information about the values (e.g. size). '
-            + 'Supports pagination using exclusiveStartKey and limit parameters. '
-            + 'Use store ID or username~store-name format to identify the store.',
+        description: `List keys in a key-value store with optional pagination.
+The results will include keys and basic info about stored values (e.g., size).
+Use exclusiveStartKey and limit to paginate.
+
+USAGE:
+- Use when you need to discover what records exist in a store.
+
+USAGE EXAMPLES:
+- user_input: List first 100 keys in store username~my-store
+- user_input: Continue listing keys in store 8TtYhCwKzQeQk7dJx from key data.json`,
         inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
         call: async (toolArgs) => {
@@ -92,11 +104,15 @@ export const getKeyValueStoreRecord: ToolEntry = {
     tool: {
         name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
         actorFullName: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-        description: 'Gets a value stored in the key-value store under a specific key. '
-            + 'The response maintains the original Content-Encoding of the stored value. '
-            + 'If the request does not specify the correct Accept-Encoding header, the record will be decompressed. '
-            + 'Most HTTP clients handle decompression automatically.'
-            + 'The record can be accessed with the URL: GET: https://api.apify.com/v2/key-value-stores/:storeId/records/:recordKey',
+        description: `Get a value stored in a key-value store under a specific key.
+The response preserves the original Content-Encoding; most clients handle decompression automatically.
+
+USAGE:
+- Use when you need to retrieve a specific record (JSON, text, or binary) from a store.
+
+USAGE EXAMPLES:
+- user_input: Get record INPUT from store 8TtYhCwKzQeQk7dJx
+- user_input: Get record data.json from store username~my-store`,
         inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
         call: async (toolArgs) => {

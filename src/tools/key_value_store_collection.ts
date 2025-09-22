@@ -30,12 +30,18 @@ export const getUserKeyValueStoresList: ToolEntry = {
     tool: {
         name: HelperTools.KEY_VALUE_STORE_LIST_GET,
         actorFullName: HelperTools.KEY_VALUE_STORE_LIST_GET,
-        description: 'Lists key-value stores owned by the user. '
-            + 'Actor runs automatically produce unnamed stores (use unnamed=true to include these). '
-            + 'Users can also create named stores manually. '
-            + 'Each store includes basic information about the store. '
-            + 'Results are sorted by createdAt in ascending order (use desc=true for descending). '
-            + 'Supports pagination with limit (max 1000) and offset parameters.',
+        description: `List key-value stores owned by the authenticated user.
+Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
+
+The results will include basic info for each store, sorted by createdAt (ascending by default).
+Use limit, offset, and desc to paginate and sort.
+
+USAGE:
+- Use when you need to browse available key-value stores (named or unnamed).
+
+USAGE EXAMPLES:
+- user_input: List my last 10 key-value stores (newest first)
+- user_input: List unnamed key-value stores`,
         inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
         call: async (toolArgs) => {

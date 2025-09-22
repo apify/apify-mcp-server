@@ -19,7 +19,15 @@ export const fetchApifyDocsTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DOCS_FETCH,
-        description: `Apify documentation fetch tool. This tool allows you to fetch the full content of an Apify documentation page by its URL.`,
+        description: `Fetch the full content of an Apify documentation page by its URL.
+Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
+
+USAGE:
+- Use when you need the complete content of a specific docs page for detailed answers.
+
+USAGE EXAMPLES:
+- user_input: Fetch https://docs.apify.com/platform/actors/running#builds
+- user_input: Fetch https://docs.apify.com/academy`,
         args: fetchApifyDocsToolArgsSchema,
         inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
