@@ -19,19 +19,16 @@ import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, ToolEntry } from '../types.js';
-import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../utils/actor.js';
+import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv } from '../utils/ajv.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
-import {
-    actorNameToToolName,
-    buildActorInputSchema,
-    fixedAjvCompile,
-} from './utils.js';
+import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile } from './utils.js';
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
@@ -214,21 +211,22 @@ async function getMCPServersAsTools(
     /**
      * This is case for the Skyfire request without any Apify token, we do not support
      * standby Actors in this case so we can skip MCP servers since they would fail anyway (they are standby Actors).
-     */
+    */
     if (apifyToken === null || apifyToken === undefined) {
         return [];
     }
 
-    const actorsMCPServerTools: ToolEntry[] = [];
-    for (const actorInfo of actorsInfo) {
+    // Process all actors in parallel
+    const actorToolPromises = actorsInfo.map(async (actorInfo) => {
         const actorId = actorInfo.actorDefinitionPruned.id;
         if (!actorInfo.webServerMcpPath) {
             log.warning('Actor does not have a web server MCP path, skipping', {
                 actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
                 actorId,
             });
-            continue;
+            return [];
         }
+
         const mcpServerUrl = await getActorMCPServerURL(
             actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
@@ -239,17 +237,25 @@ async function getMCPServersAsTools(
             mcpServerUrl,
         });
 
-        let client: Client | undefined;
+        let client: Client | null = null;
         try {
             client = await connectMCPClient(mcpServerUrl, apifyToken);
+            if (!client) {
+                // Skip this Actor, connectMCPClient will log the error
+                return [];
+            }
             const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
-            actorsMCPServerTools.push(...serverTools);
+            return serverTools;
         } finally {
             if (client) await client.close();
         }
-    }
+    });
 
-    return actorsMCPServerTools;
+    // Wait for all actors to be processed in parallel
+    const actorToolsArrays = await Promise.all(actorToolPromises);
+
+    // Flatten the arrays of tools
+    return actorToolsArrays.flat();
 }
 
 export async function getActorsAsTools(
@@ -364,29 +370,69 @@ EXAMPLES:
             const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
             const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
 
+            // Parse special format: actor:tool
+            const mcpToolMatch = actorName.match(/^(.+):(.+)$/);
+            let baseActorName = actorName;
+            let mcpToolName: string | undefined;
+
+            if (mcpToolMatch) {
+                baseActorName = mcpToolMatch[1];
+                mcpToolName = mcpToolMatch[2];
+            }
+
+            // For definition resolution we always use token-based client; Skyfire is only for actual Actor runs
+            const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
+            // Resolve MCP server URL
+            const needsMcpUrl = mcpToolName !== undefined || step === 'info';
+            const mcpServerUrlOrFalse = needsMcpUrl ? await getActorMcpUrlCached(baseActorName, apifyClientForDefinition) : false;
+            const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
+
+            // Standby Actors, thus MCPs, are not supported in Skyfire mode
+            if (isActorMcpServer && apifyMcpServer.options.skyfireMode) {
+                return buildMCPResponse([`MCP server Actors are not supported in Skyfire mode. Please use a regular Apify token without Skyfire.`]);
+            }
+
             try {
                 if (step === 'info') {
-                    const apifyClient = new ApifyClient({ token: apifyToken });
-                    // Step 1: Return Actor card and schema directly
-                    const details = await fetchActorDetails(apifyClient, actorName);
-                    if (!details) {
-                        return {
-                            content: [{ type: 'text', text: `Actor information for '${actorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
-                        };
+                    if (isActorMcpServer) {
+                        // MCP server: list tools
+                        const mcpServerUrl = mcpServerUrlOrFalse;
+                        let client: Client | null = null;
+                        // Nested try to ensure client is closed
+                        try {
+                            client = await connectMCPClient(mcpServerUrl, apifyToken);
+                            if (!client) {
+                                return buildMCPResponse([`Failed to connect to MCP server ${mcpServerUrl}`]);
+                            }
+                            const toolsResponse = await client.listTools();
+
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput Schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
+                            ).join('\n\n');
+
+                            return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
+                        } finally {
+                            if (client) await client.close();
+                        }
+                    } else {
+                        // Regular actor: return schema
+                        const details = await fetchActorDetails(apifyClientForDefinition, baseActorName);
+                        if (!details) {
+                            return buildMCPResponse([`Actor information for '${baseActorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.`]);
+                        }
+                        const content = [
+                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                        ];
+                        /**
+                         * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
+                         */
+                        if (apifyMcpServer.options.skyfireMode) {
+                            content.push({
+                                type: 'text',
+                                text: SKYFIRE_TOOL_INSTRUCTIONS,
+                            });
+                        }
+                        return { content };
                     }
-                    const content = [
-                        { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
-                    ];
-                    /**
-                     * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
-                     */
-                    if (apifyMcpServer.options.skyfireMode) {
-                        content.push({
-                            type: 'text',
-                            text: SKYFIRE_TOOL_INSTRUCTIONS,
-                        });
-                    }
-                    return { content };
                 }
 
                 /**
@@ -413,32 +459,48 @@ EXAMPLES:
 
                 // Step 2: Call the Actor
                 if (!input) {
-                    return {
-                        content: [
-                            { type: 'text', text: `Input is required when step="call". Please provide the input parameter based on the Actor's input schema.` },
-                        ],
-                    };
+                    return buildMCPResponse([`Input is required when step="call". Please provide the input parameter based on the Actor's input schema.`]);
                 }
 
+                // Handle MCP tool calls
+                if (mcpToolName) {
+                    if (!isActorMcpServer) {
+                        return buildMCPResponse([`Actor '${baseActorName}' is not an MCP server.`]);
+                    }
+
+                    const mcpServerUrl = mcpServerUrlOrFalse;
+                    let client: Client | null = null;
+                    try {
+                        client = await connectMCPClient(mcpServerUrl, apifyToken);
+                        if (!client) {
+                            return buildMCPResponse([`Failed to connect to MCP server ${mcpServerUrl}`]);
+                        }
+
+                        const result = await client.callTool({
+                            name: mcpToolName,
+                            arguments: input,
+                        });
+
+                        return { content: result.content };
+                    } finally {
+                        if (client) await client.close();
+                    }
+                }
+
+                // Handle regular Actor calls
                 const [actor] = await getActorsAsTools([actorName], apifyClient);
 
                 if (!actor) {
-                    return {
-                        content: [
-                            { type: 'text', text: `Actor '${actorName}' not found.` },
-                        ],
-                    };
+                    return buildMCPResponse([`Actor '${actorName}' was not found.`]);
                 }
 
                 if (!actor.tool.ajvValidate(input)) {
                     const { errors } = actor.tool.ajvValidate;
                     if (errors && errors.length > 0) {
-                        return {
-                            content: [
-                                { type: 'text', text: `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}` },
-                                { type: 'text', text: `Input Schema:\n${JSON.stringify(actor.tool.inputSchema)}` },
-                            ],
-                        };
+                        return buildMCPResponse([
+                            `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}`,
+                            `Input Schema:\n${JSON.stringify(actor.tool.inputSchema)}`,
+                        ]);
                     }
                 }
 
@@ -454,19 +516,15 @@ EXAMPLES:
                 if (!callResult) {
                     // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                     // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                    return { };
+                    return {};
                 }
 
                 const content = buildActorResponseContent(actorName, callResult);
 
                 return { content };
             } catch (error) {
-                log.error('Error with Actor operation', { error, actorName, step });
-                return {
-                    content: [
-                        { type: 'text', text: `Error with Actor operation: ${error instanceof Error ? error.message : String(error)}` },
-                    ],
-                };
+                log.error('Failed to call Actor', { error, actorName, step });
+                return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}`]);
             }
         },
     },
