@@ -419,6 +419,7 @@ EXAMPLES:
                             return buildMCPResponse([`Actor information for '${baseActorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.`]);
                         }
                         const content = [
+                            // TODO: update result to say: this is result of info step, you must now call again with step=call and proper input
                             { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
                         ];
                         /**
