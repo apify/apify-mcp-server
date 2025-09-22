@@ -39,7 +39,7 @@ Use limit, offset, and desc to paginate and sort.
 USAGE:
 - Use when you need to browse available key-value stores (named or unnamed).
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: List my last 10 key-value stores (newest first)
 - user_input: List unnamed key-value stores`,
         inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs),

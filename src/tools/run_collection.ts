@@ -37,7 +37,7 @@ Valid statuses: READY (not allocated), RUNNING (executing), SUCCEEDED (finished)
 USAGE:
 - Use when you need to browse or filter recent Actor runs.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: List my last 10 runs (newest first)
 - user_input: Show only SUCCEEDED runs`,
         inputSchema: zodToJsonSchema(getUserRunsListArgs),

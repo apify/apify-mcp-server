@@ -244,8 +244,7 @@ async function getMCPServersAsTools(
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
             }
-            const serverTools = await getMCPServerTools(actorId, client, mcpServerUrl);
-            return serverTools;
+            return await getMCPServerTools(actorId, client, mcpServerUrl);
         } finally {
             if (client) await client.close();
         }
@@ -340,7 +339,7 @@ There are two ways to run Actors:
 
 **Important:**
 
-A successful run returns a \`datasetId\` (the Actor's output stored as an Apify dataset) and a short preview of items.
+Typically, a successful run returns a \`datasetId\` (the Actor's output stored as an Apify dataset) and a short preview of items.
 To fetch the full output, use the ${HelperTools.ACTOR_OUTPUT_GET} tool with the \`datasetId\`.
 
 USAGE:
@@ -354,8 +353,8 @@ Step 1: Get Actor Info (step="info", default)
 - You MUST do this step first - it's required to understand how to call the Actor
 
 Step 2: Call Actor (step="call")
-- Only after step 1, call again with step="call" and proper input based on the schema
-- This calls and runs the Actor. It will create an output as an Apify dataset (with datasetId).
+- Only after step 1, call this tool again with step="call" and proper input based on the schema
+- This runs the Actor. It will create an output as an Apify dataset (with datasetId).
 - This step returns a dataset preview, typically JSON-formatted tabular data.
 
 EXAMPLES:

@@ -39,7 +39,7 @@ Use limit (max 20), offset, and desc to paginate and sort.
 USAGE:
 - Use when you need to browse available datasets (named or unnamed) to locate data.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: List my last 10 datasets (newest first)
 - user_input: List unnamed datasets`,
         inputSchema: zodToJsonSchema(getUserDatasetsListArgs),

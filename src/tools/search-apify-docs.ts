@@ -45,7 +45,7 @@ export const searchApifyDocsTool: ToolEntry = {
     USAGE:
     - Use when user asks about Apify documentation, Actor development, Crawlee, or Apify platform.
 
-    EXAMPLES:
+    USAGE EXAMPLES:
     - query: How to use create Apify Actor?
     - query: How to define Actor input schema?
     - query: How scrape with Crawlee?`,

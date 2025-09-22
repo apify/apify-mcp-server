@@ -49,7 +49,7 @@ The results will include a chunked HTML skeleton if the content is large. Use th
 USAGE:
 - Use when you need a clean HTML structure to design selectors or parsers for scraping.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Get HTML skeleton for https://example.com
 - user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
         inputSchema: zodToJsonSchema(getHtmlSkeletonArgs),

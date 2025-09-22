@@ -54,7 +54,7 @@ Note: itemCount updates may be delayed by up to ~5 seconds.
 USAGE:
 - Use when you need dataset metadata to understand its structure before fetching items.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Show info for dataset 8TtYhCwKzQeQk7dJx
 - user_input: What fields does username~my-dataset have?`,
         inputSchema: zodToJsonSchema(getDatasetArgs),
@@ -89,7 +89,7 @@ The results will include items along with pagination info (limit, offset) and to
 USAGE:
 - Use when you need to read data from a dataset (all items or only selected fields).
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset 8TtYhCwKzQeQk7dJx
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
         inputSchema: zodToJsonSchema(getDatasetItemsArgs),
@@ -151,7 +151,7 @@ Use this to understand the dataset before fetching many items.
 USAGE:
 - Use when you need to infer the structure of dataset items for downstream processing or validation.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Generate schema for dataset 8TtYhCwKzQeQk7dJx using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
         inputSchema: zodToJsonSchema(getDatasetSchemaArgs),

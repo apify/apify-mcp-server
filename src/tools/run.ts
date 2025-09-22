@@ -33,7 +33,7 @@ The results will include run metadata (status, timestamps), performance stats, a
 USAGE:
 - Use when you need to inspect run status or retrieve associated resource IDs (e.g., datasetId for output).
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
         inputSchema: zodToJsonSchema(getActorRunArgs),
@@ -74,7 +74,7 @@ The results will include the last N lines of the run’s log output (plain text)
 USAGE:
 - Use when you need to inspect recent logs to debug or monitor a run.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(GetRunLogArgs),
@@ -106,7 +106,7 @@ The results will include the updated run details after the abort request.
 USAGE:
 - Use when you need to stop a run that is taking too long or misconfigured.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(abortRunArgs),

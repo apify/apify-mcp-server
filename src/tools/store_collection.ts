@@ -82,7 +82,7 @@ USAGE:
 - Use when you need to discover Actors for a specific task or find MCP servers.
 - Use to explore available tools in the Apify ecosystem based on keywords.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Find Actors for scraping e-commerce
 - user_input: Find browserbase MCP server
 - user_input: I need to scrape instagram profiles and comments

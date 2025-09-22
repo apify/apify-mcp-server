@@ -26,7 +26,7 @@ The results will include store metadata (ID, name, owner, access settings) and u
 USAGE:
 - Use when you need to inspect a store to locate records or understand its properties.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store 8TtYhCwKzQeQk7dJx`,
         inputSchema: zodToJsonSchema(getKeyValueStoreArgs),
@@ -69,7 +69,7 @@ Use exclusiveStartKey and limit to paginate.
 USAGE:
 - Use when you need to discover what records exist in a store.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store 8TtYhCwKzQeQk7dJx from key data.json`,
         inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs),
@@ -110,7 +110,7 @@ The response preserves the original Content-Encoding; most clients handle decomp
 USAGE:
 - Use when you need to retrieve a specific record (JSON, text, or binary) from a store.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Get record INPUT from store 8TtYhCwKzQeQk7dJx
 - user_input: Get record data.json from store username~my-store`,
         inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs),

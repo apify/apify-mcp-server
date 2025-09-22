@@ -25,7 +25,7 @@ Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
 USAGE:
 - Use when you need the complete content of a specific docs page for detailed answers.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
         args: fetchApifyDocsToolArgsSchema,

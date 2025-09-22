@@ -24,7 +24,7 @@ Present the information in a user-friendly Actor card.
 USAGE:
 - Use when a user asks about an Actor’s details, input schema, README, or how to use it.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: How to use apify/rag-web-browser
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,

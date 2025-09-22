@@ -79,7 +79,7 @@ You can obtain the datasetId from an Actor run (e.g., after calling an Actor wit
 USAGE:
 - Use when you need to read Actor output data (full items or selected fields), especially when preview does not include all fields.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Get data of my last Actor run
 - user_input: Get number_of_likes from my dataset
 - user_input: Return only crawl.statusCode and url from dataset 8TtYhCwKzQeQk7dJx

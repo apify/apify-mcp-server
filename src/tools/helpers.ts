@@ -23,7 +23,7 @@ You can first discover Actors using the ${HelperTools.STORE_SEARCH} tool, then a
 USAGE:
 - Use when a user has chosen an Actor to work with and you need to make it available as a callable tool.
 
-EXAMPLES:
+USAGE EXAMPLES:
 - user_input: Add apify/rag-web-browser as a tool
 - user_input: Add apify/instagram-scraper as a tool`,
         inputSchema: zodToJsonSchema(addToolArgsSchema),
