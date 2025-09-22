@@ -61,77 +61,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
        - day: Sunday
          hours: 12–4 PM
    additionalInfo:
-     Service options:
-       - Outdoor seating: true
-       - Curbside pickup: true
-       - No-contact delivery: true
-       - Delivery: true
-       - Takeout: true
-       - Dine-in: true
-     Highlights:
-       - Fast service: true
-       - Great cocktails: true
-       - Great dessert: true
-       - Great wine list: true
-     Popular for:
-       - Lunch: true
-       - Dinner: true
-       - Solo dining: true
-     Accessibility:
-       - Wheelchair accessible entrance: true
-       - Wheelchair accessible restroom: true
-       - Wheelchair accessible seating: true
-     Offerings:
-       - Alcohol: true
-       - Beer: true
-       - Cocktails: true
-       - Coffee: true
-       - Comfort food: true
-       - Happy hour drinks: true
-       - Happy hour food: true
-       - Hard liquor: true
-       - Late-night food: true
-       - Small plates: true
-       - Vegetarian options: true
-       - Wine: true
-     Dining options:
-       - Brunch: true
-       - Lunch: true
-       - Dinner: true
-       - Catering: true
-       - Dessert: true
-       - Seating: true
-       - Table service: true
-     Amenities:
-       - Bar onsite: true
-       - Restroom: true
-       - Wi-Fi: true
-       - Free Wi-Fi: true
-     Atmosphere:
-       - Cozy: true
-       - Romantic: true
-       - Trendy: true
-       - Upscale: true
-     Crowd:
-       - Family-friendly: true
-       - Groups: true
-     Planning:
-       - Dinner reservations recommended: true
-       - Accepts reservations: true
-     Payments:
-       - Credit cards: true
-       - Debit cards: true
-       - NFC mobile payments: true
-       - Credit cards: true
-     Children:
-       - Good for kids: true
-       - Has changing table(s): true
-       - High chairs: true
-       - Kids' menu: true
-     Parking:
-       - Free street parking: true
-       - Valet parking: true
-   Pets: - Dogs allowed outside: true
+     Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+     Highlights: Fast service, Great cocktails, Great dessert, Great wine list
+     Popular for: Lunch, Dinner, Solo dining
+     Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+     Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Late-night food, Small plates, Vegetarian options, Wine
+     Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+     Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+     Atmosphere: Cozy, Romantic, Trendy, Upscale
+     Crowd: Family-friendly, Groups
+     Planning: Dinner reservations recommended, Accepts reservations
+     Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+     Children: Good for kids, Has changing table(s), High chairs, Kids' menu
+     Parking: Free street parking, Valet parking
+     Pets: Dogs allowed outside
    url: https://www.google.com/maps/search/?api=1&query=Lena%20Trattoria&query_place_id=ChIJA4JRKzCLwokRHBTppuJxhpg
    searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
    searchString: italian restaurant
@@ -183,57 +126,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 4 to 9 PM
   additionalInfo:
-    Service options:
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great dessert: true
-      - Great wine list: true
-      - Live music: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-  Crowd: - Groups: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Parking: - Usually somewhat difficult to find a space: true
+    Service options: No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great dessert, Great wine list, Live music
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Happy hour drinks, Hard liquor, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Groups
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Usually somewhat difficult to find a space
   url: https://www.google.com/maps/search/?api=1&query=Trattoria%20Ora&query_place_id=ChIJTUW3105fwokRTUXSiiya0gg
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -286,64 +191,23 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Drive-through: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Curbside pickup, No-contact delivery, Delivery, Drive-through, Takeout, Dine-in
+    Highlights: Fast service, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-  Crowd: - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
-      - Usually somewhat difficult to find a space: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Small plates, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Free street parking, Paid street parking, Usually somewhat difficult to find a space
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Sotto%20la%20Luna&query_place_id=ChIJBTuSXqhfwokRpjEVqzy1U6U
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -428,94 +292,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 10 AM–9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Fireplace: true
-      - Great beer selection: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Organic dishes: true
-      - Private dining room: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Historic: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Lunch reservations recommended: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-      - Usually a wait: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - Good for kids birthday: true
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free street parking: true
-      - Usually plenty of parking: true
-      - Valet parking: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Fireplace, Great beer selection, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Healthy options, Late-night food, Organic dishes, Private dining room, Quick bite, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Historic, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists
+    Planning: Brunch reservations recommended, Lunch reservations recommended, Dinner reservations recommended, Accepts reservations, Usually a wait
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, Good for kids birthday, High chairs, Kids' menu
+    Parking: Free street parking, Usually plenty of parking, Valet parking
   url: https://www.google.com/maps/search/?api=1&query=Pine%20Restaurant&query_place_id=ChIJIcUqAKP0wokRJzfqJIeeYkA
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -615,81 +404,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–9 PM
   additionalInfo:
-  From the business: - Identifies as women-owned: true
-    Service options:
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    From the business: Identifies as women-owned
+    Service options: Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Braille menu: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-  Parking: - Paid street parking: true
+    Offerings: Alcohol, Beer, Braille menu, Cocktails, Coffee, Comfort food, Happy hour drinks, Hard liquor, Healthy options, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Parking: Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Uncle%20Peter's&query_place_id=ChIJ-RWrUqFfwokRBdK7GCBreRw
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -773,76 +505,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–9 PM
   additionalInfo:
-    From the business:
-      - Identifies as Asian-owned: true
-      - Identifies as LGBTQ+ owned: true
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great beer selection: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    From the business: Identifies as Asian-owned, Identifies as LGBTQ+ owned
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great beer selection, Great cocktails, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Organic dishes: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Parking: - Paid parking garage: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Hard liquor, Healthy options, Late-night food, Organic dishes, Quick bite, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Paid parking garage
   url: https://www.google.com/maps/search/?api=1&query=Porto%20Salvo&query_place_id=ChIJx-zorsr1wokR5a-0j2bBtPI
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -894,50 +574,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 8 AM to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-  Highlights: - Fast service: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service
+    Popular for: Lunch, Dinner, Solo dining
   Accessibility: - Wheelchair accessible parking lot: false
-    Offerings:
-      - Coffee: true
-      - Comfort food: true
-      - Healthy options: true
-      - Late-night food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-    Dining options:
-      - Breakfast: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-  Amenities: - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-  Crowd: - Groups: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - Kids' menu: true
-  Parking: - Free street parking: true
+    Offerings: Coffee, Comfort food, Healthy options, Late-night food, Quick bite, Small plates, Vegetarian options
+    Dining options: Breakfast, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Groups
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, Kids' menu
+    Parking: Free street parking
   url: https://www.google.com/maps/search/?api=1&query=Napoli's&query_place_id=ChIJ69B93D9fwokRpdmphb9tDMs
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1021,83 +670,22 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–10:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Organic dishes: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Usually difficult to find a space: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Healthy options, Late-night food, Organic dishes, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Brunch reservations recommended, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, Usually difficult to find a space
   url: https://www.google.com/maps/search/?api=1&query=VITE%20vinosteria&query_place_id=ChIJu_ZPCDlfwokRNS7856uUxDk
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1181,72 +769,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–8 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Beer: true
-      - Coffee: true
-      - Comfort food: true
-      - Healthy options: true
-      - Quick bite: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Quiet: true
-      - Romantic: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free street parking: true
-      - Usually somewhat difficult to find a space: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Beer, Coffee, Comfort food, Healthy options, Quick bite, Vegan options, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Quiet, Romantic
+    Crowd: Family-friendly, Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Parking: Free street parking, Usually somewhat difficult to find a space
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Piccolo%20Sogno&query_place_id=ChIJU8dOIc9hwokRcYOEBJXggc0
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1316,67 +852,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-    Crowd:
-      - Groups: true
-      - LGBTQ+ friendly: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Usually plenty of parking: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Late-night food, Quick bite, Small plates, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Groups, LGBTQ+ friendly
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, Usually plenty of parking
   url: https://www.google.com/maps/search/?api=1&query=Palermo&query_place_id=ChIJV1Gg2FpfwokRS6XpD37qw8E
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1429,61 +917,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 9 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-  Crowd: - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-  Parking: - Free street parking: true
+    Service options: Outdoor seating, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Small plates, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking
   url: https://www.google.com/maps/search/?api=1&query=Riviera%20Ristorante&query_place_id=ChIJM1jHAGKKwokRF7ZyZYvOiQQ
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1568,63 +1014,23 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 2–9:30 PM
   additionalInfo:
-    Service options:
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great dessert: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great dessert
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-  Amenities: - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free parking lot: true
-      - Paid street parking: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Restroom
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Family-friendly, Groups
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Parking: Free parking lot, Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Da%20Franco%20%26%20Tony%20Ristorante&query_place_id=ChIJ7WHfHVKLwokRGB9Q__vhY18
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1709,72 +1115,23 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11:30 AM–10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great wine list: true
-      - Live music: true
-      - Serves local specialty: true
-      - Sports: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great wine list, Live music, Serves local specialty, Sports
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Quick bite: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - Tourists: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
-      - Usually somewhat difficult to find a space: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Quick bite, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy
+    Crowd: Family-friendly, Groups, Tourists
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, Paid street parking, Usually somewhat difficult to find a space
   url: https://www.google.com/maps/search/?api=1&query=Sac's%20Place&query_place_id=ChIJ9yi_ITdfwokR-NlVT6D9tMw
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1828,69 +1185,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Organic dishes: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Groups: true
-      - Tourists: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Parking: - Usually somewhat difficult to find a space: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Organic dishes, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: Groups, Tourists
+    Planning: Brunch reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Usually somewhat difficult to find a space
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Vesta%20Trattoria%20%26%20Wine%20Bar&query_place_id=ChIJGc-LBklfwokR4pON1Ije2Ls
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -1943,71 +1255,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 1 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-  Parking: - Free parking lot: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Parking: Free parking lot
   url: https://www.google.com/maps/search/?api=1&query=Armondo's%20Italian%20Resturant&query_place_id=ChIJt_uMBQdfwokRHQ0oIx2-9XI
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2059,36 +1319,15 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 7 AM to 8 PM
   additionalInfo:
-    Service options:
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-  Accessibility: - Wheelchair accessible entrance: true
-    Offerings:
-      - Alcohol: true
-      - Coffee: true
-      - Comfort food: true
-      - Quick bite: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-  Children: - Good for kids: true
+    Service options: No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance
+    Offerings: Alcohol, Coffee, Comfort food, Quick bite, Wine
+    Dining options: Lunch, Dinner, Dessert
+    Atmosphere: Casual, Cozy
+    Payments: Credit cards, Debit cards
+    Children: Good for kids
   url: https://www.google.com/maps/search/?api=1&query=Giovanna's%20Kitchen%2C%20Inc&query_place_id=ChIJ_evdIQ6LwokRDeECmeiUAmM
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2141,78 +1380,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 11:30 AM to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Groups: true
-      - Tourists: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Lunch reservations recommended: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - On-site parking: true
-      - Usually plenty of parking: true
-      - Valet parking: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Late-night food, Private dining room, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups, Tourists
+    Planning: Brunch reservations recommended, Lunch reservations recommended, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, On-site parking, Usually plenty of parking, Valet parking
   url: https://www.google.com/maps/search/?api=1&query=Trattoria%2035&query_place_id=ChIJv58SiHSKwokRhxrcu3o_zfw
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2372,70 +1552,23 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 4–10:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Fireplace: true
-      - Great cocktails: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Onsite services, Takeout, Dine-in
+    Highlights: Fast service, Fireplace, Great cocktails, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - High chairs: true
-      - Kids' menu: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Comfort food, Happy hour drinks, Hard liquor, Private dining room, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs, Kids' menu
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Via%20Trenta%20Osteria%20%26%20Wine%20Bar&query_place_id=ChIJCyZ3Zj9fwokRu-73fD6aIWA
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2492,59 +1625,18 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - Takeout: true
       - Dine-in: true
       - Delivery: false
-    Highlights:
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-  Crowd: - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free parking lot: true
-      - Free street parking: true
-      - Paid street parking: true
-      - Usually plenty of parking: true
+    Highlights: Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Wine
+    Dining options: Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs, Kids' menu
+    Parking: Free parking lot, Free street parking, Paid street parking, Usually plenty of parking
   url: https://www.google.com/maps/search/?api=1&query=Fiorentina%20Steakhouse&query_place_id=ChIJ5znu7hSLwokRLpLh1Z8dXa0
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2596,52 +1688,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 4 to 9 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great wine list: true
-    Popular for:
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great wine list
+    Popular for: Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Vegetarian options, Wine
+    Dining options: Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Parking: Free street parking, Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Figlia&query_place_id=ChIJS5UFORVfwokRKG9pzggm8Cg
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2731,74 +1791,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–2:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-      - Live music: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Late-night food: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-  Crowd: - Groups: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-      - Usually a wait: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Has changing table(s): true
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free parking lot: true
-      - Free street parking: true
-      - Usually plenty of parking: true
+    Service options: Outdoor seating, Curbside pickup, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great dessert, Great wine list, Live music, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Late-night food, Private dining room, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups
+    Planning: Brunch reservations recommended, Dinner reservations recommended, Accepts reservations, Usually a wait
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Has changing table(s), High chairs, Kids' menu
+    Parking: Free parking lot, Free street parking, Usually plenty of parking
   url: https://www.google.com/maps/search/?api=1&query=Adrienne's%20NYC&query_place_id=ChIJe4j4G9ZpwokR8CBPcLU44Sk
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.59321488768417,-73.70638644734598,13z?hl=en
   searchString: italian restaurant
@@ -2858,72 +1863,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 10 AM to 9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Locals: true
-      - Tourists: true
-      - Transgender safespace: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Locals, Tourists, Transgender safespace
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Free street parking, Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=La%20Pecora%20Bianca%20UES&query_place_id=ChIJ9YlInwlZwokRDb-WWDZkU1s
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -2982,60 +1939,22 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 3:30 PM, 5 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Groups: true
-      - Locals: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-  Parking: - Paid street parking: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: Groups, Locals
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments
+    Parking: Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=L'Osteria&query_place_id=ChIJBRyejVJZwokReyLI3g24DLU
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3094,59 +2013,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 7:30 AM to 9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
   Accessibility: - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Halal food: true
-      - Happy hour drinks: true
-      - Organic dishes: true
-      - Salad bar: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Breakfast: true
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-  Amenities: - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Parking: - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Halal food, Happy hour drinks, Organic dishes, Salad bar, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Breakfast, Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=da%20Adriano&query_place_id=ChIJU0dUbtNZwokRvLMgVDaVuA0
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3204,65 +2083,23 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 1 to 9 PM
   additionalInfo:
-  From the business: - Identifies as women-owned: true
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    From the business: Identifies as women-owned
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Beer: true
-      - Coffee: true
-      - Comfort food: true
-      - Healthy options: true
-      - Organic dishes: true
-      - Quick bite: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Gender-neutral restroom: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - Good for kids: true
-    Parking:
-      - Paid parking lot: true
-      - Paid street parking: true
-      - Usually somewhat difficult to find a space: true
+    Offerings: Beer, Coffee, Comfort food, Healthy options, Organic dishes, Quick bite, Small plates, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Gender-neutral restroom, Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids
+    Parking: Paid parking lot, Paid street parking, Usually somewhat difficult to find a space
   url: https://www.google.com/maps/search/?api=1&query=Donna%20Margherita&query_place_id=ChIJ_yzV_ulYwokRYpG_tbXMpqw
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3336,37 +2173,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 9:30 AM–9:30 PM
   additionalInfo:
-  From the business: - Identifies as women-owned: true
-    Service options:
-      - Delivery: true
-      - In-store pickup: true
-      - In-store shopping: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-  Popular for: - Solo dining: true
+    From the business: Identifies as women-owned
+    Service options: Delivery, In-store pickup, In-store shopping, Onsite services, Takeout, Dine-in
+    Popular for: Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible parking lot: false
-    Dining options:
-      - Counter service: true
-      - Dessert: true
-      - Seating: true
-    Amenities:
-      - Gender-neutral restroom: true
-      - Restroom: true
-  Crowd: - Family-friendly: true
-  Planning: - Quick visit: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - Kids' menu: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
+    Dining options: Counter service, Dessert, Seating
+    Amenities: Gender-neutral restroom, Restroom
+    Crowd: Family-friendly
+    Planning: Quick visit
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Kids' menu
+    Parking: Free street parking, Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Pastitalia&query_place_id=ChIJW1uxcSr3wokRhxS_Ai4H8GU
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3442,64 +2262,21 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Organic dishes: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Counter service: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-  Atmosphere: - Cozy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Parking:
-      - Free parking lot: true
-      - Usually plenty of parking: true
+    Offerings: Alcohol, Beer, Cocktails, Comfort food, Hard liquor, Organic dishes, Vegan options, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Counter service, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Cozy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Parking: Free parking lot, Usually plenty of parking
   url: https://www.google.com/maps/search/?api=1&query=Masseria%20East&query_place_id=ChIJfUbyZ75YwokRMi96wHTiLBA
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3558,39 +2335,18 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 11 AM to 10 PM
   additionalInfo:
-    Service options:
-      - No-contact delivery: true
-      - Delivery: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-  Highlights: - Fast service: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: No-contact delivery, Delivery, Onsite services, Takeout, Dine-in
+    Highlights: Fast service
+    Popular for: Lunch, Dinner, Solo dining
   Accessibility: - Wheelchair accessible parking lot: false
-    Offerings:
-      - Comfort food: true
-      - Quick bite: true
-      - Vegan options: true
-      - Vegetarian options: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
+    Offerings: Comfort food, Quick bite, Vegan options, Vegetarian options
+    Dining options: Lunch, Dinner, Catering
   Amenities: - Restroom: false
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-  Crowd: - Locals: true
+    Atmosphere: Casual, Cozy
+    Crowd: Locals
   Planning: - Accepts reservations: false
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - Kids' menu: true
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Kids' menu
   url: https://www.google.com/maps/search/?api=1&query=Bigoi%20Venezia&query_place_id=ChIJgdnYQcBYwokRDEGzKagrEfE
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3681,78 +2437,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11:30 AM–10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Late-night food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - College students: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-    Planning:
-      - Brunch reservations recommended: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - Credit cards: true
-  Children: - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Healthy options, Late-night food, Quick bite, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: College students, Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Brunch reservations recommended, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, Credit cards
+    Children: High chairs
+    Parking: Free street parking, Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Fumo%20Harlem&query_place_id=ChIJLe70p2X2wokReDA-X8LGqZE
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3810,55 +2508,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 PM to 12 AM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Parking: - Usually difficult to find a space: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Quick bite, Small plates, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Parking: Usually difficult to find a space
   url: https://www.google.com/maps/search/?api=1&query=Briciola%20Harlem&query_place_id=ChIJ2054MAz3wokR13Q2g5LfV_E
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -3963,76 +2626,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–3:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Organic dishes: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-    Parking:
-      - Paid street parking: true
-      - Usually somewhat difficult to find a space: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Organic dishes, Private dining room, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Paid street parking, Usually somewhat difficult to find a space
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=La%20Voglia%20NYC&query_place_id=ChIJ2Z_EuD9ZwokRB_t-ovxEzxI
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4092,72 +2703,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Sports: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Late-night food: true
-      - Organic dishes: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-  Parking: - Paid street parking: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Sports
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Late-night food, Organic dishes, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Family-friendly, Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Lex%20Restaurant&query_place_id=ChIJRS-PgqRYwokRg6Ej6VCpx2o
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4214,26 +2772,14 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 11 AM to 8 PM
   additionalInfo:
-    Service options:
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-  Highlights: - Fast service: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Offerings:
-      - Comfort food: true
-      - Quick bite: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-  Atmosphere: - Casual: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-  Parking: - Paid parking lot: true
+    Service options: Delivery, Takeout, Dine-in
+    Highlights: Fast service
+    Popular for: Lunch, Dinner, Solo dining
+    Offerings: Comfort food, Quick bite
+    Dining options: Lunch, Dinner
+    Atmosphere: Casual
+    Payments: Credit cards, Debit cards
+    Parking: Paid parking lot
   url: https://www.google.com/maps/search/?api=1&query=A%26S%20Cucina&query_place_id=ChIJU2-XmLX1wokRQt2Kd8NsckM
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4293,65 +2839,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 4:30 to 10 PM
   additionalInfo:
-    Service options:
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Organic dishes: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Gender-neutral restroom: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Groups: true
-      - Tourists: true
-    Planning:
-      - Reservations required: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Usually plenty of parking: true
+    Service options: Delivery, Takeout, Dine-in
+    Highlights: Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Organic dishes, Vegetarian options, Wine
+    Dining options: Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Gender-neutral restroom, Restroom
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups, Tourists
+    Planning: Reservations required, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, Usually plenty of parking
   url: https://www.google.com/maps/search/?api=1&query=L%E2%80%99incontro%20by%20Rocco&query_place_id=ChIJFb-9qGdfwokRi14Wngdo12o
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4441,68 +2941,22 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–4 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Healthy options: true
-      - Late-night food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Groups: true
-      - Locals: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Healthy options, Late-night food, Quick bite, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy
+    Crowd: Groups, Locals
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
   url: https://www.google.com/maps/search/?api=1&query=Bono%20Trattoria&query_place_id=ChIJNbJQ54f2wokRPxHl6aTGio0
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4562,54 +3016,21 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Takeout, Dine-in
+    Highlights: Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Late-night food: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Upscale: true
-  Crowd: - Groups: true
-    Planning:
-      - Reservations required: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - Credit cards: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Late-night food, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Upscale
+    Crowd: Groups
+    Planning: Reservations required, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, Credit cards
   url: https://www.google.com/maps/search/?api=1&query=Lusardi's&query_place_id=ChIJVdduFL9YwokRGn2EFWZDLBs
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4669,61 +3090,21 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 9 PM
   additionalInfo:
-    Service options:
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Groups: true
-      - Tourists: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Wine
+    Dining options: Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups, Tourists
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Sandro's&query_place_id=ChIJj9dKtb5YwokRHtC1_HyFZG0
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4782,69 +3163,22 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Curbside pickup, No-contact delivery, Delivery, Onsite services, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Counter service: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-    Planning:
-      - Reservations required: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - Credit cards: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Small plates, Vegan options, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Catering, Counter service, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Reservations required, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, Credit cards
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Due&query_place_id=ChIJPxCuXL5YwokR4a1zLHSjau8
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -4919,68 +3253,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Coffee: true
-      - Comfort food: true
-      - Late-night food: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegan options: true
-      - Vegetarian options: true
-    Dining options:
-      - Breakfast: true
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Counter service: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-  Amenities: - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Crowd:
-      - College students: true
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-      - Transgender safespace: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - Has changing table(s): true
-      - High chairs: true
-      - Kids' menu: true
-    Parking:
-      - Free street parking: true
-      - Usually plenty of parking: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Onsite services, Takeout, Dine-in
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Coffee, Comfort food, Late-night food, Quick bite, Small plates, Vegan options, Vegetarian options
+    Dining options: Breakfast, Brunch, Lunch, Dinner, Catering, Counter service, Dessert, Seating, Table service
+    Amenities: Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: College students, Family-friendly, Groups, LGBTQ+ friendly, Tourists, Transgender safespace
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, Has changing table(s), High chairs, Kids' menu
+    Parking: Free street parking, Usually plenty of parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Elegante%20Restaurant%20%26%20Pizzeria&query_place_id=ChIJfdftHUdowokRVbCXKo_CjlQ
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.59321488768417,-73.70638644734598,13z?hl=en
   searchString: italian restaurant
@@ -5040,59 +3325,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 4 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great wine list: true
-    Popular for:
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Hard liquor: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - Locals: true
-    Planning:
-      - Reservations required: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-  Parking: - Paid street parking: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great wine list
+    Popular for: Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Hard liquor, Vegetarian options, Wine
+    Dining options: Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Family-friendly, Groups, Locals
+    Planning: Reservations required, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=IL%20Carino%20Restaurant&query_place_id=ChIJiTxP17pYwokR0Gj0Wrd5cOg
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5168,69 +3413,22 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 11 AM–3 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Late-night food: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Breakfast: true
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Groups: true
-      - Tourists: true
-  Planning: - Usually a wait: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-  Children: - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Late-night food, Private dining room, Small plates, Vegetarian options, Wine
+    Dining options: Breakfast, Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups, Tourists
+    Planning: Usually a wait
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs
+    Parking: Free street parking, Paid street parking
   url: https://www.google.com/maps/search/?api=1&query=Uva&query_place_id=ChIJxYXIbL9YwokR7A8e89BZgGA
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5306,66 +3504,24 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 4 AM–6 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible restroom: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Tourists: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Debit cards: true
-      - NFC mobile payments: true
-    Children:
-      - High chairs: true
-      - Kids' menu: true
-  Parking: - Free street parking: true
-  Pets: - Dogs allowed outside: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Happy hour drinks, Hard liquor, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Tourists
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Debit cards, NFC mobile payments
+    Children: High chairs, Kids' menu
+    Parking: Free street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Felice%2064&query_place_id=ChIJa1dYp8JYwokRX2NCKS9MxvE
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5486,63 +3642,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 3–9:30 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great coffee: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great coffee, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-    Amenities:
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating
+    Amenities: Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
   url: https://www.google.com/maps/search/?api=1&query=Luna%20Rossa&query_place_id=ChIJO9tKSrpYwokRZQ9lHjvqcfg
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5647,72 +3760,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–4 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great wine list: true
-      - Live music: true
-      - Sports: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Hard liquor: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Counter service: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-  Parking: - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great wine list, Live music, Sports
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Hard liquor, Small plates, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Counter service, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Parking: Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Botte%20UES&query_place_id=ChIJI43xgLlYwokR9H-LXHs36gc
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5772,62 +3833,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 5 to 10 PM
   additionalInfo:
-    Service options:
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Live music: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Delivery, Takeout, Dine-in
+    Highlights: Great cocktails, Great coffee, Great dessert, Great wine list, Live music
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Groups: true
-      - Locals: true
-      - Tourists: true
-    Planning:
-      - Reservations required: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Vegetarian options, Wine
+    Dining options: Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups, Locals, Tourists
+    Planning: Reservations required, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
   url: https://www.google.com/maps/search/?api=1&query=Campagnola&query_place_id=ChIJHZRr3cBYwokRAOvPS6LgVVI
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -5903,79 +3922,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–9 PM
   additionalInfo:
-  From the business: - Identifies as women-owned: true
-    Service options:
-      - Outdoor seating: true
-      - Curbside pickup: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-      - Live music: true
-      - Serves local specialty: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Organic dishes: true
-      - Private dining room: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-      - Kids' menu: true
-    Pets:
-      - Dogs allowed: true
-      - Dogs allowed outside: true
+    From the business: Identifies as women-owned
+    Service options: Outdoor seating, Curbside pickup, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list, Live music, Serves local specialty
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Organic dishes, Private dining room, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs, Kids' menu
+    Pets: Dogs allowed, Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Finestra%20Restaurant&query_place_id=ChIJqZIo0MZYwokR91Ny6mmqVLQ
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -6034,71 +3994,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Quick bite: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Tourists: true
-  Planning: - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Parking:
-      - Free street parking: true
-      - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Quick bite, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Casual, Cozy, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Tourists
+    Planning: Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Parking: Free street parking, Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=314%20-%20pizza%2Cpasta%26cocktailbar&query_place_id=ChIJx1MYBV_3wokRjeYHCXgKrJ8
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -6158,66 +4067,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
     - day: Sunday
       hours: 12 to 10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Healthy options: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Casual: true
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-  Crowd: - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - High chairs: true
-      - Kids' menu: true
-  Parking: - Paid street parking: true
-  Pets: - Dogs allowed outside: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Healthy options, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Casual, Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: High chairs, Kids' menu
+    Parking: Paid street parking
+    Pets: Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=Bottega&query_place_id=ChIJxR4H4cFYwokRM1RXHp-Cy5s
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -6351,80 +4214,19 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–4 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - No-contact delivery: true
-      - Delivery: true
-      - Onsite services: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Fast service: true
-      - Great cocktails: true
-      - Great dessert: true
-      - Great wine list: true
-      - Live music: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
-    Accessibility:
-      - Wheelchair accessible entrance: true
-      - Wheelchair accessible parking lot: true
-      - Wheelchair accessible restroom: true
-      - Wheelchair accessible seating: true
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Happy hour drinks: true
-      - Happy hour food: true
-      - Hard liquor: true
-      - Late-night food: true
-      - Organic dishes: true
-      - Small plates: true
-      - Vegetarian options: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Catering: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Gender-neutral restroom: true
-      - Restroom: true
-      - Wi-Fi: true
-      - Free Wi-Fi: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-    Crowd:
-      - Family-friendly: true
-      - Groups: true
-      - LGBTQ+ friendly: true
-      - Transgender safespace: true
-    Planning:
-      - Reservations required: true
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
-    Children:
-      - Good for kids: true
-      - High chairs: true
-    Pets:
-      - Dogs allowed: true
-      - Dogs allowed outside: true
+    Service options: Outdoor seating, No-contact delivery, Delivery, Onsite services, Takeout, Dine-in
+    Highlights: Fast service, Great cocktails, Great dessert, Great wine list, Live music
+    Popular for: Lunch, Dinner, Solo dining
+    Accessibility: Wheelchair accessible entrance, Wheelchair accessible parking lot, Wheelchair accessible restroom, Wheelchair accessible seating
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Happy hour drinks, Happy hour food, Hard liquor, Late-night food, Organic dishes, Small plates, Vegetarian options, Wine
+    Dining options: Brunch, Lunch, Dinner, Catering, Dessert, Seating, Table service
+    Amenities: Bar onsite, Gender-neutral restroom, Restroom, Wi-Fi, Free Wi-Fi
+    Atmosphere: Cozy, Romantic, Trendy
+    Crowd: Family-friendly, Groups, LGBTQ+ friendly, Transgender safespace
+    Planning: Reservations required, Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
+    Children: Good for kids, High chairs
+    Pets: Dogs allowed, Dogs allowed outside
   url: https://www.google.com/maps/search/?api=1&query=L'Artista%20Italian%20Kitchen%20%26%20Bar&query_place_id=ChIJscGs5JD3wokRcU7HNiu5akM
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant
@@ -6514,57 +4316,20 @@ exports[`jsonToMarkdown should format real Google Maps dataset item 1`] = `
       - day: Sunday
         hours: 12–10 PM
   additionalInfo:
-    Service options:
-      - Outdoor seating: true
-      - Delivery: true
-      - Takeout: true
-      - Dine-in: true
-    Highlights:
-      - Great cocktails: true
-      - Great coffee: true
-      - Great dessert: true
-      - Great wine list: true
-    Popular for:
-      - Lunch: true
-      - Dinner: true
-      - Solo dining: true
+    Service options: Outdoor seating, Delivery, Takeout, Dine-in
+    Highlights: Great cocktails, Great coffee, Great dessert, Great wine list
+    Popular for: Lunch, Dinner, Solo dining
     Accessibility:
       - Wheelchair accessible entrance: true
       - Wheelchair accessible seating: true
       - Wheelchair accessible parking lot: false
-    Offerings:
-      - Alcohol: true
-      - Beer: true
-      - Cocktails: true
-      - Coffee: true
-      - Comfort food: true
-      - Hard liquor: true
-      - Small plates: true
-      - Wine: true
-    Dining options:
-      - Brunch: true
-      - Lunch: true
-      - Dinner: true
-      - Dessert: true
-      - Seating: true
-      - Table service: true
-    Amenities:
-      - Bar onsite: true
-      - Restroom: true
-    Atmosphere:
-      - Cozy: true
-      - Romantic: true
-      - Trendy: true
-      - Upscale: true
-  Crowd: - Groups: true
-    Planning:
-      - Dinner reservations recommended: true
-      - Accepts reservations: true
-    Payments:
-      - Credit cards: true
-      - Debit cards: true
-      - NFC mobile payments: true
-      - Credit cards: true
+    Offerings: Alcohol, Beer, Cocktails, Coffee, Comfort food, Hard liquor, Small plates, Wine
+    Dining options: Brunch, Lunch, Dinner, Dessert, Seating, Table service
+    Amenities: Bar onsite, Restroom
+    Atmosphere: Cozy, Romantic, Trendy, Upscale
+    Crowd: Groups
+    Planning: Dinner reservations recommended, Accepts reservations
+    Payments: Credit cards, Debit cards, NFC mobile payments, Credit cards
   url: https://www.google.com/maps/search/?api=1&query=Antonucci%20Cafe&query_place_id=ChIJmQKjfr5YwokRxETZofFe5hc
   searchPageUrl: https://www.google.com/maps/search/italian%20restaurant/@40.80099311231582,-73.84296222367298,13z?hl=en
   searchString: italian restaurant

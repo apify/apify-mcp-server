@@ -86,26 +86,42 @@ describe('jsonToMarkdown', () => {
 
     it('should format object object array object inline', () => {
         expect(jsonToMarkdown(
-            { additionalInfo:
-              { Service_options: [
-                  { Outdoor_seating: true },
+            { a:
+              { b: [
+                  { c: 1 },
               ] } },
-        )).toMatchInlineSnapshot('"additionalInfo: Service_options: - Outdoor_seating: true"');
+        )).toMatchInlineSnapshot(`"a: b: - c: 1"`);
     });
 
     it('should format object object array object multiline', () => {
         expect(jsonToMarkdown(
-            { additionalInfo:
-              { Service_options: [
-                  { Outdoor_seating: true },
-                  { Delivery: true },
+            { a:
+              { b: [
+                  { c: 1 },
+                  { d: 2 },
               ] } },
         )).toMatchInlineSnapshot(`
-          "additionalInfo:
-            Service_options:
-              - Outdoor_seating: true
-              - Delivery: true"
-          `);
+          "a:
+            b:
+              - c: 1
+              - d: 2"
+        `);
+    });
+
+    it('should simplify object with single property true', () => {
+        expect(jsonToMarkdown(
+            { additionalInfo:
+            { Service_options: [
+                { Outdoor_seating: true },
+            ] } },
+        )).toMatchInlineSnapshot('"additionalInfo: Service_options: Outdoor_seating"');
+        expect(jsonToMarkdown(
+            { additionalInfo:
+          { Service_options: [
+              { Outdoor_seating: true },
+              { Delivery: true },
+          ] } },
+        )).toMatchInlineSnapshot(`"additionalInfo: Service_options: Outdoor_seating, Delivery"`);
     });
 
     it('should format real Google Maps dataset item', () => {
