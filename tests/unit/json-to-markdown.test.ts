@@ -183,6 +183,21 @@ describe('jsonToMarkdown', () => {
         });
     });
 
+    it('should format more extended objects', () => {
+        expect(jsonToMarkdown(
+            { a: { b: { c: { d: { e: { f: { g: { h: 1 } } } } } } } },
+        )).toMatchInlineSnapshot(`
+          "- a:
+            - b:
+              - c:
+                - d:
+                  - e:
+                    - f:
+                      - g:
+                        - h: 1"
+        `);
+    });
+
     it('should format real Google Maps dataset item', () => {
         const jsonString = readFileSync(path.join(__dirname,
             'dataset_google-maps-extractor_2025-09-19_16-26-25-793.json'), 'utf8');

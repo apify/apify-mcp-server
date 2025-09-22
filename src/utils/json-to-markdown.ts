@@ -119,7 +119,7 @@ function serializeJson(json: JSON, pad: number): string {
             return Object.entries(json as Record<string, JSON>)
                 .filter(([key, value]) => !isEmpty(value))
                 .map(([key, value], index) => {
-                    const indentLevel = pad === 0 ? 0 : 1;
+                    const indentLevel = pad;
                     const prefix = `${getIndent(indentLevel, true)}${key}:`;
                     if (isOneLiner(value)) {
                         return `${prefix} ${serializeJson(value, -1)}`;
