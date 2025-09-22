@@ -398,7 +398,7 @@ export function createIntegrationTestsSuite(
                     limit: 5,
                 },
             });
-            const content = result.content as {text: string}[];
+            const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes(ACTOR_PYTHON_EXAMPLE))).toBe(true);
         });
 
@@ -415,7 +415,7 @@ export function createIntegrationTestsSuite(
                     limit: 100,
                 },
             });
-            const content = result.content as {text: string}[];
+            const content = result.content as { text: string }[];
             expect(content.length).toBe(1);
             const outputText = content[0].text;
 
@@ -971,6 +971,12 @@ export function createIntegrationTestsSuite(
             expect(contentById[0].text).toContain(actorName);
 
             await client.close();
+        });
+
+        it('should connect to MCP server and at least one tool is available', async () => {
+            client = await createClientFn({ tools: [ACTOR_MCP_SERVER_ACTOR_NAME] });
+            const tools = await client.listTools();
+            expect(tools.tools.length).toBeGreaterThan(0);
         });
     });
 }
