@@ -6,6 +6,7 @@ import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
+import { inputSchemaToMarkdown } from '../utils/input-schema-to-markdown.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -44,7 +45,7 @@ USAGE EXAMPLES:
                 content: [
                     { type: 'text', text: `**Actor card**:\n${details.actorCard}` },
                     { type: 'text', text: `**README:**\n${details.readme}` },
-                    { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                    { type: 'text', text: inputSchemaToMarkdown(details.inputSchema) },
                 ],
             };
         },
