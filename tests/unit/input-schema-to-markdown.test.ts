@@ -43,7 +43,7 @@ describe('inputSchemaToMarkdown', () => {
 
         const result = inputSchemaToMarkdown(schema);
         expect(result).toMatchInlineSnapshot(`
-          "# Input Schema
+          "# JSON Schema
 
           This scraper will get post and page details from Facebook pages of your choice. To try it out, just paste a Facebook Page URL and click ▷ Start. If you need any guidance, just <a href='https://blog.apify.com/scrape-facebook-posts-data/' target='_blank' rel='noopener'>follow this tutorial</a>.
 
@@ -176,7 +176,7 @@ describe('inputSchemaToMarkdown', () => {
 
         const result = inputSchemaToMarkdown(schema);
         expect(result).toMatchInlineSnapshot(`
-          "# Input Schema
+          "# JSON Schema
 
           To extract contact details from Google places, simply enter 🔍 <b>Search term</b>, add 📍 <b>Location</b>, and 💯 <b>Number of places</b> to extract. Section 🎯 <b>Filters</b> contains various extra features, filters, and sorting options. <br><br> Sections <b>with asterisk*</b> are just alternative ways to start the input (📡 Geolocation parameters, 🛰 Polygons, 🔗 URLs). They can be combined with any of the features and sorting options from the <b>Filters</b> section.
 
@@ -232,6 +232,68 @@ describe('inputSchemaToMarkdown', () => {
 
           ## \`startUrls\` optional array
           Max 300 results per search URL. Valid format for URLs contains <code>google.com/maps/</code>. This feature also supports uncommon URL formats such as: <code>google.com?cid=***</code>, <code>goo.gl/maps</code>, and custom place list URL."
+        `);
+    });
+
+    it('should format schema for rag web browser results', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                crawl: {
+                    type: 'object',
+                    properties: {
+                        httpStatusCode: {
+                            type: 'integer',
+                        },
+                        httpStatusMessage: {
+                            type: 'string',
+                        },
+                        loadedAt: {
+                            type: 'string',
+                            format: 'date-time',
+                        },
+                        uniqueKey: {
+                            type: 'string',
+                        },
+                        requestStatus: {
+                            type: 'string',
+                        },
+                    },
+                },
+                searchResult: {
+                    type: 'object',
+                },
+                metadata: {
+                    type: 'object',
+                },
+                query: {
+                    type: 'string',
+                },
+                markdown: {
+                    type: 'string',
+                    format: 'style',
+                },
+            },
+        };
+
+        const result = inputSchemaToMarkdown(schema);
+        expect(result).toMatchInlineSnapshot(`
+          "# JSON Schema
+
+          ## \`crawl\` optional object
+          ### \`httpStatusCode\` optional integer
+          ### \`httpStatusMessage\` optional string
+          ### \`loadedAt\` optional string format:date-time
+          ### \`uniqueKey\` optional string
+          ### \`requestStatus\` optional string
+
+          ## \`searchResult\` optional object
+
+          ## \`metadata\` optional object
+
+          ## \`query\` optional string
+
+          ## \`markdown\` optional string format:style"
         `);
     });
 });
