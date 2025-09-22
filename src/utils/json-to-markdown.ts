@@ -12,10 +12,36 @@ function isNotEmpty(json: JSON): boolean {
     return !isEmpty(json);
 }
 
+function typeOfJson(json: JSON): 'string' | 'number' | 'boolean' | 'object' | 'array-simple' | 'array-object' | 'array-mixed' | 'null' {
+    if (Array.isArray(json)) {
+        if (json.every((item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || item === null)) {
+            return 'array-simple';
+        }
+        if (json.every((item) => typeof item === 'object' && item !== null && !Array.isArray(item))) {
+            return 'array-object';
+        }
+        return 'array-mixed';
+    }
+    if (json === null) {
+        return 'null';
+    }
+    return typeof json as 'string' | 'number' | 'boolean' | 'object' | 'null';
+}
+
+function isOneLiner(json: JSON): boolean {
+    const type = typeOfJson(json);
+    return type === 'string' || type === 'number' || type === 'boolean' || type === 'array-simple';
+}
+
+function getIndent(pad: number, withBullet: boolean): string {
+    return ' '.repeat((pad + 1 - (withBullet ? 1 : 0)) * 2) + (withBullet ? '- ' : '');
+}
+
 export function jsonToMarkdown(json: Readonly<JSON>): string {
     const cloned = structuredClone(json) as JSON; // Copy data to avoid mutating the original object
     const simplified = simplifyJson(cloned);
-    return serializeJsonToMarkdown(simplified, 0);
+    // TODO: clear null values
+    return serializeJsonTopLevel(simplified);
 }
 
 function simplifyJson(json: JSON): JSON {
@@ -46,71 +72,96 @@ function simplifyJson(json: JSON): JSON {
     return result;
 }
 
-function serializeJsonToMarkdown(json: JSON, pad = 0): string {
-    if (typeof json === 'string' || typeof json === 'number' || typeof json === 'boolean') {
-        return String(json);
-    }
-
-    if (json === null) {
-        return ''; // Ignore null
-    }
-
-    // Trivial array will be just list like 1, 2, 3
-    if (Array.isArray(json)) {
-        if (json.length === 0) {
-            return ''; // Ignore empty arrays
-        }
-        if (json.every((item) => typeof item === 'string' || typeof item === 'number' || typeof item === 'boolean' || item === null)) {
-            // Null in array is ignored
-            return json.filter(isNotEmpty).join(', ');
-        }
-
-        // Advanced array will use bullets
-        const indent = ' '.repeat(pad * 2);
-        const singleLine = json.length === 1 && json.every((item) => {
-            const content = serializeJsonToMarkdown(item, 0);
-            return !content.includes('\n');
-        });
-        if (singleLine) {
-            // For single-item arrays with simple content, don't add indent
-            return json.filter(isNotEmpty)
-                .map((value) => {
-                    const content = serializeJsonToMarkdown(value, 0);
-                    return `- ${content}`;
-                })
-                .join(' ');
-        }
-        return json.filter(isNotEmpty)
-            .map((value, index) => {
-                const content = serializeJsonToMarkdown(value, 0);
-                const lines = content.split('\n');
-                if (lines.length === 1) {
-                    return `${indent}- ${lines[0]}`;
+function serializeJsonTopLevel(json: JSON): string {
+    switch (typeOfJson(json)) {
+        case 'string':
+        case 'number':
+        case 'boolean':
+            return String(json);
+        case 'null':
+            return '';
+        case 'object':
+            return serializeJson(json, 0);
+        case 'array-simple':
+        case 'array-mixed':
+            return serializeJson(json, 0);
+        case 'array-object':
+            return (json as JSON[]).map((unknownItem, index) => {
+                const item = unknownItem as Record<string, object>;
+                let title;
+                if (item.title) {
+                    title = `${index + 1}. ${item.title}`;
+                    delete item.title;
+                } else if (item.name) {
+                    title = `${index + 1}. ${item.name}`;
+                    delete item.name;
+                } else {
+                    title = `${index + 1}. Item`;
                 }
-                // Special case for top-level arrays to match expected inconsistent indentation
-                const nestedIndent = pad === 0 ? ' '.repeat(index === 0 ? 3 : 2) : ' '.repeat(pad * 2 + 2);
-                return `${indent}- ${lines[0]}\n${lines.slice(1).map((line) => nestedIndent + line).join('\n')}`;
-            })
-            .join('\n');
+
+                let result = '';
+                result += `## ${title}\n`;
+                result += serializeJson(unknownItem, 0);
+                return result;
+            }).join('\n\n');
+        default:
+            return serializeJson(json, 0);
     }
+}
 
-    const indent = ' '.repeat(pad * 2);
-
-    // Objects will be like key: value
-    return Object.entries(json)
-        .filter(([_, value]) => isNotEmpty(value))
-        .map(([key, value]) => {
-            const valueStr = serializeJsonToMarkdown(value, pad + 1);
-            if ((Array.isArray(value) && valueStr.includes('\n'))
-                || (!Array.isArray(value) && typeof value === 'object' && value !== null && valueStr.includes('\n'))) {
-                // Multi-line arrays or objects in objects should be on new lines with proper indentation
-                return `${indent}${key}:\n${valueStr}`;
-            }
-            // For inline values, don't add indent if we're in a nested context or if current object has single property with simple value
-            const currentObjectHasSingleProperty = Object.keys(json).length === 1;
-            const valueIsSimple = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
-            const keyIndent = (pad > 0 && ((typeof value === 'object' && value !== null) || (currentObjectHasSingleProperty && valueIsSimple))) ? '' : indent;
-            return `${keyIndent}${key}: ${valueStr}`;
-        })
-        .join('\n');
+function serializeJson(json: JSON, pad: number): string {
+    switch (typeOfJson(json)) {
+        case 'string':
+        case 'number':
+        case 'boolean':
+            return pad === 0 ? getIndent(pad, true) + String(json) : String(json);
+        case 'object':
+            return Object.entries(json as Record<string, JSON>)
+                .filter(([key, value]) => !isEmpty(value))
+                .map(([key, value], index) => {
+                    const indentLevel = pad === 0 ? 0 : 1;
+                    const prefix = `${getIndent(indentLevel, true)}${key}:`;
+                    if (isOneLiner(value)) {
+                        return `${prefix} ${serializeJson(value, -1)}`;
+                    }
+                    return `${prefix}\n${serializeJson(value, pad + 1)}`;
+                })
+                .join('\n');
+        case 'array-simple':
+            return `${(json as JSON[]).filter(isNotEmpty).join(', ')}`;
+        case 'array-mixed':
+            return (json as JSON[]).filter(isNotEmpty).map((unknownItem) => {
+                const itemType = typeOfJson(unknownItem);
+                if (itemType === 'array-simple' || itemType === 'array-object') {
+                    return `- ${serializeJson(unknownItem, -1)}`;
+                }
+                if (itemType === 'object') {
+                    return Object.entries(unknownItem as Record<string, JSON>)
+                        .filter(([key, value]) => !isEmpty(value))
+                        .map(([key, value], index) => {
+                            const prefix = `${getIndent(pad, index === 0)}${key}:`;
+                            if (isOneLiner(value)) {
+                                return `${prefix} ${serializeJson(value, -1)}`;
+                            }
+                            return `${prefix}\n${serializeJson(value, pad + 1)}`;
+                        })
+                        .join('\n');
+                }
+                return serializeJson(unknownItem, pad);
+            }).join('\n');
+        case 'array-object':
+            return (json as JSON[]).filter(isNotEmpty).map((unknownItem) => {
+                return Object.entries(unknownItem as Record<string, JSON>)
+                    .filter(([key, value]) => !isEmpty(value))
+                    .map(([key, value], index) => {
+                        const indentLevel = pad === 1 ? 1 : pad;
+                        const withBullet = pad === 1 ? index === 0 : true;
+                        return `${getIndent(indentLevel, withBullet)}${key}: ${serializeJson(value, -1)}`;
+                    }).join('\n');
+            }).join('\n');
+        case 'null':
+            return '';
+        default:
+            throw new Error(`Unknown type: ${typeof json}`);
+    }
 }
