@@ -1,4 +1,4 @@
-type JSON = string | number | boolean | null | JSON[] | { [key: string]: JSON };
+type JSON = string | number | boolean | null | JSON[] | object;
 
 function isEmpty(json: JSON): boolean {
     return (
@@ -74,17 +74,12 @@ function simplifyJson(json: JSON): JSON {
 
 function serializeJsonTopLevel(json: JSON): string {
     switch (typeOfJson(json)) {
+        case 'null':
+            return '';
         case 'string':
         case 'number':
         case 'boolean':
             return String(json);
-        case 'null':
-            return '';
-        case 'object':
-            return serializeJson(json, 0);
-        case 'array-simple':
-        case 'array-mixed':
-            return serializeJson(json, 0);
         case 'array-object':
             return (json as JSON[]).map((unknownItem, index) => {
                 const item = unknownItem as Record<string, object>;
@@ -117,8 +112,8 @@ function serializeJson(json: JSON, pad: number): string {
             return pad === 0 ? getIndent(pad, true) + String(json) : String(json);
         case 'object':
             return Object.entries(json as Record<string, JSON>)
-                .filter(([key, value]) => !isEmpty(value))
-                .map(([key, value], index) => {
+                .filter(([_key, value]) => !isEmpty(value))
+                .map(([key, value]) => {
                     const indentLevel = pad;
                     const prefix = `${getIndent(indentLevel, true)}${key}:`;
                     if (isOneLiner(value)) {
@@ -137,7 +132,7 @@ function serializeJson(json: JSON, pad: number): string {
                 }
                 if (itemType === 'object') {
                     return Object.entries(unknownItem as Record<string, JSON>)
-                        .filter(([key, value]) => !isEmpty(value))
+                        .filter(([_key, value]) => !isEmpty(value))
                         .map(([key, value], index) => {
                             const prefix = `${getIndent(pad, index === 0)}${key}:`;
                             if (isOneLiner(value)) {
@@ -152,7 +147,7 @@ function serializeJson(json: JSON, pad: number): string {
         case 'array-object':
             return (json as JSON[]).filter(isNotEmpty).map((unknownItem) => {
                 return Object.entries(unknownItem as Record<string, JSON>)
-                    .filter(([key, value]) => !isEmpty(value))
+                    .filter(([_key, value]) => !isEmpty(value))
                     .map(([key, value], index) => {
                         const indentLevel = pad === 1 ? 1 : pad;
                         const withBullet = pad === 1 ? index === 0 : true;

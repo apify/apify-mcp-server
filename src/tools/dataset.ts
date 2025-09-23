@@ -6,7 +6,6 @@ import { HelperTools } from '../const.js';
 import type { InternalTool, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
-import { jsonSchemaToMarkdown } from '../utils/json-schema-to-markdown.js';
 import { jsonToMarkdown } from '../utils/json-to-markdown.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 
@@ -178,7 +177,7 @@ export const getDatasetSchema: ToolEntry = {
             return {
                 content: [{
                     type: 'text',
-                    text: jsonSchemaToMarkdown(schema),
+                    text: JSON.stringify(schema), // TODO: jsonSchemaToMarkdown don't have implemented array support
                 }],
             };
         },

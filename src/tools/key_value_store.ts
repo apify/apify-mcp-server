@@ -31,7 +31,7 @@ export const getKeyValueStore: ToolEntry = {
             const parsed = getKeyValueStoreArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const store = await client.keyValueStore(parsed.storeId).get();
-            return { content: [{ type: 'text', text: jsonToMarkdown(store) }] };
+            return { content: [{ type: 'text', text: store ? jsonToMarkdown(store) : 'Value not found' }] };
         },
     } as InternalTool,
 };
@@ -105,7 +105,7 @@ export const getKeyValueStoreRecord: ToolEntry = {
             const parsed = getKeyValueStoreRecordArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
-            return { content: [{ type: 'text', text: jsonToMarkdown(record) }] };
+            return { content: [{ type: 'text', text: record ? jsonToMarkdown(record) : 'Value not found' }] };
         },
     } as InternalTool,
 };

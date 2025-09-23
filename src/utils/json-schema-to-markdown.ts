@@ -1,10 +1,10 @@
-import type { IActorInputSchema } from '../types';
+import type { IActorInputSchema, ISchemaProperties } from '../types';
 
 function visibleEmpty(value: string) {
     return value === '' ? '<empty>' : value;
 }
 
-function formatProperty(key: string, value: any, requiredFields: Set<string>, level = 2): string {
+function formatProperty(key: string, value: ISchemaProperties, requiredFields: Set<string>, level = 2): string {
     const isRequired = requiredFields.has(key);
     const requiredText = isRequired ? 'required' : 'optional';
 
@@ -53,7 +53,7 @@ function formatProperty(key: string, value: any, requiredFields: Set<string>, le
 }
 
 export function jsonSchemaToMarkdown(inputSchema: IActorInputSchema) {
-    const requiredFields = new Set(inputSchema.required || []);
+    const requiredFields = new Set(Array.isArray(inputSchema.required) ? inputSchema.required : []);
 
     let markdown = '# JSON Schema';
     if (inputSchema.description) {
@@ -62,7 +62,7 @@ export function jsonSchemaToMarkdown(inputSchema: IActorInputSchema) {
     }
     markdown += '\n\n'; // Add blank line after title/description
 
-    const properties = Object.entries(inputSchema.properties);
+    const properties = inputSchema.properties ? Object.entries(inputSchema.properties) : [];
     for (let i = 0; i < properties.length; i++) {
         const [key, value] = properties[i];
         markdown += formatProperty(key, value, requiredFields);

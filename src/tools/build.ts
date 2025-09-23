@@ -8,6 +8,7 @@ import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
+    IActorInputSchema,
     InternalTool,
     ISchemaProperties,
     ToolEntry,
@@ -132,7 +133,7 @@ export const actorDefinitionTool: ToolEntry = {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                 v.input.properties = shortenProperties(properties);
             }
-            return { content: [{ type: 'text', text: jsonSchemaToMarkdown(v.input) }] };
+            return { content: [{ type: 'text', text: jsonSchemaToMarkdown((v.input || {}) as IActorInputSchema) }] };
         },
     } as InternalTool,
 };

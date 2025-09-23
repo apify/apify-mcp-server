@@ -17,7 +17,7 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, IActorInputSchema, ToolEntry } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
@@ -389,7 +389,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                             client = await connectMCPClient(mcpServerUrl, apifyToken);
                             const toolsResponse = await client.listTools();
 
-                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\n\n${jsonSchemaToMarkdown(tool.inputSchema)}`,
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\n\n${jsonSchemaToMarkdown(tool.inputSchema as IActorInputSchema)}`,
                             ).join('\n\n');
 
                             return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
@@ -479,7 +479,7 @@ The step parameter enforces this workflow - you cannot call an Actor without fir
                     if (errors && errors.length > 0) {
                         return buildMCPResponse([
                             `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}`,
-                            jsonSchemaToMarkdown(actor.tool.inputSchema),
+                            jsonSchemaToMarkdown(actor.tool.inputSchema as IActorInputSchema),
                         ]);
                     }
                 }

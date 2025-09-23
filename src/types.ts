@@ -19,6 +19,7 @@ export interface ISchemaProperties {
     enumTitles?: string[]; // Array of string titles for the enum
     default?: unknown;
     prefill?: unknown;
+    format?: string;
 
     items?: ISchemaProperties;
     editor?: string;

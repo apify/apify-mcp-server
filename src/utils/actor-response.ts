@@ -1,5 +1,5 @@
 import type { CallActorGetDatasetResult } from '../tools/actor.js';
-import { jsonSchemaToMarkdown } from './json-schema-to-markdown.js';
+import { jsonToMarkdown } from './json-to-markdown.js';
 
 /**
  * Builds the response content for Actor tool calls.
@@ -38,8 +38,9 @@ Results summary:
 
 Actor output data schema:
 * You can use this schema to understand the structure of the output data and, for example, retrieve specific fields based on your current task.
-
-${jsonSchemaToMarkdown(displaySchema)}
+\`\`\`json
+${JSON.stringify(displaySchema, null, 2)}
+\`\`\`
 
 Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
 
@@ -47,7 +48,7 @@ If you need to retrieve additional data, use the "get-actor-output" tool with: d
 `;
 
     const itemsPreviewText = result.previewItems.length > 0
-        ? JSON.stringify(result.previewItems)
+        ? jsonToMarkdown(result.previewItems)
         : `No items available for preview—either the Actor did not return any items or they are too large for preview. In this case, use the "get-actor-output" tool.`;
 
     // Build content array
