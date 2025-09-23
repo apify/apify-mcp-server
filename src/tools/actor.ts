@@ -420,7 +420,7 @@ EXAMPLES:
                         }
                         const content = [
                             // TODO: update result to say: this is result of info step, you must now call again with step=call and proper input
-                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                            { type: 'text', text: `# Input Schema: \n${JSON.stringify(details.inputSchema, null, 0)}` },
                         ];
                         /**
                          * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.

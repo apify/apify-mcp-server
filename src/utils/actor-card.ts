@@ -45,11 +45,12 @@ export function formatActorToActorCard(
 
     // Build the markdown lines
     const markdownLines = [
-        `# [${actor.title}](${APIFY_STORE_URL}/${actorFullName}) (${actorFullName})`,
-        `**Developed by:** ${actor.username} ${actor.username === 'apify' ? '(Apify)' : '(community)'}`,
-        `**Description:** ${actor.description || 'No description provided.'}`,
-        `**Categories:** ${formattedCategories.length ? formattedCategories.join(', ') : 'Uncategorized'}`,
-        `**Pricing:** ${pricingInfo}`,
+        `## ${actor.title} (\`${actorFullName}\`)`,
+        `- **URL:** ${APIFY_STORE_URL}/${actorFullName}`,
+        `- **Developed by:** [${actor.username}](${APIFY_STORE_URL}) ${actor.username === 'apify' ? '(Apify)' : '(community)'}`,
+        `- **Description:** ${actor.description || 'No description provided.'}`,
+        `- **Categories:** ${formattedCategories.length ? formattedCategories.join(', ') : 'Uncategorized'}`,
+        `- **Pricing:** ${pricingInfo}`,
     ];
 
     // Add stats - handle different stat structures
@@ -111,7 +112,6 @@ export function formatActorsListToActorCard(actors: (Actor | ExtendedActorStoreL
         return [];
     }
     return actors.map((actor) => {
-        const card = formatActorToActorCard(actor);
-        return `- ${card}`;
+        return formatActorToActorCard(actor);
     });
 }

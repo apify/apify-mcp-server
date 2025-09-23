@@ -42,9 +42,9 @@ USAGE EXAMPLES:
             }
             return {
                 content: [
-                    { type: 'text', text: `**Actor card**:\n${details.actorCard}` },
-                    { type: 'text', text: `**README:**\n${details.readme}` },
-                    { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                    { type: 'text', text: `# Actor information\n${details.actorCard}` },
+                    { type: 'text', text: `# README\n${details.readme}` },
+                    { type: 'text', text: `# Input schema\n${JSON.stringify(details.inputSchema, null, 0)}` },
                 ],
             };
         },

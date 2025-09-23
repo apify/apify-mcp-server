@@ -104,9 +104,12 @@ USAGE EXAMPLES:
                 content: [
                     {
                         type: 'text',
-                        text: `**Search query:** ${parsed.search}\n\n`
-                              + `**Number of Actors found:** ${actorCards.length}\n\n`
-                              + `**Actor cards:**\n${actorCards.join('\n\n')}`,
+                        text: `
+**Search query:** ${parsed.search}
+**Number of Actors found:** ${actorCards.length}
+**Actor cards:**
+
+${actorCards.join('\n\n')}`,
                     },
                 ],
             };
