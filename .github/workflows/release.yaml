@@ -142,9 +142,10 @@ jobs:
                     cp manifest.json mcpb/manifest.json
                     cp docs/apify-logo.png mcpb/icon.png
             - name: Create MCPB package
-              run: npx -y @anthropic-ai/mcpb pack mcpb/ actors-mcp-server.dxt
+              # fix version of anthropic-ai/mcpb to 1.1.1 so that we have a reproducible build
+              run: npx -y @anthropic-ai/mcpb@1.1.1 pack mcpb/ apify-mcp-server.mcpb
             - name: Copy MCPB package
-              run: cp actors-mcp-server.dxt apify-mcp-server.dxt
+              run: cp apify-mcp-server.mcpb apify-mcp-server.mcpb
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:
@@ -153,8 +154,8 @@ jobs:
                   target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
                   body: ${{ needs.release_metadata.outputs.release_notes }}
                   files: |
-                       actors-mcp-server.dxt
-                       apify-mcp-server.dxt
+                       apify-mcp-server.mcpb
+                       actors-mcp-server.mcpb
 
     publish_to_npm:
         name: Publish to NPM
