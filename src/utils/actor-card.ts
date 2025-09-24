@@ -20,7 +20,7 @@ function formatCategories(categories?: string[]): string[] {
 }
 
 /**
- * Formats Actor details into an Actor card (Actor markdown representation).
+ * Formats Actor details into an Actor card (Actor information in markdown).
  * @param actor - Actor information from the API
  * @returns Formatted actor card
  */
