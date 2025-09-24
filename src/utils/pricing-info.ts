@@ -55,7 +55,7 @@ function convertMinutesToGreatestUnit(minutes: number): { value: number; unit: s
  */
 
 function payPerEventPricingToString(pricingPerEvent: ExtendedPricingInfo['pricingPerEvent']): string {
-    if (!pricingPerEvent || !pricingPerEvent.actorChargeEvents) return 'No event pricing information available.';
+    if (!pricingPerEvent || !pricingPerEvent.actorChargeEvents) return 'Pricing information for events is not available.';
     const eventStrings: string[] = [];
     for (const event of Object.values(pricingPerEvent.actorChargeEvents)) {
         let eventStr = `\t- **${event.eventTitle}**: ${event.eventDescription} `;
@@ -78,7 +78,7 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
     // If there is no pricing infos entries the Actor is free to use
     // based on https://github.com/apify/apify-core/blob/058044945f242387dde2422b8f1bef395110a1bf/src/packages/actor/src/paid_actors/paid_actors_common.ts#L691
     if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
-        return 'User pays for the computing resources consumed by the Actor';
+        return 'This Actor is free to use. You are only charged for Apify platform usage.';
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
         const customUnitName = pricingInfo.unitName !== 'result' ? pricingInfo.unitName : '';
@@ -98,12 +98,12 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
             const tiers = Object.entries(pricingInfo.tieredPricing)
                 .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd} per month`)
                 .join(', ');
-            return `This Actor is rental and thus has tiered pricing per month: ${tiers}, with a trial period of ${value} ${unit}.`;
+            return `This Actor is rental and has tiered pricing per month: ${tiers}, with a trial period of ${value} ${unit}.`;
         }
-        return `This Actor is rental and thus has a flat price of ${pricingInfo.pricePerUnitUsd} USD per month, with a trial period of ${value} ${unit}.`;
+        return `This Actor is rental and has a flat price of ${pricingInfo.pricePerUnitUsd} USD per month, with a trial period of ${value} ${unit}.`;
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
         return payPerEventPricingToString(pricingInfo.pricingPerEvent);
     }
-    return 'Not available';
+    return 'Pricing information is not available.';
 }

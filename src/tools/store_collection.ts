@@ -5,7 +5,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
-import { formatActorsListToActorCard } from '../utils/actor-card.js';
+import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 
 export async function searchActorsByKeywords(
@@ -99,7 +99,12 @@ USAGE EXAMPLES:
                 parsed.offset,
             );
             actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-            const actorCards = formatActorsListToActorCard(actors);
+            const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
+
+            const actorsText = actorCards.length
+                ? actorCards.join('\n\n')
+                : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
+
             return {
                 content: [
                     {
@@ -111,7 +116,7 @@ USAGE EXAMPLES:
 
 # Actors:
 
-${actorCards.join('\n\n')}`,
+${actorsText}`,
                     },
                 ],
             };

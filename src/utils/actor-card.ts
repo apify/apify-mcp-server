@@ -102,17 +102,3 @@ export function formatActorToActorCard(
     }
     return markdownLines.join('\n');
 }
-
-/**
- * Formats a list of Actors into Actor cards
- * @param actors - Array of Actor information
- * @returns Formatted markdown string
- */
-export function formatActorsListToActorCard(actors: (Actor | ExtendedActorStoreList)[]): string[] {
-    if (actors.length === 0) {
-        return [];
-    }
-    return actors.map((actor) => {
-        return formatActorToActorCard(actor);
-    });
-}
