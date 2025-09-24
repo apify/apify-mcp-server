@@ -42,15 +42,16 @@ export function formatActorToActorCard(
     }
 
     const actorFullName = `${actor.username}/${actor.name}`;
+    const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
 
     // Build the markdown lines
     const markdownLines = [
-        `## ${actor.title} (\`${actorFullName}\`)`,
-        `- **URL:** ${APIFY_STORE_URL}/${actorFullName}`,
-        `- **Developed by:** [${actor.username}](${APIFY_STORE_URL}) ${actor.username === 'apify' ? '(Apify)' : '(community)'}`,
+        `## [${actor.title}](${actorUrl}) (\`${actorFullName}\`)`,
+        `- **URL:** ${actorUrl}`,
+        `- **Developed by:** [${actor.username}](${APIFY_STORE_URL}/${actor.username}) ${actor.username === 'apify' ? '(Apify)' : '(community)'}`,
         `- **Description:** ${actor.description || 'No description provided.'}`,
         `- **Categories:** ${formattedCategories.length ? formattedCategories.join(', ') : 'Uncategorized'}`,
-        `- **Pricing:** ${pricingInfo}`,
+        `- **[Pricing](${actorUrl}/pricing):** ${pricingInfo}`,
     ];
 
     // Add stats - handle different stat structures
@@ -81,18 +82,18 @@ export function formatActorToActorCard(
         }
 
         if (statsParts.length > 0) {
-            markdownLines.push(`**Stats:** ${statsParts.join(', ')}`);
+            markdownLines.push(`- **Stats:** ${statsParts.join(', ')}`);
         }
     }
 
     // Add rating if available (ActorStoreList only)
     if ('actorReviewRating' in actor && actor.actorReviewRating) {
-        markdownLines.push(`**Rating:** ${actor.actorReviewRating.toFixed(2)} out of 5`);
+        markdownLines.push(`- **Rating:** ${actor.actorReviewRating.toFixed(2)} out of 5`);
     }
 
     // Add modification date if available
     if ('modifiedAt' in actor) {
-        markdownLines.push(`**Last modified:** ${actor.modifiedAt.toISOString()}`);
+        markdownLines.push(`- **Last modified:** ${actor.modifiedAt.toISOString()}`);
     }
 
     // Add deprecation warning if applicable

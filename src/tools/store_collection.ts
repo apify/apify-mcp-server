@@ -105,9 +105,11 @@ USAGE EXAMPLES:
                     {
                         type: 'text',
                         text: `
-**Search query:** ${parsed.search}
-**Number of Actors found:** ${actorCards.length}
-**Actor cards:**
+# Search results:
+- **Search query:** ${parsed.search}
+- **Number of Actors found:** ${actorCards.length}
+
+# Actors:
 
 ${actorCards.join('\n\n')}`,
                     },

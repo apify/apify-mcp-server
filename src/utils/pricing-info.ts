@@ -41,11 +41,24 @@ function convertMinutesToGreatestUnit(minutes: number): { value: number; unit: s
     return { value: Math.floor(minutes / (60 * 24)), unit: 'days' };
 }
 
+/**
+ * Formats the pay-per-event pricing information into a human-readable string.
+ *
+ * Example:
+ * This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:
+ *         - Event title: Event description (Flat price: $X per event)
+ *         - MCP server startup: Initial fee for starting the Kiwi MCP Server Actor (Flat price: $0.1 per event)
+ *         - Flight search: Fee for searching flights using the Kiwi.com flight search engine (Flat price: $0.001 per event)
+ *
+ * For tiered pricing, the output is more complicated and the question is whether we want to simplify it in the future.
+ * @param pricingPerEvent
+ */
+
 function payPerEventPricingToString(pricingPerEvent: ExtendedPricingInfo['pricingPerEvent']): string {
     if (!pricingPerEvent || !pricingPerEvent.actorChargeEvents) return 'No event pricing information available.';
     const eventStrings: string[] = [];
     for (const event of Object.values(pricingPerEvent.actorChargeEvents)) {
-        let eventStr = `- ${event.eventTitle}: ${event.eventDescription} `;
+        let eventStr = `\t- **${event.eventTitle}**: ${event.eventDescription} `;
         if (typeof event.eventPriceUsd === 'number') {
             eventStr += `(Flat price: $${event.eventPriceUsd} per event)`;
         } else if (event.eventTieredPricingUsd) {
@@ -58,14 +71,14 @@ function payPerEventPricingToString(pricingPerEvent: ExtendedPricingInfo['pricin
         }
         eventStrings.push(eventStr);
     }
-    return `This Actor charges per event as follows:\n${eventStrings.join('\n')}`;
+    return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${eventStrings.join('\n')}`;
 }
 
 export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): string {
     // If there is no pricing infos entries the Actor is free to use
     // based on https://github.com/apify/apify-core/blob/058044945f242387dde2422b8f1bef395110a1bf/src/packages/actor/src/paid_actors/paid_actors_common.ts#L691
     if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
-        return 'This Actor is free to use; the user only pays for the computing resources consumed by the Actor.';
+        return 'User pays for the computing resources consumed by the Actor';
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
         const customUnitName = pricingInfo.unitName !== 'result' ? pricingInfo.unitName : '';
@@ -92,5 +105,5 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
         return payPerEventPricingToString(pricingInfo.pricingPerEvent);
     }
-    return 'unknown';
+    return 'Not available';
 }
