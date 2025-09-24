@@ -1,8 +1,8 @@
 <h1 align="center">
     <a href="https://mcp.apify.com">
         <picture>
-            <source media="(prefers-color-scheme: dark)" srcset="docs/apify_mcp_server_dark_background.png">
-            <img alt="Apify MCP Server" src="docs/apify_mcp_server_white_background.png" width="500">
+            <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_dark_background.png">
+            <img alt="Apify MCP Server" src="https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify_mcp_server_white_background.png" width="500">
         </picture>
     </a>
     <br>
@@ -16,7 +16,7 @@
     <a href="https://apify.com/apify/actors-mcp-server"><img src="https://apify.com/actor-badge?actor=apify/actors-mcp-server" alt="Actor runs" style="max-width: 100%;"></a>
 </p>
 
-The Apify Model Context Protocol (MCP) Server at **mcp.apify.com** instantly connects AI applications and agents to thousands of ready‑built tools. It allows your AI assistant to use any [Apify Actor](https://apify.com/store) for web scraping, data extraction, and automation tasks in real time.
+The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, or any other website using thousands of ready-made scrapers, crawlers, and automation tools available on the Apify Store.
 
 > **🚀 Try the hosted Apify MCP Server!**
 >
