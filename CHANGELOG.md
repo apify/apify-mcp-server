@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-24)
+
+### 🐛 Bug Fixes
+
+- Actorized MCP servers have 30 seconds timeout to connect ([#272](https://github.com/apify/apify-mcp-server/pull/272)) ([cdffc3e](https://github.com/apify/apify-mcp-server/commit/cdffc3e80bcd3cd1410e4d8d7edf3e58c4202a37)) by [@MichalKalita](https://github.com/MichalKalita), closes [#250](https://github.com/apify/apify-mcp-server/issues/250)
+- Actor card markdown ([#285](https://github.com/apify/apify-mcp-server/pull/285)) ([73e3115](https://github.com/apify/apify-mcp-server/commit/73e3115b86466e268048590102fecffeaf5f7d86)) by [@jirispilka](https://github.com/jirispilka), closes [#286](https://github.com/apify/apify-mcp-server/issues/286)
+
+
 ## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-19)
 
 
