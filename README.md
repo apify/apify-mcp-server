@@ -58,8 +58,7 @@ For example, it can:
 You can use the Apify MCP Server in two ways:
 
 **HTTPS Endpoint (mcp.apify.com)**: Connect from your MCP client via OAuth or by including the `Authorization: Bearer <APIFY_TOKEN>` header in your requests. This is the recommended method for most use cases. Because it supports OAuth, you can connect from clients like [Claude.ai](https://claude.ai) or [Visual Studio Code](https://code.visualstudio.com/) using just the URL: `https://mcp.apify.com`.
-- `https://mcp.apify.com` (recommended) for streamable transport
-- `https://mcp.apify.com/sse` for legacy SSE transport
+- `https://mcp.apify.com` streamable transport
 
 **Standard Input/Output (stdio)**: Ideal for local integrations and command-line tools like the Claude for Desktop client.
 - Set the MCP client server command to `npx @apify/actors-mcp-server` and the `APIFY_TOKEN` environment variable to your Apify API token.
