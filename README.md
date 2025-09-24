@@ -310,7 +310,7 @@ Changes must be synchronized between both.
 
 To create a canary release, add the `beta` tag to your PR branch.
 This publishes the package to [pkg.pr.new](https://pkg.pr.new/) for staging and testing before merging.
-See [the workflow file](.github/workflows/pre_release.yaml) for details.
+See [the workflow file](.github/workflows/beta_release.yaml) for details.
 
 ## 🐋 Docker Hub integration
 The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, be sure to test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
