@@ -132,18 +132,20 @@ jobs:
                     npm ci
             -   name: Build module
                 run: npm run build
-            - name: Prepare DXT package
+            - name: Prepare MCPB package
               run: |
-                    mkdir dxt
-                    cp -r node_modules dxt/node_modules
-                    cp -r dist dxt/dist
-                    cp -r docs dxt/docs
-                    cp package.json dxt/package.json
-                    cp manifest.json dxt/manifest.json
-            - name: Create DXT package
-              run: npx -y @anthropic-ai/dxt pack dxt/ actors-mcp-server.dxt
-            - name: Copy DXT package
-              run: cp actors-mcp-server.dxt apify-mcp-server.dxt
+                    mkdir mcpb
+                    cp -r node_modules mcpb/node_modules
+                    cp -r dist mcpb/dist
+                    cp -r docs mcpb/docs
+                    cp package.json mcpb/package.json
+                    cp manifest.json mcpb/manifest.json
+                    cp docs/apify-logo.png mcpb/icon.png
+            - name: Create MCPB package
+              # fix version of anthropic-ai/mcpb to 1.1.1 so that we have a reproducible build
+              run: npx -y @anthropic-ai/mcpb@1.1.1 pack mcpb/ apify-mcp-server.mcpb
+            - name: Copy MCPB package
+              run: cp apify-mcp-server.mcpb apify-mcp-server.mcpb
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:
@@ -152,8 +154,8 @@ jobs:
                   target_commitish: ${{ needs.update_changelog.outputs.changelog_commitish }}
                   body: ${{ needs.release_metadata.outputs.release_notes }}
                   files: |
-                       actors-mcp-server.dxt
-                       apify-mcp-server.dxt
+                       apify-mcp-server.mcpb
+                       actors-mcp-server.mcpb
 
     publish_to_npm:
         name: Publish to NPM
