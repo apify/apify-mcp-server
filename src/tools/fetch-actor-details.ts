@@ -40,13 +40,23 @@ USAGE EXAMPLES:
                     content: [{ type: 'text', text: `Actor information for '${parsed.actor}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
                 };
             }
-            return {
-                content: [
-                    { type: 'text', text: `**Actor card**:\n${details.actorCard}` },
-                    { type: 'text', text: `**README:**\n${details.readme}` },
-                    { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
-                ],
-            };
+
+            const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+            // Add link to README title
+            details.readme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
+
+            const content = [
+                { type: 'text', text: `# Actor information\n${details.actorCard}` },
+                { type: 'text', text: `${details.readme}` },
+            ];
+
+            // Include input schema if it has properties
+            if (details.inputSchema.properties || Object.keys(details.inputSchema.properties).length !== 0) {
+                content.push({ type: 'text', text: `# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema, null, 0)}\n\`\`\`` });
+            }
+            // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
+            // This allows better formatting in the final output
+            return { content };
         },
     } as InternalTool,
 };
