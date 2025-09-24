@@ -405,7 +405,7 @@ EXAMPLES:
                             }
                             const toolsResponse = await client.listTools();
 
-                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput Schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
                             ).join('\n\n');
 
                             return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
@@ -420,7 +420,7 @@ EXAMPLES:
                         }
                         const content = [
                             // TODO: update result to say: this is result of info step, you must now call again with step=call and proper input
-                            { type: 'text', text: `**Input Schema:**\n${JSON.stringify(details.inputSchema, null, 0)}` },
+                            { type: 'text', text: `Input schema: \n${JSON.stringify(details.inputSchema, null, 0)}` },
                         ];
                         /**
                          * Add Skyfire instructions also in the info step since clients are most likely truncating the long tool description of the call-actor.
@@ -499,7 +499,7 @@ EXAMPLES:
                     if (errors && errors.length > 0) {
                         return buildMCPResponse([
                             `Input validation failed for Actor '${actorName}': ${errors.map((e) => e.message).join(', ')}`,
-                            `Input Schema:\n${JSON.stringify(actor.tool.inputSchema)}`,
+                            `Input schema:\n${JSON.stringify(actor.tool.inputSchema)}`,
                         ]);
                     }
                 }
