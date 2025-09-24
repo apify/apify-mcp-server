@@ -145,7 +145,7 @@ jobs:
               # fix version of anthropic-ai/mcpb to 1.1.1 so that we have a reproducible build
               run: npx -y @anthropic-ai/mcpb@1.1.1 pack mcpb/ apify-mcp-server.mcpb
             - name: Copy MCPB package
-              run: cp apify-mcp-server.mcpb apify-mcp-server.mcpb
+              run: cp apify-mcp-server.mcpb actors-mcp-server.mcpb
             - name: Create release
               uses: softprops/action-gh-release@v2
               with:

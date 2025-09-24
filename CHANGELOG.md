@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-24)
+## [0.4.15](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-24)
 
 ### 🐛 Bug Fixes
 
@@ -10,24 +10,9 @@ All notable changes to this project will be documented in this file.
 - Actor card markdown ([#285](https://github.com/apify/apify-mcp-server/pull/285)) ([73e3115](https://github.com/apify/apify-mcp-server/commit/73e3115b86466e268048590102fecffeaf5f7d86)) by [@jirispilka](https://github.com/jirispilka), closes [#286](https://github.com/apify/apify-mcp-server/issues/286)
 - Change dxt to mcpb in release cicd ([#281](https://github.com/apify/apify-mcp-server/pull/281)) ([150ff39](https://github.com/apify/apify-mcp-server/commit/150ff392ef987281a629f35e1e392b9073481be9)) by [@MQ37](https://github.com/MQ37)
 
-
-## [0.4.15](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.15) (2025-09-19)
-
-### 🐛 Bug Fixes
-
-- Mcpb&#x2F;dxt release cicd ([0553677](https://github.com/apify/apify-mcp-server/commit/055367712480292078c6b09cbf952fe63c08f33f))
-
-
 ## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-24)
 
 ### 🐛 Bug Fixes
-
-- Actorized MCP servers have 30 seconds timeout to connect ([#272](https://github.com/apify/apify-mcp-server/pull/272)) ([cdffc3e](https://github.com/apify/apify-mcp-server/commit/cdffc3e80bcd3cd1410e4d8d7edf3e58c4202a37)) by [@MichalKalita](https://github.com/MichalKalita), closes [#250](https://github.com/apify/apify-mcp-server/issues/250)
-- Actor card markdown ([#285](https://github.com/apify/apify-mcp-server/pull/285)) ([73e3115](https://github.com/apify/apify-mcp-server/commit/73e3115b86466e268048590102fecffeaf5f7d86)) by [@jirispilka](https://github.com/jirispilka), closes [#286](https://github.com/apify/apify-mcp-server/issues/286)
-
-
-## [0.4.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.14) (2025-09-19)
-
 
 ## [0.4.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.13) (2025-09-19)
 
