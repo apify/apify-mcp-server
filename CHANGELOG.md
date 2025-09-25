@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.17) (2025-09-25)
+
+### 🚀 Features
+
+- Improve README.md ([#291](https://github.com/apify/apify-mcp-server/pull/291)) ([27d41d1](https://github.com/apify/apify-mcp-server/commit/27d41d163b9301e3a7619cd630b7acbb79f9c5e8)) by [@jancurn](https://github.com/jancurn)
+
+
 ## [0.4.16](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.16) (2025-09-24)
 
 ### 🐛 Bug Fixes
