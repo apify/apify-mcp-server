@@ -278,6 +278,8 @@ export function shortenEnum(enumList: string[]): string[] | undefined {
 
 /**
  * Shortens the description, enum, and items.enum properties of the schema properties.
+ * This is mostly problem with compass/crawler-google-places, which has large number of categories
+ * such as ( 'abbey', 'accountant', 'accounting',  'acupuncturist', .... )
  * @param properties
  */
 export function shortenProperties(properties: { [key: string]: ISchemaProperties }): {

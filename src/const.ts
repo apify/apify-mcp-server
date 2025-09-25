@@ -1,9 +1,8 @@
 // Actor input const
 export const ACTOR_README_MAX_LENGTH = 5_000;
-export const ACTOR_ENUM_MAX_LENGTH = 200;
+// Actor enum property max length, we need to make sure that most of the enum values fit into the input (such as geocodes)
+export const ACTOR_ENUM_MAX_LENGTH = 2000;
 export const ACTOR_MAX_DESCRIPTION_LENGTH = 500;
-
-export const ACTOR_RUN_DATASET_OUTPUT_MAX_ITEMS = 5;
 
 // Actor run const
 export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of memory, free users can't run actors-mcp-server and requested Actor
