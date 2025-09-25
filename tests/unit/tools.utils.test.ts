@@ -356,7 +356,8 @@ describe('shortenProperties', () => {
 
     it('should shorten enum values if they exceed the limit', () => {
         // Create an enum with many values to exceed the character limit
-        const enumValues = Array.from({ length: 50 }, (_, i) => `enum-value-${i}`);
+        const value = 'enum-value-';
+        const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
         const properties: Record<string, ISchemaProperties> = {
             prop1: {
                 type: 'string',
@@ -371,7 +372,7 @@ describe('shortenProperties', () => {
         // Check that enum was shortened
         expect(result.prop1.enum).toBeDefined();
         if (result.prop1.enum) {
-            expect(result.prop1.enum.length).toBeLessThan(30);
+            expect(result.prop1.enum.length).toBeLessThan(enumValues.length);
             const totalEnumLen = result.prop1.enum.reduce((sum, v) => sum + v.length, 0);
             expect(totalEnumLen).toBeLessThanOrEqual(ACTOR_ENUM_MAX_LENGTH);
 
@@ -385,7 +386,8 @@ describe('shortenProperties', () => {
 
     it('should shorten items.enum values if they exceed the limit', () => {
         // Create an enum with many values to exceed the character limit
-        const enumValues = Array.from({ length: 50 }, (_, i) => `enum-value-${i}`);
+        const value = 'enum-value-';
+        const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
         const properties: Record<string, ISchemaProperties> = {
             prop1: {
                 type: 'array',
@@ -889,8 +891,8 @@ describe('inferArrayItemsTypeIfMissing', () => {
 describe('shortenEnum', () => {
     it('shorten enum list', () => {
         const enumList: string[] = [];
-        const wordLength = 10;
-        const wordCount = 30;
+        const wordLength = 100;
+        const wordCount = ACTOR_ENUM_MAX_LENGTH / wordLength + 1; // exceed the limit
 
         for (let i = 0; i < wordCount; i++) {
             enumList.push('a'.repeat(wordLength));
