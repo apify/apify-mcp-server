@@ -82,7 +82,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get data of my last Actor run
 - user_input: Get number_of_likes from my dataset
-- user_input: Return only crawl.statusCode and url from dataset 8TtYhCwKzQeQk7dJx
+- user_input: Return only crawl.statusCode and url from dataset aab123
 
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
         inputSchema: zodToJsonSchema(getActorOutputArgs),

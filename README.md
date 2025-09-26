@@ -26,7 +26,7 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 >
 > It supports OAuth, so you can connect from clients like Claude.ai or Visual Studio Code with just the URL.
 
-![Apify-MCP-server](docs/actors-mcp-server.png)
+![Apify-MCP-server](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-mcp-server.png)
 
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
