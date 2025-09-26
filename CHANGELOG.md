@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.18](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.18) (2025-09-26)
+
+### 🚀 Features
+
+- Add server.json for official MCP registry ([#276](https://github.com/apify/apify-mcp-server/pull/276)) ([f9a23e1](https://github.com/apify/apify-mcp-server/commit/f9a23e1e19b24e6b363f1fbf9377a122a5fdba19)) by [@vystrcild](https://github.com/vystrcild)
+
+### 🐛 Bug Fixes
+
+- Increase ACTOR_ENUM_MAX_LENGTH from 200 to 2000 to ensure that geocode are not removed ([#292](https://github.com/apify/apify-mcp-server/pull/292)) ([9969960](https://github.com/apify/apify-mcp-server/commit/99699601fd19950ff782f3ce1e9423b3bfb9c9d3)) by [@jirispilka](https://github.com/jirispilka)
+- Provide better output. Fix datasetId in examples ([#293](https://github.com/apify/apify-mcp-server/pull/293)) ([4f28d9b](https://github.com/apify/apify-mcp-server/commit/4f28d9bc76e45bd7699541eb5fd81cc9c9e77ba2)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.4.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.17) (2025-09-25)
 
 ### 🚀 Features
