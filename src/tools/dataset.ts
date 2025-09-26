@@ -55,7 +55,7 @@ USAGE:
 - Use when you need dataset metadata to understand its structure before fetching items.
 
 USAGE EXAMPLES:
-- user_input: Show info for dataset 8TtYhCwKzQeQk7dJx
+- user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
         inputSchema: zodToJsonSchema(getDatasetArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
@@ -90,7 +90,7 @@ USAGE:
 - Use when you need to read data from a dataset (all items or only selected fields).
 
 USAGE EXAMPLES:
-- user_input: Get first 100 items from dataset 8TtYhCwKzQeQk7dJx
+- user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
         inputSchema: zodToJsonSchema(getDatasetItemsArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
@@ -152,7 +152,7 @@ USAGE:
 - Use when you need to infer the structure of dataset items for downstream processing or validation.
 
 USAGE EXAMPLES:
-- user_input: Generate schema for dataset 8TtYhCwKzQeQk7dJx using 10 items
+- user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
         inputSchema: zodToJsonSchema(getDatasetSchemaArgs),
         ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
