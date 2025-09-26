@@ -1,0 +1,25 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "com.apify/apify-mcp-server",
+  "description": "Extract data from any website using thousands of web automation tools from the Apify Store.",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/apify/apify-mcp-server",
+    "source": "github"
+  },
+  "version": "0.4.17",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.apify.com/",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Apify API token for authentication with Apify platform services. For example 'Bearer <apify-api-token>'",
+          "is_required": true,
+          "is_secret": true
+        }
+      ]
+    }
+  ]
+}

@@ -47,7 +47,6 @@ All notable changes to this project will be documented in this file.
 
 - Duplicate skyfire description when listing tools multiple times ([#277](https://github.com/apify/apify-mcp-server/pull/277)) ([aecc147](https://github.com/apify/apify-mcp-server/commit/aecc147e31a01d4fbab90930fd1c5682f96274b6)) by [@MQ37](https://github.com/MQ37)
 
-
 ## [0.4.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.10) (2025-09-15)
 
 ### 🚀 Features
