@@ -12,8 +12,9 @@ import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { Input, ToolCategory, ToolEntry } from '../types.js';
+import type { Input, InternalTool, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
 import { getExpectedToolsByCategories } from './tools.js';
+import { ValidateFunction } from 'ajv';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
 let INTERNAL_TOOL_BY_NAME_CACHE: Map<string, ToolEntry> | null = null;
@@ -139,5 +140,37 @@ export async function loadToolsFromInput(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    return result.filter((entry) => !seen.has(entry.tool.name) && seen.add(entry.tool.name));
+    const filtered = result.filter((entry) => !seen.has(entry.tool.name) && seen.add(entry.tool.name));
+    
+    // TODO: rework this solition as it was quickly hacked together for hotfix
+    // Deep clone except ajvValidate and call functions
+    
+    // holds the original functions of the tools
+    const toolFunctions = new Map<string, { ajvValidate?: ValidateFunction<unknown>; call?: (args: InternalToolArgs) => Promise<object> }>();
+    for (const entry of filtered) {
+        if (entry.type === 'internal') {
+            toolFunctions.set(entry.tool.name, { ajvValidate: entry.tool.ajvValidate, call: (entry.tool as InternalTool).call });
+        } else {
+            toolFunctions.set(entry.tool.name, { ajvValidate: entry.tool.ajvValidate });
+        }
+    }
+
+    const cloned = JSON.parse(JSON.stringify(filtered, (key, value) => {
+        if (key === 'ajvValidate' || key === 'call') return undefined;
+        return value;
+    })) as ToolEntry[];
+    
+    // restore the original functions
+    for (const entry of cloned) {
+        const funcs = toolFunctions.get(entry.tool.name);
+        if (funcs) {
+            if (funcs.ajvValidate) {
+                entry.tool.ajvValidate = funcs.ajvValidate;
+            }
+            if (entry.type === 'internal' && funcs.call) {
+                (entry.tool as InternalTool).call = funcs.call;
+            }
+        }
+    }
+    return cloned;
 }
