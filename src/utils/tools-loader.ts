@@ -3,6 +3,7 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ApifyClient } from 'apify';
 
@@ -14,6 +15,7 @@ import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import type { Input, InternalTool, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
+import { doesMcpClientSupportDynamicTools } from './mcp-clients.js';
 import { getExpectedToolsByCategories } from './tools.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -39,6 +41,7 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
+    initializeRequestData?: InitializeRequest,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -68,6 +71,14 @@ export async function loadToolsFromInput(
             }
 
             const categoryTools = toolCategories[selector as ToolCategory];
+
+            // Handler client capabilities logic for 'actors' category to swap call-actor for add-actor
+            // if client supports dynamic tools.
+            if (selector === 'actors' && doesMcpClientSupportDynamicTools(initializeRequestData)) {
+                internalSelections.push(...categoryTools.filter((t) => t.tool.name !== 'call-actor'));
+                internalSelections.push(addTool);
+                continue;
+            }
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
