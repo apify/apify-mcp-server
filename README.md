@@ -71,7 +71,6 @@ You can find detailed instructions for setting up the MCP server in the [Apify d
 To interact with the Apify MCP server, you can use various MCP clients, such as:
 - [Claude Desktop](https://claude.ai/download)
 - [Visual Studio Code](https://code.visualstudio.com/)
-- [LibreChat](https://www.librechat.ai/)
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - Other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
 - More clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
@@ -83,7 +82,7 @@ With MCP server integrated, you can ask your AI assistant things like:
 - "Provide a step-by-step guide on using the Model Context Protocol, including source URLs."
 - "What Apify Actors can I use?"
 
-### Supported Clients Matrix
+### Supported clients matrix
 
 The following table outlines the tested MCP clients and their level of support for key features.
 
@@ -92,12 +91,19 @@ The following table outlines the tested MCP clients and their level of support f
 | **Claude.ai (web)** | ✅ Full | |
 | **Claude Desktop** | 🟡 Partial | Tools may need to be reloaded manually in the client. |
 | **VS Code (Genie)** | ✅ Full | |
-| **LibreChat** | ❓ Untested | |
 | **Apify Tester MCP Client** | ✅ Full | Designed for testing Apify MCP servers. |
 
-*This matrix is a work in progress. If you have tested other clients, please consider contributing to this documentation.*
+Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients. Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.
 
-# 🪄 Try Apify MCP Instantly
+**Smart tool selection based on client capabilities:**
+
+When the `actors` tool category is requested, the server intelligently selects the most appropriate Actor-related tools based on the client's capabilities:
+
+- **Clients with dynamic tool support** (e.g., Claude.ai web, VS Code Genie): The server provides the `add-actor` tool instead of `call-actor`. This allows for a better user experience where users can dynamically discover and add new Actors as tools during their conversation.
+
+- **Clients with limited dynamic tool support** (e.g., Claude Desktop): The server provides the standard `call-actor` tool along with other Actor category tools, ensuring compatibility while maintaining functionality.
+
+# 🪄 Try Apify MCP instantly
 
 Want to try Apify MCP without any setup?
 
@@ -172,6 +178,8 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 > **Note:**
 >
+> When using the `actors` tool category, clients that support dynamic tool discovery (like Claude.ai web and VS Code) automatically receive the `add-actor` tool instead of `call-actor` for enhanced Actor discovery capabilities.
+
 > The `get-actor-output` tool is automatically included with any Actor-related tool, such as `call-actor`, `add-actor`, or any specific Actor tool like `apify-slash-rag-web-browser`. When you call an Actor - either through the `call-actor` tool or directly via an Actor tool (e.g., `apify-slash-rag-web-browser`) - you receive a preview of the output. The preview depends on the Actor's output format and length; for some Actors and runs, it may include the entire output, while for others, only a limited version is returned to avoid overwhelming the LLM. To retrieve the full output of an Actor run, use the `get-actor-output` tool (supports limit, offset, and field filtering) with the `datasetId` provided by the Actor call.
 
 ### Tools configuration
