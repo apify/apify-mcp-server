@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.20) (2025-09-30)
+
+### 🐛 Bug Fixes
+
+- Comment out skyfire input schema modification ([#296](https://github.com/apify/apify-mcp-server/pull/296)) ([86077f0](https://github.com/apify/apify-mcp-server/commit/86077f046036f2d58ac6d2ed527a06448c943497)) by [@jirispilka](https://github.com/jirispilka)
+- Deep clone tools before modifying descriptions for skyfire to prevent state incostentcy ([#297](https://github.com/apify/apify-mcp-server/pull/297)) ([02945f9](https://github.com/apify/apify-mcp-server/commit/02945f9ad0bb68c587d6d7fdbb196f71cd44f894)) by [@MQ37](https://github.com/MQ37)
+- Revert skyfire schema comment ([#298](https://github.com/apify/apify-mcp-server/pull/298)) ([b87d32c](https://github.com/apify/apify-mcp-server/commit/b87d32c7a7fa49193c9ba76350e268585a645ee0)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.19](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.19) (2025-09-27)
 
 ### 🚀 Features
