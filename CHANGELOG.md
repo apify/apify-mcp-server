@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.21](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.21) (2025-10-01)
+
+### 🚀 Features
+
+- Swap call-actor with add-actor for actors tool category for supported clients ([#299](https://github.com/apify/apify-mcp-server/pull/299)) ([f8c2f2d](https://github.com/apify/apify-mcp-server/commit/f8c2f2df29b51424af8ae005ade123ec1a89b582)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.20) (2025-09-30)
 
 ### 🐛 Bug Fixes
