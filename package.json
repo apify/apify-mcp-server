@@ -47,7 +47,7 @@
     "apify-client": "^2.12.6",
     "cheerio": "^1.1.2",
     "express": "^4.21.2",
-    "mcp-client-capabilities": "^0.0.4",
+    "mcp-client-capabilities": "^0.0.5",
     "to-json-schema": "^0.2.5",
     "turndown": "^7.2.0",
     "yargs": "^17.7.2",
