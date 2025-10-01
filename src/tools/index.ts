@@ -11,6 +11,7 @@ import { getHtmlSkeleton } from './get-html-skeleton.js';
 import { addTool } from './helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './key_value_store.js';
 import { getUserKeyValueStoresList } from './key_value_store_collection.js';
+import { getMcpDevSummitSchedule } from './mcp-dev-summit-schedule.js';
 import { getActorRun, getActorRunLog } from './run.js';
 import { getUserRunsList } from './run_collection.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
@@ -48,10 +49,14 @@ export const toolCategories = {
     dev: [
         getHtmlSkeleton,
     ],
+    mcpDevSummit: [
+        getMcpDevSummitSchedule,
+    ]
 };
 export const toolCategoriesEnabledByDefault: ToolCategory[] = [
     'actors',
     'docs',
+    'mcpDevSummit'
 ];
 
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
