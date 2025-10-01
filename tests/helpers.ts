@@ -12,6 +12,7 @@ export interface McpClientOptions {
     enableAddingActors?: boolean;
     tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
+    clientName?: string; // Client name for identification
 }
 
 export async function createMcpSseClient(
@@ -45,7 +46,7 @@ export async function createMcpSseClient(
     );
 
     const client = new Client({
-        name: 'sse-client',
+        name: options?.clientName || 'sse-client',
         version: '1.0.0',
     });
     await client.connect(transport);
@@ -84,7 +85,7 @@ export async function createMcpStreamableClient(
     );
 
     const client = new Client({
-        name: 'streamable-http-client',
+        name: options?.clientName || 'streamable-http-client',
         version: '1.0.0',
     });
     await client.connect(transport);
@@ -134,7 +135,7 @@ export async function createMcpStdioClient(
         env,
     });
     const client = new Client({
-        name: 'stdio-client',
+        name: options?.clientName || 'stdio-client',
         version: '1.0.0',
     });
     await client.connect(transport);

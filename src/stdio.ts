@@ -117,11 +117,11 @@ async function main() {
     };
 
     // Normalize (merges actors into tools for backward compatibility)
-    const normalized = processInput(input);
+    const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalized, apifyClient);
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient);
 
     mcpServer.upsertTools(tools);
 

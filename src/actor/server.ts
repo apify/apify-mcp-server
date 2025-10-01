@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -154,7 +155,7 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer({ setupSigintHandler: false });
+                const mcpServer = new ActorsMcpServer({ setupSigintHandler: false, initializeRequestData: req.body as InitializeRequest });
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;

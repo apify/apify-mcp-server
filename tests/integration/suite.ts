@@ -978,5 +978,16 @@ export function createIntegrationTestsSuite(
             const tools = await client.listTools();
             expect(tools.tools.length).toBeGreaterThan(0);
         });
+
+        it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools', async () => {
+            client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['actors'] });
+            const names = getToolNames(await client.listTools());
+
+            // should not contain call-actor but should contain add-actor
+            expect(names).not.toContain('call-actor');
+            expect(names).toContain('add-actor');
+
+            await client.close();
+        });
     });
 }

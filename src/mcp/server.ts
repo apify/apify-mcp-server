@@ -5,6 +5,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -52,6 +53,7 @@ interface ActorsMcpServerOptions {
      * Switch to enable Skyfire agentic payment mode.
      */
     skyfireMode?: boolean;
+    initializeRequestData?: InitializeRequest;
 }
 
 /**
@@ -230,7 +232,7 @@ export class ActorsMcpServer {
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient);
+        const tools = await processParamsGetTools(url, apifyClient, this.options.initializeRequestData);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
