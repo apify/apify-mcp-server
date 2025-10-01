@@ -51,12 +51,12 @@ export const toolCategories = {
     ],
     mcpDevSummit: [
         getMcpDevSummitSchedule,
-    ]
+    ],
 };
 export const toolCategoriesEnabledByDefault: ToolCategory[] = [
     'actors',
     'docs',
-    'mcpDevSummit'
+    'mcpDevSummit',
 ];
 
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
