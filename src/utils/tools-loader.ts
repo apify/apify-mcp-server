@@ -9,7 +9,7 @@ import type { ApifyClient } from 'apify';
 
 import log from '@apify/log';
 
-import { defaults } from '../const.js';
+import { defaults, HelperTools } from '../const.js';
 import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
@@ -75,7 +75,7 @@ export async function loadToolsFromInput(
             // Handler client capabilities logic for 'actors' category to swap call-actor for add-actor
             // if client supports dynamic tools.
             if (selector === 'actors' && doesMcpClientSupportDynamicTools(initializeRequestData)) {
-                internalSelections.push(...categoryTools.filter((t) => t.tool.name !== 'call-actor'));
+                internalSelections.push(...categoryTools.filter((t) => t.tool.name !== HelperTools.ACTOR_CALL));
                 internalSelections.push(addTool);
                 continue;
             }
