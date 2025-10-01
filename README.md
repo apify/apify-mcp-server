@@ -112,7 +112,7 @@ Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-cli
 This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
 Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
-Or use the Anthropic Desktop extension file (dxt) for one-click installation: [Apify MCP server dxt file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.dxt)
+Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
 
 # 🛠️ Tools, resources, and prompts
 
