@@ -461,6 +461,13 @@ EXAMPLES:
                     return buildMCPResponse([`Input is required when step="call". Please provide the input parameter based on the Actor's input schema.`]);
                 }
 
+                // Handle the case where LLM does not respect instructions when calling MCP server Actors
+                // and does not provide the tool name.
+                const isMcpToolNameInvalid = mcpToolName === undefined || mcpToolName.trim().length === 0;
+                if (isActorMcpServer && isMcpToolNameInvalid) {
+                    return buildMCPResponse([`When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`]);
+                }
+
                 // Handle MCP tool calls
                 if (mcpToolName) {
                     if (!isActorMcpServer) {
