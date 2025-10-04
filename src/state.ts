@@ -5,6 +5,8 @@ import {
     APIFY_DOCS_CACHE_TTL_SECS,
     GET_HTML_SKELETON_CACHE_MAX_SIZE,
     GET_HTML_SKELETON_CACHE_TTL_SECS,
+    MCP_DEV_SUMMIT_SCHEDULE_CACHE_MAX_SIZE,
+    MCP_DEV_SUMMIT_SCHEDULE_CACHE_TTL_SECS,
     MCP_SERVER_CACHE_MAX_SIZE,
     MCP_SERVER_CACHE_TTL_SECS,
 } from './const.js';
@@ -18,8 +20,13 @@ export const fetchApifyDocsCache = new TTLLRUCache<string>(APIFY_DOCS_CACHE_MAX_
 /** Stores HTML content per URL so we can paginate the tool output */
 export const getHtmlSkeletonCache = new TTLLRUCache<string>(GET_HTML_SKELETON_CACHE_MAX_SIZE, GET_HTML_SKELETON_CACHE_TTL_SECS);
 /**
- * Stores MCP server resolution per actor:
- * - false: not an MCP server
- * - string: MCP server URL
- */
+  * Stores MCP server resolution per actor:
+  * - false: not an MCP server
+  * - string: MCP server URL
+  */
 export const mcpServerCache = new TTLLRUCache<boolean | string>(MCP_SERVER_CACHE_MAX_SIZE, MCP_SERVER_CACHE_TTL_SECS);
+
+/**
+ * Stores MCP Dev Summit schedule data
+ */
+export const mcpDevSummitScheduleCache = new TTLLRUCache<string[]>(MCP_DEV_SUMMIT_SCHEDULE_CACHE_MAX_SIZE, MCP_DEV_SUMMIT_SCHEDULE_CACHE_TTL_SECS);
