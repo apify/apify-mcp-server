@@ -44,6 +44,7 @@ import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { processParamsGetTools } from './utils.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -654,19 +655,11 @@ export class ActorsMcpServer {
                     }
                 }
             } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    log.error('Apify API error calling tool', { toolName: name, error });
-                    return {
-                        content: [
-                            { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },
-                        ],
-                    };
-                }
-                log.error('Error calling tool', { toolName: name, error });
-                throw new McpError(
-                    ErrorCode.InternalError,
-                    `An error occurred while calling the tool.`,
-                );
+                log.error('Error occurred while calling tool', { toolName: name, error });
+                const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+                return buildMCPResponse([
+                    `Error calling tool ${name}: ${errorMessage}`,
+                ]);
             }
 
             const msg = `Unknown tool: ${name}`;
