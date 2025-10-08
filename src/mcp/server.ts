@@ -21,7 +21,7 @@ import {
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import { type ActorCallOptions, ApifyApiError } from 'apify-client';
+import { type ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
@@ -39,6 +39,7 @@ import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } f
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
@@ -654,19 +655,11 @@ export class ActorsMcpServer {
                     }
                 }
             } catch (error) {
-                if (error instanceof ApifyApiError) {
-                    log.error('Apify API error calling tool', { toolName: name, error });
-                    return {
-                        content: [
-                            { type: 'text', text: `Apify API error calling tool ${name}: ${error.message}` },
-                        ],
-                    };
-                }
-                log.error('Error calling tool', { toolName: name, error });
-                throw new McpError(
-                    ErrorCode.InternalError,
-                    `An error occurred while calling the tool.`,
-                );
+                log.error('Error occurred while calling tool', { toolName: name, error });
+                const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+                return buildMCPResponse([
+                    `Error calling tool ${name}: ${errorMessage}`,
+                ]);
             }
 
             const msg = `Unknown tool: ${name}`;
