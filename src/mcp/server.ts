@@ -39,10 +39,9 @@ import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } f
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { cloneToolEntry } from '../utils/tools.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { getToolPublicFieldOnly } from '../utils/tools.js';
+import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -269,10 +268,9 @@ export class ActorsMcpServer {
                 if (wrap.type === 'actor'
                     || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
                     || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
-                    
                     // Clone the tool before modifying it to avoid affecting shared objects
                     const clonedWrap = cloneToolEntry(wrap);
-                    
+
                     // Add Skyfire instructions to description if not already present
                     if (!clonedWrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         clonedWrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
@@ -287,7 +285,7 @@ export class ActorsMcpServer {
                             };
                         }
                     }
-                    
+
                     // Store the cloned and modified tool
                     this.tools.set(clonedWrap.tool.name, clonedWrap);
                 } else {
