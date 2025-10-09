@@ -15,7 +15,6 @@ export async function searchActorsByKeywords(
     offset: number | undefined = undefined,
     skyfirePayId: string | undefined = undefined,
 ): Promise<ExtendedActorStoreList[]> {
-
     /**
      * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
      */
