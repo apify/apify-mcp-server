@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.23](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.23) (2025-10-09)
+
+### 🐛 Bug Fixes
+
+- Call-actor mcp with invalid tool name ([#303](https://github.com/apify/apify-mcp-server/pull/303)) ([6f2e5c3](https://github.com/apify/apify-mcp-server/commit/6f2e5c3d27d066c03ac2418dcff6a72964b054b4)) by [@MQ37](https://github.com/MQ37)
+- Simplify error handling and return the error message for all errors ([#306](https://github.com/apify/apify-mcp-server/pull/306)) ([4512904](https://github.com/apify/apify-mcp-server/commit/45129041ebbfc048c09ca411c9e9ac0ede80c37e)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.21](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.21) (2025-10-01)
 
 ### 🚀 Features
