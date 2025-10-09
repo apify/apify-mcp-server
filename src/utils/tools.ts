@@ -27,3 +27,27 @@ export function getExpectedToolsByCategories(categories: ToolCategory[]): ToolEn
 export function getExpectedToolNamesByCategories(categories: ToolCategory[]): string[] {
     return getExpectedToolsByCategories(categories).map((tool) => tool.tool.name);
 }
+
+/**
+ * Creates a deep copy of a tool entry, preserving functions like ajvValidate and call
+ * while cloning all other properties to avoid shared state mutations.
+ */
+export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
+    // Store the original functions
+    const originalAjvValidate = toolEntry.tool.ajvValidate;
+    const originalCall = (toolEntry.tool as any).call;
+
+    // Create a deep copy using JSON serialization (excluding functions)
+    const cloned = JSON.parse(JSON.stringify(toolEntry, (key, value) => {
+        if (key === 'ajvValidate' || key === 'call') return undefined;
+        return value;
+    })) as ToolEntry;
+
+    // Restore the original functions
+    cloned.tool.ajvValidate = originalAjvValidate;
+    if (toolEntry.type === 'internal' && originalCall) {
+        (cloned.tool as any).call = originalCall;
+    }
+
+    return cloned;
+}
