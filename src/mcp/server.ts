@@ -30,6 +30,7 @@ import {
     HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
+    SKYFIRE_ACTOR_SEARCH_INSTRUCTIONS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
@@ -272,7 +273,12 @@ export class ActorsMcpServer {
                     || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
                     || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
                     // Add Skyfire instructions to description if not already present
-                    if (!wrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
+                    if (wrap.type === 'internal' && wrap.tool.name === HelperTools.STORE_SEARCH) {
+                        // Add description
+                        if (!wrap.tool.description.includes(SKYFIRE_ACTOR_SEARCH_INSTRUCTIONS)) {
+                            wrap.tool.description += `\n\n${SKYFIRE_ACTOR_SEARCH_INSTRUCTIONS}`;
+                        }
+                    } else if (!wrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         wrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
                     }
                     // Add skyfire-pay-id property if not present

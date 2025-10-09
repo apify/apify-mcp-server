@@ -3,7 +3,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools, SKYFIRE_ACTOR_SEARCH_INSTRUCTIONS } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
@@ -13,11 +13,17 @@ export async function searchActorsByKeywords(
     apifyToken: string,
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
-    allowsAgenticUsers: boolean | undefined = undefined,
+    skyfirePayId: string | undefined = undefined,
 ): Promise<ExtendedActorStoreList[]> {
-    const client = new ApifyClient({ token: apifyToken });
+
+    /**
+     * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+     */
+    const client = skyfirePayId
+        ? new ApifyClient({ skyfirePayId })
+        : new ApifyClient({ token: apifyToken });
     const storeClient = client.store();
-    if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
+    if (skyfirePayId) storeClient.params = { ...storeClient.params, allowsAgenticUsers: true };
 
     const results = await storeClient.list({ search, limit, offset });
     return results.items;
@@ -96,12 +102,28 @@ USAGE EXAMPLES:
         call: async (toolArgs) => {
             const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
+
+            /**
+             * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+             * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+             */
+            if (apifyMcpServer.options.skyfireMode
+                && args['skyfire-pay-id'] === undefined
+            ) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: SKYFIRE_ACTOR_SEARCH_INSTRUCTIONS,
+                    }],
+                };
+            }
+
             let actors = await searchActorsByKeywords(
                 parsed.search,
                 apifyToken,
                 parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
-                apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
+                apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string' ? args['skyfire-pay-id'] : undefined, // // skyfirePayId
             );
             actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
             const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
