@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.24](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.24) (2025-10-09)
+
+### 🐛 Bug Fixes
+
+- Clone also the internal tools for skyfire mode ([#308](https://github.com/apify/apify-mcp-server/pull/308)) ([60e20cf](https://github.com/apify/apify-mcp-server/commit/60e20cfc97b301d4c9704656761cfaf7232a7333)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.23](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.23) (2025-10-09)
 
 ### 🐛 Bug Fixes
