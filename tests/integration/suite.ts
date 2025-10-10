@@ -4,7 +4,7 @@ import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelc
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify-client.js';
-import { defaults, HelperTools } from '../../src/const.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools } from '../../src/const.js';
 import { addTool } from '../../src/tools/helpers.js';
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
@@ -986,6 +986,26 @@ export function createIntegrationTestsSuite(
             // should not contain call-actor but should contain add-actor
             expect(names).not.toContain('call-actor');
             expect(names).toContain('add-actor');
+
+            await client.close();
+        });
+
+        it.only('should return error message when tryging to call MCP server Actor without tool name in actor parameter', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const response = await client.callTool({
+                name: 'call-actor',
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    step: 'call',
+                    input: { url: 'https://docs.apify.com' },
+                },
+            });
+
+            expect(response.content).toBeDefined();
+            const content = response.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
 
             await client.close();
         });

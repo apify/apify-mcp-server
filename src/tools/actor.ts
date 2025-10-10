@@ -8,6 +8,7 @@ import log from '@apify/log';
 import { ApifyClient } from '../apify-client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
+    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     HelperTools,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
@@ -384,8 +385,7 @@ EXAMPLES:
             // For definition resolution we always use token-based client; Skyfire is only for actual Actor runs
             const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
             // Resolve MCP server URL
-            const needsMcpUrl = mcpToolName !== undefined || performStep === 'info';
-            const mcpServerUrlOrFalse = needsMcpUrl ? await getActorMcpUrlCached(baseActorName, apifyClientForDefinition) : false;
+            const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
             const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
 
             // Standby Actors, thus MCPs, are not supported in Skyfire mode
@@ -465,7 +465,7 @@ EXAMPLES:
                 // and does not provide the tool name.
                 const isMcpToolNameInvalid = mcpToolName === undefined || mcpToolName.trim().length === 0;
                 if (isActorMcpServer && isMcpToolNameInvalid) {
-                    return buildMCPResponse([`When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`]);
+                    return buildMCPResponse([CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG]);
                 }
 
                 // Handle MCP tool calls
