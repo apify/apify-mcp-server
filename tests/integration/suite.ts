@@ -990,7 +990,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.only('should return error message when tryging to call MCP server Actor without tool name in actor parameter', async () => {
+        it('should return error message when tryging to call MCP server Actor without tool name in actor parameter', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const response = await client.callTool({

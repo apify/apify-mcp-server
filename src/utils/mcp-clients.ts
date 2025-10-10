@@ -1,11 +1,12 @@
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types';
-import mcpClients from 'mcp-client-capabilities';
+import { mcpClients } from 'mcp-client-capabilities';
 
 /**
  * Determines if the MCP client supports dynamic tools based on the InitializeRequest data.
  */
 export function doesMcpClientSupportDynamicTools(initializeRequestData?: InitializeRequest): boolean {
-    const clientCapabilities = mcpClients[initializeRequestData?.params?.clientInfo?.name || ''];
+    const clientName = initializeRequestData?.params?.clientInfo?.name;
+    const clientCapabilities = mcpClients[clientName || ''];
     if (!clientCapabilities) return false;
 
     const clientProtocolVersion = clientCapabilities.protocolVersion;
