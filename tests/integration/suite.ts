@@ -989,6 +989,26 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+        it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools for default tools', async () => {
+            client = await createClientFn({ clientName: 'Visual Studio Code' });
+            const names = getToolNames(await client.listTools());
+
+            // should not contain call-actor but should contain add-actor
+            expect(names).not.toContain('call-actor');
+            expect(names).toContain('add-actor');
+
+            await client.close();
+        });
+        it.runIf(options.transport === 'streamable-http')('should NOT swap call-actor for add-actor when client supports dynamic tools when using the call-actor explicitly', async () => {
+            client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['call-actor'] });
+            const names = getToolNames(await client.listTools());
+
+            // should not contain call-actor but should contain add-actor
+            expect(names).toContain('call-actor');
+            expect(names).not.toContain('add-actor');
+
+            await client.close();
+        });
 
         it('should return error message when tryging to call MCP server Actor without tool name in actor parameter', async () => {
             client = await createClientFn({ tools: ['actors'] });
