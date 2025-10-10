@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.25](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.25) (2025-10-10)
+
+### 🐛 Bug Fixes
+
+- Calling mcp server when calling wihtout any tool name and add integration test case ([#309](https://github.com/apify/apify-mcp-server/pull/309)) ([e368c97](https://github.com/apify/apify-mcp-server/commit/e368c97ed3a3957502016c9279fccc5d739b6b86)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.24](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.24) (2025-10-09)
 
 ### 🐛 Bug Fixes
