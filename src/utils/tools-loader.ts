@@ -141,8 +141,7 @@ export async function loadToolsFromInput(
     if (hasCallActor || hasActorTools || hasAddActorTool) {
         result.push(getActorOutput);
     }
-    
-    
+
     // Handle client capabilities logic for 'actors' category to swap call-actor for add-actor
     // if client supports dynamic tools.
     const selectorContainsCallActor = selectors?.some((s) => s === HelperTools.ACTOR_CALL);

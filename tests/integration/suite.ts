@@ -989,7 +989,7 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
-        it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools for default tools', async () => {
+        it.runIf(options.transport === 'streamable-http')(`should swap call-actor for add-actor when client supports dynamic tools for default tools`, async () => {
             client = await createClientFn({ clientName: 'Visual Studio Code' });
             const names = getToolNames(await client.listTools());
 
@@ -999,7 +999,7 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
-        it.runIf(options.transport === 'streamable-http')('should NOT swap call-actor for add-actor when client supports dynamic tools when using the call-actor explicitly', async () => {
+        it.runIf(options.transport === 'streamable-http')(`should NOT swap call-actor for add-actor when client supports dynamic tools when using the call-actor explicitly`, async () => {
             client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['call-actor'] });
             const names = getToolNames(await client.listTools());
 
