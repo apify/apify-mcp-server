@@ -65,6 +65,8 @@ export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire PAY token ID used fo
 
 export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to interact with Apify Actors, storage, and documentation. Before running any Apify Actor, you need to set up a Skyfire PAY token for billing purposes. To set up the PAY token you need to use the create-pay-token tool from the Skyfire MCP server. The PAY token must be charged with a minimum of ${SKYFIRE_MIN_CHARGE_USD} USD to be valid.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When running an Actor using the call-actor tool, you must provide the Skyfire PAY token ID in the \`skyfire-pay-id\` input property. Similarly, when retrieving Actor output using the get-actor-output tool, you must also provide the same Skyfire PAY token ID in the \`skyfire-pay-id\` input property.`;
 
+export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
+
 // Cache
 export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
