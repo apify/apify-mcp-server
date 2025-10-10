@@ -13,9 +13,13 @@ export async function searchActorsByKeywords(
     apifyToken: string,
     limit: number | undefined = undefined,
     offset: number | undefined = undefined,
+    allowsAgenticUsers: boolean | undefined = undefined,
 ): Promise<ExtendedActorStoreList[]> {
     const client = new ApifyClient({ token: apifyToken });
-    const results = await client.store().list({ search, limit, offset });
+    const storeClient = client.store();
+    if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
+
+    const results = await storeClient.list({ search, limit, offset });
     return results.items;
 }
 
@@ -90,13 +94,14 @@ USAGE EXAMPLES:
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
-            const { args, apifyToken, userRentedActorIds } = toolArgs;
+            const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
             let actors = await searchActorsByKeywords(
                 parsed.search,
                 apifyToken,
                 parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
+                apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
             );
             actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
             const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
