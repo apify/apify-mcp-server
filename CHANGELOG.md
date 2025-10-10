@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.27](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.27) (2025-10-10)
+
+### 🐛 Bug Fixes
+
+- Client capabilities tool swapping ([#311](https://github.com/apify/apify-mcp-server/pull/311)) ([285548d](https://github.com/apify/apify-mcp-server/commit/285548ddbfca1a3fd6bb7ccc1983c79ce985c483)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.26](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.26) (2025-10-10)
 
 ### 🐛 Bug Fixes
