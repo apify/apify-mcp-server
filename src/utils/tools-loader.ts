@@ -72,13 +72,6 @@ export async function loadToolsFromInput(
 
             const categoryTools = toolCategories[selector as ToolCategory];
 
-            // Handler client capabilities logic for 'actors' category to swap call-actor for add-actor
-            // if client supports dynamic tools.
-            if (selector === 'actors' && doesMcpClientSupportDynamicTools(initializeRequestData)) {
-                internalSelections.push(...categoryTools.filter((t) => t.tool.name !== HelperTools.ACTOR_CALL));
-                internalSelections.push(addTool);
-                continue;
-            }
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
@@ -115,7 +108,7 @@ export async function loadToolsFromInput(
     } // else: selectors provided but none are actors => do not load defaults
 
     // Compose final tool list
-    const result: ToolEntry[] = [];
+    let result: ToolEntry[] = [];
 
     // Internal tools
     if (selectorsProvided) {
@@ -142,11 +135,21 @@ export async function loadToolsFromInput(
      * If there is any tool that in some way, even indirectly (like add-actor), allows calling
      * Actor, then we need to ensure the get-actor-output tool is available.
      */
-    const hasCallActor = result.some((entry) => entry.tool.name === 'call-actor');
+    const hasCallActor = result.some((entry) => entry.tool.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
-    const hasAddActorTool = result.some((entry) => entry.tool.name === 'add-actor');
+    const hasAddActorTool = result.some((entry) => entry.tool.name === HelperTools.ACTOR_ADD);
     if (hasCallActor || hasActorTools || hasAddActorTool) {
         result.push(getActorOutput);
+    }
+
+    // Handle client capabilities logic for 'actors' category to swap call-actor for add-actor
+    // if client supports dynamic tools.
+    const selectorContainsCallActor = selectors?.some((s) => s === HelperTools.ACTOR_CALL);
+    if (doesMcpClientSupportDynamicTools(initializeRequestData) && hasCallActor && !selectorContainsCallActor) {
+        // Remove call-actor
+        result = result.filter((entry) => entry.tool.name !== HelperTools.ACTOR_CALL);
+        // Replace with add-actor if not already present
+        if (!hasAddActorTool) result.push(addTool);
     }
 
     // De-duplicate by tool name for safety
