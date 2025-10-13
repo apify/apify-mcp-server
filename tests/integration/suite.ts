@@ -979,23 +979,44 @@ export function createIntegrationTestsSuite(
             expect(tools.tools.length).toBeGreaterThan(0);
         });
 
-        it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools', async () => {
+        // TEMP: this logic is currently disabled, see src/utils/tools-loader.ts
+        //it.runIf(options.transport === 'streamable-http')('should swap call-actor for add-actor when client supports dynamic tools', async () => {
+        //    client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['actors'] });
+        //    const names = getToolNames(await client.listTools());
+
+        //    // should not contain call-actor but should contain add-actor
+        //    expect(names).not.toContain('call-actor');
+        //    expect(names).toContain('add-actor');
+
+        //    await client.close();
+        //});
+        //it.runIf(options.transport === 'streamable-http')(`should swap call-actor for add-actor when client supports dynamic tools for default tools`, async () => {
+        //    client = await createClientFn({ clientName: 'Visual Studio Code' });
+        //    const names = getToolNames(await client.listTools());
+
+        //    // should not contain call-actor but should contain add-actor
+        //    expect(names).not.toContain('call-actor');
+        //    expect(names).toContain('add-actor');
+
+        //    await client.close();
+        //});
+        it.runIf(options.transport === 'streamable-http')('should NOT swap call-actor for add-actor even when client supports dynamic tools', async () => {
             client = await createClientFn({ clientName: 'Visual Studio Code', tools: ['actors'] });
             const names = getToolNames(await client.listTools());
 
             // should not contain call-actor but should contain add-actor
-            expect(names).not.toContain('call-actor');
-            expect(names).toContain('add-actor');
+            expect(names).toContain('call-actor');
+            expect(names).not.toContain('add-actor');
 
             await client.close();
         });
-        it.runIf(options.transport === 'streamable-http')(`should swap call-actor for add-actor when client supports dynamic tools for default tools`, async () => {
+        it.runIf(options.transport === 'streamable-http')(`should NOT swap call-actor for add-actor even when client supports dynamic tools for default tools`, async () => {
             client = await createClientFn({ clientName: 'Visual Studio Code' });
             const names = getToolNames(await client.listTools());
 
             // should not contain call-actor but should contain add-actor
-            expect(names).not.toContain('call-actor');
-            expect(names).toContain('add-actor');
+            expect(names).toContain('call-actor');
+            expect(names).not.toContain('add-actor');
 
             await client.close();
         });
