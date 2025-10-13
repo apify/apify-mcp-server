@@ -196,6 +196,19 @@ def main():
             'error': error,
         })
 
+    # Print summary for all models
+    print(f'\n📊 Results:')
+    for result in results:
+        model = result['model']
+        accuracy = result['accuracy']
+        error = result.get('error')
+        
+        if error:
+            print(f'  {model}: ❌ Error')
+        else:
+            status = '✅' if accuracy >= PASS_THRESHOLD else '❌'
+            print(f'  {model}: {status} {accuracy:.1%}')
+
     # Check if all models meet the pass threshold
     all_passed = all(r.get('accuracy', 0) >= PASS_THRESHOLD for r in results if r.get('error') is None)
 
