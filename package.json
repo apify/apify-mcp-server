@@ -85,7 +85,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
-    "test:evals:dev": "python3 evals/run_evaluation.py",
+    "test:evals": "python3 evals/run_evaluation.py",
     "clean": "tsc -b src --clean",
     "evals:export-tools": "tsx evals/export-tools.ts --output-dir evals",
     "evals:create-dataset": "python3 evals/create_dataset.py"

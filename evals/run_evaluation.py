@@ -21,11 +21,11 @@ from config import MODELS_TO_EVALUATE, SYSTEM_PROMPT, validate_env_vars, DATASET
 
 def load_tools() -> list[dict[str, Any]]:
     """Load current tool definitions from tools.json."""
-    tools_path = Path(__file__).parent.parent / 'tools.json'
+    tools_path = Path(__file__).parent.parent / 'evals' / 'tools.json'
 
     if not tools_path.exists():
         print(f'Error: tools.json not found at {tools_path}')
-        print("Run 'npm run dump-tools' first to export current tool definitions")
+        print("Run 'npm run evals:export-tools' first to export current tool definitions")
         sys.exit(1)
 
     with open(tools_path, 'r') as f:
@@ -121,7 +121,7 @@ def main():
     print(f'Loaded {len(tools)} tools')
 
     # Initialize Phoenix client
-    phoenix_client = PhoenixClient(endpoint=os.getenv('PHOENIX_HOST'))
+    phoenix_client = PhoenixClient()
 
     # Get dataset
     try:
@@ -130,6 +130,7 @@ def main():
         print(f'Error loading dataset: {e}')
         sys.exit(1)
 
+    print(f'Loaded dataset "{DATASET_NAME}" with ID: {dataset.id}')
     # Results storage
     results = []
 
@@ -142,7 +143,6 @@ def main():
         correct_cases = 0
         total_cases = 0
         experiment_id = None
-        evaluations_df = None
         error = None
 
         if model_name.startswith("gpt"):
@@ -160,33 +160,32 @@ def main():
         experiment_name = f'MCP tool calling eval {model_name}'
         experiment_description = f'Evaluation of {model_name} on MCP tool calling'
 
-        try:
-            experiment = run_experiment(
-                dataset=dataset,
-                task=task_fnc,
-                evaluators=[tools_match],
-                experiment_name=experiment_name,
-                experiment_description=experiment_description,
-                dry_run=3
-            )
+        # try:
+        experiment = run_experiment(
+            dataset=dataset,
+            task=task_fnc,
+            evaluators=[tools_match],
+            experiment_name=experiment_name,
+            experiment_description=experiment_description,
+        )
 
-            # Get evaluations and calculate accuracy
-            evaluations_df = experiment.get_evaluations()
-            total_cases = len(evaluations_df)
-            correct_cases = len(evaluations_df[evaluations_df['score'] > 0.5])
-            accuracy = correct_cases / total_cases if total_cases > 0 else 0
-            experiment_id = experiment.id
+        # Get evaluations and calculate accuracy
+        evaluations_df = experiment.get_evaluations()
+        total_cases = len(evaluations_df)
+        correct_cases = len(evaluations_df[evaluations_df['score'] > 0.5])
+        accuracy = correct_cases / total_cases if total_cases > 0 else 0
+        experiment_id = experiment.id
 
-            print(f'{model_name}: {accuracy:.1%} ({correct_cases}/{total_cases})')
+        print(f'{model_name}: {accuracy:.1%} ({correct_cases}/{total_cases})')
 
-            # Print sample of evaluations for debugging
-            if evaluations_df is not None and len(evaluations_df) > 0:
-                print(f'Sample evaluation results:')
-                print(evaluations_df[['score', 'label', 'output', 'expected']].to_string())
+        # Print sample of evaluations for debugging
+        if evaluations_df is not None and len(evaluations_df) > 0:
+            print(f'Sample evaluation results:')
+            print(evaluations_df[['score', 'label', 'output', 'expected']].to_string())
 
-        except Exception as e:
-            print(f'Error evaluating {model_name}: {e}')
-            error = str(e)
+        # except Exception as e:
+        #     print(f'Error evaluating {model_name}: {e}')
+        #     error = str(e)
 
         # Store results
         results.append({

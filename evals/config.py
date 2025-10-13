@@ -54,7 +54,7 @@ in the generated question.
 def get_required_env_vars() -> dict:
     """Get required environment variables."""
     return {
-        'PHOENIX_HOST': os.getenv('PHOENIX_HOST'),
+        'PHOENIX_COLLECTOR_ENDPOINT': os.getenv('PHOENIX_COLLECTOR_ENDPOINT'),
         'PHOENIX_API_KEY': os.getenv('PHOENIX_API_KEY'),
         'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
         'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY'),

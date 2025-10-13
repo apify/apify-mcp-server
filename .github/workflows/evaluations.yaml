@@ -52,7 +52,7 @@ jobs:
                 run: uv pip install -e evals/
 
             -   name: Run evaluations
-                run: npm run test:evals:dev
+                run: npm run test:evals
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_HOST: ${{ secrets.PHOENIX_HOST }}
