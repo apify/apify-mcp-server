@@ -107,7 +107,7 @@ export async function loadToolsFromInput(
     } // else: selectors provided but none are actors => do not load defaults
 
     // Compose final tool list
-    let result: ToolEntry[] = [];
+    const result: ToolEntry[] = [];
 
     // Internal tools
     if (selectorsProvided) {
@@ -144,13 +144,13 @@ export async function loadToolsFromInput(
     // TEMP: for now we disable this swapping logic as the add-actor tool was misbehaving in some clients
     // Handle client capabilities logic for 'actors' category to swap call-actor for add-actor
     // if client supports dynamic tools.
-    //const selectorContainsCallActor = selectors?.some((s) => s === HelperTools.ACTOR_CALL);
-    //if (doesMcpClientSupportDynamicTools(initializeRequestData) && hasCallActor && !selectorContainsCallActor) {
+    // const selectorContainsCallActor = selectors?.some((s) => s === HelperTools.ACTOR_CALL);
+    // if (doesMcpClientSupportDynamicTools(initializeRequestData) && hasCallActor && !selectorContainsCallActor) {
     //    // Remove call-actor
     //    result = result.filter((entry) => entry.tool.name !== HelperTools.ACTOR_CALL);
     //    // Replace with add-actor if not already present
     //    if (!hasAddActorTool) result.push(addTool);
-    //}
+    // }
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
