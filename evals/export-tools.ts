@@ -1,5 +1,7 @@
 #!/usr/bin/env tsx
 
+/* eslint-disable no-console */
+
 /**
  * Export Tools Script for MCP Evaluations
  *

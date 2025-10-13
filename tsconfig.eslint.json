@@ -1,13 +1,10 @@
 {
     "extends": "./tsconfig.json",
     "include": [
-        "src/**/*",
-        "test/**/*",
-        "tests/**/*",
-        "evals/**/*",
+        "evals",
+        "src",
+        "test",
+        "tests",
         "vitest.config.ts"
     ],
-    "references": [
-        { "path": "./evals" }
-    ]
 }
