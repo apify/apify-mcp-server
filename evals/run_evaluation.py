@@ -4,7 +4,6 @@ Main evaluation script for MCP tool calling.
 """
 
 import json
-import os
 import sys
 from copy import deepcopy
 from pathlib import Path

@@ -55,7 +55,9 @@ jobs:
                 run: uv pip install -e .
 
             -   name: Run evaluations
-                run: npm run test:evals
+                run: |
+                    source .venv/bin/activate
+                    npm run test:evals
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_COLLECTOR_ENDPOINT: ${{ secrets.PHOENIX_COLLECTOR_ENDPOINT }}
