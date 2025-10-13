@@ -52,7 +52,7 @@ jobs:
                 run: uv venv
 
             -   name: Install Python dependencies
-                run: uv pip install -e evals/
+                run: uv pip install -e .
 
             -   name: Run evaluations
                 run: npm run test:evals
