@@ -7,7 +7,7 @@ on:
     # Run evaluations on master branch merges
     push:
         branches:
-            - master
+            - 'feat/evaluations'
         paths-ignore:
             - '**.md'
             - 'docs/**'
@@ -55,6 +55,6 @@ jobs:
                 run: npm run test:evals
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
-                    PHOENIX_HOST: ${{ secrets.PHOENIX_HOST }}
+                    PHOENIX_COLLECTOR_ENDPOINT: ${{ secrets.PHOENIX_COLLECTOR_ENDPOINT }}
                     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
                     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
