@@ -333,7 +333,7 @@ The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mc
 
 The Actor input schema is processed to be compatible with most MCP clients while adhering to [JSON Schema](https://json-schema.org/) standards. The processing includes:
 - **Descriptions** are truncated to 500 characters (as defined in `MAX_DESCRIPTION_LENGTH`).
-- **Enum fields** are truncated to a maximum combined length of 200 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
+- **Enum fields** are truncated to a maximum combined length of 2000 characters for all elements (as defined in `ACTOR_ENUM_MAX_LENGTH`).
 - **Required fields** are explicitly marked with a `REQUIRED` prefix in their descriptions for compatibility with frameworks that may not handle the JSON schema properly.
 - **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
@@ -359,5 +359,4 @@ For major changes, please open an issue first to discuss your proposal and ensur
 - [How to use MCP with Apify Actors](https://blog.apify.com/how-to-use-mcp/)
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
-- [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
