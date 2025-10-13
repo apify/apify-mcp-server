@@ -10,15 +10,13 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable
 
-import pandas as pd
-from copy import deepcopy
 from anthropic import Anthropic
 from openai import OpenAI
 from phoenix import Client as PhoenixClient
 from phoenix.experiments import run_experiment
 from phoenix.experiments.types import Example
 
-from config import PHOENIX_ENDPOINT, MODELS_TO_EVALUATE, SYSTEM_PROMPT, validate_env_vars, DATASET_NAME
+from config import MODELS_TO_EVALUATE, SYSTEM_PROMPT, validate_env_vars, DATASET_NAME, PASS_THRESHOLD
 
 
 def load_tools() -> list[dict[str, Any]]:
@@ -123,7 +121,7 @@ def main():
     print(f'Loaded {len(tools)} tools')
 
     # Initialize Phoenix client
-    phoenix_client = PhoenixClient(endpoint=PHOENIX_ENDPOINT)
+    phoenix_client = PhoenixClient(endpoint=os.getenv('PHOENIX_HOST'))
 
     # Get dataset
     try:
@@ -200,11 +198,16 @@ def main():
             'error': error,
         })
 
-    print('\n' + '=' * 50)
-    print('EVALUATION_RESULTS_JSON_START')
-    print(json.dumps(results))
-    print('EVALUATION_RESULTS_JSON_END')
-    print('=' * 50)
+    # Check if all models meet the pass threshold
+    all_passed = all(r.get('accuracy', 0) >= PASS_THRESHOLD for r in results if r.get('error') is None)
+
+    print(f'\nPass threshold: {PASS_THRESHOLD:.1%}')
+    if all_passed:
+        print('✅ All models passed the threshold')
+    else:
+        print('❌ Some models failed to meet the threshold')
+
+    return 0 if all_passed else 1
 
 
 if __name__ == '__main__':
@@ -212,4 +215,5 @@ if __name__ == '__main__':
     from dotenv import load_dotenv
     load_dotenv()  # Load environment variables from .env file if present
 
-    main()
+    exit_code = main()
+    sys.exit(exit_code)

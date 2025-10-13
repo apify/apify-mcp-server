@@ -14,7 +14,7 @@ MODELS_TO_EVALUATE = [
 
 PASS_THRESHOLD = 0.8
 
-DATASET_NAME = 'mcp_tool_calling_ground_truth_v1.1'
+DATASET_NAME = 'mcp_tool_calling_ground_truth_v1.2'
 
 # System prompt
 SYSTEM_PROMPT = 'You are a helpful assistant'
@@ -54,6 +54,7 @@ in the generated question.
 def get_required_env_vars() -> dict:
     """Get required environment variables."""
     return {
+        'PHOENIX_HOST': os.getenv('PHOENIX_HOST'),
         'PHOENIX_API_KEY': os.getenv('PHOENIX_API_KEY'),
         'OPENAI_API_KEY': os.getenv('OPENAI_API_KEY'),
         'ANTHROPIC_API_KEY': os.getenv('ANTHROPIC_API_KEY'),

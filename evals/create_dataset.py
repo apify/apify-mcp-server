@@ -5,13 +5,14 @@ Run this once to upload test cases to Phoenix platform and receive a dataset ID.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
 import pandas as pd
 from phoenix import Client as PhoenixClient
 
-from config import PHOENIX_ENDPOINT, validate_env_vars
+from config import validate_env_vars
 
 
 def load_test_cases() -> dict:
@@ -54,7 +55,7 @@ def create_dataset():
     df = pd.DataFrame(dataset_rows)
 
     # Initialize Phoenix client
-    phoenix_client = PhoenixClient(endpoint=PHOENIX_ENDPOINT)
+    phoenix_client = PhoenixClient(endpoint=os.getenv('PHOENIX_HOST'))
 
     # Upload dataset
     dataset_name = f'mcp_tool_calling_ground_truth_v{test_data["version"]}'
