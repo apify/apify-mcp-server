@@ -14,8 +14,8 @@ import { join } from 'node:path';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../../src/apify-client';
-import { getToolPublicFieldOnly, processParamsGetTools } from '../../src/index-internals';
+import { ApifyClient } from '../src/apify-client.js';
+import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
 
 async function exportTools(): Promise<void> {
     console.log('Exporting MCP tools...');

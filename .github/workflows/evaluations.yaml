@@ -1,0 +1,67 @@
+# This workflow runs MCP tool calling evaluations on master branch merges
+# It evaluates AI models' ability to correctly identify and call MCP tools.
+
+name: MCP tool calling evaluations
+
+on:
+    # Run evaluations on master branch merges
+    push:
+        branches:
+            - master
+        paths-ignore:
+            - '**.md'
+            - 'docs/**'
+            - '.gitignore'
+            - '.dockerignore'
+            - 'LICENSE'
+
+jobs:
+    evaluations:
+        name: MCP tool calling evaluations
+        runs-on: ubuntu-latest
+        
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+
+            -   name: Install Node dependencies
+                run: npm ci
+
+            -   name: Build project
+                run: npm run build
+
+            -   name: Export tools
+                run: npm run evals:export-tools
+
+            -   name: Set up Python
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.12'
+
+            -   name: Install uv
+                run: pip install uv
+
+            -   name: Install Python dependencies
+                run: uv pip install -e evals/
+
+            -   name: Run evaluations
+                run: npm run test:evals
+                env:
+                    PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
+                    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+            -   name: Upload evaluation reports
+                uses: actions/upload-artifact@v3
+                if: always()
+                with:
+                    name: evaluation-reports-${{ github.sha }}
+                    path: evals/reports/
+                    retention-days: 30

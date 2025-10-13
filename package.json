@@ -85,7 +85,11 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
-    "clean": "tsc -b src --clean"
+    "test:evals": "vitest run evals --reporter=verbose",
+    "test:evals:dev": "python3 evals/run_evaluation.py",
+    "clean": "tsc -b src --clean",
+    "evals:export-tools": "tsx evals/export-tools.ts --output evals/tools.json",
+    "evals:create-dataset": "python3 evals/create_dataset.py"
   },
   "author": "Apify",
   "license": "MIT"

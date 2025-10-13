@@ -14,7 +14,7 @@ MODELS_TO_EVALUATE = [
 
 PASS_THRESHOLD = 0.8
 
-DATASET_ID = 'RGF0YXNldDoz'  # Replace with your actual dataset ID
+DATASET_NAME = 'mcp_tool_calling_ground_truth_v1.1'
 
 # System prompt
 SYSTEM_PROMPT = 'You are a helpful assistant'
