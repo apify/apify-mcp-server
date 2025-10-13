@@ -1,0 +1,72 @@
+[project]
+name = "apify-mcp-evals"
+version = "0.1.0"
+description = "Python evaluations for Apify MCP Server using Arize Phoenix"
+requires-python = ">=3.12"
+dependencies = [
+    "arize-phoenix>=12.5.0",
+    "anthropic>=0.33.1",
+    "openai>=1.0.0",
+    "pandas>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "tqdm>=4.65.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "ruff",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["evals"]
+
+[tool.ruff]
+line-length = 120
+include = ["*.py"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN401", # Dynamically typed expressions (typing.Any) are disallowed in {filename}
+    "BLE001", # Do not catch blind exception
+    "C901",   # `{name}` is too complex
+    "COM812", # This rule may cause conflicts when used with the formatter
+    "D100",   # Missing docstring in public module
+    "D104",   # Missing docstring in public package
+    "D107",   # Missing docstring in `__init__`
+    "D203",   # One blank line required before class docstring
+    "D213",   # Multi-line docstring summary should start at the second line
+    "D413",   # Missing blank line after last section
+    "EM",     # flake8-errmsg
+    "G004",   # Logging statement uses f-string
+    "ISC001", # This rule may cause conflicts when used with the formatter
+    "FIX",    # flake8-fixme
+    "TRY003", # Avoid specifying long messages outside the exception class
+]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = [
+    "F401", # Unused imports
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+inline-quotes = "single"
+
+[tool.ruff.lint.flake8-type-checking]
+runtime-evaluated-base-classes = [
+    "pydantic.BaseModel",
+    "pydantic_settings.BaseSettings",
+]
+
+[tool.ruff.lint.flake8-builtins]
+builtins-ignorelist = ["id"]
