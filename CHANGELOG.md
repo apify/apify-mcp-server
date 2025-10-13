@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.28](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.28) (2025-10-13)
+
+### 🚀 Features
+
+- Filter Actors in `search-actors` when in agentic payments mode  ([#307](https://github.com/apify/apify-mcp-server/pull/307)) ([bf894cf](https://github.com/apify/apify-mcp-server/commit/bf894cf32df76ef454639e12ed05010633327f7b)) by [@stepskop](https://github.com/stepskop), closes [#305](https://github.com/apify/apify-mcp-server/issues/305)
+
+### 🐛 Bug Fixes
+
+- Disable client capabilities tools swapping ([#312](https://github.com/apify/apify-mcp-server/pull/312)) ([a41f751](https://github.com/apify/apify-mcp-server/commit/a41f7517fa2f59c764f12683103d596678884f74)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.27](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.27) (2025-10-10)
 
 ### 🐛 Bug Fixes
