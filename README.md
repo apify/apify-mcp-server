@@ -359,5 +359,4 @@ For major changes, please open an issue first to discuss your proposal and ensur
 - [How to use MCP with Apify Actors](https://blog.apify.com/how-to-use-mcp/)
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
-- [MCP Client development guide](https://github.com/cyanheads/model-context-protocol-resources/blob/main/guides/mcp-client-development-guide.md)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
