@@ -224,7 +224,7 @@ async function main(): Promise<number> {
                 evaluators: [toolsMatch],
                 experimentName,
                 experimentDescription,
-                concurrency = 10,
+                concurrency: 10,
             });
 
             const runsMap = experiment.runs ?? {};
