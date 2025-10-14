@@ -1,11 +1,10 @@
 #!/usr/bin/env tsx
+/* eslint-disable no-console */
 /**
  * Main evaluation script for MCP tool calling (TypeScript version).
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname as pathDirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// NOTE: Tools are now loaded directly from the MCP server internals, not from JSON
 
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@arizeai/phoenix-client';
@@ -16,6 +15,8 @@ import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments'
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
+import { ApifyClient } from '../src/apify-client.js';
+import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
 import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, validateEnvVars } from './config.js';
 
 dotenv.config({ path: '.env' });
@@ -28,23 +29,11 @@ type ToolDef = {
 
 type ExampleInputOnly = { input: Record<string, unknown> };
 
-function loadTools(): ToolDef[] {
-    const filename = fileURLToPath(import.meta.url);
-    const dirname = pathDirname(filename);
-    const toolsPath = join(dirname, 'tools.json');
-
-    try {
-        const json = readFileSync(toolsPath, 'utf-8');
-        return JSON.parse(json) as ToolDef[];
-    } catch {
-        // eslint-disable-next-line no-console
-        console.error(`Error: tools.json not found at ${toolsPath}`);
-        // eslint-disable-next-line no-console
-        console.error("Run 'npm run evals:export-tools' first to export current tool definitions");
-        process.exit(1);
-    }
-    // Unreachable, process exits above
-    return [];
+async function loadTools(): Promise<ToolDef[]> {
+    const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
+    const urlTools = await processParamsGetTools('', apifyClient);
+    const tools = urlTools.map((t: any) => getToolPublicFieldOnly(t.tool)) as ToolDef[]; // eslint-disable-line @typescript-eslint/no-explicit-any
+    return tools;
 }
 
 function transformToolsToOpenAIFormat(tools: ToolDef[]) {
@@ -84,7 +73,6 @@ function createOpenAITask(modelName: string, tools: ToolDef[]) {
 
         const toolCalls: string[] = [];
         const first = response.choices?.[0]?.message as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-        // eslint-disable-next-line no-console
         console.log(example.input?.question, first);
         if (first?.tool_calls?.length) {
             const toolCall = first.tool_calls[0] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -110,7 +98,6 @@ function createAnthropicTask(modelName: string, tools: ToolDef[]) {
         });
 
         const toolCalls: string[] = [];
-        // eslint-disable-next-line no-console
         console.log(example.input?.question, response.content);
         for (const content of response.content) {
             if ((content as any).type === 'tool_use') { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -148,15 +135,13 @@ const toolsMatch = asEvaluator({
 });
 
 async function main(): Promise<number> {
-    // eslint-disable-next-line no-console
     console.log('Starting MCP tool calling evaluation');
 
     if (!validateEnvVars()) {
         return 1;
     }
 
-    const tools = loadTools();
-    // eslint-disable-next-line no-console
+    const tools = await loadTools();
     console.log(`Loaded ${tools.length} tools`);
 
     // Phoenix client init (options may be provided via env)
@@ -174,18 +159,15 @@ async function main(): Promise<number> {
         datasetId = info?.id as string | undefined;
         if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
     } catch (e) {
-        // eslint-disable-next-line no-console
         console.error(`Error loading dataset: ${e}`);
         return 1;
     }
 
-    // eslint-disable-next-line no-console
     console.log(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
 
     const results: { model: string; accuracy: number; correct: number; total: number; experiment_id?: string; error?: string }[] = [];
 
     for (const modelName of MODELS_TO_EVALUATE) {
-        // eslint-disable-next-line no-console
         console.log(`\nEvaluating model: ${modelName}`);
 
         let accuracy = 0;
@@ -200,7 +182,6 @@ async function main(): Promise<number> {
         } else if (modelName.startsWith('claude')) {
             taskFn = createAnthropicTask(modelName, tools);
         } else {
-            // eslint-disable-next-line no-console
             console.log(`Unknown model type: ${modelName}, skipping`);
             results.push({ model: modelName, accuracy: 0, correct: 0, total: 0, error: 'Unknown model type' });
             continue;
@@ -229,49 +210,38 @@ async function main(): Promise<number> {
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
             experimentId = experiment.id;
 
-            // eslint-disable-next-line no-console
             console.log(`${modelName}: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
 
             if (toolMatchEvals.length > 0) {
-                // eslint-disable-next-line no-console
                 console.log('Sample evaluation results:');
-                // eslint-disable-next-line no-console
                 console.log(
                     toolMatchEvals.slice(0, Math.min(10, toolMatchEvals.length)).map((e) => ({ score: e.result?.score, label: e.result?.label })),
                 );
             }
         } catch (e: unknown) {
             const err: any = e;
-            // eslint-disable-next-line no-console
             console.error(`Error evaluating ${modelName}:`, err);
-            // eslint-disable-next-line no-console
             console.error('Full error trace:', err?.stack ?? err);
             error = String(err?.message ?? err);
         }
         results.push({ model: modelName, accuracy, correct: correctCases, total: totalCases, experiment_id: experimentId, error });
     }
 
-    // eslint-disable-next-line no-console
     console.log('\n📊 Results:');
     for (const result of results) {
         const { model, accuracy, error } = result;
         if (error) {
-            // eslint-disable-next-line no-console
             console.log(`  ${model}: ❌ Error`);
         } else {
-            // eslint-disable-next-line no-console
             console.log(`  ${model}: ${(accuracy * 100).toFixed(1)}%`);
         }
     }
 
     const allPassed = results.filter((r) => !r.error).every((r) => r.accuracy >= PASS_THRESHOLD);
-    // eslint-disable-next-line no-console
     console.log(`\nPass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
     if (allPassed) {
-        // eslint-disable-next-line no-console
         console.log('✅ All models passed the threshold');
     } else {
-        // eslint-disable-next-line no-console
         console.log('❌ Some models failed to meet the threshold');
     }
 
@@ -282,7 +252,6 @@ async function main(): Promise<number> {
 main()
     .then((code) => process.exit(code))
     .catch((err) => {
-        // eslint-disable-next-line no-console
         console.error('Unexpected error:', err);
         process.exit(1);
     });
