@@ -8,12 +8,12 @@ on:
     push:
         branches:
             - 'feat/evaluations'
-        paths-ignore:
-            - '**.md'
-            - 'docs/**'
-            - '.gitignore'
-            - '.dockerignore'
-            - 'LICENSE'
+#        paths-ignore:
+#            - '**.md'
+#            - 'docs/**'
+#            - '.gitignore'
+#            - '.dockerignore'
+#            - 'LICENSE'
 
 jobs:
     evaluations:
