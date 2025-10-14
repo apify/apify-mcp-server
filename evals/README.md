@@ -48,7 +48,7 @@ The evaluation process has two steps:
 
 ```bash
 # 1. Set environment variables
-export PHOENIX_BASE_URL="phoenix_url"
+export PHOENIX_BASE_URL="phoenix_base_url"
 export PHOENIX_API_KEY="your_key"
 export OPENAI_API_KEY="your_key"
 export ANTHROPIC_API_KEY="your_key"
