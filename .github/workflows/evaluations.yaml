@@ -41,6 +41,6 @@ jobs:
                 run: npm run evals:run
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
-                    PHOENIX_COLLECTOR_ENDPOINT: ${{ secrets.PHOENIX_COLLECTOR_ENDPOINT }}
+                    PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
                     OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
                     ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
