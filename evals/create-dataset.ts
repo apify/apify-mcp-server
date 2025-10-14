@@ -13,7 +13,12 @@ import { createClient } from '@arizeai/phoenix-client';
 import { createDataset } from '@arizeai/phoenix-client/datasets';
 import dotenv from 'dotenv';
 
+import log from '@apify/log';
+
 import { validateEnvVars } from './config.js';
+
+// Set log level to debug
+log.setLevel(log.LEVELS.INFO);
 
 // Load environment variables from .env file if present
 dotenv.config({ path: '.env' });
@@ -40,15 +45,13 @@ function loadTestCases(): TestData {
         const fileContent = readFileSync(testCasesPath, 'utf-8');
         return JSON.parse(fileContent) as TestData;
     } catch {
-        // eslint-disable-next-line no-console
-        console.error(`Error: Test cases file not found at ${testCasesPath}`);
+        log.error(`Error: Test cases file not found at ${testCasesPath}`);
         process.exit(1);
     }
 }
 
 async function createDatasetFromTestCases(): Promise<void> {
-    // eslint-disable-next-line no-console
-    console.log('Creating Phoenix dataset from test cases...');
+    log.info('Creating Phoenix dataset from test cases...');
 
     // Validate environment variables
     if (!validateEnvVars()) {
@@ -59,8 +62,7 @@ async function createDatasetFromTestCases(): Promise<void> {
     const testData = loadTestCases();
     const testCases = testData.test_cases;
 
-    // eslint-disable-next-line no-console
-    console.log(`Loaded ${testCases.length} test cases`);
+    log.info(`Loaded ${testCases.length} test cases`);
 
     // Convert to format expected by Phoenix
     const examples = testCases.map((testCase) => ({
@@ -80,8 +82,7 @@ async function createDatasetFromTestCases(): Promise<void> {
     // Upload dataset
     const datasetName = `mcp_tool_calling_ground_truth_v${testData.version}`;
 
-    // eslint-disable-next-line no-console
-    console.log(`Uploading dataset '${datasetName}' to Phoenix...`);
+    log.info(`Uploading dataset '${datasetName}' to Phoenix...`);
 
     try {
         const { datasetId } = await createDataset({
@@ -91,18 +92,15 @@ async function createDatasetFromTestCases(): Promise<void> {
             examples,
         });
 
-        // eslint-disable-next-line no-console
-        console.log(`Dataset '${datasetName}' created with ID: ${datasetId}`);
+        log.info(`Dataset '${datasetName}' created with ID: ${datasetId}`);
     } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error(`Error creating dataset: ${error}`);
+        log.error(`Error creating dataset: ${error}`);
         process.exit(1);
     }
 }
 
 // Run the script
 createDatasetFromTestCases().catch((error) => {
-    // eslint-disable-next-line no-console
-    console.error('Unexpected error:', error);
+    log.error('Unexpected error:', error);
     process.exit(1);
 });

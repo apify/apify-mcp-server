@@ -2,15 +2,29 @@
  * Configuration for Apify MCP Server evaluations.
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+// Read version from test_cases.json
+function getTestCasesVersion(): string {
+    const currentFilename = fileURLToPath(import.meta.url);
+    const currentDirname = dirname(currentFilename);
+    const testCasesPath = join(currentDirname, 'test_cases.json');
+    const testCasesContent = readFileSync(testCasesPath, 'utf-8');
+    const testCases = JSON.parse(testCasesContent);
+    return testCases.version;
+}
+
 // Models to evaluate
 export const MODELS_TO_EVALUATE = [
     'gpt-4o-mini',
-    'claude-3-5-haiku-latest',
+    // 'claude-3-5-haiku-latest',
 ];
 
 export const PASS_THRESHOLD = 0.8;
 
-export const DATASET_NAME = 'mcp_tool_calling_ground_truth_v1.4';
+export const DATASET_NAME = `mcp_tool_calling_ground_truth_v${getTestCasesVersion()}`;
 
 // System prompt
 export const SYSTEM_PROMPT = 'You are a helpful assistant';
