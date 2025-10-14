@@ -4,8 +4,6 @@
  * Main evaluation script for MCP tool calling (TypeScript version).
  */
 
-// NOTE: Tools are now loaded directly from the MCP server internals, not from JSON
-
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@arizeai/phoenix-client';
 // eslint-disable-next-line import/extensions
@@ -23,7 +21,7 @@ import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, valida
 
 dotenv.config({ path: '.env' });
 
-type ExampleInputOnly = { input: Record<string, unknown> };
+type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 
 async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
@@ -68,7 +66,11 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
 
         const toolCalls: string[] = [];
         const first = response.choices?.[0]?.message;
-        console.log(example.input?.question, first);
+        console.log(
+            example.metadata?.category,
+            example.input?.question,
+            JSON.stringify(first, (_key, value) => (value === null ? undefined : value)),
+        );
         if (first?.tool_calls?.length) {
             const toolCall = first.tool_calls[0];
             const name = toolCall?.function?.name;
@@ -97,8 +99,7 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
         for (const content of response.content) {
             if (content.type === 'tool_use') {
                 const toolUseContent = content as Anthropic.ToolUseBlock;
-                const { name } = toolUseContent;
-                if (name) toolCalls.push(name);
+                if (toolUseContent.name) toolCalls.push(toolUseContent.name);
             }
         }
         return { toolCalls };
