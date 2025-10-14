@@ -9,7 +9,7 @@ import { createClient } from '@arizeai/phoenix-client';
 import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
 // eslint-disable-next-line import/extensions
 import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments';
-import type { ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
+import type { ExperimentEvaluationRun, ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
@@ -30,16 +30,6 @@ process.env.ANTHROPIC_API_KEY = sanitizeHeaderValue(process.env.ANTHROPIC_API_KE
 process.env.PHOENIX_API_KEY = sanitizeHeaderValue(process.env.PHOENIX_API_KEY);
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
-
-// Type for Phoenix evaluation run results
-interface EvaluationRun {
-    name: string;
-    result?: {
-        score?: number;
-        [key: string]: unknown;
-    };
-    [key: string]: unknown;
-}
 
 async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
@@ -187,11 +177,12 @@ async function main(): Promise<number> {
     try {
         const info = await getDatasetInfo({ client, dataset: { datasetName: DATASET_NAME } });
         datasetId = info?.id as string | undefined;
-        if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
     } catch (e) {
         log.error(`Error loading dataset: ${e}`);
         return 1;
     }
+
+    if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
 
     log.info(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
 
@@ -236,8 +227,8 @@ async function main(): Promise<number> {
             const runsMap = experiment.runs ?? {};
             const evalRuns = experiment.evaluationRuns ?? [];
             totalCases = Object.keys(runsMap).length;
-            const toolMatchEvals = evalRuns.filter((er: EvaluationRun) => er.name === 'tools_match');
-            correctCases = toolMatchEvals.filter((er: EvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
+            const toolMatchEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tools_match');
+            correctCases = toolMatchEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
             experimentId = experiment.id;
 
@@ -261,7 +252,7 @@ async function main(): Promise<number> {
         }
     }
 
-    const allPassed = results.filter((r) => !r.error).every((r) => r.accuracy >= PASS_THRESHOLD);
+    const allPassed = results.every((r) => !r.error && r.accuracy >= PASS_THRESHOLD);
     log.info(`Pass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
     if (allPassed) {
         log.info('✅ All models passed the threshold');
