@@ -148,7 +148,7 @@ const toolsMatch = asEvaluator({
         const actual = [...actualArr].sort();
         const matches = JSON.stringify(expectedTools) === JSON.stringify(actual);
         log.debug(
-            `-----------------------\n`
+            `----------------------\n`
             + `Query: ${String(output?.input?.question ?? '')}\n`
             + `LLM response: ${JSON.stringify(output?.metadata?.content ?? '')}\n`
             + `Match: ${matches}, expected tools: ${JSON.stringify(expectedTools)}, actual tools: ${JSON.stringify(actual)}`,
