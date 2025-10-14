@@ -19,7 +19,7 @@ function getTestCasesVersion(): string {
 // Models to evaluate
 export const MODELS_TO_EVALUATE = [
     'gpt-4o-mini',
-    'claude-3-5-haiku-latest',
+    // 'claude-3-5-haiku-latest',
 ];
 
 export const PASS_THRESHOLD = 0.8;

@@ -226,6 +226,7 @@ async function main(): Promise<number> {
                 experimentDescription,
                 concurrency: 10,
             });
+            log.info(`Experiment run completed. View details at: ${experiment}`);
 
             const runsMap = experiment.runs ?? {};
             const evalRuns = experiment.evaluationRuns ?? [];
