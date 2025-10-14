@@ -1,5 +1,4 @@
 #!/usr/bin/env tsx
-/* eslint-disable no-console */
 /**
  * Main evaluation script for MCP tool calling (TypeScript version).
  */
@@ -14,10 +13,14 @@ import type { ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../src/apify-client.js';
 import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
 import type { ToolBase, ToolEntry } from '../src/types.js';
 import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, validateEnvVars } from './config.js';
+
+log.setLevel(log.LEVELS.DEBUG);
 
 dotenv.config({ path: '.env' });
 
@@ -66,10 +69,8 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
 
         const toolCalls: string[] = [];
         const first = response.choices?.[0]?.message;
-        console.log(
-            example.metadata?.category,
-            example.input?.question,
-            JSON.stringify(first, (_key, value) => (value === null ? undefined : value)),
+        log.debug(
+            `${example.metadata?.category} - ${example.input?.question} - ${JSON.stringify(first, (_key, value) => (value === null ? undefined : value))}`,
         );
         if (first?.tool_calls?.length) {
             const toolCall = first.tool_calls[0];
@@ -95,7 +96,7 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
         });
 
         const toolCalls: string[] = [];
-        console.log(example.input?.question, response.content);
+        log.debug(`${example.input?.question} - ${response.content}`);
         for (const content of response.content) {
             if (content.type === 'tool_use') {
                 const toolUseContent = content as Anthropic.ToolUseBlock;
@@ -132,14 +133,14 @@ const toolsMatch = asEvaluator({
 });
 
 async function main(): Promise<number> {
-    console.log('Starting MCP tool calling evaluation');
+    log.info('Starting MCP tool calling evaluation');
 
     if (!validateEnvVars()) {
         return 1;
     }
 
     const tools = await loadTools();
-    console.log(`Loaded ${tools.length} tools`);
+    log.info(`Loaded ${tools.length} tools`);
 
     // Phoenix client init (options may be provided via env)
     const client = createClient({
@@ -156,16 +157,16 @@ async function main(): Promise<number> {
         datasetId = info?.id as string | undefined;
         if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
     } catch (e) {
-        console.error(`Error loading dataset: ${e}`);
+        log.error(`Error loading dataset: ${e}`);
         return 1;
     }
 
-    console.log(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
+    log.info(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
 
     const results: { model: string; accuracy: number; correct: number; total: number; experiment_id?: string; error?: string }[] = [];
 
     for (const modelName of MODELS_TO_EVALUATE) {
-        console.log(`\nEvaluating model: ${modelName}`);
+        log.info(`\nEvaluating model: ${modelName}`);
 
         let accuracy = 0;
         let correctCases = 0;
@@ -179,7 +180,7 @@ async function main(): Promise<number> {
         } else if (modelName.startsWith('claude')) {
             taskFn = createAnthropicTask(modelName, tools);
         } else {
-            console.log(`Unknown model type: ${modelName}, skipping`);
+            log.warning(`Unknown model type: ${modelName}, skipping`);
             results.push({ model: modelName, accuracy: 0, correct: 0, total: 0, error: 'Unknown model type' });
             continue;
         }
@@ -207,39 +208,40 @@ async function main(): Promise<number> {
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
             experimentId = experiment.id;
 
-            console.log(`${modelName}: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
+            log.info(`${modelName}: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
 
             if (toolMatchEvals.length > 0) {
-                console.log('Sample evaluation results:');
-                console.log(
-                    toolMatchEvals.slice(0, Math.min(10, toolMatchEvals.length)).map((e) => ({ score: e.result?.score, label: e.result?.label })),
-                );
+                log.info('Sample evaluation results:');
+                const sampleResults = toolMatchEvals
+                    .slice(0, Math.min(10, toolMatchEvals.length))
+                    .map((e) => ({ score: e.result?.score, label: e.result?.label }));
+                log.info(JSON.stringify(sampleResults));
             }
         } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
-            console.error(`Error evaluating ${modelName}:`, err);
-            console.error('Full error trace:', err.stack ?? err.message);
+            log.error(`Error evaluating ${modelName}:`, err);
+            log.error(`Full error trace: ${err.stack ?? err.message}`);
             error = err.message;
         }
         results.push({ model: modelName, accuracy, correct: correctCases, total: totalCases, experiment_id: experimentId, error });
     }
 
-    console.log('\n📊 Results:');
+    log.info('\n📊 Results:');
     for (const result of results) {
         const { model, accuracy, error } = result;
         if (error) {
-            console.log(`  ${model}: ❌ Error`);
+            log.info(`  ${model}: ❌ Error`);
         } else {
-            console.log(`  ${model}: ${(accuracy * 100).toFixed(1)}%`);
+            log.info(`  ${model}: ${(accuracy * 100).toFixed(1)}%`);
         }
     }
 
     const allPassed = results.filter((r) => !r.error).every((r) => r.accuracy >= PASS_THRESHOLD);
-    console.log(`\nPass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
+    log.info(`\nPass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
     if (allPassed) {
-        console.log('✅ All models passed the threshold');
+        log.info('✅ All models passed the threshold');
     } else {
-        console.log('❌ Some models failed to meet the threshold');
+        log.info('❌ Some models failed to meet the threshold');
     }
 
     return allPassed ? 0 : 1;
@@ -249,6 +251,6 @@ async function main(): Promise<number> {
 main()
     .then((code) => process.exit(code))
     .catch((err) => {
-        console.error('Unexpected error:', err);
+        log.error('Unexpected error:', err);
         process.exit(1);
     });
