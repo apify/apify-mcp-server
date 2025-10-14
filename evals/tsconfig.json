@@ -1,9 +1,17 @@
 {
-    "extends": "../tsconfig.json",
-    "include": [
-        "**/*"
-    ],
     "compilerOptions": {
+        "target": "ES2019",
+        "module": "ES2022",
+        "moduleResolution": "bundler",
+        "lib": ["ESNext"],
+        "strict": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "skipLibCheck": true,
+        "noEmit": true,
         "types": ["vitest/globals"]
-    }
+    },
+    "include": [
+        "*.ts"
+    ]
 }
