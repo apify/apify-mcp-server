@@ -12,51 +12,46 @@ import { createClient } from '@arizeai/phoenix-client';
 import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
 // eslint-disable-next-line import/extensions
 import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments';
+import type { ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
 import { ApifyClient } from '../src/apify-client.js';
 import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
+import type { ToolBase, ToolEntry } from '../src/types.js';
 import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, validateEnvVars } from './config.js';
 
 dotenv.config({ path: '.env' });
 
-type ToolDef = {
-    name: string;
-    description: string;
-    inputSchema: Record<string, unknown>;
-};
-
 type ExampleInputOnly = { input: Record<string, unknown> };
 
-async function loadTools(): Promise<ToolDef[]> {
+async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
     const urlTools = await processParamsGetTools('', apifyClient);
-    const tools = urlTools.map((t: any) => getToolPublicFieldOnly(t.tool)) as ToolDef[]; // eslint-disable-line @typescript-eslint/no-explicit-any
-    return tools;
+    return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t.tool)) as ToolBase[];
 }
 
-function transformToolsToOpenAIFormat(tools: ToolDef[]) {
+function transformToolsToOpenAIFormat(tools: ToolBase[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
     return tools.map((tool) => ({
         type: 'function',
         function: {
             name: tool.name,
             description: tool.description,
-            parameters: tool.inputSchema,
+            parameters: tool.inputSchema as OpenAI.Chat.ChatCompletionTool['function']['parameters'],
         },
     }));
 }
 
-function transformToolsToAnthropicFormat(tools: ToolDef[]) {
+function transformToolsToAnthropicFormat(tools: ToolBase[]): Anthropic.Tool[] {
     return tools.map((tool) => ({
         name: tool.name,
         description: tool.description,
         // Phoenix tools schema uses inputSchema in Anthropic
-        input_schema: tool.inputSchema as Record<string, unknown>,
+        input_schema: tool.inputSchema as Anthropic.Tool.InputSchema,
     }));
 }
 
-function createOpenAITask(modelName: string, tools: ToolDef[]) {
+function createOpenAITask(modelName: string, tools: ToolBase[]) {
     const toolsOpenAI = transformToolsToOpenAIFormat(tools);
 
     return async (example: ExampleInputOnly): Promise<{ toolCalls: string[] }> => {
@@ -68,22 +63,22 @@ function createOpenAITask(modelName: string, tools: ToolDef[]) {
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: String(example.input?.question ?? '') },
             ],
-            tools: toolsOpenAI as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+            tools: toolsOpenAI,
         });
 
         const toolCalls: string[] = [];
-        const first = response.choices?.[0]?.message as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+        const first = response.choices?.[0]?.message;
         console.log(example.input?.question, first);
         if (first?.tool_calls?.length) {
-            const toolCall = first.tool_calls[0] as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-            const name = toolCall?.function?.name as string | undefined;
+            const toolCall = first.tool_calls[0];
+            const name = toolCall?.function?.name;
             if (name) toolCalls.push(name);
         }
         return { toolCalls };
     };
 }
 
-function createAnthropicTask(modelName: string, tools: ToolDef[]) {
+function createAnthropicTask(modelName: string, tools: ToolBase[]) {
     const toolsAnthropic = transformToolsToAnthropicFormat(tools);
 
     return async (example: ExampleInputOnly): Promise<{ toolCalls: string[] }> => {
@@ -93,15 +88,16 @@ function createAnthropicTask(modelName: string, tools: ToolDef[]) {
             model: modelName,
             system: SYSTEM_PROMPT,
             messages: [{ role: 'user', content: String(example.input?.question ?? '') }],
-            tools: toolsAnthropic as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+            tools: toolsAnthropic,
             max_tokens: 2048,
         });
 
         const toolCalls: string[] = [];
         console.log(example.input?.question, response.content);
         for (const content of response.content) {
-            if ((content as any).type === 'tool_use') { // eslint-disable-line @typescript-eslint/no-explicit-any
-                const name = (content as any).name as string | undefined; // eslint-disable-line @typescript-eslint/no-explicit-any
+            if (content.type === 'tool_use') {
+                const toolUseContent = content as Anthropic.ToolUseBlock;
+                const { name } = toolUseContent;
                 if (name) toolCalls.push(name);
             }
         }
@@ -194,8 +190,8 @@ async function main(): Promise<number> {
             const experiment = await runExperiment({
                 client,
                 dataset: { datasetName: DATASET_NAME },
-                // Cast as any to satisfy ExperimentTask type
-                task: taskFn as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+                // Cast to satisfy ExperimentTask type
+                task: taskFn as ExperimentTask,
                 evaluators: [toolsMatch],
                 experimentName,
                 experimentDescription,
@@ -219,10 +215,10 @@ async function main(): Promise<number> {
                 );
             }
         } catch (e: unknown) {
-            const err: any = e;
+            const err = e instanceof Error ? e : new Error(String(e));
             console.error(`Error evaluating ${modelName}:`, err);
-            console.error('Full error trace:', err?.stack ?? err);
-            error = String(err?.message ?? err);
+            console.error('Full error trace:', err.stack ?? err.message);
+            error = err.message;
         }
         results.push({ model: modelName, accuracy, correct: correctCases, total: totalCases, experiment_id: experimentId, error });
     }
