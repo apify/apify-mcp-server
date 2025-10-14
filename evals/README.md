@@ -10,7 +10,7 @@ The MCP server tool calls evaluation has several key objectives:
 2. **Create a test suite** that can be run manually or automatically in CI
 3. **Allow for quick iteration** on tool descriptions
 
-## 1. ✍️ **Create test cases manually** (Current Implementation)
+## 1. ✍️ **Create test cases manually**
 
 - **Pros:**
   - Straightforward approach
