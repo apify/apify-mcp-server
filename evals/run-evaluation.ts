@@ -68,12 +68,11 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
         });
 
         const toolCalls: string[] = [];
-        const first = response.choices?.[0]?.message;
-        log.debug(
-            `${example.metadata?.category} - ${example.input?.question} - ${JSON.stringify(first, (_key, value) => (value === null ? undefined : value))}`,
-        );
-        if (first?.tool_calls?.length) {
-            const toolCall = first.tool_calls[0];
+        const firstMessage = response.choices?.[0]?.message;
+        const msg = JSON.stringify(JSON.stringify(firstMessage));
+        log.debug(`${example.metadata?.category} - ${example.input?.question} - ${msg}`);
+        if (firstMessage?.tool_calls?.length) {
+            const toolCall = firstMessage.tool_calls[0];
             const name = toolCall?.function?.name;
             if (name) toolCalls.push(name);
         }
@@ -84,7 +83,11 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
 function createAnthropicTask(modelName: string, tools: ToolBase[]) {
     const toolsAnthropic = transformToolsToAnthropicFormat(tools);
 
-    return async (example: ExampleInputOnly): Promise<{ toolCalls: string[] }> => {
+    return async (example: ExampleInputOnly): Promise<{
+        toolCalls: string[];
+        input: Record<string, unknown>,
+        metadata: Record<string, unknown>,
+    }> => {
         const client = new Anthropic({});
 
         const response = await client.messages.create({
@@ -96,14 +99,18 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
         });
 
         const toolCalls: string[] = [];
-        log.debug(`${example.input?.question} - ${response.content}`);
+        log.debug(`${example.input?.question} - ${JSON.stringify(response.content)}`);
         for (const content of response.content) {
             if (content.type === 'tool_use') {
                 const toolUseContent = content as Anthropic.ToolUseBlock;
                 if (toolUseContent.name) toolCalls.push(toolUseContent.name);
             }
         }
-        return { toolCalls };
+        return {
+            toolCalls,
+            input: example.input,
+            metadata: { content: response.content },
+        };
     };
 }
 
@@ -111,16 +118,18 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
 const toolsMatch = asEvaluator({
     name: 'tools_match',
     kind: 'CODE',
-    evaluate: async (args) => {
-        const { output, expected } = args as { output: { toolCalls?: string[] } | null; expected?: Record<string, unknown> };
-        const toolCalls = String((expected as Record<string, unknown> | undefined)?.tool_calls ?? '');
+    evaluate: async ({ output, expected }: {
+        output: { toolCalls?: string[] } | null;
+        expected?: Record<string, unknown>;
+    }) => {
+        const toolCalls = String(expected?.tool_calls ?? '');
         const expectedTools = toolCalls
             .split(', ')
             .map((t) => t.trim())
             .filter(Boolean)
             .sort();
 
-        const actualArr = Array.isArray(output?.toolCalls) ? output?.toolCalls ?? [] : [];
+        const actualArr = Array.isArray(output?.toolCalls) ? output.toolCalls : [];
         const actual = [...actualArr].sort();
         const matches = JSON.stringify(expectedTools) === JSON.stringify(actual);
         return {
@@ -203,20 +212,12 @@ async function main(): Promise<number> {
             const runsMap = experiment.runs ?? {};
             const evalRuns = experiment.evaluationRuns ?? [];
             totalCases = Object.keys(runsMap).length;
-            const toolMatchEvals = evalRuns.filter((er) => er.name === 'tools_match');
-            correctCases = toolMatchEvals.filter((er) => (er.result?.score ?? 0) > 0.5).length;
+            const toolMatchEvals = evalRuns.filter((er: any) => er.name === 'tools_match');
+            correctCases = toolMatchEvals.filter((er: any) => (er.result?.score ?? 0) > 0.5).length;
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
             experimentId = experiment.id;
 
             log.info(`${modelName}: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
-
-            if (toolMatchEvals.length > 0) {
-                log.info('Sample evaluation results:');
-                const sampleResults = toolMatchEvals
-                    .slice(0, Math.min(10, toolMatchEvals.length))
-                    .map((e) => ({ score: e.result?.score, label: e.result?.label }));
-                log.info(JSON.stringify(sampleResults));
-            }
         } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
             log.error(`Error evaluating ${modelName}:`, err);
