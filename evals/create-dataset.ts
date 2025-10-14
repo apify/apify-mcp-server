@@ -15,7 +15,7 @@ import dotenv from 'dotenv';
 
 import log from '@apify/log';
 
-import { validateEnvVars } from './config.js';
+import { sanitizeHeaderValue, validateEnvVars } from './config.js';
 
 // Set log level to debug
 log.setLevel(log.LEVELS.INFO);
@@ -75,7 +75,7 @@ async function createDatasetFromTestCases(): Promise<void> {
     const client = createClient({
         options: {
             baseUrl: process.env.PHOENIX_BASE_URL!,
-            headers: { Authorization: `Bearer ${process.env.PHOENIX_API_KEY}` },
+            headers: { Authorization: `Bearer ${sanitizeHeaderValue(process.env.PHOENIX_API_KEY)}` },
         },
     });
 

@@ -69,6 +69,13 @@ export function getRequiredEnvVars(): Record<string, string | undefined> {
     };
 }
 
+// Removes newlines and trims whitespace. Useful for Authorization header values
+// because CI secrets sometimes include trailing newlines or quotes.
+export function sanitizeHeaderValue(value?: string): string | undefined {
+    if (value == null) return value;
+    return value.replace(/[\r\n]/g, '').trim().replace(/^"|"$/g, '');
+}
+
 export function validateEnvVars(): boolean {
     const envVars = getRequiredEnvVars();
     const missing = Object.entries(envVars)

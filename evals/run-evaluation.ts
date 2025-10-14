@@ -18,11 +18,16 @@ import log from '@apify/log';
 import { ApifyClient } from '../src/apify-client.js';
 import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
 import type { ToolBase, ToolEntry } from '../src/types.js';
-import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, validateEnvVars } from './config.js';
+import { DATASET_NAME, MODELS_TO_EVALUATE, PASS_THRESHOLD, SYSTEM_PROMPT, sanitizeHeaderValue, validateEnvVars } from './config.js';
 
 log.setLevel(log.LEVELS.DEBUG);
 
 dotenv.config({ path: '.env' });
+
+// Sanitize secrets early to avoid invalid header characters in CI
+process.env.OPENAI_API_KEY = sanitizeHeaderValue(process.env.OPENAI_API_KEY);
+process.env.ANTHROPIC_API_KEY = sanitizeHeaderValue(process.env.ANTHROPIC_API_KEY);
+process.env.PHOENIX_API_KEY = sanitizeHeaderValue(process.env.PHOENIX_API_KEY);
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 
@@ -70,7 +75,7 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
         input: Record<string, unknown>,
         metadata: Record<string, unknown>,
     }> => {
-        const client = new OpenAI();
+        const client = new OpenAI({ apiKey: sanitizeHeaderValue(process.env.OPENAI_API_KEY) });
 
         const response = await client.chat.completions.create({
             model: modelName,
@@ -104,7 +109,7 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
         input: Record<string, unknown>,
         metadata: Record<string, unknown>,
     }> => {
-        const client = new Anthropic({});
+        const client = new Anthropic({ apiKey: sanitizeHeaderValue(process.env.ANTHROPIC_API_KEY) });
 
         const response = await client.messages.create({
             model: modelName,
@@ -173,7 +178,7 @@ async function main(): Promise<number> {
     const client = createClient({
         options: {
             baseUrl: process.env.PHOENIX_BASE_URL!,
-            headers: { Authorization: `Bearer ${process.env.PHOENIX_API_KEY}` },
+            headers: { Authorization: `Bearer ${sanitizeHeaderValue(process.env.PHOENIX_API_KEY)}` },
         },
     });
 
