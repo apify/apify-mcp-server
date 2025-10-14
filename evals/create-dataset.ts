@@ -27,19 +27,19 @@ interface TestCase {
     id: string;
     category: string;
     question: string;
-    expected_tools: string[];
+    expectedTools: string[];
 }
 
 interface TestData {
     version: string;
-    test_cases: TestCase[];
+    testCases: TestCase[];
 }
 
 // eslint-disable-next-line consistent-return
 function loadTestCases(): TestData {
     const filename = fileURLToPath(import.meta.url);
     const dirname = pathDirname(filename);
-    const testCasesPath = join(dirname, 'test_cases.json');
+    const testCasesPath = join(dirname, 'test-cases.json');
 
     try {
         const fileContent = readFileSync(testCasesPath, 'utf-8');
@@ -60,14 +60,14 @@ async function createDatasetFromTestCases(): Promise<void> {
 
     // Load test cases
     const testData = loadTestCases();
-    const testCases = testData.test_cases;
+    const { testCases } = testData;
 
     log.info(`Loaded ${testCases.length} test cases`);
 
     // Convert to format expected by Phoenix
     const examples = testCases.map((testCase) => ({
         input: { question: testCase.question },
-        output: { tool_calls: testCase.expected_tools.join(', ') },
+        output: { tool_calls: testCase.expectedTools.join(', ') },
         metadata: { category: testCase.category },
     }));
 

@@ -1,389 +1,389 @@
 {
   "version": "1.6",
-  "test_cases": [
+  "testCases": [
     {
       "id": "fetch-actor-details-1",
       "category": "fetch-actor-details",
       "question": "What are the details of apify/instagram-scraper?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-2",
       "category": "fetch-actor-details",
       "question": "Give me the documentation for apify/rag-web-browser",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-3",
       "category": "fetch-actor-details",
       "question": "Scrape details of apify/google-search-scraper",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-4",
       "category": "fetch-actor-details",
       "question": "What can apify/instagram-scraper do?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-5",
       "category": "fetch-actor-details",
       "question": "How does apify/rag-web-browser work?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-6",
       "category": "fetch-actor-details",
       "question": "How much does apify/instagram-scraper cost?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-7",
       "category": "fetch-actor-details",
       "question": "What parameters does apify/instagram-scraper accept?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-8",
       "category": "fetch-actor-details",
       "question": "Tell me about apify/social-media-hashtag-research features",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-9",
       "category": "fetch-actor-details",
       "question": "What's the pricing model for apify/rag-web-browser?",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "fetch-actor-details-10",
       "category": "fetch-actor-details",
       "question": "Show me the input schema for apify/rag-web-browser",
-      "expected_tools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details"]
     },
     {
       "id": "search-actors-1",
       "category": "search-actors",
       "question": "How to search for Instagram posts",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-2",
       "category": "search-actors",
       "question": "What are the best Instagram scrapers?",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-3",
       "category": "search-actors",
       "question": "Find actors for scraping social media",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-4",
       "category": "search-actors",
       "question": "Show me Twitter scraping tools",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-5",
       "category": "search-actors",
       "question": "What actors can scrape TikTok content?",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-6",
       "category": "search-actors",
       "question": "Find Facebook data extraction tools",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-7",
       "category": "search-actors",
       "question": "Show me actors for web scraping",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-8",
       "category": "search-actors",
       "question": "Find actors that can scrape news articles",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-9",
       "category": "search-actors",
       "question": "What tools can extract data from e-commerce sites?",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-10",
       "category": "search-actors",
       "question": "Show me Amazon product scrapers",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-11",
       "category": "search-actors",
       "question": "Search for Playwright browser MCP server",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-12",
       "category": "search-actors",
       "question": "I need to find solution to scrape details of Amazon products",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-13",
       "category": "search-actors",
       "question": "Fetch posts from Twitter about AI",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-14",
       "category": "search-actors",
       "question": "Get flight information from Skyscanner",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-15",
       "category": "search-actors",
       "question": "Can you find actors to scrape weather data?",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-16",
       "category": "search-actors",
       "question": "What actors can be used for scraping social media?",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-17",
       "category": "search-actors",
       "question": "Find actors for data extraction tasks",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-18",
       "category": "search-actors",
       "question": "Look for actors that can scrape news articles",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-19",
       "category": "search-actors",
       "question": "Find actors that extract data from e-commerce sites",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "rag-web-browser-1",
       "category": "apify-slash-rag-web-browser",
       "question": "Search articles about AI from tech blogs",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "rag-web-browser-2",
       "category": "apify-slash-rag-web-browser",
       "question": "Fetch recent articles about climate change",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "rag-web-browser-3",
       "category": "apify-slash-rag-web-browser",
       "question": "Get the latest weather forecast for San Francisco",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "rag-web-browser-4",
       "category": "apify-slash-rag-web-browser",
       "question": "Get data from example.com",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "rag-web-browser-5",
       "category": "apify-slash-rag-web-browser",
       "question": "Get the latest tech industry news",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-1",
       "category": "search-actors",
       "question": "Find posts about AI on Instagram",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-2",
       "category": "search-actors",
       "question": "Scrape Instagram posts about AI",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-3",
       "category": "apify-slash-rag-web-browser",
       "question": "Search for AI articles on tech blogs",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-4",
       "category": "apify-slash-rag-web-browser",
       "question": "Fetch articles about AI from Wired and The Verge",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-5",
       "category": "apify-slash-rag-web-browser",
       "question": "Get the latest weather forecast for New York",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-6",
       "category": "search-actors",
       "question": "Search for weather data scraping tools",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-7",
       "category": "search-actors",
       "question": "Fetch flight details for New York to London",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-8",
       "category": "search-actors",
       "question": "Find actors for flight data extraction",
-      "expected_tools": ["search-actors"]
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-9",
       "category": "apify-slash-rag-web-browser",
       "question": "Look for news articles on AI",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-10",
       "category": "apify-slash-rag-web-browser",
       "question": "Fetch AI-related news from CNN and BBC",
-      "expected_tools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-apify-docs-1",
       "category": "search-apify-docs",
       "question": "How to build an Apify Actor",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-2",
       "category": "search-apify-docs",
       "question": "Ho to define Actor input schema, provide examples",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-3",
       "category": "search-apify-docs",
       "question": "How to use Playwright library with Apify",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-4",
       "category": "search-apify-docs",
       "question": "Is there is a documentation for MCP server",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-5",
       "category": "search-apify-docs",
       "question": "How to use Apify Proxy",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-6",
       "category": "search-apify-docs",
       "question": "Web scraping with Crawlee",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-7",
       "category": "search-apify-docs",
       "question": "Apify API integration guide",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "search-apify-docs-8",
       "category": "search-apify-docs",
       "question": "Error handling in Actors",
-      "expected_tools": ["search-apify-docs"]
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "call-actor-1",
       "category": "call-actor",
       "question": "Run apify/instagram-scraper to scrape #dwaynejohnson",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "call-actor-2",
       "category": "call-actor",
       "question": "Run apidojo/tweet-scraper to scrape twitter profiles",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "call-actor-3",
       "category": "call-actor",
       "question": "Call apify/google-search-scraper to find restaurants in London",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "call-actor-4",
       "category": "call-actor",
       "question": "Run apify/social-media-hashtag-research for #AI",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "call-actor-5",
       "category": "call-actor",
       "question": "Scrape iPhone15 at Amazon using apify/e-commerce-scraping-tool",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "call-actor-6",
       "category": "call-actor",
       "question": "Call epctex/weather-scraper for New York",
-      "expected_tools": ["call-actor"]
+      "expectedTools": ["call-actor"]
     },
     {
       "id": "get-actor-output-1",
       "category": "get-actor-output",
       "question": "Get output from my latest actor with datasetId des32s",
-      "expected_tools": ["get-actor-output"]
+      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "get-actor-output-2",
       "category": "get-actor-output",
       "question": "Retrieve results from dataset abc123",
-      "expected_tools": ["get-actor-output"]
+      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "get-actor-output-3",
       "category": "get-actor-output",
       "question": "Show me the data from my Instagram scraper run with datasetId d23d2, ",
-      "expected_tools": ["get-actor-output"]
+      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "get-actor-output-4",
       "category": "get-actor-output",
       "question": "Get the first 50 items from my datasetId abc123",
-      "expected_tools": ["get-actor-output"]
+      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "get-actor-output-5",
       "category": "get-actor-output",
       "question": "Retrieve all results from my web scraper with datasetID abc123",
-      "expected_tools": ["get-actor-output"]
+      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "fetch-apify-docs-1",
       "category": "fetch-apify-docs",
       "question": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
-      "expected_tools": ["fetch-apify-docs"]
+      "expectedTools": ["fetch-apify-docs"]
     }
   ]
 }

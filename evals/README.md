@@ -1,56 +1,84 @@
 # MCP Tool Calling Evaluations
 
-Python-based evaluations for the Apify MCP Server using Arize Phoenix platform.
+TypeScript-based evaluations for the Apify MCP Server using Arize Phoenix platform.
 
-> **Note**: The TypeScript package had connection issues, so we use the Python implementation instead.
+## Objectives
+
+The MCP server tool calls evaluation has several key objectives:
+
+1. **Identify problems** in the description of the tools
+2. **Create a test suite** that can be run manually or automatically in CI
+3. **Allow for quick iteration** on tool descriptions
+
+## 1. ✍️ **Create test cases manually** (Current Implementation)
+
+- **Pros:**
+  - Straightforward approach
+  - Simple to create test cases for each tool
+  - Direct control over test scenarios
+
+- **Cons:**
+  - Complicated to create flows (several tool calls in a row)
+  - Requires maintenance when MCP server changes
+  - Manual effort for comprehensive coverage
+
+## Test case examples
+
+### Simple tool selection
+```
+"What are the best Instagram scrapers" → "search-actors"
+```
+
+### Multi-step flow
+```
+User: "Search for the weather MCP server and then add it to available tools"
+Expected sequence:
+1. search-actors (with input: {"search": "weather mcp", "limit": 5})
+2. add-actor (to add the found weather MCP server)
+```
 
 ## Workflow
 
-The evaluation process has 4 steps:
+The evaluation process has two steps:
 
 1. **Create dataset** (if not exists) - Upload test cases to Phoenix
-2. **Update dataset ID** in `config.py` - Point to the correct Phoenix dataset  
-3. **Export tools** - Get current MCP tool definitions
-4. **Run evaluation** - Test models against ground truth
+2. **Run evaluation** - Test models against ground truth
 
-## Quick Start
+## Quick start
 
 ```bash
 # 1. Set environment variables
+export PHOENIX_BASE_URL="phoenix_url"
 export PHOENIX_API_KEY="your_key"
-export OPENAI_API_KEY="your_key" 
+export OPENAI_API_KEY="your_key"
 export ANTHROPIC_API_KEY="your_key"
 
 # 2. Install dependencies
-uv pip install -e evals/
+npm ci
 
 # 3. Create dataset (one-time)
-python3 evals/create_dataset.py
+npm run evals:create-dataset
 
-# 4. Update DATASET_NAME in config.py with the returned dataset ID
-
-# 5. Export tools and run evaluation
-npm run evals:export-tools
-python3 evals/run_evaluation.py
+# 5. Run evaluation
+npm run evals:run
 ```
 
 ## Files
 
-- `config.py` - Configuration (models, threshold, Phoenix settings)
-- `test_cases.json` - Ground truth test cases
-- `run_evaluation.py` - Main evaluation script
-- `create_dataset.py` - Upload test cases to Phoenix
-- `export-tools.ts` - Export MCP tools to JSON
-- `evaluation_2025.ipynb` - Interactive analysis notebook
+- `config.ts` - Configuration (models, threshold, Phoenix settings)
+- `test-cases.json` - Ground truth test cases
+- `run-evaluation.ts` - Main evaluation script
+- `create-dataset.ts` - Upload test cases to Phoenix
+- `evaluation_2025.ipynb` - Interactive analysis notebook (Python-based, requires `pip install -e .`)
 
 ## Configuration
 
-Key settings in `config.py`:
+Key settings in `config.ts`:
 - `MODELS_TO_EVALUATE` - Models to test (default: `['gpt-4o-mini', 'claude-3-5-haiku-latest']`)
 - `PASS_THRESHOLD` - Accuracy threshold (default: 0.8)
 - `DATASET_NAME` - Phoenix dataset name
 
-## Test Cases
+## Test cases
 
 40+ test cases covering 7 tool categories:
 - `fetch-actor-details` - Actor information queries
@@ -70,18 +98,14 @@ Key settings in `config.py`:
 ## Troubleshooting
 
 ```bash
-# Missing tools.json
-npm run evals:export-tools
-
 # Missing dataset
-python3 evals/create_dataset.py
+npm run evals:create-dataset
 
 # Environment issues
-python3 -c "from dotenv import load_dotenv; load_dotenv()"
+# Make sure .env file exists with required API keys
 ```
 
-## Adding Test Cases
+## Adding test cases
 
-1. Edit `test_cases.json`
-2. Update version number
-3. Run `python3 evals/create_dataset.py`
+1. Edit `test-cases.json`
+3. Run `npm run evals:create-dataset`

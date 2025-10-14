@@ -26,6 +26,16 @@ dotenv.config({ path: '.env' });
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 
+// Type for Phoenix evaluation run results
+interface EvaluationRun {
+    name: string;
+    result?: {
+        score?: number;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+
 async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
     const urlTools = await processParamsGetTools('', apifyClient);
@@ -55,7 +65,11 @@ function transformToolsToAnthropicFormat(tools: ToolBase[]): Anthropic.Tool[] {
 function createOpenAITask(modelName: string, tools: ToolBase[]) {
     const toolsOpenAI = transformToolsToOpenAIFormat(tools);
 
-    return async (example: ExampleInputOnly): Promise<{ toolCalls: string[] }> => {
+    return async (example: ExampleInputOnly): Promise<{
+        toolCalls: string[];
+        input: Record<string, unknown>,
+        metadata: Record<string, unknown>,
+    }> => {
         const client = new OpenAI();
 
         const response = await client.chat.completions.create({
@@ -69,14 +83,16 @@ function createOpenAITask(modelName: string, tools: ToolBase[]) {
 
         const toolCalls: string[] = [];
         const firstMessage = response.choices?.[0]?.message;
-        const msg = JSON.stringify(JSON.stringify(firstMessage));
-        log.debug(`${example.metadata?.category} - ${example.input?.question} - ${msg}`);
         if (firstMessage?.tool_calls?.length) {
             const toolCall = firstMessage.tool_calls[0];
             const name = toolCall?.function?.name;
             if (name) toolCalls.push(name);
         }
-        return { toolCalls };
+        return {
+            toolCalls,
+            input: example.input,
+            metadata: { content: firstMessage },
+        };
     };
 }
 
@@ -99,7 +115,6 @@ function createAnthropicTask(modelName: string, tools: ToolBase[]) {
         });
 
         const toolCalls: string[] = [];
-        log.debug(`${example.input?.question} - ${JSON.stringify(response.content)}`);
         for (const content of response.content) {
             if (content.type === 'tool_use') {
                 const toolUseContent = content as Anthropic.ToolUseBlock;
@@ -119,7 +134,7 @@ const toolsMatch = asEvaluator({
     name: 'tools_match',
     kind: 'CODE',
     evaluate: async ({ output, expected }: {
-        output: { toolCalls?: string[] } | null;
+        output: { toolCalls?: string[], input?: Record<string, unknown>, metadata?: Record<string, unknown> } | null;
         expected?: Record<string, unknown>;
     }) => {
         const toolCalls = String(expected?.tool_calls ?? '');
@@ -128,15 +143,18 @@ const toolsMatch = asEvaluator({
             .map((t) => t.trim())
             .filter(Boolean)
             .sort();
-
+        // console.log(`Output tools: ${JSON.stringify(output?.metadata)} -> ${JSON.stringify(output?.toolCalls)}`);
         const actualArr = Array.isArray(output?.toolCalls) ? output.toolCalls : [];
         const actual = [...actualArr].sort();
         const matches = JSON.stringify(expectedTools) === JSON.stringify(actual);
+        log.debug(
+            `-----------------------\n`
+            + `Query: ${String(output?.input?.question ?? '')}\n`
+            + `LLM response: ${JSON.stringify(output?.metadata?.content ?? '')}\n`
+            + `Match: ${matches}, expected tools: ${JSON.stringify(expectedTools)}, actual tools: ${JSON.stringify(actual)}`,
+        );
         return {
-            label: matches ? 'matches' : 'does not match',
             score: matches ? 1 : 0,
-            explanation: matches ? 'Output tool calls match expected' : 'Mismatch between expected and output tool calls',
-            metadata: {},
         };
     },
 });
@@ -206,14 +224,14 @@ async function main(): Promise<number> {
                 evaluators: [toolsMatch],
                 experimentName,
                 experimentDescription,
-                dryRun: 3,
+                concurrency = 10,
             });
 
             const runsMap = experiment.runs ?? {};
             const evalRuns = experiment.evaluationRuns ?? [];
             totalCases = Object.keys(runsMap).length;
-            const toolMatchEvals = evalRuns.filter((er: any) => er.name === 'tools_match');
-            correctCases = toolMatchEvals.filter((er: any) => (er.result?.score ?? 0) > 0.5).length;
+            const toolMatchEvals = evalRuns.filter((er: EvaluationRun) => er.name === 'tools_match');
+            correctCases = toolMatchEvals.filter((er: EvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
             experimentId = experiment.id;
 
@@ -227,7 +245,7 @@ async function main(): Promise<number> {
         results.push({ model: modelName, accuracy, correct: correctCases, total: totalCases, experiment_id: experimentId, error });
     }
 
-    log.info('\n📊 Results:');
+    log.info('📊 Results:');
     for (const result of results) {
         const { model, accuracy, error } = result;
         if (error) {
@@ -238,7 +256,7 @@ async function main(): Promise<number> {
     }
 
     const allPassed = results.filter((r) => !r.error).every((r) => r.accuracy >= PASS_THRESHOLD);
-    log.info(`\nPass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
+    log.info(`Pass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
     if (allPassed) {
         log.info('✅ All models passed the threshold');
     } else {

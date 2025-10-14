@@ -37,27 +37,8 @@ jobs:
             -   name: Build project
                 run: npm run build
 
-            -   name: Export tools
-                run: npm run evals:export-tools
-
-            -   name: Set up Python
-                uses: actions/setup-python@v4
-                with:
-                    python-version: '3.12'
-
-            -   name: Install uv
-                run: pip install uv
-
-            -   name: Create Python virtual environment
-                run: uv venv
-
-            -   name: Install Python dependencies
-                run: uv pip install -e .
-
             -   name: Run evaluations
-                run: |
-                    source .venv/bin/activate
-                    npm run test:evals
+                run: npm run evals:run
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_COLLECTOR_ENDPOINT: ${{ secrets.PHOENIX_COLLECTOR_ENDPOINT }}

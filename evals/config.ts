@@ -6,11 +6,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Read version from test_cases.json
+// Read version from test-cases.json
 function getTestCasesVersion(): string {
     const currentFilename = fileURLToPath(import.meta.url);
     const currentDirname = dirname(currentFilename);
-    const testCasesPath = join(currentDirname, 'test_cases.json');
+    const testCasesPath = join(currentDirname, 'test-cases.json');
     const testCasesContent = readFileSync(testCasesPath, 'utf-8');
     const testCases = JSON.parse(testCasesContent);
     return testCases.version;
@@ -19,7 +19,7 @@ function getTestCasesVersion(): string {
 // Models to evaluate
 export const MODELS_TO_EVALUATE = [
     'gpt-4o-mini',
-    // 'claude-3-5-haiku-latest',
+    'claude-3-5-haiku-latest',
 ];
 
 export const PASS_THRESHOLD = 0.8;
