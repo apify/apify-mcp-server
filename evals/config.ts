@@ -18,7 +18,7 @@ function getTestCasesVersion(): string {
 
 // Evaluator names
 export const EVALUATOR_NAMES = {
-    TOOLS_EXACT_MATCH: 'tools-exact-match',
+    TOOLS_EXACT_MATCH: 'tool-exact-match',
     TOOL_SELECTION_LLM: 'tool-selection-llm',
 } as const;
 
@@ -26,22 +26,19 @@ export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES]
 
 // Models to evaluate
 export const MODELS_TO_EVALUATE = [
-    'gpt-4o-mini',
-    'claude-3-5-haiku-latest',
+    'openai/gpt-4o-mini',
+    'anthropic/claude-3.5-haiku',
     'google/gemini-2.5-flash',
 ];
 
-export const PASS_THRESHOLD = 0.8;
+export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini';
 
-export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const PASS_THRESHOLD = 0.8;
 
 export const DATASET_NAME = `mcp_tool_calling_ground_truth_v${getTestCasesVersion()}`;
 
 // System prompt
 export const SYSTEM_PROMPT = 'You are a helpful assistant';
-
-// Tool calling evaluation template
-// Environment variables
 
 export const TOOL_CALLING_BASE_TEMPLATE = `
 You are an evaluation assistant evaluating questions and tool calls to
@@ -77,8 +74,8 @@ export function getRequiredEnvVars(): Record<string, string | undefined> {
     return {
         PHOENIX_BASE_URL: process.env.PHOENIX_BASE_URL,
         PHOENIX_API_KEY: process.env.PHOENIX_API_KEY,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+        OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+        OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL,
     };
 }
 

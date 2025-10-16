@@ -11,9 +11,11 @@ import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
 import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments';
 import type { ExperimentEvaluationRun, ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
 import { createClassifierFn } from '@arizeai/phoenix-evals';
-import { openai } from '@ai-sdk/openai';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
+import { createOpenAI } from '@ai-sdk/openai';
+
+
 
 import log from '@apify/log';
 
@@ -26,11 +28,11 @@ import {
     PASS_THRESHOLD,
     SYSTEM_PROMPT,
     TOOL_CALLING_BASE_TEMPLATE,
+    TOOL_SELECTION_EVAL_MODEL,
     EVALUATOR_NAMES,
     type EvaluatorName,
     sanitizeHeaderValue,
-    validateEnvVars,
-    OPENROUTER_BASE_URL
+    validateEnvVars
 } from './config.js';
 
 interface EvaluatorResult {
@@ -50,7 +52,6 @@ log.setLevel(log.LEVELS.DEBUG);
 dotenv.config({ path: '.env' });
 
 // Sanitize secrets early to avoid invalid header characters in CI
-process.env.ANTHROPIC_API_KEY = sanitizeHeaderValue(process.env.ANTHROPIC_API_KEY);
 process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
@@ -83,7 +84,7 @@ function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
         reference: string;
     }> => {
         const client = new OpenAI({
-            baseURL: OPENROUTER_BASE_URL,
+            baseURL: process.env.OPENROUTER_BASE_URL,
             apiKey: sanitizeHeaderValue(process.env.OPENROUTER_API_KEY),
         });
 
@@ -155,15 +156,17 @@ const toolsExactMatch = asEvaluator({
     },
 });
 
-// Create the Phoenix classifier evaluator
-const model = openai('gpt-4o-mini');
+const openai = createOpenAI({
+    // custom settings, e.g.
+    baseURL: process.env.OPENROUTER_BASE_URL,
+    apiKey: process.env.OPENROUTER_API_KEY,
+});
 
 const classifierFn = createClassifierFn({
-    model,
+    model: openai(TOOL_SELECTION_EVAL_MODEL),
     choices: { correct: 1.0, incorrect: 0.0, 'not-applicable': 1 },
     promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
 });
-
 // LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
 const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
     name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
@@ -302,7 +305,7 @@ async function main(): Promise<number> {
                 experimentDescription,
                 concurrency: 10,
             });
-            log.info(`Experiment run completed. View details at: ${experiment}`);
+            log.info(`Experiment run completed`);
 
             // Process each evaluator separately
             results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOLS_EXACT_MATCH));
