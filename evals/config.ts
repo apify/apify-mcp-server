@@ -49,19 +49,17 @@ the right tool to call.
     [END DATA]
 
 
-DECISION: [correct or incorrect]
+DECISION: [correct, incorrect, not-applicable]
 EXPLANATION: [Super short explanation of why the tool choice was correct or incorrect]
 
-Your response must be single word, either "correct" or "incorrect",
+Your response must be single word, either "correct", "incorrect", or "not-applicable"
 and should not contain any text or characters aside from that word.
+
 "incorrect" means that the chosen tool was not correctly
 or that the tool signature includes parameter values that don't match
 the formats specified in the tool signatures below.
 
-"correct" means the correct tool call was chosen, the correct parameters
-were extracted from the query, the tool call generated is runnable and correct,
-and that no outside information not present in the query was used
-in the generated query.
+"not-applicable" means that response was not a function call.
 
 [Reference instructions]: {reference}
 
