@@ -46,6 +46,7 @@
     "apify": "^3.4.2",
     "apify-client": "^2.12.6",
     "cheerio": "^1.1.2",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mcp-client-capabilities": "^0.0.5",
     "to-json-schema": "^0.2.5",
@@ -55,18 +56,19 @@
     "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
-    "@anthropic-ai/sdk": "^0.33.1",
-    "@anthropic-ai/tokenizer": "^0.0.4",
+    "@ai-sdk/openai": "^2.0.52",
     "@apify/eslint-config": "^1.0.0",
     "@apify/tsconfig": "^0.1.0",
+    "@arizeai/phoenix-client": "^4.2.0",
+    "@arizeai/phoenix-evals": "^0.2.2",
     "@types/express": "^4.0.0",
     "@types/to-json-schema": "^0.2.4",
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
-    "dotenv": "^16.4.7",
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
-    "tsx": "^4.20.5",
+    "openai": "^4.77.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
     "vitest": "^3.0.8"
@@ -85,7 +87,9 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
-    "clean": "tsc -b src --clean"
+    "clean": "tsc -b src --clean",
+    "evals:create-dataset": "tsx evals/create-dataset.ts",
+    "evals:run": "tsx evals/run-evaluation.ts"
   },
   "author": "Apify",
   "license": "MIT"

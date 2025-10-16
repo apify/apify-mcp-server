@@ -28,3 +28,10 @@ key.pem
 
 # Ignore MCP config for Opencode client
 opencode.json
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python

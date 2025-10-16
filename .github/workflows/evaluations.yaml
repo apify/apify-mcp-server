@@ -1,0 +1,46 @@
+# This workflow runs MCP tool calling evaluations on master branch merges
+# It evaluates AI models' ability to correctly identify and call MCP tools.
+
+name: MCP tool calling evaluations
+
+on:
+    # Run evaluations on master branch merges
+    push:
+        branches:
+            - 'master'
+    # Also run on PRs with 'evals' label for testing
+    pull_request:
+        types: [labeled, synchronize, reopened]
+
+jobs:
+    evaluations:
+        name: MCP tool calling evaluations
+        runs-on: ubuntu-latest
+        # Run on master pushes or PRs with 'evals' label
+        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'validated')
+
+        steps:
+            -   name: Checkout code
+                uses: actions/checkout@v4
+
+            -   name: Use Node.js 22
+                uses: actions/setup-node@v4
+                with:
+                    node-version: 22
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+
+            -   name: Install Node dependencies
+                run: npm ci --include=dev
+
+            -   name: Build project
+                run: npm run build
+
+            -   name: Run evaluations
+                run: npm run evals:run
+                env:
+                    GITHUB_PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.number || 'master' }}
+                    PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
+                    PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
+                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+                    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
