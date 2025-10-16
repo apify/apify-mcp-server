@@ -2,6 +2,14 @@
 
 Evaluates MCP server tool selection. Phoenix used only for storing results and visualization.
 
+## CI Workflow
+
+The evaluation workflow runs automatically on:
+- **Master branch pushes** - for production evaluations (saves CI cycles)
+- **PRs with `evals` label** - for testing evaluation changes before merging
+
+To trigger evaluations on a PR, add the `evals` label to your pull request.
+
 ## Two evaluation methods
 
 1. **exact match** (`tool-exact-match`) - binary tool name validation
