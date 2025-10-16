@@ -1,5 +1,5 @@
 {
-  "version": "1.7",
+  "version": "1.0",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
