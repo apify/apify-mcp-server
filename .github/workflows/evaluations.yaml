@@ -32,7 +32,7 @@ jobs:
                     cache-dependency-path: 'package-lock.json'
 
             -   name: Install Node dependencies
-                run: npm ci
+                run: npm ci --include=dev
 
             -   name: Build project
                 run: npm run build

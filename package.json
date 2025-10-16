@@ -38,7 +38,6 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
-    "@arizeai/phoenix-client": "^4.2.0",
     "@modelcontextprotocol/sdk": "^1.18.1",
     "@types/cheerio": "^0.22.35",
     "@types/turndown": "^5.0.5",
@@ -54,20 +53,21 @@
     "turndown": "^7.2.0",
     "yargs": "^17.7.2",
     "zod": "^3.24.1",
-    "zod-to-json-schema": "^3.24.1",
-    "openai": "^4.77.0",
-    "@anthropic-ai/sdk": "^0.33.1"
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
-    "@anthropic-ai/tokenizer": "^0.0.4",
+    "@ai-sdk/openai": "^2.0.52",
     "@apify/eslint-config": "^1.0.0",
     "@apify/tsconfig": "^0.1.0",
+    "@arizeai/phoenix-client": "^4.2.0",
+    "@arizeai/phoenix-evals": "^0.2.2",
     "@types/express": "^4.0.0",
     "@types/to-json-schema": "^0.2.4",
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
+    "openai": "^4.77.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
