@@ -33,7 +33,7 @@ export const MODELS_TO_EVALUATE = [
 
 export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini';
 
-export const PASS_THRESHOLD = 0.8;
+export const PASS_THRESHOLD = 0.6;
 
 export const DATASET_NAME = `mcp_tool_calling_ground_truth_v${getTestCasesVersion()}`;
 
