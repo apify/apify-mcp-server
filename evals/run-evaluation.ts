@@ -10,6 +10,8 @@ import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
 // eslint-disable-next-line import/extensions
 import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments';
 import type { ExperimentEvaluationRun, ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
+import { createClassifierFn } from '@arizeai/phoenix-evals';
+import { openai } from '@ai-sdk/openai';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 
@@ -139,32 +141,47 @@ const toolsMatch = asEvaluator({
     },
 });
 
-// // Evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise (legacy)
-// const toolCallExactMatch = asEvaluator({
-//     name: 'tool_call_exact_match',
-//     kind: 'CODE',
-//     evaluate: async ({ output, expected }: any) => {
-//         const toolCalls = String(expected?.tool_calls ?? '');
-//         const expectedTools = toolCalls
-//             .split(', ')
-//             .map((t) => t.trim())
-//             .filter(Boolean)
-//             .sort();
-//         // console.log(`Output tools: ${JSON.stringify(output?.metadata)} -> ${JSON.stringify(output?.toolCalls)}`);
-//         const actualArr = Array.isArray(output?.toolCalls) ? output.toolCalls : [];
-//         const actual = [...actualArr].sort();
-//         const matches = JSON.stringify(expectedTools) === JSON.stringify(actual);
-//         log.debug(
-//             `----------------------\n`
-//             + `Query: ${String(output?.input?.question ?? '')}\n`
-//             + `LLM response: ${JSON.stringify(output?.metadata?.content ?? '')}\n`
-//             + `Match: ${matches}, expected tools: ${JSON.stringify(expectedTools)}, actual tools: ${JSON.stringify(actual)}`,
-//         );
-//         return {
-//             score: matches ? 1 : 0,
-//         };
-//     },
-// });
+// Create the Phoenix classifier evaluator
+const model = openai('gpt-4o-mini');
+
+const classifierFn = createClassifierFn({
+    model,
+    choices: { correct: 1.0, incorrect: 0.0 },
+    promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
+});
+
+// LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
+const createToolCallingLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
+    name: 'tool_calling_llm',
+    kind: 'LLM',
+    evaluate: async ({ input, output, expected }: any) => {
+        console.log(`Evaluating tool calling. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
+
+        const evalInput = {
+            query: input?.query || '',
+            context: input?.context || '',
+            tool_calls: output?.tool_calls || [],
+            llm_response: output?.llm_response || '',
+            reference: expected?.reference || '',
+            tool_definitions: JSON.stringify(tools)
+        };
+
+        try {
+            const result = await classifierFn(evalInput);
+            console.log(`# Tool calling evaluation result: ${JSON.stringify(result)} (Score: ${result.score})`);
+            return {
+                score: result.score || 0.0,
+                explanation: result.explanation || 'No explanation provided'
+            };
+        } catch (error) {
+            console.log(`Evaluation failed: ${error}`);
+            return {
+                score: 0.0,
+                explanation: `Evaluation failed: ${error}`
+            };
+        }
+    },
+});
 
 async function main(): Promise<number> {
     log.info('Starting MCP tool calling evaluation');
@@ -200,6 +217,9 @@ async function main(): Promise<number> {
 
     const results: { model: string; accuracy: number; correct: number; total: number; experiment_id?: string; error?: string }[] = [];
 
+    // Create the LLM evaluator with loaded tools
+    const toolCallingLLMEvaluator = createToolCallingLLMEvaluator(tools);
+
     for (const modelName of MODELS_TO_EVALUATE) {
         log.info(`\nEvaluating model: ${modelName}`);
 
@@ -222,7 +242,8 @@ async function main(): Promise<number> {
                 dataset: { datasetName: DATASET_NAME },
                 // Cast to satisfy ExperimentTask type
                 task: taskFn as ExperimentTask,
-                evaluators: [toolsMatch],
+                // evaluators: [toolsMatch, toolCallingLLMEvaluator],
+                evaluators: [toolCallingLLMEvaluator],
                 experimentName,
                 experimentDescription,
                 concurrency: 10,
@@ -237,12 +258,12 @@ async function main(): Promise<number> {
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
 
             // Log detailed results for both evaluators
-            // const toolCallingEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tool_calling_evaluator');
-            // const toolCallingCorrect = toolCallingEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
-            // const toolCallingAccuracy = totalCases > 0 ? toolCallingCorrect / totalCases : 0;
+            const toolCallingEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tool_calling_llm');
+            const toolCallingCorrect = toolCallingEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
+            const toolCallingAccuracy = totalCases > 0 ? toolCallingCorrect / totalCases : 0;
 
             log.info(`${modelName} - Tools Match: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
-            // log.info(`${modelName} - Tool Calling LLM: ${(toolCallingAccuracy * 100).toFixed(1)}% (${toolCallingCorrect}/${totalCases})`);
+            log.info(`${modelName} - Tool Calling LLM: ${(toolCallingAccuracy * 100).toFixed(1)}% (${toolCallingCorrect}/${totalCases})`);
             experimentId = experiment.id;
         } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
