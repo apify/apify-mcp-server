@@ -26,10 +26,24 @@ import {
     PASS_THRESHOLD,
     SYSTEM_PROMPT,
     TOOL_CALLING_BASE_TEMPLATE,
+    EVALUATOR_NAMES,
+    type EvaluatorName,
     sanitizeHeaderValue,
     validateEnvVars,
     OPENROUTER_BASE_URL
 } from './config.js';
+
+interface EvaluatorResult {
+    model: string;
+    experimentName: string;
+    experimentId: string;
+    evaluatorName: EvaluatorName;
+    accuracy: number;
+    correct: number;
+    total: number;
+    passed: boolean;
+    error?: string;
+}
 
 log.setLevel(log.LEVELS.DEBUG);
 
@@ -106,7 +120,7 @@ function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
 const toolsExactMatch = asEvaluator({
-    name: 'tools-exact-match',
+    name: EVALUATOR_NAMES.TOOLS_EXACT_MATCH,
     kind: 'CODE',
     evaluate: async ({ output, expected }: any) => {
         let expectedTools = expected?.expectedTools || [];
@@ -152,7 +166,7 @@ const classifierFn = createClassifierFn({
 
 // LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
 const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
-    name: 'tool-selection-llm',
+    name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
     kind: 'LLM',
     evaluate: async ({ input, output, expected }: any) => {
         console.log(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
@@ -182,6 +196,54 @@ const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
         }
     },
 });
+
+function processEvaluatorResult(
+    experiment: any,
+    modelName: string,
+    experimentName: string,
+    evaluatorName: EvaluatorName
+): EvaluatorResult {
+    const runsMap = experiment.runs ?? {};
+    const evalRuns = experiment.evaluationRuns ?? [];
+    const total = Object.keys(runsMap).length;
+
+    const evaluatorRuns = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === evaluatorName);
+    const correct = evaluatorRuns.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
+    const accuracy = total > 0 ? correct / total : 0;
+
+    return {
+        model: modelName,
+        experimentName,
+        experimentId: experiment.id,
+        evaluatorName,
+        accuracy,
+        correct,
+        total,
+        passed: accuracy >= PASS_THRESHOLD,
+    };
+}
+
+
+function printResults(results: EvaluatorResult[]): void {
+    log.info('📊 Results:');
+    for (const result of results) {
+        const { model, evaluatorName, accuracy, correct, total, passed, error } = result;
+        if (error) {
+            log.info(`${model}: ${evaluatorName} ❌ Error`);
+        } else {
+            const status = passed ? 'PASS' : 'FAIL';
+            log.info(`${model}: ${evaluatorName} ${(accuracy * 100).toFixed(1)}% (${correct}/${total}) ${status}`);
+        }
+    }
+
+    log.info(`\nPass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
+    const allPassed = results.every(r => !r.error && r.passed);
+    if (allPassed) {
+        log.info('All tests passed');
+    } else {
+        log.info('Some tests failed');
+    }
+}
 
 async function main(): Promise<number> {
     log.info('Starting MCP tool calling evaluation');
@@ -215,7 +277,7 @@ async function main(): Promise<number> {
 
     log.info(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
 
-    const results: { model: string; accuracy: number; correct: number; total: number; experiment_id?: string; error?: string }[] = [];
+    const results: EvaluatorResult[] = [];
 
     // Create the LLM evaluator with loaded tools
     const toolSelectionLLMEvaluator = createToolSelectionLLMEvaluator(tools);
@@ -223,15 +285,8 @@ async function main(): Promise<number> {
     for (const modelName of MODELS_TO_EVALUATE) {
         log.info(`\nEvaluating model: ${modelName}`);
 
-        let accuracy = 0;
-        let correctCases = 0;
-        let totalCases = 0;
-        let experimentId: string | undefined;
-        let error: string | undefined;
-
         // OpenRouter task
-        let taskFn: (example: ExampleInputOnly) => Promise<any>;
-        taskFn = createOpenRouterTask(modelName, tools);
+        const taskFn = createOpenRouterTask(modelName, tools);
 
         const experimentName = `MCP tool selection eval ${modelName}`;
         const experimentDescription = `Evaluation of ${modelName} on MCP tool selection`;
@@ -249,48 +304,34 @@ async function main(): Promise<number> {
             });
             log.info(`Experiment run completed. View details at: ${experiment}`);
 
-            const runsMap = experiment.runs ?? {};
-            const evalRuns = experiment.evaluationRuns ?? [];
-            totalCases = Object.keys(runsMap).length;
-            const toolMatchEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tools-exact-match');
-            correctCases = toolMatchEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
-            accuracy = totalCases > 0 ? correctCases / totalCases : 0;
-
-            // Log detailed results for both evaluators
-            const toolSelectionEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tool-selection-llm');
-            const toolSelectionCorrect = toolSelectionEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
-            const toolSelectionAccuracy = totalCases > 0 ? toolSelectionCorrect / totalCases : 0;
-
-            log.info(`${modelName} - Tools exact match: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
-            log.info(`${modelName} - Tool selection LLM: ${(toolSelectionAccuracy * 100).toFixed(1)}% (${toolSelectionCorrect}/${totalCases})`);
-            experimentId = experiment.id;
+            // Process each evaluator separately
+            results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOLS_EXACT_MATCH));
+            results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOL_SELECTION_LLM));
         } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
             log.error(`Error evaluating ${modelName}:`, err);
             log.error(`Full error trace: ${err.stack ?? err.message}`);
-            error = err.message;
+
+            // Add error results for both evaluators
+            Object.values(EVALUATOR_NAMES).forEach(evaluatorName => {
+                results.push({
+                    model: modelName,
+                    experimentName,
+                    experimentId: '',
+                    evaluatorName,
+                    accuracy: 0,
+                    correct: 0,
+                    total: 0,
+                    passed: false,
+                    error: err.message
+                });
+            });
         }
-        results.push({ model: modelName, accuracy, correct: correctCases, total: totalCases, experiment_id: experimentId, error });
     }
 
-    log.info('📊 Results:');
-    for (const result of results) {
-        const { model, accuracy, error } = result;
-        if (error) {
-            log.info(`  ${model}: ❌ Error`);
-        } else {
-            log.info(`  ${model}: ${(accuracy * 100).toFixed(1)}%`);
-        }
-    }
+    printResults(results);
 
-    const allPassed = results.every((r) => !r.error && r.accuracy >= PASS_THRESHOLD);
-    log.info(`Pass threshold: ${(PASS_THRESHOLD * 100).toFixed(1)}%`);
-    if (allPassed) {
-        log.info('✅ All models passed the threshold');
-    } else {
-        log.info('❌ Some models failed to meet the threshold');
-    }
-
+    const allPassed = results.every(r => !r.error && r.passed);
     return allPassed ? 0 : 1;
 }
 
