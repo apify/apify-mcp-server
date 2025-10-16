@@ -105,8 +105,8 @@ function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 }
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
-const toolsMatch = asEvaluator({
-    name: 'tools_exact_match',
+const toolsExactMatch = asEvaluator({
+    name: 'tools-exact-match',
     kind: 'CODE',
     evaluate: async ({ output, expected }: any) => {
         let expectedTools = expected?.expectedTools || [];
@@ -132,7 +132,7 @@ const toolsMatch = asEvaluator({
         const score = isCorrect ? 1.0 : 0.0;
         const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputTools)}`;
 
-        log.debug(`# Tools match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`# Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
 
         return {
             score,
@@ -146,16 +146,16 @@ const model = openai('gpt-4o-mini');
 
 const classifierFn = createClassifierFn({
     model,
-    choices: { correct: 1.0, incorrect: 0.0 },
+    choices: { correct: 1.0, incorrect: 0.0, 'not-applicable': 1 },
     promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
 });
 
 // LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
-const createToolCallingLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
-    name: 'tool_calling_llm',
+const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
+    name: 'tool-selection-llm',
     kind: 'LLM',
     evaluate: async ({ input, output, expected }: any) => {
-        console.log(`Evaluating tool calling. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
+        console.log(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
 
         const evalInput = {
             query: input?.query || '',
@@ -168,13 +168,13 @@ const createToolCallingLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
 
         try {
             const result = await classifierFn(evalInput);
-            console.log(`# Tool calling evaluation result: ${JSON.stringify(result)} (Score: ${result.score})`);
+            console.log(`# Tool selection evaluation result: ${JSON.stringify(result)} (Score: ${result.score})`);
             return {
                 score: result.score || 0.0,
                 explanation: result.explanation || 'No explanation provided'
             };
         } catch (error) {
-            console.log(`Evaluation failed: ${error}`);
+            console.log(`Tool selection evaluation failed: ${error}`);
             return {
                 score: 0.0,
                 explanation: `Evaluation failed: ${error}`
@@ -218,7 +218,7 @@ async function main(): Promise<number> {
     const results: { model: string; accuracy: number; correct: number; total: number; experiment_id?: string; error?: string }[] = [];
 
     // Create the LLM evaluator with loaded tools
-    const toolCallingLLMEvaluator = createToolCallingLLMEvaluator(tools);
+    const toolSelectionLLMEvaluator = createToolSelectionLLMEvaluator(tools);
 
     for (const modelName of MODELS_TO_EVALUATE) {
         log.info(`\nEvaluating model: ${modelName}`);
@@ -233,8 +233,8 @@ async function main(): Promise<number> {
         let taskFn: (example: ExampleInputOnly) => Promise<any>;
         taskFn = createOpenRouterTask(modelName, tools);
 
-        const experimentName = `MCP tool calling eval ${modelName}`;
-        const experimentDescription = `Evaluation of ${modelName} on MCP tool calling`;
+        const experimentName = `MCP tool selection eval ${modelName}`;
+        const experimentDescription = `Evaluation of ${modelName} on MCP tool selection`;
 
         try {
             const experiment = await runExperiment({
@@ -242,8 +242,7 @@ async function main(): Promise<number> {
                 dataset: { datasetName: DATASET_NAME },
                 // Cast to satisfy ExperimentTask type
                 task: taskFn as ExperimentTask,
-                // evaluators: [toolsMatch, toolCallingLLMEvaluator],
-                evaluators: [toolCallingLLMEvaluator],
+                evaluators: [toolsExactMatch, toolSelectionLLMEvaluator],
                 experimentName,
                 experimentDescription,
                 concurrency: 10,
@@ -253,17 +252,17 @@ async function main(): Promise<number> {
             const runsMap = experiment.runs ?? {};
             const evalRuns = experiment.evaluationRuns ?? [];
             totalCases = Object.keys(runsMap).length;
-            const toolMatchEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tools_exact_match');
+            const toolMatchEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tools-exact-match');
             correctCases = toolMatchEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
             accuracy = totalCases > 0 ? correctCases / totalCases : 0;
 
             // Log detailed results for both evaluators
-            const toolCallingEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tool_calling_llm');
-            const toolCallingCorrect = toolCallingEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
-            const toolCallingAccuracy = totalCases > 0 ? toolCallingCorrect / totalCases : 0;
+            const toolSelectionEvals = evalRuns.filter((er: ExperimentEvaluationRun) => er.name === 'tool-selection-llm');
+            const toolSelectionCorrect = toolSelectionEvals.filter((er: ExperimentEvaluationRun) => (er.result?.score ?? 0) > 0.5).length;
+            const toolSelectionAccuracy = totalCases > 0 ? toolSelectionCorrect / totalCases : 0;
 
-            log.info(`${modelName} - Tools Match: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
-            log.info(`${modelName} - Tool Calling LLM: ${(toolCallingAccuracy * 100).toFixed(1)}% (${toolCallingCorrect}/${totalCases})`);
+            log.info(`${modelName} - Tools exact match: ${(accuracy * 100).toFixed(1)}% (${correctCases}/${totalCases})`);
+            log.info(`${modelName} - Tool selection LLM: ${(toolSelectionAccuracy * 100).toFixed(1)}% (${toolSelectionCorrect}/${totalCases})`);
             experimentId = experiment.id;
         } catch (e: unknown) {
             const err = e instanceof Error ? e : new Error(String(e));
