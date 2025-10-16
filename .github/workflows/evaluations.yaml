@@ -17,7 +17,7 @@ jobs:
         name: MCP tool calling evaluations
         runs-on: ubuntu-latest
         # Run on master pushes or PRs with 'evals' label
-        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'evals')
+        if: github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'validated')
 
         steps:
             -   name: Checkout code

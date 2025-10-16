@@ -6,9 +6,9 @@ Evaluates MCP server tool selection. Phoenix used only for storing results and v
 
 The evaluation workflow runs automatically on:
 - **Master branch pushes** - for production evaluations (saves CI cycles)
-- **PRs with `evals` label** - for testing evaluation changes before merging
+- **PRs with `validated` label** - for testing evaluation changes before merging
 
-To trigger evaluations on a PR, add the `evals` label to your pull request.
+To trigger evaluations on a PR, add the `validated` label to your pull request.
 
 ## Two evaluation methods
 
@@ -21,7 +21,7 @@ unified API for Gemini, Claude, GPT. no separate integrations needed.
 
 ## Judge model
 
-- model: `openai/gpt-4o-mini` 
+- model: `openai/gpt-4o-mini`
 - prompt: structured eval with context + tool definitions
 - output: "correct"/"incorrect" → 1.0/0.0 score (and explanation)
 
@@ -37,7 +37,7 @@ TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini'
 
 ```bash
 export PHOENIX_BASE_URL="your_url"
-export PHOENIX_API_KEY="your_key" 
+export PHOENIX_API_KEY="your_key"
 export OPENROUTER_API_KEY="your_key"
 export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
@@ -53,12 +53,12 @@ npm run evals:run
 ## Output
 
 - Phoenix dashboard with detailed results
-- console: pass/fail per model + evaluator  
+- console: pass/fail per model + evaluator
 - exit code: 0 = success, 1 = failure
 
 ## Updating test cases
 
 to add/modify test cases:
-1. edit `test-cases.json` 
+1. edit `test-cases.json`
 2. run `npm run evals:create-dataset` to update Phoenix dataset
 3. run `npm run evals:run` to test changes
