@@ -42,5 +42,5 @@ jobs:
                 env:
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
-                    OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-                    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+                    OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
+                    OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
