@@ -1,111 +1,56 @@
-# MCP Tool Calling Evaluations
+# MCP tool selection evaluation
 
-TypeScript-based evaluations for the Apify MCP Server using Arize Phoenix platform.
+Evaluates MCP server tool selection. Phoenix used only for storing results and visualization.
 
-## Objectives
+## Two evaluation methods
 
-The MCP server tool calls evaluation has several key objectives:
+1. **exact match** (`tool-exact-match`) - binary tool name validation
+2. **LLM judge** (`tool-selection-llm`) - Phoenix classifier with structured prompt
 
-1. **Identify problems** in the description of the tools
-2. **Create a test suite** that can be run manually or automatically in CI
-3. **Allow for quick iteration** on tool descriptions
+## Why OpenRouter?
 
-## 1. ✍️ **Create test cases manually**
+unified API for Gemini, Claude, GPT. no separate integrations needed.
 
-- **Pros:**
-  - Straightforward approach
-  - Simple to create test cases for each tool
-  - Direct control over test scenarios
+## Judge model
 
-- **Cons:**
-  - Complicated to create flows (several tool calls in a row)
-  - Requires maintenance when MCP server changes
-  - Manual effort for comprehensive coverage
+- model: `openai/gpt-4o-mini` 
+- prompt: structured eval with context + tool definitions
+- output: "correct"/"incorrect" → 1.0/0.0 score (and explanation)
 
-## Test case examples
+## Config (`config.ts`)
 
-### Simple tool selection
-```
-"What are the best Instagram scrapers" → "search-actors"
+```typescript
+MODELS_TO_EVALUATE = ['openai/gpt-4o-mini', 'anthropic/claude-3.5-haiku', 'google/gemini-2.5-flash']
+PASS_THRESHOLD = 0.6
+TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini'
 ```
 
-### Multi-step flow
-```
-User: "Search for the weather MCP server and then add it to available tools"
-Expected sequence:
-1. search-actors (with input: {"search": "weather mcp", "limit": 5})
-2. add-actor (to add the found weather MCP server)
-```
-
-## Workflow
-
-The evaluation process has two steps:
-
-1. **Create dataset** (if not exists) - Upload test cases to Phoenix
-2. **Run evaluation** - Test models against ground truth
-
-## Quick start
+## Setup
 
 ```bash
-# 1. Set environment variables
-export PHOENIX_BASE_URL="phoenix_base_url"
-export PHOENIX_API_KEY="your_key"
-export OPENAI_API_KEY="your_key"
-export ANTHROPIC_API_KEY="your_key"
+export PHOENIX_BASE_URL="your_url"
+export PHOENIX_API_KEY="your_key" 
+export OPENROUTER_API_KEY="your_key"
+export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
-# 2. Install dependencies
 npm ci
-
-# 3. Create dataset (one-time)
-npm run evals:create-dataset
-
-# 5. Run evaluation
+npm run evals:create-dataset  # one-time
 npm run evals:run
 ```
 
-## Files
-
-- `config.ts` - Configuration (models, threshold, Phoenix settings)
-- `test-cases.json` - Ground truth test cases
-- `run-evaluation.ts` - Main evaluation script
-- `create-dataset.ts` - Upload test cases to Phoenix
-- `evaluation_2025.ipynb` - Interactive analysis notebook (Python-based, requires `pip install -e .`)
-
-## Configuration
-
-Key settings in `config.ts`:
-- `MODELS_TO_EVALUATE` - Models to test (default: `['gpt-4o-mini', 'claude-3-5-haiku-latest']`)
-- `PASS_THRESHOLD` - Accuracy threshold (default: 0.8)
-- `DATASET_NAME` - Phoenix dataset name
-
 ## Test cases
 
-40+ test cases covering 7 tool categories:
-- `fetch-actor-details` - Actor information queries
-- `search-actors` - Actor discovery
-- `apify-slash-rag-web-browser` - Web browsing
-- `search-apify-docs` - Documentation search
-- `call-actor` - Actor execution
-- `get-actor-output` - Dataset retrieval
-- `fetch-apify-docs` - Specific docs fetching
+40+ cases across 7 tool categories: `fetch-actor-details`, `search-actors`, `apify-slash-rag-web-browser`, `search-apify-docs`, `call-actor`, `get-actor-output`, `fetch-apify-docs`
 
-## Results
+## Output
 
-- **Phoenix Dashboard**: Detailed experiment results
-- **Console Output**: Pass/fail status with threshold check
-- **Exit Code**: 0 for success, 1 for failure (CI/CD ready)
+- Phoenix dashboard with detailed results
+- console: pass/fail per model + evaluator  
+- exit code: 0 = success, 1 = failure
 
-## Troubleshooting
+## Updating test cases
 
-```bash
-# Missing dataset
-npm run evals:create-dataset
-
-# Environment issues
-# Make sure .env file exists with required API keys
-```
-
-## Adding test cases
-
-1. Edit `test-cases.json`
-3. Run `npm run evals:create-dataset`
+to add/modify test cases:
+1. edit `test-cases.json` 
+2. run `npm run evals:create-dataset` to update Phoenix dataset
+3. run `npm run evals:run` to test changes
