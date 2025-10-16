@@ -3,7 +3,6 @@
  * Main evaluation script for MCP tool calling (TypeScript version).
  */
 
-import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@arizeai/phoenix-client';
 // eslint-disable-next-line import/extensions
 import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
@@ -14,8 +13,6 @@ import { createClassifierFn } from '@arizeai/phoenix-evals';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { createOpenAI } from '@ai-sdk/openai';
-
-
 
 import log from '@apify/log';
 
