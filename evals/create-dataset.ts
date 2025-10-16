@@ -26,8 +26,10 @@ dotenv.config({ path: '.env' });
 interface TestCase {
     id: string;
     category: string;
-    question: string;
-    expectedTools: string[];
+    query: string;
+    context?: string;
+    expectedTools?: string[];
+    reference?: string;
 }
 
 interface TestData {
@@ -66,8 +68,8 @@ async function createDatasetFromTestCases(): Promise<void> {
 
     // Convert to format expected by Phoenix
     const examples = testCases.map((testCase) => ({
-        input: { question: testCase.question },
-        output: { tool_calls: testCase.expectedTools.join(', ') },
+        input: { query: testCase.query },
+        output: { expectedTools: testCase.expectedTools?.join(', '), reference: testCase.reference || '' },
         metadata: { category: testCase.category },
     }));
 
@@ -80,7 +82,7 @@ async function createDatasetFromTestCases(): Promise<void> {
     });
 
     // Upload dataset
-    const datasetName = `mcp_tool_calling_ground_truth_v${testData.version}`;
+    const datasetName = `mcp_server_dataset_v${testData.version}`;
 
     log.info(`Uploading dataset '${datasetName}' to Phoenix...`);
 
@@ -88,7 +90,7 @@ async function createDatasetFromTestCases(): Promise<void> {
         const { datasetId } = await createDataset({
             client,
             name: datasetName,
-            description: `MCP tool calling ground truth dataset version ${testData.version}`,
+            description: `MCP server dataset: version ${testData.version}`,
             examples,
         });
 

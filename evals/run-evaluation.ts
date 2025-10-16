@@ -129,8 +129,8 @@ const toolsExactMatch = asEvaluator({
         if (!expectedTools || expectedTools.length === 0) {
             log.debug('Tools match: No expected tools provided');
             return {
-                score: 1.0,
-                explanation: 'No expected tools provided',
+                score: 0.0,
+                explanation: 'No expected tools present in the test case, either not required or not provided',
             };
         }
 
@@ -144,7 +144,7 @@ const toolsExactMatch = asEvaluator({
         const score = isCorrect ? 1.0 : 0.0;
         const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputTools)}`;
 
-        log.debug(`# Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`🕵 Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
 
         return {
             score,
@@ -159,11 +159,12 @@ const openai = createOpenAI({
     apiKey: process.env.OPENROUTER_API_KEY,
 });
 
-const classifierFn = createClassifierFn({
+const evaluator = createClassifierFn({
     model: openai(TOOL_SELECTION_EVAL_MODEL),
-    choices: { correct: 1.0, incorrect: 0.0, 'not-applicable': 1 },
+    choices: {correct: 1.0, incorrect: 0.0},
     promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
 });
+
 // LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
 const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
     name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
@@ -172,20 +173,20 @@ const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
         console.log(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
 
         const evalInput = {
-            query: input?.query || '',
-            context: input?.context || '',
-            tool_calls: output?.tool_calls || [],
-            llm_response: output?.llm_response || '',
-            reference: expected?.reference || '',
-            tool_definitions: JSON.stringify(tools)
+            query: `[User query] ${input?.query}` || '',
+            context: `[Context]: ${input?.context}` || '',
+            tool_calls: `[Tool calls]: ${JSON.stringify(output?.tool_calls)}` || '',
+            llm_response: `[LLM response]: ${output?.llm_response}` || '',
+            reference: `[Reference instructions]: ${expected?.reference}` || '',
+            tool_definitions: `[Tool Definitions]: ${JSON.stringify(tools)}`
         };
 
         try {
-            const result = await classifierFn(evalInput);
-            console.log(`# Tool selection evaluation result: ${JSON.stringify(result)} (Score: ${result.score})`);
+            const result = await evaluator(evalInput);
+            console.log(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
             return {
                 score: result.score || 0.0,
-                explanation: result.explanation || 'No explanation provided'
+                explanation: result.explanation || 'No explanation returned by model'
             };
         } catch (error) {
             console.log(`Tool selection evaluation failed: ${error}`);
@@ -288,8 +289,12 @@ async function main(): Promise<number> {
         // OpenRouter task
         const taskFn = createOpenRouterTask(modelName, tools);
 
-        const experimentName = `MCP tool selection eval ${modelName}`;
-        const experimentDescription = `Evaluation of ${modelName} on MCP tool selection`;
+        // Get PR info for better tracking
+        const prNumber = process.env.GITHUB_PR_NUMBER || 'local';
+        const prLabel = prNumber === 'local' ? 'local run' : `PR #${prNumber}`;
+
+        const experimentName = `MCP server:  ${modelName}`;
+        const experimentDescription = `${modelName}, ${prLabel}`;
 
         try {
             const experiment = await runExperiment({

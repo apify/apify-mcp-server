@@ -39,6 +39,7 @@ jobs:
             -   name: Run evaluations
                 run: npm run evals:run
                 env:
+                    GITHUB_PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.number || 'master' }}
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
                     OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
