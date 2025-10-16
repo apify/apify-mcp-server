@@ -85,26 +85,36 @@ function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
             apiKey: sanitizeHeaderValue(process.env.OPENROUTER_API_KEY),
         });
 
-        console.log(`Input: ${JSON.stringify(example)}`);
+        log.info(`Input: ${JSON.stringify(example)}`);
 
         const context = String(example.input?.context ?? '');
         const query = String(example.input?.query ?? '');
 
-        let content = context ? `Context: ${context}\n\n` : '';
-        content += query ? `User query: ${query}` : '';
-
         const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
             { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content },
         ];
 
-        console.log(`Model: ${modelName}, Messages: ${JSON.stringify(messages)}`);
+        if (context) {
+            messages.push({
+                role: 'user',
+                content: `My previous interaction with the assistant: ${context}`
+            });
+        }
+
+        messages.push({
+            role: 'user',
+            content: `${query}`,
+        });
+
+        log.info(`Messages to model: ${JSON.stringify(messages)}`);
 
         const response = await client.chat.completions.create({
             model: modelName,
             messages,
             tools: toolsOpenAI,
         });
+
+        log.info(`Model response: ${JSON.stringify(response.choices[0])}`);
 
         return {
             tool_calls: response.choices[0].message.tool_calls || [],
@@ -121,6 +131,8 @@ const toolsExactMatch = asEvaluator({
     name: EVALUATOR_NAMES.TOOLS_EXACT_MATCH,
     kind: 'CODE',
     evaluate: async ({ output, expected }: any) => {
+        log.info(`Evaluating tools match. Expected: ${JSON.stringify(expected)}, Output: ${JSON.stringify(output)}`);
+
         let expectedTools = expected?.expectedTools || [];
         if (typeof expectedTools === 'string') {
             expectedTools = expectedTools.split(', ');
@@ -144,7 +156,7 @@ const toolsExactMatch = asEvaluator({
         const score = isCorrect ? 1.0 : 0.0;
         const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputTools)}`;
 
-        log.debug(`🕵 Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
 
         return {
             score,
@@ -170,26 +182,26 @@ const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
     name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
     kind: 'LLM',
     evaluate: async ({ input, output, expected }: any) => {
-        console.log(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
+        log.info(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
 
         const evalInput = {
-            query: `[User query] ${input?.query}` || '',
-            context: `[Context]: ${input?.context}` || '',
-            tool_calls: `[Tool calls]: ${JSON.stringify(output?.tool_calls)}` || '',
-            llm_response: `[LLM response]: ${output?.llm_response}` || '',
-            reference: `[Reference instructions]: ${expected?.reference}` || '',
-            tool_definitions: `[Tool Definitions]: ${JSON.stringify(tools)}`
+            query: input?.query || '',
+            context: input?.context || '',
+            tool_calls: JSON.stringify(output?.tool_calls || []),
+            llm_response: output?.llm_response || '',
+            reference: expected?.reference || '',
+            tool_definitions: JSON.stringify(tools)
         };
 
         try {
             const result = await evaluator(evalInput);
-            console.log(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
+            log.info(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
             return {
                 score: result.score || 0.0,
                 explanation: result.explanation || 'No explanation returned by model'
             };
         } catch (error) {
-            console.log(`Tool selection evaluation failed: ${error}`);
+            log.info(`Tool selection evaluation failed: ${error}`);
             return {
                 score: 0.0,
                 explanation: `Evaluation failed: ${error}`

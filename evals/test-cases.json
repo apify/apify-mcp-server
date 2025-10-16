@@ -385,6 +385,78 @@
       "category": "fetch-apify-docs",
       "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
       "expectedTools": ["fetch-apify-docs"]
+    },
+    {
+      "id": "get-actor-output-basic-2",
+      "category": "get-actor-output",
+      "query": "Get query and markdown fields from dataset UvsU",
+      "expectedTools": ["get-actor-output"]
+    },
+    {
+      "id": "fetch-apify-docs-edge-1",
+      "category": "fetch-apify-docs",
+      "query": "Get content from: https://docs.apify.com/nonexistent-page",
+      "expectedTools": ["fetch-apify-docs"]
+    },
+    {
+      "id": "misleading-query-1",
+      "category": "misleading",
+      "query": "What's the weather like today?",
+      "expectedTools": ["search-actors"]
+    },
+    {
+      "id": "misleading-query-2",
+      "category": "misleading",
+      "query": "How do I scrape Instagram without using Apify?",
+      "expectedTools": ["search-actors"]
+    },
+    {
+      "id": "misleading-query-3",
+      "category": "misleading",
+      "query": "I need to build my own scraper from scratch",
+      "expectedTools": ["search-apify-docs"]
+    },
+    {
+      "id": "ambiguous-query-1",
+      "category": "ambiguous",
+      "query": "Instagram",
+      "expectedTools": ["search-actors"]
+    },
+    {
+      "id": "ambiguous-query-3",
+      "category": "ambiguous",
+      "query": "documentation",
+      "expectedTools": ["search-apify-docs"]
+    },
+    {
+      "id": "tool-selection-confusion-1",
+      "category": "tool-selection",
+      "query": "Find posts about AI on Instagram",
+      "expectedTools": ["search-actors"]
+    },
+    {
+      "id": "tool-selection-confusion-2",
+      "category": "tool-selection",
+      "query": "Search for AI articles on tech blogs",
+      "expectedTools": ["apify-slash-rag-web-browser"]
+    },
+    {
+      "id": "tool-selection-confusion-3",
+      "category": "tool-selection",
+      "query": "Get the latest weather forecast for New York",
+      "expectedTools": ["apify-slash-rag-web-browser"]
+    },
+    {
+      "id": "weather-mcp-search-then-call-1",
+      "category": "flow",
+      "query": "Now, use the mcp to check the weather in Prague, Czechia?",
+      "expectedTools": ["call-actor"],
+      "context": [
+          { "role": "user", "content": "Search for weather MCP server" },
+          { "role": "assistant", "content": "I'll help you to do that" },
+          { "role": "tool_use", "tool": "search-actors", "input": {"search": "weather mcp", "limit": 5} },
+          { "role": "tool_result", "tool_use_id": 12, "content": "Tool 'search-actors' successful, Actor found: jiri.spilka/weather-mcp-server" }
+      ]
     }
   ]
 }

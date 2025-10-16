@@ -56,9 +56,67 @@ npm run evals:run
 - console: pass/fail per model + evaluator
 - exit code: 0 = success, 1 = failure
 
-## Updating test cases
+## Adding new test cases
 
-to add/modify test cases:
-1. edit `test-cases.json`
-2. run `npm run evals:create-dataset` to update Phoenix dataset
-3. run `npm run evals:run` to test changes
+### How to contribute?
+
+1. **Create an issue or PR** with your new test cases
+2. **Explain why it should pass** - add a `reference` field with clear reasoning
+3. **Test locally** before submitting
+4. **Publish** - we'll review and merge
+
+### Test case structure
+
+Each test case in `test-cases.json` has this structure:
+
+```json
+{
+  "id": "unique-test-id",
+  "category": "tool-category",
+  "query": "user query text",
+  "expectedTools": ["tool-name"],
+  "reference": "explanation of why this should pass (optional)",
+  "context": [/* conversation history (optional) */]
+}
+```
+
+### Simple examples
+
+**Basic tool selection:**
+```json
+{
+  "id": "fetch-actor-details-1",
+  "category": "fetch-actor-details",
+  "query": "What are the details of apify/instagram-scraper?",
+  "expectedTools": ["fetch-actor-details"]
+}
+```
+
+**With reference explanation:**
+```json
+{
+  "id": "fetch-actor-details-3",
+  "category": "fetch-actor-details",
+  "query": "Scrape details of apify/google-search-scraper",
+  "expectedTools": ["fetch-actor-details"],
+  "reference": "It should call the fetch-actor-details with the actor ID 'apify/google-search-scraper' and return the actor's documentation."
+}
+```
+
+### Advanced examples with context
+
+**Multi-step conversation flow:**
+```json
+{
+  "id": "weather-mcp-search-then-call-1",
+  "category": "flow",
+  "query": "Now, use the mcp to check the weather in Prague, Czechia?",
+  "expectedTools": ["call-actor"],
+  "context": [
+    { "role": "user", "content": "Search for weather MCP server" },
+    { "role": "assistant", "content": "I'll help you to do that" },
+    { "role": "tool_use", "tool": "search-actors", "input": {"search": "weather mcp", "limit": 5} },
+    { "role": "tool_result", "tool_use_id": 12, "content": "Tool 'search-actors' successful, Actor found: jiri.spilka/weather-mcp-server" }
+  ]
+}
+```

@@ -33,7 +33,7 @@ export const MODELS_TO_EVALUATE = [
 
 export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini';
 
-export const PASS_THRESHOLD = 0.6;
+export const PASS_THRESHOLD = 0.7;
 
 export const DATASET_NAME = `mcp_server_dataset_v${getTestCasesVersion()}`;
 
@@ -50,11 +50,11 @@ the right tool to call.
 
 [BEGIN DATA]
 ************
-{{context}}
-{{query}}
+[User's previous interaction with the assistant]: {{context}}
+[User query]: {{query}}
 ************
-{{tool_calls}}
-{{llm_response}}
+[LLM decided to call these tools]: {{tool_calls}}
+[LLM response]: {{llm_response}}
 ************
 [END DATA]
 
@@ -78,9 +78,9 @@ Base your decision solely on the information provided in [BEGIN DATA] ... [END D
 the [Tool Definitions], and the [Reference instructions] (if provided).
 Reference instructions are optional and are intended to help you understand the use case and make your decision.
 
-{{reference}}
+[Reference instructions]: {{reference}}
 
-{{tool_definitions}}
+[Tool definitions]: {{tool_definitions}}
 `
 export function getRequiredEnvVars(): Record<string, string | undefined> {
     return {

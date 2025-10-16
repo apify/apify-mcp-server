@@ -27,7 +27,7 @@ interface TestCase {
     id: string;
     category: string;
     query: string;
-    context?: string;
+    context?: string | string[];
     expectedTools?: string[];
     reference?: string;
 }
@@ -68,7 +68,7 @@ async function createDatasetFromTestCases(): Promise<void> {
 
     // Convert to format expected by Phoenix
     const examples = testCases.map((testCase) => ({
-        input: { query: testCase.query },
+        input: { query: testCase.query, context: testCase.context || '' },
         output: { expectedTools: testCase.expectedTools?.join(', '), reference: testCase.reference || '' },
         metadata: { category: testCase.category },
     }));
