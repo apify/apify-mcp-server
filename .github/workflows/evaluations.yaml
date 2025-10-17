@@ -4,20 +4,20 @@
 name: MCP tool calling evaluations
 
 on:
-    # Run evaluations on master branch merges
-    push:
+    # Run evaluations on PR merges to master or PRs with 'validated' label
+    pull_request:
+        types: [closed, labeled]
         branches:
             - 'master'
-    # Also run on PRs with 'evals' label for testing
-    pull_request:
-        types: [labeled, synchronize, reopened, closed]
 
 jobs:
     evaluations:
         name: MCP tool calling evaluations
         runs-on: ubuntu-latest
-        # Run on master pushes, merged PRs, or PRs with 'validated' label
-        if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true) || contains(github.event.pull_request.labels.*.name, 'validated')
+        # Run on PR merges to master or PRs with 'validated' label
+        if: |
+            (github.event.action == 'closed' && github.event.pull_request.merged == true) ||
+            (github.event.action == 'labeled' && github.event.label.name == 'validated')
 
         steps:
             -   name: Checkout code
@@ -39,7 +39,7 @@ jobs:
             -   name: Run evaluations
                 run: npm run evals:run
                 env:
-                    GITHUB_PR_NUMBER: ${{ github.event_name == 'pull_request' && github.event.number || (github.event_name == 'push' && 'master') || 'unknown' }}
+                    GITHUB_PR_NUMBER: ${{ github.event.pull_request.number }}
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}
                     PHOENIX_BASE_URL: ${{ secrets.PHOENIX_BASE_URL }}
                     OPENROUTER_BASE_URL: ${{ secrets.OPENROUTER_BASE_URL }}
