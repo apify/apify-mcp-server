@@ -67,6 +67,9 @@ jobs:
             -   name: Update manifest.json version
                 run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json
 
+            -   name: Update server.json version
+                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' server.json > server.json.tmp && mv server.json.tmp server.json
+
             -   name: Update CHANGELOG.md
                 uses: DamianReeves/write-file-action@master
                 with:
@@ -80,7 +83,7 @@ jobs:
                 with:
                     author_name: Apify Release Bot
                     author_email: noreply@apify.com
-                    message: "chore(release): Update changelog, package.json and manifest.json versions [skip ci]"
+                    message: "chore(release): Update changelog, package.json, manifest.json and server.json versions [skip ci]"
 
     create_github_release:
         name: Create github release
@@ -118,7 +121,21 @@ jobs:
                         exit 1
                     fi
 
-                    echo "✓ Version check passed: manifest.json has correct version $ACTUAL_VERSION"
+                     echo "✓ Version check passed: manifest.json has correct version $ACTUAL_VERSION"
+            -   name: Verify server.json version
+                run: |
+                    EXPECTED_VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    ACTUAL_VERSION=$(jq -r '.version' server.json)
+
+                     echo "Expected version: $EXPECTED_VERSION"
+                     echo "Actual version in server.json: $ACTUAL_VERSION"
+
+                     if [ "$EXPECTED_VERSION" != "$ACTUAL_VERSION" ]; then
+                        echo "ERROR: Version mismatch! Expected $EXPECTED_VERSION but found $ACTUAL_VERSION in server.json"
+                        exit 1
+                     fi
+
+                     echo "✓ Version check passed: server.json has correct version $ACTUAL_VERSION"
             -   name: Use Node.js 22
                 uses: actions/setup-node@v4
                 with:
