@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.0) (2025-10-22)
+
+### 🚀 Features
+
+- MCP tool calling evaluations in CI&#x2F;CD ([#313](https://github.com/apify/apify-mcp-server/pull/313)) ([a971322](https://github.com/apify/apify-mcp-server/commit/a971322850e586d655b8481e3a8df82b03005cc1)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Capture PR number on merge to master ([#314](https://github.com/apify/apify-mcp-server/pull/314)) ([e3a3587](https://github.com/apify/apify-mcp-server/commit/e3a358770eaab2fc970f0a03c2507185ef645179)) by [@jirispilka](https://github.com/jirispilka)
+- Add correct PR number in the evals ([#315](https://github.com/apify/apify-mcp-server/pull/315)) ([69c540e](https://github.com/apify/apify-mcp-server/commit/69c540ed52fe9037bf2c14cb8e3bcd297be1c22f)) by [@jirispilka](https://github.com/jirispilka)
+- Call-actor output length ([#317](https://github.com/apify/apify-mcp-server/pull/317)) ([f99efbf](https://github.com/apify/apify-mcp-server/commit/f99efbfc96f0b3ac3a2e614d779f0bcbd3614d31)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.4.28](https://github.com/apify/apify-mcp-server/releases/tag/v0.4.28) (2025-10-13)
 
 ### 🚀 Features
