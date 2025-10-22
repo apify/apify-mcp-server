@@ -75,7 +75,7 @@ export function ensureOutputWithinCharLimit(items: DatasetItem[], importantField
      * If important fields are defined, use only those fields for that fallback step.
      */
     let sourceItems = items;
-    // Try only the important fields
+    // Try keeping only the important fields
     if (importantFields.length > 0) {
         const importantItems = items.map((item) => getValuesByDotKeys(item, importantFields));
         const importantItemsString = JSON.stringify(importantItems);
