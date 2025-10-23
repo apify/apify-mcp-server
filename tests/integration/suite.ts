@@ -31,6 +31,7 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractJsonFromMarkdown(text: string): any {
     // Handle markdown code blocks like ```json
     const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
