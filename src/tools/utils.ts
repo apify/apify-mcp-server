@@ -172,6 +172,13 @@ export function buildActorInputSchema(actorFullName: string, input: IActorInputS
     if (working && typeof working === 'object' && 'properties' in working && working.properties) {
         working.properties = transformActorInputSchemaProperties(working);
     }
+    
+    // Remove the schemaVersion field if present
+    // since it was causing issues with Gemini CLI
+    // https://github.com/apify/apify-mcp-server/issues/295
+    if (working.schemaVersion) {
+        delete working.schemaVersion;
+    }
 
     let finalSchema = working;
     if (isRag) {
