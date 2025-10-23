@@ -400,7 +400,7 @@
     },
     {
       "id": "misleading-query-1",
-      "category": "misleading",
+      "category": "search-actors",
       "query": "What's the weather like today?",
       "expectedTools": ["search-actors"]
     },
@@ -412,13 +412,13 @@
     },
     {
       "id": "misleading-query-3",
-      "category": "misleading",
+      "category": "search-actors",
       "query": "I need to build my own scraper from scratch",
       "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "ambiguous-query-1",
-      "category": "ambiguous",
+      "category": "search-actors",
       "query": "Instagram",
       "expectedTools": ["search-actors"]
     },
@@ -430,7 +430,7 @@
     },
     {
       "id": "tool-selection-confusion-1",
-      "category": "tool-selection",
+      "category": "search-actors",
       "query": "Find posts about AI on Instagram",
       "expectedTools": ["search-actors"]
     },
