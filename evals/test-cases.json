@@ -101,53 +101,47 @@
     {
       "id": "search-actors-7",
       "category": "search-actors",
-      "query": "Show me actors for web scraping",
+      "query": "Find actors that can scrape news articles",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-8",
       "category": "search-actors",
-      "query": "Find actors that can scrape news articles",
+      "query": "What tools can extract data from e-commerce sites?",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-9",
       "category": "search-actors",
-      "query": "What tools can extract data from e-commerce sites?",
+      "query": "Show me Amazon product scrapers",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-10",
       "category": "search-actors",
-      "query": "Show me Amazon product scrapers",
+      "query": "Search for Playwright browser MCP server",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-11",
       "category": "search-actors",
-      "query": "Search for Playwright browser MCP server",
+      "query": "I need to find solution to scrape details of Amazon products",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-12",
       "category": "search-actors",
-      "query": "I need to find solution to scrape details of Amazon products",
+      "query": "Fetch posts from Twitter about AI",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-13",
       "category": "search-actors",
-      "query": "Fetch posts from Twitter about AI",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-14",
-      "category": "search-actors",
       "query": "Get flight information from Skyscanner",
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-actors-15",
+      "id": "search-actors-14",
       "category": "search-actors",
       "query": "Can you find actors to scrape weather data?",
       "expectedTools": ["search-actors"]
@@ -155,25 +149,14 @@
     {
       "id": "search-actors-16",
       "category": "search-actors",
-      "query": "What actors can be used for scraping social media?",
-      "expectedTools": ["search-actors"]
+      "query": "Find actors for data extraction tasks",
+      "expectedTools": [],
+      "reference": "It should not call any tools, because the query is general, it should suggest to be more specific."
     },
     {
       "id": "search-actors-17",
       "category": "search-actors",
-      "query": "Find actors for data extraction tasks",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-18",
-      "category": "search-actors",
       "query": "Look for actors that can scrape news articles",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-19",
-      "category": "search-actors",
-      "query": "Find actors that extract data from e-commerce sites",
       "expectedTools": ["search-actors"]
     },
     {
@@ -457,6 +440,20 @@
           { "role": "tool_use", "tool": "search-actors", "input": {"search": "weather mcp", "limit": 5} },
           { "role": "tool_result", "tool_use_id": 12, "content": "Tool 'search-actors' successful, Actor found: jiri.spilka/weather-mcp-server" }
       ]
+    },
+    {
+      "id": "stackoverflow-scraper-python-1",
+      "category": "search-actors",
+      "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python",
+      "expectedTools": ["search-actors"],
+      "reference": "The 'search-actors' tool should be called using the exact query: 'StackOverflow'. It must not use extended queries such as 'StackOverflow scraper Python' or any more detailed variations."
+    },
+    {
+      "id": "instagram-profile-scraping-1",
+      "category": "search-actors",
+      "query": "I need to find Actor for instagram profile scraping",
+      "expectedTools": ["search-actors"],
+      "reference": "The 'search-actors' tool should be called with search parameter 'instagram profile'. It must not use extended queries such as 'instagram profile scraper' or any more detailed variations."
     }
   ]
 }

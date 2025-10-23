@@ -26,8 +26,8 @@ export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES]
 
 // Models to evaluate
 export const MODELS_TO_EVALUATE = [
-    'openai/gpt-4o-mini',
-    'anthropic/claude-3.5-haiku',
+    'openai/gpt-4.1-mini',
+    'anthropic/claude-haiku-4.5',
     'google/gemini-2.5-flash',
 ];
 
