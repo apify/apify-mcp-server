@@ -13,6 +13,9 @@ import { createClassifierFn } from '@arizeai/phoenix-evals';
 import dotenv from 'dotenv';
 import OpenAI from 'openai';
 import { createOpenAI } from '@ai-sdk/openai';
+import yargs from 'yargs';
+// eslint-disable-next-line import/extensions
+import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
@@ -44,9 +47,35 @@ interface EvaluatorResult {
     error?: string;
 }
 
+/**
+ * Interface for command line arguments
+ */
+interface CliArgs {
+    datasetName?: string;
+}
+
 log.setLevel(log.LEVELS.DEBUG);
 
 dotenv.config({ path: '.env' });
+
+// Parse command line arguments using yargs
+const argv = yargs(hideBin(process.argv))
+    .wrap(null) // Disable automatic wrapping to avoid issues with long lines
+    .usage('Usage: $0 [options]')
+    .env()
+    .option('dataset-name', {
+        type: 'string',
+        describe: 'Custom dataset name to evaluate (default: from config.ts)',
+        example: 'my_custom_dataset',
+    })
+    .help('help')
+    .alias('h', 'help')
+    .version(false)
+    .epilogue('Examples:')
+    .epilogue('  $0                                    # Use default dataset from config')
+    .epilogue('  $0 --dataset-name tmp-1               # Evaluate custom dataset')
+    .epilogue('  npm run evals:run -- --dataset-name custom_v1  # Via npm script')
+    .parseSync() as CliArgs;
 
 // Sanitize secrets early to avoid invalid header characters in CI
 process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
@@ -258,7 +287,7 @@ function printResults(results: EvaluatorResult[]): void {
     }
 }
 
-async function main(): Promise<number> {
+async function main(datasetName: string): Promise<number> {
     log.info('Starting MCP tool calling evaluation');
 
     if (!validateEnvVars()) {
@@ -279,16 +308,16 @@ async function main(): Promise<number> {
     // Resolve dataset by name -> id
     let datasetId: string | undefined;
     try {
-        const info = await getDatasetInfo({ client, dataset: { datasetName: DATASET_NAME } });
+        const info = await getDatasetInfo({ client, dataset: { datasetName } });
         datasetId = info?.id as string | undefined;
     } catch (e) {
         log.error(`Error loading dataset: ${e}`);
         return 1;
     }
 
-    if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
+    if (!datasetId) throw new Error(`Dataset "${datasetName}" not found`);
 
-    log.info(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
+    log.info(`Loaded dataset "${datasetName}" with ID: ${datasetId}`);
 
     const results: EvaluatorResult[] = [];
 
@@ -311,7 +340,7 @@ async function main(): Promise<number> {
         try {
             const experiment = await runExperiment({
                 client,
-                dataset: { datasetName: DATASET_NAME },
+                dataset: { datasetName },
                 // Cast to satisfy ExperimentTask type
                 task: taskFn as ExperimentTask,
                 evaluators: [toolsExactMatch, toolSelectionLLMEvaluator],
@@ -353,7 +382,7 @@ async function main(): Promise<number> {
 }
 
 // Run
-main()
+main(argv.datasetName || DATASET_NAME)
     .then((code) => process.exit(code))
     .catch((err) => {
         log.error('Unexpected error:', err);
