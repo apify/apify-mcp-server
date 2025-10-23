@@ -147,7 +147,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
                 .map((item) => cleanEmptyProperties(item))
                 .filter((item) => item !== undefined);
 
-            let outputText = JSON.stringify(cleanedItems);
+            let outputText = `\`\`\`json\n${JSON.stringify(cleanedItems)}\n\`\`\``;
             let truncated = false;
             if (outputText.length > TOOL_MAX_OUTPUT_CHARS) {
                 outputText = outputText.slice(0, TOOL_MAX_OUTPUT_CHARS);

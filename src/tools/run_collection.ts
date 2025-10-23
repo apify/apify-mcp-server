@@ -47,7 +47,7 @@ USAGE EXAMPLES:
             const parsed = getUserRunsListArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
-            return { content: [{ type: 'text', text: JSON.stringify(runs) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(runs, null, 2)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };

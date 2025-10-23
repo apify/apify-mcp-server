@@ -131,7 +131,7 @@ export const actorDefinitionTool: ToolEntry = {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
                 v.input.properties = shortenProperties(properties);
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };

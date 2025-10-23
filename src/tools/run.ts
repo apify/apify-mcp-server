@@ -46,7 +46,7 @@ USAGE EXAMPLES:
             if (!v) {
                 return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };
@@ -116,7 +116,7 @@ USAGE EXAMPLES:
             const parsed = abortRunArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };

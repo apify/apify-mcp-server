@@ -31,6 +31,16 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
+function extractJsonFromMarkdown(text: string): any {
+    // Handle markdown code blocks like ```json
+    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
+    if (jsonMatch) {
+        return JSON.parse(jsonMatch[1]);
+    }
+    // If no markdown formatting, assume it's raw JSON
+    return JSON.parse(text);
+}
+
 async function callPythonExampleActor(client: Client, selectedToolName: string) {
     const result = await client.callTool({
         name: selectedToolName,
@@ -53,7 +63,7 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     };
     // Parse the JSON to compare objects regardless of property order
     const actual = content[0];
-    expect(JSON.parse(actual.text)).toEqual(JSON.parse(expected.text));
+    expect(extractJsonFromMarkdown(actual.text)).toEqual(JSON.parse(expected.text));
     expect(actual.type).toBe(expected.type);
 }
 
@@ -836,7 +846,7 @@ export function createIntegrationTestsSuite(
 
             expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = JSON.parse(outputContent[0].text);
+            const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
             expect(output.length).toBeGreaterThan(0);
             expect(output[0]).toHaveProperty('metadata.title');
@@ -894,7 +904,7 @@ export function createIntegrationTestsSuite(
             // Validate the output contains the expected structure with metadata.title
             expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = JSON.parse(outputContent[0].text);
+            const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
             expect(output.length).toBeGreaterThan(0);
             expect(output[0]).toHaveProperty('metadata.title');
@@ -935,7 +945,7 @@ export function createIntegrationTestsSuite(
 
             expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = JSON.parse(outputContent[0].text);
+            const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
             expect(output.length).toBe(1);
             expect(output[0]).toHaveProperty('first_number', input.first_number);
