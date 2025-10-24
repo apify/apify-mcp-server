@@ -54,7 +54,7 @@ USAGE EXAMPLES:
                 desc: parsed.desc,
                 unnamed: parsed.unnamed,
             });
-            return { content: [{ type: 'text', text: JSON.stringify(stores) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(stores)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };

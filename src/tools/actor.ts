@@ -407,7 +407,7 @@ EXAMPLES:
                             }
                             const toolsResponse = await client.listTools();
 
-                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema: ${JSON.stringify(tool.inputSchema, null, 2)}`,
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``,
                             ).join('\n\n');
 
                             return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
@@ -422,7 +422,7 @@ EXAMPLES:
                         }
                         const content = [
                             `Actor name: ${actorName}`,
-                            `Input schema: \n${JSON.stringify(details.inputSchema, null, 0)}`,
+                            `Input schema:\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``,
                             `To run Actor, use step="call" with Actor name format: "${actorName}"`,
                         ];
                         // Add Skyfire instructions also in the info performStep since clients are most likely truncating
@@ -504,7 +504,7 @@ EXAMPLES:
                     const { errors } = actor.tool.ajvValidate;
                     const content = [
                         `Input validation failed for Actor '${actorName}'. Please ensure your input matches the Actor's input schema.`,
-                        `Input schema:\n${JSON.stringify(actor.tool.inputSchema)}`,
+                        `Input schema:\n\`\`\`json\n${JSON.stringify(actor.tool.inputSchema)}\n\`\`\``,
                     ];
                     if (errors && errors.length > 0) {
                         content.push(`Validation errors: ${errors.map((e) => e.message).join(', ')}`);

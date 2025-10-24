@@ -36,7 +36,7 @@ USAGE EXAMPLES:
             const parsed = getKeyValueStoreArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const store = await client.keyValueStore(parsed.storeId).get();
-            return { content: [{ type: 'text', text: JSON.stringify(store) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };
@@ -82,7 +82,7 @@ USAGE EXAMPLES:
                 exclusiveStartKey: parsed.exclusiveStartKey,
                 limit: parsed.limit,
             });
-            return { content: [{ type: 'text', text: JSON.stringify(keys) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(keys)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };
@@ -120,7 +120,7 @@ USAGE EXAMPLES:
             const parsed = getKeyValueStoreRecordArgs.parse(args);
             const client = new ApifyClient({ token: apifyToken });
             const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
-            return { content: [{ type: 'text', text: JSON.stringify(record) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };

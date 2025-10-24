@@ -67,7 +67,7 @@ USAGE EXAMPLES:
             if (!v) {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };
@@ -116,7 +116,7 @@ USAGE EXAMPLES:
             if (!v) {
                 return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
             }
-            return { content: [{ type: 'text', text: JSON.stringify(v) }] };
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
         },
     } as InternalTool,
 };
@@ -191,7 +191,7 @@ USAGE EXAMPLES:
             return {
                 content: [{
                     type: 'text',
-                    text: JSON.stringify(schema),
+                    text: `\`\`\`json\n${JSON.stringify(schema)}\n\`\`\``,
                 }],
             };
         },

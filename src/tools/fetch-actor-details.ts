@@ -52,7 +52,7 @@ USAGE EXAMPLES:
 
             // Include input schema if it has properties
             if (details.inputSchema.properties || Object.keys(details.inputSchema.properties).length !== 0) {
-                content.push({ type: 'text', text: `# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema, null, 0)}\n\`\`\`` });
+                content.push({ type: 'text', text: `# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\`` });
             }
             // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
             // This allows better formatting in the final output
