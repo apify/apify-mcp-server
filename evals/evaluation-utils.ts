@@ -175,13 +175,11 @@ export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
             };
 
             log.info(`Evaluating tool selection.
-                Input: query: ${input?.query},
-                context: ${input?.context},
-                tool_calls: ${JSON.stringify(output?.tool_calls)},
-                llm_response: ${output?.llm_response},
-                reference: ${expected?.reference}`
-            );
-
+Input: query: ${input?.query},
+context: ${input?.context},
+tool_calls: ${JSON.stringify(output?.tool_calls)},
+llm_response: ${output?.llm_response},
+reference: ${expected?.reference}`);
             try {
                 const result = await evaluator(evalInput);
                 log.info(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
