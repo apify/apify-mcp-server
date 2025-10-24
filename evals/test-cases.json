@@ -442,18 +442,25 @@
       ]
     },
     {
-      "id": "stackoverflow-scraper-python-1",
+      "id": "search-actors-input-args-1",
       "category": "search-actors",
       "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python",
       "expectedTools": ["search-actors"],
-      "reference": "The 'search-actors' tool should be called using the exact query: 'StackOverflow'. It must not use extended queries such as 'StackOverflow scraper Python' or any more detailed variations."
+      "reference": "It must call the 'search-actors' tool with the query: 'StackOverflow'. It must not use extended queries such as 'StackOverflow scraper Python' or any more detailed variations."
     },
     {
-      "id": "instagram-profile-scraping-1",
+      "id": "search-actors-input-args-2",
       "category": "search-actors",
       "query": "I need to find Actor for instagram profile scraping",
       "expectedTools": ["search-actors"],
-      "reference": "The 'search-actors' tool should be called with search parameter 'instagram profile'. It must not use extended queries such as 'instagram profile scraper' or any more detailed variations."
+      "reference": "It must call the 'search-actors' tool with the query: 'instagram profile' or 'instagram profiles'. It must not use extended queries such as 'instagram profile scraper' or any more detailed variations."
+    },
+    {
+      "id": "search-actors-input-args-3",
+      "category": "search-actors",
+      "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'tiktok comments' or their combination. It must not use queries with extra words such as 'tiktok comments cheap' or any more detailed variations."
     }
   ]
 }

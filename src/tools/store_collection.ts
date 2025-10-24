@@ -29,17 +29,19 @@ export const searchActorsArgsSchema = z.object({
         .min(1)
         .max(100)
         .default(10)
-        .describe('The maximum number of Actors to return. The default value is 10.'),
+        .describe('The maximum number of Actors to return (default = 10)'),
     offset: z.number()
         .int()
         .min(0)
         .default(0)
-        .describe('The number of elements to skip at the start. The default value is 0.'),
-    search: z.string()
+        .describe('The number of elements to skip from the start (default = 0)'),
+    keywords: z.string()
         .default('')
-        .describe(`A string to search for in the Actor's title, name, description, username, and readme.
-Use simple space-separated keywords, such as "web scraping", "data extraction", or "playwright browser mcp".
-Do not use complex queries, AND/OR operators, or other advanced syntax, as this tool uses full-text search only.`),
+        .describe(`Enter space-separated keywords to search Actors by title, name, description, username, or readme.
+Important: Never search using general keywords such as: scraping, scraper, extractor, or crawler"
+This results in too many matches and is not useful.
+Do not use advanced syntax, operators, or complex queries; only basic full-text search is supported.
+`),
     category: z.string()
         .default('')
         .describe('Filter the results by the specified category.'),
@@ -75,29 +77,48 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,
-        description: `Search the Apify Store for Actors or Model Context Protocol (MCP) servers using keywords.
-Apify Store features solutions for web scraping, automation, and AI agents (e.g., Instagram, TikTok, LinkedIn, flights, bookings).
+        description: `Search the Apify Store for Actors using keyword-based queries.
+This tool searches across the entire Apify Store, which contains thousands of pre-built Actors (scrapers, crawlers, model context protocol (MCP) servers, and AI agents) created by Apify and the community.
 
-The results will include curated Actor cards with title, description, pricing model, usage statistics, and ratings.
-For best results, use simple space-separated keywords (e.g., "instagram posts", "twitter profile", "playwright mcp").
-For detailed information about a specific Actor, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+Use this tool whenever user needs to discover Actors to scrape data, find MCP servers, or explore available solutions in the Apify store.
+Do NOT use this tool when users ask for detailed information about a specific Actor user already knows - use the ${HelperTools.ACTOR_GET_DETAILS} tool instead for comprehensive Actor information including full README, input schema, and detailed usage instructions
 
-USAGE:
-- Use when you need to discover Actors for a specific task or find MCP servers.
-- Use to explore available tools in the Apify ecosystem based on keywords.
+The search uses basic keyword matching with space-separated terms - all keywords must appear somewhere in the Actor's information.
+Advanced search operators, regex patterns, or complex queries are not supported.
+IMPORTANT: NEVER use general keywords such as: scraping, scraper, extractor, or crawler.
+These yield too many results and are not useful.
+Always use simple space-separated keywords (e.g. "instagram posts", "twitter profile", or "playwright mcp").
 
-USAGE EXAMPLES:
-- user_input: Find Actors for scraping e-commerce
-- user_input: Find browserbase MCP server
-- user_input: I need to scrape instagram profiles and comments
-- user_input: I need to get flights and airbnb data`,
+Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
+For complete Actor details, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+The search is limited to publicly available Actors and may not include private, rental, or restricted Actors depending on the user's access level.
+
+The tool returns Actor cards.
+Always display each Actor card in the following format:
+- **Actor title:** Display as a markdown header with the Actor title linked to its Store page (e.g., "## [Actor Title](https://apify.com/username/name)")
+- **Actor name:** Show the full Actor name in code format (e.g., "\`username/name\`")
+- **URL:** Direct link to the Actor's Store page
+- **Developer:** Developer information with username linked to their profile, indicating if it's Apify or community-developed
+- **Description:** Actor description or "No description provided" if missing
+- **Categories:** Formatted categories (e.g., "Web Scraping, Social Media") or "Uncategorized"
+- **Pricing:** Detailed pricing information with link to pricing page
+- **Stats:** Usage statistics including total users, monthly users, success rate percentage, and bookmark count
+- **Rating:** Star rating out of 5 (if available)
+- **Last Modified:** Modification date in ISO format (if available)
+- **Deprecation Warning:** Alert if the Actor is deprecated
+
+Usage examples:
+- user: Find Actors for scraping e-commerce
+- user: Find browserbase MCP server
+- user: I need to scrape instagram profiles and comments
+- user: I need to retrieve flights and airbnb data`,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {
             const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
             let actors = await searchActorsByKeywords(
-                parsed.search,
+                parsed.keywords,
                 apifyToken,
                 parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
                 parsed.offset,
@@ -116,7 +137,7 @@ USAGE EXAMPLES:
                         type: 'text',
                         text: `
 # Search results:
-- **Search query:** ${parsed.search}
+- **Search query:** ${parsed.keywords}
 - **Number of Actors found:** ${actorCards.length}
 
 # Actors:

@@ -16,7 +16,7 @@ log.setLevel(log.LEVELS.INFO);
 
 // const MODEL_NAME = 'openai/gpt-4.1-mini';
 const MODEL_NAME = 'anthropic/claude-haiku-4.5'
-const RUN_LLM_JUDGE = false;
+const RUN_LLM_JUDGE = true;
 
 // Hardcoded examples for quick testing
 const EXAMPLES: TestCase[] = [
@@ -32,7 +32,6 @@ async function main() {
     // 1. Load tools
     const tools = await loadTools();
     console.log(`Loaded ${tools.length} tools\n`);
-    console.log('Tools:', JSON.stringify(tools));
 
     // Loop through each example
     for (let i = 0; i < EXAMPLES.length; i++) {
@@ -64,10 +63,11 @@ async function main() {
                 expected: example as unknown as Record<string, unknown>
             });
 
+            const passed = result.score ? (result.score > PASS_THRESHOLD) : false;
             console.log('\nEvaluation result');
-            console.log('Score:', result.score);
+            console.log('Score:', result.score );
             console.log('Explanation:', result.explanation);
-            console.log('Passed:', result.score ? (result.score > PASS_THRESHOLD ? 'True' : 'False') : 'False');
+            console.log('Passed:', result.score ? (passed ? 'True ✅' : 'False ❌') : 'False ❌');
             console.log('='.repeat(50));
         }
     }
