@@ -38,8 +38,9 @@ export const searchActorsArgsSchema = z.object({
     keywords: z.string()
         .default('')
         .describe(`Enter space-separated keywords to search Actors by title, name, description, username, or readme.
-Important: Never search using general keywords such as: scraping, scraper, extractor, or crawler"
-This results in too many matches and is not useful.
+
+CRITICAL: Use ONLY core platform/service names together with required data such as profiles, posts, comments.
+NEVER add descriptive words like "scraper", "tool", "bot", "extractor", "extraction".
 Do not use advanced syntax, operators, or complex queries; only basic full-text search is supported.
 `),
     category: z.string()
@@ -85,9 +86,14 @@ Do NOT use this tool when users ask for detailed information about a specific Ac
 
 The search uses basic keyword matching with space-separated terms - all keywords must appear somewhere in the Actor's information.
 Advanced search operators, regex patterns, or complex queries are not supported.
-IMPORTANT: NEVER use general keywords such as: scraping, scraper, extractor, or crawler.
-These yield too many results and are not useful.
-Always use simple space-separated keywords (e.g. "instagram posts", "twitter profile", or "playwright mcp").
+
+CRITICAL KEYWORD RULES:
+- NEVER use general keywords such as: scraping, scraper, extractor, crawler
+- NEVER add descriptive words like scraper, tool, bot, extractor to platform/service names
+- Use ONLY the names such as (e.g., "Skyscanner flights", "Instagram posts", "Twitter profiles", "Airbnb")
+
+These rules prevent too many generic results and ensure precise matches.
+Always use simple space-separated keywords focusing on the core platform/service name together with required data such as profiles, posts, comments.
 
 Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
 For complete Actor details, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
