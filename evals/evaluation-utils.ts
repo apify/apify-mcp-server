@@ -2,6 +2,10 @@
  * Shared evaluation utilities extracted from run-evaluation.ts
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname as pathDirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import OpenAI from 'openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { asEvaluator } from '@arizeai/phoenix-client/experiments';
@@ -21,6 +25,49 @@ import {
 } from './config.js';
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
+
+export interface TestCase {
+    id: string;
+    category: string;
+    query: string;
+    context?: string | string[];
+    expectedTools?: string[];
+    reference?: string;
+}
+
+export interface TestData {
+    version: string;
+    testCases: TestCase[];
+}
+
+// eslint-disable-next-line consistent-return
+export function loadTestCases(filePath: string): TestData {
+    const filename = fileURLToPath(import.meta.url);
+    const dirname = pathDirname(filename);
+    const testCasesPath = join(dirname, filePath);
+
+    try {
+        const fileContent = readFileSync(testCasesPath, 'utf-8');
+        return JSON.parse(fileContent) as TestData;
+    } catch {
+        log.error(`Error: Test cases file not found at ${testCasesPath}`);
+        process.exit(1);
+    }
+}
+
+export function filterByCategory(testCases: TestCase[], category: string): TestCase[] {
+    // Convert wildcard pattern to regex
+    const pattern = category.replace(/\*/g, '.*');
+    const regex = new RegExp(`^${pattern}$`);
+
+    return testCases.filter((testCase) => regex.test(testCase.category));
+}
+
+export function filterById(testCases: TestCase[], idPattern: string): TestCase[] {
+    const regex = new RegExp(idPattern);
+
+    return testCases.filter((testCase) => regex.test(testCase.id));
+}
 
 export async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
@@ -117,7 +164,6 @@ export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
         name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
         kind: 'LLM',
         evaluate: async ({ input, output, expected }: any) => {
-            log.info(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
 
             const evalInput = {
                 query: input?.query || '',
@@ -127,6 +173,14 @@ export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
                 reference: expected?.reference || '',
                 tool_definitions: JSON.stringify(tools)
             };
+
+            log.info(`Evaluating tool selection.
+                Input: query: ${input?.query},
+                context: ${input?.context},
+                tool_calls: ${JSON.stringify(output?.tool_calls)},
+                llm_response: ${output?.llm_response},
+                reference: ${expected?.reference}`
+            );
 
             try {
                 const result = await evaluator(evalInput);

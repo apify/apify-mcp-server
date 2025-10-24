@@ -4,10 +4,6 @@
  * Run this once to upload test cases to Phoenix platform and receive a dataset ID.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname as pathDirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import { createClient } from '@arizeai/phoenix-client';
 // eslint-disable-next-line import/extensions
 import { createDataset } from '@arizeai/phoenix-client/datasets';
@@ -19,6 +15,7 @@ import { hideBin } from 'yargs/helpers';
 import log from '@apify/log';
 
 import { sanitizeHeaderValue, validateEnvVars } from './config.js';
+import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation-utils.js';
 
 // Set log level to debug
 log.setLevel(log.LEVELS.INFO);
@@ -29,6 +26,7 @@ log.setLevel(log.LEVELS.INFO);
 interface CliArgs {
     testCases?: string;
     category?: string;
+    id?: string;
     datasetName?: string;
 }
 
@@ -51,6 +49,11 @@ const argv = yargs(hideBin(process.argv))
         describe: 'Filter test cases by category. Supports wildcards with * (e.g., search-actors, search-actors-*)',
         example: 'search-actors',
     })
+    .option('id', {
+        type: 'string',
+        describe: 'Filter test cases by ID using regex pattern',
+        example: 'instagram.*',
+    })
     .option('dataset-name', {
         type: 'string',
         describe: 'Custom dataset name (overrides auto-generated name)',
@@ -64,46 +67,11 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('  $0 --test-cases custom.json          # Use custom test cases file')
     .epilogue('  $0 --category search-actors          # Filter by exact category')
     .epilogue('  $0 --category search-actors-*        # Filter by wildcard pattern')
-    .epilogue('  $0 --dataset-name my_dataset              # Custom dataset name')
+    .epilogue('  $0 --id instagram.*                  # Filter by ID regex pattern')
+    .epilogue('  $0 --dataset-name my_dataset         # Custom dataset name')
     .epilogue('  $0 --test-cases custom.json --category search-actors')
     .parseSync() as CliArgs;
 
-interface TestCase {
-    id: string;
-    category: string;
-    query: string;
-    context?: string | string[];
-    expectedTools?: string[];
-    reference?: string;
-}
-
-interface TestData {
-    version: string;
-    testCases: TestCase[];
-}
-
-// eslint-disable-next-line consistent-return
-function loadTestCases(filePath: string): TestData {
-    const filename = fileURLToPath(import.meta.url);
-    const dirname = pathDirname(filename);
-    const testCasesPath = join(dirname, filePath);
-
-    try {
-        const fileContent = readFileSync(testCasesPath, 'utf-8');
-        return JSON.parse(fileContent) as TestData;
-    } catch {
-        log.error(`Error: Test cases file not found at ${testCasesPath}`);
-        process.exit(1);
-    }
-}
-
-function filterByCategory(testCases: TestCase[], category: string): TestCase[] {
-    // Convert wildcard pattern to regex
-    const pattern = category.replace(/\*/g, '.*');
-    const regex = new RegExp(`^${pattern}$`);
-
-    return testCases.filter((testCase) => regex.test(testCase.category));
-}
 
 async function createDatasetFromTestCases(
     testCases: TestCase[],
@@ -175,6 +143,12 @@ async function main(): Promise<void> {
         if (argv.category) {
             testCases = filterByCategory(testCases, argv.category);
             log.info(`Filtered to ${testCases.length} test cases in category '${argv.category}'`);
+        }
+
+        // Apply ID filter if specified
+        if (argv.id) {
+            testCases = filterById(testCases, argv.id);
+            log.info(`Filtered to ${testCases.length} test cases matching ID pattern '${argv.id}'`);
         }
 
         // Determine dataset name
