@@ -407,7 +407,7 @@ EXAMPLES:
                             }
                             const toolsResponse = await client.listTools();
 
-                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema, null, 2)}\n\`\`\``,
+                            const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``,
                             ).join('\n\n');
 
                             return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
@@ -422,7 +422,7 @@ EXAMPLES:
                         }
                         const content = [
                             `Actor name: ${actorName}`,
-                            `Input schema:\n\`\`\`json\n${JSON.stringify(details.inputSchema, null, 0)}\n\`\`\``,
+                            `Input schema:\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``,
                             `To run Actor, use step="call" with Actor name format: "${actorName}"`,
                         ];
                         // Add Skyfire instructions also in the info performStep since clients are most likely truncating

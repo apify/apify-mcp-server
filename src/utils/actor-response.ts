@@ -38,7 +38,7 @@ Results summary:
 Actor output data schema:
 * You can use this schema to understand the structure of the output data and, for example, retrieve specific fields based on your current task.
 \`\`\`json
-${JSON.stringify(displaySchema, null, 2)}
+${JSON.stringify(displaySchema)}
 \`\`\`
 
 Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
