@@ -37,12 +37,17 @@ export const searchActorsArgsSchema = z.object({
         .describe('The number of elements to skip from the start (default = 0)'),
     keywords: z.string()
         .default('')
-        .describe(`Enter space-separated keywords to search Actors by title, name, description, username, or readme.
+        .describe(`Space-separated keywords used to search Actors in the Apify Store.
+The search engine requires ALL keywords to appear in the same Actor's name, description, username, or readme content.
+Keywords are case-insensitive and matched using basic text search.
 
-CRITICAL: Use ONLY core platform/service names together with required data such as profiles, posts, comments.
-NEVER add descriptive words like "scraper", "tool", "bot", "extractor", "extraction".
-Do not use advanced syntax, operators, or complex queries; only basic full-text search is supported.
-`),
+The most effective keywords are specific platform names (Instagram, Twitter, TikTok, etc.)
+and specific data types (posts, products, profiles, weather, news, reviews, comments, etc.). 
+
+Avoid generic terms that are too broad and will return too many irrelevant results: "scraper", "extractor", "crawler", "data extraction", "tools", "best", "cheap", "free", "automation", "bot".
+
+If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords.
+The goal is to find Actors that specifically handle the platform and data type the user mentioned.`),
     category: z.string()
         .default('')
         .describe('Filter the results by the specified category.'),
@@ -70,7 +75,6 @@ function filterRentalActors(
         || userRentedActorIds.includes(actor.id),
     );
 }
-
 /**
  * https://docs.apify.com/api/v2/store-get
  */
@@ -78,46 +82,44 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.STORE_SEARCH,
-        description: `Search the Apify Store for Actors using keyword-based queries.
-This tool searches across the entire Apify Store, which contains thousands of pre-built Actors (scrapers, crawlers, model context protocol (MCP) servers, and AI agents) created by Apify and the community.
+        description: `
+Search the Apify Store for Actors using keyword-based queries.
+Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers).
 
 Use this tool whenever user needs to discover Actors to scrape data, find MCP servers, or explore available solutions in the Apify store.
-Do NOT use this tool when users ask for detailed information about a specific Actor user already knows - use the ${HelperTools.ACTOR_GET_DETAILS} tool instead for comprehensive Actor information including full README, input schema, and detailed usage instructions
+Actors are named using platform or service name together with the type of data or task they perform,
 
-The search uses basic keyword matching with space-separated terms - all keywords must appear somewhere in the Actor's information.
-Advanced search operators, regex patterns, or complex queries are not supported.
-
-CRITICAL KEYWORD RULES:
-- NEVER use general keywords such as: scraping, scraper, extractor, crawler
-- NEVER add descriptive words like scraper, tool, bot, extractor to platform/service names
-- Use ONLY the names such as (e.g., "Skyscanner flights", "Instagram posts", "Twitter profiles", "Airbnb")
-
+The search uses basic keyword matching with space-separated terms - all keywords must appear in the Actor's name (the most important), description, username, or readme.
+Never include generic terms like "scraper", "crawler", "data extraction", "scraping" as these will not help find relevant Actors.
+It is better to omit such generic terms entirely from the search query and decide later based on the search results.
 These rules prevent too many generic results and ensure precise matches.
-Always use simple space-separated keywords focusing on the core platform/service name together with required data such as profiles, posts, comments.
 
 Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
 For complete Actor details, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
 The search is limited to publicly available Actors and may not include private, rental, or restricted Actors depending on the user's access level.
 
-The tool returns Actor cards.
-Always display each Actor card in the following format:
-- **Actor title:** Display as a markdown header with the Actor title linked to its Store page (e.g., "## [Actor Title](https://apify.com/username/name)")
-- **Actor name:** Show the full Actor name in code format (e.g., "\`username/name\`")
-- **URL:** Direct link to the Actor's Store page
-- **Developer:** Developer information with username linked to their profile, indicating if it's Apify or community-developed
-- **Description:** Actor description or "No description provided" if missing
-- **Categories:** Formatted categories (e.g., "Web Scraping, Social Media") or "Uncategorized"
-- **Pricing:** Detailed pricing information with link to pricing page
-- **Stats:** Usage statistics including total users, monthly users, success rate percentage, and bookmark count
-- **Rating:** Star rating out of 5 (if available)
-- **Last Modified:** Modification date in ISO format (if available)
-- **Deprecation Warning:** Alert if the Actor is deprecated
+Use the most direct query possible.
+The search is smart enough to return all relevant actors from one query.
+
+Returns Actor cards with the following info:
+- **Title:** Markdown header linked to Store page
+- **Name:** Full Actor name in code format
+- **URL:** Direct Store link
+- **Developer:** Username linked to profile
+- **Description:** Actor description or fallback
+- **Categories:** Formatted or "Uncategorized"
+- **Pricing:** Details with pricing link
+- **Stats:** Usage, success rate, bookmarks
+- **Rating:** Out of 5 (if available)
+- **Last Modified:** ISO date (if available)
+- **Deprecation Warning:** If deprecated
 
 Usage examples:
 - user: Find Actors for scraping e-commerce
 - user: Find browserbase MCP server
-- user: I need to scrape instagram profiles and comments
-- user: I need to retrieve flights and airbnb data`,
+- user: I need weather data
+- user: Search for flight booking tools
+ `,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
         ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
         call: async (toolArgs) => {

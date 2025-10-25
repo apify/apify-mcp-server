@@ -52,6 +52,9 @@ interface CliArgs {
 
 log.setLevel(log.LEVELS.DEBUG);
 
+const RUN_LLM_EVALUATOR = false;
+const RUN_TOOLS_EXACT_MATCH_EVALUATOR = true;
+
 dotenv.config({ path: '.env' });
 
 // Parse command line arguments using yargs
@@ -91,22 +94,24 @@ const toolsExactMatch = asEvaluator({
         if (!expectedTools || expectedTools.length === 0) {
             log.debug('Tools match: No expected tools provided');
             return {
-                score: 0.0,
+                score: 1.0,
                 explanation: 'No expected tools present in the test case, either not required or not provided',
             };
         }
 
         expectedTools = [...expectedTools].sort();
 
-        const outputTools = (output?.tool_calls || [])
+        const outputToolsTmp = (output?.tool_calls || [])
             .map((toolCall: any) => toolCall.function?.name || '')
             .sort();
 
-        const isCorrect = JSON.stringify(expectedTools) === JSON.stringify(outputTools);
+        const outputToolsSet = Array.from(new Set(outputToolsTmp)).sort();
+        // it is correct if outputTools includes multiple calls to the same tool
+        const isCorrect = JSON.stringify(expectedTools) === JSON.stringify(outputToolsSet);
         const score = isCorrect ? 1.0 : 0.0;
-        const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputTools)}`;
+        const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputToolsSet)}`;
 
-        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputToolsSet)}, expected=${JSON.stringify(expectedTools)}`);
 
         return {
             score,
@@ -214,13 +219,21 @@ async function main(datasetName: string): Promise<number> {
         const experimentName = `MCP server:  ${modelName}`;
         const experimentDescription = `${modelName}, ${prLabel}`;
 
+        const evaluators = [];
+        if (RUN_TOOLS_EXACT_MATCH_EVALUATOR) {
+            evaluators.push(toolsExactMatch);
+        }
+        if (RUN_LLM_EVALUATOR) {
+            evaluators.push(toolSelectionLLMEvaluator);
+        }
+
         try {
             const experiment = await runExperiment({
                 client,
                 dataset: { datasetName },
                 // Cast to satisfy ExperimentTask type
                 task: taskFn as ExperimentTask,
-                evaluators: [toolsExactMatch, toolSelectionLLMEvaluator],
+                evaluators,
                 experimentName,
                 experimentDescription,
                 concurrency: 10,

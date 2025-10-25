@@ -1,6 +1,8 @@
 # MCP tool selection evaluation
 
-Evaluates MCP server tool selection. Phoenix used only for storing results and visualization.
+Evaluates MCP server tool selection. Phoenix is used only for storing results and visualization.
+
+You can find the results here: https://app.phoenix.arize.com/s/apify
 
 ## CI Workflow
 
@@ -76,7 +78,7 @@ Each test case in `test-cases.json` has this structure:
   "query": "user query text",
   "expectedTools": ["tool-name"],
   "reference": "explanation of why this should pass (optional)",
-  "context": [/* conversation history (optional) */]
+  "context": "/* conversation history (optional) */"
 }
 ```
 
@@ -120,3 +122,96 @@ Each test case in `test-cases.json` has this structure:
   ]
 }
 ```
+
+# Best practices for tool definitions and evaluation
+
+## Best practices for tool definitions (based on Anthropic's guidelines)
+
+To get the best performance out of Claude when using tools, follow these guidelines:
+
+- **Provide extremely detailed descriptions.**
+  This is by far the most important factor in tool performance.
+  Your descriptions should explain every detail about the tool, including:
+    - What the tool does
+    - When it should be used (and when it shouldn’t)
+    - What each parameter means and how it affects the tool’s behavior
+    - Any important caveats or limitations (e.g., what information the tool does not return if the tool name is unclear)
+
+  The more context you give Claude about your tools, the better it will be at deciding when and how to use them.
+  Aim for at least **3–4 sentences per tool description**, and more if the tool is complex.
+
+- **Prioritize descriptions over examples.**
+  While you can include examples of how to use a tool in its description or accompanying prompt, this is less important than having a clear and comprehensive explanation of the tool’s purpose and parameters.
+  Only add examples **after** you’ve fully developed the description.
+---
+
+## How to analyze and improve a specific tool
+
+To improve a tool, you first need to analyze the **evaluation results** to understand where the problem lies.
+
+1. **Analyze results:**
+   Open experiments in **Phoenix**, check specific models, and compare **exact matches** with **LLM-as-judge** results.
+
+2. **Understand the issue:**
+   Once you’ve identified the problem, modify the tool description to address it.
+   The modification is typically **not straightforward** — you might need to:
+    - Update the description
+    - Adjust input arguments
+    - Add examples or negative examples
+
+   According to Anthropic’s Claude documentation, **the most important part is the tool description and explanation**, not the examples.
+
+3. **Iterate experimentally:**
+   The path is not always clear and usually requires experimentation.
+   Once you’re happy with your updates, **re-run the experiment**.
+
+4. **Fast iteration:**
+   For faster testing:
+    - Select a **subset of the test data**
+    - Focus on **models that perform poorly**
+
+   Once you fix the problem for one model and data subset, **run it on the complete dataset and across different models.**
+
+   ⚠️ Be aware that fixing one example might break another.
+
+---
+
+## Practical debugging steps
+
+This process is **trial and error**, but following these steps has proven effective:
+
+- **Focus on exact tool match first.**
+  If the exact match fails, it’s easier to debug and track.
+  LLM-judge comparisons are much harder to interpret and may be inaccurate.
+
+- **Update one tool at a time.**
+  Changing multiple tools simultaneously is untraceable and leads to confusion.
+
+- **Debug tools individually, but keep global stability in mind.**
+  Ensure changes don’t break other tools.
+
+- **If even one tool consistently fails,** the model might struggle to understand the tool, or your test cases may be incorrect.
+
+- **Isolate during testing:**
+  When improving a single tool, **enable only that tool** and make sure all use cases pass with just this tool active.
+
+- **Run multiple models after each change.**
+  Different models may behave differently — verify stability across all.
+
+---
+
+## Evaluation and comparison workflow
+
+Use **Phoenix MCP** to:
+- Fetch experiment results
+- Compare outcomes
+- Identify failure patterns
+
+However, **never use an LLM to automatically fix tool descriptions.**
+Always make improvements **manually**, based on your understanding of the problem.
+LLMs are very likely to worsen the issue instead of fixing it.
+
+
+# References:
+
+- [Example of a good tool description](https://docs.claude.com/en/docs/agents-and-tools/tool-use/implement-tool-use#example-of-a-good-tool-description)

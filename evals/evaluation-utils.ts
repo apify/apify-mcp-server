@@ -21,6 +21,7 @@ import {
     TOOL_CALLING_BASE_TEMPLATE,
     TOOL_SELECTION_EVAL_MODEL,
     EVALUATOR_NAMES,
+    TEMPERATURE,
     sanitizeHeaderValue
 } from './config.js';
 
@@ -103,7 +104,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 
         log.info(`Input: ${JSON.stringify(example)}`);
 
-        const context = String(example.input?.context ?? '');
+        const context = JSON.stringify(example.input?.context ?? {});
         const query = String(example.input?.query ?? '');
 
         const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
@@ -128,6 +129,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
             model: modelName,
             messages,
             tools: toolsOpenAI,
+            temperature: TEMPERATURE,  // Use configured temperature (0 = deterministic)
         });
 
         log.info(`Model response: ${JSON.stringify(response.choices[0])}`);
@@ -136,7 +138,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
             tool_calls: response.choices[0].message.tool_calls || [],
             llm_response: response.choices[0].message.content || '',
             query: String(example.input?.query ?? ''),
-            context: String(example.input?.context ?? ''),
+            context: String(JSON.stringify(example.input?.context ?? '{}')),
             reference: String(example.input?.reference ?? ''),
         };
     };
@@ -167,18 +169,19 @@ export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
 
             const evalInput = {
                 query: input?.query || '',
-                context: input?.context || '',
+                context: JSON.stringify(input?.context || {}),
                 tool_calls: JSON.stringify(output?.tool_calls || []),
                 llm_response: output?.llm_response || '',
                 reference: expected?.reference || '',
-                tool_definitions: JSON.stringify(tools)
+                // tool_definitions: JSON.stringify(tools)
             };
 
             log.info(`Evaluating tool selection.
 Input: query: ${input?.query},
-context: ${input?.context},
+context: ${JSON.stringify(input?.context || {})},
 tool_calls: ${JSON.stringify(output?.tool_calls)},
 llm_response: ${output?.llm_response},
+tool definitions: ${JSON.stringify(tools.map((t) => t.name))},
 reference: ${expected?.reference}`);
             try {
                 const result = await evaluator(evalInput);
