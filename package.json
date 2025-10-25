@@ -11,14 +11,17 @@
   "exports": {
     ".": "./dist/index.js",
     "./internals": "./dist/index-internals.js",
-    "./internals.js": "./dist/index-internals.js"
+    "./internals.js": "./dist/index-internals.js",
+    "./manifest": "./manifest.json"
   },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
   },
   "files": [
     "dist",
-    "LICENSE"
+    "LICENSE",
+    "server.json",
+    "manifest.json"
   ],
   "repository": {
     "type": "git",
