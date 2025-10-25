@@ -12,7 +12,7 @@
     ".": "./dist/index.js",
     "./internals": "./dist/index-internals.js",
     "./internals.js": "./dist/index-internals.js",
-    "./manifest": "./manifest.json"
+    "./manifest.json": "./manifest.json"
   },
   "bin": {
     "actors-mcp-server": "./dist/stdio.js"
