@@ -25,13 +25,18 @@ export const EVALUATOR_NAMES = {
 export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES];
 
 // Models to evaluate
+// 'openai/gpt-4.1-mini', // DO NOT USE - it has much worse performance than gpt-4o-mini and other models
+// 'openai/gpt-4o-mini',  // Neither used in cursor or copilot
 export const MODELS_TO_EVALUATE = [
-    'openai/gpt-4.1-mini',
     'anthropic/claude-haiku-4.5',
-    'google/gemini-2.5-flash',
+    'anthropic/claude-sonnet-4.5',
+    'google/gemini-2.5-pro',
+    'openai/gpt-4.1',
+    'openai/gpt-5',
+    'openai/gpt-5-mini',
 ];
 
-export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini';
+export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4.1';
 
 export const PASS_THRESHOLD = 0.7;
 
@@ -71,15 +76,17 @@ in the generated query.
 
 "incorrect" means that the chosen tool was not correct
 or that the tool signature includes parameter values that don't match
-the formats specified in the tool signatures below.
+the formats specified in the tool definitions below.
 
 You must not use any outside information or make assumptions.
 Base your decision solely on the information provided in [BEGIN DATA] ... [END DATA],
 the [Tool Definitions], and the [Reference instructions] (if provided).
-Reference instructions are optional and are intended to help you understand the use case and make your decision.
+
+If [Reference instructions] are provided, they contain SPECIFIC REQUIREMENTS
+about how tool should be called and what parameters should be used. You MUST strictly follow these instructions.
+If the tool call does not match the requirements specified in the reference instructions, the evaluation should be marked as "incorrect".
 
 [Reference instructions]: {{reference}}
-
 [Tool definitions]: {{tool_definitions}}
 `
 export function getRequiredEnvVars(): Record<string, string | undefined> {
