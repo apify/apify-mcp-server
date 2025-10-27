@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.1) (2025-10-27)
+
+### 🚀 Features
+
+- Improve tool output json markdown format ([#320](https://github.com/apify/apify-mcp-server/pull/320)) ([232a71e](https://github.com/apify/apify-mcp-server/commit/232a71ed59eefa7c9697e1dc3081fd05474e6283)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Actor tool input schema remove the schemaVersion that cause issues with Gemini CLI ([#319](https://github.com/apify/apify-mcp-server/pull/319)) ([6ade35d](https://github.com/apify/apify-mcp-server/commit/6ade35d8a73e9be9426137dc6e8ad8e07321089a)) by [@MQ37](https://github.com/MQ37), closes [#295](https://github.com/apify/apify-mcp-server/issues/295)
+
+
 ## [0.5.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.0) (2025-10-22)
 
 ### 🚀 Features
