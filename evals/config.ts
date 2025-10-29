@@ -25,21 +25,44 @@ export const EVALUATOR_NAMES = {
 export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES];
 
 // Models to evaluate
+// 'openai/gpt-4.1-mini', // DO NOT USE - it has much worse performance than gpt-4o-mini and other models
+// 'openai/gpt-4o-mini',  // Neither used in cursor nor copilot
+// 'openai/gpt-4.1',
 export const MODELS_TO_EVALUATE = [
-    'openai/gpt-4o-mini',
-    'anthropic/claude-3.5-haiku',
-    'google/gemini-2.5-flash',
+    'anthropic/claude-haiku-4.5',
+    // 'anthropic/claude-sonnet-4.5',
+    'google/gemini-2.5-pro',
+    // 'openai/gpt-5',
+    'openai/gpt-5-mini',
 ];
 
-export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4o-mini';
+export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4.1';
 
 export const PASS_THRESHOLD = 0.7;
+
+// LLM sampling parameters
+// Temperature = 0 provides deterministic, focused responses
+export const TEMPERATURE = 0;
 
 export const DATASET_NAME = `mcp_server_dataset_v${getTestCasesVersion()}`;
 
 // System prompt
-export const SYSTEM_PROMPT = 'You are a helpful assistant';
+export const SYSTEM_PROMPT = 'You are a helpful assistant with a set of tools. Use the tools when necessary to help the user.';
 
+// Should TOOL DEFINITIONS be included in the prompt?
+// Including tool definitions significantly increases prompt size and can affect evaluation results.
+// Changing a tool definition may not impact tool call correctness, but it can alter the evaluation outcome.
+// This can lead to inconsistent or circular evaluation results.
+//
+// PROMPT with tools definitions:
+//
+// "incorrect" means that the chosen tool was not correct
+// or that the tool signature includes parameter values that don't match
+// the formats specified in the tool definitions below.
+//
+// You must not use any outside information or make assumptions.
+// Base your decision solely on the information provided in [BEGIN DATA] ... [END DATA],
+// the [Tool Definitions], and the [Reference instructions] (if provided).
 export const TOOL_CALLING_BASE_TEMPLATE = `
 You are an evaluation assistant evaluating user queries and tool calls to
 determine whether a tool was chosen and if it was a right tool.
@@ -71,16 +94,17 @@ in the generated query.
 
 "incorrect" means that the chosen tool was not correct
 or that the tool signature includes parameter values that don't match
-the formats specified in the tool signatures below.
+the formats specified in the tool definitions below.
 
 You must not use any outside information or make assumptions.
 Base your decision solely on the information provided in [BEGIN DATA] ... [END DATA],
 the [Tool Definitions], and the [Reference instructions] (if provided).
-Reference instructions are optional and are intended to help you understand the use case and make your decision.
+
+If [Reference instructions] are provided, they contain SPECIFIC REQUIREMENTS
+about how tool should be called and what parameters should be used. You MUST strictly follow these instructions.
+If the tool call does not match the requirements specified in the reference instructions, the evaluation should be marked as "incorrect".
 
 [Reference instructions]: {{reference}}
-
-[Tool definitions]: {{tool_definitions}}
 `
 export function getRequiredEnvVars(): Record<string, string | undefined> {
     return {
