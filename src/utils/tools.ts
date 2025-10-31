@@ -1,5 +1,5 @@
 import { toolCategories } from '../tools/index.js';
-import type { HelperTool, ToolBase, ToolCategory, ToolEntry } from '../types.js';
+import type { ToolBase, ToolCategory, ToolEntry } from '../types.js';
 
 /**
  * Returns a public version of the tool containing only fields that should be exposed publicly.
@@ -35,7 +35,7 @@ export function getExpectedToolNamesByCategories(categories: ToolCategory[]): st
 export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     // Store the original functions
     const originalAjvValidate = toolEntry.ajvValidate;
-    const originalCall = toolEntry.type === 'internal' ? (toolEntry as HelperTool).call : undefined;
+    const originalCall = toolEntry.type === 'internal' ? toolEntry.call : undefined;
 
     // Create a deep copy using JSON serialization (excluding functions)
     const cloned = JSON.parse(JSON.stringify(toolEntry, (key, value) => {
@@ -46,7 +46,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     // Restore the original functions
     cloned.ajvValidate = originalAjvValidate;
     if (toolEntry.type === 'internal' && originalCall) {
-        (cloned as HelperTool).call = originalCall;
+        cloned.call = originalCall;
     }
 
     return cloned;

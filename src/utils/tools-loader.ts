@@ -14,7 +14,7 @@ import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { HelperTool, Input, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
+import type { Input, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
 import { getExpectedToolsByCategories } from './tools.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -163,7 +163,7 @@ export async function loadToolsFromInput(
     const toolFunctions = new Map<string, { ajvValidate?: ValidateFunction<unknown>; call?:(args: InternalToolArgs) => Promise<object> }>();
     for (const entry of filtered) {
         if (entry.type === 'internal') {
-            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate, call: (entry as HelperTool).call });
+            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate, call: entry.call });
         } else {
             toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate });
         }
@@ -182,7 +182,7 @@ export async function loadToolsFromInput(
                 entry.ajvValidate = funcs.ajvValidate;
             }
             if (entry.type === 'internal' && funcs.call) {
-                (entry as HelperTool).call = funcs.call;
+                entry.call = funcs.call;
             }
         }
     }
