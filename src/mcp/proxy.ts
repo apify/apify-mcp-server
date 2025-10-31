@@ -17,6 +17,7 @@ export async function getMCPServerTools(
     const compiledTools: ToolEntry[] = [];
     for (const tool of tools) {
         const mcpTool: ActorMcpTool = {
+            type: 'actor-mcp',
             actorId: actorID,
             serverId: getMCPServerID(serverUrl),
             serverUrl,
@@ -28,12 +29,7 @@ export async function getMCPServerTools(
             ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
         };
 
-        const wrap: ToolEntry = {
-            type: 'actor-mcp',
-            tool: mcpTool,
-        };
-
-        compiledTools.push(wrap);
+        compiledTools.push(mcpTool);
     }
 
     return compiledTools;

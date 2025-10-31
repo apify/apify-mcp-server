@@ -37,7 +37,7 @@ import {
 import { prompts } from '../prompts/index.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
+import type { ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -142,7 +142,7 @@ export class ActorsMcpServer {
     private listInternalToolNames(): string[] {
         return Array.from(this.tools.values())
             .filter((tool) => tool.type === 'internal')
-            .map((tool) => (tool.tool as HelperTool).name);
+            .map((tool) => tool.name);
     }
 
     /**
@@ -152,7 +152,7 @@ export class ActorsMcpServer {
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
             .filter((tool) => tool.type === 'actor')
-            .map((tool) => (tool.tool as ActorTool).actorFullName);
+            .map((tool) => tool.actorFullName);
     }
 
     /**
@@ -162,7 +162,7 @@ export class ActorsMcpServer {
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())
             .filter((tool: ToolEntry) => tool.type === 'actor-mcp')
-            .map((tool: ToolEntry) => (tool.tool as ActorMcpTool).actorId);
+            .map((tool) => tool.actorId);
         // Ensure uniqueness
         return Array.from(new Set(ids));
     }
@@ -188,7 +188,7 @@ export class ActorsMcpServer {
         const internalToolMap = new Map([
             ...defaultTools,
             ...Object.values(toolCategories).flat(),
-        ].map((tool) => [tool.tool.name, tool]));
+        ].map((tool) => [tool.name, tool]));
 
         for (const tool of toolNames) {
             // Skip if the tool is already loaded
@@ -266,18 +266,20 @@ export class ActorsMcpServer {
         if (this.options.skyfireMode) {
             for (const wrap of tools) {
                 if (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
-                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
+                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_CALL)
+                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_OUTPUT_GET)) {
                     // Clone the tool before modifying it to avoid affecting shared objects
                     const clonedWrap = cloneToolEntry(wrap);
 
                     // Add Skyfire instructions to description if not already present
-                    if (!clonedWrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
-                        clonedWrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
+                    if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
+                        clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
+                    } else if (!clonedWrap.description) {
+                        clonedWrap.description = SKYFIRE_TOOL_INSTRUCTIONS;
                     }
                     // Add skyfire-pay-id property if not present
-                    if (clonedWrap.tool.inputSchema && 'properties' in clonedWrap.tool.inputSchema) {
-                        const props = clonedWrap.tool.inputSchema.properties as Record<string, unknown>;
+                    if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
+                        const props = clonedWrap.inputSchema.properties as Record<string, unknown>;
                         if (!props['skyfire-pay-id']) {
                             props['skyfire-pay-id'] = {
                                 type: 'string',
@@ -287,16 +289,16 @@ export class ActorsMcpServer {
                     }
 
                     // Store the cloned and modified tool
-                    this.tools.set(clonedWrap.tool.name, clonedWrap);
+                    this.tools.set(clonedWrap.name, clonedWrap);
                 } else {
                     // Store unmodified tools as-is
-                    this.tools.set(wrap.tool.name, wrap);
+                    this.tools.set(wrap.name, wrap);
                 }
             }
         } else {
             // No skyfire mode - store tools as-is
             for (const wrap of tools) {
-                this.tools.set(wrap.tool.name, wrap);
+                this.tools.set(wrap.name, wrap);
             }
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
@@ -456,7 +458,7 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool.tool));
+            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool));
             return { tools };
         });
 
@@ -502,7 +504,7 @@ export class ActorsMcpServer {
             // TODO - if connection is /mcp client will not receive notification on tool change
             // Find tool by name or actor full name
             const tool = Array.from(this.tools.values())
-                .find((t) => t.tool.name === name || (t.type === 'actor' && (t.tool as ActorTool).actorFullName === name));
+                .find((t) => t.name === name || (t.type === 'actor' && t.actorFullName === name));
             if (!tool) {
                 const msg = `Tool ${name} not found. Available tools: ${this.listToolNames().join(', ')}`;
                 log.error(msg);
@@ -524,9 +526,9 @@ export class ActorsMcpServer {
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args);
-            log.debug('Validate arguments for tool', { toolName: tool.tool.name, input: args });
-            if (!tool.tool.ajvValidate(args)) {
-                const msg = `Invalid arguments for tool ${tool.tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.tool.ajvValidate.errors)}`;
+            log.debug('Validate arguments for tool', { toolName: tool.name, input: args });
+            if (!tool.ajvValidate(args)) {
+                const msg = `Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -538,15 +540,13 @@ export class ActorsMcpServer {
             try {
                 // Handle internal tool
                 if (tool.type === 'internal') {
-                    const internalTool = tool.tool as HelperTool;
-
                     // Only create progress tracker for call-actor tool
-                    const progressTracker = internalTool.name === 'call-actor'
+                    const progressTracker = tool.name === 'call-actor'
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    log.info('Calling internal tool', { name: internalTool.name, input: args });
-                    const res = await internalTool.call({
+                    log.info('Calling internal tool', { name: tool.name, input: args });
+                    const res = await tool.call({
                         args,
                         extra,
                         apifyMcpServer: this,
@@ -564,12 +564,11 @@ export class ActorsMcpServer {
                 }
 
                 if (tool.type === 'actor-mcp') {
-                    const serverTool = tool.tool as ActorMcpTool;
                     let client: Client | null = null;
                     try {
-                        client = await connectMCPClient(serverTool.serverUrl, apifyToken);
+                        client = await connectMCPClient(tool.serverUrl, apifyToken);
                         if (!client) {
-                            const msg = `Failed to connect to MCP server ${serverTool.serverUrl}`;
+                            const msg = `Failed to connect to MCP server ${tool.serverUrl}`;
                             log.error(msg);
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             return {
@@ -595,9 +594,9 @@ export class ActorsMcpServer {
                             }
                         }
 
-                        log.info('Calling Actor-MCP', { actorId: serverTool.actorId, toolName: serverTool.originToolName, input: args });
+                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, input: args });
                         const res = await client.callTool({
-                            name: serverTool.originToolName,
+                            name: tool.originToolName,
                             arguments: args,
                             _meta: {
                                 progressToken,
@@ -625,12 +624,10 @@ export class ActorsMcpServer {
                         };
                     }
 
-                    const actorTool = tool.tool as ActorTool;
-
                     // Create progress tracker if progressToken is available
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
-                    const callOptions: ActorCallOptions = { memory: actorTool.memoryMbytes };
+                    const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
 
                     /**
                      * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
@@ -641,9 +638,9 @@ export class ActorsMcpServer {
                         : new ApifyClient({ token: apifyToken });
 
                     try {
-                        log.info('Calling Actor', { actorName: actorTool.actorFullName, input: actorArgs });
+                        log.info('Calling Actor', { actorName: tool.actorFullName, input: actorArgs });
                         const callResult = await callActorGetDataset(
-                            actorTool.actorFullName,
+                            tool.actorFullName,
                             actorArgs,
                             apifyClient,
                             callOptions,
@@ -657,7 +654,7 @@ export class ActorsMcpServer {
                             return { };
                         }
 
-                        const content = buildActorResponseContent(actorTool.actorFullName, callResult);
+                        const content = buildActorResponseContent(tool.actorFullName, callResult);
                         return { content };
                     } finally {
                         if (progressTracker) {
@@ -698,8 +695,8 @@ export class ActorsMcpServer {
         }
         // Clear all tools and their compiled schemas
         for (const tool of this.tools.values()) {
-            if (tool.tool.ajvValidate && typeof tool.tool.ajvValidate === 'function') {
-                (tool.tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
+            if (tool.ajvValidate && typeof tool.ajvValidate === 'function') {
+                (tool as { ajvValidate: ValidateFunction<unknown> | null }).ajvValidate = null;
             }
         }
         this.tools.clear();

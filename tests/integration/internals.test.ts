@@ -33,7 +33,7 @@ describe('MCP server internals integration tests', () => {
         const names = actorsMcpServer.listAllToolNames();
         // With enableAddingActors=true and no tools/actors, we should only have add-actor initially
         const expectedToolNames = [
-            addTool.tool.name,
+            addTool.name,
             ACTOR_PYTHON_EXAMPLE,
             'get-actor-output',
         ];
@@ -76,7 +76,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(1);
         expect(latestTools.length).toBe(numberOfTools + 1);
         expect(latestTools).toContain(actor);
-        expect(latestTools).toContain(addTool.tool.name);
+        expect(latestTools).toContain(addTool.name);
         // No default actors are present when only add-actor is enabled by default
 
         // Remove the Actor
@@ -86,7 +86,7 @@ describe('MCP server internals integration tests', () => {
         expect(toolNotificationCount).toBe(2);
         expect(latestTools.length).toBe(numberOfTools);
         expect(latestTools).not.toContain(actor);
-        expect(latestTools).toContain(addTool.tool.name);
+        expect(latestTools).toContain(addTool.name);
         // No default actors are present by default in this mode
     });
 

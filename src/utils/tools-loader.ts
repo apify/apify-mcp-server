@@ -14,7 +14,7 @@ import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { Input, InternalTool, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
+import type { Input, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
 import { getExpectedToolsByCategories } from './tools.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -23,7 +23,7 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
     if (!INTERNAL_TOOL_BY_NAME_CACHE) {
         const allInternal = getExpectedToolsByCategories(Object.keys(toolCategories) as ToolCategory[]);
         INTERNAL_TOOL_BY_NAME_CACHE = new Map<string, ToolEntry>(
-            allInternal.map((entry) => [entry.tool.name, entry]),
+            allInternal.map((entry) => [entry.name, entry]),
         );
     }
     return INTERNAL_TOOL_BY_NAME_CACHE;
@@ -114,7 +114,7 @@ export async function loadToolsFromInput(
         result.push(...internalSelections);
         // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
-            const hasAddActor = result.some((e) => e.tool.name === addTool.tool.name);
+            const hasAddActor = result.some((e) => e.name === addTool.name);
             if (!hasAddActor) result.push(addTool);
         }
     } else if (addActorEnabled && !actorsExplicitlyEmpty) {
@@ -134,9 +134,9 @@ export async function loadToolsFromInput(
      * If there is any tool that in some way, even indirectly (like add-actor), allows calling
      * Actor, then we need to ensure the get-actor-output tool is available.
      */
-    const hasCallActor = result.some((entry) => entry.tool.name === HelperTools.ACTOR_CALL);
+    const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
-    const hasAddActorTool = result.some((entry) => entry.tool.name === HelperTools.ACTOR_ADD);
+    const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
     if (hasCallActor || hasActorTools || hasAddActorTool) {
         result.push(getActorOutput);
     }
@@ -154,7 +154,7 @@ export async function loadToolsFromInput(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    const filtered = result.filter((entry) => !seen.has(entry.tool.name) && seen.add(entry.tool.name));
+    const filtered = result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
 
     // TODO: rework this solition as it was quickly hacked together for hotfix
     // Deep clone except ajvValidate and call functions
@@ -163,9 +163,9 @@ export async function loadToolsFromInput(
     const toolFunctions = new Map<string, { ajvValidate?: ValidateFunction<unknown>; call?:(args: InternalToolArgs) => Promise<object> }>();
     for (const entry of filtered) {
         if (entry.type === 'internal') {
-            toolFunctions.set(entry.tool.name, { ajvValidate: entry.tool.ajvValidate, call: (entry.tool as InternalTool).call });
+            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate, call: entry.call });
         } else {
-            toolFunctions.set(entry.tool.name, { ajvValidate: entry.tool.ajvValidate });
+            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate });
         }
     }
 
@@ -176,13 +176,13 @@ export async function loadToolsFromInput(
 
     // restore the original functions
     for (const entry of cloned) {
-        const funcs = toolFunctions.get(entry.tool.name);
+        const funcs = toolFunctions.get(entry.name);
         if (funcs) {
             if (funcs.ajvValidate) {
-                entry.tool.ajvValidate = funcs.ajvValidate;
+                entry.ajvValidate = funcs.ajvValidate;
             }
             if (entry.type === 'internal' && funcs.call) {
-                (entry.tool as InternalTool).call = funcs.call;
+                entry.call = funcs.call;
             }
         }
     }
