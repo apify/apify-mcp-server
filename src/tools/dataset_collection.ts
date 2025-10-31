@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getUserDatasetsListArgs = z.object({
@@ -27,9 +27,8 @@ const getUserDatasetsListArgs = z.object({
  */
 export const getUserDatasetsList: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.DATASET_LIST_GET,
-        description: `List datasets (collections of Actor run data) for the authenticated user.
+    name: HelperTools.DATASET_LIST_GET,
+    description: `List datasets (collections of Actor run data) for the authenticated user.
 Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
 
 The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
@@ -41,19 +40,18 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List my last 10 datasets (newest first)
 - user_input: List unnamed datasets`,
-        inputSchema: zodToJsonSchema(getUserDatasetsListArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const parsed = getUserDatasetsListArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            const datasets = await client.datasets().list({
-                limit: parsed.limit,
-                offset: parsed.offset,
-                desc: parsed.desc,
-                unnamed: parsed.unnamed,
-            });
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(datasets)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+    inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as McpInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
+        const parsed = getUserDatasetsListArgs.parse(args);
+        const client = new ApifyClient({ token: apifyToken });
+        const datasets = await client.datasets().list({
+            limit: parsed.limit,
+            offset: parsed.offset,
+            desc: parsed.desc,
+            unnamed: parsed.unnamed,
+        });
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(datasets)}\n\`\`\`` }] };
+    },
+} as const;

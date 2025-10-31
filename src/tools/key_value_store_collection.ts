@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getUserKeyValueStoresListArgs = z.object({
@@ -27,9 +27,8 @@ const getUserKeyValueStoresListArgs = z.object({
  */
 export const getUserKeyValueStoresList: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.KEY_VALUE_STORE_LIST_GET,
-        description: `List key-value stores owned by the authenticated user.
+    name: HelperTools.KEY_VALUE_STORE_LIST_GET,
+    description: `List key-value stores owned by the authenticated user.
 Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
 
 The results will include basic info for each store, sorted by createdAt (ascending by default).
@@ -41,19 +40,18 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List my last 10 key-value stores (newest first)
 - user_input: List unnamed key-value stores`,
-        inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const parsed = getUserKeyValueStoresListArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            const stores = await client.keyValueStores().list({
-                limit: parsed.limit,
-                offset: parsed.offset,
-                desc: parsed.desc,
-                unnamed: parsed.unnamed,
-            });
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(stores)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+    inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs) as McpInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
+        const parsed = getUserKeyValueStoresListArgs.parse(args);
+        const client = new ApifyClient({ token: apifyToken });
+        const stores = await client.keyValueStores().list({
+            limit: parsed.limit,
+            offset: parsed.offset,
+            desc: parsed.desc,
+            unnamed: parsed.unnamed,
+        });
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(stores)}\n\`\`\`` }] };
+    },
+} as const;

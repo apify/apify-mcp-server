@@ -8,8 +8,9 @@ import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
-    InternalTool,
+    InternalToolArgs,
     ISchemaProperties,
+    McpInputSchema,
     ToolEntry,
 } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -108,28 +109,26 @@ const getActorDefinitionArgsSchema = z.object({
  */
 export const actorDefinitionTool: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.ACTOR_GET_DETAILS,
-        description: 'Get documentation, readme, input schema and other details about an Actor. '
-            + 'For example, when user says, I need to know more about web crawler Actor.'
-            + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
-            + `Limit the length of the README if needed.`,
-        inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
+    name: HelperTools.ACTOR_GET_DETAILS,
+    description: 'Get documentation, readme, input schema and other details about an Actor. '
+        + 'For example, when user says, I need to know more about web crawler Actor.'
+        + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
+        + `Limit the length of the README if needed.`,
+    inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema) as McpInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
 
-            const parsed = getActorDefinitionArgsSchema.parse(args);
-            const apifyClient = new ApifyClient({ token: apifyToken });
-            const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
-            if (!v) {
-                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
-            }
-            if (v && v.input && 'properties' in v.input && v.input) {
-                const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
-                v.input.properties = shortenProperties(properties);
-            }
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+        const parsed = getActorDefinitionArgsSchema.parse(args);
+        const apifyClient = new ApifyClient({ token: apifyToken });
+        const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
+        if (!v) {
+            return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+        }
+        if (v && v.input && 'properties' in v.input && v.input) {
+            const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
+            v.input.properties = shortenProperties(properties);
+        }
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+    },
+} as const;

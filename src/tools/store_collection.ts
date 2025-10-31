@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
-import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
+import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 
@@ -73,9 +73,8 @@ function filterRentalActors(
  */
 export const searchActors: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.STORE_SEARCH,
-        description: `Search the Apify Store for Actors or Model Context Protocol (MCP) servers using keywords.
+    name: HelperTools.STORE_SEARCH,
+    description: `Search the Apify Store for Actors or Model Context Protocol (MCP) servers using keywords.
 Apify Store features solutions for web scraping, automation, and AI agents (e.g., Instagram, TikTok, LinkedIn, flights, bookings).
 
 The results will include curated Actor cards with title, description, pricing model, usage statistics, and ratings.
@@ -91,30 +90,30 @@ USAGE EXAMPLES:
 - user_input: Find browserbase MCP server
 - user_input: I need to scrape instagram profiles and comments
 - user_input: I need to get flights and airbnb data`,
-        inputSchema: zodToJsonSchema(searchActorsArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
-        call: async (toolArgs) => {
-            const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
-            const parsed = searchActorsArgsSchema.parse(args);
-            let actors = await searchActorsByKeywords(
-                parsed.search,
-                apifyToken,
-                parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
-                parsed.offset,
-                apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
-            );
-            actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-            const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
+    inputSchema: zodToJsonSchema(searchActorsArgsSchema) as McpInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
+        const parsed = searchActorsArgsSchema.parse(args);
+        let actors = await searchActorsByKeywords(
+            parsed.search,
+            apifyToken,
+            parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
+            parsed.offset,
+            apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
+        );
+        actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
+        const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
 
-            const actorsText = actorCards.length
-                ? actorCards.join('\n\n')
-                : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
+        const actorsText = actorCards.length
+            ? actorCards.join('\n\n')
+            : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
 
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: `
 # Search results:
 - **Search query:** ${parsed.search}
 - **Number of Actors found:** ${actorCards.length}
@@ -122,9 +121,8 @@ USAGE EXAMPLES:
 # Actors:
 
 ${actorsText}`,
-                    },
-                ],
-            };
-        },
-    } as HelperTool,
-};
+                },
+            ],
+        };
+    },
+} as const;

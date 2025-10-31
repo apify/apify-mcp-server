@@ -3,12 +3,12 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import type { Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
+import type z from 'zod';
 
 import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
-import z from 'zod';
 
 export interface ISchemaProperties {
     type: string;
@@ -79,9 +79,11 @@ export type McpInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 
 /**
  * Interface for Actor-based tools - tools that wrap Apify Actors.
- * Extends ToolBase with Actor-specific properties.
+ * Type discriminator: 'actor'
  */
 export interface ActorTool extends ToolBase {
+    /** Type discriminator for actor tools */
+    type: 'actor';
     /** Full name of the Apify Actor (username/name) */
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
@@ -115,10 +117,12 @@ export type InternalToolArgs = {
 }
 
 /**
- * Interface for internal tools - tools implemented directly in the MCP server.
- * Extends ToolBase with a call function implementation.
+ * Helper tool - tools implemented directly in the MCP server.
+ * Type discriminator: 'internal'
  */
 export interface HelperTool extends ToolBase {
+    /** Type discriminator for helper/internal tools */
+    type: 'internal';
     /**
      * Executes the tool with the given arguments
      * @param toolArgs - Arguments and server references
@@ -128,66 +132,34 @@ export interface HelperTool extends ToolBase {
 }
 
 /**
-* Actorized MCP server tool where this MCP server acts as a proxy.
-* Extends ToolBase with a tool-associated MCP server.
-*/
+ * Actor MCP tool - tools from Actorized MCP servers that this server proxies.
+ * Type discriminator: 'actor-mcp'
+ */
 export interface ActorMcpTool extends ToolBase {
-    // Origin MCP server tool name is needed for the tool call
+    /** Type discriminator for actor MCP tools */
+    type: 'actor-mcp';
+    /** Origin MCP server tool name is needed for the tool call */
     originToolName: string;
-    // ID of the Actorized MCP server - for example, apify/actors-mcp-server
+    /** ID of the Actorized MCP server - for example, apify/actors-mcp-server */
     actorId: string;
     /**
      * ID of the Actorized MCP server the tool is associated with.
      * serverId is generated unique ID based on the serverUrl.
      */
     serverId: string;
-    // Connection URL of the Actorized MCP server
+    /** Connection URL of the Actorized MCP server */
     serverUrl: string;
 }
 
 /**
- * Discriminated union for Helper (internal) tools.
- * These are tools implemented directly in the MCP server.
- */
-export interface HelperToolEntry {
-    /** Type discriminator for helper/internal tools */
-    type: 'internal';
-    /** The helper tool instance */
-    tool: HelperTool;
-}
-
-/**
- * Discriminated union for Actor tools.
- * These are tools that wrap Apify Actors.
- */
-export interface ActorToolEntry {
-    /** Type discriminator for actor tools */
-    type: 'actor';
-    /** The actor tool instance */
-    tool: ActorTool;
-}
-
-/**
- * Discriminated union for Actor MCP tools.
- * These are tools from Actorized MCP servers that this server proxies.
- */
-export interface ActorMcpToolEntry {
-    /** Type discriminator for actor MCP tools */
-    type: 'actor-mcp';
-    /** The actor MCP tool instance */
-    tool: ActorMcpTool;
-}
-
-/**
- * Wrapper interface that combines a tool with its type discriminator.
- * Used to store and manage tools of different types uniformly.
- * 
+ * Discriminated union of all tool types.
+ *
  * This is a discriminated union that ensures type safety:
  * - When type is 'internal', tool is guaranteed to be HelperTool
  * - When type is 'actor', tool is guaranteed to be ActorTool
  * - When type is 'actor-mcp', tool is guaranteed to be ActorMcpTool
  */
-export type ToolEntry = HelperToolEntry | ActorToolEntry | ActorMcpToolEntry;
+export type ToolEntry = HelperTool | ActorTool | ActorMcpTool;
 
 /**
  * Price for a single event in a specific tier.
@@ -228,19 +200,6 @@ export type ExtendedPricingInfo = PricingInfo & {
     pricingPerEvent: PricingPerEvent;
     tieredPricing?: Partial<Record<PricingTier, { tieredPricePerUnitUsd: number }>>;
 };
-
-/**
- * Interface for internal tools - tools implemented directly in the MCP server.
- * Extends ToolBase with a call function implementation.
- */
-export interface InternalTool extends ToolBase {
-    /**
-     * Executes the tool with the given arguments
-     * @param toolArgs - Arguments and server references
-     * @returns Promise resolving to the tool's output
-     */
-    call: (toolArgs: InternalToolArgs) => Promise<object>;
-}
 
 export type ToolCategory = keyof typeof toolCategories;
 /**
