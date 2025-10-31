@@ -142,20 +142,48 @@ export interface ActorMcpTool extends ToolBase {
 }
 
 /**
- * Type discriminator for tools - indicates whether a tool is internal or Actor-based.
+ * Discriminated union for Helper (internal) tools.
+ * These are tools implemented directly in the MCP server.
  */
-export type ToolType = 'internal' | 'actor' | 'actor-mcp';
+export interface HelperToolEntry {
+    /** Type discriminator for helper/internal tools */
+    type: 'internal';
+    /** The helper tool instance */
+    tool: HelperTool;
+}
+
+/**
+ * Discriminated union for Actor tools.
+ * These are tools that wrap Apify Actors.
+ */
+export interface ActorToolEntry {
+    /** Type discriminator for actor tools */
+    type: 'actor';
+    /** The actor tool instance */
+    tool: ActorTool;
+}
+
+/**
+ * Discriminated union for Actor MCP tools.
+ * These are tools from Actorized MCP servers that this server proxies.
+ */
+export interface ActorMcpToolEntry {
+    /** Type discriminator for actor MCP tools */
+    type: 'actor-mcp';
+    /** The actor MCP tool instance */
+    tool: ActorMcpTool;
+}
 
 /**
  * Wrapper interface that combines a tool with its type discriminator.
  * Used to store and manage tools of different types uniformly.
+ * 
+ * This is a discriminated union that ensures type safety:
+ * - When type is 'internal', tool is guaranteed to be HelperTool
+ * - When type is 'actor', tool is guaranteed to be ActorTool
+ * - When type is 'actor-mcp', tool is guaranteed to be ActorMcpTool
  */
-export interface ToolEntry {
-    /** Type of the tool (internal or actor) */
-    type: ToolType;
-    /** The tool instance */
-    tool: ActorTool | HelperTool | ActorMcpTool;
-}
+export type ToolEntry = HelperToolEntry | ActorToolEntry | ActorMcpToolEntry;
 
 /**
  * Price for a single event in a specific tier.

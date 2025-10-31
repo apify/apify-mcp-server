@@ -110,8 +110,6 @@ export const actorDefinitionTool: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_GET_DETAILS,
-        // TODO: remove actorFullName from internal tools
-        actorFullName: HelperTools.ACTOR_GET_DETAILS,
         description: 'Get documentation, readme, input schema and other details about an Actor. '
             + 'For example, when user says, I need to know more about web crawler Actor.'
             + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'

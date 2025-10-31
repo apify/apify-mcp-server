@@ -45,7 +45,6 @@ export const getDataset: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DATASET_GET,
-        actorFullName: HelperTools.DATASET_GET,
         description: `Get metadata for a dataset (collection of structured data created by an Actor run).
 The results will include dataset details such as itemCount, schema, fields, and stats.
 Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
@@ -79,7 +78,6 @@ export const getDatasetItems: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DATASET_GET_ITEMS,
-        actorFullName: HelperTools.DATASET_GET_ITEMS,
         description: `Retrieve dataset items with pagination, sorting, and field selection.
 Use clean=true to skip empty items and hidden fields. Include or omit fields using comma-separated lists.
 For nested objects, first flatten them (e.g., flatten="metadata"), then reference nested fields via dot notation (e.g., fields="metadata.url").
@@ -143,7 +141,6 @@ export const getDatasetSchema: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DATASET_SCHEMA_GET,
-        actorFullName: HelperTools.DATASET_SCHEMA_GET,
         description: `Generate a JSON schema from a sample of dataset items.
 The schema describes the structure of the data and can be used for validation, documentation, or processing.
 Use this to understand the dataset before fetching many items.

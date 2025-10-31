@@ -29,7 +29,6 @@ export const getUserKeyValueStoresList: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_LIST_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_LIST_GET,
         description: `List key-value stores owned by the authenticated user.
 Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
 

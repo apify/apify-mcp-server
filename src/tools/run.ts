@@ -26,7 +26,6 @@ export const getActorRun: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_GET,
-        actorFullName: HelperTools.ACTOR_RUNS_GET,
         description: `Get detailed information about a specific Actor run by runId.
 The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
 
@@ -67,7 +66,6 @@ export const getActorRunLog: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_LOG,
-        actorFullName: HelperTools.ACTOR_RUNS_LOG,
         description: `Retrieve recent log lines for a specific Actor run.
 The results will include the last N lines of the run’s log output (plain text).
 
@@ -98,7 +96,6 @@ export const abortActorRun: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUNS_ABORT,
-        actorFullName: HelperTools.ACTOR_RUNS_ABORT,
         description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.
 The results will include the updated run details after the abort request.

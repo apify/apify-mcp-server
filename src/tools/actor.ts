@@ -329,7 +329,6 @@ export const callActor: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_CALL,
-        actorFullName: HelperTools.ACTOR_CALL,
         description: `Call any Actor from the Apify Store using a mandatory two-step workflow.
 This ensures you first get the Actor’s input schema and details before executing it safely.
 

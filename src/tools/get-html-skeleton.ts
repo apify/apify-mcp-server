@@ -40,7 +40,6 @@ export const getHtmlSkeleton: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.GET_HTML_SKELETON,
-        actorFullName: HelperTools.GET_HTML_SKELETON,
         description: `Retrieve the HTML skeleton (clean structure) of a webpage by stripping scripts, styles, and non-essential attributes.
 This keeps the core HTML structure, links, images, and data attributes for analysis. Supports optional JavaScript rendering for dynamic pages.
 

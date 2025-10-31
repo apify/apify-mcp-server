@@ -29,7 +29,6 @@ export const getUserDatasetsList: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.DATASET_LIST_GET,
-        actorFullName: HelperTools.DATASET_LIST_GET,
         description: `List datasets (collections of Actor run data) for the authenticated user.
 Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
 

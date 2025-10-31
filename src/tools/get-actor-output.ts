@@ -67,7 +67,6 @@ export const getActorOutput: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_OUTPUT_GET,
-        actorFullName: HelperTools.ACTOR_OUTPUT_GET,
         description: `Retrieve the output dataset items of a specific Actor run using its datasetId.
 You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.
 This tool is a simplified version of the get-dataset-items tool, focused on Actor run outputs.

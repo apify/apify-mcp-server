@@ -19,7 +19,6 @@ export const getKeyValueStore: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_GET,
         description: `Get details about a key-value store by ID or username~store-name.
 The results will include store metadata (ID, name, owner, access settings) and usage statistics.
 
@@ -61,7 +60,6 @@ export const getKeyValueStoreKeys: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_KEYS_GET,
         description: `List keys in a key-value store with optional pagination.
 The results will include keys and basic info about stored values (e.g., size).
 Use exclusiveStartKey and limit to paginate.
@@ -103,7 +101,6 @@ export const getKeyValueStoreRecord: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_RECORD_GET,
         description: `Get a value stored in a key-value store under a specific key.
 The response preserves the original Content-Encoding; most clients handle decompression automatically.
 

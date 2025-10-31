@@ -29,7 +29,6 @@ export const getUserRunsList: ToolEntry = {
     type: 'internal',
     tool: {
         name: HelperTools.ACTOR_RUN_LIST_GET,
-        actorFullName: HelperTools.ACTOR_RUN_LIST_GET,
         description: `List Actor runs for the authenticated user with optional filtering and sorting.
 The results will include run details (including datasetId and keyValueStoreId) and can be filtered by status.
 Valid statuses: READY (not allocated), RUNNING (executing), SUCCEEDED (finished), FAILED (failed), TIMING-OUT, TIMED-OUT, ABORTING, ABORTED.
