@@ -1,6 +1,6 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Prompt, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 
@@ -8,6 +8,7 @@ import type { ACTOR_PRICING_MODEL } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
+import z from 'zod';
 
 export interface ISchemaProperties {
     type: string;
@@ -60,18 +61,21 @@ export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
 
 /**
  * Base interface for all tools in the MCP server.
- * Contains common properties shared by all tool types.
+ * Extends the MCP SDK's Tool schema, which requires inputSchema to have type: "object".
+ * Adds ajvValidate for runtime validation.
  */
-export interface ToolBase {
-    /** Unique name/identifier for the tool */
-    name: string;
-    /** Description of what the tool does */
-    description: string;
-    /** JSON schema defining the tool's input parameters */
-    inputSchema: object;
+export interface ToolBase extends z.infer<typeof ToolSchema> {
     /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
 }
+
+/**
+ * Type for MCP SDK's inputSchema constraint.
+ * Extracted directly from the MCP SDK's ToolSchema to ensure alignment with the specification.
+ * The MCP SDK requires inputSchema to have type: "object" (literal) at the top level.
+ * Use this type when casting schemas that have type: string to the strict MCP format.
+ */
+export type McpInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 
 /**
  * Interface for Actor-based tools - tools that wrap Apify Actors.

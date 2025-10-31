@@ -272,8 +272,10 @@ export class ActorsMcpServer {
                     const clonedWrap = cloneToolEntry(wrap);
 
                     // Add Skyfire instructions to description if not already present
-                    if (!clonedWrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
+                    if (clonedWrap.tool.description && !clonedWrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         clonedWrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
+                    } else if (!clonedWrap.tool.description) {
+                        clonedWrap.tool.description = SKYFIRE_TOOL_INSTRUCTIONS;
                     }
                     // Add skyfire-pay-id property if not present
                     if (clonedWrap.tool.inputSchema && 'properties' in clonedWrap.tool.inputSchema) {
