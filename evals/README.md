@@ -143,6 +143,13 @@ To get the best performance out of Claude when using tools, follow these guideli
 - **Prioritize descriptions over examples.**
   While you can include examples of how to use a tool in its description or accompanying prompt, this is less important than having a clear and comprehensive explanation of the tool’s purpose and parameters.
   Only add examples **after** you’ve fully developed the description.
+
+## Optimize metadata for OpenAI models
+
+- Name – pair the domain with the action (calendar.create_event).
+- Description – start with “Use this when…” and call out disallowed cases (“Do not use for reminders”).
+- Parameter docs – describe each argument, include examples, and use enums for constrained values.
+- Read-only hint – annotate readOnlyHint: true on tools that never mutate state so ChatGPT can streamline confirmation.
 ---
 
 ## How to analyze and improve a specific tool
@@ -212,6 +219,43 @@ Always make improvements **manually**, based on your understanding of the proble
 LLMs are very likely to worsen the issue instead of fixing it.
 
 
-# References:
+# Tool definition patterns
+
+Based on analysis of [Cursor Agent Tools v1.0](https://raw.githubusercontent.com/x1xhlol/system-prompts-and-models-of-ai-tools/refs/heads/main/Cursor%20Prompts/Agent%20Tools%20v1.0.json), [Lovable Agent Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Lovable/Agent%20Tools.json), and [Claude Code Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Claude%20Code/claude-code-tools.json):
+
+## Tool description vs parameter description
+
+**Tool description** should contain:
+- What the tool does (core functionality)
+- When to use it (usage context)
+- Key limitations (what it doesn't do)
+- High-level behavior (how it works conceptually)
+
+**Parameter description** should contain:
+- Parameter-specific details (what each parameter does)
+- Input constraints (validation rules, formats)
+- Usage examples (specific examples for that parameter)
+- Parameter-specific guidance (how to use that specific parameter)
+
+## Key patterns
+
+1. **Concise but comprehensive** - Avoid overly verbose descriptions
+2. **Semantic clarity** - Use language that matches user intent
+3. **Clear separation** - Tool purpose vs parameter-specific guidance
+4. **Operational constraints** - State limitations and boundaries
+5. **Contextual guidance** - Include usage instructions where relevant
+
+## References
 
 - [Example of a good tool description](https://docs.claude.com/en/docs/agents-and-tools/tool-use/implement-tool-use#example-of-a-good-tool-description)
+- [Cursor Agent Tools v1.0](https://raw.githubusercontent.com/x1xhlol/system-prompts-and-models-of-ai-tools/refs/heads/main/Cursor%20Prompts/Agent%20Tools%20v1.0.json)
+- [Lovable Agent Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Lovable/Agent%20Tools.json)
+- [Claude Code Tools](https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Claude%20Code/claude-code-tools.json)
+- [OpenAI optimize metadata](https://developers.openai.com/apps-sdk/guides/optimize-metadata)
+
+NOTES:
+
+// System prompt - instructions mainly cursor (very similar instructions in copilot)
+// https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Cursor%20Prompts/Agent%20Prompt%20v1.2.txt
+// https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/VSCode%20Agent/Prompt.txt
+

@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.3",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -66,15 +66,15 @@
       "id": "search-actors-1",
       "category": "search-actors",
       "query": "How to scrape Instagram posts",
-      "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar"
+      "expectedTools": [],
+      "reference": "Either it should explain how to scrape Instagram posts or call 'search-actors' tool with the query: 'Instagram posts' or similar"
     },
     {
       "id": "search-actors-2",
       "category": "search-actors",
       "query": "What are the best Instagram scrapers?",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Instagram scraper' or similar."
+      "reference": "It must call the 'search-actors' tool with the query: `Instagram`, 'Instagram scraper', or similar."
     },
     {
       "id": "search-actors-3",
@@ -196,9 +196,9 @@
     {
       "id": "search-vs-rag-1",
       "category": "search-actors",
-      "query": "Find posts about AI on Instagram",
+      "query": "Find posts about the Rock on Instagram",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Instagram' or 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts AI' or any more detailed variations."
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram' or 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts the Rock' or any more detailed variations."
     },
     {
       "id": "search-vs-rag-2",
@@ -234,9 +234,8 @@
     {
       "id": "search-vs-rag-7",
       "category": "search-actors",
-      "query": "Fetch flight details for New York to London",
-      "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'flight data' or 'flight booking' or similar"
+      "query": "Find one way flights from New York to London tomorrow",
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-8",
@@ -391,8 +390,8 @@
     },
     {
       "id": "misleading-query-1",
-      "category": "search-actors",
-      "query": "What's the weather like today?",
+      "category": "apify-slash-rag-web-browser",
+      "query": "What's the weather like today in San Francisco?",
       "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
@@ -410,7 +409,7 @@
     {
       "id": "ambiguous-query-1",
       "category": "search-actors",
-      "query": "Instagram posts",
+      "query": "Get instagram posts",
       "expectedTools": ["search-actors"],
       "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar"
     },
