@@ -52,7 +52,7 @@ interface CliArgs {
 
 log.setLevel(log.LEVELS.DEBUG);
 
-const RUN_LLM_EVALUATOR = false;
+const RUN_LLM_EVALUATOR = true;
 const RUN_TOOLS_EXACT_MATCH_EVALUATOR = true;
 
 dotenv.config({ path: '.env' });
