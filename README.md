@@ -49,7 +49,7 @@ For example, it can:
 - Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
 - Use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content.
 
-**Video tutorial: Integrate 5,000+ Apify Actors and Agents with Claude**
+**Video tutorial: Integrate 8,000+ Apify Actors and Agents with Claude**
 
 [![Apify MCP Server Tutorial: Integrate 5,000+ Apify Actors and Agents with Claude](https://img.youtube.com/vi/BKu8H91uCTg/hqdefault.jpg)](https://www.youtube.com/watch?v=BKu8H91uCTg)
 
@@ -66,34 +66,29 @@ You can use the Apify MCP Server in two ways:
 
 You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
 
-# 🤖 MCP clients and examples
+# 🤖 MCP clients
 
-To interact with the Apify MCP server, you can use various MCP clients, such as:
-- [Claude Desktop](https://claude.ai/download)
-- [Visual Studio Code](https://code.visualstudio.com/)
-- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
-- Other clients at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients)
-- More clients at [https://glama.ai/mcp/clients](https://glama.ai/mcp/clients)
+Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
+Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.
 
-With MCP server integrated, you can ask your AI assistant things like:
-- "Search the web and summarize recent trends in AI Agents."
-- "Find the top 10 Italian restaurants in San Francisco."
-- "Find and analyze the Instagram profile of The Rock."
-- "Provide a step-by-step guide on using the Model Context Protocol, including source URLs."
-- "What Apify Actors can I use?"
+To interact with the Apify MCP server, you can use clients, such as: [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+
+Visit the [mcp.apify.com](https://mcp.apify.com) to configure server for your preferred client.
+
+![Apify-MCP-client](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/mcp-clients.png)
 
 ### Supported clients matrix
 
 The following table outlines the tested MCP clients and their level of support for key features.
 
-| Client | Dynamic Tool Discovery | Notes |
-| --- | --- | --- |
-| **Claude.ai (web)** | ✅ Full | |
-| **Claude Desktop** | 🟡 Partial | Tools may need to be reloaded manually in the client. |
-| **VS Code (Genie)** | ✅ Full | |
-| **Apify Tester MCP Client** | ✅ Full | Designed for testing Apify MCP servers. |
+| Client                      | Dynamic Tool Discovery | Notes                                                 |
+|-----------------------------|------------------------|-------------------------------------------------------|
+| **Claude.ai (web)**         | ✅ Full                 |                                                       |
+| **Claude Desktop**          | 🟡 Partial             | Tools may need to be reloaded manually in the client. |
+| **VS Code (Genie)**         | ✅ Full                 |                                                       |
+| **Cursor**                  | ✅ Full                 |                                                       |
+| **Apify Tester MCP Client** | ✅ Full                 | Designed for testing Apify MCP servers.               |
 
-Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients. Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.
 
 **Smart tool selection based on client capabilities:**
 
