@@ -71,11 +71,11 @@ You can find detailed instructions for setting up the MCP server in the [Apify d
 Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
 Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.
 
-To interact with the Apify MCP server, you can use clients, such as: [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
+To interact with the Apify MCP server, you can use clients such as: [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client).
 
-Visit the [mcp.apify.com](https://mcp.apify.com) to configure server for your preferred client.
+Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your preferred client.
 
-![Apify-MCP-client](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/mcp-clients.png)
+![Apify-MCP-configuration-clients](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/mcp-clients.png)
 
 ### Supported clients matrix
 
