@@ -69,7 +69,7 @@ You can find detailed instructions for setting up the MCP server in the [Apify d
 # 🤖 MCP clients
 
 Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
-Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.
+<!--Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.-->
 
 To interact with the Apify MCP server, you can use clients such as: [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client).
 
@@ -81,14 +81,14 @@ Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your pr
 
 The following table outlines the tested MCP clients and their level of support for key features.
 
-| Client                      | Dynamic Tool Discovery | Notes                                                 |
-|-----------------------------|------------------------|-------------------------------------------------------|
-| **Claude.ai (web)**         | ✅ Full                 |                                                       |
-| **Claude Desktop**          | 🟡 Partial             | Tools may need to be reloaded manually in the client. |
-| **VS Code (Genie)**         | ✅ Full                 |                                                       |
-| **Cursor**                  | ✅ Full                 |                                                       |
-| **Apify Tester MCP Client** | ✅ Full                 | Designed for testing Apify MCP servers.               |
-| **OpenCode**                        | ✅ Full                 |                                                                                       |
+| Client                      | Dynamic Tool Discovery | Notes                                                |
+|-----------------------------|------------------------|------------------------------------------------------|
+| **Claude.ai (web)**         | 🟡 Partial             | Tools mey need to be reloaded manually in the client |
+| **Claude Desktop**          | 🟡 Partial             | Tools may need to be reloaded manually in the client |
+| **VS Code (Genie)**         | ✅ Full                 |                                                      |
+| **Cursor**                  | ✅ Full                 |                                                      |
+| **Apify Tester MCP Client** | ✅ Full                 | Designed for testing Apify MCP servers               |
+| **OpenCode**                | ✅ Full                 |                                                      |
 
 
 **Smart tool selection based on client capabilities:**
