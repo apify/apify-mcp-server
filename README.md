@@ -88,6 +88,7 @@ The following table outlines the tested MCP clients and their level of support f
 | **VS Code (Genie)**         | ✅ Full                 |                                                       |
 | **Cursor**                  | ✅ Full                 |                                                       |
 | **Apify Tester MCP Client** | ✅ Full                 | Designed for testing Apify MCP servers.               |
+| **OpenCode**                        | ✅ Full                 |                                                                                       |
 
 
 **Smart tool selection based on client capabilities:**
