@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
-import type { ActorPricingModel, ExtendedActorStoreList, HelperTool, ToolEntry } from '../types.js';
+import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 
@@ -81,9 +81,8 @@ function filterRentalActors(
  */
 export const searchActors: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.STORE_SEARCH,
-        description: `
+    name: HelperTools.STORE_SEARCH,
+    description: `
 Search the Apify Store for Actors using keyword-based queries.
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
@@ -110,32 +109,31 @@ Returns list of Actor cards with the following info:
 - **Pricing:** Details with pricing link
 - **Stats:** Usage, success rate, bookmarks
 - **Rating:** Out of 5 (if available)
+`,
+    inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
+        const parsed = searchActorsArgsSchema.parse(args);
+        let actors = await searchActorsByKeywords(
+            parsed.keywords,
+            apifyToken,
+            parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
+            parsed.offset,
+            apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
+        );
+        actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
+        const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
 
- `,
-        inputSchema: zodToJsonSchema(searchActorsArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
-        call: async (toolArgs) => {
-            const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
-            const parsed = searchActorsArgsSchema.parse(args);
-            let actors = await searchActorsByKeywords(
-                parsed.keywords,
-                apifyToken,
-                parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
-                parsed.offset,
-                apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
-            );
-            actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-            const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
+        const actorsText = actorCards.length
+            ? actorCards.join('\n\n')
+            : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
 
-            const actorsText = actorCards.length
-                ? actorCards.join('\n\n')
-                : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
-
-            return {
-                content: [
-                    {
-                        type: 'text',
-                        text: `
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: `
 # Search results:
 - **Search query:** ${parsed.keywords}
 - **Number of Actors found:** ${actorCards.length}
@@ -147,9 +145,8 @@ ${actorsText}
 If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
 If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
 `,
-                    },
-                ],
-            };
-        },
-    } as HelperTool,
-};
+                },
+            ],
+        };
+    },
+} as const;

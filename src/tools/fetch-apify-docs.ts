@@ -5,7 +5,7 @@ import log from '@apify/log';
 
 import { HelperTools } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
 
@@ -17,9 +17,8 @@ const fetchApifyDocsToolArgsSchema = z.object({
 
 export const fetchApifyDocsTool: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.DOCS_FETCH,
-        description: `Fetch the full content of an Apify documentation page by its URL.
+    name: HelperTools.DOCS_FETCH,
+    description: `Fetch the full content of an Apify documentation page by its URL.
 Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
 
 USAGE:
@@ -28,62 +27,60 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
-        args: fetchApifyDocsToolArgsSchema,
-        inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
-        call: async (toolArgs) => {
-            const { args } = toolArgs;
+    inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args } = toolArgs;
 
-            const parsed = fetchApifyDocsToolArgsSchema.parse(args);
-            const url = parsed.url.trim();
-            const urlWithoutFragment = url.split('#')[0];
+        const parsed = fetchApifyDocsToolArgsSchema.parse(args);
+        const url = parsed.url.trim();
+        const urlWithoutFragment = url.split('#')[0];
 
-            // Only allow URLs starting with https://docs.apify.com
-            if (!url.startsWith('https://docs.apify.com')) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: `Only URLs starting with https://docs.apify.com are allowed.`,
-                    }],
-                };
-            }
-
-            // Cache URL without fragment to avoid fetching the same page multiple times
-            let markdown = fetchApifyDocsCache.get(urlWithoutFragment);
-            // If the content is not cached, fetch it from the URL
-            if (!markdown) {
-                try {
-                    const response = await fetch(url);
-                    if (!response.ok) {
-                        return {
-                            content: [{
-                                type: 'text',
-                                text: `Failed to fetch the documentation page at ${url}. Status: ${response.status} ${response.statusText}`,
-                            }],
-                        };
-                    }
-                    const html = await response.text();
-                    markdown = htmlToMarkdown(html);
-                    // Cache the processed Markdown content
-                    // Use the URL without fragment as the key to avoid caching same page with different fragments
-                    fetchApifyDocsCache.set(urlWithoutFragment, markdown);
-                } catch (error) {
-                    log.error('Failed to fetch the documentation page', { url, error });
-                    return {
-                        content: [{
-                            type: 'text',
-                            text: `Failed to fetch the documentation page at ${url}. Please check the URL and try again.`,
-                        }],
-                    };
-                }
-            }
-
+        // Only allow URLs starting with https://docs.apify.com
+        if (!url.startsWith('https://docs.apify.com')) {
             return {
                 content: [{
                     type: 'text',
-                    text: `Fetched content from ${url}:\n\n${markdown}`,
+                    text: `Only URLs starting with https://docs.apify.com are allowed.`,
                 }],
             };
-        },
-    } as InternalTool,
-};
+        }
+
+        // Cache URL without fragment to avoid fetching the same page multiple times
+        let markdown = fetchApifyDocsCache.get(urlWithoutFragment);
+        // If the content is not cached, fetch it from the URL
+        if (!markdown) {
+            try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                    return {
+                        content: [{
+                            type: 'text',
+                            text: `Failed to fetch the documentation page at ${url}. Status: ${response.status} ${response.statusText}`,
+                        }],
+                    };
+                }
+                const html = await response.text();
+                markdown = htmlToMarkdown(html);
+                // Cache the processed Markdown content
+                // Use the URL without fragment as the key to avoid caching same page with different fragments
+                fetchApifyDocsCache.set(urlWithoutFragment, markdown);
+            } catch (error) {
+                log.error('Failed to fetch the documentation page', { url, error });
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Failed to fetch the documentation page at ${url}. Please check the URL and try again.`,
+                    }],
+                };
+            }
+        }
+
+        return {
+            content: [{
+                type: 'text',
+                text: `Fetched content from ${url}:\n\n${markdown}`,
+            }],
+        };
+    },
+} as const;

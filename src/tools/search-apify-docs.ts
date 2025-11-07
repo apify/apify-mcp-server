@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { searchApifyDocsCached } from '../utils/apify-docs.js';
 
@@ -28,9 +28,8 @@ Use this to paginate through the search results. For example, if you want to get
 
 export const searchApifyDocsTool: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.DOCS_SEARCH,
-        description: `Search Apify documentation using full-text search.
+    name: HelperTools.DOCS_SEARCH,
+    description: `Search Apify documentation using full-text search.
     You can use it to find relevant documentation based on keywords.
     Apify documentation has information about Apify console, Actors (development
     (actor.json, input schema, dataset schema, dockerfile), deployment, builds, runs),
@@ -49,38 +48,36 @@ export const searchApifyDocsTool: ToolEntry = {
     - query: How to use create Apify Actor?
     - query: How to define Actor input schema?
     - query: How scrape with Crawlee?`,
-        args: searchApifyDocsToolArgsSchema,
-        inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
-        call: async (toolArgs) => {
-            const { args } = toolArgs;
+    inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
+    ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args } = toolArgs;
 
-            const parsed = searchApifyDocsToolArgsSchema.parse(args);
-            const query = parsed.query.trim();
+        const parsed = searchApifyDocsToolArgsSchema.parse(args);
+        const query = parsed.query.trim();
 
-            const resultsRaw = await searchApifyDocsCached(query);
-            const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
+        const resultsRaw = await searchApifyDocsCached(query);
+        const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
-            if (results.length === 0) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: `No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}. Try a different query or adjust the limit and offset.`,
-                    }],
-                };
-            }
+        if (results.length === 0) {
+            return {
+                content: [{
+                    type: 'text',
+                    text: `No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}. Try a different query or adjust the limit and offset.`,
+                }],
+            };
+        }
 
-            const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
+        const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
 Search results for "${query}":
 
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
   Content: ${result.content}`).join('\n\n')}`;
-            return {
-                content: [{
-                    type: 'text',
-                    text: textContent,
-                }],
-            };
-        },
-    } as InternalTool,
-};
+        return {
+            content: [{
+                type: 'text',
+                text: textContent,
+            }],
+        };
+    },
+} as const;

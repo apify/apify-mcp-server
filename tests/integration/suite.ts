@@ -405,7 +405,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
-                    search: query,
+                    keywords: query,
                     limit: 5,
                 },
             });
@@ -422,7 +422,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
-                    search: 'rental',
+                    keywords: 'rental',
                     limit: 100,
                 },
             });
@@ -490,7 +490,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: actorizedMCPSearchTool as string,
                 arguments: {
-                    search: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    keywords: ACTOR_MCP_SERVER_ACTOR_NAME,
                     limit: 1,
                 },
             });
@@ -597,20 +597,20 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            expect(toolNames).toContain(addTool.tool.name);
+            expect(toolNames).toContain(addTool.name);
         });
 
         it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
             client = await createClientFn({
                 enableAddingActors: false,
-                tools: [addTool.tool.name],
+                tools: [addTool.name],
             });
 
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
             // Must include add-actor since it was selected directly
-            expect(toolNames).toContain(addTool.tool.name);
+            expect(toolNames).toContain(addTool.name);
         });
 
         it('should handle multiple tool category keys input correctly', async () => {
@@ -789,7 +789,7 @@ export function createIntegrationTestsSuite(
                 ...toolCategories.docs,
                 ...toolCategories.runs,
             ];
-            const expectedToolNames = expectedTools.map((tool) => tool.tool.name);
+            const expectedToolNames = expectedTools.map((tool) => tool.name);
 
             expect(toolNames).toHaveLength(expectedToolNames.length);
             for (const expectedToolName of expectedToolNames) {
