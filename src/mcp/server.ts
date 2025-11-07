@@ -611,7 +611,7 @@ export class ActorsMcpServer {
                     mcp_client: this.options.initializeRequestData?.params?.clientInfo?.name || '',
                     mcp_session_id: mcpSessionId || '',
                     connection_type: this.options.connectionType || '',
-                    // This is the version if the apify-mcp-server package
+                    // This is the version of the apify-mcp-server package
                     // this can be different from the internal remote server version
                     server_version: getPackageVersion() || '',
                     tool_name: toolFullName,
