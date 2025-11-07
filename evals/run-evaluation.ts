@@ -9,23 +9,22 @@ import { getDatasetInfo } from '@arizeai/phoenix-client/datasets';
 // eslint-disable-next-line import/extensions
 import { asEvaluator, runExperiment } from '@arizeai/phoenix-client/experiments';
 import type { ExperimentEvaluationRun, ExperimentTask } from '@arizeai/phoenix-client/types/experiments';
-import { createClassifierFn } from '@arizeai/phoenix-evals';
 import dotenv from 'dotenv';
-import OpenAI from 'openai';
-import { createOpenAI } from '@ai-sdk/openai';
+import yargs from 'yargs';
+// eslint-disable-next-line import/extensions
+import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../src/apify-client.js';
-import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
-import type { ToolBase, ToolEntry } from '../src/types.js';
+import {
+    loadTools,
+    createOpenRouterTask,
+    createToolSelectionLLMEvaluator
+} from './evaluation-utils.js';
 import {
     DATASET_NAME,
     MODELS_TO_EVALUATE,
     PASS_THRESHOLD,
-    SYSTEM_PROMPT,
-    TOOL_CALLING_BASE_TEMPLATE,
-    TOOL_SELECTION_EVAL_MODEL,
     EVALUATOR_NAMES,
     type EvaluatorName,
     sanitizeHeaderValue,
@@ -44,87 +43,41 @@ interface EvaluatorResult {
     error?: string;
 }
 
+/**
+ * Interface for command line arguments
+ */
+interface CliArgs {
+    datasetName?: string;
+}
+
 log.setLevel(log.LEVELS.DEBUG);
+
+const RUN_LLM_EVALUATOR = true;
+const RUN_TOOLS_EXACT_MATCH_EVALUATOR = true;
 
 dotenv.config({ path: '.env' });
 
+// Parse command line arguments using yargs
+const argv = yargs(hideBin(process.argv))
+    .wrap(null) // Disable automatic wrapping to avoid issues with long lines
+    .usage('Usage: $0 [options]')
+    .env()
+    .option('dataset-name', {
+        type: 'string',
+        describe: 'Custom dataset name to evaluate (default: from config.ts)',
+        example: 'my_custom_dataset',
+    })
+    .help('help')
+    .alias('h', 'help')
+    .version(false)
+    .epilogue('Examples:')
+    .epilogue('  $0                                    # Use default dataset from config')
+    .epilogue('  $0 --dataset-name tmp-1               # Evaluate custom dataset')
+    .epilogue('  npm run evals:run -- --dataset-name custom_v1  # Via npm script')
+    .parseSync() as CliArgs;
+
 // Sanitize secrets early to avoid invalid header characters in CI
 process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
-
-type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
-
-async function loadTools(): Promise<ToolBase[]> {
-    const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
-    const urlTools = await processParamsGetTools('', apifyClient);
-    return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t.tool)) as ToolBase[];
-}
-
-function transformToolsToOpenAIFormat(tools: ToolBase[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
-    return tools.map((tool) => ({
-        type: 'function',
-        function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.inputSchema as OpenAI.Chat.ChatCompletionTool['function']['parameters'],
-        },
-    }));
-}
-
-function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
-    const toolsOpenAI = transformToolsToOpenAIFormat(tools);
-
-    return async (example: ExampleInputOnly): Promise<{
-        tool_calls: Array<{ function?: { name?: string } }>;
-        llm_response: string;
-        query: string;
-        context: string;
-        reference: string;
-    }> => {
-        const client = new OpenAI({
-            baseURL: process.env.OPENROUTER_BASE_URL,
-            apiKey: sanitizeHeaderValue(process.env.OPENROUTER_API_KEY),
-        });
-
-        log.info(`Input: ${JSON.stringify(example)}`);
-
-        const context = String(example.input?.context ?? '');
-        const query = String(example.input?.query ?? '');
-
-        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-            { role: 'system', content: SYSTEM_PROMPT },
-        ];
-
-        if (context) {
-            messages.push({
-                role: 'user',
-                content: `My previous interaction with the assistant: ${context}`
-            });
-        }
-
-        messages.push({
-            role: 'user',
-            content: `${query}`,
-        });
-
-        log.info(`Messages to model: ${JSON.stringify(messages)}`);
-
-        const response = await client.chat.completions.create({
-            model: modelName,
-            messages,
-            tools: toolsOpenAI,
-        });
-
-        log.info(`Model response: ${JSON.stringify(response.choices[0])}`);
-
-        return {
-            tool_calls: response.choices[0].message.tool_calls || [],
-            llm_response: response.choices[0].message.content || '',
-            query: String(example.input?.query ?? ''),
-            context: String(example.input?.context ?? ''),
-            reference: String(example.input?.reference ?? ''),
-        };
-    };
-}
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
 const toolsExactMatch = asEvaluator({
@@ -141,22 +94,24 @@ const toolsExactMatch = asEvaluator({
         if (!expectedTools || expectedTools.length === 0) {
             log.debug('Tools match: No expected tools provided');
             return {
-                score: 0.0,
+                score: 1.0,
                 explanation: 'No expected tools present in the test case, either not required or not provided',
             };
         }
 
         expectedTools = [...expectedTools].sort();
 
-        const outputTools = (output?.tool_calls || [])
+        const outputToolsTmp = (output?.tool_calls || [])
             .map((toolCall: any) => toolCall.function?.name || '')
             .sort();
 
-        const isCorrect = JSON.stringify(expectedTools) === JSON.stringify(outputTools);
+        const outputToolsSet = Array.from(new Set(outputToolsTmp)).sort();
+        // it is correct if outputTools includes multiple calls to the same tool
+        const isCorrect = JSON.stringify(expectedTools) === JSON.stringify(outputToolsSet);
         const score = isCorrect ? 1.0 : 0.0;
-        const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputTools)}`;
+        const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputToolsSet)}`;
 
-        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputTools)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputToolsSet)}, expected=${JSON.stringify(expectedTools)}`);
 
         return {
             score,
@@ -165,50 +120,6 @@ const toolsExactMatch = asEvaluator({
     },
 });
 
-const openai = createOpenAI({
-    // custom settings, e.g.
-    baseURL: process.env.OPENROUTER_BASE_URL,
-    apiKey: process.env.OPENROUTER_API_KEY,
-});
-
-const evaluator = createClassifierFn({
-    model: openai(TOOL_SELECTION_EVAL_MODEL),
-    choices: {correct: 1.0, incorrect: 0.0},
-    promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
-});
-
-// LLM-based evaluator using Phoenix classifier - more robust than direct LLM calls
-const createToolSelectionLLMEvaluator = (tools: ToolBase[]) => asEvaluator({
-    name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
-    kind: 'LLM',
-    evaluate: async ({ input, output, expected }: any) => {
-        log.info(`Evaluating tool selection. Input: ${JSON.stringify(input)}, Output: ${JSON.stringify(output)}, Expected: ${JSON.stringify(expected)}`);
-
-        const evalInput = {
-            query: input?.query || '',
-            context: input?.context || '',
-            tool_calls: JSON.stringify(output?.tool_calls || []),
-            llm_response: output?.llm_response || '',
-            reference: expected?.reference || '',
-            tool_definitions: JSON.stringify(tools)
-        };
-
-        try {
-            const result = await evaluator(evalInput);
-            log.info(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
-            return {
-                score: result.score || 0.0,
-                explanation: result.explanation || 'No explanation returned by model'
-            };
-        } catch (error) {
-            log.info(`Tool selection evaluation failed: ${error}`);
-            return {
-                score: 0.0,
-                explanation: `Evaluation failed: ${error}`
-            };
-        }
-    },
-});
 
 function processEvaluatorResult(
     experiment: any,
@@ -258,7 +169,7 @@ function printResults(results: EvaluatorResult[]): void {
     }
 }
 
-async function main(): Promise<number> {
+async function main(datasetName: string): Promise<number> {
     log.info('Starting MCP tool calling evaluation');
 
     if (!validateEnvVars()) {
@@ -279,16 +190,16 @@ async function main(): Promise<number> {
     // Resolve dataset by name -> id
     let datasetId: string | undefined;
     try {
-        const info = await getDatasetInfo({ client, dataset: { datasetName: DATASET_NAME } });
+        const info = await getDatasetInfo({ client, dataset: { datasetName } });
         datasetId = info?.id as string | undefined;
     } catch (e) {
         log.error(`Error loading dataset: ${e}`);
         return 1;
     }
 
-    if (!datasetId) throw new Error(`Dataset "${DATASET_NAME}" not found`);
+    if (!datasetId) throw new Error(`Dataset "${datasetName}" not found`);
 
-    log.info(`Loaded dataset "${DATASET_NAME}" with ID: ${datasetId}`);
+    log.info(`Loaded dataset "${datasetName}" with ID: ${datasetId}`);
 
     const results: EvaluatorResult[] = [];
 
@@ -308,13 +219,21 @@ async function main(): Promise<number> {
         const experimentName = `MCP server:  ${modelName}`;
         const experimentDescription = `${modelName}, ${prLabel}`;
 
+        const evaluators = [];
+        if (RUN_TOOLS_EXACT_MATCH_EVALUATOR) {
+            evaluators.push(toolsExactMatch);
+        }
+        if (RUN_LLM_EVALUATOR) {
+            evaluators.push(toolSelectionLLMEvaluator);
+        }
+
         try {
             const experiment = await runExperiment({
                 client,
-                dataset: { datasetName: DATASET_NAME },
+                dataset: { datasetName },
                 // Cast to satisfy ExperimentTask type
                 task: taskFn as ExperimentTask,
-                evaluators: [toolsExactMatch, toolSelectionLLMEvaluator],
+                evaluators,
                 experimentName,
                 experimentDescription,
                 concurrency: 10,
@@ -353,7 +272,7 @@ async function main(): Promise<number> {
 }
 
 // Run
-main()
+main(argv.datasetName || DATASET_NAME)
     .then((code) => process.exit(code))
     .catch((err) => {
         log.error('Unexpected error:', err);
