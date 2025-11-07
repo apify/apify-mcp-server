@@ -405,7 +405,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
-                    search: query,
+                    keywords: query,
                     limit: 5,
                 },
             });
@@ -422,7 +422,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
-                    search: 'rental',
+                    keywords: 'rental',
                     limit: 100,
                 },
             });
@@ -490,7 +490,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: actorizedMCPSearchTool as string,
                 arguments: {
-                    search: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    keywords: ACTOR_MCP_SERVER_ACTOR_NAME,
                     limit: 1,
                 },
             });
