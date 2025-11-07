@@ -42,7 +42,7 @@ export function trackToolCall(
 
     // TODO: Implement anonymousId tracking for device/session identification
     client.track({
-        userId: userId || 'anonymous',
+        userId: userId || '',
         event: SEGMENT_EVENTS.TOOL_CALL,
         properties,
     });
