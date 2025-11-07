@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 
@@ -65,10 +65,8 @@ export function cleanEmptyProperties(obj: unknown): unknown {
  */
 export const getActorOutput: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.ACTOR_OUTPUT_GET,
-        actorFullName: HelperTools.ACTOR_OUTPUT_GET,
-        description: `Retrieve the output dataset items of a specific Actor run using its datasetId.
+    name: HelperTools.ACTOR_OUTPUT_GET,
+    description: `Retrieve the output dataset items of a specific Actor run using its datasetId.
 You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.
 This tool is a simplified version of the get-dataset-items tool, focused on Actor run outputs.
 
@@ -85,78 +83,77 @@ USAGE EXAMPLES:
 - user_input: Return only crawl.statusCode and url from dataset aab123
 
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
-        inputSchema: zodToJsonSchema(getActorOutputArgs),
-        /**
-         * Allow additional properties for Skyfire mode to pass `skyfire-pay-id` and for telemetry to pass `reason` field.
-         */
-        ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorOutputArgs), additionalProperties: true }),
-        call: async (toolArgs) => {
-            const { args, apifyToken, apifyMcpServer } = toolArgs;
+    inputSchema: zodToJsonSchema(getActorOutputArgs) as ToolInputSchema,
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorOutputArgs), additionalProperties: true }),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
 
-            /**
+        /**
              * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
              * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
              */
-            if (apifyMcpServer.options.skyfireMode
+        if (apifyMcpServer.options.skyfireMode
                 && args['skyfire-pay-id'] === undefined
-            ) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: SKYFIRE_TOOL_INSTRUCTIONS,
-                    }],
-                };
-            }
+        ) {
+            return {
+                content: [{
+                    type: 'text',
+                    text: SKYFIRE_TOOL_INSTRUCTIONS,
+                }],
+            };
+        }
 
-            /**
+        /**
              * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
              */
-            const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
-                ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
-                : new ApifyClient({ token: apifyToken });
-            const parsed = getActorOutputArgs.parse(args);
+        const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
+            ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
+            : new ApifyClient({ token: apifyToken });
+        const parsed = getActorOutputArgs.parse(args);
 
-            // Parse fields into array
-            const fieldsArray = parseCommaSeparatedList(parsed.fields);
+        // Parse fields into array
+        const fieldsArray = parseCommaSeparatedList(parsed.fields);
 
-            // TODO: we can optimize the API level field filtering in future
-            /**
+        // TODO: we can optimize the API level field filtering in future
+        /**
              * Only top-level fields can be filtered.
              * If a dot is present, filtering is done here and not at the API level.
              */
-            const hasDot = fieldsArray.some((field) => field.includes('.'));
-            const response = await apifyClient.dataset(parsed.datasetId).listItems({
-                offset: parsed.offset,
-                limit: parsed.limit,
-                fields: fieldsArray.length > 0 && !hasDot ? fieldsArray : undefined,
-                clean: true,
-            });
+        const hasDot = fieldsArray.some((field) => field.includes('.'));
+        const response = await apifyClient.dataset(parsed.datasetId).listItems({
+            offset: parsed.offset,
+            limit: parsed.limit,
+            fields: fieldsArray.length > 0 && !hasDot ? fieldsArray : undefined,
+            clean: true,
+        });
 
-            if (!response) {
-                return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
-            }
+        if (!response) {
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+        }
 
-            let { items } = response;
-            // Apply field selection if specified
-            if (fieldsArray.length > 0) {
-                items = items.map((item) => getValuesByDotKeys(item, fieldsArray));
-            }
+        let { items } = response;
+        // Apply field selection if specified
+        if (fieldsArray.length > 0) {
+            items = items.map((item) => getValuesByDotKeys(item, fieldsArray));
+        }
 
-            // Clean empty properties
-            const cleanedItems = items
-                .map((item) => cleanEmptyProperties(item))
-                .filter((item) => item !== undefined);
+        // Clean empty properties
+        const cleanedItems = items
+            .map((item) => cleanEmptyProperties(item))
+            .filter((item) => item !== undefined);
 
-            let outputText = `\`\`\`json\n${JSON.stringify(cleanedItems)}\n\`\`\``;
-            let truncated = false;
-            if (outputText.length > TOOL_MAX_OUTPUT_CHARS) {
-                outputText = outputText.slice(0, TOOL_MAX_OUTPUT_CHARS);
-                truncated = true;
-            }
-            if (truncated) {
-                outputText += `\n\n[Output was truncated to ${TOOL_MAX_OUTPUT_CHARS} characters to comply with the tool output limits.]`;
-            }
-            return { content: [{ type: 'text', text: outputText }] };
-        },
-    } as InternalTool,
-};
+        let outputText = `\`\`\`json\n${JSON.stringify(cleanedItems)}\n\`\`\``;
+        let truncated = false;
+        if (outputText.length > TOOL_MAX_OUTPUT_CHARS) {
+            outputText = outputText.slice(0, TOOL_MAX_OUTPUT_CHARS);
+            truncated = true;
+        }
+        if (truncated) {
+            outputText += `\n\n[Output was truncated to ${TOOL_MAX_OUTPUT_CHARS} characters to comply with the tool output limits.]`;
+        }
+        return { content: [{ type: 'text', text: outputText }] };
+    },
+} as const;

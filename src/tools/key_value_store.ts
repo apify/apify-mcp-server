@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalTool, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getKeyValueStoreArgs = z.object({
@@ -17,10 +17,8 @@ const getKeyValueStoreArgs = z.object({
  */
 export const getKeyValueStore: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.KEY_VALUE_STORE_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_GET,
-        description: `Get details about a key-value store by ID or username~store-name.
+    name: HelperTools.KEY_VALUE_STORE_GET,
+    description: `Get details about a key-value store by ID or username~store-name.
 The results will include store metadata (ID, name, owner, access settings) and usage statistics.
 
 USAGE:
@@ -29,20 +27,19 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
-        inputSchema: zodToJsonSchema(getKeyValueStoreArgs),
-        ajvValidate: ajv.compile({
-            ...zodToJsonSchema(getKeyValueStoreArgs),
-            additionalProperties: true, // Allow additional properties for telemetry reason field
-        }),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const parsed = getKeyValueStoreArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            const store = await client.keyValueStore(parsed.storeId).get();
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+    inputSchema: zodToJsonSchema(getKeyValueStoreArgs) as ToolInputSchema,
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(getKeyValueStoreArgs),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
+        const parsed = getKeyValueStoreArgs.parse(args);
+        const client = new ApifyClient({ token: apifyToken });
+        const store = await client.keyValueStore(parsed.storeId).get();
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
+    },
+} as const;
 
 const getKeyValueStoreKeysArgs = z.object({
     storeId: z.string()
@@ -62,10 +59,8 @@ const getKeyValueStoreKeysArgs = z.object({
  */
 export const getKeyValueStoreKeys: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_KEYS_GET,
-        description: `List keys in a key-value store with optional pagination.
+    name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+    description: `List keys in a key-value store with optional pagination.
 The results will include keys and basic info about stored values (e.g., size).
 Use exclusiveStartKey and limit to paginate.
 
@@ -75,23 +70,22 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
-        inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs),
-        ajvValidate: ajv.compile({
-            ...zodToJsonSchema(getKeyValueStoreKeysArgs),
-            additionalProperties: true, // Allow additional properties for telemetry reason field
-        }),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const parsed = getKeyValueStoreKeysArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            const keys = await client.keyValueStore(parsed.storeId).listKeys({
-                exclusiveStartKey: parsed.exclusiveStartKey,
-                limit: parsed.limit,
-            });
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(keys)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+    inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(getKeyValueStoreKeysArgs),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
+        const parsed = getKeyValueStoreKeysArgs.parse(args);
+        const client = new ApifyClient({ token: apifyToken });
+        const keys = await client.keyValueStore(parsed.storeId).listKeys({
+            exclusiveStartKey: parsed.exclusiveStartKey,
+            limit: parsed.limit,
+        });
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(keys)}\n\`\`\`` }] };
+    },
+} as const;
 
 const getKeyValueStoreRecordArgs = z.object({
     storeId: z.string()
@@ -107,10 +101,8 @@ const getKeyValueStoreRecordArgs = z.object({
  */
 export const getKeyValueStoreRecord: ToolEntry = {
     type: 'internal',
-    tool: {
-        name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-        actorFullName: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-        description: `Get a value stored in a key-value store under a specific key.
+    name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+    description: `Get a value stored in a key-value store under a specific key.
 The response preserves the original Content-Encoding; most clients handle decompression automatically.
 
 USAGE:
@@ -119,17 +111,16 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
-        inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs),
-        ajvValidate: ajv.compile({
-            ...zodToJsonSchema(getKeyValueStoreRecordArgs),
-            additionalProperties: true, // Allow additional properties for telemetry reason field
-        }),
-        call: async (toolArgs) => {
-            const { args, apifyToken } = toolArgs;
-            const parsed = getKeyValueStoreRecordArgs.parse(args);
-            const client = new ApifyClient({ token: apifyToken });
-            const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
-        },
-    } as InternalTool,
-};
+    inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(getKeyValueStoreRecordArgs),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
+    call: async (toolArgs: InternalToolArgs) => {
+        const { args, apifyToken } = toolArgs;
+        const parsed = getKeyValueStoreRecordArgs.parse(args);
+        const client = new ApifyClient({ token: apifyToken });
+        const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
+    },
+} as const;
