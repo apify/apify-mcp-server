@@ -37,7 +37,7 @@ USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
         inputSchema: zodToJsonSchema(getActorRunArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
+        ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorRunArgs), additionalProperties: true }), // Allow additional properties for telemetry reason field
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getActorRunArgs.parse(args);
@@ -78,7 +78,7 @@ USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(GetRunLogArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
+        ajvValidate: ajv.compile({ ...zodToJsonSchema(GetRunLogArgs), additionalProperties: true }), // Allow additional properties for telemetry reason field
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = GetRunLogArgs.parse(args);
@@ -110,7 +110,7 @@ USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
         inputSchema: zodToJsonSchema(abortRunArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
+        ajvValidate: ajv.compile({ ...zodToJsonSchema(abortRunArgs), additionalProperties: true }), // Allow additional properties for telemetry reason field
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = abortRunArgs.parse(args);

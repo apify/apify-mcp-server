@@ -53,7 +53,10 @@ USAGE EXAMPLES:
 - user_input: Get HTML skeleton for https://example.com
 - user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
         inputSchema: zodToJsonSchema(getHtmlSkeletonArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getHtmlSkeletonArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getHtmlSkeletonArgs.parse(args);

@@ -29,7 +29,10 @@ USAGE EXAMPLES:
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,
         inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(fetchActorDetailsToolArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = fetchActorDetailsToolArgsSchema.parse(args);

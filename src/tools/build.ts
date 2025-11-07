@@ -117,7 +117,10 @@ export const actorDefinitionTool: ToolEntry = {
             + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
             + `Limit the length of the README if needed.`,
         inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getActorDefinitionArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
 

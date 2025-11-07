@@ -27,7 +27,10 @@ USAGE EXAMPLES:
 - user_input: Add apify/rag-web-browser as a tool
 - user_input: Add apify/instagram-scraper as a tool`,
         inputSchema: zodToJsonSchema(addToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(addToolArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
         call: async (toolArgs) => {
             const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;

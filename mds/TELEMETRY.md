@@ -61,11 +61,13 @@ This document outlines the implementation plan for analytics tracking in the Api
   - For internal tools: uses tool name
 
 - **Reason**: Why the tool was called (LLM-provided reasoning)
-  - Currently: Empty string (TODO: extract from tool arguments when reason field is added to schemas)
-  - Originally proposed by @Jiří Spilka
-  - Similar to implementation by mcpcat.io at MCP dev summit London
-  - Will be implemented via special `reason` input field in tool schemas
+  - ✅ **IMPLEMENTED**: Added as optional `reason` field to all tool input schemas when telemetry is enabled
+  - Extracted from tool call arguments: `(args as Record<string, unknown>).reason?.toString() || ''`
+  - When telemetry is `'off'`: reason field is NOT added to schemas (saves schema overhead for tests)
+  - When telemetry is `'dev'` or `'prod'`: reason field is dynamically added to ALL tool schemas
+  - Field description: "A brief explanation of why this tool is being called and what it will help you accomplish"
   - Allows LLMs to explain their tool selection and usage context
+  - Originally proposed by @Jiří Spilka, similar to mcpcat.io implementation at MCP dev summit London
 
 - **Timestamp**: When tool call occurred
   - Handled automatically by Segment SDK
@@ -434,9 +436,16 @@ Future enhancement: Automatically detect connection type from transport type whe
   - **Legacy SSE transport**: Extracts session ID from URL query parameters via `getURLSessionID()`
   - Session ID injected into tool call request params for telemetry tracking
   - Supports cross-instance session correlation in distributed deployments
+- **Reason field implementation** ✅
+  - Dynamically added to all tool input schemas when telemetry is enabled (`'dev'` or `'prod'`)
+  - Optional string field with title "Reason" and guidance description
+  - Extracted from tool arguments during tool call: `(args as Record<string, unknown>).reason?.toString() || ''`
+  - Not added when telemetry is `'off'` (reduces schema overhead for tests)
+  - All AJV validators updated with `additionalProperties: true` to accept the field
+  - New tests verify: reason field presence/absence based on telemetry setting
+  - Works with `upsertTools()` conditional modification logic alongside Skyfire mode
 
 #### 🔲 Not Yet Implemented (TODOs)
-- Extract reason from tool arguments (requires adding reason field to tool input schemas)
 - Implement anonymousId tracking for device/session identification
 
 ### Multi-Server Environment

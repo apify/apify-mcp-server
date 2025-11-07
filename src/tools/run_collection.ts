@@ -41,7 +41,10 @@ USAGE EXAMPLES:
 - user_input: List my last 10 runs (newest first)
 - user_input: Show only SUCCEEDED runs`,
         inputSchema: zodToJsonSchema(getUserRunsListArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getUserRunsListArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getUserRunsListArgs.parse(args);

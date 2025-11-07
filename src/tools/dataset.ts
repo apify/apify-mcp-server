@@ -58,7 +58,10 @@ USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
         inputSchema: zodToJsonSchema(getDatasetArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getDatasetArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetArgs.parse(args);
@@ -93,7 +96,10 @@ USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
         inputSchema: zodToJsonSchema(getDatasetItemsArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getDatasetItemsArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetItemsArgs.parse(args);
@@ -155,7 +161,10 @@ USAGE EXAMPLES:
 - user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
         inputSchema: zodToJsonSchema(getDatasetSchemaArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getDatasetSchemaArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getDatasetSchemaArgs.parse(args);

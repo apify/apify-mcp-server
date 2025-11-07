@@ -71,7 +71,12 @@ export function createExpressApp(
                 rt: Routes.SSE,
                 tr: TransportType.SSE,
             });
-            const mcpServer = new ActorsMcpServer({ setupSigintHandler: false });
+            // Extract telemetry query parameter - if 'off' disable, otherwise use ENVIRONMENT env variable
+            const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+            const telemetryParam = urlParams.get('telemetry');
+            const telemetry = telemetryParam === 'off' ? null : undefined;
+
+            const mcpServer = new ActorsMcpServer({ setupSigintHandler: false, connectionType: 'remote', telemetry });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
@@ -150,12 +155,22 @@ export function createExpressApp(
             // Reuse existing transport
                 transport = transports[sessionId];
             } else if (!sessionId && isInitializeRequest(req.body)) {
-            // New initialization request - use JSON response mode
+            // New initialization request
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer({ setupSigintHandler: false, initializeRequestData: req.body as InitializeRequest });
+                // Extract telemetry query parameter - if 'off' disable, otherwise use ENVIRONMENT env variable
+                const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+                const telemetryParam = urlParams.get('telemetry');
+                const telemetry = telemetryParam === 'off' ? null : undefined;
+
+                const mcpServer = new ActorsMcpServer({
+                    setupSigintHandler: false,
+                    initializeRequestData: req.body as InitializeRequest,
+                    connectionType: 'remote',
+                    telemetry,
+                });
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;

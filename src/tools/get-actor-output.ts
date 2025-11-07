@@ -87,7 +87,7 @@ USAGE EXAMPLES:
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
         inputSchema: zodToJsonSchema(getActorOutputArgs),
         /**
-         * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+         * Allow additional properties for Skyfire mode to pass `skyfire-pay-id` and for telemetry to pass `reason` field.
          */
         ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorOutputArgs), additionalProperties: true }),
         call: async (toolArgs) => {

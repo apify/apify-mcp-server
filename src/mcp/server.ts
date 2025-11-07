@@ -293,15 +293,18 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        // Handle Skyfire mode modifications before storing tools
-        if (this.options.skyfireMode) {
-            for (const wrap of tools) {
-                if (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
-                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET)) {
-                    // Clone the tool before modifying it to avoid affecting shared objects
-                    const clonedWrap = cloneToolEntry(wrap);
+        const isTelemetryEnabled = this.options.telemetry === 'dev' || this.options.telemetry === 'prod';
 
+        if (this.options.skyfireMode || isTelemetryEnabled) {
+            for (const wrap of tools) {
+                // Clone the tool before modifying it to avoid affecting shared objects
+                const clonedWrap = cloneToolEntry(wrap);
+                let modified = false;
+
+                // Handle Skyfire mode modifications
+                if (this.options.skyfireMode && (wrap.type === 'actor'
+                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_CALL)
+                    || (wrap.type === 'internal' && wrap.tool.name === HelperTools.ACTOR_OUTPUT_GET))) {
                     // Add Skyfire instructions to description if not already present
                     if (!clonedWrap.tool.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         clonedWrap.tool.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
@@ -316,16 +319,30 @@ export class ActorsMcpServer {
                             };
                         }
                     }
-
-                    // Store the cloned and modified tool
-                    this.tools.set(clonedWrap.tool.name, clonedWrap);
-                } else {
-                    // Store unmodified tools as-is
-                    this.tools.set(wrap.tool.name, wrap);
+                    modified = true;
                 }
+
+                // Handle telemetry modifications - add reason field to all tools when telemetry is enabled
+                if (isTelemetryEnabled) {
+                    if (clonedWrap.tool.inputSchema && 'properties' in clonedWrap.tool.inputSchema) {
+                        const props = clonedWrap.tool.inputSchema.properties as Record<string, unknown>;
+                        if (!props.reason) {
+                            props.reason = {
+                                type: 'string',
+                                title: 'Reason',
+                                description: 'A brief explanation of why this tool is being called and what it will help you accomplish. '
+                                    + 'Keep it concise and do not include any personal identifiable information (PII) or sensitive data.',
+                            };
+                        }
+                    }
+                    modified = true;
+                }
+
+                // Store the cloned and modified tool only if modifications were made
+                this.tools.set(clonedWrap.tool.name, modified ? clonedWrap : wrap);
             }
         } else {
-            // No skyfire mode - store tools as-is
+            // No skyfire mode and telemetry disabled - store tools as-is
             for (const wrap of tools) {
                 this.tools.set(wrap.tool.name, wrap);
             }
@@ -498,7 +515,6 @@ export class ActorsMcpServer {
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
-            log.debug('FINDME Received request to call tool', { request });
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = request.params;
             const { progressToken } = meta || {};
@@ -587,6 +603,9 @@ export class ActorsMcpServer {
                     log.debug('Telemetry: no API token provided');
                 }
 
+                // Extract reason from tool arguments if provided
+                const reason = (args as Record<string, unknown>).reason?.toString() || '';
+
                 const telemetryData = {
                     app: 'mcp_server',
                     mcp_client: this.options.initializeRequestData?.params?.clientInfo?.name || '',
@@ -596,7 +615,7 @@ export class ActorsMcpServer {
                     // this can be different from the internal remote server version
                     server_version: getPackageVersion() || '',
                     tool_name: toolFullName,
-                    reason: '',
+                    reason,
                 };
 
                 log.debug('Telemetry: tracking tool call', telemetryData);

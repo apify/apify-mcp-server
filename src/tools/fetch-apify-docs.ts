@@ -30,7 +30,10 @@ USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/academy`,
         args: fetchApifyDocsToolArgsSchema,
         inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(fetchApifyDocsToolArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args } = toolArgs;
 

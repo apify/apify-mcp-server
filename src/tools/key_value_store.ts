@@ -30,7 +30,10 @@ USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
         inputSchema: zodToJsonSchema(getKeyValueStoreArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getKeyValueStoreArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreArgs.parse(args);
@@ -73,7 +76,10 @@ USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
         inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getKeyValueStoreKeysArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreKeysArgs.parse(args);
@@ -114,7 +120,10 @@ USAGE EXAMPLES:
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
         inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs),
-        ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(getKeyValueStoreRecordArgs),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken } = toolArgs;
             const parsed = getKeyValueStoreRecordArgs.parse(args);

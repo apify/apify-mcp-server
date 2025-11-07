@@ -51,7 +51,10 @@ export const searchApifyDocsTool: ToolEntry = {
     - query: How scrape with Crawlee?`,
         args: searchApifyDocsToolArgsSchema,
         inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(searchApifyDocsToolArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args } = toolArgs;
 

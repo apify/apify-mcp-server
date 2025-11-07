@@ -92,7 +92,10 @@ USAGE EXAMPLES:
 - user_input: I need to scrape instagram profiles and comments
 - user_input: I need to get flights and airbnb data`,
         inputSchema: zodToJsonSchema(searchActorsArgsSchema),
-        ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+        ajvValidate: ajv.compile({
+            ...zodToJsonSchema(searchActorsArgsSchema),
+            additionalProperties: true, // Allow additional properties for telemetry reason field
+        }),
         call: async (toolArgs) => {
             const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
             const parsed = searchActorsArgsSchema.parse(args);
