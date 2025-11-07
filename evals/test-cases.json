@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.3",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -65,116 +65,103 @@
     {
       "id": "search-actors-1",
       "category": "search-actors",
-      "query": "How to search for Instagram posts",
-      "expectedTools": ["search-actors"]
+      "query": "How to scrape Instagram posts",
+      "expectedTools": [],
+      "reference": "Either it should explain how to scrape Instagram posts or call 'search-actors' tool with the query: 'Instagram posts' or similar"
     },
     {
       "id": "search-actors-2",
       "category": "search-actors",
       "query": "What are the best Instagram scrapers?",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: `Instagram`, 'Instagram scraper', or similar."
     },
     {
       "id": "search-actors-3",
       "category": "search-actors",
       "query": "Find actors for scraping social media",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'social media' or 'instagram' or 'facebook' or 'twitter' or similar."
     },
     {
       "id": "search-actors-4",
       "category": "search-actors",
       "query": "Show me Twitter scraping tools",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Twitter scraper' or similar."
     },
     {
       "id": "search-actors-5",
       "category": "search-actors",
       "query": "What actors can scrape TikTok content?",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'TikTok' or 'TikTok scraper' or 'TikTok content' or similar."
     },
     {
       "id": "search-actors-6",
       "category": "search-actors",
-      "query": "Find Facebook data extraction tools",
-      "expectedTools": ["search-actors"]
+      "query": "Get Facebook data",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar."
     },
     {
       "id": "search-actors-7",
       "category": "search-actors",
-      "query": "Show me actors for web scraping",
-      "expectedTools": ["search-actors"]
+      "query": "Find actors that can scrape news articles",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'news articles' or similar. It must not use extended queries such as 'news articles scrape' or any more detailed variations."
     },
     {
       "id": "search-actors-8",
       "category": "search-actors",
-      "query": "Find actors that can scrape news articles",
-      "expectedTools": ["search-actors"]
+      "query": "What tools can extract data from e-commerce sites?",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'e-commerce' or similar. It must not use extended queries such as 'e-commerce extract' or 'e-commerce tools' or any more detailed variations."
     },
     {
       "id": "search-actors-9",
       "category": "search-actors",
-      "query": "What tools can extract data from e-commerce sites?",
-      "expectedTools": ["search-actors"]
+      "query": "Show me Amazon product scrapers",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Amazon products' or similar. It must not use extended queries such as 'Amazon product scrapers' or any more detailed variations."
     },
     {
       "id": "search-actors-10",
-      "category": "search-actors",
-      "query": "Show me Amazon product scrapers",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-11",
       "category": "search-actors",
       "query": "Search for Playwright browser MCP server",
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-actors-12",
+      "id": "search-actors-11",
       "category": "search-actors",
       "query": "I need to find solution to scrape details of Amazon products",
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-actors-13",
+      "id": "search-actors-12",
       "category": "search-actors",
       "query": "Fetch posts from Twitter about AI",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar"
     },
     {
-      "id": "search-actors-14",
+      "id": "search-actors-13",
       "category": "search-actors",
       "query": "Get flight information from Skyscanner",
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-actors-15",
+      "id": "search-actors-14",
       "category": "search-actors",
       "query": "Can you find actors to scrape weather data?",
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-actors-16",
-      "category": "search-actors",
-      "query": "What actors can be used for scraping social media?",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-17",
+      "id": "search-actors-15",
       "category": "search-actors",
       "query": "Find actors for data extraction tasks",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-18",
-      "category": "search-actors",
-      "query": "Look for actors that can scrape news articles",
-      "expectedTools": ["search-actors"]
-    },
-    {
-      "id": "search-actors-19",
-      "category": "search-actors",
-      "query": "Find actors that extract data from e-commerce sites",
-      "expectedTools": ["search-actors"]
+      "expectedTools": [],
+      "reference": "It should not call any tools, because the query is too general. It should suggest to be more specific about the platform or data type needed."
     },
     {
       "id": "rag-web-browser-1",
@@ -209,14 +196,16 @@
     {
       "id": "search-vs-rag-1",
       "category": "search-actors",
-      "query": "Find posts about AI on Instagram",
-      "expectedTools": ["search-actors"]
+      "query": "Find posts about the Rock on Instagram",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram' or 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts the Rock' or any more detailed variations."
     },
     {
       "id": "search-vs-rag-2",
       "category": "search-actors",
       "query": "Scrape Instagram posts about AI",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar. It must not use extended queries such as 'Instagram posts scraper about AI' or any more detailed variations."
     },
     {
       "id": "search-vs-rag-3",
@@ -245,14 +234,15 @@
     {
       "id": "search-vs-rag-7",
       "category": "search-actors",
-      "query": "Fetch flight details for New York to London",
+      "query": "Find one way flights from New York to London tomorrow",
       "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-8",
       "category": "search-actors",
       "query": "Find actors for flight data extraction",
-      "expectedTools": ["search-actors"]
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'flight data' or 'flight booking' or similar. Must not use 'extractor' or 'extraction"
     },
     {
       "id": "search-vs-rag-9",
@@ -400,9 +390,9 @@
     },
     {
       "id": "misleading-query-1",
-      "category": "misleading",
-      "query": "What's the weather like today?",
-      "expectedTools": ["search-actors"]
+      "category": "apify-slash-rag-web-browser",
+      "query": "What's the weather like today in San Francisco?",
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "misleading-query-2",
@@ -412,15 +402,16 @@
     },
     {
       "id": "misleading-query-3",
-      "category": "misleading",
+      "category": "search-apify-docs",
       "query": "I need to build my own scraper from scratch",
       "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "ambiguous-query-1",
-      "category": "ambiguous",
-      "query": "Instagram",
-      "expectedTools": ["search-actors"]
+      "category": "search-actors",
+      "query": "Get instagram posts",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar"
     },
     {
       "id": "ambiguous-query-3",
@@ -430,7 +421,7 @@
     },
     {
       "id": "tool-selection-confusion-1",
-      "category": "tool-selection",
+      "category": "search-actors",
       "query": "Find posts about AI on Instagram",
       "expectedTools": ["search-actors"]
     },
@@ -457,6 +448,27 @@
           { "role": "tool_use", "tool": "search-actors", "input": {"search": "weather mcp", "limit": 5} },
           { "role": "tool_result", "tool_use_id": 12, "content": "Tool 'search-actors' successful, Actor found: jiri.spilka/weather-mcp-server" }
       ]
+    },
+    {
+      "id": "search-actors-input-args-1",
+      "category": "search-actors",
+      "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'StackOverflow', 'Stack overflow', 'StackOverflow questions answers' or similar. It must not use extended queries such as 'StackOverflow scraper Python' or any more detailed variations."
+    },
+    {
+      "id": "search-actors-input-args-2",
+      "category": "search-actors",
+      "query": "I need to find Actor for instagram profile scraping",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'instagram profile' or 'instagram profiles'. It must not use extended queries such as 'instagram profile scraper' or any more detailed variations."
+    },
+    {
+      "id": "search-actors-input-args-3",
+      "category": "search-actors",
+      "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
+      "expectedTools": ["search-actors"],
+      "reference": "It must call the 'search-actors' tool with the query: 'tiktok comments' or their combination. It must not use queries with extra words such as 'tiktok comments cheap' or any more detailed variations."
     }
   ]
 }
