@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getUserKeyValueStoresListArgs = z.object({
@@ -40,7 +40,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List my last 10 key-value stores (newest first)
 - user_input: List unnamed key-value stores`,
-    inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

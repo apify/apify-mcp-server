@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getUserDatasetsListArgs = z.object({
@@ -40,7 +40,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List my last 10 datasets (newest first)
 - user_input: List unnamed datasets`,
-    inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 export const addToolArgsSchema = z.object({
@@ -25,7 +25,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Add apify/rag-web-browser as a tool
 - user_input: Add apify/instagram-scraper as a tool`,
-    inputSchema: zodToJsonSchema(addToolArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(addToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
     // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
     call: async (toolArgs: InternalToolArgs) => {

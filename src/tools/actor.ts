@@ -19,7 +19,7 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
@@ -195,7 +195,7 @@ Actor description: ${actorDefinitionPruned.description}`;
             name: actorNameToToolName(actorDefinitionPruned.actorFullName),
             actorFullName: actorDefinitionPruned.actorFullName,
             description,
-            inputSchema: inputSchema as McpInputSchema,
+            inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
             memoryMbytes,
         });
@@ -355,7 +355,7 @@ Step 2: Call Actor (step="call")
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
-    inputSchema: zodToJsonSchema(callActorArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(callActorArgs) as ToolInputSchema,
     ajvValidate: ajv.compile({
         ...zodToJsonSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id

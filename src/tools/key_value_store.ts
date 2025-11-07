@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getKeyValueStoreArgs = z.object({
@@ -27,7 +27,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getKeyValueStoreArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -67,7 +67,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -105,7 +105,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { searchApifyDocsCached } from '../utils/apify-docs.js';
 
@@ -48,7 +48,7 @@ export const searchApifyDocsTool: ToolEntry = {
     - query: How to use create Apify Actor?
     - query: How to define Actor input schema?
     - query: How scrape with Crawlee?`,
-    inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;

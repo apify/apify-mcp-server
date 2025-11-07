@@ -75,7 +75,7 @@ export interface ToolBase extends z.infer<typeof ToolSchema> {
  * The MCP SDK requires inputSchema to have type: "object" (literal) at the top level.
  * Use this type when casting schemas that have type: string to the strict MCP format.
  */
-export type McpInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
+export type ToolInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 
 /**
  * Interface for Actor-based tools - tools that wrap Apify Actors.

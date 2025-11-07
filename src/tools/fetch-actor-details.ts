@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
 
@@ -27,7 +27,7 @@ USAGE EXAMPLES:
 - user_input: How to use apify/rag-web-browser
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,
-    inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

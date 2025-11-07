@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getActorRunArgs = z.object({
@@ -34,7 +34,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
-    inputSchema: zodToJsonSchema(getActorRunArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getActorRunArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -72,7 +72,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
-    inputSchema: zodToJsonSchema(GetRunLogArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -101,7 +101,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
-    inputSchema: zodToJsonSchema(abortRunArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(abortRunArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

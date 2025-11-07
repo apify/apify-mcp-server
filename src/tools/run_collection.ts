@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 
 const getUserRunsListArgs = z.object({
@@ -38,7 +38,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List my last 10 runs (newest first)
 - user_input: Show only SUCCEEDED runs`,
-    inputSchema: zodToJsonSchema(getUserRunsListArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getUserRunsListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

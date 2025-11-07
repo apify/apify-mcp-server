@@ -3,7 +3,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
@@ -55,7 +55,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
-    inputSchema: zodToJsonSchema(getDatasetArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getDatasetArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -87,7 +87,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
-    inputSchema: zodToJsonSchema(getDatasetItemsArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getDatasetItemsArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -146,7 +146,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
-    inputSchema: zodToJsonSchema(getDatasetSchemaArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getDatasetSchemaArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

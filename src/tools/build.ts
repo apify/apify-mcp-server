@@ -10,8 +10,8 @@ import type {
     ActorDefinitionWithDesc,
     InternalToolArgs,
     ISchemaProperties,
-    McpInputSchema,
     ToolEntry,
+    ToolInputSchema,
 } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { filterSchemaProperties, shortenProperties } from './utils.js';
@@ -114,7 +114,7 @@ export const actorDefinitionTool: ToolEntry = {
         + 'For example, when user says, I need to know more about web crawler Actor.'
         + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
         + `Limit the length of the README if needed.`,
-    inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

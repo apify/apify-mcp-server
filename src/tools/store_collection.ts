@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
-import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 
@@ -90,7 +90,7 @@ USAGE EXAMPLES:
 - user_input: Find browserbase MCP server
 - user_input: I need to scrape instagram profiles and comments
 - user_input: I need to get flights and airbnb data`,
-    inputSchema: zodToJsonSchema(searchActorsArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;

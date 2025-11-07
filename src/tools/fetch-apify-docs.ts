@@ -5,7 +5,7 @@ import log from '@apify/log';
 
 import { HelperTools } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
 
@@ -27,7 +27,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
-    inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as McpInputSchema,
+    inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;

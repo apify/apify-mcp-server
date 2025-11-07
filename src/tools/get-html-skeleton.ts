@@ -4,7 +4,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
 import { getHtmlSkeletonCache } from '../state.js';
-import type { InternalToolArgs, McpInputSchema, ToolEntry } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { isValidHttpUrl } from '../utils/generic.js';
 import { stripHtml } from '../utils/html.js';
@@ -50,7 +50,7 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get HTML skeleton for https://example.com
 - user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
-    inputSchema: zodToJsonSchema(getHtmlSkeletonArgs) as McpInputSchema,
+    inputSchema: zodToJsonSchema(getHtmlSkeletonArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
