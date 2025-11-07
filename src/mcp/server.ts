@@ -35,6 +35,7 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
+import { trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../types.js';
@@ -42,6 +43,8 @@ import { buildActorResponseContent } from '../utils/actor-response.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getUserIdFromToken } from '../utils/user-cache.js';
+import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { processParamsGetTools } from './utils.js';
@@ -55,6 +58,25 @@ interface ActorsMcpServerOptions {
      */
     skyfireMode?: boolean;
     initializeRequestData?: InitializeRequest;
+    /**
+     * Enable telemetry tracking for tool calls.
+     * - null: No telemetry (default)
+     * - 'dev': Use development Segment write key
+     * - 'prod': Use production Segment write key
+     */
+    telemetry?: null | 'dev' | 'prod';
+    /**
+     * Connection type for telemetry tracking.
+     * - 'stdio': Direct/local connection
+     * - 'remote': Remote/HTTP streamble or SSE connection
+     */
+    connectionType?: 'stdio' | 'remote';
+    /**
+     * Apify API token for authentication
+     * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
+     * instead of APIFY_TOKEN environment variable, so it can be passed to the server
+     */
+    token?: string;
 }
 
 /**
@@ -70,6 +92,15 @@ export class ActorsMcpServer {
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
+
+        // If telemetry is not explicitly set, try to read from ENVIRONMENT env variable, this is used in the mcp.apify.com deployment
+        if (this.options.telemetry === undefined) {
+            const envValue = process.env.ENVIRONMENT;
+            if (envValue === 'dev' || envValue === 'prod') {
+                this.options.telemetry = envValue;
+            }
+        }
+
         const { setupSigintHandler = true } = options;
         this.server = new Server(
             {
@@ -467,16 +498,21 @@ export class ActorsMcpServer {
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+            log.debug('FINDME Received request to call tool', { request });
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = request.params;
             const { progressToken } = meta || {};
-            const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
+            const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
+            // Injected for telemetry purposes
+            const mcpSessionId = request.params.mcpSessionId as string | undefined;
 
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
             // Remove other custom params passed from apify-mcp-server
             delete request.params.userRentedActorIds;
+            // Remove mcpSessionId
+            delete request.params.mcpSessionId;
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode) {
@@ -533,6 +569,38 @@ export class ActorsMcpServer {
                     ErrorCode.InvalidParams,
                     msg,
                 );
+            }
+
+            // Track telemetry if enabled
+            if (this.options.telemetry && (this.options.telemetry === 'dev' || this.options.telemetry === 'prod')) {
+                const toolFullName = tool.type === 'actor' ? (tool.tool as ActorTool).actorFullName : tool.tool.name;
+
+                // Get userId from cache or fetch from API
+                let userId = '';
+                // Use token from options (e.g., from stdio auth file) or from request
+                if (apifyToken) {
+                    const apifyClient = new ApifyClient({ token: apifyToken });
+                    const userInfo = await getUserIdFromToken(apifyToken, apifyClient);
+                    userId = userInfo?.id || '';
+                    log.debug('Telemetry: fetched user info', { userId, userFound: !!userInfo });
+                } else {
+                    log.debug('Telemetry: no API token provided');
+                }
+
+                const telemetryData = {
+                    app: 'mcp_server',
+                    mcp_client: this.options.initializeRequestData?.params?.clientInfo?.name || '',
+                    mcp_session_id: mcpSessionId || '',
+                    connection_type: this.options.connectionType || '',
+                    // This is the version if the apify-mcp-server package
+                    // this can be different from the internal remote server version
+                    server_version: getPackageVersion() || '',
+                    tool_name: toolFullName,
+                    reason: '',
+                };
+
+                log.debug('Telemetry: tracking tool call', telemetryData);
+                trackToolCall(userId, this.options.telemetry, telemetryData);
             }
 
             try {

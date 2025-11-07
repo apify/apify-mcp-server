@@ -31,6 +31,7 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
+- [📊 Telemetry](#telemetry)
 - [🤖 MCP clients and examples](#-mcp-clients-and-examples)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [🛠️ Tools, resources, and prompts](#-tools-resources-and-prompts)
@@ -258,13 +259,24 @@ The server provides a set of predefined example prompts to help you get started 
 
 The server does not yet provide any resources.
 
-### Debugging the NPM package
+## 📡 Telemetry
 
-To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
+The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service. By default, telemetry is **enabled** for all tool calls.
 
-```shell
-export APIFY_TOKEN="your-apify-token"
-npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
+### Opting Out of Telemetry
+
+You can disable telemetry in two ways:
+
+**For the hosted remote server (mcp.apify.com)**:
+Add the `?telemetry=off` query parameter to the URL:
+```text
+https://mcp.apify.com?telemetry=off
+```
+
+**For the local stdio server**:
+Use the `--telemetry off` CLI flag:
+```bash
+npx @apify/actors-mcp-server --telemetry off
 ```
 
 # ⚙️ Development
@@ -324,6 +336,15 @@ The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mc
 - Make sure you have `node` installed by running `node -v`.
 - Make sure the `APIFY_TOKEN` environment variable is set.
 - Always use the latest version of the MCP server by using `@apify/actors-mcp-server@latest`.
+
+### Debugging the NPM package
+
+To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
+
+```shell
+export APIFY_TOKEN="your-apify-token"
+npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
+```
 
 ## 💡 Limitations
 

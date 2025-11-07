@@ -116,6 +116,8 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             env.TOOLS = tools.join(',');
         }
+        // Disable telemetry for tests
+        env.TELEMETRY = 'off';
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -127,6 +129,8 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             args.push('--tools', tools.join(','));
         }
+        // Disable telemetry for tests
+        args.push('--telemetry', 'off');
     }
 
     const transport = new StdioClientTransport({
