@@ -99,19 +99,49 @@ const toolsExactMatch = asEvaluator({
             };
         }
 
-        expectedTools = [...expectedTools].sort();
+        // Normalize tool names: treat call-actor with step="info" as equivalent to fetch-actor-details
+        const normalizeToolName = (toolName: string): string => {
+            // Normalize call-actor to fetch-actor-details (bidirectional equivalence)
+            if (toolName === 'call-actor' || toolName === 'fetch-actor-details') {
+                return 'fetch-actor-details';
+            }
+            return toolName;
+        };
+
+        const normalizeToolCall = (toolCall: any): string => {
+            const toolName = toolCall.function?.name || '';
+
+            // If it's call-actor with step="info", treat it as fetch-actor-details
+            if (toolName === 'call-actor') {
+                try {
+                    const args = JSON.parse(toolCall.function?.arguments || '{}');
+                    if (args.step === 'info') {
+                        return 'fetch-actor-details';
+                    }
+                } catch (e) {
+                    // If we can't parse arguments, just return the tool name
+                }
+            }
+
+            return toolName;
+        };
+
+        // Normalize expected tools (both call-actor and fetch-actor-details → fetch-actor-details)
+        const normalizedExpectedTools = [...expectedTools]
+            .map(normalizeToolName)
+            .sort();
 
         const outputToolsTmp = (output?.tool_calls || [])
-            .map((toolCall: any) => toolCall.function?.name || '')
+            .map(normalizeToolCall)
             .sort();
 
         const outputToolsSet = Array.from(new Set(outputToolsTmp)).sort();
         // it is correct if outputTools includes multiple calls to the same tool
-        const isCorrect = JSON.stringify(expectedTools) === JSON.stringify(outputToolsSet);
+        const isCorrect = JSON.stringify(normalizedExpectedTools) === JSON.stringify(outputToolsSet);
         const score = isCorrect ? 1.0 : 0.0;
-        const explanation = `Expected: ${JSON.stringify(expectedTools)}, Got: ${JSON.stringify(outputToolsSet)}`;
+        const explanation = `Expected: ${JSON.stringify(normalizedExpectedTools)}, Got: ${JSON.stringify(outputToolsSet)}`;
 
-        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputToolsSet)}, expected=${JSON.stringify(expectedTools)}`);
+        log.debug(`🤖 Tools exact match: score=${score}, output=${JSON.stringify(outputToolsSet)}, expected=${JSON.stringify(normalizedExpectedTools)}`);
 
         return {
             score,

@@ -48,7 +48,15 @@ export enum HelperTools {
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
 export const RAG_WEB_BROWSER_WHITELISTED_FIELDS = ['query', 'maxResults', 'outputFormats'];
-export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `This tool provides general web browsing functionality, for specific sites like e-commerce, social media it is always better to search for a specific Actor`;
+export const RAG_WEB_BROWSER_ADDITIONAL_DESC = `Use this tool when user wants to GET or RETRIEVE actual data immediately (one-time data retrieval).
+This tool directly fetches and returns data - it does NOT just find tools.
+
+Examples of when to use:
+- User wants current/immediate data (e.g., "Get flight prices for tomorrow", "What's the weather today?")
+- User needs to fetch specific content now (e.g., "Fetch news articles from CNN", "Get product info from Amazon")
+- User has time indicators like "today", "current", "latest", "recent", "now"
+
+This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
 
 export const defaults = {
     actors: [
