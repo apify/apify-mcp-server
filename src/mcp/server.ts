@@ -214,7 +214,7 @@ export class ActorsMcpServer {
      * Load actors as tools, upsert them to the server, and return the tool entries.
      * This is a public method that wraps getActorsAsTools and handles the upsert operation.
      * @param actorIdsOrNames - Array of actor IDs or names to load as tools
-     * @param apifyClient - Apify API token for authentication
+     * @param apifyClient
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
     public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
