@@ -179,7 +179,7 @@ export class ActorsMcpServer {
     * Loads missing toolNames from a provided list of tool names.
     * Skips toolNames that are already loaded and loads only the missing ones.
     * @param toolNames - Array of tool names to ensure are loaded
-    * @param apifyToken - Apify API token for authentication
+    * @param apifyClient
     */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = this.listAllToolNames();
@@ -214,7 +214,7 @@ export class ActorsMcpServer {
      * Load actors as tools, upsert them to the server, and return the tool entries.
      * This is a public method that wraps getActorsAsTools and handles the upsert operation.
      * @param actorIdsOrNames - Array of actor IDs or names to load as tools
-     * @param apifyToken - Apify API token for authentication
+     * @param apifyClient - Apify API token for authentication
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
     public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
@@ -482,7 +482,9 @@ export class ActorsMcpServer {
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode) {
-                const msg = 'APIFY_TOKEN is required. It must be set in the environment variables or passed as a parameter in the body.';
+                const msg = `APIFY_TOKEN is required but was not provided.
+Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request body.
+You can obtain your Apify token from https://console.apify.com/account/integrations.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -506,7 +508,10 @@ export class ActorsMcpServer {
             const tool = Array.from(this.tools.values())
                 .find((t) => t.name === name || (t.type === 'actor' && t.actorFullName === name));
             if (!tool) {
-                const msg = `Tool ${name} not found. Available tools: ${this.listToolNames().join(', ')}`;
+                const availableTools = this.listToolNames();
+                const msg = `Tool "${name}" was not found.
+Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
+Please verify the tool name is correct. You can list all available tools using the tools/list request.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -515,7 +520,8 @@ export class ActorsMcpServer {
                 );
             }
             if (!args) {
-                const msg = `Missing arguments for tool ${name}`;
+                const msg = `Missing arguments for tool "${name}".
+Please provide the required arguments for this tool. Check the tool's input schema to see what parameters are required.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -528,7 +534,11 @@ export class ActorsMcpServer {
             args = decodeDotPropertyNames(args);
             log.debug('Validate arguments for tool', { toolName: tool.name, input: args });
             if (!tool.ajvValidate(args)) {
-                const msg = `Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`;
+                const errors = tool?.ajvValidate.errors || [];
+                const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
+                const msg = `Invalid arguments for tool "${tool.name}".
+Validation errors: ${errorMessages}.
+Please check the tool's input schema and ensure all required parameters are provided with correct types and values.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -568,14 +578,11 @@ export class ActorsMcpServer {
                     try {
                         client = await connectMCPClient(tool.serverUrl, apifyToken);
                         if (!client) {
-                            const msg = `Failed to connect to MCP server ${tool.serverUrl}`;
+                            const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
+Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
                             log.error(msg);
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                            return {
-                                content: [
-                                    { type: 'text', text: msg },
-                                ],
-                            };
+                            return buildMCPResponse([msg]);
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -616,12 +623,7 @@ export class ActorsMcpServer {
                     if (this.options.skyfireMode
                         && args['skyfire-pay-id'] === undefined
                     ) {
-                        return {
-                            content: [{
-                                type: 'text',
-                                text: SKYFIRE_TOOL_INSTRUCTIONS,
-                            }],
-                        };
+                        return buildMCPResponse([SKYFIRE_TOOL_INSTRUCTIONS]);
                     }
 
                     // Create progress tracker if progressToken is available
@@ -666,11 +668,15 @@ export class ActorsMcpServer {
                 log.error('Error occurred while calling tool', { toolName: name, error });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
-                    `Error calling tool ${name}: ${errorMessage}`,
+                    `Error calling tool "${name}": ${errorMessage}.
+Please verify the tool name, input parameters, and ensure all required resources are available.`,
                 ]);
             }
 
-            const msg = `Unknown tool: ${name}`;
+            const availableTools = this.listToolNames();
+            const msg = `Unknown tool type for "${name}".
+Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
+Please verify the tool name and ensure the tool is properly registered.`;
             log.error(msg);
             await this.server.sendLoggingMessage({
                 level: 'error',

@@ -386,7 +386,9 @@ EXAMPLES:
 
         // Standby Actors, thus MCPs, are not supported in Skyfire mode
         if (isActorMcpServer && apifyMcpServer.options.skyfireMode) {
-            return buildMCPResponse([`MCP server Actors are not supported in Skyfire mode. Please use a regular Apify token without Skyfire.`]);
+            return buildMCPResponse([
+                `This Actor (${actorName}) is an MCP server and cannot be accessed using a Skyfire token. To use this Actor, please provide a valid Apify token instead of a Skyfire token.`,
+            ]);
         }
 
         try {
@@ -414,7 +416,9 @@ EXAMPLES:
                     // Regular actor: return schema
                     const details = await fetchActorDetails(apifyClientForDefinition, baseActorName);
                     if (!details) {
-                        return buildMCPResponse([`Actor information for '${baseActorName}' was not found. Please check the Actor ID or name and ensure the Actor exists.`]);
+                        return buildMCPResponse([`Actor information for '${baseActorName}' was not found.
+Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`]);
                     }
                     const content = [
                         `Actor name: ${actorName}`,
@@ -493,7 +497,9 @@ EXAMPLES:
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {
-                return buildMCPResponse([`Actor '${actorName}' was not found.`]);
+                return buildMCPResponse([`Actor '${actorName}' was not found.
+Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`]);
             }
 
             if (!actor.ajvValidate(input)) {
@@ -528,7 +534,9 @@ EXAMPLES:
             return { content };
         } catch (error) {
             log.error('Failed to call Actor', { error, actorName, performStep });
-            return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}`]);
+            return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
+Please verify the Actor name, input parameters, and ensure the Actor exists.
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`]);
         }
     },
 };
