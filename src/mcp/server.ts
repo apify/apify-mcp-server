@@ -521,7 +521,7 @@ Please verify the tool name is correct. You can list all available tools using t
             }
             if (!args) {
                 const msg = `Missing arguments for tool "${name}".
-Please provide the required arguments for this tool. Check the tool's input schema to see what parameters are required.`;
+Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
@@ -538,7 +538,7 @@ Please provide the required arguments for this tool. Check the tool's input sche
                 const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
                 const msg = `Invalid arguments for tool "${tool.name}".
 Validation errors: ${errorMessages}.
-Please check the tool's input schema and ensure all required parameters are provided with correct types and values.`;
+Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.`;
                 log.error(msg);
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
