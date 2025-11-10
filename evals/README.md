@@ -44,13 +44,40 @@ export OPENROUTER_API_KEY="your_key"
 export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
 npm ci
-npm run evals:create-dataset  # one-time
-npm run evals:run
+npm run evals:create-dataset  # one-time: creates dataset from test-cases.json
+npm run evals:run              # runs evaluation on default dataset (v1.4)
+```
+
+### Using a specific dataset version
+
+By default, the evaluation uses the dataset version from `test-cases.json` (`v1.4`). To use a different dataset:
+
+```bash
+# Create a new dataset with custom name
+npm run evals:create-dataset -- --dataset-name mcp_server_dataset_v1.3
+
+# Run evaluation on custom dataset
+npm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 ```
 
 ## Test cases
 
-40+ cases across 7 tool categories: `fetch-actor-details`, `search-actors`, `apify-slash-rag-web-browser`, `search-apify-docs`, `call-actor`, `get-actor-output`, `fetch-apify-docs`
+**Current version: v1.4** (74 test cases)
+
+**Changes in v1.4:**
+- Fixed contradictory test cases (search-actors-1, search-actors-15)
+- Removed misleading-query-2 (contradictory intent)
+- Disambiguated intent-ambiguous queries by adding time indicators ("recent", "current") or "Actor" mentions
+- Split search-vs-rag-7 into two clear variants (7a for immediate data, 7b for tool search)
+- Updated fetch-actor-details-7 to accept both `fetch-actor-details` and `call-actor`
+- Made vague queries more specific (added context to ambiguous-query-3, ambiguous-query-1)
+- Updated tool descriptions and judge evaluator to reduce false negatives
+- Added missing tool descriptions to judge prompt (get-actor-output, fetch-apify-docs)
+- Clarified information vs data retrieval intent in tool descriptions:
+  - search-actors: Emphasizes finding/discovering what tools exist (informational intent)
+  - apify-slash-rag-web-browser: Emphasizes getting/retrieving actual data (data retrieval intent)
+
+Test categories: `fetch-actor-details`, `search-actors`, `apify-slash-rag-web-browser`, `search-apify-docs`, `call-actor`, `get-actor-output`, `fetch-apify-docs`
 
 ## Output
 

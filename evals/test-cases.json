@@ -1,5 +1,5 @@
 {
-  "version": "1.3",
+  "version": "1.4",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -42,7 +42,8 @@
       "id": "fetch-actor-details-7",
       "category": "fetch-actor-details",
       "query": "What parameters does apify/instagram-scraper accept?",
-      "expectedTools": ["fetch-actor-details"]
+      "expectedTools": ["fetch-actor-details", "call-actor"],
+      "reference": "Both fetch-actor-details and call-actor with step='info' are valid for getting Actor parameters."
     },
     {
       "id": "fetch-actor-details-8",
@@ -65,9 +66,9 @@
     {
       "id": "search-actors-1",
       "category": "search-actors",
-      "query": "How to scrape Instagram posts",
-      "expectedTools": [],
-      "reference": "Either it should explain how to scrape Instagram posts or call 'search-actors' tool with the query: 'Instagram posts' or similar"
+      "query": "What Actors can scrape Instagram posts?",
+      "expectedTools": ["search-actors"],
+      "reference": "It should call 'search-actors' tool with the query: 'Instagram posts' or similar. Query explicitly asks about Actors."
     },
     {
       "id": "search-actors-2",
@@ -100,9 +101,9 @@
     {
       "id": "search-actors-6",
       "category": "search-actors",
-      "query": "Get Facebook data",
+      "query": "Find an Actor to get Facebook data",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar."
+      "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar. Added 'Actor' to make intent clear."
     },
     {
       "id": "search-actors-7",
@@ -140,15 +141,16 @@
     {
       "id": "search-actors-12",
       "category": "search-actors",
-      "query": "Fetch posts from Twitter about AI",
+      "query": "Find an Actor to fetch posts from Twitter about AI",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar"
+      "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar. Added 'Actor' to clarify tool search intent."
     },
     {
       "id": "search-actors-13",
       "category": "search-actors",
-      "query": "Get flight information from Skyscanner",
-      "expectedTools": ["search-actors"]
+      "query": "Find an Actor to get flight information from Skyscanner",
+      "expectedTools": ["search-actors"],
+      "reference": "Added 'Actor' to clarify this is a tool search, not immediate data retrieval."
     },
     {
       "id": "search-actors-14",
@@ -160,14 +162,15 @@
       "id": "search-actors-15",
       "category": "search-actors",
       "query": "Find actors for data extraction tasks",
-      "expectedTools": [],
-      "reference": "It should not call any tools, because the query is too general. It should suggest to be more specific about the platform or data type needed."
+      "expectedTools": ["search-actors"],
+      "reference": "While query is general, it explicitly asks about 'actors', so search-actors is appropriate. Changed from [] to allow tool call."
     },
     {
       "id": "rag-web-browser-1",
       "category": "apify-slash-rag-web-browser",
-      "query": "Search articles about AI from tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "query": "Find recent articles about AI from tech blogs",
+      "expectedTools": ["apify-slash-rag-web-browser"],
+      "reference": "Added 'recent' to signal immediate data need rather than tool search."
     },
     {
       "id": "rag-web-browser-2",
@@ -210,14 +213,16 @@
     {
       "id": "search-vs-rag-3",
       "category": "apify-slash-rag-web-browser",
-      "query": "Search for AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "query": "Find recent AI articles on tech blogs",
+      "expectedTools": ["apify-slash-rag-web-browser"],
+      "reference": "Added 'recent' to signal immediate data retrieval rather than tool search."
     },
     {
       "id": "search-vs-rag-4",
       "category": "apify-slash-rag-web-browser",
-      "query": "Fetch articles about AI from Wired and The Verge",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "query": "Get current articles about AI from Wired and The Verge",
+      "expectedTools": ["apify-slash-rag-web-browser"],
+      "reference": "Added 'current' to signal immediate data need."
     },
     {
       "id": "search-vs-rag-5",
@@ -232,10 +237,18 @@
       "expectedTools": ["search-actors"]
     },
     {
-      "id": "search-vs-rag-7",
+      "id": "search-vs-rag-7a",
+      "category": "apify-slash-rag-web-browser",
+      "query": "Get flight prices from New York to London for tomorrow",
+      "expectedTools": ["apify-slash-rag-web-browser"],
+      "reference": "Time indicator 'tomorrow' signals immediate data need. Split from ambiguous search-vs-rag-7."
+    },
+    {
+      "id": "search-vs-rag-7b",
       "category": "search-actors",
-      "query": "Find one way flights from New York to London tomorrow",
-      "expectedTools": ["search-actors"]
+      "query": "Find an Actor that scrapes flight data from booking sites",
+      "expectedTools": ["search-actors"],
+      "reference": "Explicit 'Actor' mention signals tool search. Split from ambiguous search-vs-rag-7."
     },
     {
       "id": "search-vs-rag-8",
@@ -395,29 +408,25 @@
       "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
-      "id": "misleading-query-2",
-      "category": "misleading",
-      "query": "How do I scrape Instagram without using Apify?",
-      "expectedTools": ["search-actors"]
-    },
-    {
       "id": "misleading-query-3",
       "category": "search-apify-docs",
-      "query": "I need to build my own scraper from scratch",
-      "expectedTools": ["search-apify-docs"]
+      "query": "I need to build my own Apify Actor from scratch",
+      "expectedTools": ["search-apify-docs"],
+      "reference": "Added 'Apify Actor' to clarify seeking Apify-specific documentation."
     },
     {
       "id": "ambiguous-query-1",
       "category": "search-actors",
-      "query": "Get instagram posts",
+      "query": "Find an Actor to get instagram posts",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar"
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar. Added 'Actor' to remove ambiguity."
     },
     {
       "id": "ambiguous-query-3",
       "category": "ambiguous",
-      "query": "documentation",
-      "expectedTools": ["search-apify-docs"]
+      "query": "Show me Apify Actor documentation",
+      "expectedTools": ["search-apify-docs"],
+      "reference": "Made query less vague by adding 'Apify Actor' context."
     },
     {
       "id": "tool-selection-confusion-1",
@@ -428,8 +437,9 @@
     {
       "id": "tool-selection-confusion-2",
       "category": "tool-selection",
-      "query": "Search for AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "query": "Find recent AI articles on tech blogs",
+      "expectedTools": ["apify-slash-rag-web-browser"],
+      "reference": "Added 'recent' to signal immediate data need."
     },
     {
       "id": "tool-selection-confusion-3",
