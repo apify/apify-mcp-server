@@ -20,16 +20,32 @@ export async function getActorMcpUrlCached(
         return cached as string | false;
     }
 
-    const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
-    const mcpPath = actorDefinitionPruned && getActorMCPServerPath(actorDefinitionPruned);
-    if (actorDefinitionPruned && mcpPath) {
-        const url = await getActorMCPServerURL(actorDefinitionPruned.id, mcpPath);
-        mcpServerCache.set(actorIdOrName, url);
-        return url;
-    }
+    try {
+        const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
+        const mcpPath = actorDefinitionPruned && getActorMCPServerPath(actorDefinitionPruned);
+        if (actorDefinitionPruned && mcpPath) {
+            const url = await getActorMCPServerURL(actorDefinitionPruned.id, mcpPath);
+            mcpServerCache.set(actorIdOrName, url);
+            return url;
+        }
 
-    mcpServerCache.set(actorIdOrName, false);
-    return false;
+        mcpServerCache.set(actorIdOrName, false);
+        return false;
+    } catch (error) {
+        // Check if it's a "not found" error (404 or 400 status codes)
+        const isNotFound = typeof error === 'object'
+            && error !== null
+            && 'statusCode' in error
+            && (error.statusCode === 404 || error.statusCode === 400);
+
+        if (isNotFound) {
+            // Actor doesn't exist - cache false and return false
+            mcpServerCache.set(actorIdOrName, false);
+            return false;
+        }
+        // Real server error - don't cache, let it propagate
+        throw error;
+    }
 }
 
 /**
