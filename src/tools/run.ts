@@ -36,6 +36,10 @@ USAGE EXAMPLES:
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: zodToJsonSchema(getActorRunArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
+    annotations: {
+        title: 'Get Actor run',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
@@ -74,6 +78,10 @@ USAGE EXAMPLES:
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
+    annotations: {
+        title: 'Get Actor run log',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
@@ -103,6 +111,9 @@ USAGE EXAMPLES:
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(abortRunArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
+    annotations: {
+        title: 'Abort Actor run',
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = abortRunArgs.parse(args);

@@ -40,6 +40,10 @@ USAGE EXAMPLES:
 - user_input: Show only SUCCEEDED runs`,
     inputSchema: zodToJsonSchema(getUserRunsListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
+    annotations: {
+        title: 'Get user runs list',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserRunsListArgs.parse(args);

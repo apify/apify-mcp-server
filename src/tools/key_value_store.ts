@@ -29,6 +29,10 @@ USAGE EXAMPLES:
 - user_input: Get details for store adb123`,
     inputSchema: zodToJsonSchema(getKeyValueStoreArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
+    annotations: {
+        title: 'Get key-value store',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
@@ -69,6 +73,10 @@ USAGE EXAMPLES:
 - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
+    annotations: {
+        title: 'Get key-value store keys',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
@@ -107,6 +115,10 @@ USAGE EXAMPLES:
 - user_input: Get record data.json from store username~my-store`,
     inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
+    annotations: {
+        title: 'Get key-value store record',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);

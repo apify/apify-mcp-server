@@ -112,6 +112,10 @@ Returns list of Actor cards with the following info:
 `,
     inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+    annotations: {
+        title: 'Search Actors',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);

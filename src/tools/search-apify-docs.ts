@@ -34,7 +34,7 @@ export const searchApifyDocsTool: ToolEntry = {
     Apify documentation has information about Apify console, Actors (development
     (actor.json, input schema, dataset schema, dockerfile), deployment, builds, runs),
     schedules, storages (datasets, key-value store), Proxy, Integrations,
-    Apify Academy (crawling and webscraping with Crawlee),
+    Apify Academy (crawling and webscraping with Crawlee).
 
     The results will include the URL of the documentation page, a fragment identifier (if available),
     and a limited piece of content that matches the search query.
@@ -50,6 +50,10 @@ export const searchApifyDocsTool: ToolEntry = {
     - query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
+    annotations: {
+        title: 'Search Apify docs',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;
 

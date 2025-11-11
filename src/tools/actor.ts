@@ -198,6 +198,10 @@ Actor description: ${actorDefinitionPruned.description}`;
             inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
             memoryMbytes,
+            annotations: {
+                title: actorDefinitionPruned.actorFullName,
+                openWorldHint: true,
+            },
         });
     }
     return tools;
@@ -361,6 +365,10 @@ EXAMPLES:
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),
+    annotations: {
+        title: 'Call Actor',
+        openWorldHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
         const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);

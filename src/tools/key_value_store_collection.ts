@@ -42,6 +42,10 @@ USAGE EXAMPLES:
 - user_input: List unnamed key-value stores`,
     inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
+    annotations: {
+        title: 'Get user key-value stores list',
+        readOnlyHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserKeyValueStoresListArgs.parse(args);
