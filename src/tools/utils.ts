@@ -180,6 +180,16 @@ export function buildActorInputSchema(actorFullName: string, input: IActorInputS
         delete working.schemaVersion;
     }
 
+    // Remove $ref and $schema fields if present
+    // since AJV cannot resolve external schema references
+    // $ref and $schema are present in apify/website-content-crawler input schema
+    if ('$ref' in working) {
+        delete (working as { $ref?: string }).$ref;
+    }
+    if ('$schema' in working) {
+        delete (working as { $schema?: string }).$schema;
+    }
+
     let finalSchema = working;
     if (isRag) {
         finalSchema = pruneSchemaPropertiesByWhitelist(finalSchema, RAG_WEB_BROWSER_WHITELISTED_FIELDS);

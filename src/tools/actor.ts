@@ -244,6 +244,14 @@ async function getMCPServersAsTools(
                 return [];
             }
             return await getMCPServerTools(actorId, client, mcpServerUrl);
+        } catch (error) {
+            // Server error - log and continue processing other actors
+            log.error('Failed to connect to MCP server', {
+                actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+                actorId,
+                error,
+            });
+            return [];
         } finally {
             if (client) await client.close();
         }
@@ -273,17 +281,26 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
-            if (!actorDefinitionPruned) {
-                log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
+            try {
+                const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
+                if (!actorDefinitionPruned) {
+                    log.info('Actor not found or definition is not available', { actorName: actorIdOrName });
+                    return null;
+                }
+                // Cache the pruned Actor definition
+                actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
+                return {
+                    actorDefinitionPruned,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
+                } as ActorInfo;
+            } catch (error) {
+                // Server error - log and continue processing other actors
+                log.error('Failed to fetch Actor definition', {
+                    actorName: actorIdOrName,
+                    error,
+                });
                 return null;
             }
-            // Cache the pruned Actor definition
-            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
-            return {
-                actorDefinitionPruned,
-                webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
-            } as ActorInfo;
         }),
     );
 
@@ -431,12 +448,10 @@ EXAMPLES:
             }
 
             /**
-                 * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-                 * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-                 */
-            if (apifyMcpServer.options.skyfireMode
-                    && args['skyfire-pay-id'] === undefined
-            ) {
+            * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+            * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+            */
+            if (apifyMcpServer.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
                 return {
                     content: [{
                         type: 'text',
@@ -446,8 +461,8 @@ EXAMPLES:
             }
 
             /**
-                 * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-                 */
+            * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+            */
             const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
