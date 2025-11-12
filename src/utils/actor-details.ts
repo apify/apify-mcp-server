@@ -1,5 +1,7 @@
 import type { Actor, Build } from 'apify-client';
 
+import log from '@apify/log';
+
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { IActorInputSchema } from '../types.js';
@@ -15,23 +17,40 @@ export interface ActorDetailsResult {
 }
 
 export async function fetchActorDetails(apifyClient: ApifyClient, actorName: string): Promise<ActorDetailsResult | null> {
-    const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
-        apifyClient.actor(actorName).get(),
-        apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
-    ]);
-    if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
-    const inputSchema = (buildInfo.actorDefinition.input || {
-        type: 'object',
-        properties: {},
-    }) as IActorInputSchema;
-    inputSchema.properties = filterSchemaProperties(inputSchema.properties);
-    inputSchema.properties = shortenProperties(inputSchema.properties);
-    const actorCard = formatActorToActorCard(actorInfo);
-    return {
-        actorInfo,
-        buildInfo,
-        actorCard,
-        inputSchema,
-        readme: buildInfo.actorDefinition.readme || 'No README provided.',
-    };
+    try {
+        const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
+            apifyClient.actor(actorName).get(),
+            apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
+        ]);
+        if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+        const inputSchema = (buildInfo.actorDefinition.input || {
+            type: 'object',
+            properties: {},
+        }) as IActorInputSchema;
+        inputSchema.properties = filterSchemaProperties(inputSchema.properties);
+        inputSchema.properties = shortenProperties(inputSchema.properties);
+        const actorCard = formatActorToActorCard(actorInfo);
+        return {
+            actorInfo,
+            buildInfo,
+            actorCard,
+            inputSchema,
+            readme: buildInfo.actorDefinition.readme || 'No README provided.',
+        };
+    } catch (error) {
+        // Check if it's a 404 error (actor not found) - this is expected
+        const is404 = typeof error === 'object'
+            && error !== null
+            && 'statusCode' in error
+            && (error as { statusCode?: number }).statusCode === 404;
+
+        if (is404) {
+            // Log 404 errors at info level since they're expected (user may query non-existent actors)
+            log.info(`Actor '${actorName}' not found`, { actorName });
+        } else {
+            // Log other errors at error level
+            log.error(`Failed to fetch actor details for '${actorName}'`, { actorName, error });
+        }
+        return null;
+    }
 }
