@@ -448,12 +448,10 @@ EXAMPLES:
             }
 
             /**
-                 * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-                 * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-                 */
-            if (apifyMcpServer.options.skyfireMode
-                    && args['skyfire-pay-id'] === undefined
-            ) {
+            * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+            * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+            */
+            if (apifyMcpServer.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
                 return {
                     content: [{
                         type: 'text',
@@ -463,8 +461,8 @@ EXAMPLES:
             }
 
             /**
-                 * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-                 */
+            * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+            */
             const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
