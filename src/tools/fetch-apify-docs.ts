@@ -1,13 +1,12 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import log from '@apify/log';
-
 import { HelperTools } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
@@ -51,6 +50,10 @@ Please provide a valid Apify documentation URL. You can find documentation URLs 
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
+                    const error = Object.assign(new Error(`HTTP ${response.status} ${response.statusText}`), {
+                        statusCode: response.status,
+                    });
+                    logHttpError(error, 'Failed to fetch the documentation page', { url, statusText: response.statusText });
                     return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
 HTTP Status: ${response.status} ${response.statusText}.
 Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`]);
@@ -61,7 +64,7 @@ Please verify the URL is correct and accessible. You can search for available do
                 // Use the URL without fragment as the key to avoid caching same page with different fragments
                 fetchApifyDocsCache.set(urlWithoutFragment, markdown);
             } catch (error) {
-                log.error('Failed to fetch the documentation page', { url, error });
+                logHttpError(error, 'Failed to fetch the documentation page', { url });
                 return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
 Error: ${error instanceof Error ? error.message : String(error)}.
 Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`]);

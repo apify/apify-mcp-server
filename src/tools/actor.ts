@@ -24,6 +24,7 @@ import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getAc
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv } from '../utils/ajv.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
@@ -84,7 +85,7 @@ export async function callActorGetDataset(
             try {
                 await apifyClient.run(actorRun.id).abort({ gracefully: false });
             } catch (e) {
-                log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
+                logHttpError(e, 'Error aborting Actor run', { runId: actorRun.id });
             }
             // Reject to stop waiting
             resolve(CLIENT_ABORT);
@@ -244,6 +245,12 @@ async function getMCPServersAsTools(
                 return [];
             }
             return await getMCPServerTools(actorId, client, mcpServerUrl);
+        } catch (error) {
+            logHttpError(error, 'Failed to connect to MCP server', {
+                actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+                actorId,
+            });
+            return [];
         } finally {
             if (client) await client.close();
         }
@@ -273,17 +280,24 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
-            const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
-            if (!actorDefinitionPruned) {
-                log.error('Actor not found or definition is not available', { actorName: actorIdOrName });
+            try {
+                const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
+                if (!actorDefinitionPruned) {
+                    log.info('Actor not found or definition is not available', { actorName: actorIdOrName });
+                    return null;
+                }
+                // Cache the pruned Actor definition
+                actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
+                return {
+                    actorDefinitionPruned,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
+                } as ActorInfo;
+            } catch (error) {
+                logHttpError(error, 'Failed to fetch Actor definition', {
+                    actorName: actorIdOrName,
+                });
                 return null;
             }
-            // Cache the pruned Actor definition
-            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
-            return {
-                actorDefinitionPruned,
-                webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
-            } as ActorInfo;
         }),
     );
 
@@ -435,12 +449,10 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             }
 
             /**
-                 * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-                 * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-                 */
-            if (apifyMcpServer.options.skyfireMode
-                    && args['skyfire-pay-id'] === undefined
-            ) {
+            * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
+            * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
+            */
+            if (apifyMcpServer.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
                 return {
                     content: [{
                         type: 'text',
@@ -450,8 +462,8 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             }
 
             /**
-                 * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-                 */
+            * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
+            */
             const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
@@ -533,7 +545,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
             return { content };
         } catch (error) {
-            log.error('Failed to call Actor', { error, actorName, performStep });
+            logHttpError(error, 'Failed to call Actor', { actorName, performStep });
             return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`]);

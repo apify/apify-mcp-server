@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.5) (2025-11-14)
+
+### 🚀 Features
+
+- Refactor(logging): centralize HTTP error logging  ([#336](https://github.com/apify/apify-mcp-server/pull/336)) ([7b0a52d](https://github.com/apify/apify-mcp-server/commit/7b0a52d1e3baeb732747b1cbf58cb70ad1a135a7)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.5.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.2) (2025-11-12)
+
+### 🚀 Features
+
+- Update search-actors tool ([#321](https://github.com/apify/apify-mcp-server/pull/321)) ([602abc5](https://github.com/apify/apify-mcp-server/commit/602abc55bff1f59e937d8e24acc8d7aad64852c2)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Update readme, add image with clients ([#326](https://github.com/apify/apify-mcp-server/pull/326)) ([da560ab](https://github.com/apify/apify-mcp-server/commit/da560abcbd8b7cb2553032899b8cc963357495e5)) by [@jirispilka](https://github.com/jirispilka)
+- Deduplicate error logs, use info for 404&#x2F;400 errors, fix ajv validate when it contains $ref ([#335](https://github.com/apify/apify-mcp-server/pull/335)) ([0ebbf50](https://github.com/apify/apify-mcp-server/commit/0ebbf5069a38e4168c5b031764136c66db4f2e18)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.5.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.1) (2025-10-27)
 
 ### 🚀 Features

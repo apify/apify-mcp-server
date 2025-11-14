@@ -1,8 +1,6 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import log from '@apify/log';
-
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
 import type {
@@ -32,7 +30,7 @@ export async function getActorDefinition(
 ): Promise<ActorDefinitionPruned | null> {
     const actorClient = apifyClient.actor(actorIdOrName);
     try {
-        // Fetch actor details
+        // Fetch Actor details
         const actor = await actorClient.get();
         if (!actor) {
             return null;
@@ -53,9 +51,20 @@ export async function getActorDefinition(
         }
         return null;
     } catch (error) {
-        const errorMessage = `Failed to fetch input schema for Actor: ${actorIdOrName} with error ${error}.`;
-        log.error(errorMessage);
-        throw new Error(errorMessage);
+        // Check if it's a "not found" error (404 or 400 status codes)
+        const isNotFound = typeof error === 'object'
+            && error !== null
+            && 'statusCode' in error
+            && (error.statusCode === 404 || error.statusCode === 400);
+
+        if (isNotFound) {
+            // Return null for not found - caller will log appropriately
+            return null;
+        }
+
+        // For server errors, throw the original error (preserve error type)
+        // Caller should catch and log
+        throw error;
     }
 }
 function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitionPruned {
@@ -121,14 +130,23 @@ export const actorDefinitionTool: ToolEntry = {
 
         const parsed = getActorDefinitionArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
-        const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
-        if (!v) {
-            return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+        try {
+            const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
+            if (!v) {
+                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+            }
+            if (v && v.input && 'properties' in v.input && v.input) {
+                const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
+                v.input.properties = shortenProperties(properties);
+            }
+            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+        } catch (error) {
+            return {
+                content: [{
+                    type: 'text',
+                    text: `Failed to fetch Actor definition: ${error instanceof Error ? error.message : String(error)}`,
+                }],
+            };
         }
-        if (v && v.input && 'properties' in v.input && v.input) {
-            const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
-            v.input.properties = shortenProperties(properties);
-        }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
 } as const;

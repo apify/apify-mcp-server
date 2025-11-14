@@ -39,6 +39,7 @@ import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } f
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
@@ -485,7 +486,7 @@ export class ActorsMcpServer {
                 const msg = `APIFY_TOKEN is required but was not provided.
 Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request body.
 You can obtain your Apify token from https://console.apify.com/account/integrations.`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -512,7 +513,7 @@ You can obtain your Apify token from https://console.apify.com/account/integrati
                 const msg = `Tool "${name}" was not found.
 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
 Please verify the tool name is correct. You can list all available tools using the tools/list request.`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 404 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -522,7 +523,7 @@ Please verify the tool name is correct. You can list all available tools using t
             if (!args) {
                 const msg = `Missing arguments for tool "${name}".
 Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -539,7 +540,7 @@ Please provide the required arguments for this tool. Check the tool's input sche
                 const msg = `Invalid arguments for tool "${tool.name}".
 Validation errors: ${errorMessages}.
 Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -580,7 +581,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                         if (!client) {
                             const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
 Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
-                            log.error(msg);
+                            log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             return buildMCPResponse([msg]);
                         }
@@ -665,7 +666,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     }
                 }
             } catch (error) {
-                log.error('Error occurred while calling tool', { toolName: name, error });
+                logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
                     `Error calling tool "${name}": ${errorMessage}.
@@ -677,7 +678,7 @@ Please verify the tool name, input parameters, and ensure all required resources
             const msg = `Unknown tool type for "${name}".
 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
 Please verify the tool name and ensure the tool is properly registered.`;
-            log.error(msg);
+            log.softFail(msg, { statusCode: 404 });
             await this.server.sendLoggingMessage({
                 level: 'error',
                 data: msg,
