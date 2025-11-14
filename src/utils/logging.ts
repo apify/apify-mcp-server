@@ -39,12 +39,13 @@ export function getHttpStatusCode(error: unknown): number | undefined {
  */
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
 
     if (statusCode !== undefined && statusCode < 500) {
-        // Client errors (< 500) - log as softFail
-        log.softFail(message, { error, statusCode, ...data });
+        // Client errors (< 500) - log as softFail without stack trace
+        log.softFail(message, { error: errorMessage, statusCode, ...data });
     } else if (statusCode !== undefined && statusCode >= 500) {
-        // Server errors (>= 500) - log as exception
+        // Server errors (>= 500) - log as exception with full error (includes stack trace)
         const errorObj = error instanceof Error ? error : new Error(String(error));
         log.exception(errorObj, message, { statusCode, ...data });
     } else {

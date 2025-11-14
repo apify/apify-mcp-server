@@ -30,8 +30,9 @@ export function createExpressApp(
             // Server errors (>= 500) - log as exception
             log.exception(error instanceof Error ? error : new Error(String(error)), 'Error in request', { logMessage, statusCode });
         } else {
-            // Client errors (< 500) - log as softFail
-            log.softFail('Error in request', { logMessage, error, statusCode });
+            // Client errors (< 500) - log as softFail without stack trace
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.softFail('Error in request', { logMessage, error: errorMessage, statusCode });
         }
         if (!res.headersSent) {
             res.status(statusCode).json({
