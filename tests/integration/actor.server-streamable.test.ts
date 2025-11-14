@@ -15,6 +15,9 @@ let httpServerPort: number;
 let httpServerHost: string;
 let mcpUrl: string;
 
+// Set environment to dev for telemetry tests
+process.env.ENVIRONMENT = 'dev';
+
 createIntegrationTestsSuite({
     suiteName: 'Apify MCP Server Streamable HTTP',
     transport: 'streamable-http',

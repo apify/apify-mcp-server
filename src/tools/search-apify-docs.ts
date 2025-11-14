@@ -49,7 +49,10 @@ export const searchApifyDocsTool: ToolEntry = {
     - query: How to define Actor input schema?
     - query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(searchApifyDocsToolArgsSchema),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;
 

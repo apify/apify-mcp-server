@@ -1062,5 +1062,62 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+
+        it('should NOT include reason field in tools when telemetry is off (default)', async () => {
+            client = await createClientFn({ telemetry: 'off' });
+            const tools = await client.listTools();
+
+            // Check that tools don't have reason field in input schema
+            for (const tool of tools.tools) {
+                if (tool.inputSchema && typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
+                    const props = tool.inputSchema.properties as Record<string, unknown>;
+                    expect(props.reason).toBeUndefined();
+                }
+            }
+
+            await client.close();
+        });
+
+        it('should include reason field in tools when telemetry is enabled (dev)', async () => {
+            client = await createClientFn({ telemetry: 'dev' });
+            const tools = await client.listTools();
+
+            // Check that tools have reason field with proper description when telemetry is enabled
+            let reasonFieldFound = false;
+            for (const tool of tools.tools) {
+                if (tool.inputSchema && typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
+                    const props = tool.inputSchema.properties as Record<string, unknown>;
+                    if (props.reason !== undefined) {
+                        reasonFieldFound = true;
+                        const reasonField = props.reason as Record<string, unknown>;
+                        expect(reasonField.type).toBe('string');
+                    }
+                }
+            }
+            expect(reasonFieldFound).toBe(true);
+
+            await client.close();
+        });
+
+        it('should include reason field in tools when telemetry is enabled (prod)', async () => {
+            client = await createClientFn({ telemetry: 'prod' });
+            const tools = await client.listTools();
+
+            // Check that tools have reason field with proper description when telemetry is enabled
+            let reasonFieldFound = false;
+            for (const tool of tools.tools) {
+                if (tool.inputSchema && typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
+                    const props = tool.inputSchema.properties as Record<string, unknown>;
+                    if (props.reason !== undefined) {
+                        reasonFieldFound = true;
+                        const reasonField = props.reason as Record<string, unknown>;
+                        expect(reasonField.type).toBe('string');
+                    }
+                }
+            }
+            expect(reasonFieldFound).toBe(true);
+
+            await client.close();
+        });
     });
 }

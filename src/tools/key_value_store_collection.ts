@@ -41,7 +41,10 @@ USAGE EXAMPLES:
 - user_input: List my last 10 key-value stores (newest first)
 - user_input: List unnamed key-value stores`,
     inputSchema: zodToJsonSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getUserKeyValueStoresListArgs)),
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(getUserKeyValueStoresListArgs),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserKeyValueStoresListArgs.parse(args);

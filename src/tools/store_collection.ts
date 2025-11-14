@@ -111,7 +111,10 @@ Returns list of Actor cards with the following info:
 - **Rating:** Out of 5 (if available)
 `,
     inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(searchActorsArgsSchema),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);

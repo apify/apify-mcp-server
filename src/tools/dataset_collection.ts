@@ -41,7 +41,10 @@ USAGE EXAMPLES:
 - user_input: List my last 10 datasets (newest first)
 - user_input: List unnamed datasets`,
     inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
+    ajvValidate: ajv.compile({
+        ...zodToJsonSchema(getUserDatasetsListArgs),
+        additionalProperties: true, // Allow additional properties for telemetry reason field
+    }),
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserDatasetsListArgs.parse(args);
