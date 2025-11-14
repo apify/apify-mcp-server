@@ -39,8 +39,9 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
 /**
  * Process input parameters from URL and get tools
  * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
- * @param url
- * @param apifyToken
+ * @param url The URL to process
+ * @param apifyClient The Apify client instance
+ * @param initializeRequestData Optional initialize request data
  */
 export async function processParamsGetTools(url: string, apifyClient: ApifyClient, initializeRequestData?: InitializeRequest) {
     const input = parseInputParamsFromUrl(url);

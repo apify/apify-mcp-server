@@ -34,7 +34,8 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  * This function is used by both the stdio.ts and the processParamsGetTools function.
  *
  * @param input The processed Input object
- * @param apifyToken The Apify API token
+ * @param apifyClient The Apify client instance
+ * @param _initializeRequestData Optional initialize request data
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(

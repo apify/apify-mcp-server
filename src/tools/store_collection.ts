@@ -7,6 +7,7 @@ import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorToActorCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 export async function searchActorsByKeywords(
     search: string,
@@ -125,15 +126,14 @@ Returns list of Actor cards with the following info:
         actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
         const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
 
-        const actorsText = actorCards.length
-            ? actorCards.join('\n\n')
-            : 'No Actors were found for the given search query. Please try different keywords or simplify your query.';
+        if (actorCards.length === 0) {
+            return buildMCPResponse([`No Actors were found for the search query "${parsed.keywords}".
+Please try different keywords or simplify your query. Consider using more specific platform names (e.g., "Instagram", "Twitter") and data types (e.g., "posts", "products") rather than generic terms like "scraper" or "crawler".`]);
+        }
 
-        return {
-            content: [
-                {
-                    type: 'text',
-                    text: `
+        const actorsText = actorCards.join('\n\n');
+
+        return buildMCPResponse([`
 # Search results:
 - **Search query:** ${parsed.keywords}
 - **Number of Actors found:** ${actorCards.length}
@@ -144,9 +144,6 @@ ${actorsText}
 
 If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
 If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
-`,
-                },
-            ],
-        };
+`]);
     },
 } as const;
