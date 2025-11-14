@@ -24,6 +24,7 @@ import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getAc
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv } from '../utils/ajv.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
@@ -84,7 +85,7 @@ export async function callActorGetDataset(
             try {
                 await apifyClient.run(actorRun.id).abort({ gracefully: false });
             } catch (e) {
-                log.error('Error aborting Actor run', { error: e, runId: actorRun.id });
+                logHttpError(e, 'Error aborting Actor run', { runId: actorRun.id });
             }
             // Reject to stop waiting
             resolve(CLIENT_ABORT);
@@ -245,11 +246,9 @@ async function getMCPServersAsTools(
             }
             return await getMCPServerTools(actorId, client, mcpServerUrl);
         } catch (error) {
-            // Server error - log and continue processing other actors
-            log.error('Failed to connect to MCP server', {
+            logHttpError(error, 'Failed to connect to MCP server', {
                 actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
                 actorId,
-                error,
             });
             return [];
         } finally {
@@ -294,10 +293,8 @@ export async function getActorsAsTools(
                     webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
                 } as ActorInfo;
             } catch (error) {
-                // Server error - log and continue processing other actors
-                log.error('Failed to fetch Actor definition', {
+                logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName: actorIdOrName,
-                    error,
                 });
                 return null;
             }
@@ -542,7 +539,7 @@ EXAMPLES:
 
             return { content };
         } catch (error) {
-            log.error('Failed to call Actor', { error, actorName, performStep });
+            logHttpError(error, 'Failed to call Actor', { actorName, performStep });
             return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}`]);
         }
     },

@@ -1,13 +1,12 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import log from '@apify/log';
-
 import { HelperTools } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
+import { logHttpError } from '../utils/logging.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
     url: z.string()
@@ -53,6 +52,11 @@ USAGE EXAMPLES:
             try {
                 const response = await fetch(url);
                 if (!response.ok) {
+                    // Create error object with statusCode for logHttpError
+                    const error = Object.assign(new Error(`HTTP ${response.status} ${response.statusText}`), {
+                        statusCode: response.status,
+                    });
+                    logHttpError(error, 'Failed to fetch the documentation page', { url, statusText: response.statusText });
                     return {
                         content: [{
                             type: 'text',
@@ -66,7 +70,7 @@ USAGE EXAMPLES:
                 // Use the URL without fragment as the key to avoid caching same page with different fragments
                 fetchApifyDocsCache.set(urlWithoutFragment, markdown);
             } catch (error) {
-                log.error('Failed to fetch the documentation page', { url, error });
+                logHttpError(error, 'Failed to fetch the documentation page', { url });
                 return {
                     content: [{
                         type: 'text',
