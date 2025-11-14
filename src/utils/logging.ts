@@ -31,7 +31,6 @@ export function getHttpStatusCode(error: unknown): number | undefined {
 /**
  * Logs HTTP errors based on status code, following apify-core pattern.
  * Uses `softFail` for status < 500 (API client errors) and `exception` for status >= 500 (API server errors).
- * Similar to apify-core's `logHttpError` but uses `softFail` instead of `warning` for < 500.
  *
  * @param error - The error object
  * @param message - The log message
