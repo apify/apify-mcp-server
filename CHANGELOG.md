@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.5) (2025-11-14)
+
+### 🚀 Features
+
+- Refactor(logging): centralize HTTP error logging  ([#336](https://github.com/apify/apify-mcp-server/pull/336)) ([7b0a52d](https://github.com/apify/apify-mcp-server/commit/7b0a52d1e3baeb732747b1cbf58cb70ad1a135a7)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.5.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.2) (2025-11-12)
 
 ### 🚀 Features
