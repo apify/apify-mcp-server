@@ -28,6 +28,11 @@ USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/academy`,
     inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
+    annotations: {
+        title: 'Fetch Apify docs',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;
 

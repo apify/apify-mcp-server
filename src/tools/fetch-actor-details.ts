@@ -29,6 +29,11 @@ USAGE EXAMPLES:
 - user_input: What is the pricing for apify/instagram-scraper?`,
     inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
+    annotations: {
+        title: 'Fetch Actor details',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);

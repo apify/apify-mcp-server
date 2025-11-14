@@ -57,6 +57,11 @@ USAGE EXAMPLES:
 - user_input: What fields does username~my-dataset have?`,
     inputSchema: zodToJsonSchema(getDatasetArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
+    annotations: {
+        title: 'Get dataset',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
@@ -89,6 +94,11 @@ USAGE EXAMPLES:
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: zodToJsonSchema(getDatasetItemsArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
+    annotations: {
+        title: 'Get dataset items',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
@@ -148,6 +158,11 @@ USAGE EXAMPLES:
 - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: zodToJsonSchema(getDatasetSchemaArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
+    annotations: {
+        title: 'Get dataset schema',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
