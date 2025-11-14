@@ -19,8 +19,8 @@ import { filterSchemaProperties, shortenProperties } from './utils.js';
  * First, fetch the Actor details to get the default build tag and buildId.
  * Then, fetch the build details and return actorName, description, and input schema.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
+ * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @param {string} apifyToken
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 export async function getActorDefinition(
