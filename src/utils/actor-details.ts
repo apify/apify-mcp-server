@@ -1,11 +1,10 @@
 import type { Actor, Build } from 'apify-client';
 
-import log from '@apify/log';
-
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { IActorInputSchema } from '../types.js';
 import { formatActorToActorCard } from './actor-card.js';
+import { logHttpError } from './logging.js';
 
 // Keep the interface here since it is a self contained module
 export interface ActorDetailsResult {
@@ -38,19 +37,7 @@ export async function fetchActorDetails(apifyClient: ApifyClient, actorName: str
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
         };
     } catch (error) {
-        // Check if it's a 404 error (actor not found) - this is expected
-        const is404 = typeof error === 'object'
-            && error !== null
-            && 'statusCode' in error
-            && (error as { statusCode?: number }).statusCode === 404;
-
-        if (is404) {
-            // Log 404 errors at info level since they're expected (user may query non-existent actors)
-            log.info(`Actor '${actorName}' not found`, { actorName });
-        } else {
-            // Log other errors at error level
-            log.error(`Failed to fetch actor details for '${actorName}'`, { actorName, error });
-        }
+        logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
         return null;
     }
 }

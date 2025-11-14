@@ -39,6 +39,7 @@ import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } f
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
@@ -483,7 +484,7 @@ export class ActorsMcpServer {
             // Validate token
             if (!apifyToken && !this.options.skyfireMode) {
                 const msg = 'APIFY_TOKEN is required. It must be set in the environment variables or passed as a parameter in the body.';
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -507,7 +508,7 @@ export class ActorsMcpServer {
                 .find((t) => t.name === name || (t.type === 'actor' && t.actorFullName === name));
             if (!tool) {
                 const msg = `Tool ${name} not found. Available tools: ${this.listToolNames().join(', ')}`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 404 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -516,7 +517,7 @@ export class ActorsMcpServer {
             }
             if (!args) {
                 const msg = `Missing arguments for tool ${name}`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -529,7 +530,7 @@ export class ActorsMcpServer {
             log.debug('Validate arguments for tool', { toolName: tool.name, input: args });
             if (!tool.ajvValidate(args)) {
                 const msg = `Invalid arguments for tool ${tool.name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(tool?.ajvValidate.errors)}`;
-                log.error(msg);
+                log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -569,7 +570,9 @@ export class ActorsMcpServer {
                         client = await connectMCPClient(tool.serverUrl, apifyToken);
                         if (!client) {
                             const msg = `Failed to connect to MCP server ${tool.serverUrl}`;
-                            log.error(msg);
+                            // Note: Timeout errors are already logged as warning in connectMCPClient
+                            // This is a fallback log for when connection fails (client-side issue)
+                            log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             return {
                                 content: [
@@ -663,7 +666,7 @@ export class ActorsMcpServer {
                     }
                 }
             } catch (error) {
-                log.error('Error occurred while calling tool', { toolName: name, error });
+                logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
                     `Error calling tool ${name}: ${errorMessage}`,
@@ -671,7 +674,7 @@ export class ActorsMcpServer {
             }
 
             const msg = `Unknown tool: ${name}`;
-            log.error(msg);
+            log.softFail(msg, { statusCode: 404 });
             await this.server.sendLoggingMessage({
                 level: 'error',
                 data: msg,
