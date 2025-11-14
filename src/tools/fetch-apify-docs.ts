@@ -32,6 +32,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Fetch Apify docs',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;

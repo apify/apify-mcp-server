@@ -45,6 +45,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user key-value stores list',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

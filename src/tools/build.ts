@@ -119,6 +119,7 @@ export const actorDefinitionTool: ToolEntry = {
     annotations: {
         title: 'Get Actor definition',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

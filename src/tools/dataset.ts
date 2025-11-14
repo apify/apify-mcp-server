@@ -60,6 +60,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -96,6 +97,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -159,6 +161,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

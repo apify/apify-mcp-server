@@ -32,6 +32,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

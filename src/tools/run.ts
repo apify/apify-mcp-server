@@ -39,6 +39,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -81,6 +82,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -113,6 +115,7 @@ USAGE EXAMPLES:
     ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
     annotations: {
         title: 'Abort Actor run',
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;

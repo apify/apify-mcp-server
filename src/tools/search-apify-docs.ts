@@ -53,6 +53,7 @@ export const searchApifyDocsTool: ToolEntry = {
     annotations: {
         title: 'Search Apify docs',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;

@@ -115,6 +115,7 @@ Returns list of Actor cards with the following info:
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
+        openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;

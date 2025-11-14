@@ -29,6 +29,7 @@ USAGE EXAMPLES:
     ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
     annotations: {
         title: 'Add tool',
+        openWorldHint: true,
     },
     // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
     call: async (toolArgs: InternalToolArgs) => {
