@@ -4,7 +4,7 @@ const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
 const PROD_WRITE_KEY = 'cOkp5EIJaN69gYaN8bcp7KtaD0fGABwJ';
 
 const SEGMENT_EVENTS = {
-    TOOL_CALL: 'MCP Tool Call',
+    TOOL_CALL: 'MCP tool call',
 };
 
 // Map to store singleton Segment Analytics clients per environment

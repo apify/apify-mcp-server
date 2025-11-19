@@ -78,12 +78,19 @@ export function createExpressApp(
                 rt: Routes.SSE,
                 tr: TransportType.SSE,
             });
-            // Extract telemetry query parameter - if 'off' disable, otherwise use ENVIRONMENT env variable
+            // Extract telemetry query parameters
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-            const telemetryParam = urlParams.get('telemetry');
-            const telemetry = telemetryParam === 'off' ? null : undefined;
+            const telemetryEnabledParam = urlParams.get('telemetry-enabled');
+            const telemetryEnvParam = urlParams.get('telemetry-env');
+            const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
+            const telemetryEnv: 'dev' | 'prod' = (telemetryEnvParam === 'dev' ? 'dev' : 'prod'); // Default to 'prod'
 
-            const mcpServer = new ActorsMcpServer({ setupSigintHandler: false, connectionType: 'remote', telemetry });
+            const mcpServer = new ActorsMcpServer({
+                setupSigintHandler: false,
+                transportType: 'sse',
+                telemetryEnabled,
+                telemetryEnv,
+            });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
@@ -167,16 +174,19 @@ export function createExpressApp(
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                // Extract telemetry query parameter - if 'off' disable, otherwise use ENVIRONMENT env variable
+                // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
-                const telemetryParam = urlParams.get('telemetry');
-                const telemetry = telemetryParam === 'off' ? null : undefined;
+                const telemetryEnabledParam = urlParams.get('telemetry-enabled');
+                const telemetryEnvParam = urlParams.get('telemetry-env');
+                const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
+                const telemetryEnv: 'dev' | 'prod' = (telemetryEnvParam === 'dev' ? 'dev' : 'prod'); // Default to 'prod'
 
                 const mcpServer = new ActorsMcpServer({
                     setupSigintHandler: false,
                     initializeRequestData: req.body as InitializeRequest,
-                    connectionType: 'remote',
-                    telemetry,
+                    transportType: 'http',
+                    telemetryEnabled,
+                    telemetryEnv,
                 });
 
                 // Load MCP server tools

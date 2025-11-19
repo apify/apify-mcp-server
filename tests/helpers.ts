@@ -13,19 +13,18 @@ export interface McpClientOptions {
     tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
     clientName?: string; // Client name for identification
-    telemetry?: 'dev' | 'prod' | 'off'; // Telemetry configuration (default: 'off' for tests)
+    telemetryEnabled?: boolean; // Enable or disable telemetry (default: false for tests)
+    telemetryEnv?: 'dev' | 'prod'; // Telemetry environment (default: 'prod', only used when telemetryEnabled is true)
 }
 
-export async function createMcpSseClient(
-    serverUrl: string,
-    options?: McpClientOptions,
-): Promise<Client> {
+function checkApifyToken(): void {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
-    const telemetry = options?.telemetry ?? 'off';
+}
+
+function appendSearchParams(url: URL, options?: McpClientOptions): void {
+    const { actors, enableAddingActors, tools, telemetryEnabled, telemetryEnv } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -35,11 +34,22 @@ export async function createMcpSseClient(
     if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
-    // Only append telemetry parameter if it's 'off' to disable telemetry
-    // Otherwise the server will use ENVIRONMENT env variable
-    if (telemetry === 'off') {
-        url.searchParams.append('telemetry', 'off');
+    // Append telemetry parameters
+    if (telemetryEnabled === false) {
+        url.searchParams.append('telemetry-enabled', 'false');
     }
+    if (telemetryEnv !== undefined && telemetryEnabled !== false) {
+        url.searchParams.append('telemetry-env', telemetryEnv);
+    }
+}
+
+export async function createMcpSseClient(
+    serverUrl: string,
+    options?: McpClientOptions,
+): Promise<Client> {
+    checkApifyToken();
+    const url = new URL(serverUrl);
+    appendSearchParams(url, options);
 
     const transport = new SSEClientTransport(
         url,
@@ -65,26 +75,9 @@ export async function createMcpStreamableClient(
     serverUrl: string,
     options?: McpClientOptions,
 ): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
+    checkApifyToken();
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
-    const telemetry = options?.telemetry ?? 'off';
-    if (actors !== undefined) {
-        url.searchParams.append('actors', actors.join(','));
-    }
-    if (enableAddingActors !== undefined) {
-        url.searchParams.append('enableAddingActors', enableAddingActors.toString());
-    }
-    if (tools !== undefined) {
-        url.searchParams.append('tools', tools.join(','));
-    }
-    // Only append telemetry parameter if it's 'off' to disable telemetry
-    // Otherwise the server will use ENVIRONMENT env variable
-    if (telemetry === 'off') {
-        url.searchParams.append('telemetry', 'off');
-    }
+    appendSearchParams(url, options);
 
     const transport = new StreamableHTTPClientTransport(
         url,
@@ -109,11 +102,8 @@ export async function createMcpStreamableClient(
 export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
-    const { actors, enableAddingActors, tools, useEnv } = options || {};
-    const telemetry = options?.telemetry ?? 'off';
+    checkApifyToken();
+    const { actors, enableAddingActors, tools, useEnv, telemetryEnabled, telemetryEnv } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -130,7 +120,12 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             env.TOOLS = tools.join(',');
         }
-        env.TELEMETRY = telemetry;
+        if (telemetryEnabled !== undefined) {
+            env.TELEMETRY_ENABLED = telemetryEnabled.toString();
+        }
+        if (telemetryEnv !== undefined) {
+            env.TELEMETRY_ENV = telemetryEnv;
+        }
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -142,7 +137,12 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             args.push('--tools', tools.join(','));
         }
-        args.push('--telemetry', telemetry);
+        if (telemetryEnabled === false) {
+            args.push('--telemetry-enabled', 'false');
+        }
+        if (telemetryEnv !== undefined && telemetryEnabled !== false) {
+            args.push('--telemetry-env', telemetryEnv);
+        }
     }
 
     const transport = new StdioClientTransport({

@@ -1065,7 +1065,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should NOT include reason field in tools when telemetry is off (default)', async () => {
-            client = await createClientFn({ telemetry: 'off' });
+            client = await createClientFn({ telemetryEnabled: false });
             const tools = await client.listTools();
 
             // Check that tools don't have reason field in input schema
@@ -1080,7 +1080,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should include reason field in tools when telemetry is enabled (dev)', async () => {
-            client = await createClientFn({ telemetry: 'dev' });
+            client = await createClientFn({ telemetryEnabled: true, telemetryEnv: 'dev' });
             const tools = await client.listTools();
 
             // Check that tools have reason field with proper description when telemetry is enabled
@@ -1101,7 +1101,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should include reason field in tools when telemetry is enabled (prod)', async () => {
-            client = await createClientFn({ telemetry: 'prod' });
+            client = await createClientFn({ telemetryEnabled: true, telemetryEnv: 'prod' });
             const tools = await client.listTools();
 
             // Check that tools have reason field with proper description when telemetry is enabled

@@ -47,8 +47,10 @@ interface CliArgs {
     enableActorAutoLoading: boolean;
     /** Tool categories to include */
     tools?: string;
-    /** Telemetry environment: 'prod', 'dev', or 'off' */
-    telemetry: 'prod' | 'dev' | 'off';
+    /** Enable or disable telemetry tracking (default: true) */
+    telemetryEnabled: boolean;
+    /** Telemetry environment: 'prod' or 'dev' (default: 'prod', only used when telemetry-enabled is true) */
+    telemetryEnv: 'prod' | 'dev';
 }
 
 /**
@@ -98,14 +100,21 @@ Deprecated: use tools experimental category instead.`,
 For more details visit https://mcp.apify.com`,
         example: 'actors,docs,apify/rag-web-browser',
     })
-    .option('telemetry', {
+    .option('telemetry-enabled', {
+        type: 'boolean',
+        default: true,
+        describe: `Enable or disable telemetry tracking for tool calls. Can also be set via TELEMETRY_ENABLED environment variable.
+Default: true (enabled)`,
+    })
+    .option('telemetry-env', {
         type: 'string',
-        choices: ['prod', 'dev', 'off'],
+        choices: ['prod', 'dev'],
         default: 'prod',
-        describe: `Enable telemetry tracking for tool calls. Can also be set via TELEMETRY environment variable.
+        hidden: true,
+        describe: `Telemetry environment when telemetry is enabled. Can also be set via TELEMETRY_ENV environment variable.
 - 'prod': Send events to production Segment workspace (default)
 - 'dev': Send events to development Segment workspace
-- 'off': Disable telemetry`,
+Only used when --telemetry-enabled is true`,
     })
     .help('help')
     .alias('h', 'help')
@@ -137,14 +146,15 @@ const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();
 
 // Validate environment
 if (!apifyToken) {
-    log.error('APIFY_TOKEN is required but not set in the environment variables or ~/.apify/auth.json');
+    log.error('APIFY_TOKEN is required but not set in the environment variables or in ~/.apify/auth.json');
     process.exit(1);
 }
 
 async function main() {
     const mcpServer = new ActorsMcpServer({
-        connectionType: 'stdio',
-        telemetry: argv.telemetry === 'off' ? null : (argv.telemetry as 'dev' | 'prod'),
+        transportType: 'stdio',
+        telemetryEnabled: argv.telemetryEnabled,
+        telemetryEnv: argv.telemetryEnv || 'prod',
         token: apifyToken,
     });
 

@@ -269,22 +269,23 @@ The server does not yet provide any resources.
 
 ## 📡 Telemetry
 
-The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service. By default, telemetry is **enabled** for all tool calls.
+The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
+By default, telemetry is **enabled** for all tool calls.
 
-### Opting Out of Telemetry
+### Opting out of telemetry
 
 You can disable telemetry in two ways:
 
-**For the hosted remote server (mcp.apify.com)**:
-Add the `?telemetry=off` query parameter to the URL:
+**For the remote server (mcp.apify.com)**:
+Add the `?telemetry-enabled=false` query parameter to the URL:
 ```text
-https://mcp.apify.com?telemetry=off
+https://mcp.apify.com?telemetry-enabled=false
 ```
 
 **For the local stdio server**:
-Use the `--telemetry off` CLI flag:
+Use the `--telemetry-enabled=false` CLI flag:
 ```bash
-npx @apify/actors-mcp-server --telemetry off
+npx @apify/actors-mcp-server --telemetry-enabled=false
 ```
 
 # ⚙️ Development

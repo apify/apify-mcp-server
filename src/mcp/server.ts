@@ -60,18 +60,23 @@ interface ActorsMcpServerOptions {
     skyfireMode?: boolean;
     initializeRequestData?: InitializeRequest;
     /**
-     * Enable telemetry tracking for tool calls.
-     * - null: No telemetry (default)
-     * - 'dev': Use development Segment write key
-     * - 'prod': Use production Segment write key
+     * Enable or disable telemetry tracking for tool calls.
+     * Defaults to true when not set, or can be set from ENVIRONMENT env variable.
      */
-    telemetry?: null | 'dev' | 'prod';
+    telemetryEnabled?: boolean;
     /**
-     * Connection type for telemetry tracking.
-     * - 'stdio': Direct/local connection
-     * - 'remote': Remote/HTTP streamble or SSE connection
+     * Telemetry environment when telemetry is enabled.
+     * - 'dev': Use development Segment write key
+     * - 'prod': Use production Segment write key (default)
      */
-    connectionType?: 'stdio' | 'remote';
+    telemetryEnv?: 'dev' | 'prod';
+    /**
+     * Transport type for telemetry tracking.
+     * - 'stdio': Direct/local stdio connection
+     * - 'http': Remote HTTP streamable connection
+     * - 'sse': Remote Server-Sent Events (SSE) connection
+     */
+    transportType?: 'stdio' | 'http' | 'sse';
     /**
      * Apify API token for authentication
      * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
@@ -94,12 +99,20 @@ export class ActorsMcpServer {
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
-        // If telemetry is not explicitly set, try to read from ENVIRONMENT env variable, this is used in the mcp.apify.com deployment
-        if (this.options.telemetry === undefined) {
+        // If telemetryEnabled is not explicitly set, try to read from ENVIRONMENT env variable, this is used in the mcp.apify.com deployment
+        if (this.options.telemetryEnabled === undefined) {
             const envValue = process.env.ENVIRONMENT;
             if (envValue === 'dev' || envValue === 'prod') {
-                this.options.telemetry = envValue;
+                this.options.telemetryEnabled = true;
+                this.options.telemetryEnv = envValue;
+            } else {
+                // Default to enabled with prod environment
+                this.options.telemetryEnabled = true;
+                this.options.telemetryEnv = this.options.telemetryEnv || 'prod';
             }
+        } else if (this.options.telemetryEnabled) {
+            // If telemetry is enabled, ensure telemetryEnv is set (default to 'prod')
+            this.options.telemetryEnv = this.options.telemetryEnv || 'prod';
         }
 
         const { setupSigintHandler = true } = options;
@@ -294,7 +307,7 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        const isTelemetryEnabled = this.options.telemetry === 'dev' || this.options.telemetry === 'prod';
+        const isTelemetryEnabled = this.options.telemetryEnabled === true;
 
         if (this.options.skyfireMode || isTelemetryEnabled) {
             for (const wrap of tools) {
@@ -599,7 +612,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
             }
 
             // Track telemetry if enabled
-            if (this.options.telemetry && (this.options.telemetry === 'dev' || this.options.telemetry === 'prod')) {
+            if (this.options.telemetryEnabled === true) {
                 const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
                 // Get userId from cache or fetch from API
@@ -621,7 +634,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     app: 'mcp_server',
                     mcp_client: this.options.initializeRequestData?.params?.clientInfo?.name || '',
                     mcp_session_id: mcpSessionId || '',
-                    connection_type: this.options.connectionType || '',
+                    transport_type: this.options.transportType || '',
                     // This is the version of the apify-mcp-server package
                     // this can be different from the internal remote server version
                     server_version: getPackageVersion() || '',
@@ -630,7 +643,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                 };
 
                 log.debug('Telemetry: tracking tool call', telemetryData);
-                trackToolCall(userId, this.options.telemetry, telemetryData);
+                trackToolCall(userId, this.options.telemetryEnv || 'prod', telemetryData);
             }
 
             try {

@@ -4,6 +4,49 @@
 
 This document outlines the implementation plan for analytics tracking in the Apify MCP Server using Segment. The goal is to track all tool calls to understand user behavior, tool usage patterns, and MCP client preferences.
 
+**Note:** This document is intended for consumers of `ActorsMcpServer` in other repositories. It describes the telemetry API and how to configure it.
+
+## Quick Reference
+
+### ActorsMcpServerOptions
+
+```typescript
+interface ActorsMcpServerOptions {
+  telemetryEnabled?: boolean;  // Default: true (enabled)
+  telemetryEnv?: 'dev' | 'prod';  // Default: 'prod'
+  transportType?: 'stdio' | 'http' | 'sse';
+}
+```
+
+### Default Behavior
+- **Telemetry**: Enabled by default (`telemetryEnabled: true`)
+- **Environment**: Production by default (`telemetryEnv: 'prod'`)
+- **ENVIRONMENT env var**: If set to 'dev' or 'prod', automatically enables telemetry with that environment
+
+### Usage Examples
+
+```typescript
+// Enable telemetry with production environment (default)
+const server = new ActorsMcpServer({
+  telemetryEnabled: true,  // or omit (defaults to true)
+  telemetryEnv: 'prod',    // or omit (defaults to 'prod')
+  transportType: 'stdio',
+});
+
+// Enable telemetry with development environment (for debugging)
+const server = new ActorsMcpServer({
+  telemetryEnabled: true,
+  telemetryEnv: 'dev',
+  transportType: 'http',
+});
+
+// Disable telemetry
+const server = new ActorsMcpServer({
+  telemetryEnabled: false,
+  transportType: 'sse',
+});
+```
+
 ## Data to Be Collected
 
 ### Required Fields per Tool Call
@@ -15,7 +58,7 @@ This document outlines the implementation plan for analytics tracking in the Api
   "properties": {
     "app": "mcp_server",
     "mcp_client": "Claude Desktop",
-    "connection_type": "stdio|remote",
+    "transport_type": "stdio|http|sse",
     "server_version": "VERSION",
     "tool_name": "apify/instagram-scraper",
     "reason": "REASON_FOR_TOOL_CALL"
@@ -42,11 +85,12 @@ This document outlines the implementation plan for analytics tracking in the Api
   - Informs which MCP spec features are most important
   - Reference: https://modelcontextprotocol.io/clients
 
-- **Connection Type**: How server is accessed
-  - `stdio`: Local/direct connection (from `src/stdio.ts` entry point)
-  - `remote`: Remote/SSE connection (from `src/actor/server.ts` with SSE transport)
-  - Passed via `ActorsMcpServerOptions.connectionType`
-  - Differentiates between local and remote MCP server instances
+- **Transport Type**: How server is accessed
+  - `stdio`: Local/direct stdio connection (from `src/stdio.ts` entry point)
+  - `http`: Remote HTTP streamable connection (from `src/actor/server.ts` with Streamable HTTP transport)
+  - `sse`: Remote Server-Sent Events (SSE) connection (from `src/actor/server.ts` with SSE transport)
+  - Passed via `ActorsMcpServerOptions.transportType`
+  - Differentiates between local and remote MCP server instances and transport types
 
 - **Server Version**: Apify MCP server version
   - Dynamically read from package.json via `getPackageVersion()` function in `src/const.ts`
@@ -63,8 +107,8 @@ This document outlines the implementation plan for analytics tracking in the Api
 - **Reason**: Why the tool was called (LLM-provided reasoning)
   - ✅ **IMPLEMENTED**: Added as optional `reason` field to all tool input schemas when telemetry is enabled
   - Extracted from tool call arguments: `(args as Record<string, unknown>).reason?.toString() || ''`
-  - When telemetry is `'off'`: reason field is NOT added to schemas (saves schema overhead for tests)
-  - When telemetry is `'dev'` or `'prod'`: reason field is dynamically added to ALL tool schemas
+  - When telemetry is disabled (`telemetryEnabled: false`): reason field is NOT added to schemas (saves schema overhead for tests)
+  - When telemetry is enabled (`telemetryEnabled: true`): reason field is dynamically added to ALL tool schemas
   - Field description: "A brief explanation of why this tool is being called and what it will help you accomplish"
   - Allows LLMs to explain their tool selection and usage context
   - Originally proposed by @Jiří Spilka, similar to mcpcat.io implementation at MCP dev summit London
@@ -135,7 +179,7 @@ Return Response
     - Gets or initializes the client for the specified environment
     - Returns singleton instance
     - Never called directly from server code
-  
+
   - `trackToolCall(userId: string, env: 'dev' | 'prod', properties: Record<string, string>): void`
     - Sends tool call event to Segment
     - Lazily initializes client if needed
@@ -168,21 +212,70 @@ Return Response
 
 **File**: `src/mcp/server.ts`
 
-- **ActorsMcpServerOptions Interface**: 
-  - Added `telemetry?: null | 'dev' | 'prod'` option
-    - `null` (default): No telemetry
+#### ActorsMcpServerOptions Interface
+
+When creating an `ActorsMcpServer` instance, use the following options:
+
+```typescript
+interface ActorsMcpServerOptions {
+  telemetryEnabled?: boolean;  // Default: true
+  telemetryEnv?: 'dev' | 'prod';  // Default: 'prod'
+  transportType?: 'stdio' | 'http' | 'sse';
+  // ... other options
+}
+```
+
+**Usage Examples:**
+
+```typescript
+// Enable telemetry with production environment (default)
+const server = new ActorsMcpServer({
+  telemetryEnabled: true,  // or omit (defaults to true)
+  telemetryEnv: 'prod',    // or omit (defaults to 'prod')
+  transportType: 'stdio',
+});
+
+// Enable telemetry with development environment (for debugging)
+const server = new ActorsMcpServer({
+  telemetryEnabled: true,
+  telemetryEnv: 'dev',
+  transportType: 'http',
+});
+
+// Disable telemetry
+const server = new ActorsMcpServer({
+  telemetryEnabled: false,
+  transportType: 'sse',
+});
+```
+
+- **ActorsMcpServerOptions Interface Details**:
+  - Added `telemetryEnabled?: boolean` option
+    - `true` (default): Telemetry enabled
+    - `false`: Telemetry disabled
+    - If not explicitly set, reads from `ENVIRONMENT` env variable (if set to 'dev' or 'prod', enables telemetry)
+    - Defaults to `true` when not set
+  - Added `telemetryEnv?: 'dev' | 'prod'` option
+    - `'prod'` (default): Use production Segment write key
     - `'dev'`: Use development Segment write key
-    - `'prod'`: Use production Segment write key
-  - Added `connectionType?: 'stdio' | 'remote'` option
+    - Only used when `telemetryEnabled` is `true`
+    - If not explicitly set, reads from `ENVIRONMENT` env variable
+    - Defaults to `'prod'` when not set
+  - Added `transportType?: 'stdio' | 'http' | 'sse'` option
+    - `'stdio'`: Direct/local stdio connection
+    - `'http'`: Remote HTTP streamable connection
+    - `'sse'`: Remote Server-Sent Events (SSE) connection
     - Specifies how the server is being accessed
-    - Passed to telemetry for connection type tracking
+    - Passed to telemetry for transport type tracking
   - Added `initializeRequestData?: InitializeRequest` option (from MCP SDK)
     - Contains client info like `clientInfo.name`, capabilities, etc.
     - Injected via message interception or HTTP request body
 
-- **Constructor** (lines 95-102):
-  - If telemetry is not explicitly set, reads from `ENVIRONMENT` env variable
-  - Falls back to undefined if neither provided nor env var available
+- **Constructor** (lines 98-115):
+  - If `telemetryEnabled` is not explicitly set, reads from `ENVIRONMENT` env variable
+  - If `ENVIRONMENT === 'dev'` or `'prod'`: sets `telemetryEnabled = true` and `telemetryEnv = envValue`
+  - Otherwise, defaults to `telemetryEnabled = true` and `telemetryEnv = 'prod'`
+  - If `telemetryEnabled` is explicitly `true`, ensures `telemetryEnv` is set (defaults to 'prod')
   - Supports environment-based telemetry control for hosted deployments
 
 - **Tool Call Handler** (lines 568-600, `CallToolRequestSchema`):
@@ -194,10 +287,10 @@ Return Response
   - Builds telemetry properties object with:
     - `app`: 'mcp_server' (identifies this server)
     - `mcp_client`: Client name from `initializeRequestData.params.clientInfo.name` or 'unknown'
-    - `connection_type`: 'stdio', 'remote', or 'unknown'
+    - `transport_type`: 'stdio', 'http', 'sse', or empty string
     - `server_version`: From `getPackageVersion()` (package.json version)
     - `tool_name`: Actor full name or internal tool name
-    - `reason`: Empty string (TODO: extract from tool args when implemented)
+    - `reason`: Extracted from tool arguments if provided, otherwise empty string
   - Logs full telemetry payload before sending (debug level)
   - Calls `trackToolCall()` with userId, telemetry environment, and properties
 
@@ -227,10 +320,12 @@ Return Response
   - JSON file is parsed and token is extracted from `token` key
   - Silently fails on file not found or parse errors (no error thrown)
 
-- **Server Initialization** (lines 143-147):
-  - Passes `connectionType: 'stdio'` when creating ActorsMcpServer
-  - Passes telemetry option from CLI `--telemetry` flag (`prod`/`dev`/`off`)
-  - Converts `'off'` to null, leaves `'prod'` and `'dev'` as-is
+- **Server Initialization** (lines 154-159):
+  - Passes `transportType: 'stdio'` when creating ActorsMcpServer
+  - Passes telemetry options from CLI flags:
+    - `--telemetry-enabled` (boolean, default: true) - documented for end users
+    - `--telemetry-env` ('prod'|'dev', default: 'prod') - hidden flag for debugging only
+  - Converts CLI flags to `telemetryEnabled` (boolean) and `telemetryEnv` ('dev'|'prod')
 
 - **Message Interception** (lines 162-176):
   - Creates proxy for `transport.onmessage` to intercept MCP messages
@@ -282,16 +377,18 @@ The telemetry infrastructure is integrated into the remote server that hosts the
   - Session resumability support via `mcp-session-id` header
 
 - **`handleNewSession()` Handler**:
-  - Extracts `?telemetry=off` query parameter from request URL
-  - Converts parameter to option: `telemetryParam === 'off' ? null : undefined`
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from request URL
+  - Converts parameters to options:
+    - `telemetryEnabled = telemetryEnabledParam !== 'false'` (defaults to true)
+    - `telemetryEnv = telemetryEnvParam || 'prod'` (defaults to 'prod')
   - Passes to ActorsMcpServer constructor:
-    - `connectionType: 'remote'` - identifies remote/HTTP connection
-    - `telemetry: telemetryOption` - per-session telemetry control
+    - `transportType: 'http'` - identifies remote HTTP streamable connection
+    - `telemetryEnabled` and `telemetryEnv` - per-session telemetry control
     - `initializeRequestData: req.body` - client info from HTTP request
 
 - **`handleSessionRestore()` Handler**:
   - Restores session from Redis state for resumable connections
-  - Same telemetry and connectionType handling as handleNewSession()
+  - Same telemetry and transportType handling as handleNewSession()
   - Allows clients to resume sessions with telemetry disabled
 
 **File**: `src/server/legacy-sse.ts`
@@ -301,11 +398,13 @@ The telemetry infrastructure is integrated into the remote server that hosts the
   - Provides session resumability for older clients
 
 - **`initMCPSession()` Handler** (lines 153-210):
-  - Extracts `?telemetry=off` query parameter from response URL
-  - Converts parameter to option: `telemetryParam === 'off' ? null : undefined`
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from response URL
+  - Converts parameters to options:
+    - `telemetryEnabled = telemetryEnabledParam !== 'false'` (defaults to true)
+    - `telemetryEnv = telemetryEnvParam || 'prod'` (defaults to 'prod')
   - Creates ActorsMcpServer with:
-    - `connectionType: 'remote'` - identifies remote/SSE connection
-    - `telemetry: telemetryOption` - per-session telemetry control
+    - `transportType: 'sse'` - identifies remote SSE connection
+    - `telemetryEnabled` and `telemetryEnv` - per-session telemetry control
   - Message interception proxy (lines 203-210):
     - Proxies `transport.onmessage` to capture MCP initialize message
     - Extracts client information from initialize request data
@@ -313,19 +412,21 @@ The telemetry infrastructure is integrated into the remote server that hosts the
     - Calls original onmessage handler to continue processing
 
 - **Per-Session Control**:
-  - Both transports support `?telemetry=off` query parameter
+  - Both transports support `?telemetry-enabled=false` query parameter to disable telemetry
+  - Optional `?telemetry-env=dev` parameter to use development workspace (for debugging only)
   - Prevents test data from polluting production telemetry
-  - Example: `https://mcp.apify.com/?telemetry=off` for streamable
-  - Example: `https://mcp.apify.com/sse?telemetry=off` for SSE
+  - Example: `https://mcp.apify.com/?telemetry-enabled=false` for streamable
+  - Example: `https://mcp.apify.com/sse?telemetry-enabled=false` for SSE
+  - Example: `https://mcp.apify.com/?telemetry-env=dev` for debugging (uses dev workspace)
 
 **Test Configuration**:
 
 - **`test/integration/tests/server-streamable.test.ts`**:
-  - mcpUrl configured with `/?telemetry=off` query parameter
+  - mcpUrl configured with `/?telemetry-enabled=false` query parameter
   - Prevents integration tests from sending telemetry events
 
 - **`test/integration/tests/server-sse.test.ts`**:
-  - mcpUrl configured with `/sse?telemetry=off` query parameter
+  - mcpUrl configured with `/sse?telemetry-enabled=false` query parameter
   - Prevents integration tests from sending telemetry events
 
 ## Data Flow
@@ -341,8 +442,9 @@ From `CallToolRequestSchema` handler in `src/mcp/server.ts` (line 568+):
 - `meta`: Metadata including progressToken
 
 From `ActorsMcpServer` instance:
-- `this.options.telemetry`: Telemetry environment configuration ('dev', 'prod', or null)
-- `this.options.connectionType`: Connection type ('stdio' or 'remote')
+- `this.options.telemetryEnabled`: Boolean indicating if telemetry is enabled (default: true)
+- `this.options.telemetryEnv`: Telemetry environment ('dev' or 'prod', default: 'prod')
+- `this.options.transportType`: Transport type ('stdio', 'http', or 'sse')
 - `this.options.initializeRequestData`: MCP client info and capabilities
   - `params.clientInfo.name`: MCP client name (e.g., 'Claude Desktop', 'Cline')
   - `params.capabilities`: Client capabilities
@@ -378,27 +480,29 @@ Token available?
 Track telemetry with userId
 ```
 
-### Connection Type Detection
+### Transport Type Detection
 
-Connection type is now passed via `ActorsMcpServerOptions`:
+Transport type is now passed via `ActorsMcpServerOptions`:
 - **Stdio** (Local): When using `src/stdio.ts` entry point
-  - Passes `connectionType: 'stdio'` when creating ActorsMcpServer
+  - Passes `transportType: 'stdio'` when creating ActorsMcpServer
+  - Passes `telemetryEnabled` and `telemetryEnv` from CLI flags
   - Message interception proxy captures initialize request data from MCP protocol
-  - Example: `npx @apify/actors-mcp-server --telemetry=dev`
+  - Example: `npx @apify/actors-mcp-server --telemetry-enabled=false`
+  - Example: `npx @apify/actors-mcp-server --telemetry-env=dev` (for debugging)
 
-- **Streamable HTTP** (Remote): When using `src/server/streamable.ts` with Streamable HTTP transport
-  - Passes `connectionType: 'remote'` in both `handleSessionRestore()` and `handleNewSession()` handlers
-  - Extracts `?telemetry=off` query parameter to disable telemetry per-session
+- **Streamable HTTP** (Remote): When using `src/actor/server.ts` with Streamable HTTP transport
+  - Passes `transportType: 'http'` when creating ActorsMcpServer
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from URL
   - Client info available via `req.body` (InitializeRequest passed as initializeRequestData)
-  - Connection: `https://mcp.apify.com/?telemetry=off`
+  - Connection: `https://mcp.apify.com/?telemetry-enabled=false`
+  - Connection: `https://mcp.apify.com/?telemetry-env=dev` (for debugging)
 
-- **Legacy SSE** (Remote): When using `src/server/legacy-sse.ts` with SSE transport
-  - Passes `connectionType: 'remote'` in `initMCPSession()` handler
-  - Extracts `?telemetry=off` query parameter from URL
+- **Legacy SSE** (Remote): When using `src/actor/server.ts` with SSE transport
+  - Passes `transportType: 'sse'` when creating ActorsMcpServer
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from URL
   - Message interception proxy captures initialize request data from MCP JSON-RPC messages
-  - Connection: `https://mcp.apify.com/sse?telemetry=off`
-
-Future enhancement: Automatically detect connection type from transport type when not explicitly provided.
+  - Connection: `https://mcp.apify.com/sse?telemetry-enabled=false`
+  - Connection: `https://mcp.apify.com/sse?telemetry-env=dev` (for debugging)
 
 ## Implementation Notes
 
@@ -408,25 +512,24 @@ Future enhancement: Automatically detect connection type from transport type whe
 - Telemetry module with singleton Segment clients per environment
 - Tool call tracking in `CallToolRequestSchema` handler at line 568 of `src/mcp/server.ts`
 - Dynamic version reading from package.json via `getPackageVersion()` function in `src/utils/version.ts`
-- Connection type option in ActorsMcpServerOptions interface
-- Stdio transport passing `connectionType: 'stdio'` and telemetry CLI flag in `src/stdio.ts`
+- Transport type option in ActorsMcpServerOptions interface
+- Stdio transport passing `transportType: 'stdio'` and telemetry CLI flags in `src/stdio.ts`
 - package.json included in npm build files
 - User cache module with token hashing and in-memory caching in `src/utils/user-cache.ts`
 - Token resolution from env var and ~/.apify/auth.json file in `src/stdio.ts`
 - Debug logging for telemetry operations in tool call handler
 - Full User object caching (not custom wrapper interface)
 - Message interception proxy to capture initialize request data in stdio (`src/stdio.ts`)
-- Streamable HTTP transport with telemetry query parameter support (`src/server/streamable.ts`)
-  - `handleNewSession()`: Extracts `?telemetry=off` query param and passes to ActorsMcpServer
-  - `handleSessionRestore()`: Same telemetry and connectionType handling
-  - Both handlers pass `connectionType: 'remote'`
-- Legacy SSE transport with telemetry query parameter support (`src/server/legacy-sse.ts`)
-  - `initMCPSession()`: Extracts `?telemetry=off` query param
+- Streamable HTTP transport with telemetry query parameter support (`src/actor/server.ts`)
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query params
+  - Passes `transportType: 'http'` and telemetry options to ActorsMcpServer
+- Legacy SSE transport with telemetry query parameter support (`src/actor/server.ts`)
+  - Extracts `?telemetry-enabled` and `?telemetry-env` query params
   - Message interception proxy to capture initialize request data from MCP protocol
-  - Passes `connectionType: 'remote'` and telemetry option
+  - Passes `transportType: 'sse'` and telemetry options
 - Test configuration to prevent telemetry pollution
-  - `test/integration/tests/server-streamable.test.ts`: Uses `/?telemetry=off`
-  - `test/integration/tests/server-sse.test.ts`: Uses `/sse?telemetry=off`
+  - `test/integration/tests/server-streamable.test.ts`: Uses `/?telemetry-enabled=false`
+  - `test/integration/tests/server-sse.test.ts`: Uses `/sse?telemetry-enabled=false`
 - MCP session ID tracking and injection
   - **Stdio transport** (`src/stdio.ts`): Manually generates UUID4 session ID using `randomUUID()` from `node:crypto` module
     - Generated at startup (line 160 in stdio.ts)
@@ -437,10 +540,10 @@ Future enhancement: Automatically detect connection type from transport type whe
   - Session ID injected into tool call request params for telemetry tracking
   - Supports cross-instance session correlation in distributed deployments
 - **Reason field implementation** ✅
-  - Dynamically added to all tool input schemas when telemetry is enabled (`'dev'` or `'prod'`)
+  - Dynamically added to all tool input schemas when telemetry is enabled (`telemetryEnabled: true`)
   - Optional string field with title "Reason" and guidance description
   - Extracted from tool arguments during tool call: `(args as Record<string, unknown>).reason?.toString() || ''`
-  - Not added when telemetry is `'off'` (reduces schema overhead for tests)
+  - Not added when telemetry is disabled (`telemetryEnabled: false`) (reduces schema overhead for tests)
   - All AJV validators updated with `additionalProperties: true` to accept the field
   - New tests verify: reason field presence/absence based on telemetry setting
   - Works with `upsertTools()` conditional modification logic alongside Skyfire mode
@@ -456,7 +559,7 @@ Future enhancement: Automatically detect connection type from transport type whe
 - Telemetry clients are shared via singleton Map pattern per environment
 - User cache is global (shared across all server instances)
 - Session data is stored in Redis for cross-instance resumability
-- Per-session telemetry control via `?telemetry=off` query parameter prevents test pollution
+- Per-session telemetry control via `?telemetry-enabled=false` query parameter prevents test pollution
 
 ### User Authentication
 - Apify token extracted from `APIFY_TOKEN` env var first
@@ -488,7 +591,7 @@ All telemetry operations emit debug logs including:
 - Full telemetry payload before sending:
   - app ('mcp_server')
   - mcp_client (client name from initialize data or 'unknown')
-  - connection_type ('stdio', 'remote', or 'unknown')
+  - transport_type ('stdio', 'http', 'sse', or empty string)
   - server_version (from package.json or 'unknown')
   - tool_name (actor full name or internal tool name)
   - reason (empty string)
@@ -498,7 +601,7 @@ Enable with `DEBUG=*` or `LOG_LEVEL=debug` to see telemetry details.
 Example debug output:
 ```
 Telemetry: fetched user info { userId: 'user-123', userFound: true }
-Telemetry: tracking tool call { app: 'mcp_server', mcp_client: 'Claude Desktop', connection_type: 'stdio', server_version: '0.5.3', tool_name: 'apify/instagram-scraper', reason: '' }
+Telemetry: tracking tool call { app: 'mcp_server', mcp_client: 'Claude Desktop', transport_type: 'stdio', server_version: '0.5.3', tool_name: 'apify/instagram-scraper', reason: '' }
 ```
 
 ### Future Enhancements
@@ -550,15 +653,20 @@ Telemetry: tracking tool call { app: 'mcp_server', mcp_client: 'Claude Desktop',
 ## Testing & Validation
 
 1. **Dev Environment**
-  - Initialize server with `telemetry: 'dev'`
+  - Initialize server with `telemetryEnabled: true, telemetryEnv: 'dev'`
+  - Or use CLI: `--telemetry-env=dev` (hidden flag for debugging)
+  - Or use URL: `?telemetry-env=dev`
   - Verify events appear in Segment dev workspace
 
 2. **Production**
-  - Initialize server with `telemetry: 'prod'`
+  - Initialize server with `telemetryEnabled: true, telemetryEnv: 'prod'` (default)
+  - Or use CLI: `--telemetry-enabled` (default: true)
   - Monitor Segment prod workspace for events
 
 3. **No Telemetry**
-  - Initialize server without telemetry option
+  - Initialize server with `telemetryEnabled: false`
+  - Or use CLI: `--telemetry-enabled=false`
+  - Or use URL: `?telemetry-enabled=false`
   - Verify no tracking occurs
   - Verify no errors from missing telemetry
 
