@@ -287,7 +287,7 @@ export async function getActorsAsTools(
             try {
                 const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
                 if (!actorDefinitionPruned) {
-                    log.info('Actor not found or definition is not available', { actorName: actorIdOrName });
+                    log.softFail('Actor not found or definition is not available', { actorName: actorIdOrName, statusCode: 404 });
                     return null;
                 }
                 // Cache the pruned Actor definition
