@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.6) (2025-11-19)
+
+### 🚀 Features
+
+- Add tool annotations ([#333](https://github.com/apify/apify-mcp-server/pull/333)) ([149cbbc](https://github.com/apify/apify-mcp-server/commit/149cbbc7f5ee1db6c4bed68b2beead4197e990b3)) by [@jirispilka](https://github.com/jirispilka), closes [#327](https://github.com/apify/apify-mcp-server/issues/327)
+- Improve error handling (required for claude connector) ([#331](https://github.com/apify/apify-mcp-server/pull/331)) ([005db2a](https://github.com/apify/apify-mcp-server/commit/005db2a3af24595e67d9548597ca09302be0f9fa)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.5.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.5) (2025-11-14)
 
 ### 🚀 Features
