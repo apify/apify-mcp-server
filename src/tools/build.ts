@@ -19,8 +19,8 @@ import { filterSchemaProperties, shortenProperties } from './utils.js';
  * First, fetch the Actor details to get the default build tag and buildId.
  * Then, fetch the build details and return actorName, description, and input schema.
  * @param {string} actorIdOrName - Actor ID or Actor full name.
+ * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @param {string} apifyToken
  * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
  */
 export async function getActorDefinition(
@@ -138,7 +138,7 @@ export const actorDefinitionTool: ToolEntry = {
         try {
             const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
             if (!v) {
-                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }], isError: true };
             }
             if (v && v.input && 'properties' in v.input && v.input) {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
@@ -151,6 +151,7 @@ export const actorDefinitionTool: ToolEntry = {
                     type: 'text',
                     text: `Failed to fetch Actor definition: ${error instanceof Error ? error.message : String(error)}`,
                 }],
+                isError: true,
             };
         }
     },

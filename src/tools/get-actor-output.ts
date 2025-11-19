@@ -136,7 +136,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
         });
 
         if (!response) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
 
         let { items } = response;

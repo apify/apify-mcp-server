@@ -47,7 +47,7 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },

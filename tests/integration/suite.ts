@@ -1043,7 +1043,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should return error message when tryging to call MCP server Actor without tool name in actor parameter', async () => {
+        it('should return error message when trying to call MCP server Actor without tool name in actor parameter', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const response = await client.callTool({
@@ -1059,6 +1059,7 @@ export function createIntegrationTestsSuite(
             const content = response.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
+            expect(response.isError).toBe(true);
 
             await client.close();
         });

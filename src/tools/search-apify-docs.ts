@@ -5,6 +5,7 @@ import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { searchApifyDocsCached } from '../utils/apify-docs.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 const searchApifyDocsToolArgsSchema = z.object({
     query: z.string()
@@ -30,24 +31,24 @@ export const searchApifyDocsTool: ToolEntry = {
     type: 'internal',
     name: HelperTools.DOCS_SEARCH,
     description: `Search Apify documentation using full-text search.
-    You can use it to find relevant documentation based on keywords.
-    Apify documentation has information about Apify console, Actors (development
-    (actor.json, input schema, dataset schema, dockerfile), deployment, builds, runs),
-    schedules, storages (datasets, key-value store), Proxy, Integrations,
-    Apify Academy (crawling and webscraping with Crawlee).
+You can use it to find relevant documentation based on keywords.
+Apify documentation has information about Apify console, Actors (development
+(actor.json, input schema, dataset schema, dockerfile), deployment, builds, runs),
+schedules, storages (datasets, key-value store), Proxy, Integrations,
+Apify Academy (crawling and webscraping with Crawlee),
 
-    The results will include the URL of the documentation page, a fragment identifier (if available),
-    and a limited piece of content that matches the search query.
+The results will include the URL of the documentation page, a fragment identifier (if available),
+and a limited piece of content that matches the search query.
 
-    Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
+Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
 
-    USAGE:
-    - Use when user asks about Apify documentation, Actor development, Crawlee, or Apify platform.
+USAGE:
+- Use when user asks about Apify documentation, Actor development, Crawlee, or Apify platform.
 
-    USAGE EXAMPLES:
-    - query: How to use create Apify Actor?
-    - query: How to define Actor input schema?
-    - query: How scrape with Crawlee?`,
+USAGE EXAMPLES:
+- query: How to use create Apify Actor?
+- query: How to define Actor input schema?
+- query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
     annotations: {
@@ -65,12 +66,9 @@ export const searchApifyDocsTool: ToolEntry = {
         const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
         if (results.length === 0) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}. Try a different query or adjust the limit and offset.`,
-                }],
-            };
+            return buildMCPResponse([`No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}.
+Please try a different query with different keywords, or adjust the limit and offset parameters.
+You can also try using more specific or alternative keywords related to your search topic.`]);
         }
 
         const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
@@ -78,11 +76,6 @@ Search results for "${query}":
 
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
   Content: ${result.content}`).join('\n\n')}`;
-        return {
-            content: [{
-                type: 'text',
-                text: textContent,
-            }],
-        };
+        return buildMCPResponse([textContent]);
     },
 } as const;
