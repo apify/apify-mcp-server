@@ -632,14 +632,18 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                 // Extract reason from tool arguments if provided
                 const reason = (args as Record<string, unknown>).reason?.toString() || '';
 
+                const capabilities = this.options.initializeRequestData?.params?.capabilities;
+                const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
+                const serverVersion = getPackageVersion() || '';
                 const telemetryData = {
-                    app: 'mcp_server',
-                    mcp_client: this.options.initializeRequestData?.params?.clientInfo?.name || '',
+                    app_name: 'apify-mcp-server',
+                    app_version: serverVersion,
+                    mcp_client_name: params?.clientInfo?.name?.valueOf() || '',
+                    mcp_client_version: params?.clientInfo?.version?.valueOf() || '',
+                    mcp_protocol_version: params?.protocolVersion?.valueOf() || '',
+                    mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
                     mcp_session_id: mcpSessionId || '',
                     transport_type: this.options.transportType || '',
-                    // This is the version of the apify-mcp-server package
-                    // this can be different from the internal remote server version
-                    server_version: getPackageVersion() || '',
                     tool_name: toolFullName,
                     reason,
                 };
