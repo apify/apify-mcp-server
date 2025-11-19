@@ -13,7 +13,9 @@ import express from 'express';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
+import { type TelemetryEnv } from '../const.js';
 import { ActorsMcpServer } from '../mcp/server.js';
+import { getTelemetryEnv } from '../telemetry.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -83,7 +85,7 @@ export function createExpressApp(
             const telemetryEnabledParam = urlParams.get('telemetry-enabled');
             const telemetryEnvParam = urlParams.get('telemetry-env');
             const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
-            const telemetryEnv: 'dev' | 'prod' = (telemetryEnvParam === 'dev' ? 'dev' : 'prod'); // Default to 'prod'
+            const telemetryEnv: TelemetryEnv = getTelemetryEnv(telemetryEnvParam);
 
             const mcpServer = new ActorsMcpServer({
                 setupSigintHandler: false,
@@ -179,7 +181,7 @@ export function createExpressApp(
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
                 const telemetryEnvParam = urlParams.get('telemetry-env');
                 const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
-                const telemetryEnv: 'dev' | 'prod' = (telemetryEnvParam === 'dev' ? 'dev' : 'prod'); // Default to 'prod'
+                const telemetryEnv: TelemetryEnv = getTelemetryEnv(telemetryEnvParam);
 
                 const mcpServer = new ActorsMcpServer({
                     setupSigintHandler: false,

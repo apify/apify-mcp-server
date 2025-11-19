@@ -34,8 +34,9 @@ import {
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
+import { TELEMETRY_ENV, type TelemetryEnv } from '../const.js';
 import { prompts } from '../prompts/index.js';
-import { trackToolCall } from '../telemetry.js';
+import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ToolEntry } from '../types.js';
@@ -69,7 +70,7 @@ interface ActorsMcpServerOptions {
      * - 'dev': Use development Segment write key
      * - 'prod': Use production Segment write key (default)
      */
-    telemetryEnv?: 'dev' | 'prod';
+    telemetryEnv?: TelemetryEnv;
     /**
      * Transport type for telemetry tracking.
      * - 'stdio': Direct/local stdio connection
@@ -102,17 +103,18 @@ export class ActorsMcpServer {
         // If telemetryEnabled is not explicitly set, try to read from ENVIRONMENT env variable, this is used in the mcp.apify.com deployment
         if (this.options.telemetryEnabled === undefined) {
             const envValue = process.env.ENVIRONMENT;
-            if (envValue === 'dev' || envValue === 'prod') {
+            const validEnv = getTelemetryEnv(envValue);
+            if (envValue === TELEMETRY_ENV.DEV || envValue === TELEMETRY_ENV.PROD) {
                 this.options.telemetryEnabled = true;
-                this.options.telemetryEnv = envValue;
+                this.options.telemetryEnv = validEnv;
             } else {
                 // Default to enabled with prod environment
                 this.options.telemetryEnabled = true;
-                this.options.telemetryEnv = this.options.telemetryEnv || 'prod';
+                this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
             }
         } else if (this.options.telemetryEnabled) {
             // If telemetry is enabled, ensure telemetryEnv is set (default to 'prod')
-            this.options.telemetryEnv = this.options.telemetryEnv || 'prod';
+            this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
         }
 
         const { setupSigintHandler = true } = options;
@@ -643,7 +645,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                 };
 
                 log.debug('Telemetry: tracking tool call', telemetryData);
-                trackToolCall(userId, this.options.telemetryEnv || 'prod', telemetryData);
+                trackToolCall(userId, getTelemetryEnv(this.options.telemetryEnv), telemetryData);
             }
 
             try {

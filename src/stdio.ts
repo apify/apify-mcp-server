@@ -29,8 +29,10 @@ import { hideBin } from 'yargs/helpers';
 import log from '@apify/log';
 
 import { ApifyClient } from './apify-client.js';
+import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV, type TelemetryEnv } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
+import { getTelemetryEnv } from './telemetry.js';
 import type { Input, ToolSelector } from './types.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
@@ -50,7 +52,7 @@ interface CliArgs {
     /** Enable or disable telemetry tracking (default: true) */
     telemetryEnabled: boolean;
     /** Telemetry environment: 'prod' or 'dev' (default: 'prod', only used when telemetry-enabled is true) */
-    telemetryEnv: 'prod' | 'dev';
+    telemetryEnv: TelemetryEnv;
 }
 
 /**
@@ -108,8 +110,8 @@ Default: true (enabled)`,
     })
     .option('telemetry-env', {
         type: 'string',
-        choices: ['prod', 'dev'],
-        default: 'prod',
+        choices: [TELEMETRY_ENV.PROD, TELEMETRY_ENV.DEV],
+        default: DEFAULT_TELEMETRY_ENV,
         hidden: true,
         describe: `Telemetry environment when telemetry is enabled. Can also be set via TELEMETRY_ENV environment variable.
 - 'prod': Send events to production Segment workspace (default)
@@ -154,7 +156,7 @@ async function main() {
     const mcpServer = new ActorsMcpServer({
         transportType: 'stdio',
         telemetryEnabled: argv.telemetryEnabled,
-        telemetryEnv: argv.telemetryEnv || 'prod',
+        telemetryEnv: getTelemetryEnv(argv.telemetryEnv),
         token: apifyToken,
     });
 

@@ -4,7 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
-import { HelperTools } from '../src/const.js';
+import { HelperTools, type TelemetryEnv } from '../src/const.js';
 import type { ToolCategory } from '../src/types.js';
 
 export interface McpClientOptions {
@@ -14,7 +14,7 @@ export interface McpClientOptions {
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
     clientName?: string; // Client name for identification
     telemetryEnabled?: boolean; // Enable or disable telemetry (default: false for tests)
-    telemetryEnv?: 'dev' | 'prod'; // Telemetry environment (default: 'prod', only used when telemetryEnabled is true)
+    telemetryEnv?: TelemetryEnv; // Telemetry environment (default: 'prod', only used when telemetryEnabled is true)
 }
 
 function checkApifyToken(): void {
