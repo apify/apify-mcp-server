@@ -45,7 +45,7 @@ USAGE EXAMPLES:
         if (!url.startsWith('https://docs.apify.com')) {
             return buildMCPResponse([`Invalid URL: "${url}".
 Only URLs starting with "https://docs.apify.com" are allowed.
-Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`]);
+Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`], true);
         }
 
         // Cache URL without fragment to avoid fetching the same page multiple times
@@ -61,7 +61,7 @@ Please provide a valid Apify documentation URL. You can find documentation URLs 
                     logHttpError(error, 'Failed to fetch the documentation page', { url, statusText: response.statusText });
                     return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
 HTTP Status: ${response.status} ${response.statusText}.
-Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`]);
+Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`], true);
                 }
                 const html = await response.text();
                 markdown = htmlToMarkdown(html);
@@ -72,7 +72,7 @@ Please verify the URL is correct and accessible. You can search for available do
                 logHttpError(error, 'Failed to fetch the documentation page', { url });
                 return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
 Error: ${error instanceof Error ? error.message : String(error)}.
-Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`]);
+Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`], true);
             }
         }
 

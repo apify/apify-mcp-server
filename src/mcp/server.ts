@@ -583,7 +583,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
 Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
                             log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                            return buildMCPResponse([msg]);
+                            return buildMCPResponse([msg], true);
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -671,7 +671,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 return buildMCPResponse([
                     `Error calling tool "${name}": ${errorMessage}.
 Please verify the tool name, input parameters, and ensure all required resources are available.`,
-                ]);
+                ], true);
             }
 
             const availableTools = this.listToolNames();

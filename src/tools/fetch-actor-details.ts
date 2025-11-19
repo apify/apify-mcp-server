@@ -45,7 +45,7 @@ USAGE EXAMPLES:
 Please verify Actor ID or name format and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`,
             ];
-            return buildMCPResponse(texts);
+            return buildMCPResponse(texts, true);
         }
 
         const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;

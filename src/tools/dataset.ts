@@ -68,7 +68,7 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -119,7 +119,7 @@ USAGE EXAMPLES:
             flatten,
         });
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -175,7 +175,7 @@ USAGE EXAMPLES:
         });
 
         if (!datasetResponse) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
 
         const datasetItems = datasetResponse.items;
@@ -192,7 +192,7 @@ USAGE EXAMPLES:
         });
 
         if (!schema) {
-            return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }] };
+            return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }], isError: true };
         }
 
         return {

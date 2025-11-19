@@ -138,7 +138,7 @@ export const actorDefinitionTool: ToolEntry = {
         try {
             const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
             if (!v) {
-                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }] };
+                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }], isError: true };
             }
             if (v && v.input && 'properties' in v.input && v.input) {
                 const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
@@ -151,6 +151,7 @@ export const actorDefinitionTool: ToolEntry = {
                     type: 'text',
                     text: `Failed to fetch Actor definition: ${error instanceof Error ? error.message : String(error)}`,
                 }],
+                isError: true,
             };
         }
     },
