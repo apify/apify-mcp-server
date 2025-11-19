@@ -30,6 +30,10 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(addToolArgsSchema),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Add tool',
+        openWorldHint: true,
+    },
     // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
     call: async (toolArgs: InternalToolArgs) => {
         const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;

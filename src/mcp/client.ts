@@ -5,6 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import log from '@apify/log';
 
 import { TimeoutError } from '../errors.js';
+import { logHttpError } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './utils.js';
 
@@ -40,8 +41,7 @@ export async function connectMCPClient(
             log.warning('Connection to MCP server using SSE transport timed out', { url });
             return null;
         }
-
-        log.error('Failed to connect to MCP server using SSE transport', { cause: error });
+        logHttpError(error, 'Failed to connect to MCP server using SSE transport', { url, cause: error });
         throw error;
     }
 }

@@ -43,6 +43,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getUserRunsListArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get user runs list',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserRunsListArgs.parse(args);

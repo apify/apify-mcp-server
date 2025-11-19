@@ -45,6 +45,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getUserDatasetsListArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get user datasets list',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserDatasetsListArgs.parse(args);

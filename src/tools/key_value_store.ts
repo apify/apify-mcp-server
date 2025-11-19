@@ -32,6 +32,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getKeyValueStoreArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get key-value store',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
@@ -75,6 +80,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getKeyValueStoreKeysArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get key-value store keys',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
@@ -116,6 +126,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getKeyValueStoreRecordArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get key-value store record',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);

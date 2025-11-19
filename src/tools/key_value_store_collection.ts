@@ -45,6 +45,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getUserKeyValueStoresListArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get user key-value stores list',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserKeyValueStoresListArgs.parse(args);

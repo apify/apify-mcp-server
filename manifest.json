@@ -2,7 +2,7 @@
   "manifest_version": "0.2",
   "name": "apify-mcp-server",
   "display_name": "Apify MCP server",
-  "version": "0.5.1",
+  "version": "0.5.6",
   "description": "Extract data from any website using thousands of tools from the Apify Store.",
   "long_description": "Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
   "keywords": [

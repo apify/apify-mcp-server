@@ -60,13 +60,18 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getDatasetArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get dataset',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -95,6 +100,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getDatasetItemsArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get dataset items',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
@@ -115,7 +125,7 @@ USAGE EXAMPLES:
             flatten,
         });
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -157,6 +167,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getDatasetSchemaArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get dataset schema',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
@@ -169,7 +184,7 @@ USAGE EXAMPLES:
         });
 
         if (!datasetResponse) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
         }
 
         const datasetItems = datasetResponse.items;
@@ -186,7 +201,7 @@ USAGE EXAMPLES:
         });
 
         if (!schema) {
-            return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }] };
+            return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }], isError: true };
         }
 
         return {

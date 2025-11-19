@@ -26,7 +26,14 @@ export function createExpressApp(
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
-        log.error('Error in request', { logMessage, error });
+        if (statusCode >= 500) {
+            // Server errors (>= 500) - log as exception
+            log.exception(error instanceof Error ? error : new Error(String(error)), 'Error in request', { logMessage, statusCode });
+        } else {
+            // Client errors (< 500) - log as softFail without stack trace
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.softFail('Error in request', { logMessage, error: errorMessage, statusCode });
+        }
         if (!res.headersSent) {
             res.status(statusCode).json({
                 jsonrpc: '2.0',
@@ -110,7 +117,7 @@ export function createExpressApp(
             });
             const sessionId = new URL(req.url, `http://${req.headers.host}`).searchParams.get('sessionId');
             if (!sessionId) {
-                log.error('No session ID provided in POST request');
+                log.softFail('No session ID provided in POST request', { statusCode: 400 });
                 res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
@@ -125,7 +132,7 @@ export function createExpressApp(
             if (transport) {
                 await transport.handlePostMessage(req, res);
             } else {
-                log.error('Server is not connected to the client.');
+                log.softFail('Server is not connected to the client.', { statusCode: 400 });
                 res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
@@ -232,7 +239,7 @@ export function createExpressApp(
             return;
         }
 
-        log.error('Session not found', { sessionId });
+        log.softFail('Session not found', { sessionId, statusCode: 400 });
         res.status(400).send('Bad Request: Session not found').end();
     });
 

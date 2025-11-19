@@ -6,6 +6,7 @@ import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -32,32 +33,39 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(fetchActorDetailsToolArgsSchema),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Fetch Actor details',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
         const details = await fetchActorDetails(apifyClient, parsed.actor);
         if (!details) {
-            return {
-                content: [{ type: 'text', text: `Actor information for '${parsed.actor}' was not found. Please check the Actor ID or name and ensure the Actor exists.` }],
-            };
+            const texts = [`Actor information for '${parsed.actor}' was not found.
+Please verify Actor ID or name format and ensure that the Actor exists.
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`,
+            ];
+            return buildMCPResponse(texts, true);
         }
 
         const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
         // Add link to README title
         details.readme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
 
-        const content = [
-            { type: 'text', text: `# Actor information\n${details.actorCard}` },
-            { type: 'text', text: `${details.readme}` },
+        const texts = [
+            `# Actor information\n${details.actorCard}`,
+            `${details.readme}`,
         ];
 
         // Include input schema if it has properties
         if (details.inputSchema.properties || Object.keys(details.inputSchema.properties).length !== 0) {
-            content.push({ type: 'text', text: `# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\`` });
+            texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
         }
         // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
         // This allows better formatting in the final output
-        return { content };
+        return buildMCPResponse(texts);
     },
 } as const;

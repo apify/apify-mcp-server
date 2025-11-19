@@ -39,13 +39,18 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(getActorRunArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get Actor run',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }] };
+            return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }], isError: true };
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -80,6 +85,11 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(GetRunLogArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Get Actor run log',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
@@ -112,6 +122,10 @@ USAGE EXAMPLES:
         ...zodToJsonSchema(abortRunArgs),
         additionalProperties: true, // Allow additional properties for telemetry reason field
     }),
+    annotations: {
+        title: 'Abort Actor run',
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = abortRunArgs.parse(args);

@@ -73,7 +73,7 @@ export function filterById(testCases: TestCase[], idPattern: string): TestCase[]
 export async function loadTools(): Promise<ToolBase[]> {
     const apifyClient = new ApifyClient({ token: process.env.APIFY_API_TOKEN || '' });
     const urlTools = await processParamsGetTools('', apifyClient);
-    return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t.tool)) as ToolBase[];
+    return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t)) as ToolBase[];
 }
 
 export function transformToolsToOpenAIFormat(tools: ToolBase[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
