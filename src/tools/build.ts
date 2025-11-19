@@ -125,6 +125,11 @@ export const actorDefinitionTool: ToolEntry = {
         + `Limit the length of the README if needed.`,
     inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
+    annotations: {
+        title: 'Get Actor definition',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
 

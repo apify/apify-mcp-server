@@ -42,6 +42,11 @@ USAGE EXAMPLES:
 - user_input: List unnamed datasets`,
     inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
+    annotations: {
+        title: 'Get user datasets list',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getUserDatasetsListArgs.parse(args);

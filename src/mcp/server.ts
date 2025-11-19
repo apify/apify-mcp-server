@@ -298,8 +298,8 @@ export class ActorsMcpServer {
             }
         } else {
             // No skyfire mode - store tools as-is
-            for (const wrap of tools) {
-                this.tools.set(wrap.name, wrap);
+            for (const tool of tools) {
+                this.tools.set(tool.name, tool);
             }
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();

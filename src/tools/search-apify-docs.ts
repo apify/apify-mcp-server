@@ -51,6 +51,11 @@ USAGE EXAMPLES:
 - query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
+    annotations: {
+        title: 'Search Apify docs',
+        readOnlyHint: true,
+        openWorldHint: false,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args } = toolArgs;
 
