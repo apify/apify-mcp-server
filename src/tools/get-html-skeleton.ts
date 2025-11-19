@@ -52,6 +52,11 @@ USAGE EXAMPLES:
 - user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
     inputSchema: zodToJsonSchema(getHtmlSkeletonArgs) as ToolInputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
+    annotations: {
+        title: 'Get HTML skeleton',
+        readOnlyHint: true,
+        openWorldHint: true,
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
         const parsed = getHtmlSkeletonArgs.parse(args);
