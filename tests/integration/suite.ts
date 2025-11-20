@@ -31,39 +31,6 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
-/**
- * Checks that no tools have a reason field in their input schema
- */
-function expectReasonFieldAbsent(tools: { tools: { inputSchema?: unknown }[] }) {
-    for (const tool of tools.tools) {
-        if (tool.inputSchema && typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
-            const props = tool.inputSchema.properties as Record<string, unknown>;
-            expect(props.reason).toBeUndefined();
-        }
-    }
-}
-
-/**
- * Checks that at least one tool has a reason field in its input schema
- * @param validateType - If true, also validates that the reason field type is 'string'
- */
-function expectReasonFieldPresent(tools: { tools: { inputSchema?: unknown }[] }, validateType = false) {
-    let reasonFieldFound = false;
-    for (const tool of tools.tools) {
-        if (tool.inputSchema && typeof tool.inputSchema === 'object' && 'properties' in tool.inputSchema) {
-            const props = tool.inputSchema.properties as Record<string, unknown>;
-            if (props.reason !== undefined) {
-                reasonFieldFound = true;
-                if (validateType) {
-                    const reasonField = props.reason as Record<string, unknown>;
-                    expect(reasonField.type).toBe('string');
-                }
-            }
-        }
-    }
-    expect(reasonFieldFound).toBe(true);
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function extractJsonFromMarkdown(text: string): any {
     // Handle markdown code blocks like ```json
@@ -1097,27 +1064,14 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should NOT include reason field in tools when telemetry is off', async () => {
-            client = await createClientFn({ telemetryEnabled: false });
-            const tools = await client.listTools();
-            expectReasonFieldAbsent(tools);
-            await client.close();
-        });
-
-        it('should include reason field in tools when telemetry is enabled (dev)', async () => {
-            client = await createClientFn({ telemetryEnabled: true, telemetryEnv: 'dev' });
-            const tools = await client.listTools();
-            expectReasonFieldPresent(tools, true);
-            await client.close();
-        });
-
         // Environment variable precedence tests
         it.runIf(options.transport === 'stdio')('should use TELEMETRY_ENABLED env var when CLI arg is not provided', async () => {
             // When useEnv=true, telemetryEnabled option translates to env.TELEMETRY_ENABLED in child process
             client = await createClientFn({ useEnv: true, telemetryEnabled: false });
             const tools = await client.listTools();
 
-            expectReasonFieldAbsent(tools);
+            // Verify tools are loaded correctly
+            expect(tools.tools.length).toBeGreaterThan(0);
             await client.close();
         });
     });

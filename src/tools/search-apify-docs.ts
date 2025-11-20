@@ -50,10 +50,7 @@ USAGE EXAMPLES:
 - query: How to define Actor input schema?
 - query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(searchApifyDocsToolArgsSchema),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
     annotations: {
         title: 'Search Apify docs',
         readOnlyHint: true,

@@ -56,10 +56,7 @@ USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
     inputSchema: zodToJsonSchema(getDatasetArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getDatasetArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
@@ -96,10 +93,7 @@ USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: zodToJsonSchema(getDatasetItemsArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getDatasetItemsArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
@@ -163,10 +157,7 @@ USAGE EXAMPLES:
 - user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: zodToJsonSchema(getDatasetSchemaArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getDatasetSchemaArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,

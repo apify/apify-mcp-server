@@ -51,10 +51,7 @@ USAGE EXAMPLES:
 - user_input: Get HTML skeleton for https://example.com
 - user_input: Get next chunk of HTML skeleton for https://example.com (chunk=2)`,
     inputSchema: zodToJsonSchema(getHtmlSkeletonArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getHtmlSkeletonArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getHtmlSkeletonArgs)),
     annotations: {
         title: 'Get HTML skeleton',
         readOnlyHint: true,

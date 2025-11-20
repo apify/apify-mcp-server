@@ -28,10 +28,7 @@ USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
     inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(fetchApifyDocsToolArgsSchema),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
     annotations: {
         title: 'Fetch Apify docs',
         readOnlyHint: true,

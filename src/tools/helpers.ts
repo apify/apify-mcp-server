@@ -26,10 +26,7 @@ USAGE EXAMPLES:
 - user_input: Add apify/rag-web-browser as a tool
 - user_input: Add apify/instagram-scraper as a tool`,
     inputSchema: zodToJsonSchema(addToolArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(addToolArgsSchema),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
     annotations: {
         title: 'Add tool',
         openWorldHint: true,

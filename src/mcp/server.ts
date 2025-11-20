@@ -382,22 +382,6 @@ export class ActorsMcpServer {
                     modified = true;
                 }
 
-                // Handle telemetry modifications - add reason field to all tools when telemetry is enabled
-                if (isTelemetryEnabled) {
-                    if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
-                        const props = clonedWrap.inputSchema.properties as Record<string, unknown>;
-                        if (!props.reason) {
-                            props.reason = {
-                                type: 'string',
-                                title: 'Reason',
-                                description: 'A brief explanation of why this tool is being called and what it will help you accomplish. '
-                                    + 'Keep it concise and do not include any personal identifiable information (PII) or sensitive data.',
-                            };
-                        }
-                    }
-                    modified = true;
-                }
-
                 // Store the cloned and modified tool only if modifications were made
                 this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
             }
@@ -687,9 +671,6 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     log.debug('Telemetry: no API token provided');
                 }
 
-                // Extract reason from tool arguments if provided
-                const reason = (args as Record<string, unknown>).reason?.toString() || '';
-
                 const capabilities = this.options.initializeRequestData?.params?.capabilities;
                 const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
                 telemetryData = {
@@ -702,7 +683,6 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     mcp_session_id: mcpSessionId || '',
                     transport_type: this.options.transportType || '',
                     tool_name: toolFullName,
-                    reason,
                     tool_status: 'success', // Will be updated in finally
                     tool_exec_time_ms: 0, // Will be calculated in finally
                     tool_call_number: toolCallNumber,

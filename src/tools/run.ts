@@ -35,10 +35,7 @@ USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: zodToJsonSchema(getActorRunArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getActorRunArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
@@ -81,10 +78,7 @@ USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(GetRunLogArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
@@ -118,10 +112,7 @@ USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(abortRunArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(abortRunArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
     annotations: {
         title: 'Abort Actor run',
         openWorldHint: false,

@@ -72,8 +72,7 @@ const server = new ActorsMcpServer({
     "mcp_client": "Claude Desktop",
     "transport_type": "stdio|http|sse",
     "server_version": "VERSION",
-    "tool_name": "apify/instagram-scraper",
-    "reason": "REASON_FOR_TOOL_CALL"
+    "tool_name": "apify/instagram-scraper"
   },
   "timestamp": "ISO 8601 TIMESTAMP"
 }
@@ -116,15 +115,6 @@ const server = new ActorsMcpServer({
   - For actor tools: uses full actor name (e.g., 'apify/instagram-scraper')
   - For internal tools: uses tool name
 
-- **Reason**: Why the tool was called (LLM-provided reasoning)
-  - ✅ **IMPLEMENTED**: Added as optional `reason` field to all tool input schemas when telemetry is enabled
-  - Extracted from tool call arguments: `(args as Record<string, unknown>).reason?.toString() || ''`
-  - When telemetry is disabled (`telemetryEnabled: false`): reason field is NOT added to schemas (saves schema overhead for tests)
-  - When telemetry is enabled (`telemetryEnabled: true`): reason field is dynamically added to ALL tool schemas
-  - Field description: "A brief explanation of why this tool is being called and what it will help you accomplish"
-  - Allows LLMs to explain their tool selection and usage context
-  - Originally proposed by @Jiří Spilka, similar to mcpcat.io implementation at MCP dev summit London
-
 - **Timestamp**: When tool call occurred
   - Handled automatically by Segment SDK
 
@@ -150,12 +140,6 @@ const server = new ActorsMcpServer({
 - Identify frequent MCP server users
 - Track use cases per user/organization
 - Understand different user archetypes
-
-### 5. Tool Call Reasoning
-- Understand why specific tools are called
-- Group tool calls by context (e.g., "researching Instagram profile", "monitoring for new posts")
-- Create dashboards showing tool calls with reasoning/context
-- Group by MCP session ID for full interaction flows
 
 ## Implementation Architecture
 
@@ -305,7 +289,6 @@ const server = new ActorsMcpServer({
     - `transport_type`: 'stdio', 'http', 'sse', or empty string
     - `server_version`: From `getPackageVersion()` (package.json version)
     - `tool_name`: Actor full name or internal tool name
-    - `reason`: Extracted from tool arguments if provided, otherwise empty string
   - Logs full telemetry payload before sending (debug level)
   - Calls `trackToolCall()` with userId, telemetry environment, and properties
 
@@ -471,7 +454,7 @@ The telemetry infrastructure is integrated into the remote server that hosts the
 
 From `CallToolRequestSchema` handler in `src/mcp/server.ts` (line 568+):
 - `name`: Tool name (may have 'local__' prefix that is stripped)
-- `args`: Validated input arguments (includes `reason` field when implemented)
+- `args`: Validated input arguments
 - `apifyToken`: Apify API token (may be null in Skyfire mode)
 - `userRentedActorIds`: List of rented actor IDs
 - `progressToken`: Optional progress tracking token
@@ -582,14 +565,6 @@ Transport type is now passed via `ActorsMcpServerOptions`:
   - **Legacy SSE transport**: Extracts session ID from URL query parameters via `getURLSessionID()`
   - Session ID injected into tool call request params for telemetry tracking
   - Supports cross-instance session correlation in distributed deployments
-- **Reason field implementation** ✅
-  - Dynamically added to all tool input schemas when telemetry is enabled (`telemetryEnabled: true`)
-  - Optional string field with title "Reason" and guidance description
-  - Extracted from tool arguments during tool call: `(args as Record<string, unknown>).reason?.toString() || ''`
-  - Not added when telemetry is disabled (`telemetryEnabled: false`) (reduces schema overhead for tests)
-  - All AJV validators updated with `additionalProperties: true` to accept the field
-  - New tests verify: reason field presence/absence based on telemetry setting
-  - Works with `upsertTools()` conditional modification logic alongside Skyfire mode
 
 #### 🔲 Not Yet Implemented (TODOs)
 - Implement anonymousId tracking for device/session identification
@@ -614,12 +589,6 @@ Transport type is now passed via `ActorsMcpServerOptions`:
   - Unauthenticated scenarios (future MCP documentation tools feature)
   - If token is invalid or user fetch fails
 
-### Tool Input Schema Enhancement
-- Currently: reason field is always empty string
-- TODO: Add optional `reason` field to all tool input schemas
-- LLMs will fill in reasoning for why they called the tool
-- Enables dashboard and analytics on tool call context
-
 ### Version Management
 - Server version is dynamically read from package.json at runtime
 - Function: `getPackageVersion()` in `src/utils/version.ts`
@@ -637,14 +606,12 @@ All telemetry operations emit debug logs including:
   - transport_type ('stdio', 'http', 'sse', or empty string)
   - server_version (from package.json or 'unknown')
   - tool_name (actor full name or internal tool name)
-  - reason (empty string)
-
 Enable with `DEBUG=*` or `LOG_LEVEL=debug` to see telemetry details.
 
 Example debug output:
 ```
 Telemetry: fetched user info { userId: 'user-123', userFound: true }
-Telemetry: tracking tool call { app: 'mcp_server', mcp_client: 'Claude Desktop', transport_type: 'stdio', server_version: '0.5.3', tool_name: 'apify/instagram-scraper', reason: '' }
+Telemetry: tracking tool call { app: 'mcp_server', mcp_client: 'Claude Desktop', transport_type: 'stdio', server_version: '0.5.3', tool_name: 'apify/instagram-scraper' }
 ```
 
 ### Future Enhancements

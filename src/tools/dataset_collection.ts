@@ -41,10 +41,7 @@ USAGE EXAMPLES:
 - user_input: List my last 10 datasets (newest first)
 - user_input: List unnamed datasets`,
     inputSchema: zodToJsonSchema(getUserDatasetsListArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getUserDatasetsListArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getUserDatasetsListArgs)),
     annotations: {
         title: 'Get user datasets list',
         readOnlyHint: true,

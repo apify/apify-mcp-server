@@ -39,10 +39,7 @@ USAGE EXAMPLES:
 - user_input: List my last 10 runs (newest first)
 - user_input: Show only SUCCEEDED runs`,
     inputSchema: zodToJsonSchema(getUserRunsListArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(getUserRunsListArgs),
-        additionalProperties: true, // Allow additional properties for telemetry reason field
-    }),
+    ajvValidate: ajv.compile(zodToJsonSchema(getUserRunsListArgs)),
     annotations: {
         title: 'Get user runs list',
         readOnlyHint: true,
