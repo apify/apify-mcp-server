@@ -35,3 +35,4 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+/apify-mcp-server.code-workspace
