@@ -34,7 +34,7 @@ import {
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
-import { TELEMETRY_ENV, type TelemetryEnv } from '../const.js';
+import { type TelemetryEnv } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
@@ -62,7 +62,7 @@ interface ActorsMcpServerOptions {
     initializeRequestData?: InitializeRequest;
     /**
      * Enable or disable telemetry tracking for tool calls.
-     * Defaults to true when not set, or can be set from ENVIRONMENT env variable.
+     * Defaults to true when not set.
      */
     telemetryEnabled?: boolean;
     /**
@@ -100,18 +100,11 @@ export class ActorsMcpServer {
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
-        // If telemetryEnabled is not explicitly set, try to read from ENVIRONMENT env variable, this is used in the mcp.apify.com deployment
+        // Default telemetry configuration
         if (this.options.telemetryEnabled === undefined) {
-            const envValue = process.env.ENVIRONMENT;
-            const validEnv = getTelemetryEnv(envValue);
-            if (envValue === TELEMETRY_ENV.DEV || envValue === TELEMETRY_ENV.PROD) {
-                this.options.telemetryEnabled = true;
-                this.options.telemetryEnv = validEnv;
-            } else {
-                // Default to enabled with prod environment
-                this.options.telemetryEnabled = true;
-                this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
-            }
+            // Default to enabled with prod environment
+            this.options.telemetryEnabled = true;
+            this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
         } else if (this.options.telemetryEnabled) {
             // If telemetry is enabled, ensure telemetryEnv is set (default to 'prod')
             this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
@@ -634,16 +627,17 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
 
                 const capabilities = this.options.initializeRequestData?.params?.capabilities;
                 const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
-                const serverVersion = getPackageVersion() || '';
                 const telemetryData = {
-                    app_name: 'apify-mcp-server',
-                    app_version: serverVersion,
-                    mcp_client_name: params?.clientInfo?.name?.valueOf() || '',
-                    mcp_client_version: params?.clientInfo?.version?.valueOf() || '',
-                    mcp_protocol_version: params?.protocolVersion?.valueOf() || '',
+                    app: 'mcp_server',
+                    mcp_client: params?.clientInfo?.name || '',
+                    mcp_client_version: params?.clientInfo?.version || '',
+                    mcp_protocol_version: params?.protocolVersion || '',
                     mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
                     mcp_session_id: mcpSessionId || '',
                     transport_type: this.options.transportType || '',
+                    // This is the version of the apify-mcp-server package
+                    // this can be different from the internal remote server version
+                    server_version: getPackageVersion() || '',
                     tool_name: toolFullName,
                     reason,
                 };
