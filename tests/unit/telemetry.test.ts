@@ -28,7 +28,7 @@ describe('telemetry', () => {
             mcp_session_id: 'session-123',
             transport_type: 'stdio',
             tool_name: 'test-tool',
-            tool_status: 'success' as const,
+            tool_status: 'succeeded' as const,
             tool_exec_time_ms: 100,
             tool_call_number: 1,
         };
@@ -48,7 +48,7 @@ describe('telemetry', () => {
                 mcp_session_id: 'session-123',
                 transport_type: 'stdio',
                 tool_name: 'test-tool',
-                tool_status: 'success',
+                tool_status: 'succeeded',
                 tool_exec_time_ms: 100,
                 tool_call_number: 1,
             },

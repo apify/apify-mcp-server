@@ -307,7 +307,7 @@ export interface ToolCallTelemetryProperties {
     mcp_session_id: string;
     transport_type: string;
     tool_name: string;
-    tool_status: 'success' | 'failure' | 'cancelled';
+    tool_status: 'succeeded' | 'failed' | 'aborted';
     tool_exec_time_ms: number;
     tool_call_number: number;
 }

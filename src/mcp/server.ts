@@ -683,14 +683,14 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     mcp_session_id: mcpSessionId || '',
                     transport_type: this.options.transportType || '',
                     tool_name: toolFullName,
-                    tool_status: 'success', // Will be updated in finally
+                    tool_status: 'succeeded', // Will be updated in finally
                     tool_exec_time_ms: 0, // Will be calculated in finally
                     tool_call_number: toolCallNumber,
                 };
             }
 
             const startTime = Date.now();
-            let toolStatus: 'success' | 'failure' | 'cancelled' = 'success';
+            let toolStatus: 'succeeded' | 'failed' | 'aborted' = 'succeeded';
 
             try {
                 // Handle internal tool
@@ -794,7 +794,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         );
 
                         if (!callResult) {
-                            toolStatus = 'cancelled';
+                            toolStatus = 'aborted';
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
@@ -809,7 +809,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     }
                 }
             } catch (error) {
-                toolStatus = extra.signal?.aborted ? 'cancelled' : 'failure';
+                toolStatus = extra.signal?.aborted ? 'aborted' : 'failed';
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
