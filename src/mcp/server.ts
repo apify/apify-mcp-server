@@ -39,7 +39,7 @@ import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
-import type { ToolEntry } from '../types.js';
+import type { ToolCallTelemetryProperties, ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
@@ -618,12 +618,14 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                 );
             }
 
-            // Track telemetry if enabled
+            // Prepare telemetry data (but don't track yet)
+            let telemetryData: ToolCallTelemetryProperties | null = null;
+            let userId = '';
+
             if (this.options.telemetryEnabled === true) {
                 const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
                 // Get userId from cache or fetch from API
-                let userId = '';
                 // Use token from options (e.g., from stdio auth file) or from request
                 if (apifyToken) {
                     const apifyClient = new ApifyClient({ token: apifyToken });
@@ -639,7 +641,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
 
                 const capabilities = this.options.initializeRequestData?.params?.capabilities;
                 const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
-                const telemetryData = {
+                telemetryData = {
                     app_name: 'apify-mcp-server',
                     app_version: getPackageVersion() || '',
                     mcp_client_name: params?.clientInfo?.name || '',
@@ -650,11 +652,13 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     transport_type: this.options.transportType || '',
                     tool_name: toolFullName,
                     reason,
+                    tool_status: 'success', // Will be updated in finally
+                    tool_exec_time_ms: 0, // Will be calculated in finally
                 };
-
-                log.debug('Telemetry: tracking tool call', telemetryData);
-                trackToolCall(userId, getTelemetryEnv(this.options.telemetryEnv), telemetryData);
             }
+
+            const startTime = Date.now();
+            let toolStatus: 'success' | 'failure' | 'cancelled' = 'success';
 
             try {
                 // Handle internal tool
@@ -758,6 +762,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         );
 
                         if (!callResult) {
+                            toolStatus = 'cancelled';
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
@@ -772,12 +777,21 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     }
                 }
             } catch (error) {
+                toolStatus = extra.signal?.aborted ? 'cancelled' : 'failure';
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
                     `Error calling tool "${name}": ${errorMessage}.
 Please verify the tool name, input parameters, and ensure all required resources are available.`,
                 ], true);
+            } finally {
+                // Track telemetry once at the end with determined status and execution time
+                if (telemetryData) {
+                    const execTime = Date.now() - startTime;
+                    telemetryData.tool_status = toolStatus;
+                    telemetryData.tool_exec_time_ms = execTime;
+                    trackToolCall(userId, getTelemetryEnv(this.options.telemetryEnv), telemetryData);
+                }
             }
 
             const availableTools = this.listToolNames();
