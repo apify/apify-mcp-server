@@ -34,20 +34,38 @@ import {
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
+import { type TelemetryEnv } from '../const.js';
 import { prompts } from '../prompts/index.js';
+import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
-import type { ToolEntry } from '../types.js';
+import type { ToolCallTelemetryProperties, ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
+import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getUserIdFromToken } from '../utils/user-cache.js';
+import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
+
+/**
+ * Interface for storing and retrieving tool call counters per session.
+ * Used for tracking tool call sequence in user journeys.
+ */
+interface ToolCallCounterStore {
+    /**
+     * Gets and increments the tool call counter for a session atomically.
+     * @param sessionId - The session ID
+     * @returns Promise resolving to the new counter value (after increment)
+     */
+    getAndIncrement(sessionId: string): Promise<number>;
+}
 
 interface ActorsMcpServerOptions {
     setupSigintHandler?: boolean;
@@ -56,6 +74,36 @@ interface ActorsMcpServerOptions {
      */
     skyfireMode?: boolean;
     initializeRequestData?: InitializeRequest;
+    /**
+     * Enable or disable telemetry tracking for tool calls.
+     * Defaults to true when not set.
+     */
+    telemetryEnabled?: boolean;
+    /**
+     * Telemetry environment when telemetry is enabled.
+     * - 'dev': Use development Segment write key
+     * - 'prod': Use production Segment write key (default)
+     */
+    telemetryEnv?: TelemetryEnv;
+    /**
+     * Transport type for telemetry tracking.
+     * - 'stdio': Direct/local stdio connection
+     * - 'http': Remote HTTP streamable connection
+     * - 'sse': Remote Server-Sent Events (SSE) connection
+     */
+    transportType?: 'stdio' | 'http' | 'sse';
+    /**
+     * Apify API token for authentication
+     * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
+     * instead of APIFY_TOKEN environment variable, so it can be passed to the server
+     */
+    token?: string;
+    /**
+     * Optional store for tool call counters.
+     * If not provided, uses in-memory storage (suitable for stdio).
+     * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
+     */
+    toolCallCounterStore?: ToolCallCounterStore;
 }
 
 /**
@@ -68,9 +116,12 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
+    // In-memory storage for tool call counters (used when toolCallCounterStore is not provided)
+    private sessionToolCallCounters = new Map<string, number>();
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
+
         const { setupSigintHandler = true } = options;
         this.server = new Server(
             {
@@ -81,7 +132,7 @@ export class ActorsMcpServer {
                 capabilities: {
                     tools: { listChanged: true },
                     /**
-                     * Declaring prompts even though we are not using them
+                     * Declaring resources even though we are not using them
                      * to prevent clients like Claude desktop from failing.
                      */
                     resources: { },
@@ -90,6 +141,7 @@ export class ActorsMcpServer {
                 },
             },
         );
+        this.setupTelemetry();
         this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
@@ -100,6 +152,44 @@ export class ActorsMcpServer {
          * We need to handle resource requests to prevent clients like Claude desktop from failing.
          */
         this.setupResourceHandlers();
+    }
+
+    /**
+     * Gets and increments the tool call counter for a session.
+     * Uses external store if provided, otherwise uses in-memory Map.
+     * @param sessionId - The session ID
+     * @returns Promise resolving to the new counter value (after increment)
+     */
+    private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
+        if (this.options.toolCallCounterStore) {
+            // Use external store (Redis for HTTP/SSE)
+            return await this.options.toolCallCounterStore.getAndIncrement(sessionId);
+        }
+        // Use in-memory storage (for stdio)
+        const current = this.sessionToolCallCounters.get(sessionId) || 0;
+        const newValue = current + 1;
+        this.sessionToolCallCounters.set(sessionId, newValue);
+        return newValue;
+    }
+
+    /**
+     * Telemetry configuration with precedence: explicit options > env vars > defaults
+     */
+    private setupTelemetry() {
+        if (this.options.telemetryEnabled === undefined) {
+            // Check environment variable as fallback
+            const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
+            this.options.telemetryEnabled = envEnabled !== undefined ? envEnabled : true;
+        }
+        // Set telemetryEnv: explicit option > env var > default ('prod')
+        const telemetryEnv = process.env.TELEMETRY_ENV;
+        const telemetryParam = this.options.telemetryEnv;
+        this.options.telemetryEnv = getTelemetryEnv(telemetryParam ?? telemetryEnv);
+
+        // If telemetry is enabled, ensure telemetryEnv is set
+        if (this.options.telemetryEnabled && this.options.telemetryEnv === undefined) {
+            this.options.telemetryEnv = getTelemetryEnv(undefined);
+        }
     }
 
     /**
@@ -263,20 +353,21 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        // Handle Skyfire mode modifications before storing tools
-        if (this.options.skyfireMode) {
-            for (const wrap of tools) {
-                if (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_CALL)
-                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_OUTPUT_GET)) {
-                    // Clone the tool before modifying it to avoid affecting shared objects
-                    const clonedWrap = cloneToolEntry(wrap);
+        const isTelemetryEnabled = this.options.telemetryEnabled === true;
 
+        if (this.options.skyfireMode || isTelemetryEnabled) {
+            for (const wrap of tools) {
+                // Clone the tool before modifying it to avoid affecting shared objects
+                const clonedWrap = cloneToolEntry(wrap);
+                let modified = false;
+
+                // Handle Skyfire mode modifications
+                if (this.options.skyfireMode && (wrap.type === 'actor'
+                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_CALL)
+                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_OUTPUT_GET))) {
                     // Add Skyfire instructions to description if not already present
                     if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-                    } else if (!clonedWrap.description) {
-                        clonedWrap.description = SKYFIRE_TOOL_INSTRUCTIONS;
                     }
                     // Add skyfire-pay-id property if not present
                     if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
@@ -288,16 +379,14 @@ export class ActorsMcpServer {
                             };
                         }
                     }
-
-                    // Store the cloned and modified tool
-                    this.tools.set(clonedWrap.name, clonedWrap);
-                } else {
-                    // Store unmodified tools as-is
-                    this.tools.set(wrap.name, wrap);
+                    modified = true;
                 }
+
+                // Store the cloned and modified tool only if modifications were made
+                this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
             }
         } else {
-            // No skyfire mode - store tools as-is
+            // No skyfire mode and telemetry disabled - store tools as-is
             for (const tool of tools) {
                 this.tools.set(tool.name, tool);
             }
@@ -473,13 +562,17 @@ export class ActorsMcpServer {
             // eslint-disable-next-line prefer-const
             let { name, arguments: args, _meta: meta } = request.params;
             const { progressToken } = meta || {};
-            const apifyToken = (request.params.apifyToken || process.env.APIFY_TOKEN) as string;
+            const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
+            // Injected for telemetry purposes
+            const mcpSessionId = request.params.mcpSessionId as string | undefined;
 
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
             // Remove other custom params passed from apify-mcp-server
             delete request.params.userRentedActorIds;
+            // Remove mcpSessionId
+            delete request.params.mcpSessionId;
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode) {
@@ -547,6 +640,57 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     msg,
                 );
             }
+
+            // Prepare telemetry data (but don't track yet)
+            let telemetryData: ToolCallTelemetryProperties | null = null;
+            let userId = '';
+
+            if (this.options.telemetryEnabled === true) {
+                const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
+
+                // Get or increment tool call counter for this session
+                let toolCallNumber = 0;
+                const sessionId = mcpSessionId || 'unknown';
+                if (sessionId !== 'unknown') {
+                    try {
+                        toolCallNumber = await this.getAndIncrementToolCallCounter(sessionId);
+                    } catch (error) {
+                        log.warning('Failed to get tool call counter', { sessionId, error: String(error) });
+                        // Continue with 0 if counter fails
+                    }
+                }
+
+                // Get userId from cache or fetch from API
+                // Use token from options (e.g., from stdio auth file) or from request
+                if (apifyToken) {
+                    const apifyClient = new ApifyClient({ token: apifyToken });
+                    const userInfo = await getUserIdFromToken(apifyToken, apifyClient);
+                    userId = userInfo?.id || '';
+                    log.debug('Telemetry: fetched user info', { userId, userFound: !!userInfo });
+                } else {
+                    log.debug('Telemetry: no API token provided');
+                }
+
+                const capabilities = this.options.initializeRequestData?.params?.capabilities;
+                const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
+                telemetryData = {
+                    app_name: 'apify-mcp-server',
+                    app_version: getPackageVersion() || '',
+                    mcp_client_name: params?.clientInfo?.name || '',
+                    mcp_client_version: params?.clientInfo?.version || '',
+                    mcp_protocol_version: params?.protocolVersion || '',
+                    mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
+                    mcp_session_id: mcpSessionId || '',
+                    transport_type: this.options.transportType || '',
+                    tool_name: toolFullName,
+                    tool_status: 'succeeded', // Will be updated in finally
+                    tool_exec_time_ms: 0, // Will be calculated in finally
+                    tool_call_number: toolCallNumber,
+                };
+            }
+
+            const startTime = Date.now();
+            let toolStatus: 'succeeded' | 'failed' | 'aborted' = 'succeeded';
 
             try {
                 // Handle internal tool
@@ -621,9 +765,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    if (this.options.skyfireMode
-                        && args['skyfire-pay-id'] === undefined
-                    ) {
+                    if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
                         return buildMCPResponse([SKYFIRE_TOOL_INSTRUCTIONS]);
                     }
 
@@ -652,6 +794,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         );
 
                         if (!callResult) {
+                            toolStatus = 'aborted';
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
@@ -666,12 +809,21 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     }
                 }
             } catch (error) {
+                toolStatus = extra.signal?.aborted ? 'aborted' : 'failed';
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
                     `Error calling tool "${name}": ${errorMessage}.
 Please verify the tool name, input parameters, and ensure all required resources are available.`,
                 ], true);
+            } finally {
+                // Track telemetry once at the end with determined status and execution time
+                if (telemetryData) {
+                    const execTime = Date.now() - startTime;
+                    telemetryData.tool_status = toolStatus;
+                    telemetryData.tool_exec_time_ms = execTime;
+                    trackToolCall(userId, getTelemetryEnv(this.options.telemetryEnv), telemetryData);
+                }
             }
 
             const availableTools = this.listToolNames();
