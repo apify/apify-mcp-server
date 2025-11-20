@@ -29,6 +29,9 @@ describe('telemetry', () => {
             transport_type: 'stdio',
             tool_name: 'test-tool',
             reason: 'test reason',
+            tool_status: 'success' as const,
+            tool_exec_time_ms: 100,
+            tool_call_number: 1,
         };
 
         trackToolCall(userId, TELEMETRY_ENV.DEV, properties);
@@ -47,6 +50,9 @@ describe('telemetry', () => {
                 transport_type: 'stdio',
                 tool_name: 'test-tool',
                 reason: 'test reason',
+                tool_status: 'success',
+                tool_exec_time_ms: 100,
+                tool_call_number: 1,
             },
         });
     });

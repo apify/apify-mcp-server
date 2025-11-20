@@ -310,4 +310,5 @@ export interface ToolCallTelemetryProperties {
     reason: string;
     tool_status: 'success' | 'failure' | 'cancelled';
     tool_exec_time_ms: number;
+    tool_call_number: number;
 }

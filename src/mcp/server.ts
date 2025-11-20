@@ -54,6 +54,19 @@ import { processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
+/**
+ * Interface for storing and retrieving tool call counters per session.
+ * Used for tracking tool call sequence in user journeys.
+ */
+interface ToolCallCounterStore {
+    /**
+     * Gets and increments the tool call counter for a session atomically.
+     * @param sessionId - The session ID
+     * @returns Promise resolving to the new counter value (after increment)
+     */
+    getAndIncrement(sessionId: string): Promise<number>;
+}
+
 interface ActorsMcpServerOptions {
     setupSigintHandler?: boolean;
     /**
@@ -85,6 +98,12 @@ interface ActorsMcpServerOptions {
      * instead of APIFY_TOKEN environment variable, so it can be passed to the server
      */
     token?: string;
+    /**
+     * Optional store for tool call counters.
+     * If not provided, uses in-memory storage (suitable for stdio).
+     * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
+     */
+    toolCallCounterStore?: ToolCallCounterStore;
 }
 
 /**
@@ -97,6 +116,8 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
+    // In-memory storage for tool call counters (used when toolCallCounterStore is not provided)
+    private sessionToolCallCounters = new Map<string, number>();
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
@@ -131,6 +152,24 @@ export class ActorsMcpServer {
          * We need to handle resource requests to prevent clients like Claude desktop from failing.
          */
         this.setupResourceHandlers();
+    }
+
+    /**
+     * Gets and increments the tool call counter for a session.
+     * Uses external store if provided, otherwise uses in-memory Map.
+     * @param sessionId - The session ID
+     * @returns Promise resolving to the new counter value (after increment)
+     */
+    private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
+        if (this.options.toolCallCounterStore) {
+            // Use external store (Redis for HTTP/SSE)
+            return await this.options.toolCallCounterStore.getAndIncrement(sessionId);
+        }
+        // Use in-memory storage (for stdio)
+        const current = this.sessionToolCallCounters.get(sessionId) || 0;
+        const newValue = current + 1;
+        this.sessionToolCallCounters.set(sessionId, newValue);
+        return newValue;
     }
 
     /**
@@ -625,6 +664,18 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
             if (this.options.telemetryEnabled === true) {
                 const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
+                // Get or increment tool call counter for this session
+                let toolCallNumber = 0;
+                const sessionId = mcpSessionId || 'unknown';
+                if (sessionId !== 'unknown') {
+                    try {
+                        toolCallNumber = await this.getAndIncrementToolCallCounter(sessionId);
+                    } catch (error) {
+                        log.warning('Failed to get tool call counter', { sessionId, error: String(error) });
+                        // Continue with 0 if counter fails
+                    }
+                }
+
                 // Get userId from cache or fetch from API
                 // Use token from options (e.g., from stdio auth file) or from request
                 if (apifyToken) {
@@ -654,6 +705,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     reason,
                     tool_status: 'success', // Will be updated in finally
                     tool_exec_time_ms: 0, // Will be calculated in finally
+                    tool_call_number: toolCallNumber,
                 };
             }
 
