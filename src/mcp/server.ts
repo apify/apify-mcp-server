@@ -640,16 +640,14 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                 const capabilities = this.options.initializeRequestData?.params?.capabilities;
                 const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
                 const telemetryData = {
-                    app: 'mcp_server',
-                    mcp_client: params?.clientInfo?.name || '',
+                    app_name: 'apify-mcp-server',
+                    app_version: getPackageVersion() || '',
+                    mcp_client_name: params?.clientInfo?.name || '',
                     mcp_client_version: params?.clientInfo?.version || '',
                     mcp_protocol_version: params?.protocolVersion || '',
                     mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
                     mcp_session_id: mcpSessionId || '',
                     transport_type: this.options.transportType || '',
-                    // This is the version of the apify-mcp-server package
-                    // this can be different from the internal remote server version
-                    server_version: getPackageVersion() || '',
                     tool_name: toolFullName,
                     reason,
                 };
@@ -731,9 +729,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    if (this.options.skyfireMode
-                        && args['skyfire-pay-id'] === undefined
-                    ) {
+                    if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
                         return buildMCPResponse([SKYFIRE_TOOL_INSTRUCTIONS]);
                     }
 

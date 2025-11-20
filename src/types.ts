@@ -293,3 +293,19 @@ export type DatasetItem = Record<number | string, unknown>;
  * Can be null or undefined in case of Skyfire requests.
  */
 export type ApifyToken = string | null | undefined;
+
+/**
+ * Properties for tool call telemetry events sent to Segment.
+ */
+export interface ToolCallTelemetryProperties {
+    app_name: string;
+    app_version: string;
+    mcp_client_name: string;
+    mcp_client_version: string;
+    mcp_protocol_version: string;
+    mcp_capabilities: string;
+    mcp_session_id: string;
+    transport_type: string;
+    tool_name: string;
+    reason: string;
+}
