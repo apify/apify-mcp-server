@@ -75,7 +75,7 @@ export function getActorDefinitionStorageFieldNames(storage: ActorDefinitionStor
  * Ensures the Actor output items are within the character limit.
  *
  * First checks if all items fit into the limit, then tries only the important fields and as a last resort
- * starts removing items until within the limit. In worst scenario return empty array.
+ * starts removing items until within the limit. In the worst scenario return empty array.
  *
  * This is primarily used to ensure the tool output does not exceed the LLM context length or tool output limit.
  */

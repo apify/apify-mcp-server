@@ -4,10 +4,10 @@
  */
 
 import type { ValidateFunction } from 'ajv';
-import type { ApifyClient } from 'apify';
 
 import log from '@apify/log';
 
+import type { ApifyClient } from '../apify-client.js';
 import { defaults, HelperTools } from '../const.js';
 import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
