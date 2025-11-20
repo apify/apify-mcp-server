@@ -37,7 +37,7 @@ describe('telemetry', () => {
 
         expect(mockTrack).toHaveBeenCalledWith({
             userId: 'test-user-123',
-            event: 'MCP tool call',
+            event: 'MCP Tool Call',
             properties: {
                 app_name: 'apify-mcp-server',
                 app_version: '0.5.6',
