@@ -1,4 +1,4 @@
-import type { ApifyClientOptions } from 'apify';
+import type { ApifyClientOptions } from 'apify-client';
 import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
