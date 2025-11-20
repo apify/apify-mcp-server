@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto';
 import type { User } from 'apify-client';
 
 import type { ApifyClient } from '../apify-client.js';
+import { USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS } from '../const.js';
+import { TTLLRUCache } from './ttl-lru.js';
 
-// Type for cached user info - stores the raw User object from API
-const userCache = new Map<string, User>();
+// LRU cache with TTL for user info - stores the raw User object from API
+const userCache = new TTLLRUCache<User>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
 
 /**
  * Gets user info from token, using cache to avoid repeated API calls
@@ -20,8 +22,9 @@ export async function getUserIdFromToken(
     const tokenHash = createHash('sha256').update(token).digest('hex');
 
     // Check cache first
-    if (userCache.has(tokenHash)) {
-        return userCache.get(tokenHash)!;
+    const cachedUser = userCache.get(tokenHash);
+    if (cachedUser) {
+        return cachedUser;
     }
 
     // Fetch from API
