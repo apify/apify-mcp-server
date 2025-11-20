@@ -21,7 +21,19 @@ interface ActorsMcpServerOptions {
 ### Default Behavior
 - **Telemetry**: Enabled by default (`telemetryEnabled: true`)
 - **Environment**: Production by default (`telemetryEnv: 'prod'`)
-- **ENVIRONMENT env var**: If set to 'dev' or 'prod', automatically enables telemetry with that environment
+
+### Configuration Precedence
+
+Telemetry configuration can be set via multiple methods with the following precedence (highest to lowest):
+
+1. **CLI arguments** (for stdio) or **URL query parameters** (for remote server)
+2. **Environment variables** (`TELEMETRY_ENABLED`, `TELEMETRY_ENV`)
+3. **Defaults** (`telemetryEnabled: true`, `telemetryEnv: 'prod'`)
+
+#### Environment Variables
+
+- `TELEMETRY_ENABLED`: Set to `true`, `1`, `false`, or `0` to enable/disable telemetry
+- `TELEMETRY_ENV`: Set to `prod` or `dev` to specify the telemetry environment (only used when telemetry is enabled)
 
 ### Usage Examples
 
@@ -253,13 +265,13 @@ const server = new ActorsMcpServer({
   - Added `telemetryEnabled?: boolean` option
     - `true` (default): Telemetry enabled
     - `false`: Telemetry disabled
-    - If not explicitly set, reads from `ENVIRONMENT` env variable (if set to 'dev' or 'prod', enables telemetry)
+    - If not explicitly set, reads from `TELEMETRY_ENABLED` env variable
     - Defaults to `true` when not set
   - Added `telemetryEnv?: 'dev' | 'prod'` option
     - `'prod'` (default): Use production Segment write key
     - `'dev'`: Use development Segment write key
     - Only used when `telemetryEnabled` is `true`
-    - If not explicitly set, reads from `ENVIRONMENT` env variable
+    - If not explicitly set, reads from `TELEMETRY_ENV` env variable
     - Defaults to `'prod'` when not set
   - Added `transportType?: 'stdio' | 'http' | 'sse'` option
     - `'stdio'`: Direct/local stdio connection
@@ -271,10 +283,13 @@ const server = new ActorsMcpServer({
     - Contains client info like `clientInfo.name`, capabilities, etc.
     - Injected via message interception or HTTP request body
 
-- **Constructor** (lines 98-115):
-  - If `telemetryEnabled` is not explicitly set, reads from `ENVIRONMENT` env variable
-  - If `ENVIRONMENT === 'dev'` or `'prod'`: sets `telemetryEnabled = true` and `telemetryEnv = envValue`
-  - Otherwise, defaults to `telemetryEnabled = true` and `telemetryEnv = 'prod'`
+- **Constructor** (lines 100-120):
+  - If `telemetryEnabled` is not explicitly set, reads from `TELEMETRY_ENABLED` env variable
+  - Parses env var value: `'true'` or `'1'` = true, `'false'` or `'0'` = false
+  - If env var not set, defaults to `telemetryEnabled = true`
+  - If `telemetryEnv` is not explicitly set, reads from `TELEMETRY_ENV` env variable
+  - Validates env var value via `getTelemetryEnv()` (must be 'dev' or 'prod')
+  - If env var not set or invalid, defaults to `telemetryEnv = 'prod'`
   - If `telemetryEnabled` is explicitly `true`, ensures `telemetryEnv` is set (defaults to 'prod')
   - Supports environment-based telemetry control for hosted deployments
 
@@ -320,11 +335,13 @@ const server = new ActorsMcpServer({
   - JSON file is parsed and token is extracted from `token` key
   - Silently fails on file not found or parse errors (no error thrown)
 
-- **Server Initialization** (lines 154-159):
+- **Server Initialization** (lines 156-161):
   - Passes `transportType: 'stdio'` when creating ActorsMcpServer
-  - Passes telemetry options from CLI flags:
+  - Passes telemetry options from CLI flags (via yargs):
     - `--telemetry-enabled` (boolean, default: true) - documented for end users
     - `--telemetry-env` ('prod'|'dev', default: 'prod') - hidden flag for debugging only
+  - CLI flags take precedence over environment variables (via yargs `.env()`)
+  - Environment variables `TELEMETRY_ENABLED` and `TELEMETRY_ENV` are supported as fallback
   - Converts CLI flags to `telemetryEnabled` (boolean) and `telemetryEnv` ('dev'|'prod')
 
 - **Message Interception** (lines 162-176):
@@ -336,6 +353,19 @@ const server = new ActorsMcpServer({
   - Falls back to 'unknown' if client name not found in initialize data
 
 **File**: `src/telemetry.ts`
+
+- **`parseBooleanFromString(value: string | undefined | null)` Function**:
+  - Parses boolean values from environment variable strings
+  - Accepts `'true'`, `'1'` as `true`
+  - Accepts `'false'`, `'0'` as `false`
+  - Returns `undefined` for unrecognized values
+  - Used to parse `TELEMETRY_ENABLED` environment variable
+
+- **`getTelemetryEnv(env?: string | null)` Function**:
+  - Validates and normalizes telemetry environment value
+  - Accepts `'dev'` or `'prod'`
+  - Returns default (`'prod'`) for invalid or missing values
+  - Used to parse `TELEMETRY_ENV` environment variable
 
 - **`getOrInitAnalyticsClient(env: 'dev' | 'prod')` Function**:
   - Singleton pattern ensures only one Segment Analytics client per environment
@@ -378,9 +408,11 @@ The telemetry infrastructure is integrated into the remote server that hosts the
 
 - **`handleNewSession()` Handler**:
   - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from request URL
+  - URL parameters take precedence over environment variables
+  - Falls back to `TELEMETRY_ENABLED` and `TELEMETRY_ENV` env vars if URL params not provided
   - Converts parameters to options:
-    - `telemetryEnabled = telemetryEnabledParam !== 'false'` (defaults to true)
-    - `telemetryEnv = telemetryEnvParam || 'prod'` (defaults to 'prod')
+    - `telemetryEnabled`: URL param > env var > default (true)
+    - `telemetryEnv`: URL param > env var > default ('prod')
   - Passes to ActorsMcpServer constructor:
     - `transportType: 'http'` - identifies remote HTTP streamable connection
     - `telemetryEnabled` and `telemetryEnv` - per-session telemetry control
@@ -399,9 +431,11 @@ The telemetry infrastructure is integrated into the remote server that hosts the
 
 - **`initMCPSession()` Handler** (lines 153-210):
   - Extracts `?telemetry-enabled` and `?telemetry-env` query parameters from response URL
+  - URL parameters take precedence over environment variables
+  - Falls back to `TELEMETRY_ENABLED` and `TELEMETRY_ENV` env vars if URL params not provided
   - Converts parameters to options:
-    - `telemetryEnabled = telemetryEnabledParam !== 'false'` (defaults to true)
-    - `telemetryEnv = telemetryEnvParam || 'prod'` (defaults to 'prod')
+    - `telemetryEnabled`: URL param > env var > default (true)
+    - `telemetryEnv`: URL param > env var > default ('prod')
   - Creates ActorsMcpServer with:
     - `transportType: 'sse'` - identifies remote SSE connection
     - `telemetryEnabled` and `telemetryEnv` - per-session telemetry control
@@ -414,6 +448,8 @@ The telemetry infrastructure is integrated into the remote server that hosts the
 - **Per-Session Control**:
   - Both transports support `?telemetry-enabled=false` query parameter to disable telemetry
   - Optional `?telemetry-env=dev` parameter to use development workspace (for debugging only)
+  - URL parameters take precedence over `TELEMETRY_ENABLED` and `TELEMETRY_ENV` environment variables
+  - Environment variables can be used as fallback when URL parameters are not provided
   - Prevents test data from polluting production telemetry
   - Example: `https://mcp.apify.com/?telemetry-enabled=false` for streamable
   - Example: `https://mcp.apify.com/sse?telemetry-enabled=false` for SSE
@@ -522,11 +558,18 @@ Transport type is now passed via `ActorsMcpServerOptions`:
 - Message interception proxy to capture initialize request data in stdio (`src/stdio.ts`)
 - Streamable HTTP transport with telemetry query parameter support (`src/actor/server.ts`)
   - Extracts `?telemetry-enabled` and `?telemetry-env` query params
+  - Falls back to `TELEMETRY_ENABLED` and `TELEMETRY_ENV` env vars when URL params not provided
   - Passes `transportType: 'http'` and telemetry options to ActorsMcpServer
 - Legacy SSE transport with telemetry query parameter support (`src/actor/server.ts`)
   - Extracts `?telemetry-enabled` and `?telemetry-env` query params
+  - Falls back to `TELEMETRY_ENABLED` and `TELEMETRY_ENV` env vars when URL params not provided
   - Message interception proxy to capture initialize request data from MCP protocol
   - Passes `transportType: 'sse'` and telemetry options
+- Environment variable support for telemetry configuration
+  - `TELEMETRY_ENABLED`: Set to `'true'`, `'1'`, `'false'`, or `'0'` to enable/disable telemetry
+  - `TELEMETRY_ENV`: Set to `'prod'` or `'dev'` to specify telemetry environment
+  - Used as fallback when CLI/URL parameters are not provided
+  - Precedence: CLI/URL params > env vars > defaults
 - Test configuration to prevent telemetry pollution
   - `test/integration/tests/server-streamable.test.ts`: Uses `/?telemetry-enabled=false`
   - `test/integration/tests/server-sse.test.ts`: Uses `/sse?telemetry-enabled=false`
