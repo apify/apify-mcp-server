@@ -41,6 +41,7 @@ import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } f
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type { ToolEntry } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
+import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -100,16 +101,6 @@ export class ActorsMcpServer {
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
-        // Default telemetry configuration
-        if (this.options.telemetryEnabled === undefined) {
-            // Default to enabled with prod environment
-            this.options.telemetryEnabled = true;
-            this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
-        } else if (this.options.telemetryEnabled) {
-            // If telemetry is enabled, ensure telemetryEnv is set (default to 'prod')
-            this.options.telemetryEnv = getTelemetryEnv(this.options.telemetryEnv);
-        }
-
         const { setupSigintHandler = true } = options;
         this.server = new Server(
             {
@@ -120,7 +111,7 @@ export class ActorsMcpServer {
                 capabilities: {
                     tools: { listChanged: true },
                     /**
-                     * Declaring prompts even though we are not using them
+                     * Declaring resources even though we are not using them
                      * to prevent clients like Claude desktop from failing.
                      */
                     resources: { },
@@ -129,6 +120,7 @@ export class ActorsMcpServer {
                 },
             },
         );
+        this.setupTelemetry();
         this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
@@ -139,6 +131,26 @@ export class ActorsMcpServer {
          * We need to handle resource requests to prevent clients like Claude desktop from failing.
          */
         this.setupResourceHandlers();
+    }
+
+    /**
+     * Telemetry configuration with precedence: explicit options > env vars > defaults
+     */
+    private setupTelemetry() {
+        if (this.options.telemetryEnabled === undefined) {
+            // Check environment variable as fallback
+            const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
+            this.options.telemetryEnabled = envEnabled !== undefined ? envEnabled : true;
+        }
+        // Set telemetryEnv: explicit option > env var > default ('prod')
+        const telemetryEnv = process.env.TELEMETRY_ENV;
+        const telemetryParam = this.options.telemetryEnv;
+        this.options.telemetryEnv = getTelemetryEnv(telemetryParam ?? telemetryEnv);
+
+        // If telemetry is enabled, ensure telemetryEnv is set
+        if (this.options.telemetryEnabled && this.options.telemetryEnv === undefined) {
+            this.options.telemetryEnv = getTelemetryEnv(undefined);
+        }
     }
 
     /**

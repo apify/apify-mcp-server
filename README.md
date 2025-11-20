@@ -274,18 +274,25 @@ By default, telemetry is **enabled** for all tool calls.
 
 ### Opting out of telemetry
 
-You can disable telemetry in two ways:
+You can opt out of telemetry by setting the `--telemetry-enabled` CLI flag to `false` or the `TELEMETRY_ENABLED` environment variable to `false`.
+CLI flags take precedence over environment variables.
+
+#### Examples
 
 **For the remote server (mcp.apify.com)**:
-Add the `?telemetry-enabled=false` query parameter to the URL:
 ```text
+# Disable via URL parameter
 https://mcp.apify.com?telemetry-enabled=false
 ```
 
 **For the local stdio server**:
-Use the `--telemetry-enabled=false` CLI flag:
 ```bash
+# Disable via CLI flag
 npx @apify/actors-mcp-server --telemetry-enabled=false
+
+# Or set environment variable
+export TELEMETRY_ENABLED=false
+npx @apify/actors-mcp-server
 ```
 
 # ⚙️ Development

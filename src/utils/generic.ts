@@ -65,3 +65,22 @@ export function isValidHttpUrl(urlString: string): boolean {
         return false;
     }
 }
+
+/**
+ * Parses a boolean value from a string.
+ * Accepts 'true', '1' as true, 'false', '0' as false.
+ * Returns undefined if the value is not a recognized boolean string.
+ */
+export function parseBooleanFromString(value: string | undefined | null): boolean | undefined {
+    if (value === undefined || value === null) {
+        return undefined;
+    }
+    const normalized = value.toLowerCase().trim();
+    if (normalized === 'true' || normalized === '1') {
+        return true;
+    }
+    if (normalized === 'false' || normalized === '0') {
+        return false;
+    }
+    return undefined;
+}

@@ -35,8 +35,8 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
         url.searchParams.append('tools', tools.join(','));
     }
     // Append telemetry parameters
-    if (telemetryEnabled === false) {
-        url.searchParams.append('telemetry-enabled', 'false');
+    if (telemetryEnabled !== undefined) {
+        url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
     }
     if (telemetryEnv !== undefined && telemetryEnabled !== false) {
         url.searchParams.append('telemetry-env', telemetryEnv);
