@@ -38,7 +38,14 @@ import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
-import type { ActorsMcpServerOptions, ToolCallTelemetryProperties, ToolEntry } from '../types.js';
+import type {
+    ActorMcpTool,
+    ActorsMcpServerOptions,
+    ActorTool,
+    HelperTool,
+    ToolCallTelemetryProperties,
+    ToolEntry,
+} from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
@@ -519,9 +526,8 @@ export class ActorsMcpServer {
             const { progressToken } = meta || {};
             const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
-            // Injected for telemetry purposes
-            const mcpSessionId = request.params.mcpSessionId as string | undefined;
-
+            // mcpSessionId was injected upstream by stdio; optional (for telemetry purposes only)
+            const mcpSessionId = typeof request.params.mcpSessionId === 'string' ? request.params.mcpSessionId : undefined;
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
             // Remove other custom params passed from apify-mcp-server
@@ -595,54 +601,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     msg,
                 );
             }
-
-            // Prepare telemetry data (but don't track yet)
-            let telemetryData: ToolCallTelemetryProperties | null = null;
-            let userId = '';
-
-            if (this.options.telemetry?.enabled === true) {
-                const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
-
-                // Get or increment tool call counter for this session
-                let toolCallNumber = 0;
-                const sessionId = mcpSessionId || 'unknown';
-                if (sessionId !== 'unknown') {
-                    try {
-                        toolCallNumber = await this.getAndIncrementToolCallCounter(sessionId);
-                    } catch (error) {
-                        log.warning('Failed to get tool call counter', { sessionId, error: String(error) });
-                        // Continue with 0 if counter fails
-                    }
-                }
-
-                // Get userId from cache or fetch from API
-                // Use token from options (e.g., from stdio auth file) or from request
-                if (apifyToken) {
-                    const apifyClient = new ApifyClient({ token: apifyToken });
-                    const userInfo = await getUserIdFromToken(apifyToken, apifyClient);
-                    userId = userInfo?.id || '';
-                    log.debug('Telemetry: fetched user info', { userId, userFound: !!userInfo });
-                } else {
-                    log.debug('Telemetry: no API token provided');
-                }
-
-                const capabilities = this.options.initializeRequestData?.params?.capabilities;
-                const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
-                telemetryData = {
-                    app_name: 'apify-mcp-server',
-                    app_version: getPackageVersion() || '',
-                    mcp_client_name: params?.clientInfo?.name || '',
-                    mcp_client_version: params?.clientInfo?.version || '',
-                    mcp_protocol_version: params?.protocolVersion || '',
-                    mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
-                    mcp_session_id: mcpSessionId || '',
-                    transport_type: this.options.transportType || '',
-                    tool_name: toolFullName,
-                    tool_status: 'succeeded', // Will be updated in finally
-                    tool_exec_time_ms: 0, // Will be calculated in finally
-                    tool_call_number: toolCallNumber,
-                };
-            }
+            const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
 
             const startTime = Date.now();
             let toolStatus: 'succeeded' | 'failed' | 'aborted' = 'succeeded';
@@ -772,13 +731,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 Please verify the tool name, input parameters, and ensure all required resources are available.`,
                 ], true);
             } finally {
-                // Track telemetry once at the end with determined status and execution time
-                if (telemetryData) {
-                    const execTime = Date.now() - startTime;
-                    telemetryData.tool_status = toolStatus;
-                    telemetryData.tool_exec_time_ms = execTime;
-                    trackToolCall(userId, telemetryData);
-                }
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
             }
 
             const availableTools = this.listToolNames();
@@ -795,6 +748,85 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 msg,
             );
         });
+    }
+
+    /**
+     * Finalizes and tracks telemetry for a tool call.
+     * Calculates execution time, sets final status, and sends the telemetry event.
+     *
+     * @param telemetryData - Telemetry data to finalize and track (null if telemetry is disabled)
+     * @param userId - Apify user ID
+     * @param startTime - Timestamp when the tool call started
+     * @param toolStatus - Final status of the tool call ('succeeded', 'failed', or 'aborted')
+     */
+    private finalizeAndTrackTelemetry(
+        telemetryData: ToolCallTelemetryProperties | null,
+        userId: string,
+        startTime: number,
+        toolStatus: 'succeeded' | 'failed' | 'aborted',
+    ): void {
+        if (!telemetryData) {
+            return;
+        }
+
+        const execTime = Date.now() - startTime;
+        const finalizedTelemetryData: ToolCallTelemetryProperties = {
+            ...telemetryData,
+            tool_status: toolStatus,
+            tool_exec_time_ms: execTime,
+        };
+        trackToolCall(userId, finalizedTelemetryData);
+    }
+
+    /*
+    * Creates telemetry data for a tool call.
+    */
+    private async prepareTelemetryData(
+        tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
+    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string }> {
+        if (this.options.telemetry?.enabled !== true) {
+            return { telemetryData: null, userId: '' };
+        }
+
+        const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
+
+        // Get or increment tool call counter for this session
+        let toolCallNumber = 0;
+        if (mcpSessionId) {
+            try {
+                toolCallNumber = await this.getAndIncrementToolCallCounter(mcpSessionId);
+            } catch (error) {
+                log.warning('Failed to get tool call counter', { mcpSessionId, error: String(error) });
+            }
+        }
+
+        // Get userId from cache or fetch from API
+        let userId = '';
+        if (apifyToken) {
+            const apifyClient = new ApifyClient({ token: apifyToken });
+            const userInfo = await getUserIdFromToken(apifyToken, apifyClient);
+            userId = userInfo?.id || '';
+            log.debug('Telemetry: fetched user info', { userId, userFound: !!userInfo });
+        }
+
+        const capabilities = this.options.initializeRequestData?.params?.capabilities;
+        const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
+        const telemetryData: ToolCallTelemetryProperties = {
+            app_name: 'apify-mcp-server',
+            app_version: getPackageVersion() || '',
+            mcp_client_name: params?.clientInfo?.name || '',
+            mcp_client_version: params?.clientInfo?.version || '',
+            mcp_protocol_version: params?.protocolVersion || '',
+            mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
+            mcp_session_id: mcpSessionId || '',
+            transport_type: this.options.transportType || '',
+            tool_name: toolFullName,
+            tool_status: 'succeeded', // Will be updated in finally
+            tool_exec_time_ms: 0, // Will be calculated in finally
+            tool_call_number: toolCallNumber,
+        };
+
+        return { telemetryData, userId };
     }
 
     async connect(transport: Transport): Promise<void> {
