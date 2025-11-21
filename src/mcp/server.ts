@@ -103,20 +103,11 @@ export class ActorsMcpServer {
 
     /**
      * Gets and increments the tool call counter for a session.
-     * Uses external store if provided, otherwise uses in-memory Map.
      * @param sessionId - The session ID
      * @returns Promise resolving to the new counter value (after increment)
      */
     private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
-        if (this.options.telemetry?.toolCallCountStore) {
-            // Use external store (Redis for HTTP/SSE)
-            return await this.options.telemetry.toolCallCountStore.getAndIncrement(sessionId);
-        }
-        // Use in-memory storage (for stdio)
-        const current = this.sessionToolCallCounters.get(sessionId) || 0;
-        const newValue = current + 1;
-        this.sessionToolCallCounters.set(sessionId, newValue);
-        return newValue;
+        return await this.options.telemetry!.toolCallCountStore!.getAndIncrement(sessionId);
     }
 
     /**
@@ -141,6 +132,18 @@ export class ActorsMcpServer {
         // If telemetry is enabled, ensure telemetryEnv is set
         if (this.options.telemetry.enabled && this.options.telemetry.env === undefined) {
             this.options.telemetry.env = getTelemetryEnv(undefined);
+        }
+
+        // Provide default in-memory store if not provided
+        if (!this.options.telemetry.toolCallCountStore) {
+            this.options.telemetry.toolCallCountStore = {
+                getAndIncrement: async (sessionId: string): Promise<number> => {
+                    const current = this.sessionToolCallCounters.get(sessionId) || 0;
+                    const newValue = current + 1;
+                    this.sessionToolCallCounters.set(sessionId, newValue);
+                    return newValue;
+                },
+            };
         }
     }
 
