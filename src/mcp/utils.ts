@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
@@ -41,11 +40,10 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
  * If URL contains query parameter `actors`, return tools from Actors otherwise return null.
  * @param url The URL to process
  * @param apifyClient The Apify client instance
- * @param initializeRequestData Optional initialize request data
  */
-export async function processParamsGetTools(url: string, apifyClient: ApifyClient, initializeRequestData?: InitializeRequest) {
+export async function processParamsGetTools(url: string, apifyClient: ApifyClient) {
     const input = parseInputParamsFromUrl(url);
-    return await loadToolsFromInput(input, apifyClient, initializeRequestData);
+    return await loadToolsFromInput(input, apifyClient);
 }
 
 export function parseInputParamsFromUrl(url: string): Input {
