@@ -363,7 +363,6 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-
         if (this.options.skyfireMode) {
             for (const wrap of tools) {
                 // Clone the tool before modifying it to avoid affecting shared objects
