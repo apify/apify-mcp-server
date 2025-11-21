@@ -1,11 +1,11 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 import type z from 'zod';
 
-import type { ACTOR_PRICING_MODEL } from './const.js';
+import type { ACTOR_PRICING_MODEL, TelemetryEnv } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
@@ -310,4 +310,64 @@ export interface ToolCallTelemetryProperties {
     tool_status: 'succeeded' | 'failed' | 'aborted';
     tool_exec_time_ms: number;
     tool_call_number: number;
+}
+
+/**
+ * Interface for storing and retrieving tool call counters per session.
+ * Used for tracking tool call sequence in user journeys.
+ */
+export interface ToolCallCounterStore {
+    /**
+     * Gets and increments the tool call counter for a session atomically.
+     * @param sessionId - The session ID
+     * @returns Promise resolving to the new counter value (after increment)
+     */
+    getAndIncrement(sessionId: string): Promise<number>;
+}
+
+/**
+ * Options for configuring the ActorsMcpServer instance.
+ */
+export interface ActorsMcpServerOptions {
+    setupSigintHandler?: boolean;
+    /**
+     * Switch to enable Skyfire agentic payment mode.
+     */
+    skyfireMode?: boolean;
+    initializeRequestData?: InitializeRequest;
+    /**
+     * Telemetry configuration options.
+     */
+    telemetry?: {
+        /**
+         * Enable or disable telemetry tracking for tool calls.
+         * Defaults to true when not set.
+         */
+        enabled?: boolean;
+        /**
+         * Telemetry environment when telemetry is enabled.
+         * - 'dev': Use development Segment write key
+         * - 'prod': Use production Segment write key (default)
+         */
+        env?: TelemetryEnv;
+        /**
+         * Optional store for tool call counters.
+         * If not provided, uses in-memory storage (suitable for stdio).
+         * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
+         */
+        toolCallCountStore?: ToolCallCounterStore;
+    };
+    /**
+     * Transport type for telemetry tracking.
+     * - 'stdio': Direct/local stdio connection
+     * - 'http': Remote HTTP streamable connection
+     * - 'sse': Remote Server-Sent Events (SSE) connection
+     */
+    transportType?: 'stdio' | 'http' | 'sse';
+    /**
+     * Apify API token for authentication
+     * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
+     * instead of APIFY_TOKEN environment variable, so it can be passed to the server
+     */
+    token?: string;
 }
