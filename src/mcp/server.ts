@@ -822,7 +822,7 @@ Please verify the tool name, input parameters, and ensure all required resources
                     const execTime = Date.now() - startTime;
                     telemetryData.tool_status = toolStatus;
                     telemetryData.tool_exec_time_ms = execTime;
-                    trackToolCall(userId, getTelemetryEnv(this.options.telemetryEnv), telemetryData);
+                    trackToolCall(userId, telemetryData);
                 }
             }
 

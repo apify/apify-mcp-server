@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { TELEMETRY_ENV } from '../../src/const.js';
 import { trackToolCall } from '../../src/telemetry.js';
 
 // Mock the Segment Analytics client
@@ -33,7 +32,7 @@ describe('telemetry', () => {
             tool_call_number: 1,
         };
 
-        trackToolCall(userId, TELEMETRY_ENV.DEV, properties);
+        trackToolCall(userId, properties);
 
         expect(mockTrack).toHaveBeenCalledWith({
             userId: 'test-user-123',

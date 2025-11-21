@@ -13,9 +13,7 @@ import express from 'express';
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
-import { type TelemetryEnv } from '../const.js';
 import { ActorsMcpServer } from '../mcp/server.js';
-import { getTelemetryEnv } from '../telemetry.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -83,15 +81,12 @@ export function createExpressApp(
             // Extract telemetry query parameters
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
             const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-            const telemetryEnvParam = urlParams.get('telemetry-env');
             const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
-            const telemetryEnv: TelemetryEnv = getTelemetryEnv(telemetryEnvParam);
 
             const mcpServer = new ActorsMcpServer({
                 setupSigintHandler: false,
                 transportType: 'sse',
                 telemetryEnabled,
-                telemetryEnv,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -179,16 +174,13 @@ export function createExpressApp(
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-                const telemetryEnvParam = urlParams.get('telemetry-env');
                 const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
-                const telemetryEnv: TelemetryEnv = getTelemetryEnv(telemetryEnvParam);
 
                 const mcpServer = new ActorsMcpServer({
                     setupSigintHandler: false,
                     initializeRequestData: req.body as InitializeRequest,
                     transportType: 'http',
                     telemetryEnabled,
-                    telemetryEnv,
                 });
 
                 // Load MCP server tools

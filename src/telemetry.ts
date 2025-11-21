@@ -17,38 +17,35 @@ export function getTelemetryEnv(env?: string | null): TelemetryEnv {
     return (env === TELEMETRY_ENV.DEV || env === TELEMETRY_ENV.PROD) ? env : DEFAULT_TELEMETRY_ENV;
 }
 
-// Map to store singleton Segment Analytics clients per environment
-const analyticsClients = new Map<TelemetryEnv, Analytics>();
+// Single Segment Analytics client (environment determined by process.env.TELEMETRY_ENV)
+let analyticsClient: Analytics | null = null;
 
 /**
- * Gets or initializes a Segment Analytics client for the specified environment.
- * This ensures that only one client is created per environment, even if multiple
- * ActorsMcpServer instances are initialized with telemetry enabled.
+ * Gets or initializes the Segment Analytics client.
+ * The environment is determined by the TELEMETRY_ENV environment variable.
  *
- * @param env - 'dev' for development, 'prod' for production
  * @returns Analytics client instance
  */
-export function getOrInitAnalyticsClient(env: TelemetryEnv): Analytics {
-    if (!analyticsClients.has(env)) {
+export function getOrInitAnalyticsClient(): Analytics {
+    if (!analyticsClient) {
+        const env = getTelemetryEnv(process.env.TELEMETRY_ENV);
         const writeKey = env === TELEMETRY_ENV.PROD ? PROD_WRITE_KEY : DEV_WRITE_KEY;
-        analyticsClients.set(env, new Analytics({ writeKey }));
+        analyticsClient = new Analytics({ writeKey });
     }
-    return analyticsClients.get(env)!;
+    return analyticsClient;
 }
 
 /**
  * Tracks a tool call event to Segment.
  *
  * @param userId - Apify user ID (TODO: extract from token when auth available)
- * @param env - 'dev' for development, 'prod' for production
  * @param properties - Event properties for the tool call
  */
 export function trackToolCall(
     userId: string,
-    env: TelemetryEnv,
     properties: ToolCallTelemetryProperties,
 ): void {
-    const client = getOrInitAnalyticsClient(env);
+    const client = getOrInitAnalyticsClient();
 
     // TODO: Implement anonymousId tracking for device/session identification
     client.track({

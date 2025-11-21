@@ -24,7 +24,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetryEnabled, telemetryEnv } = options || {};
+    const { actors, enableAddingActors, tools, telemetryEnabled } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -37,9 +37,6 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     // Append telemetry parameters
     if (telemetryEnabled !== undefined) {
         url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
-    }
-    if (telemetryEnv !== undefined && telemetryEnabled !== false) {
-        url.searchParams.append('telemetry-env', telemetryEnv);
     }
 }
 
