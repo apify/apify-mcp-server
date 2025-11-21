@@ -1066,8 +1066,8 @@ export function createIntegrationTestsSuite(
 
         // Environment variable precedence tests
         it.runIf(options.transport === 'stdio')('should use TELEMETRY_ENABLED env var when CLI arg is not provided', async () => {
-            // When useEnv=true, telemetryEnabled option translates to env.TELEMETRY_ENABLED in child process
-            client = await createClientFn({ useEnv: true, telemetryEnabled: false });
+            // When useEnv=true, telemetry.enabled option translates to env.TELEMETRY_ENABLED in child process
+            client = await createClientFn({ useEnv: true, telemetry: { enabled: false } });
             const tools = await client.listTools();
 
             // Verify tools are loaded correctly
