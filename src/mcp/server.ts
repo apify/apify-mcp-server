@@ -341,7 +341,7 @@ export class ActorsMcpServer {
                 this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
             }
         } else {
-            // No skyfire mode and telemetry disabled - store tools as-is
+            // No skyfire mode - store tools as-is
             for (const tool of tools) {
                 this.tools.set(tool.name, tool);
             }
