@@ -14,6 +14,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
+import { parseBooleanFromString } from '../utils/generic.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -81,7 +82,10 @@ export function createExpressApp(
             // Extract telemetry query parameters
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
             const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-            const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
+            // URL param > env var > default (true)
+            const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
+                ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+                ?? true;
 
             const mcpServer = new ActorsMcpServer({
                 setupSigintHandler: false,
@@ -176,7 +180,10 @@ export function createExpressApp(
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
-                const telemetryEnabled = telemetryEnabledParam !== 'false'; // Default to true
+                // URL param > env var > default (true)
+                const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
+                    ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+                    ?? true;
 
                 const mcpServer = new ActorsMcpServer({
                     setupSigintHandler: false,

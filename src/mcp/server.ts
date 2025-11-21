@@ -127,9 +127,12 @@ export class ActorsMcpServer {
         }
 
         // Configure telemetryEnabled: explicit option > env var > default (true)
-        if (this.options.telemetry.enabled === undefined) {
+        const telemetryEnabled = parseBooleanFromString(this.options.telemetry.enabled);
+        if (telemetryEnabled === undefined) {
             const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
             this.options.telemetry.enabled = envEnabled !== undefined ? envEnabled : true;
+        } else {
+            this.options.telemetry.enabled = telemetryEnabled;
         }
 
         // Configure telemetryEnv: explicit option > env var > default ('PROD')
