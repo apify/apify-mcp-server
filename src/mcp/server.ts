@@ -132,8 +132,8 @@ export class ActorsMcpServer {
             this.options.telemetry.enabled = envEnabled !== undefined ? envEnabled : true;
         }
 
-        // Configure telemetryEnv: explicit option > env var > default ('prod')
-        // getTelemetryEnv always returns a value (defaults to 'prod'), so no need for undefined check
+        // Configure telemetryEnv: explicit option > env var > default ('PROD')
+        // getTelemetryEnv always returns a value (defaults to 'PROD'), so no need for undefined check
         const envVarEnv = process.env.TELEMETRY_ENV;
         const explicitEnv = this.options.telemetry.env;
         this.options.telemetry.env = getTelemetryEnv(explicitEnv ?? envVarEnv);

@@ -14,10 +14,17 @@ const SEGMENT_EVENTS = {
 } as const;
 
 /**
- * Gets the telemetry environment, defaulting to 'prod' if not provided or invalid
+ * Gets the telemetry environment, defaulting to 'PROD' if not provided or invalid
  */
 export function getTelemetryEnv(env?: string | null): TelemetryEnv {
-    return (env === TELEMETRY_ENV.DEV || env === TELEMETRY_ENV.PROD) ? env : DEFAULT_TELEMETRY_ENV;
+    if (!env) {
+        return DEFAULT_TELEMETRY_ENV;
+    }
+    const normalizedEnv = env.toUpperCase();
+    if (normalizedEnv === TELEMETRY_ENV.DEV || normalizedEnv === TELEMETRY_ENV.PROD) {
+        return normalizedEnv as TelemetryEnv;
+    }
+    return DEFAULT_TELEMETRY_ENV;
 }
 
 // Single Segment Analytics client (environment determined by process.env.TELEMETRY_ENV)

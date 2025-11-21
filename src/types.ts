@@ -346,8 +346,8 @@ export interface ActorsMcpServerOptions {
         enabled?: boolean;
         /**
          * Telemetry environment when telemetry is enabled.
-         * - 'dev': Use development Segment write key
-         * - 'prod': Use production Segment write key (default)
+         * - 'DEV': Use development Segment write key
+         * - 'PROD': Use production Segment write key (default)
          */
         env?: TelemetryEnv;
         /**

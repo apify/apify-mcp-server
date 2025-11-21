@@ -15,7 +15,7 @@ export interface McpClientOptions {
     clientName?: string; // Client name for identification
     telemetry?: {
         enabled?: boolean; // Enable or disable telemetry (default: false for tests)
-        env?: TelemetryEnv; // Telemetry environment (default: 'prod', only used when telemetry.enabled is true)
+        env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
 }
 

@@ -51,7 +51,7 @@ interface CliArgs {
     tools?: string;
     /** Enable or disable telemetry tracking (default: true) */
     telemetryEnabled: boolean;
-    /** Telemetry environment: 'prod' or 'dev' (default: 'prod', only used when telemetry-enabled is true) */
+    /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
 }
 
@@ -114,8 +114,8 @@ Default: true (enabled)`,
         default: DEFAULT_TELEMETRY_ENV,
         hidden: true,
         describe: `Telemetry environment when telemetry is enabled. Can also be set via TELEMETRY_ENV environment variable.
-- 'prod': Send events to production Segment workspace (default)
-- 'dev': Send events to development Segment workspace
+- 'PROD': Send events to production Segment workspace (default)
+- 'DEV': Send events to development Segment workspace
 Only used when --telemetry-enabled is true`,
     })
     .help('help')

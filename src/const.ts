@@ -109,8 +109,8 @@ export const APIFY_STORE_URL = 'https://apify.com';
 
 // Telemetry
 export const TELEMETRY_ENV = {
-    DEV: 'dev',
-    PROD: 'prod',
+    DEV: 'DEV',
+    PROD: 'PROD',
 } as const;
 export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 
