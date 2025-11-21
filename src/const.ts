@@ -76,6 +76,8 @@ export const GET_HTML_SKELETON_CACHE_TTL_SECS = 5 * 60; // 5 minutes
 export const GET_HTML_SKELETON_CACHE_MAX_SIZE = 200;
 export const MCP_SERVER_CACHE_MAX_SIZE = 500;
 export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
+export const USER_CACHE_MAX_SIZE = 200;
+export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */
@@ -104,3 +106,12 @@ export const ALGOLIA = {
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 
 export const APIFY_STORE_URL = 'https://apify.com';
+
+// Telemetry
+export const TELEMETRY_ENV = {
+    DEV: 'dev',
+    PROD: 'prod',
+} as const;
+export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
+
+export const DEFAULT_TELEMETRY_ENV: TelemetryEnv = TELEMETRY_ENV.PROD;
