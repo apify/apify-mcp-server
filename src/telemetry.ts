@@ -51,11 +51,11 @@ export function getOrInitAnalyticsClient(): Analytics | null {
 /**
  * Tracks a tool call event to Segment.
  *
- * @param userId - Apify user ID
+ * @param userId - Apify user ID (null if not available)
  * @param properties - Event properties for the tool call
  */
 export function trackToolCall(
-    userId: string,
+    userId: string | null,
     properties: ToolCallTelemetryProperties,
 ): void {
     const client = getOrInitAnalyticsClient();

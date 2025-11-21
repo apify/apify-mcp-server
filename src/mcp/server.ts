@@ -52,7 +52,7 @@ import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
-import { getUserIdFromToken } from '../utils/user-cache.js';
+import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
@@ -761,7 +761,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
-        userId: string,
+        userId: string | null,
         startTime: number,
         toolStatus: 'succeeded' | 'failed' | 'aborted',
     ): void {
@@ -783,9 +783,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
     */
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
-    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string }> {
+    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (this.options.telemetry?.enabled !== true) {
-            return { telemetryData: null, userId: '' };
+            return { telemetryData: null, userId: null };
         }
 
         const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
@@ -801,12 +801,11 @@ Please verify the tool name and ensure the tool is properly registered.`;
         }
 
         // Get userId from cache or fetch from API
-        let userId = '';
+        let userId: string | null = null;
         if (apifyToken) {
             const apifyClient = new ApifyClient({ token: apifyToken });
-            const userInfo = await getUserIdFromToken(apifyToken, apifyClient);
-            userId = userInfo?.id || '';
-            log.debug('Telemetry: fetched user info', { userId, userFound: !!userInfo });
+            userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
+            log.debug('Telemetry: fetched userId', { userId });
         }
 
         const capabilities = this.options.initializeRequestData?.params?.capabilities;
