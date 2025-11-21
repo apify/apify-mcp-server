@@ -14,7 +14,7 @@ const userCache = new TTLLRUCache<User>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS
  * Token is hashed before caching to avoid storing raw tokens
  * Returns the full User object from API or null if not found
  */
-export async function getUserIdFromToken(
+export async function getUserInfoFromTokenCached(
     token: string,
     apifyClient: ApifyClient,
 ): Promise<User | null> {
