@@ -155,8 +155,10 @@ if (!apifyToken) {
 async function main() {
     const mcpServer = new ActorsMcpServer({
         transportType: 'stdio',
-        telemetryEnabled: argv.telemetryEnabled,
-        telemetryEnv: getTelemetryEnv(argv.telemetryEnv),
+        telemetry: {
+            enabled: argv.telemetryEnabled,
+            env: getTelemetryEnv(argv.telemetryEnv),
+        },
         token: apifyToken,
     });
 

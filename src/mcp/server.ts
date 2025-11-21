@@ -75,16 +75,27 @@ interface ActorsMcpServerOptions {
     skyfireMode?: boolean;
     initializeRequestData?: InitializeRequest;
     /**
-     * Enable or disable telemetry tracking for tool calls.
-     * Defaults to true when not set.
+     * Telemetry configuration options.
      */
-    telemetryEnabled?: boolean;
-    /**
-     * Telemetry environment when telemetry is enabled.
-     * - 'dev': Use development Segment write key
-     * - 'prod': Use production Segment write key (default)
-     */
-    telemetryEnv?: TelemetryEnv;
+    telemetry?: {
+        /**
+         * Enable or disable telemetry tracking for tool calls.
+         * Defaults to true when not set.
+         */
+        enabled?: boolean;
+        /**
+         * Telemetry environment when telemetry is enabled.
+         * - 'dev': Use development Segment write key
+         * - 'prod': Use production Segment write key (default)
+         */
+        env?: TelemetryEnv;
+        /**
+         * Optional store for tool call counters.
+         * If not provided, uses in-memory storage (suitable for stdio).
+         * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
+         */
+        toolCallCountStore?: ToolCallCounterStore;
+    };
     /**
      * Transport type for telemetry tracking.
      * - 'stdio': Direct/local stdio connection
@@ -98,12 +109,6 @@ interface ActorsMcpServerOptions {
      * instead of APIFY_TOKEN environment variable, so it can be passed to the server
      */
     token?: string;
-    /**
-     * Optional store for tool call counters.
-     * If not provided, uses in-memory storage (suitable for stdio).
-     * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
-     */
-    toolCallCounterStore?: ToolCallCounterStore;
 }
 
 /**
@@ -161,9 +166,9 @@ export class ActorsMcpServer {
      * @returns Promise resolving to the new counter value (after increment)
      */
     private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
-        if (this.options.toolCallCounterStore) {
+        if (this.options.telemetry?.toolCallCountStore) {
             // Use external store (Redis for HTTP/SSE)
-            return await this.options.toolCallCounterStore.getAndIncrement(sessionId);
+            return await this.options.telemetry.toolCallCountStore.getAndIncrement(sessionId);
         }
         // Use in-memory storage (for stdio)
         const current = this.sessionToolCallCounters.get(sessionId) || 0;
@@ -176,19 +181,24 @@ export class ActorsMcpServer {
      * Telemetry configuration with precedence: explicit options > env vars > defaults
      */
     private setupTelemetry() {
-        if (this.options.telemetryEnabled === undefined) {
+        // Initialize telemetry object if not present
+        if (!this.options.telemetry) {
+            this.options.telemetry = {};
+        }
+
+        if (this.options.telemetry.enabled === undefined) {
             // Check environment variable as fallback
             const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
-            this.options.telemetryEnabled = envEnabled !== undefined ? envEnabled : true;
+            this.options.telemetry.enabled = envEnabled !== undefined ? envEnabled : true;
         }
         // Set telemetryEnv: explicit option > env var > default ('prod')
         const telemetryEnv = process.env.TELEMETRY_ENV;
-        const telemetryParam = this.options.telemetryEnv;
-        this.options.telemetryEnv = getTelemetryEnv(telemetryParam ?? telemetryEnv);
+        const telemetryParam = this.options.telemetry.env;
+        this.options.telemetry.env = getTelemetryEnv(telemetryParam ?? telemetryEnv);
 
         // If telemetry is enabled, ensure telemetryEnv is set
-        if (this.options.telemetryEnabled && this.options.telemetryEnv === undefined) {
-            this.options.telemetryEnv = getTelemetryEnv(undefined);
+        if (this.options.telemetry.enabled && this.options.telemetry.env === undefined) {
+            this.options.telemetry.env = getTelemetryEnv(undefined);
         }
     }
 
@@ -353,9 +363,8 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        const isTelemetryEnabled = this.options.telemetryEnabled === true;
 
-        if (this.options.skyfireMode || isTelemetryEnabled) {
+        if (this.options.skyfireMode) {
             for (const wrap of tools) {
                 // Clone the tool before modifying it to avoid affecting shared objects
                 const clonedWrap = cloneToolEntry(wrap);
@@ -645,7 +654,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
             let telemetryData: ToolCallTelemetryProperties | null = null;
             let userId = '';
 
-            if (this.options.telemetryEnabled === true) {
+            if (this.options.telemetry?.enabled === true) {
                 const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
                 // Get or increment tool call counter for this session

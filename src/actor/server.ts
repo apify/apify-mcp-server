@@ -86,7 +86,9 @@ export function createExpressApp(
             const mcpServer = new ActorsMcpServer({
                 setupSigintHandler: false,
                 transportType: 'sse',
-                telemetryEnabled,
+                telemetry: {
+                    enabled: telemetryEnabled,
+                },
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -180,7 +182,9 @@ export function createExpressApp(
                     setupSigintHandler: false,
                     initializeRequestData: req.body as InitializeRequest,
                     transportType: 'http',
-                    telemetryEnabled,
+                    telemetry: {
+                        enabled: telemetryEnabled,
+                    },
                 });
 
                 // Load MCP server tools
