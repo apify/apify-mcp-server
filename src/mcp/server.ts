@@ -119,15 +119,17 @@ export class ActorsMcpServer {
             this.options.telemetry = {};
         }
 
+        // Configure telemetryEnabled: explicit option > env var > default (true)
         if (this.options.telemetry.enabled === undefined) {
-            // Check environment variable as fallback
             const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
             this.options.telemetry.enabled = envEnabled !== undefined ? envEnabled : true;
         }
-        // Set telemetryEnv: explicit option > env var > default ('prod')
-        const telemetryEnv = process.env.TELEMETRY_ENV;
-        const telemetryParam = this.options.telemetry.env;
-        this.options.telemetry.env = getTelemetryEnv(telemetryParam ?? telemetryEnv);
+
+        // Configure telemetryEnv: explicit option > env var > default ('prod')
+        // getTelemetryEnv always returns a value (defaults to 'prod'), so no need for undefined check
+        const envVarEnv = process.env.TELEMETRY_ENV;
+        const explicitEnv = this.options.telemetry.env;
+        this.options.telemetry.env = getTelemetryEnv(explicitEnv ?? envVarEnv);
 
         // If telemetry is enabled, ensure telemetryEnv is set
         if (this.options.telemetry.enabled && this.options.telemetry.env === undefined) {
