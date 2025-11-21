@@ -108,11 +108,10 @@ export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 export const APIFY_STORE_URL = 'https://apify.com';
 
 // Telemetry
-export type TelemetryEnv = 'dev' | 'prod';
-
 export const TELEMETRY_ENV = {
     DEV: 'dev',
     PROD: 'prod',
 } as const;
+export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 
 export const DEFAULT_TELEMETRY_ENV: TelemetryEnv = TELEMETRY_ENV.PROD;
