@@ -62,7 +62,7 @@ export function getOrInitAnalyticsClient(): Analytics | null {
  * @param properties - Event properties for the tool call
  */
 export function trackToolCall(
-    userId: string | null,
+    userId: string,
     properties: ToolCallTelemetryProperties,
 ): void {
     const client = getOrInitAnalyticsClient();
@@ -73,7 +73,7 @@ export function trackToolCall(
 
     try {
         client.track({
-            userId: userId || '',
+            userId,
             event: SEGMENT_EVENTS.TOOL_CALL,
             properties,
         });

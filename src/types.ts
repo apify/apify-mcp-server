@@ -298,7 +298,7 @@ export type ApifyToken = string | null | undefined;
  * Properties for tool call telemetry events sent to Segment.
  */
 export interface ToolCallTelemetryProperties {
-    app_name: string;
+    app: 'mcp';
     app_version: string;
     mcp_client_name: string;
     mcp_client_version: string;

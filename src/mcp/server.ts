@@ -2,6 +2,8 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import * as crypto from 'node:crypto';
+
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -764,7 +766,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
-        userId: string | null,
+        userId: string,
         startTime: number,
         toolStatus: 'succeeded' | 'failed' | 'aborted',
     ): void {
@@ -786,9 +788,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
     */
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
-    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
+    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string }> {
         if (this.options.telemetry?.enabled !== true) {
-            return { telemetryData: null, userId: null };
+            return { telemetryData: null, userId: crypto.randomUUID() };
         }
 
         const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
@@ -810,11 +812,15 @@ Please verify the tool name and ensure the tool is properly registered.`;
             userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
             log.debug('Telemetry: fetched userId', { userId });
         }
+        if (!userId) {
+            userId = crypto.randomUUID();
+            log.debug('Telemetry: using random userId', { userId });
+        }
 
         const capabilities = this.options.initializeRequestData?.params?.capabilities;
         const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
         const telemetryData: ToolCallTelemetryProperties = {
-            app_name: 'apify-mcp-server',
+            app: 'mcp',
             app_version: getPackageVersion() || '',
             mcp_client_name: params?.clientInfo?.name || '',
             mcp_client_version: params?.clientInfo?.version || '',

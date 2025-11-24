@@ -18,7 +18,7 @@ describe('telemetry', () => {
     it('should send correct payload structure to Segment', () => {
         const userId = 'test-user-123';
         const properties = {
-            app_name: 'apify-mcp-server',
+            app: 'mcp' as const,
             app_version: '0.5.6',
             mcp_client_name: 'test-client',
             mcp_client_version: '1.0.0',
@@ -38,7 +38,7 @@ describe('telemetry', () => {
             userId: 'test-user-123',
             event: 'MCP Tool Call',
             properties: {
-                app_name: 'apify-mcp-server',
+                app: 'mcp',
                 app_version: '0.5.6',
                 mcp_client_name: 'test-client',
                 mcp_client_version: '1.0.0',
