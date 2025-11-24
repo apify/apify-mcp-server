@@ -2,8 +2,6 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
-import * as crypto from 'node:crypto';
-
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -761,13 +759,13 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * Calculates execution time, sets final status, and sends the telemetry event.
      *
      * @param telemetryData - Telemetry data to finalize and track (null if telemetry is disabled)
-     * @param userId - Apify user ID
+     * @param userId - Apify user ID (string or null if not available)
      * @param startTime - Timestamp when the tool call started
      * @param toolStatus - Final status of the tool call ('succeeded', 'failed', or 'aborted')
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
-        userId: string,
+        userId: string | null,
         startTime: number,
         toolStatus: 'succeeded' | 'failed' | 'aborted',
     ): void {
@@ -789,9 +787,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
     */
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
-    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string }> {
+    ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (this.options.telemetry?.enabled !== true) {
-            return { telemetryData: null, userId: crypto.randomUUID() };
+            return { telemetryData: null, userId: null };
         }
 
         const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
@@ -813,11 +811,6 @@ Please verify the tool name and ensure the tool is properly registered.`;
             userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
             log.debug('Telemetry: fetched userId', { userId });
         }
-        if (!userId) {
-            userId = crypto.randomUUID();
-            log.debug('Telemetry: using random userId', { userId });
-        }
-
         const capabilities = this.options.initializeRequestData?.params?.capabilities;
         const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
         const telemetryData: ToolCallTelemetryProperties = {

@@ -1,3 +1,5 @@
+import * as crypto from 'node:crypto';
+
 import { Analytics } from '@segment/analytics-node';
 
 import log from '@apify/log';
@@ -57,12 +59,14 @@ export function getOrInitAnalyticsClient(): Analytics | null {
 
 /**
  * Tracks a tool call event to Segment.
+ * Segment requires either userId OR anonymousId, but not both
+ * When userId is available, use it; otherwise use anonymousId
  *
  * @param userId - Apify user ID (null if not available)
  * @param properties - Event properties for the tool call
  */
 export function trackToolCall(
-    userId: string,
+    userId: string | null,
     properties: ToolCallTelemetryProperties,
 ): void {
     const client = getOrInitAnalyticsClient();
@@ -73,7 +77,7 @@ export function trackToolCall(
 
     try {
         client.track({
-            userId,
+            ...(userId ? { userId } : { anonymousId: crypto.randomUUID() }),
             event: SEGMENT_EVENTS.TOOL_CALL,
             properties,
         });
