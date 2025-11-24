@@ -825,7 +825,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             mcp_client_name: params?.clientInfo?.name || '',
             mcp_client_version: params?.clientInfo?.version || '',
             mcp_protocol_version: params?.protocolVersion || '',
-            mcp_capabilities: capabilities ? JSON.stringify(capabilities) : '',
+            mcp_client_capabilities: capabilities ? JSON.stringify(capabilities) : '',
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
             tool_name: toolFullName,
