@@ -36,10 +36,9 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
-    // Append telemetry parameters
-    if (telemetry?.enabled !== undefined) {
-        url.searchParams.append('telemetry-enabled', telemetry.enabled.toString());
-    }
+    // Append telemetry parameters (default to false for tests when not explicitly set)
+    const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
+    url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
 }
 
 export async function createMcpSseClient(

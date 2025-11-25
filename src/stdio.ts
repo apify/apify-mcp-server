@@ -113,6 +113,7 @@ Default: true (enabled)`,
         choices: [TELEMETRY_ENV.PROD, TELEMETRY_ENV.DEV],
         default: DEFAULT_TELEMETRY_ENV,
         hidden: true,
+        coerce: (arg: string) => arg?.toUpperCase(),
         describe: `Telemetry environment when telemetry is enabled. Can also be set via TELEMETRY_ENV environment variable.
 - 'PROD': Send events to production Segment workspace (default)
 - 'DEV': Send events to development Segment workspace
