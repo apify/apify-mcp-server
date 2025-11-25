@@ -8,7 +8,7 @@ import { TTLLRUCache } from './ttl-lru.js';
 const userIdCache = new TTLLRUCache<string>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
 
 /**
- * Gets user info from token, using cache to avoid repeated API calls
+ * Gets user ID from token, using cache to avoid repeated API calls
  * Token is hashed before caching to avoid storing raw tokens
  * Returns userId or null if not found
  */

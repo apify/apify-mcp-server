@@ -71,12 +71,8 @@ export function trackToolCall(
 ): void {
     const client = getOrInitAnalyticsClient();
 
-    if (!client) {
-        return;
-    }
-
     try {
-        client.track({
+        client?.track({
             ...(userId ? { userId } : { anonymousId: crypto.randomUUID() }),
             event: SEGMENT_EVENTS.TOOL_CALL,
             properties,
