@@ -103,7 +103,7 @@
       "category": "search-actors",
       "query": "Find an Actor to get Facebook data",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar. Added 'Actor' to make intent clear."
+      "reference": "It must call the 'search-actors' tool with the query: 'Facebook' or similar."
     },
     {
       "id": "search-actors-7",
@@ -143,14 +143,13 @@
       "category": "search-actors",
       "query": "Find an Actor to fetch posts from Twitter about AI",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar. Added 'Actor' to clarify tool search intent."
+      "reference": "It must call the 'search-actors' tool with the query: 'Twitter posts' or similar."
     },
     {
       "id": "search-actors-13",
       "category": "search-actors",
       "query": "Find an Actor to get flight information from Skyscanner",
-      "expectedTools": ["search-actors"],
-      "reference": "Added 'Actor' to clarify this is a tool search, not immediate data retrieval."
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-actors-14",
@@ -163,14 +162,13 @@
       "category": "search-actors",
       "query": "Find actors for data extraction tasks",
       "expectedTools": ["search-actors"],
-      "reference": "While query is general, it explicitly asks about 'actors', so search-actors is appropriate. Changed from [] to allow tool call."
+      "reference": "While query is general, it explicitly asks about 'actors', so search-actors is appropriate."
     },
     {
       "id": "rag-web-browser-1",
       "category": "apify-slash-rag-web-browser",
       "query": "Find recent articles about AI from tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"],
-      "reference": "Added 'recent' to signal immediate data need rather than tool search."
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "rag-web-browser-2",
@@ -214,15 +212,13 @@
       "id": "search-vs-rag-3",
       "category": "apify-slash-rag-web-browser",
       "query": "Find recent AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"],
-      "reference": "Added 'recent' to signal immediate data retrieval rather than tool search."
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-4",
       "category": "apify-slash-rag-web-browser",
       "query": "Get current articles about AI from Wired and The Verge",
-      "expectedTools": ["apify-slash-rag-web-browser"],
-      "reference": "Added 'current' to signal immediate data need."
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-5",
@@ -240,15 +236,13 @@
       "id": "search-vs-rag-7a",
       "category": "apify-slash-rag-web-browser",
       "query": "Get flight prices from New York to London for tomorrow",
-      "expectedTools": ["apify-slash-rag-web-browser"],
-      "reference": "Time indicator 'tomorrow' signals immediate data need. Split from ambiguous search-vs-rag-7."
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "search-vs-rag-7b",
       "category": "search-actors",
       "query": "Find an Actor that scrapes flight data from booking sites",
-      "expectedTools": ["search-actors"],
-      "reference": "Explicit 'Actor' mention signals tool search. Split from ambiguous search-vs-rag-7."
+      "expectedTools": ["search-actors"]
     },
     {
       "id": "search-vs-rag-8",
@@ -411,22 +405,20 @@
       "id": "misleading-query-3",
       "category": "search-apify-docs",
       "query": "I need to build my own Apify Actor from scratch",
-      "expectedTools": ["search-apify-docs"],
-      "reference": "Added 'Apify Actor' to clarify seeking Apify-specific documentation."
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "ambiguous-query-1",
       "category": "search-actors",
       "query": "Find an Actor to get instagram posts",
       "expectedTools": ["search-actors"],
-      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar. Added 'Actor' to remove ambiguity."
+      "reference": "It must call the 'search-actors' tool with the query: 'Instagram posts' or similar."
     },
     {
       "id": "ambiguous-query-3",
       "category": "ambiguous",
       "query": "Show me Apify Actor documentation",
-      "expectedTools": ["search-apify-docs"],
-      "reference": "Made query less vague by adding 'Apify Actor' context."
+      "expectedTools": ["search-apify-docs"]
     },
     {
       "id": "tool-selection-confusion-1",
@@ -438,8 +430,7 @@
       "id": "tool-selection-confusion-2",
       "category": "tool-selection",
       "query": "Find recent AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"],
-      "reference": "Added 'recent' to signal immediate data need."
+      "expectedTools": ["apify-slash-rag-web-browser"]
     },
     {
       "id": "tool-selection-confusion-3",
