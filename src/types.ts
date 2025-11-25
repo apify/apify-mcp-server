@@ -341,9 +341,10 @@ export interface ActorsMcpServerOptions {
     telemetry?: {
         /**
          * Enable or disable telemetry tracking for tool calls.
-         * Defaults to true when not set.
+         * Must be explicitly set when telemetry object is provided.
+         * When telemetry object is omitted entirely, defaults to true (via env var or default).
          */
-        enabled?: boolean;
+        enabled: boolean;
         /**
          * Telemetry environment when telemetry is enabled.
          * - 'DEV': Use development Segment write key
