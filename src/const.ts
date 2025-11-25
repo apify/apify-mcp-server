@@ -78,6 +78,8 @@ export const MCP_SERVER_CACHE_MAX_SIZE = 500;
 export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const USER_CACHE_MAX_SIZE = 200;
 export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
+export const SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE = 200;
+export const SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */
@@ -114,4 +116,13 @@ export const TELEMETRY_ENV = {
 } as const;
 export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 
+export const DEFAULT_TELEMETRY_ENABLED = true;
 export const DEFAULT_TELEMETRY_ENV: TelemetryEnv = TELEMETRY_ENV.PROD;
+
+// We are using the same values as apify-core for consistency (despite that we ship events of different types).
+// https://github.com/apify/apify-core/blob/2284766c122c6ac5bc4f27ec28051f4057d6f9c0/src/packages/analytics/src/server/segment.ts#L28
+// Reasoning from the apify-core:
+// Flush at 50 events to avoid sending too many small requests (default is 15)
+export const SEGMENT_FLUSH_AT_EVENTS = 50;
+// Flush interval in milliseconds (default is 10000)
+export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;

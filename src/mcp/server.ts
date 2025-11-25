@@ -27,12 +27,17 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
+    DEFAULT_TELEMETRY_ENABLED,
+    DEFAULT_TELEMETRY_ENV,
     HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
+    SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE,
+    SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
+    type TelemetryEnv,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
@@ -43,6 +48,7 @@ import type {
     ActorsMcpServerOptions,
     ActorTool,
     HelperTool,
+    ToolCallCounterStore,
     ToolCallTelemetryProperties,
     ToolEntry,
 } from '../types.js';
@@ -52,6 +58,7 @@ import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { TTLLRUCache } from '../utils/ttl-lru.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -70,8 +77,17 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
-    // In-memory storage for tool call counters (used when toolCallCounterStore is not provided)
-    private sessionToolCallCounters = new Map<string, number>();
+
+    // Telemetry configuration (resolved from options and env vars in setupTelemetry)
+    private telemetryEnabled: boolean | null = null;
+    private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
+    private toolCallCountStore: ToolCallCounterStore | undefined;
+
+    // In-memory storage for tool call counters (used when toolCallCountStore is not provided)
+    private sessionToolCallCounters = new TTLLRUCache<number>(
+        SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE,
+        SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS,
+    );
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
@@ -114,49 +130,47 @@ export class ActorsMcpServer {
      * @returns Promise resolving to the new counter value (after increment)
      */
     private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
-        return await this.options.telemetry!.toolCallCountStore!.getAndIncrement(sessionId);
+        return await this.toolCallCountStore?.getAndIncrement(sessionId) ?? 0;
     }
 
     /**
      * Telemetry configuration with precedence: explicit options > env vars > defaults
      */
     private setupTelemetry() {
-        // Initialize telemetry object if not present
-        if (!this.options.telemetry) {
-            this.options.telemetry = {};
-        }
-
-        // Configure telemetryEnabled: explicit option > env var > default (true)
-        const telemetryEnabled = parseBooleanFromString(this.options.telemetry.enabled);
-        if (telemetryEnabled === undefined) {
-            const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
-            this.options.telemetry.enabled = envEnabled !== undefined ? envEnabled : true;
+        const explicitEnabled = parseBooleanFromString(this.options.telemetry?.enabled);
+        if (explicitEnabled !== undefined) {
+            this.telemetryEnabled = explicitEnabled;
         } else {
-            this.options.telemetry.enabled = telemetryEnabled;
+            const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
+            this.telemetryEnabled = envEnabled ?? DEFAULT_TELEMETRY_ENABLED;
         }
 
-        // Configure telemetryEnv: explicit option > env var > default ('PROD')
-        // getTelemetryEnv always returns a value (defaults to 'PROD'), so no need for undefined check
-        const envVarEnv = process.env.TELEMETRY_ENV;
-        const explicitEnv = this.options.telemetry.env;
-        this.options.telemetry.env = getTelemetryEnv(explicitEnv ?? envVarEnv);
+        // Setup tool call counter store only if telemetry is enabled
+        if (this.telemetryEnabled) {
+            // Configure telemetryEnv: explicit option > env var > default ('PROD')
+            this.telemetryEnv = getTelemetryEnv(this.options.telemetry?.env ?? process.env.TELEMETRY_ENV);
 
-        // If telemetry is enabled, ensure telemetryEnv is set
-        if (this.options.telemetry.enabled && this.options.telemetry.env === undefined) {
-            this.options.telemetry.env = getTelemetryEnv(undefined);
+            if (this.options.telemetry?.toolCallCountStore) {
+                this.toolCallCountStore = this.options.telemetry.toolCallCountStore;
+            } else {
+                this.toolCallCountStore = {
+                    getAndIncrement: async (sessionId: string): Promise<number> => {
+                        const current = this.sessionToolCallCounters.get(sessionId) ?? 0;
+                        const newValue = current + 1;
+                        this.sessionToolCallCounters.set(sessionId, newValue);
+                        return newValue;
+                    },
+                };
+            }
         }
+    }
 
-        // Provide default in-memory store if not provided
-        if (!this.options.telemetry.toolCallCountStore) {
-            this.options.telemetry.toolCallCountStore = {
-                getAndIncrement: async (sessionId: string): Promise<number> => {
-                    const current = this.sessionToolCallCounters.get(sessionId) || 0;
-                    const newValue = current + 1;
-                    this.sessionToolCallCounters.set(sessionId, newValue);
-                    return newValue;
-                },
-            };
-        }
+    /**
+     * Gets the tool call counter store (for testing purposes)
+     * @internal
+     */
+    public getToolCallCountStore(): ToolCallCounterStore | undefined {
+        return this.toolCallCountStore;
     }
 
     /**
@@ -779,7 +793,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             tool_status: toolStatus,
             tool_exec_time_ms: execTime,
         };
-        trackToolCall(userId, finalizedTelemetryData);
+        trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
     }
 
     /*
@@ -788,7 +802,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-        if (this.options.telemetry?.enabled !== true) {
+        if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };
         }
 

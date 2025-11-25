@@ -32,7 +32,7 @@ describe('telemetry', () => {
             tool_call_number: 1,
         };
 
-        trackToolCall(userId, properties);
+        trackToolCall(userId, 'DEV', properties);
 
         expect(mockTrack).toHaveBeenCalledWith({
             userId: 'test-user-123',
@@ -70,7 +70,7 @@ describe('telemetry', () => {
             tool_call_number: 1,
         };
 
-        trackToolCall(null, properties);
+        trackToolCall(null, 'DEV', properties);
 
         expect(mockTrack).toHaveBeenCalledTimes(1);
         const callArgs = mockTrack.mock.calls[0][0];

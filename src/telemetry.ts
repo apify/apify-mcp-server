@@ -4,7 +4,13 @@ import { Analytics } from '@segment/analytics-node';
 
 import log from '@apify/log';
 
-import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV, type TelemetryEnv } from './const.js';
+import {
+    DEFAULT_TELEMETRY_ENV,
+    SEGMENT_FLUSH_AT_EVENTS,
+    SEGMENT_FLUSH_INTERVAL_MS,
+    TELEMETRY_ENV,
+    type TelemetryEnv,
+} from './const.js';
 import type { ToolCallTelemetryProperties } from './types.js';
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
@@ -38,16 +44,14 @@ let analyticsClient: Analytics | null = null;
  *
  * @returns Analytics client instance or null if initialization failed
  */
-export function getOrInitAnalyticsClient(): Analytics | null {
+export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics | null {
     if (!analyticsClient) {
         try {
-            const env = getTelemetryEnv(process.env.TELEMETRY_ENV);
-            const writeKey = env === TELEMETRY_ENV.PROD ? PROD_WRITE_KEY : DEV_WRITE_KEY;
-
+            const writeKey = telemetryEnv === TELEMETRY_ENV.PROD ? PROD_WRITE_KEY : DEV_WRITE_KEY;
             analyticsClient = new Analytics({
                 writeKey,
-                flushAt: 50,
-                flushInterval: 5000,
+                flushAt: SEGMENT_FLUSH_AT_EVENTS,
+                flushInterval: SEGMENT_FLUSH_INTERVAL_MS,
             });
         } catch (error) {
             log.error('Segment initialization failed', { error });
@@ -63,13 +67,15 @@ export function getOrInitAnalyticsClient(): Analytics | null {
  * When userId is available, use it; otherwise use anonymousId
  *
  * @param userId - Apify user ID (null if not available)
+ * @param telemetryEnv - Telemetry environment
  * @param properties - Event properties for the tool call
  */
 export function trackToolCall(
     userId: string | null,
+    telemetryEnv: TelemetryEnv,
     properties: ToolCallTelemetryProperties,
 ): void {
-    const client = getOrInitAnalyticsClient();
+    const client = getOrInitAnalyticsClient(telemetryEnv);
 
     try {
         client?.track({
