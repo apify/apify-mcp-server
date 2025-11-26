@@ -14,6 +14,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
+import { parseBooleanFromString } from '../utils/generic.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -78,7 +79,21 @@ export function createExpressApp(
                 rt: Routes.SSE,
                 tr: TransportType.SSE,
             });
-            const mcpServer = new ActorsMcpServer({ setupSigintHandler: false });
+            // Extract telemetry query parameters
+            const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+            const telemetryEnabledParam = urlParams.get('telemetry-enabled');
+            // URL param > env var > default (true)
+            const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
+                ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+                ?? true;
+
+            const mcpServer = new ActorsMcpServer({
+                setupSigintHandler: false,
+                transportType: 'sse',
+                telemetry: {
+                    enabled: telemetryEnabled,
+                },
+            });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Load MCP server tools
@@ -157,12 +172,27 @@ export function createExpressApp(
             // Reuse existing transport
                 transport = transports[sessionId];
             } else if (!sessionId && isInitializeRequest(req.body)) {
-            // New initialization request - use JSON response mode
+            // New initialization request
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
                 });
-                const mcpServer = new ActorsMcpServer({ setupSigintHandler: false, initializeRequestData: req.body as InitializeRequest });
+                // Extract telemetry query parameters
+                const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
+                const telemetryEnabledParam = urlParams.get('telemetry-enabled');
+                // URL param > env var > default (true)
+                const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
+                    ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+                    ?? true;
+
+                const mcpServer = new ActorsMcpServer({
+                    setupSigintHandler: false,
+                    initializeRequestData: req.body as InitializeRequest,
+                    transportType: 'http',
+                    telemetry: {
+                        enabled: telemetryEnabled,
+                    },
+                });
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;

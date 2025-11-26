@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getValuesByDotKeys, isValidHttpUrl, parseCommaSeparatedList } from '../../src/utils/generic.js';
+import { getValuesByDotKeys, isValidHttpUrl, parseBooleanFromString, parseCommaSeparatedList } from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
     it('should get value for a key without dot', () => {
@@ -100,5 +100,51 @@ describe('isValidUrl', () => {
         expect(isValidHttpUrl('http//example.com')).toBe(false);
         expect(isValidHttpUrl('https//example.com')).toBe(false);
         expect(isValidHttpUrl('://example.com')).toBe(false);
+    });
+});
+
+describe('parseBooleanFromString', () => {
+    it('should return boolean values directly', () => {
+        expect(parseBooleanFromString(true)).toBe(true);
+        expect(parseBooleanFromString(false)).toBe(false);
+    });
+
+    it('should parse "true" and "1" as true', () => {
+        expect(parseBooleanFromString('true')).toBe(true);
+        expect(parseBooleanFromString('TRUE')).toBe(true);
+        expect(parseBooleanFromString('True')).toBe(true);
+        expect(parseBooleanFromString('1')).toBe(true);
+        expect(parseBooleanFromString('  true  ')).toBe(true);
+        expect(parseBooleanFromString('  1  ')).toBe(true);
+    });
+
+    it('should parse "false" and "0" as false', () => {
+        expect(parseBooleanFromString('false')).toBe(false);
+        expect(parseBooleanFromString('FALSE')).toBe(false);
+        expect(parseBooleanFromString('False')).toBe(false);
+        expect(parseBooleanFromString('0')).toBe(false);
+        expect(parseBooleanFromString('  false  ')).toBe(false);
+        expect(parseBooleanFromString('  0  ')).toBe(false);
+    });
+
+    it('should return undefined for null and undefined', () => {
+        expect(parseBooleanFromString(null)).toBeUndefined();
+        expect(parseBooleanFromString(undefined)).toBeUndefined();
+    });
+
+    it('should return undefined for empty strings', () => {
+        expect(parseBooleanFromString('')).toBeUndefined();
+        expect(parseBooleanFromString('   ')).toBeUndefined();
+        expect(parseBooleanFromString('\t')).toBeUndefined();
+        expect(parseBooleanFromString('\n')).toBeUndefined();
+    });
+
+    it('should return undefined for unrecognized strings', () => {
+        expect(parseBooleanFromString('yes')).toBeUndefined();
+        expect(parseBooleanFromString('no')).toBeUndefined();
+        expect(parseBooleanFromString('2')).toBeUndefined();
+        expect(parseBooleanFromString('maybe')).toBeUndefined();
+        expect(parseBooleanFromString('on')).toBeUndefined();
+        expect(parseBooleanFromString('off')).toBeUndefined();
     });
 });

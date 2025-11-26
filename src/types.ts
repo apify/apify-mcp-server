@@ -1,11 +1,11 @@
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
-import type { Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 import type z from 'zod';
 
-import type { ACTOR_PRICING_MODEL } from './const.js';
+import type { ACTOR_PRICING_MODEL, TelemetryEnv } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
@@ -293,3 +293,62 @@ export type DatasetItem = Record<number | string, unknown>;
  * Can be null or undefined in case of Skyfire requests.
  */
 export type ApifyToken = string | null | undefined;
+
+/**
+ * Properties for tool call telemetry events sent to Segment.
+ */
+export interface ToolCallTelemetryProperties {
+    app: 'mcp';
+    app_version: string;
+    mcp_client_name: string;
+    mcp_client_version: string;
+    mcp_protocol_version: string;
+    mcp_client_capabilities: string;
+    mcp_session_id: string;
+    transport_type: string;
+    tool_name: string;
+    tool_status: 'succeeded' | 'failed' | 'aborted';
+    tool_exec_time_ms: number;
+}
+
+/**
+ * Options for configuring the ActorsMcpServer instance.
+ */
+export interface ActorsMcpServerOptions {
+    setupSigintHandler?: boolean;
+    /**
+     * Switch to enable Skyfire agentic payment mode.
+     */
+    skyfireMode?: boolean;
+    initializeRequestData?: InitializeRequest;
+    /**
+     * Telemetry configuration options.
+     */
+    telemetry?: {
+        /**
+         * Enable or disable telemetry tracking for tool calls.
+         * Must be explicitly set when telemetry object is provided.
+         * When telemetry object is omitted entirely, defaults to true (via env var or default).
+         */
+        enabled: boolean;
+        /**
+         * Telemetry environment when telemetry is enabled.
+         * - 'DEV': Use development Segment write key
+         * - 'PROD': Use production Segment write key (default)
+         */
+        env?: TelemetryEnv;
+    };
+    /**
+     * Transport type for telemetry tracking.
+     * - 'stdio': Direct/local stdio connection
+     * - 'http': Remote HTTP streamable connection
+     * - 'sse': Remote Server-Sent Events (SSE) connection
+     */
+    transportType?: 'stdio' | 'http' | 'sse';
+    /**
+     * Apify API token for authentication
+     * Primarily used by stdio transport when token is read from ~/.apify/auth.json file
+     * instead of APIFY_TOKEN environment variable, so it can be passed to the server
+     */
+    token?: string;
+}

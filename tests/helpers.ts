@@ -4,7 +4,7 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
-import { HelperTools } from '../src/const.js';
+import { HelperTools, type TelemetryEnv } from '../src/const.js';
 import type { ToolCategory } from '../src/types.js';
 
 export interface McpClientOptions {
@@ -13,17 +13,20 @@ export interface McpClientOptions {
     tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include
     useEnv?: boolean; // Use environment variables instead of command line arguments (stdio only)
     clientName?: string; // Client name for identification
+    telemetry?: {
+        enabled?: boolean; // Enable or disable telemetry (default: false for tests)
+        env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
+    };
 }
 
-export async function createMcpSseClient(
-    serverUrl: string,
-    options?: McpClientOptions,
-): Promise<Client> {
+function checkApifyToken(): void {
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
-    const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
+}
+
+function appendSearchParams(url: URL, options?: McpClientOptions): void {
+    const { actors, enableAddingActors, tools, telemetry } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -33,6 +36,18 @@ export async function createMcpSseClient(
     if (tools !== undefined) {
         url.searchParams.append('tools', tools.join(','));
     }
+    // Append telemetry parameters (default to false for tests when not explicitly set)
+    const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
+    url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
+}
+
+export async function createMcpSseClient(
+    serverUrl: string,
+    options?: McpClientOptions,
+): Promise<Client> {
+    checkApifyToken();
+    const url = new URL(serverUrl);
+    appendSearchParams(url, options);
 
     const transport = new SSEClientTransport(
         url,
@@ -58,20 +73,9 @@ export async function createMcpStreamableClient(
     serverUrl: string,
     options?: McpClientOptions,
 ): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
+    checkApifyToken();
     const url = new URL(serverUrl);
-    const { actors, enableAddingActors, tools } = options || {};
-    if (actors !== undefined) {
-        url.searchParams.append('actors', actors.join(','));
-    }
-    if (enableAddingActors !== undefined) {
-        url.searchParams.append('enableAddingActors', enableAddingActors.toString());
-    }
-    if (tools !== undefined) {
-        url.searchParams.append('tools', tools.join(','));
-    }
+    appendSearchParams(url, options);
 
     const transport = new StreamableHTTPClientTransport(
         url,
@@ -96,10 +100,8 @@ export async function createMcpStreamableClient(
 export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
-    if (!process.env.APIFY_TOKEN) {
-        throw new Error('APIFY_TOKEN environment variable is not set.');
-    }
-    const { actors, enableAddingActors, tools, useEnv } = options || {};
+    checkApifyToken();
+    const { actors, enableAddingActors, tools, useEnv, telemetry } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -116,6 +118,12 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             env.TOOLS = tools.join(',');
         }
+        if (telemetry?.enabled !== undefined) {
+            env.TELEMETRY_ENABLED = telemetry.enabled.toString();
+        }
+        if (telemetry?.env !== undefined) {
+            env.TELEMETRY_ENV = telemetry.env;
+        }
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -126,6 +134,12 @@ export async function createMcpStdioClient(
         }
         if (tools !== undefined) {
             args.push('--tools', tools.join(','));
+        }
+        if (telemetry?.enabled === false) {
+            args.push('--telemetry-enabled', 'false');
+        }
+        if (telemetry?.env !== undefined && telemetry?.enabled !== false) {
+            args.push('--telemetry-env', telemetry.env);
         }
     }
 

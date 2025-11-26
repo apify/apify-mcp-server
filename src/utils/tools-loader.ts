@@ -3,7 +3,6 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 import type { ApifyClient } from 'apify';
 
@@ -35,13 +34,11 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  *
  * @param input The processed Input object
  * @param apifyClient The Apify client instance
- * @param _initializeRequestData Optional initialize request data
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    _initializeRequestData?: InitializeRequest,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
