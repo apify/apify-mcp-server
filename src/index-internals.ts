@@ -8,7 +8,7 @@ import { processParamsGetTools } from './mcp/utils.js';
 import { addTool } from './tools/helpers.js';
 import { defaultTools, getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
-import type { ToolCallCounterStore, ToolCategory } from './types.js';
+import type { ToolCategory } from './types.js';
 import { getExpectedToolNamesByCategories, getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl-lru.js';
 
@@ -24,7 +24,6 @@ export {
     toolCategories,
     toolCategoriesEnabledByDefault,
     type ToolCategory,
-    type ToolCallCounterStore,
     processParamsGetTools,
     getActorsAsTools,
     getToolPublicFieldOnly,

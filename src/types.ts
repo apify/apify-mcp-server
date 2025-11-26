@@ -309,20 +309,6 @@ export interface ToolCallTelemetryProperties {
     tool_name: string;
     tool_status: 'succeeded' | 'failed' | 'aborted';
     tool_exec_time_ms: number;
-    tool_call_number: number;
-}
-
-/**
- * Interface for storing and retrieving tool call counters per session.
- * Used for tracking tool call sequence in user journeys.
- */
-export interface ToolCallCounterStore {
-    /**
-     * Gets and increments the tool call counter for a session atomically.
-     * @param sessionId - The session ID
-     * @returns Promise resolving to the new counter value (after increment)
-     */
-    getAndIncrement(sessionId: string): Promise<number>;
 }
 
 /**
@@ -351,12 +337,6 @@ export interface ActorsMcpServerOptions {
          * - 'PROD': Use production Segment write key (default)
          */
         env?: TelemetryEnv;
-        /**
-         * Optional store for tool call counters.
-         * If not provided, uses in-memory storage (suitable for stdio).
-         * For distributed deployments (HTTP/SSE), provide a Redis-backed implementation.
-         */
-        toolCallCountStore?: ToolCallCounterStore;
     };
     /**
      * Transport type for telemetry tracking.

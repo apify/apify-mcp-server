@@ -78,8 +78,6 @@ export const MCP_SERVER_CACHE_MAX_SIZE = 500;
 export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const USER_CACHE_MAX_SIZE = 200;
 export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
-export const SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE = 200;
-export const SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */

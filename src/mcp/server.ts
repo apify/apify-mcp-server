@@ -32,8 +32,6 @@ import {
     HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
-    SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE,
-    SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
@@ -48,7 +46,6 @@ import type {
     ActorsMcpServerOptions,
     ActorTool,
     HelperTool,
-    ToolCallCounterStore,
     ToolCallTelemetryProperties,
     ToolEntry,
 } from '../types.js';
@@ -58,7 +55,6 @@ import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
-import { TTLLRUCache } from '../utils/ttl-lru.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -81,13 +77,6 @@ export class ActorsMcpServer {
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
     private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
-    private toolCallCountStore: ToolCallCounterStore | undefined;
-
-    // In-memory storage for tool call counters (used when toolCallCountStore is not provided)
-    private sessionToolCallCounters = new TTLLRUCache<number>(
-        SESSION_TOOL_CALL_COUNTER_CACHE_MAX_SIZE,
-        SESSION_TOOL_CALL_COUNTER_CACHE_TTL_SECS,
-    );
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
@@ -125,15 +114,6 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Gets and increments the tool call counter for a session.
-     * @param sessionId - The session ID
-     * @returns Promise resolving to the new counter value (after increment)
-     */
-    private async getAndIncrementToolCallCounter(sessionId: string): Promise<number> {
-        return await this.toolCallCountStore?.getAndIncrement(sessionId) ?? 0;
-    }
-
-    /**
      * Telemetry configuration with precedence: explicit options > env vars > defaults
      */
     private setupTelemetry() {
@@ -145,32 +125,10 @@ export class ActorsMcpServer {
             this.telemetryEnabled = envEnabled ?? DEFAULT_TELEMETRY_ENABLED;
         }
 
-        // Setup tool call counter store only if telemetry is enabled
+        // Configure telemetryEnv: explicit option > env var > default ('PROD')
         if (this.telemetryEnabled) {
-            // Configure telemetryEnv: explicit option > env var > default ('PROD')
             this.telemetryEnv = getTelemetryEnv(this.options.telemetry?.env ?? process.env.TELEMETRY_ENV);
-
-            if (this.options.telemetry?.toolCallCountStore) {
-                this.toolCallCountStore = this.options.telemetry.toolCallCountStore;
-            } else {
-                this.toolCallCountStore = {
-                    getAndIncrement: async (sessionId: string): Promise<number> => {
-                        const current = this.sessionToolCallCounters.get(sessionId) ?? 0;
-                        const newValue = current + 1;
-                        this.sessionToolCallCounters.set(sessionId, newValue);
-                        return newValue;
-                    },
-                };
-            }
         }
-    }
-
-    /**
-     * Gets the tool call counter store (for testing purposes)
-     * @internal
-     */
-    public getToolCallCountStore(): ToolCallCounterStore | undefined {
-        return this.toolCallCountStore;
     }
 
     /**
@@ -808,16 +766,6 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
         const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
-        // Get or increment tool call counter for this session
-        let toolCallNumber = 0;
-        if (mcpSessionId) {
-            try {
-                toolCallNumber = await this.getAndIncrementToolCallCounter(mcpSessionId);
-            } catch (error) {
-                log.warning('Failed to get tool call counter', { mcpSessionId, error: String(error) });
-            }
-        }
-
         // Get userId from cache or fetch from API
         let userId: string | null = null;
         if (apifyToken) {
@@ -839,7 +787,6 @@ Please verify the tool name and ensure the tool is properly registered.`;
             tool_name: toolFullName,
             tool_status: 'succeeded', // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
-            tool_call_number: toolCallNumber,
         };
 
         return { telemetryData, userId };

@@ -29,7 +29,6 @@ describe('telemetry', () => {
             tool_name: 'test-tool',
             tool_status: 'succeeded' as const,
             tool_exec_time_ms: 100,
-            tool_call_number: 1,
         };
 
         trackToolCall(userId, 'DEV', properties);
@@ -49,7 +48,6 @@ describe('telemetry', () => {
                 tool_name: 'test-tool',
                 tool_status: 'succeeded',
                 tool_exec_time_ms: 100,
-                tool_call_number: 1,
             },
         });
     });
@@ -67,7 +65,6 @@ describe('telemetry', () => {
             tool_name: 'test-tool',
             tool_status: 'succeeded' as const,
             tool_exec_time_ms: 100,
-            tool_call_number: 1,
         };
 
         trackToolCall(null, 'DEV', properties);
