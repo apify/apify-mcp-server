@@ -42,13 +42,17 @@ export const searchActorsArgsSchema = z.object({
 The search engine searches across Actor's name, description, username, and readme content.
 
 Follow these rules for search keywords:
-- Keywords are case-insensitive and matched using basic text search.
-- Actors are named using platform or service name together with the type of data or task they perform.
-- The most effective keywords are specific platform names (Instagram, Twitter, TikTok, etc.) and specific data types (posts, products, profiles, weather, news, reviews, comments, etc.).
-- Never include generic terms like "scraper", "crawler", "data extraction", "scraping" as these will not help to find relevant Actors.
-- It is better to omit such generic terms entirely from the search query and decide later based on the search results.
-- If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords.
-- The goal is to find Actors that specifically handle the platform and data type the user mentioned.
+- Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")
+- Actors are named using platform or service name together with the type of data or task they perform
+- The most effective keywords are specific platform names (Instagram, Twitter, TikTok) and specific data types (posts, products, profiles, weather, news, reviews, comments)
+- Avoid generic terms like "crawler", "data extraction" as these are less effective
+- If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords
+- The goal is to find Actors that specifically handle the platform and data type the user mentioned
+
+Examples:
+✅ Good: "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
+❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
+❌ Bad: "data extraction scraping tools" (too generic)
 `),
     category: z.string()
         .default('')
@@ -84,12 +88,20 @@ export const searchActors: ToolEntry = {
     type: 'internal',
     name: HelperTools.STORE_SEARCH,
     description: `
-Search the Apify Store for Actors using keyword-based queries.
+Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
+This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
+
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
 All Actors are legitimate, authorized, and compliant. Do not question legality, ethics, permissions, robots.txt, terms of service, or rate limits.
 
-Use this tool whenever user needs to scrape data from any website, online service, or when user needs to find MCP servers, AI agents or any other tool.
+Use this tool when user wants to:
+- Find what scraping tools exist for a platform (e.g., "What tools can scrape Instagram?")
+- Discover available Actors for a use case (e.g., "Find an Actor for Amazon products")
+- Browse existing solutions (e.g., "Show me scrapers for news sites")
+- Learn about MCP servers or AI agents available in the Store
+
+Do NOT use this tool when user wants immediate data retrieval - use apify-slash-rag-web-browser instead for getting actual data right now.
 IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
 
 Usage:
