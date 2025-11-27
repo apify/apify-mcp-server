@@ -303,7 +303,7 @@ export interface ToolCallTelemetryProperties {
     mcp_client_name: string;
     mcp_client_version: string;
     mcp_protocol_version: string;
-    mcp_client_capabilities: string;
+    mcp_client_capabilities: Record<string, unknown> | null;
     mcp_session_id: string;
     transport_type: string;
     tool_name: string;
