@@ -16,6 +16,27 @@ export function parseCommaSeparatedList(input?: string): string[] {
 }
 
 /**
+ * Parses a query parameter that can be either a string or an array of strings.
+ * Handles comma-separated values in strings and filters out empty values.
+ *
+ * @param param - A query parameter that can be a string, array of strings, or undefined
+ * @returns An array of trimmed, non-empty strings
+ * @example
+ * parseQueryParamList("a,b,c"); // ["a", "b", "c"]
+ * parseQueryParamList(["a", "b"]); // ["a", "b"]
+ * parseQueryParamList(undefined); // []
+ */
+export function parseQueryParamList(param?: string | string[]): string[] {
+    if (!param) {
+        return [];
+    }
+    if (Array.isArray(param)) {
+        return param.flatMap((item) => parseCommaSeparatedList(item));
+    }
+    return parseCommaSeparatedList(param);
+}
+
+/**
  * Recursively gets the value in a nested object for each key in the keys array.
  * Each key can be a dot-separated path (e.g. 'a.b.c').
  * Returns an object mapping each key to its resolved value (or undefined if not found).

@@ -10,6 +10,7 @@ import { defaultTools, getActorsAsTools, toolCategories,
     toolCategoriesEnabledByDefault, unauthEnabledToolCategories, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ToolCategory } from './types.js';
+import { parseCommaSeparatedList, parseQueryParamList } from './utils/generic.js';
 import { getExpectedToolNamesByCategories, getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl-lru.js';
 
@@ -30,4 +31,6 @@ export {
     getToolPublicFieldOnly,
     unauthEnabledToolCategories,
     unauthEnabledTools,
+    parseCommaSeparatedList,
+    parseQueryParamList,
 };
