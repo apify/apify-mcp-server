@@ -16,6 +16,13 @@ import { getUserRunsList } from './run_collection.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
+/* list of tools that can be used without authentication */
+export const unauthEnabledTools: string[] = [
+    // docs
+    searchApifyDocsTool.name,
+    fetchApifyDocsTool.name,
+];
+
 export const toolCategories = {
     experimental: [
         addTool,
@@ -49,10 +56,28 @@ export const toolCategories = {
         getHtmlSkeleton,
     ],
 };
+
 export const toolCategoriesEnabledByDefault: ToolCategory[] = [
     'actors',
     'docs',
 ];
+
+/**
+ * Builds the list of tool categories that are enabled for unauthenticated users.
+ * A category is included if all tools in it are in the unauthEnabledTools list.
+ */
+function buildUnauthEnabledToolCategories(): ToolCategory[] {
+    const unauthEnabledToolsSet = new Set(unauthEnabledTools);
+
+    return (Object.entries(toolCategories) as [ToolCategory, typeof toolCategories[ToolCategory]][])
+        .filter(([, tools]) => {
+            // Include category only if all tools are in the unauthEnabledTools list
+            return tools.every((tool) => unauthEnabledToolsSet.has(tool.name));
+        })
+        .map(([category]) => category);
+}
+
+export const unauthEnabledToolCategories = buildUnauthEnabledToolCategories();
 
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
 

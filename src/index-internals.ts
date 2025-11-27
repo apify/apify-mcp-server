@@ -6,7 +6,8 @@ import { ApifyClient } from './apify-client.js';
 import { defaults, HelperTools } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { addTool } from './tools/helpers.js';
-import { defaultTools, getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from './tools/index.js';
+import { defaultTools, getActorsAsTools, toolCategories,
+    toolCategoriesEnabledByDefault, unauthEnabledToolCategories, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ToolCategory } from './types.js';
 import { getExpectedToolNamesByCategories, getToolPublicFieldOnly } from './utils/tools.js';
@@ -27,4 +28,6 @@ export {
     processParamsGetTools,
     getActorsAsTools,
     getToolPublicFieldOnly,
+    unauthEnabledToolCategories,
+    unauthEnabledTools,
 };
