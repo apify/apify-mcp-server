@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.8) (2025-11-27)
+
+### 🚀 Features
+
+- Segment telemetry ([#329](https://github.com/apify/apify-mcp-server/pull/329)) ([fa8f421](https://github.com/apify/apify-mcp-server/commit/fa8f4217378ec0f6a206959bcd0a1ef60df2821f)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Log mcp_client_capabilities as object (not json) ([#340](https://github.com/apify/apify-mcp-server/pull/340)) ([541b3fb](https://github.com/apify/apify-mcp-server/commit/541b3fb3146473573bda012d191d48f90add39e9)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.5.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.6) (2025-11-19)
 
 ### 🚀 Features
