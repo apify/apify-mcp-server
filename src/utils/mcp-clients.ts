@@ -1,4 +1,4 @@
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types';
+import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { mcpClients } from 'mcp-client-capabilities';
 
 /**

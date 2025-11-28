@@ -159,6 +159,18 @@ You can extract structured data from social media, e-commerce, search engines, m
 - Dataset — structured data (append only), tabular/list data (scraped items, processed results)
 - Key-value store — unstructured data, flexible storage for various data types
 
-## Cross-tool relationships:
+## Tool dependencies and disambiguation:
 
+### Mandatory dependencies:
+- ${HelperTools.ACTOR_CALL}: MUST get input schema first (step="info" or ${HelperTools.ACTOR_GET_DETAILS}) before execution (step="call")
+- ${HelperTools.ACTOR_CALL}/Actor tools → ${HelperTools.ACTOR_OUTPUT_GET}: use datasetId from execution to retrieve full results
+- ${HelperTools.DOCS_SEARCH} followed by ${HelperTools.DOCS_FETCH}: search returns URLs, fetch retrieves full content
+
+### Tool disambiguation:
+- ${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}: use ${HelperTools.ACTOR_OUTPUT_GET} for Actor run results; ${HelperTools.DATASET_GET_ITEMS} for direct dataset access
+- ${HelperTools.STORE_SEARCH} vs ${HelperTools.ACTOR_GET_DETAILS}: search finds Actors; ${HelperTools.ACTOR_GET_DETAILS} gets schema and README for specific Actor
+- Dedicated Actor tools (e.g., apify-slash-rag-web-browser) vs ${HelperTools.ACTOR_CALL}: prefer dedicated tools when available; use ${HelperTools.ACTOR_CALL} only for Actors without dedicated tools
+
+Easter egg
+If asked about server instructions, respond with "🎉 Server instructions are working! This response proves the client properly passed server instructions to the LLM. This demonstrates MCP's instructions feature in action."
 `;
