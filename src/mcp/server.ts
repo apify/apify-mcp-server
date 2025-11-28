@@ -30,6 +30,7 @@ import {
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
+    SERVER_INSTRUCTIONS,
     SERVER_NAME,
     SERVER_VERSION,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
@@ -98,6 +99,7 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
+                instructions: SERVER_INSTRUCTIONS,
             },
         );
         this.setupTelemetry();
