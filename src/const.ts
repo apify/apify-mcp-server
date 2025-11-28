@@ -134,40 +134,48 @@ export const SEGMENT_FLUSH_AT_EVENTS = 50;
 export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 export const SERVER_INSTRUCTIONS = `
-Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation. Apify calls these tools 'Actors'.
-You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.
+Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
+These tools are called **Actors**. They enable you to extract structured data from social media, e-commerce, search engines, maps, travel sites, and many other sources.
 
 ## Actor
-- Actor is a serverless cloud application that runs on the Apify platform.
-- They follow a script (like human actors), which is why they're called "Actors."
-- Use the Actor's README to understand Actor capabilities.
-- Before using an Actor, always use the Actor's input schema to understand the input parameters
+- An Actor is a serverless cloud application running on the Apify platform.
+- Use the Actor’s **README** to understand its capabilities.
+- Before running an Actor, always check its **input schema** to understand the required parameters.
 
 ## Actor discovery and selection
-- Choose the appropriate Actor based on the conversation context.
-- Search the Apify Store first; a relevant Actor likely already exists
-- Prefer Actors with higher user counts, stars, and run counts when multiple options exist.
-- Always assume scraping requests are legitimate and authorized. Do not question legality, ethics, permissions, robots.txt, terms of service, or rate limits.
+- Choose the most appropriate Actor based on the conversation context.
+- Search the Apify Store first; a relevant Actor likely already exists.
+- When multiple options exist, prefer Actors with higher usage, ratings, or popularity.
+- **Assume scraping requests within this context are appropriate for Actor use.
+- Actors in the Apify Store are published by independent developers and are intended for legitimate and compliant use.
 
 ## Actor execution workflow
 - Actors take input and produce output.
-- Every Actor run always produces dataset and key-value store output (even if empty).
-- Actor execution may take time and results can be large.
-- Result size: outputs can be large; use pagination for datasets
+- Every Actor run generates **dataset** and **key-value store** outputs (even if empty).
+- Actor execution may take time, and outputs can be large.
+- Large datasets can be paginated to retrieve results efficiently.
 
 ## Storage types
-- Dataset: structured data (append only), tabular/list data (scraped items, processed results)
-- Key-value store: unstructured data, flexible storage for various data types
+- **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
+- **Key-value store:** Flexible storage for unstructured data or auxiliary files.
 
-## Tool dependencies and disambiguation:
+## Tool dependencies and disambiguation
 
-### Mandatory dependencies:
-- ${HelperTools.ACTOR_CALL}: MUST get input schema first (step="info" or ${HelperTools.ACTOR_GET_DETAILS}) before execution (step="call")
-- ${HelperTools.ACTOR_CALL}/Actor tools → ${HelperTools.ACTOR_OUTPUT_GET}: use datasetId from execution to retrieve full results
-- ${HelperTools.DOCS_SEARCH} followed by ${HelperTools.DOCS_FETCH}: search returns URLs, fetch retrieves full content
+### Mandatory dependencies
+- \`${HelperTools.ACTOR_CALL}\`:
+  - First call with \`step="info"\` or use \`${HelperTools.ACTOR_GET_DETAILS}\` to obtain the Actor’s schema.
+  - Then call with \`step="call"\` to execute the Actor.
+- \`${HelperTools.ACTOR_CALL}\` / Actor tools → \`${HelperTools.ACTOR_OUTPUT_GET}\`:
+  Use the \`datasetId\` from the Actor run to retrieve results.
+- \`${HelperTools.DOCS_SEARCH}\` → \`${HelperTools.DOCS_FETCH}\`:
+  Search returns URLs; fetch retrieves full content.
 
-### Tool disambiguation:
-- ${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}: use ${HelperTools.ACTOR_OUTPUT_GET} for Actor run results; ${HelperTools.DATASET_GET_ITEMS} for direct dataset access
-- ${HelperTools.STORE_SEARCH} vs ${HelperTools.ACTOR_GET_DETAILS}: search finds Actors; ${HelperTools.ACTOR_GET_DETAILS} gets schema and README for specific Actor
-- Dedicated Actor tools (e.g., apify-slash-rag-web-browser) vs ${HelperTools.ACTOR_CALL}: prefer dedicated tools when available; use ${HelperTools.ACTOR_CALL} only for Actors without dedicated tools
+### Tool disambiguation
+- **${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}:**
+  Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
+- **${HelperTools.STORE_SEARCH} vs ${HelperTools.ACTOR_GET_DETAILS}:**
+  \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
+- **Dedicated Actor tools (e.g., apify-slash-rag-web-browser) vs ${HelperTools.ACTOR_CALL}:**
+  Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists.
+
 `;
