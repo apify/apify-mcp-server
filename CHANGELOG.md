@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.9) (2025-11-28)
+
+### 🚀 Features
+
+- Add tool context to judge prompt and improve evaluation accuracy ([#334](https://github.com/apify/apify-mcp-server/pull/334)) ([1eaec5b](https://github.com/apify/apify-mcp-server/commit/1eaec5b517eef12dcf63f7ab95e7828f44035302)) by [@yfe404](https://github.com/yfe404)
+- Unauth mode for docs tools ([#341](https://github.com/apify/apify-mcp-server/pull/341)) ([e041a98](https://github.com/apify/apify-mcp-server/commit/e041a98dbac4923455c1e62da2a72cd0b12ac509)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.5.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.8) (2025-11-27)
 
 ### 🚀 Features
