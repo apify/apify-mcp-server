@@ -511,9 +511,9 @@ export class ActorsMcpServer {
             delete request.params.mcpSessionId;
 
             // Validate token
-            if (!apifyToken && !this.options.skyfireMode) {
-                const msg = `APIFY_TOKEN is required but was not provided.
-Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request body.
+            if (!apifyToken && !this.options.skyfireMode && !this.options.allowUnauthMode) {
+                const msg = `Apify API token is required but was not provided.
+Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
 You can obtain your Apify token from https://console.apify.com/account/integrations.`;
                 log.softFail(msg, { statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });

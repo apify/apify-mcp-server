@@ -320,6 +320,13 @@ export interface ActorsMcpServerOptions {
      * Switch to enable Skyfire agentic payment mode.
      */
     skyfireMode?: boolean;
+    /**
+     * Allow unauthenticated mode - tools can be called without an Apify API token.
+     * This is primarily used for making documentation tools available without authentication.
+     * When enabled, Apify token validation is skipped.
+     * Default: false
+     */
+    allowUnauthMode?: boolean;
     initializeRequestData?: InitializeRequest;
     /**
      * Telemetry configuration options.

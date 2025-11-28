@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getValuesByDotKeys, isValidHttpUrl, parseBooleanFromString, parseCommaSeparatedList } from '../../src/utils/generic.js';
+import { getValuesByDotKeys, isValidHttpUrl, parseBooleanFromString, parseCommaSeparatedList, parseQueryParamList } from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
     it('should get value for a key without dot', () => {
@@ -80,6 +80,63 @@ describe('parseCommaSeparatedList', () => {
     it('should handle single item', () => {
         const result = parseCommaSeparatedList(' single ');
         expect(result).toEqual(['single']);
+    });
+});
+
+describe('parseQueryParamList', () => {
+    it('should parse comma-separated string', () => {
+        const result = parseQueryParamList('tool1, tool2, tool3');
+        expect(result).toEqual(['tool1', 'tool2', 'tool3']);
+    });
+
+    it('should parse comma-separated string without spaces', () => {
+        const result = parseQueryParamList('tool1,tool2,tool3');
+        expect(result).toEqual(['tool1', 'tool2', 'tool3']);
+    });
+
+    it('should parse array of strings', () => {
+        const result = parseQueryParamList(['tool1', 'tool2', 'tool3']);
+        expect(result).toEqual(['tool1', 'tool2', 'tool3']);
+    });
+
+    it('should handle undefined input', () => {
+        const result = parseQueryParamList(undefined);
+        expect(result).toEqual([]);
+    });
+
+    it('should handle empty string', () => {
+        const result = parseQueryParamList('');
+        expect(result).toEqual([]);
+    });
+
+    it('should handle empty array', () => {
+        const result = parseQueryParamList([]);
+        expect(result).toEqual([]);
+    });
+
+    it('should flatten array with comma-separated values', () => {
+        const result = parseQueryParamList(['tool1, tool2', 'tool3, tool4']);
+        expect(result).toEqual(['tool1', 'tool2', 'tool3', 'tool4']);
+    });
+
+    it('should filter empty strings from array', () => {
+        const result = parseQueryParamList(['tool1', '', 'tool2']);
+        expect(result).toEqual(['tool1', 'tool2']);
+    });
+
+    it('should handle single tool in string', () => {
+        const result = parseQueryParamList('single-tool');
+        expect(result).toEqual(['single-tool']);
+    });
+
+    it('should handle single tool in array', () => {
+        const result = parseQueryParamList(['single-tool']);
+        expect(result).toEqual(['single-tool']);
+    });
+
+    it('should trim whitespace from array items and their comma-separated values', () => {
+        const result = parseQueryParamList([' tool1 , tool2 ', ' tool3']);
+        expect(result).toEqual(['tool1', 'tool2', 'tool3']);
     });
 });
 
