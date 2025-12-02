@@ -161,21 +161,18 @@ These tools are called **Actors**. They enable you to extract structured data fr
 
 ## Tool dependencies and disambiguation
 
-### Mandatory dependencies
+### Tool dependencies
 - \`${HelperTools.ACTOR_CALL}\`:
   - First call with \`step="info"\` or use \`${HelperTools.ACTOR_GET_DETAILS}\` to obtain the Actor’s schema.
   - Then call with \`step="call"\` to execute the Actor.
-- \`${HelperTools.ACTOR_CALL}\` / Actor tools → \`${HelperTools.ACTOR_OUTPUT_GET}\`:
-  Use the \`datasetId\` from the Actor run to retrieve results.
-- \`${HelperTools.DOCS_SEARCH}\` → \`${HelperTools.DOCS_FETCH}\`:
-  Search returns URLs; fetch retrieves full content.
 
 ### Tool disambiguation
 - **${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}:**
   Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **${HelperTools.STORE_SEARCH} vs ${HelperTools.ACTOR_GET_DETAILS}:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
-- **Dedicated Actor tools (e.g., apify-slash-rag-web-browser) vs ${HelperTools.ACTOR_CALL}:**
-  Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists.
-
+- **${HelperTools.STORE_SEARCH} vs ${RAG_WEB_BROWSER}:**
+  \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
+- **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs ${HelperTools.ACTOR_CALL}:**
+  Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in Apify store.
 `;
