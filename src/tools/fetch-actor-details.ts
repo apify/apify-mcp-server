@@ -7,6 +7,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { actorDetailsOutputSchema } from './schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -29,88 +30,7 @@ USAGE EXAMPLES:
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,
     inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
-    outputSchema: {
-        type: 'object',
-        properties: {
-            actorInfo: {
-                type: 'object',
-                properties: {
-                    title: { type: 'string', description: 'Actor title' },
-                    url: { type: 'string', description: 'Actor URL' },
-                    fullName: { type: 'string', description: 'Full actor name (username/name)' },
-                    developer: {
-                        type: 'object',
-                        properties: {
-                            username: { type: 'string', description: 'Developer username' },
-                            isOfficialApify: { type: 'boolean', description: 'Whether the actor is developed by Apify' },
-                            url: { type: 'string', description: 'Developer profile URL' },
-                        },
-                        required: ['username', 'isOfficialApify', 'url'],
-                    },
-                    description: { type: 'string', description: 'Actor description' },
-                    categories: { type: 'array',
-                        items: { type: 'string' },
-                        description: 'Actor categories' },
-                    pricing: {
-                        type: 'object',
-                        properties: {
-                            model: { type: 'string', description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)' },
-                            isFree: { type: 'boolean', description: 'Whether the actor is free to use' },
-                            pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
-                            unitName: { type: 'string', description: 'Unit name for pricing' },
-                            trialMinutes: { type: 'number', description: 'Trial period in minutes' },
-                            tieredPricing: { type: 'array',
-                                items: {
-                                    type: 'object',
-                                    properties: {
-                                        tier: { type: 'string', description: 'Tier name' },
-                                        pricePerUnit: { type: 'number', description: 'Price per unit for this tier' },
-                                    },
-                                },
-                                description: 'Tiered pricing information' },
-                            events: { type: 'array',
-                                items: {
-                                    type: 'object',
-                                    properties: {
-                                        title: { type: 'string', description: 'Event title' },
-                                        description: { type: 'string', description: 'Event description' },
-                                        priceUsd: { type: 'number', description: 'Price in USD' },
-                                        tieredPricing: {
-                                            type: 'array',
-                                            items: {
-                                                type: 'object',
-                                                properties: {
-                                                    tier: { type: 'string' },
-                                                    priceUsd: { type: 'number' },
-                                                },
-                                            },
-                                        },
-                                    },
-                                },
-                                description: 'Event-based pricing information' },
-                        },
-                        required: ['model', 'isFree'],
-                    },
-                    stats: {
-                        type: 'object',
-                        properties: {
-                            totalUsers: { type: 'number', description: 'Total users' },
-                            monthlyUsers: { type: 'number', description: 'Monthly active users' },
-                            successRate: { type: 'number', description: 'Success rate percentage' },
-                            bookmarks: { type: 'number', description: 'Number of bookmarks' },
-                        },
-                    },
-                    rating: { type: 'number', description: 'Actor rating' },
-                    modifiedAt: { type: 'string', description: 'Last modification date' },
-                    isDeprecated: { type: 'boolean', description: 'Whether the actor is deprecated' },
-                },
-                required: ['url', 'fullName', 'developer', 'description', 'categories', 'pricing'],
-            },
-            readme: { type: 'string', description: 'Actor README documentation.' },
-            inputSchema: { type: 'object', description: 'Actor input schema.' },
-        },
-        required: ['actorInfo', 'readme', 'inputSchema'],
-    },
+    outputSchema: actorDetailsOutputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
     annotations: {
         title: 'Fetch Actor details',
