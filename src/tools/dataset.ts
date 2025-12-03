@@ -197,7 +197,7 @@ USAGE EXAMPLES:
             return buildMCPResponse(
                 [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
                 true,
-                TOOL_STATUS.FAILED
+                TOOL_STATUS.FAILED,
             );
         }
 

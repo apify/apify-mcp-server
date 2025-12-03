@@ -66,7 +66,7 @@ Please provide a valid Apify documentation URL. You can find documentation URLs 
 HTTP Status: ${response.status} ${response.statusText}.
 Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`],
                         true,
-                        isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED
+                        isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
                     );
                 }
                 const html = await response.text();
@@ -82,7 +82,7 @@ Please verify the URL is correct and accessible. You can search for available do
 Error: ${error instanceof Error ? error.message : String(error)}.
 Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`],
                     true,
-                    TOOL_STATUS.SOFT_FAIL
+                    TOOL_STATUS.SOFT_FAIL,
                 );
             }
         }
