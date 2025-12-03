@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
@@ -45,7 +45,8 @@ USAGE EXAMPLES:
 Please verify Actor ID or name format and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`,
             ];
-            return buildMCPResponse(texts, true);
+            // User error – actor not found, mark as soft_fail internally while keeping MCP isError=true
+            return buildMCPResponse(texts, true, TOOL_STATUS.SOFT_FAIL);
         }
 
         const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;

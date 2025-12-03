@@ -36,7 +36,7 @@ import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
-    type TelemetryEnv,
+    TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
@@ -47,14 +47,17 @@ import type {
     ActorsMcpServerOptions,
     ActorTool,
     HelperTool,
+    TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
+    ToolStatus,
 } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
+import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
@@ -581,7 +584,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
             const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
 
             const startTime = Date.now();
-            let toolStatus: 'succeeded' | 'failed' | 'aborted' = 'succeeded';
+            let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
 
             try {
                 // Handle internal tool
@@ -605,8 +608,19 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     if (progressTracker) {
                         progressTracker.stop();
                     }
-                    toolStatus = ('isError' in res && res.isError) ? 'failed' : 'succeeded';
-                    return { ...res };
+
+                    // If tool provided internal status, use it; otherwise infer from isError flag
+                    const { _toolStatus, ...rest } = res as { _toolStatus?: ToolStatus; isError?: boolean };
+                    if (_toolStatus !== undefined) {
+                        toolStatus = _toolStatus;
+                    } else if ('isError' in rest && rest.isError) {
+                        toolStatus = TOOL_STATUS.FAILED;
+                    } else {
+                        toolStatus = TOOL_STATUS.SUCCEEDED;
+                    }
+
+                    // Never expose internal _toolStatus field to MCP clients
+                    return { ...rest };
                 }
 
                 if (tool.type === 'actor-mcp') {
@@ -618,7 +632,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
 Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
                             log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                            toolStatus = 'failed';
+                            toolStatus = TOOL_STATUS.SOFT_FAIL;
                             return buildMCPResponse([msg], true);
                         }
 
@@ -649,6 +663,8 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
                         });
 
+                        // For external MCP servers we do not try to infer soft_fail vs failed from isError.
+                        // We treat the call as succeeded at the telemetry layer unless an actual error is thrown.
                         return { ...res };
                     } finally {
                         if (client) await client.close();
@@ -686,7 +702,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         );
 
                         if (!callResult) {
-                            toolStatus = 'aborted';
+                            toolStatus = TOOL_STATUS.ABORTED;
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return { };
@@ -700,8 +716,10 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         }
                     }
                 }
+                // If we reached here without returning, it means the tool type was not recognized (user error)
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
-                toolStatus = extra.signal?.aborted ? 'aborted' : 'failed';
+                toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse([
@@ -735,13 +753,13 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * @param telemetryData - Telemetry data to finalize and track (null if telemetry is disabled)
      * @param userId - Apify user ID (string or null if not available)
      * @param startTime - Timestamp when the tool call started
-     * @param toolStatus - Final status of the tool call ('succeeded', 'failed', or 'aborted')
+     * @param toolStatus - Final status of the tool call
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
         userId: string | null,
         startTime: number,
-        toolStatus: 'succeeded' | 'failed' | 'aborted',
+        toolStatus: ToolStatus,
     ): void {
         if (!telemetryData) {
             return;
@@ -787,7 +805,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
             tool_name: toolFullName,
-            tool_status: 'succeeded', // Will be updated in finally
+            tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
         };
 

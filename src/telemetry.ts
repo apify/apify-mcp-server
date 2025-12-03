@@ -9,9 +9,8 @@ import {
     SEGMENT_FLUSH_AT_EVENTS,
     SEGMENT_FLUSH_INTERVAL_MS,
     TELEMETRY_ENV,
-    type TelemetryEnv,
 } from './const.js';
-import type { ToolCallTelemetryProperties } from './types.js';
+import type { TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
 const PROD_WRITE_KEY = 'cOkp5EIJaN69gYaN8bcp7KtaD0fGABwJ';
