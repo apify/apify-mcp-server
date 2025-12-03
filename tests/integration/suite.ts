@@ -73,6 +73,40 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     expect(actual.type).toBe(expected.type);
 }
 
+function validateStructuredOutput(
+    result: unknown,
+    toolOutputSchema: unknown,
+    toolName: string,
+): void {
+    // Ensure result has structured content
+    const resultWithStructured = result as Record<string, unknown>;
+    if (!resultWithStructured.structuredContent) {
+        return;
+    }
+
+    const { structuredContent } = resultWithStructured;
+
+    // Verify tool has an outputSchema
+    expect(toolOutputSchema).toBeDefined();
+
+    if (toolOutputSchema) {
+        // Create AJV validator instance
+        const ajv = new Ajv();
+        const validate = ajv.compile(toolOutputSchema as Record<string, unknown>);
+
+        // Validate structured content against the schema
+        const isValid = validate(structuredContent);
+
+        if (!isValid) {
+            // eslint-disable-next-line no-console
+            console.error(`Validation errors for ${toolName}:`, validate.errors);
+        }
+
+        expect(isValid).toBe(true);
+        expect(validate.errors).toBeNull();
+    }
+}
+
 export function createIntegrationTestsSuite(
     options: IntegrationTestsSuiteOptions,
 ) {
@@ -614,34 +648,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            // Validate structured content against the tool's outputSchema programmatically
-            const resultWithStructured = result as Record<string, unknown>;
-            if (resultWithStructured.structuredContent) {
-                const { structuredContent } = resultWithStructured;
-
-                // Get the output schema from the tool definition
-                const { outputSchema } = searchApifyDocsTool;
-
-                // Verify tool has an outputSchema
-                expect(outputSchema).toBeDefined();
-
-                if (outputSchema) {
-                    // Create AJV validator instance
-                    const ajv = new Ajv();
-                    const validate = ajv.compile(outputSchema as Record<string, unknown>);
-
-                    // Validate structured content against the schema
-                    const isValid = validate(structuredContent);
-
-                    if (!isValid) {
-                        // eslint-disable-next-line no-console
-                        console.error('Validation errors:', validate.errors);
-                    }
-
-                    expect(isValid).toBe(true);
-                    expect(validate.errors).toBeNull();
-                }
-            }
+            validateStructuredOutput(result, searchApifyDocsTool.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-actor-details matching outputSchema', async () => {
@@ -661,34 +668,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            // Validate structured content against the tool's outputSchema programmatically
-            const resultWithStructured = result as Record<string, unknown>;
-            if (resultWithStructured.structuredContent) {
-                const { structuredContent } = resultWithStructured;
-
-                // Get the output schema from the tool definition
-                const { outputSchema } = fetchActorDetailsTool;
-
-                // Verify tool has an outputSchema
-                expect(outputSchema).toBeDefined();
-
-                if (outputSchema) {
-                    // Create AJV validator instance
-                    const ajv = new Ajv();
-                    const validate = ajv.compile(outputSchema as Record<string, unknown>);
-
-                    // Validate structured content against the schema
-                    const isValid = validate(structuredContent);
-
-                    if (!isValid) {
-                        // eslint-disable-next-line no-console
-                        console.error('Validation errors:', validate.errors);
-                    }
-
-                    expect(isValid).toBe(true);
-                    expect(validate.errors).toBeNull();
-                }
-            }
+            validateStructuredOutput(result, fetchActorDetailsTool.outputSchema, toolName);
         });
 
         it('should return structured output for search-actors matching outputSchema', async () => {
@@ -710,34 +690,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            // Validate structured content against the tool's outputSchema programmatically
-            const resultWithStructured = result as Record<string, unknown>;
-            if (resultWithStructured.structuredContent) {
-                const { structuredContent } = resultWithStructured;
-
-                // Get the output schema from the tool definition
-                const { outputSchema } = searchActors;
-
-                // Verify tool has an outputSchema
-                expect(outputSchema).toBeDefined();
-
-                if (outputSchema) {
-                    // Create AJV validator instance
-                    const ajv = new Ajv();
-                    const validate = ajv.compile(outputSchema as Record<string, unknown>);
-
-                    // Validate structured content against the schema
-                    const isValid = validate(structuredContent);
-
-                    if (!isValid) {
-                        // eslint-disable-next-line no-console
-                        console.error('Validation errors:', validate.errors);
-                    }
-
-                    expect(isValid).toBe(true);
-                    expect(validate.errors).toBeNull();
-                }
-            }
+            validateStructuredOutput(result, searchActors.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
@@ -757,34 +710,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            // Validate structured content against the tool's outputSchema programmatically
-            const resultWithStructured = result as Record<string, unknown>;
-            if (resultWithStructured.structuredContent) {
-                const { structuredContent } = resultWithStructured;
-
-                // Get the output schema from the tool definition
-                const { outputSchema } = fetchApifyDocsTool;
-
-                // Verify tool has an outputSchema
-                expect(outputSchema).toBeDefined();
-
-                if (outputSchema) {
-                    // Create AJV validator instance
-                    const ajv = new Ajv();
-                    const validate = ajv.compile(outputSchema as Record<string, unknown>);
-
-                    // Validate structured content against the schema
-                    const isValid = validate(structuredContent);
-
-                    if (!isValid) {
-                        // eslint-disable-next-line no-console
-                        console.error('Validation errors:', validate.errors);
-                    }
-
-                    expect(isValid).toBe(true);
-                    expect(validate.errors).toBeNull();
-                }
-            }
+            validateStructuredOutput(result, fetchApifyDocsTool.outputSchema, toolName);
         });
 
         it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {
