@@ -133,6 +133,10 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
     return 'Pricing information is not available.';
 }
 
+/**
+ * Transform and normalize API response to match unstructured text output format
+ * instead of just dumping raw API data - ensures consistency across structured & unstructured modes.
+ */
 export function pricingInfoToStructured(pricingInfo: ExtendedPricingInfo | null): StructuredPricingInfo {
     const structuredPricing: StructuredPricingInfo = {
         model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE,
@@ -144,13 +148,13 @@ export function pricingInfoToStructured(pricingInfo: ExtendedPricingInfo | null)
     }
 
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
-        structuredPricing.pricePerUnit = (pricingInfo.pricePerUnitUsd || 0) * 1000; // Convert to price per 1000 units
+        structuredPricing.pricePerUnit = pricingInfo.pricePerUnitUsd || 0;
         structuredPricing.unitName = pricingInfo.unitName || 'result';
 
         if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
             structuredPricing.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
                 tier,
-                pricePerUnit: obj.tieredPricePerUnitUsd * 1000,
+                pricePerUnit: obj.tieredPricePerUnitUsd,
             }));
         }
     } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
