@@ -5,7 +5,7 @@ import type { ExtendedPricingInfo } from '../types.js';
 
 /**
  * Custom type to transform raw API pricing data into a clean, client-friendly format
- * that matches the style of the unstructured text output insteda of using the raw API format.
+ * that matches the style of the unstructured text output instead of using the raw API format.
  */
 export interface StructuredPricingInfo {
     model: string;
