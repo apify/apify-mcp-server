@@ -1,7 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { TOOL_STATUS } from '../../src/types.js';
+import { TOOL_STATUS } from '../../src/const.js';
 import { getToolStatusFromError } from '../../src/utils/tool-status.js';
 
 describe('getToolStatusFromError', () => {
