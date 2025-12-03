@@ -2,10 +2,11 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
+import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -136,7 +137,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
         });
 
         if (!response) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
+            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
         }
 
         let { items } = response;

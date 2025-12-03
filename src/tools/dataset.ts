@@ -2,10 +2,11 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 
 const getDatasetArgs = z.object({
@@ -68,7 +69,7 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
+            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -119,7 +120,7 @@ USAGE EXAMPLES:
             flatten,
         });
         if (!v) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
+            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -175,7 +176,7 @@ USAGE EXAMPLES:
         });
 
         if (!datasetResponse) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' not found.` }], isError: true };
+            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
         }
 
         const datasetItems = datasetResponse.items;
@@ -192,7 +193,12 @@ USAGE EXAMPLES:
         });
 
         if (!schema) {
-            return { content: [{ type: 'text', text: `Failed to generate schema for dataset '${parsed.datasetId}'.` }], isError: true };
+            // Schema generation failure is typically a server/processing error, not a user error
+            return buildMCPResponse(
+                [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
+                true,
+                TOOL_STATUS.FAILED
+            );
         }
 
         return {
