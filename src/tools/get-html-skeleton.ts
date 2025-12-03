@@ -62,7 +62,7 @@ USAGE EXAMPLES:
         const parsed = getHtmlSkeletonArgs.parse(args);
 
         if (!isValidHttpUrl(parsed.url)) {
-            return buildMCPResponse([`The provided URL is not a valid HTTP or HTTPS URL: ${parsed.url}`], true);
+            return buildMCPResponse({ texts: [`The provided URL is not a valid HTTP or HTTPS URL: ${parsed.url}`], isError: true });
         }
 
         // Try to get from cache first
@@ -81,16 +81,16 @@ USAGE EXAMPLES:
 
             const datasetItems = await client.dataset(run.defaultDatasetId).listItems();
             if (datasetItems.items.length === 0) {
-                return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], true);
+                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
             }
 
             const firstItem = datasetItems.items[0] as unknown as ScrapedPageItem;
             if (firstItem.crawl.httpStatusMessage.toLocaleLowerCase() !== 'ok') {
-                return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], true);
+                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
             }
 
             if (!firstItem.html) {
-                return buildMCPResponse([`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], true);
+                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
             }
 
             strippedHtml = stripHtml(firstItem.html);
@@ -108,6 +108,6 @@ USAGE EXAMPLES:
 
         const chunkInfo = `\n\n--- Chunk ${parsed.chunk} of ${totalChunks} ---\n${hasNextChunk ? `Next chunk: ${parsed.chunk + 1}` : 'End of content'}`;
 
-        return buildMCPResponse([chunkContent + chunkInfo]);
+        return buildMCPResponse({ texts: [chunkContent + chunkInfo] });
     },
 } as const;

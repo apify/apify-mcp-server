@@ -617,7 +617,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = 'failed';
-                            return buildMCPResponse([msg], true);
+                            return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -656,7 +656,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 // Handle actor tool
                 if (tool.type === 'actor') {
                     if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                        return buildMCPResponse([SKYFIRE_TOOL_INSTRUCTIONS]);
+                        return buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS] });
                     }
 
                     // Create progress tracker if progressToken is available
@@ -702,10 +702,11 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 toolStatus = extra.signal?.aborted ? 'aborted' : 'failed';
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
-                return buildMCPResponse([
+                return buildMCPResponse({ texts: [
                     `Error calling tool "${name}": ${errorMessage}.
 Please verify the tool name, input parameters, and ensure all required resources are available.`,
-                ], true);
+                ],
+                isError: true });
             } finally {
                 this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
             }

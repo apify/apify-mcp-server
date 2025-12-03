@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()
@@ -47,9 +48,10 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return { content: [{ type: 'text', text: `Run with ID '${parsed.runId}' not found.` }], isError: true };
+            return buildMCPResponse({ texts: [`Run with ID '${parsed.runId}' not found.`], isError: true });
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+        const texts = [`\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``];
+        return buildMCPResponse({ texts });
     },
 } as const;
 
@@ -78,6 +80,7 @@ USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
+    // It does not make sense to add structured output here since the log API just returns plain text
     ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
     annotations: {
         title: 'Get Actor run log',

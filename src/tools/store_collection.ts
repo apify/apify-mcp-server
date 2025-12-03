@@ -5,7 +5,7 @@ import zodToJsonSchema from 'zod-to-json-schema';
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { formatActorToActorCard } from '../utils/actor-card.js';
+import { formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 
@@ -124,6 +124,91 @@ Returns list of Actor cards with the following info:
 - **Rating:** Out of 5 (if available)
 `,
     inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
+    outputSchema: {
+        type: 'object',
+        properties: {
+            actors: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        title: { type: 'string', description: 'Actor title' },
+                        fullName: { type: 'string', description: 'Full actor name (username/name)' },
+                        url: { type: 'string', description: 'Actor URL' },
+                        developer: {
+                            type: 'object',
+                            properties: {
+                                username: { type: 'string', description: 'Developer username' },
+                                isOfficialApify: { type: 'boolean', description: 'Whether the actor is developed by Apify' },
+                                url: { type: 'string', description: 'Developer profile URL' },
+                            },
+                            required: ['username', 'isOfficialApify', 'url'],
+                        },
+                        description: { type: 'string', description: 'Actor description' },
+                        categories: { type: 'array',
+                            items: { type: 'string' },
+                            description: 'Actor categories' },
+                        pricing: {
+                            type: 'object',
+                            properties: {
+                                model: { type: 'string', description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)' },
+                                isFree: { type: 'boolean', description: 'Whether the actor is free to use' },
+                                pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
+                                unitName: { type: 'string', description: 'Unit name for pricing' },
+                                trialMinutes: { type: 'number', description: 'Trial period in minutes' },
+                                tieredPricing: { type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            tier: { type: 'string', description: 'Tier name' },
+                                            pricePerUnit: { type: 'number', description: 'Price per unit for this tier' },
+                                        },
+                                    },
+                                    description: 'Tiered pricing information' },
+                                events: { type: 'array',
+                                    items: {
+                                        type: 'object',
+                                        properties: {
+                                            title: { type: 'string', description: 'Event title' },
+                                            description: { type: 'string', description: 'Event description' },
+                                            priceUsd: { type: 'number', description: 'Price in USD' },
+                                            tieredPricing: {
+                                                type: 'array',
+                                                items: {
+                                                    type: 'object',
+                                                    properties: {
+                                                        tier: { type: 'string' },
+                                                        priceUsd: { type: 'number' },
+                                                    },
+                                                },
+                                            },
+                                        },
+                                    },
+                                    description: 'Event-based pricing information' },
+                            },
+                            required: ['model', 'isFree'],
+                        },
+                        stats: {
+                            type: 'object',
+                            properties: {
+                                totalUsers: { type: 'number', description: 'Total users' },
+                                monthlyUsers: { type: 'number', description: 'Monthly active users' },
+                                successRate: { type: 'number', description: 'Success rate percentage' },
+                                bookmarks: { type: 'number', description: 'Number of bookmarks' },
+                            },
+                        },
+                        rating: { type: 'number', description: 'Actor rating' },
+                        isDeprecated: { type: 'boolean', description: 'Whether the actor is deprecated' },
+                    },
+                    required: ['fullName', 'url', 'developer', 'description', 'categories', 'pricing'],
+                },
+                description: 'List of Actor cards matching the search query',
+            },
+            query: { type: 'string', description: 'The search query used' },
+            count: { type: 'number', description: 'Number of actors returned' },
+        },
+        required: ['actors', 'query', 'count'],
+    },
     ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
     annotations: {
         title: 'Search Actors',
@@ -144,23 +229,34 @@ Returns list of Actor cards with the following info:
         const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
 
         if (actorCards.length === 0) {
-            return buildMCPResponse([`No Actors were found for the search query "${parsed.keywords}".
-Please try different keywords or simplify your query. Consider using more specific platform names (e.g., "Instagram", "Twitter") and data types (e.g., "posts", "products") rather than generic terms like "scraper" or "crawler".`]);
+            return buildMCPResponse({ texts: [`No Actors were found for the search query "${parsed.keywords}".
+ Please try different keywords or simplify your query. Consider using more specific platform names (e.g., "Instagram", "Twitter") and data types (e.g., "posts", "products") rather than generic terms like "scraper" or "crawler".`] });
         }
 
         const actorsText = actorCards.join('\n\n');
 
-        return buildMCPResponse([`
-# Search results:
-- **Search query:** ${parsed.keywords}
-- **Number of Actors found:** ${actorCards.length}
+        // Generate structured cards for the actors
+        const structuredActorCards = actors.map(formatActorToStructuredCard);
 
-# Actors:
+        const texts = [`
+ # Search results:
+ - **Search query:** ${parsed.keywords}
+ - **Number of Actors found:** ${actorCards.length}
 
-${actorsText}
+ # Actors:
 
-If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
-If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
-`]);
+ ${actorsText}
+
+ If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+ If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
+ `];
+
+        const structuredContent = {
+            actors: structuredActorCards,
+            query: parsed.keywords,
+            count: actorCards.length,
+        };
+
+        return buildMCPResponse({ texts, structuredContent });
     },
 } as const;

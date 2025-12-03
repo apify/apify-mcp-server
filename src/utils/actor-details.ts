@@ -3,7 +3,7 @@ import type { Actor, Build } from 'apify-client';
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { IActorInputSchema } from '../types.js';
-import { formatActorToActorCard } from './actor-card.js';
+import { formatActorToActorCard, formatActorToStructuredCard, type StructuredActorCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
 
 // Keep the interface here since it is a self contained module
@@ -11,6 +11,7 @@ export interface ActorDetailsResult {
     actorInfo: Actor;
     buildInfo: Build;
     actorCard: string;
+    actorCardStructured: StructuredActorCard;
     inputSchema: IActorInputSchema;
     readme: string;
 }
@@ -29,10 +30,12 @@ export async function fetchActorDetails(apifyClient: ApifyClient, actorName: str
         inputSchema.properties = filterSchemaProperties(inputSchema.properties);
         inputSchema.properties = shortenProperties(inputSchema.properties);
         const actorCard = formatActorToActorCard(actorInfo);
+        const actorCardStructured = formatActorToStructuredCard(actorInfo);
         return {
             actorInfo,
             buildInfo,
             actorCard,
+            actorCardStructured,
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
         };

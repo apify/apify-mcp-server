@@ -50,6 +50,24 @@ USAGE EXAMPLES:
 - query: How to define Actor input schema?
 - query: How scrape with Crawlee?`,
     inputSchema: zodToJsonSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
+    outputSchema: {
+        type: 'object',
+        properties: {
+            results: {
+                type: 'array',
+                items: {
+                    type: 'object',
+                    properties: {
+                        url: { type: 'string', description: 'URL of the documentation page.' },
+                        fragment: { type: 'string', description: 'Fragment identifier within the document, if available.' },
+                        content: { type: 'string', description: 'A limited piece of content that matches the search query.' },
+                    },
+                    required: ['url', 'content'],
+                },
+            },
+        },
+        required: ['results'],
+    },
     ajvValidate: ajv.compile(zodToJsonSchema(searchApifyDocsToolArgsSchema)),
     annotations: {
         title: 'Search Apify docs',
@@ -66,16 +84,23 @@ USAGE EXAMPLES:
         const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
         if (results.length === 0) {
-            return buildMCPResponse([`No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}.
+            return buildMCPResponse({ texts: [`No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}.
 Please try a different query with different keywords, or adjust the limit and offset parameters.
-You can also try using more specific or alternative keywords related to your search topic.`]);
+You can also try using more specific or alternative keywords related to your search topic.`] });
         }
 
         const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
 Search results for "${query}":
 
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
-  Content: ${result.content}`).join('\n\n')}`;
-        return buildMCPResponse([textContent]);
+   Content: ${result.content}`).join('\n\n')}`;
+        const structuredContent = {
+            results: results.map((result) => ({
+                url: result.url,
+                fragment: result.fragment,
+                content: result.content,
+            })),
+        };
+        return buildMCPResponse({ texts: [textContent], structuredContent });
     },
 } as const;

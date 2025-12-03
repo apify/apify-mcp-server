@@ -2,7 +2,30 @@ import type { Actor } from 'apify-client';
 
 import { APIFY_STORE_URL } from '../const.js';
 import type { ExtendedActorStoreList, ExtendedPricingInfo } from '../types.js';
-import { getCurrentPricingInfo, pricingInfoToString } from './pricing-info.js';
+import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured, type StructuredPricingInfo } from './pricing-info.js';
+
+export interface StructuredActorCard {
+    title?: string;
+    url: string;
+    fullName: string;
+    developer: {
+        username: string;
+        isOfficialApify: boolean;
+        url: string;
+    };
+    description: string;
+    categories: string[];
+    pricing: StructuredPricingInfo;
+    stats?: {
+        totalUsers: number;
+        monthlyUsers: number;
+        successRate?: number;
+        bookmarks?: number;
+    };
+    rating?: number;
+    modifiedAt?: string;
+    isDeprecated: boolean;
+}
 
 // Helper function to format categories from uppercase with underscores to proper case
 function formatCategories(categories?: string[]): string[] {
@@ -101,4 +124,86 @@ export function formatActorToActorCard(
         markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
     }
     return markdownLines.join('\n');
+}
+
+/**
+ * Extracts structured data from Actor information.
+ * @param actor - Actor information from the API
+ * @returns Structured actor card data for programmatic use
+ */
+export function formatActorToStructuredCard(
+    actor: Actor | ExtendedActorStoreList,
+): StructuredActorCard {
+    // Format categories for display
+    const formattedCategories = formatCategories('categories' in actor ? actor.categories : undefined);
+
+    // Get pricing info - try to extract from the appropriate source
+    let pricingInfo: ExtendedPricingInfo | null = null;
+    if ('currentPricingInfo' in actor) {
+        // ActorStoreList has currentPricingInfo
+        pricingInfo = actor.currentPricingInfo as unknown as ExtendedPricingInfo;
+    } else if ('pricingInfos' in actor && actor.pricingInfos && actor.pricingInfos.length > 0) {
+        // Actor has pricingInfos array - get the current one
+        pricingInfo = getCurrentPricingInfo(actor.pricingInfos, new Date()) as unknown as ExtendedPricingInfo;
+    }
+    // If pricingInfo is still null, it means the actor is free (no pricing info means free)
+    const pricing = pricingInfoToStructured(pricingInfo);
+
+    const actorFullName = `${actor.username}/${actor.name}`;
+    const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
+
+    // Build structured data
+    const structuredData: StructuredActorCard = {
+        title: actor.title,
+        url: actorUrl,
+        fullName: actorFullName,
+        developer: {
+            username: actor.username,
+            isOfficialApify: actor.username === 'apify',
+            url: `${APIFY_STORE_URL}/${actor.username}`,
+        },
+        description: actor.description || 'No description provided.',
+        categories: formattedCategories,
+        pricing,
+        isDeprecated: ('isDeprecated' in actor && actor.isDeprecated) || false,
+    };
+
+    // Add stats if available
+    if ('stats' in actor) {
+        const { stats } = actor;
+        if ('totalUsers' in stats && 'totalUsers30Days' in stats) {
+            structuredData.stats = {
+                totalUsers: stats.totalUsers,
+                monthlyUsers: stats.totalUsers30Days,
+            };
+
+            // Add success rate for last 30 days if available
+            if ('publicActorRunStats30Days' in stats && stats.publicActorRunStats30Days) {
+                const runStats = stats.publicActorRunStats30Days as {
+                    SUCCEEDED: number;
+                    TOTAL: number;
+                };
+                if (runStats.TOTAL > 0) {
+                    structuredData.stats.successRate = Number(((runStats.SUCCEEDED / runStats.TOTAL) * 100).toFixed(1));
+                }
+            }
+
+            // Add bookmark count if available (ActorStoreList only)
+            if ('bookmarkCount' in actor && actor.bookmarkCount) {
+                structuredData.stats.bookmarks = actor.bookmarkCount;
+            }
+        }
+    }
+
+    // Add rating if available (ActorStoreList only)
+    if ('actorReviewRating' in actor && actor.actorReviewRating) {
+        structuredData.rating = actor.actorReviewRating;
+    }
+
+    // Add modification date if available
+    if ('modifiedAt' in actor && actor.modifiedAt) {
+        structuredData.modifiedAt = actor.modifiedAt.toISOString();
+    }
+
+    return structuredData;
 }
