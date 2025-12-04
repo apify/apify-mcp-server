@@ -78,12 +78,14 @@ Search results for "${query}":
 
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
    Content: ${result.content}`).join('\n\n')}`;
+
         const structuredContent = {
             results: results.map((result) => ({
                 url: result.url,
                 fragment: result.fragment,
                 content: result.content,
             })),
+            instructions: `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.`,
         };
         return buildMCPResponse({ texts: [textContent], structuredContent });
     },

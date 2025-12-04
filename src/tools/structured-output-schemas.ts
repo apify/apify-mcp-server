@@ -144,6 +144,7 @@ export const actorSearchOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
     },
     required: ['actors', 'query', 'count'],
 };
@@ -163,6 +164,7 @@ export const searchApifyDocsToolOutputSchema = {
                 required: ['url', 'content'],
             },
         },
+        instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
     },
     required: ['results'],
 };

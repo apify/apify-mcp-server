@@ -172,6 +172,8 @@ Returns list of Actor cards with the following info:
             actors: structuredActorCards,
             query: parsed.keywords,
             count: actorCards.length,
+            instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+ If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.`,
         };
 
         return buildMCPResponse({ texts, structuredContent });
