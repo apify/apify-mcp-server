@@ -113,7 +113,7 @@ export const actorInfoSchema = {
         stats: statsSchema,
         rating: { type: 'number', description: 'Actor rating' },
         modifiedAt: { type: 'string', description: 'Last modification date' },
-        isDeprecated: { type: 'boolean', description: 'Whether the actor is deprecated' },
+        isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
     required: ['url', 'fullName', 'developer', 'description', 'categories', 'pricing'],
 };
