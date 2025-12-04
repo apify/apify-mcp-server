@@ -2,8 +2,8 @@ import type { Actor, Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { IActorInputSchema } from '../types.js';
-import { formatActorToActorCard, formatActorToStructuredCard, type StructuredActorCard } from './actor-card.js';
+import type { IActorInputSchema, type StructuredActorCard } from '../types.js';
+import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
 
 // Keep the interface here since it is a self contained module

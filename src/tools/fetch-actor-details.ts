@@ -7,7 +7,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { actorDetailsOutputSchema } from './schemas.js';
+import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()

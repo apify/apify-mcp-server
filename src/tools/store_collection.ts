@@ -8,7 +8,7 @@ import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolE
 import { formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { actorSearchOutputSchema } from './schemas.js';
+import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
 export async function searchActorsByKeywords(
     search: string,

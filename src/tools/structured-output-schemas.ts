@@ -6,7 +6,7 @@
 /**
  * Schema for developer information
  */
-export const developerSchema = {
+const developerSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         username: { type: 'string', description: 'Developer username' },
@@ -146,4 +146,32 @@ export const actorSearchOutputSchema = {
         count: { type: 'number', description: 'Number of Actors returned' },
     },
     required: ['actors', 'query', 'count'],
+};
+
+export const searchApifyDocsToolOutputSchema = {
+    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    properties: {
+        results: {
+            type: 'array' as const, // Literal type required for MCP SDK type compatibility
+            items: {
+                type: 'object' as const, // Literal type required for MCP SDK type compatibility
+                properties: {
+                    url: { type: 'string', description: 'URL of the documentation page.' },
+                    fragment: { type: 'string', description: 'Fragment identifier within the document, if available.' },
+                    content: { type: 'string', description: 'A limited piece of content that matches the search query.' },
+                },
+                required: ['url', 'content'],
+            },
+        },
+    },
+    required: ['results'],
+};
+
+export const fetchApifyDocsToolOutputSchema = {
+    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    properties: {
+        url: { type: 'string', description: 'The documentation URL that was fetched' },
+        content: { type: 'string', description: 'The full markdown content of the documentation page' },
+    },
+    required: ['url', 'content'],
 };

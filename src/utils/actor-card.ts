@@ -1,31 +1,8 @@
 import type { Actor } from 'apify-client';
 
 import { APIFY_STORE_URL } from '../const.js';
-import type { ExtendedActorStoreList, ExtendedPricingInfo } from '../types.js';
-import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured, type StructuredPricingInfo } from './pricing-info.js';
-
-export interface StructuredActorCard {
-    title?: string;
-    url: string;
-    fullName: string;
-    developer: {
-        username: string;
-        isOfficialApify: boolean;
-        url: string;
-    };
-    description: string;
-    categories: string[];
-    pricing: StructuredPricingInfo;
-    stats?: {
-        totalUsers: number;
-        monthlyUsers: number;
-        successRate?: number;
-        bookmarks?: number;
-    };
-    rating?: number;
-    modifiedAt?: string;
-    isDeprecated: boolean;
-}
+import type { ExtendedActorStoreList, ExtendedPricingInfo, StructuredActorCard } from '../types.js';
+import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured } from './pricing-info.js';
 
 // Helper function to format categories from uppercase with underscores to proper case
 function formatCategories(categories?: string[]): string[] {
