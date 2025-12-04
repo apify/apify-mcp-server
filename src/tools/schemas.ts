@@ -101,7 +101,7 @@ export const actorInfoSchema = {
     properties: {
         title: { type: 'string', description: 'Actor title' },
         url: { type: 'string', description: 'Actor URL' },
-        fullName: { type: 'string', description: 'Full actor name (username/name)' },
+        fullName: { type: 'string', description: 'Full Actor name (username/name)' },
         developer: developerSchema,
         description: { type: 'string', description: 'Actor description' },
         categories: {
