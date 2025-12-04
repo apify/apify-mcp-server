@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.0) (2025-12-04)
+
+### 🚀 Features
+
+- Add server instructions ([#342](https://github.com/apify/apify-mcp-server/pull/342)) ([25a3a07](https://github.com/apify/apify-mcp-server/commit/25a3a0781a78f4fc6d631aa66d7e5ccc8aea8cdc)) by [@jirispilka](https://github.com/jirispilka)
+- Update package.json to require node &gt;= 20 ([#346](https://github.com/apify/apify-mcp-server/pull/346)) ([08629b8](https://github.com/apify/apify-mcp-server/commit/08629b8f3e40ccc1ccc58011c823f451c9e2681d)) by [@jirispilka](https://github.com/jirispilka)
+- Telemery add soft fail for client errors ([#350](https://github.com/apify/apify-mcp-server/pull/350)) ([f3a23a2](https://github.com/apify/apify-mcp-server/commit/f3a23a2f474de5950a32c10bac81b36d270d2445)) by [@jirispilka](https://github.com/jirispilka)
+- Structured output for the crucial tools ([#349](https://github.com/apify/apify-mcp-server/pull/349)) ([fb17b1e](https://github.com/apify/apify-mcp-server/commit/fb17b1e02ce6e8a7988ba26324f5ebe8b349d34b)) by [@MQ37](https://github.com/MQ37)
+- Add eslint from apify-core, add AGENTS.md ([#351](https://github.com/apify/apify-mcp-server/pull/351)) ([77a7bd5](https://github.com/apify/apify-mcp-server/commit/77a7bd5cf5ca01f44eb276deae6c79210a5b24dd)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Structured output add instructions for the agent since some clients consider only structured output if present ([#352](https://github.com/apify/apify-mcp-server/pull/352)) ([a534789](https://github.com/apify/apify-mcp-server/commit/a53478964e17e8e29602f4f3baae43e639013d2e)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.5.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.5.9) (2025-11-28)
 
 ### 🚀 Features
