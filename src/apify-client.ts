@@ -4,10 +4,10 @@ import type { AxiosRequestConfig } from 'axios';
 
 import { USER_AGENT_ORIGIN } from './const.js';
 
-interface ExtendedApifyClientOptions extends Omit<ApifyClientOptions, 'token'> {
+type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
     skyfirePayId?: string;
-}
+};
 
 /**
  * Adds a User-Agent header to the request config.

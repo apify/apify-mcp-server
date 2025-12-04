@@ -2,7 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
-import type { ActorInputSchemaProperties, IActorInputSchema, ISchemaProperties } from '../types.js';
+import type { ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -53,10 +53,10 @@ export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunct
  * For proxy objects (type='object', editor='proxy'), adds 'useApifyProxy' property.
  * For request list sources (type='array', editor='requestListSources'), adds URL structure to items.
  *
- * @param {Record<string, ISchemaProperties>} properties - The input schema properties
- * @returns {Record<string, ISchemaProperties>} Modified properties with nested properties
+ * @param {Record<string, SchemaProperties>} properties - The input schema properties
+ * @returns {Record<string, SchemaProperties>} Modified properties with nested properties
  */
-export function buildApifySpecificProperties(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
+export function buildApifySpecificProperties(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
     const clonedProperties = { ...properties };
 
     for (const [propertyName, property] of Object.entries(clonedProperties)) {
@@ -83,10 +83,10 @@ export function buildApifySpecificProperties(properties: Record<string, ISchemaP
  * This is done to reduce the size of the input schema and to make it more readable.
  * @param properties
  */
-export function filterSchemaProperties(properties: { [key: string]: ISchemaProperties }): {
-    [key: string]: ISchemaProperties
+export function filterSchemaProperties(properties: { [key: string]: SchemaProperties }): {
+    [key: string]: SchemaProperties
 } {
-    const filteredProperties: { [key: string]: ISchemaProperties } = {};
+    const filteredProperties: { [key: string]: SchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
         filteredProperties[key] = {
             title: property.title,
@@ -107,8 +107,8 @@ export function filterSchemaProperties(properties: { [key: string]: ISchemaPrope
  * For array properties missing items.type, infers and sets the type using inferArrayItemType.
  * @param properties
  */
-export function inferArrayItemsTypeIfMissing(properties: { [key: string]: ISchemaProperties }): {
-    [key: string]: ISchemaProperties
+export function inferArrayItemsTypeIfMissing(properties: { [key: string]: SchemaProperties }): {
+    [key: string]: SchemaProperties
 } {
     for (const [, property] of Object.entries(properties)) {
         if (property.type === 'array' && !property.items?.type) {
@@ -128,15 +128,15 @@ export function inferArrayItemsTypeIfMissing(properties: { [key: string]: ISchem
 
 /**
  * Marks input properties as required by adding a "REQUIRED" prefix to their descriptions.
- * Takes an IActorInput object and returns a modified Record of SchemaProperties.
+ * Takes an ActorInput object and returns a modified Record of SchemaProperties.
  *
  * This is done for maximum compatibility in case where library or agent framework does not consider
  * required fields and does not handle the JSON schema properly: we are prepending this to the description
  * as a preventive measure.
- * @param {IActorInputSchema} input - Actor input object containing properties and required fields
- * @returns {Record<string, ISchemaProperties>} - Modified properties with required fields marked
+ * @param {ActorInputSchema} input - Actor input object containing properties and required fields
+ * @returns {Record<string, SchemaProperties>} - Modified properties with required fields marked
  */
-export function markInputPropertiesAsRequired(input: IActorInputSchema): Record<string, ISchemaProperties> {
+export function markInputPropertiesAsRequired(input: ActorInputSchema): Record<string, SchemaProperties> {
     const { required = [], properties } = input;
 
     for (const property of Object.keys(properties)) {
@@ -154,7 +154,7 @@ export function markInputPropertiesAsRequired(input: IActorInputSchema): Record<
 /**
  * Builds the final Actor input schema for MCP tool usage.
  */
-export function buildActorInputSchema(actorFullName: string, input: IActorInputSchema | undefined, isRag: boolean) {
+export function buildActorInputSchema(actorFullName: string, input: ActorInputSchema | undefined, isRag: boolean) {
     if (!input) {
         return {
             inputSchema: {
@@ -208,18 +208,18 @@ export function buildActorInputSchema(actorFullName: string, input: IActorInputS
  * only a subset of input properties to the MCP tool without redefining the schema.
  */
 export function pruneSchemaPropertiesByWhitelist(
-    input: IActorInputSchema,
+    input: ActorInputSchema,
     whitelist: Iterable<string>,
-): IActorInputSchema {
+): ActorInputSchema {
     if (!input || !input.properties || typeof input.properties !== 'object' || !whitelist) return input;
 
     const allowed = new Set<string>(Array.from(whitelist));
-    const newProps: Record<string, ISchemaProperties> = {};
+    const newProps: Record<string, SchemaProperties> = {};
     for (const key of Object.keys(input.properties)) {
         if (allowed.has(key)) newProps[key] = input.properties[key];
     }
 
-    const cloned: IActorInputSchema = { ...input, properties: newProps };
+    const cloned: ActorInputSchema = { ...input, properties: newProps };
     if (Array.isArray(input.required)) {
         cloned.required = input.required.filter((k) => allowed.has(k));
     }
@@ -233,7 +233,7 @@ export function pruneSchemaPropertiesByWhitelist(
  * Based on JSON schema, the array needs a type, and most of the time Actor input schema does not have this, so we need to infer that.
  *
  */
-export function inferArrayItemType(property: ISchemaProperties): string | null {
+export function inferArrayItemType(property: SchemaProperties): string | null {
     return property.items?.type
         || (Array.isArray(property.prefill) && property.prefill.length > 0 && typeof property.prefill[0])
         || (Array.isArray(property.default) && property.default.length > 0 && typeof property.default[0])
@@ -263,7 +263,7 @@ export function inferArrayItemType(property: ISchemaProperties): string | null {
  *
  * @param properties
  */
-export function addEnumsToDescriptionsWithExamples(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
+export function addEnumsToDescriptionsWithExamples(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
         if (property.enum && property.enum.length > 0) {
             property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
@@ -299,8 +299,8 @@ export function shortenEnum(enumList: string[]): string[] | undefined {
  * such as ( 'abbey', 'accountant', 'accounting',  'acupuncturist', .... )
  * @param properties
  */
-export function shortenProperties(properties: { [key: string]: ISchemaProperties }): {
-    [key: string]: ISchemaProperties
+export function shortenProperties(properties: { [key: string]: SchemaProperties }): {
+    [key: string]: SchemaProperties
 } {
     for (const property of Object.values(properties)) {
         if (property.description.length > ACTOR_MAX_DESCRIPTION_LENGTH) {
@@ -325,10 +325,10 @@ export function shortenProperties(properties: { [key: string]: ISchemaProperties
  * Some providers, such as Anthropic, allow only the following characters in property names: `^[a-zA-Z0-9_-]{1,64}$`.
  *
  * @param properties - The schema properties to fix.
- * @returns {Record<string, ISchemaProperties>} The schema properties with fixed names.
+ * @returns {Record<string, SchemaProperties>} The schema properties with fixed names.
  */
-export function encodeDotPropertyNames(properties: Record<string, ISchemaProperties>): Record<string, ISchemaProperties> {
-    const encodedProperties: Record<string, ISchemaProperties> = {};
+export function encodeDotPropertyNames(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
+    const encodedProperties: Record<string, SchemaProperties> = {};
     for (const [key, value] of Object.entries(properties)) {
         // Replace dots with '-dot-' to avoid issues with property names
         const fixedKey = key.replace(/\./g, '-dot-');
@@ -344,7 +344,7 @@ export function encodeDotPropertyNames(properties: Record<string, ISchemaPropert
  * that do not allow dots in property names.
  *
  * @param properties - The schema properties with encoded names.
- * @returns {Record<string, ISchemaProperties>} The schema properties with restored names.
+ * @returns {Record<string, SchemaProperties>} The schema properties with restored names.
  */
 export function decodeDotPropertyNames(properties: Record<string, unknown>): Record<string, unknown> {
     const decodedProperties: Record<string, unknown> = {};
@@ -356,9 +356,9 @@ export function decodeDotPropertyNames(properties: Record<string, unknown>): Rec
     return decodedProperties;
 }
 
-export function transformActorInputSchemaProperties(input: Readonly<IActorInputSchema>): ActorInputSchemaProperties {
+export function transformActorInputSchemaProperties(input: Readonly<ActorInputSchema>): ActorInputSchemaProperties {
     // Deep clone input to avoid mutating the original object
-    const inputClone: IActorInputSchema = structuredClone(input);
+    const inputClone: ActorInputSchema = structuredClone(input);
     let transformedProperties = markInputPropertiesAsRequired(inputClone);
     transformedProperties = buildApifySpecificProperties(transformedProperties);
     transformedProperties = inferArrayItemsTypeIfMissing(transformedProperties);

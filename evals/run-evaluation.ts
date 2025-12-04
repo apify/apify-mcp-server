@@ -31,7 +31,7 @@ import {
     validateEnvVars
 } from './config.js';
 
-interface EvaluatorResult {
+type EvaluatorResult = {
     model: string;
     experimentName: string;
     experimentId: string;
@@ -41,14 +41,14 @@ interface EvaluatorResult {
     total: number;
     passed: boolean;
     error?: string;
-}
+};
 
 /**
- * Interface for command line arguments
+ * Type for command line arguments
  */
-interface CliArgs {
+type CliArgs = {
     datasetName?: string;
-}
+};
 
 log.setLevel(log.LEVELS.DEBUG);
 

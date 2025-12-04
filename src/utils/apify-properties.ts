@@ -1,4 +1,4 @@
-import type { ISchemaProperties } from '../types.js';
+import type { SchemaProperties } from '../types.js';
 
 const USER_DATA_DESCRIPTION = `User data object. A JSON object with custom user data that will be passed in the userData property of the Request object for each URL`;
 const HEADERS_DESCRIPTION = `Headers object. A JSON object whose properties and values contain HTTP headers that will sent with the request.`;
@@ -7,7 +7,7 @@ const HEADERS_DESCRIPTION = `Headers object. A JSON object whose properties and 
  * Adds resource picker schema structure to array properties with editor === 'resourcePicker'.
  * The resource picker allows users to select resources from their Apify account.
  */
-export function addResourcePickerProperties(property: ISchemaProperties): ISchemaProperties {
+export function addResourcePickerProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         items: {
@@ -22,7 +22,7 @@ export function addResourcePickerProperties(property: ISchemaProperties): ISchem
 /**
  * Adds key-value schema structure to array properties with editor === 'keyValue'.
  */
-export function addKeyValueProperties(property: ISchemaProperties): ISchemaProperties {
+export function addKeyValueProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         items: {
@@ -49,7 +49,7 @@ export function addKeyValueProperties(property: ISchemaProperties): ISchemaPrope
 /**
  * Adds globs schema structure to array properties with editor === 'globs'.
  */
-export function addGlobsProperties(property: ISchemaProperties): ISchemaProperties {
+export function addGlobsProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         items: {
@@ -108,7 +108,7 @@ export function addGlobsProperties(property: ISchemaProperties): ISchemaProperti
 /**
  * Adds pseudoUrls schema structure to array properties with items.editor === 'pseudoUrls'.
  */
-export function addPseudoUrlsProperties(property: ISchemaProperties): ISchemaProperties {
+export function addPseudoUrlsProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         items: {
@@ -168,7 +168,7 @@ export function addPseudoUrlsProperties(property: ISchemaProperties): ISchemaPro
 /**
  * Adds Apify proxy-specific properties to a proxy object property.
  */
-export function addProxyProperties(property: ISchemaProperties): ISchemaProperties {
+export function addProxyProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         properties: {
@@ -221,7 +221,7 @@ IP addresses located in homes and offices around the world. These IPs are the le
 /**
  * Adds request list source structure to array properties with editor 'requestListSources'.
  */
-export function addRequestListSourcesProperties(property: ISchemaProperties): ISchemaProperties {
+export function addRequestListSourcesProperties(property: SchemaProperties): SchemaProperties {
     return {
         ...property,
         items: {

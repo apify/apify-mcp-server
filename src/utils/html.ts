@@ -1,13 +1,13 @@
 import * as cheerio from 'cheerio';
 
-interface CheerioElementLike {
+type CheerioElementLike = {
     attribs: Record<string, string>;
     tagName: string;
-}
+};
 
-interface NodeLike {
+type NodeLike = {
     type: string;
-}
+};
 
 /**
  * Strips HTML and keeps only the structure.

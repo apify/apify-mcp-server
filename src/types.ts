@@ -11,7 +11,7 @@ import type { toolCategories } from './tools/index.js';
 import type { StructuredPricingInfo } from './utils/pricing-info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
-export interface ISchemaProperties {
+export type SchemaProperties = {
     type: string;
 
     title: string;
@@ -22,34 +22,34 @@ export interface ISchemaProperties {
     default?: unknown;
     prefill?: unknown;
 
-    items?: ISchemaProperties;
+    items?: SchemaProperties;
     editor?: string;
     examples?: unknown[];
 
-    properties?: Record<string, ISchemaProperties>;
+    properties?: Record<string, SchemaProperties>;
     required?: string[];
-}
+};
 
-export interface IActorInputSchema {
+export type ActorInputSchema = {
     $id?: string;
     title?: string;
     description?: string;
 
     type: string;
 
-    properties: Record<string, ISchemaProperties>;
+    properties: Record<string, SchemaProperties>;
 
     required?: string[];
     schemaVersion?: number;
-}
+};
 
 export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
     defaultRunOptions: ActorDefaultRunOptions;
-    input?: IActorInputSchema;
-}
+    input?: ActorInputSchema;
+};
 
 /**
  * Pruned Actor definition type.
@@ -58,17 +58,17 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'> & {
         webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
-    }
+    };
 
 /**
- * Base interface for all tools in the MCP server.
+ * Base type for all tools in the MCP server.
  * Extends the MCP SDK's Tool schema, which requires inputSchema to have type: "object".
  * Adds ajvValidate for runtime validation.
  */
-export interface ToolBase extends z.infer<typeof ToolSchema> {
+export type ToolBase = z.infer<typeof ToolSchema> & {
     /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
-}
+};
 
 /**
  * Type for MCP SDK's inputSchema constraint.
@@ -79,17 +79,17 @@ export interface ToolBase extends z.infer<typeof ToolSchema> {
 export type ToolInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 
 /**
- * Interface for Actor-based tools - tools that wrap Apify Actors.
+ * Type for Actor-based tools - tools that wrap Apify Actors.
  * Type discriminator: 'actor'
  */
-export interface ActorTool extends ToolBase {
+export type ActorTool = ToolBase & {
     /** Type discriminator for actor tools */
     type: 'actor';
     /** Full name of the Apify Actor (username/name) */
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
-}
+};
 
 /**
  * Arguments passed to internal tool calls.
@@ -115,13 +115,13 @@ export type InternalToolArgs = {
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
-}
+};
 
 /**
  * Helper tool - tools implemented directly in the MCP server.
  * Type discriminator: 'internal'
  */
-export interface HelperTool extends ToolBase {
+export type HelperTool = ToolBase & {
     /** Type discriminator for helper/internal tools */
     type: 'internal';
     /**
@@ -130,13 +130,13 @@ export interface HelperTool extends ToolBase {
      * @returns Promise resolving to the tool's output
      */
     call: (toolArgs: InternalToolArgs) => Promise<object>;
-}
+};
 
 /**
  * Actor MCP tool - tools from Actorized MCP servers that this server proxies.
  * Type discriminator: 'actor-mcp'
  */
-export interface ActorMcpTool extends ToolBase {
+export type ActorMcpTool = ToolBase & {
     /** Type discriminator for actor MCP tools */
     type: 'actor-mcp';
     /** Origin MCP server tool name is needed for the tool call */
@@ -150,7 +150,7 @@ export interface ActorMcpTool extends ToolBase {
     serverId: string;
     /** Connection URL of the Actorized MCP server */
     serverUrl: string;
-}
+};
 
 /**
  * Discriminated union of all tool types.
@@ -165,9 +165,9 @@ export type ToolEntry = HelperTool | ActorTool | ActorMcpTool;
 /**
  * Price for a single event in a specific tier.
  */
-export interface TieredEventPrice {
+export type TieredEventPrice = {
     tieredEventPriceUsd: number;
-}
+};
 
 /**
  * Allowed pricing tiers for tiered event pricing.
@@ -178,21 +178,21 @@ export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | '
  * Describes a single chargeable event for an Actor.
  * Supports either flat pricing (eventPriceUsd) or tiered pricing (eventTieredPricingUsd).
  */
-export interface ActorChargeEvent {
+export type ActorChargeEvent = {
     eventTitle: string;
     eventDescription: string;
     /** Flat price per event in USD (if not tiered) */
     eventPriceUsd?: number;
     /** Tiered pricing per event, by tier name (FREE, BRONZE, etc.) */
     eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
-}
+};
 
 /**
  * Pricing per event for an Actor, supporting both flat and tiered pricing.
  */
-export interface PricingPerEvent {
+export type PricingPerEvent = {
     actorChargeEvents: Record<string, ActorChargeEvent>;
-}
+};
 
 export type ExtendedPricingInfo = PricingInfo & {
     pricePerUnitUsd?: number;
@@ -244,10 +244,10 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 /**
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
-export interface ActorInfo {
+export type ActorInfo = {
     webServerMcpPath: string | null; // To determined if the Actor is an MCP server
     actorDefinitionPruned: ActorDefinitionPruned;
-}
+};
 
 export type ExtendedActorStoreList = ActorStoreList & {
     categories?: string[];
@@ -272,14 +272,14 @@ export type ActorDefinitionStorage = {
     >;
 };
 
-export interface ApifyDocsSearchResult {
+export type ApifyDocsSearchResult = {
     /** URL of the documentation page */
     url: string;
     /** Fragment identifier, e.g. "document-heading-1" so LLM knows what section to use when fetching whole document */
     fragment?: string;
     /** Piece of content that matches the search query from Algolia */
     content: string;
-}
+};
 
 export type PromptBase = Prompt & {
     /**
@@ -292,7 +292,7 @@ export type PromptBase = Prompt & {
     render: (args: Record<string, string>) => string;
 };
 
-export type ActorInputSchemaProperties = Record<string, ISchemaProperties>;
+export type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.
@@ -310,7 +310,7 @@ export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];
 /**
  * Properties for tool call telemetry events sent to Segment.
  */
-export interface ToolCallTelemetryProperties {
+export type ToolCallTelemetryProperties = {
     app: 'mcp';
     app_version: string;
     mcp_client_name: string;
@@ -322,12 +322,12 @@ export interface ToolCallTelemetryProperties {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
-}
+};
 
 /**
  * Options for configuring the ActorsMcpServer instance.
  */
-export interface ActorsMcpServerOptions {
+export type ActorsMcpServerOptions = {
     setupSigintHandler?: boolean;
     /**
      * Switch to enable Skyfire agentic payment mode.
@@ -372,7 +372,8 @@ export interface ActorsMcpServerOptions {
      */
     token?: string;
 }
-export interface StructuredActorCard {
+
+export type StructuredActorCard = {
     title?: string;
     url: string;
     fullName: string;

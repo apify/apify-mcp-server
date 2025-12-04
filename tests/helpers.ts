@@ -4,10 +4,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { expect } from 'vitest';
 
-import { HelperTools, type TelemetryEnv } from '../src/const.js';
-import type { ToolCategory } from '../src/types.js';
+import { HelperTools } from '../src/const.js';
+import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
-export interface McpClientOptions {
+export type McpClientOptions = {
     actors?: string[];
     enableAddingActors?: boolean;
     tools?: (ToolCategory | string)[]; // Tool categories, specific tool or Actor names to include

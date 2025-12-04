@@ -2,19 +2,19 @@ import type { Actor, Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { IActorInputSchema, StructuredActorCard } from '../types.js';
+import type { ActorInputSchema, StructuredActorCard } from '../types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
 
-// Keep the interface here since it is a self contained module
-export interface ActorDetailsResult {
+// Keep the type here since it is a self-contained module
+export type ActorDetailsResult = {
     actorInfo: Actor;
     buildInfo: Build;
     actorCard: string;
     actorCardStructured: StructuredActorCard;
-    inputSchema: IActorInputSchema;
+    inputSchema: ActorInputSchema;
     readme: string;
-}
+};
 
 export async function fetchActorDetails(apifyClient: ApifyClient, actorName: string): Promise<ActorDetailsResult | null> {
     try {
@@ -26,7 +26,7 @@ export async function fetchActorDetails(apifyClient: ApifyClient, actorName: str
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',
             properties: {},
-        }) as IActorInputSchema;
+        }) as ActorInputSchema;
         inputSchema.properties = filterSchemaProperties(inputSchema.properties);
         inputSchema.properties = shortenProperties(inputSchema.properties);
         const actorCard = formatActorToActorCard(actorInfo);

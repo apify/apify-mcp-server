@@ -18,7 +18,7 @@ import { getExpectedToolNamesByCategories } from '../../src/utils/tools.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 
-interface IntegrationTestsSuiteOptions {
+type IntegrationTestsSuiteOptions = {
     suiteName: string;
     transport: 'sse' | 'streamable-http' | 'stdio';
     createClientFn: (options?: McpClientOptions) => Promise<Client>;
@@ -26,7 +26,7 @@ interface IntegrationTestsSuiteOptions {
     afterAllFn?: () => Promise<void>;
     beforeEachFn?: () => Promise<void>;
     afterEachFn?: () => Promise<void>;
-}
+};
 
 function getToolNames(tools: { tools: { name: string }[] }) {
     return tools.tools.map((tool) => tool.name);

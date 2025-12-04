@@ -27,19 +27,19 @@ import {
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 
-export interface TestCase {
+export type TestCase = {
     id: string;
     category: string;
     query: string;
     context?: string | string[];
     expectedTools?: string[];
     reference?: string;
-}
+};
 
-export interface TestData {
+export type TestData = {
     version: string;
     testCases: TestCase[];
-}
+};
 
 // eslint-disable-next-line consistent-return
 export function loadTestCases(filePath: string): TestData {
