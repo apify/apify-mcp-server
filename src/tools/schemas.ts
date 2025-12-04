@@ -93,8 +93,8 @@ export const statsSchema = {
 };
 
 /**
- * Schema for actor information (card)
- * Used in both search results and detailed actor info
+ * Schema for Actor information (card)
+ * Used in both search results and detailed Actor info
  */
 export const actorInfoSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
