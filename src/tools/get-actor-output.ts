@@ -137,7 +137,11 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
         });
 
         if (!response) {
-            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
+            return buildMCPResponse({
+                texts: [`Dataset '${parsed.datasetId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         let { items } = response;

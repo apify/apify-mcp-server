@@ -66,9 +66,11 @@ USAGE EXAMPLES:
         const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
         if (results.length === 0) {
-            return buildMCPResponse([`No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}.
+            return buildMCPResponse({
+                texts: [`No results found for the query "${query}" with limit ${parsed.limit} and offset ${parsed.offset}.
 Please try a different query with different keywords, or adjust the limit and offset parameters.
-You can also try using more specific or alternative keywords related to your search topic.`]);
+You can also try using more specific or alternative keywords related to your search topic.`],
+            });
         }
 
         const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.
@@ -76,6 +78,6 @@ Search results for "${query}":
 
 ${results.map((result) => `- Document URL: ${result.url}${result.fragment ? `\n  Document fragment: ${result.fragment}` : ''}
   Content: ${result.content}`).join('\n\n')}`;
-        return buildMCPResponse([textContent]);
+        return buildMCPResponse({ texts: [textContent] });
     },
 } as const;

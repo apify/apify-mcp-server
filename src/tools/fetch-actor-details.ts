@@ -41,12 +41,13 @@ USAGE EXAMPLES:
         const apifyClient = new ApifyClient({ token: apifyToken });
         const details = await fetchActorDetails(apifyClient, parsed.actor);
         if (!details) {
-            const texts = [`Actor information for '${parsed.actor}' was not found.
+            return buildMCPResponse({
+                texts: [`Actor information for '${parsed.actor}' was not found.
 Please verify Actor ID or name format and ensure that the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`,
-            ];
-            // User error – actor not found, mark as soft_fail internally while keeping MCP isError=true
-            return buildMCPResponse(texts, true, TOOL_STATUS.SOFT_FAIL);
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
@@ -64,6 +65,6 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         }
         // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
         // This allows better formatting in the final output
-        return buildMCPResponse(texts);
+        return buildMCPResponse({ texts });
     },
 } as const;

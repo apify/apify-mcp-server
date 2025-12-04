@@ -610,9 +610,9 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     }
 
                     // If tool provided internal status, use it; otherwise infer from isError flag
-                    const { _toolStatus, ...rest } = res as { _toolStatus?: ToolStatus; isError?: boolean };
-                    if (_toolStatus !== undefined) {
-                        toolStatus = _toolStatus;
+                    const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
+                    if (internalToolStatus !== undefined) {
+                        toolStatus = internalToolStatus;
                     } else if ('isError' in rest && rest.isError) {
                         toolStatus = TOOL_STATUS.FAILED;
                     } else {
@@ -633,7 +633,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            return buildMCPResponse([msg], true);
+                            return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -674,7 +674,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 // Handle actor tool
                 if (tool.type === 'actor') {
                     if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                        return buildMCPResponse([SKYFIRE_TOOL_INSTRUCTIONS]);
+                        return buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS] });
                     }
 
                     // Create progress tracker if progressToken is available
@@ -722,10 +722,11 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
-                return buildMCPResponse([
-                    `Error calling tool "${name}": ${errorMessage}.
-Please verify the tool name, input parameters, and ensure all required resources are available.`,
-                ], true);
+                return buildMCPResponse({
+                    texts: [`Error calling tool "${name}": ${errorMessage}.  Please verify the tool name, input parameters, and ensure all required resources are available.`],
+                    isError: true,
+                    toolStatus,
+                });
             } finally {
                 this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
             }

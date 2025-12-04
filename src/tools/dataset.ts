@@ -69,7 +69,11 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
-            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
+            return buildMCPResponse({
+                texts: [`Dataset '${parsed.datasetId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -120,7 +124,11 @@ USAGE EXAMPLES:
             flatten,
         });
         if (!v) {
-            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
+            return buildMCPResponse({
+                texts: [`Dataset '${parsed.datasetId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
@@ -176,7 +184,11 @@ USAGE EXAMPLES:
         });
 
         if (!datasetResponse) {
-            return buildMCPResponse([`Dataset '${parsed.datasetId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
+            return buildMCPResponse({
+                texts: [`Dataset '${parsed.datasetId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         const datasetItems = datasetResponse.items;
@@ -194,11 +206,11 @@ USAGE EXAMPLES:
 
         if (!schema) {
             // Schema generation failure is typically a server/processing error, not a user error
-            return buildMCPResponse(
-                [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
-                true,
-                TOOL_STATUS.FAILED,
-            );
+            return buildMCPResponse({
+                texts: [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.FAILED,
+            });
         }
 
         return {

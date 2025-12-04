@@ -407,11 +407,11 @@ EXAMPLES:
 
         // Standby Actors, thus MCPs, are not supported in Skyfire mode
         if (isActorMcpServer && apifyMcpServer.options.skyfireMode) {
-            return buildMCPResponse(
-                [`This Actor (${actorName}) is an MCP server and cannot be accessed using a Skyfire token. To use this Actor, please provide a valid Apify token instead of a Skyfire token.`],
-                true,
-                TOOL_STATUS.SOFT_FAIL,
-            );
+            return buildMCPResponse({
+                texts: [`This Actor (${actorName}) is an MCP server and cannot be accessed using a Skyfire token. To use this Actor, please provide a valid Apify token instead of a Skyfire token.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         try {
@@ -424,14 +424,20 @@ EXAMPLES:
                     try {
                         client = await connectMCPClient(mcpServerUrl, apifyToken);
                         if (!client) {
-                            return buildMCPResponse([`Failed to connect to MCP server ${mcpServerUrl}`], true);
+                            return buildMCPResponse({
+                                texts: [`Failed to connect to MCP server ${mcpServerUrl}`],
+                                isError: true,
+                                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                            });
                         }
                         const toolsResponse = await client.listTools();
 
                         const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``,
                         ).join('\n\n');
 
-                        return buildMCPResponse([`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`]);
+                        return buildMCPResponse({
+                            texts: [`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`],
+                        });
                     } finally {
                         if (client) await client.close();
                     }
@@ -439,13 +445,13 @@ EXAMPLES:
                     // Regular Actor: return schema
                     const details = await fetchActorDetails(apifyClientForDefinition, baseActorName);
                     if (!details) {
-                        return buildMCPResponse(
-                            [`Actor information for '${baseActorName}' was not found.
+                        return buildMCPResponse({
+                            texts: [`Actor information for '${baseActorName}' was not found.
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
-                            true,
-                            TOOL_STATUS.SOFT_FAIL,
-                        );
+                            isError: true,
+                            toolStatus: TOOL_STATUS.SOFT_FAIL,
+                        });
                     }
                     const content = [
                         `Actor name: ${actorName}`,
@@ -457,7 +463,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                     if (apifyMcpServer.options.skyfireMode) {
                         content.push(SKYFIRE_TOOL_INSTRUCTIONS);
                     }
-                    return buildMCPResponse(content);
+                    return buildMCPResponse({ texts: content });
                 }
             }
 
@@ -483,30 +489,30 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
             // Step 2: Call the Actor
             if (!input) {
-                // This is most likely LLM error, so NOT marking as soft fail
-                return buildMCPResponse(
-                    [`Input is required when step="call". Please provide the input parameter based on the Actor's input schema.`],
-                    true,
-                );
+                // Missing input is most likely an LLM error, so NOT marking as a soft-fail to track potential issues with tool description
+                return buildMCPResponse({
+                    texts: [`Input is required when step="call". Please provide the input parameter based on the Actor's input schema.`],
+                    isError: true,
+                });
             }
 
             // Handle the case where LLM does not respect instructions when calling MCP server Actors
             // and does not provide the tool name.
             const isMcpToolNameInvalid = mcpToolName === undefined || mcpToolName.trim().length === 0;
             if (isActorMcpServer && isMcpToolNameInvalid) {
-                return buildMCPResponse(
-                    [CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG],
-                    true,
-                );
+                return buildMCPResponse({
+                    texts: [CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG],
+                    isError: true,
+                });
             }
 
             // Handle MCP tool calls
             if (mcpToolName) {
                 if (!isActorMcpServer) {
-                    return buildMCPResponse(
-                        [`Actor '${baseActorName}' is not an MCP server.`],
-                        true,
-                    );
+                    return buildMCPResponse({
+                        texts: [`Actor '${baseActorName}' is not an MCP server.`],
+                        isError: true,
+                    });
                 }
 
                 const mcpServerUrl = mcpServerUrlOrFalse;
@@ -514,10 +520,10 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 try {
                     client = await connectMCPClient(mcpServerUrl, apifyToken);
                     if (!client) {
-                        return buildMCPResponse(
-                            [`Failed to connect to MCP server ${mcpServerUrl}`],
-                            true,
-                        );
+                        return buildMCPResponse({
+                            texts: [`Failed to connect to MCP server ${mcpServerUrl}`],
+                            isError: true,
+                        });
                     }
 
                     const result = await client.callTool({
@@ -535,13 +541,13 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {
-                return buildMCPResponse(
-                    [`Actor '${actorName}' was not found.
+                return buildMCPResponse({
+                    texts: [`Actor '${actorName}' was not found.
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
-                    true,
-                    TOOL_STATUS.SOFT_FAIL,
-                );
+                    isError: true,
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                });
             }
 
             if (!actor.ajvValidate(input)) {
@@ -553,7 +559,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 if (errors && errors.length > 0) {
                     content.push(`Validation errors: ${errors.map((e) => (e as { message?: string }).message).join(', ')}`);
                 }
-                return buildMCPResponse(content);
+                return buildMCPResponse({ texts: content, isError: true });
             }
 
             const callResult = await callActorGetDataset(
@@ -576,9 +582,13 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             return { content };
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, performStep });
-            return buildMCPResponse([`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
+            // Let the server classify the error; we only mark it as an MCP error response
+            return buildMCPResponse({
+                texts: [`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`], true);
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
+                isError: true,
+            });
         }
     },
 };

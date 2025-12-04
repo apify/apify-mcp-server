@@ -48,9 +48,14 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return buildMCPResponse([`Run with ID '${parsed.runId}' not found.`], true, TOOL_STATUS.SOFT_FAIL);
+            return buildMCPResponse({
+                texts: [`Run with ID '${parsed.runId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+        const texts = [`\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``];
+        return buildMCPResponse({ texts });
     },
 } as const;
 

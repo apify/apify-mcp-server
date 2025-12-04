@@ -144,13 +144,15 @@ Returns list of Actor cards with the following info:
         const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
 
         if (actorCards.length === 0) {
-            return buildMCPResponse([`No Actors were found for the search query "${parsed.keywords}".
-Please try different keywords or simplify your query. Consider using more specific platform names (e.g., "Instagram", "Twitter") and data types (e.g., "posts", "products") rather than generic terms like "scraper" or "crawler".`]);
+            return buildMCPResponse({
+                texts: [`No Actors were found for the search query "${parsed.keywords}".
+Please try different keywords or simplify your query. Consider using more specific platform names (e.g., "Instagram", "Twitter") and data types (e.g., "posts", "products") rather than generic terms like "scraper" or "crawler".`],
+            });
         }
 
         const actorsText = actorCards.join('\n\n');
 
-        return buildMCPResponse([`
+        return buildMCPResponse({ texts: [`
 # Search results:
 - **Search query:** ${parsed.keywords}
 - **Number of Actors found:** ${actorCards.length}
@@ -161,6 +163,6 @@ ${actorsText}
 
 If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
 If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
-`]);
+`] });
     },
 } as const;
