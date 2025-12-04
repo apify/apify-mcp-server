@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
@@ -41,11 +41,13 @@ USAGE EXAMPLES:
         const apifyClient = new ApifyClient({ token: apifyToken });
         const details = await fetchActorDetails(apifyClient, parsed.actor);
         if (!details) {
-            const texts = [`Actor information for '${parsed.actor}' was not found.
+            return buildMCPResponse({
+                texts: [`Actor information for '${parsed.actor}' was not found.
 Please verify Actor ID or name format and ensure that the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`,
-            ];
-            return buildMCPResponse(texts, true);
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
@@ -63,6 +65,6 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         }
         // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
         // This allows better formatting in the final output
-        return buildMCPResponse(texts);
+        return buildMCPResponse({ texts });
     },
 } as const;

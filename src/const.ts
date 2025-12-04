@@ -10,7 +10,7 @@ export const ACTOR_MAX_MEMORY_MBYTES = 4_096; // If the Actor requires 8GB of me
 // Tool output
 /**
  * Usual tool output limit is 25k tokens where 1 token =~ 4 characters
- * thus 50k chars so we have some buffer becase there was some issue with Claude code Actor call output token count.
+ * thus 50k chars so we have some buffer because there was some issue with Claude code Actor call output token count.
  * This is primarily used for Actor tool call output, but we can then
  * reuse this in other tools as well.
  */
@@ -120,10 +120,9 @@ export const TELEMETRY_ENV = {
     DEV: 'DEV',
     PROD: 'PROD',
 } as const;
-export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 
 export const DEFAULT_TELEMETRY_ENABLED = true;
-export const DEFAULT_TELEMETRY_ENV: TelemetryEnv = TELEMETRY_ENV.PROD;
+export const DEFAULT_TELEMETRY_ENV = TELEMETRY_ENV.PROD;
 
 // We are using the same values as apify-core for consistency (despite that we ship events of different types).
 // https://github.com/apify/apify-core/blob/2284766c122c6ac5bc4f27ec28051f4057d6f9c0/src/packages/analytics/src/server/segment.ts#L28
@@ -132,6 +131,18 @@ export const DEFAULT_TELEMETRY_ENV: TelemetryEnv = TELEMETRY_ENV.PROD;
 export const SEGMENT_FLUSH_AT_EVENTS = 50;
 // Flush interval in milliseconds (default is 10000)
 export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
+
+// Tool status
+/**
+ * Unified status constants for tool execution lifecycle.
+ * Single source of truth for all tool status values.
+ */
+export const TOOL_STATUS = {
+    SUCCEEDED: 'SUCCEEDED',
+    FAILED: 'FAILED',
+    ABORTED: 'ABORTED',
+    SOFT_FAIL: 'SOFT_FAIL',
+} as const;
 
 export const SERVER_INSTRUCTIONS = `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.

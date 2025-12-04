@@ -5,7 +5,7 @@ import type { ValidateFunction } from 'ajv';
 import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 import type z from 'zod';
 
-import type { ACTOR_PRICING_MODEL, TelemetryEnv } from './const.js';
+import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
 import type { ProgressTracker } from './utils/progress.js';
@@ -235,6 +235,12 @@ export type Input = {
 export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
 
 /**
+ * Telemetry environment type.
+ * Derived from TELEMETRY_ENV to ensure type safety and avoid duplication.
+ */
+export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
+
+/**
  * Type representing the Actor information needed in order to turn it into an MCP server tool.
  */
 export interface ActorInfo {
@@ -295,6 +301,12 @@ export type DatasetItem = Record<number | string, unknown>;
 export type ApifyToken = string | null | undefined;
 
 /**
+ * Unified status type for tool execution lifecycle.
+ * Derived from TOOL_STATUS to ensure type safety and avoid duplication.
+ */
+export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];
+
+/**
  * Properties for tool call telemetry events sent to Segment.
  */
 export interface ToolCallTelemetryProperties {
@@ -307,7 +319,7 @@ export interface ToolCallTelemetryProperties {
     mcp_session_id: string;
     transport_type: string;
     tool_name: string;
-    tool_status: 'succeeded' | 'failed' | 'aborted';
+    tool_status: ToolStatus;
     tool_exec_time_ms: number;
 }
 

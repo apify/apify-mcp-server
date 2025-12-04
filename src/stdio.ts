@@ -29,11 +29,11 @@ import { hideBin } from 'yargs/helpers';
 import log from '@apify/log';
 
 import { ApifyClient } from './apify-client.js';
-import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV, type TelemetryEnv } from './const.js';
+import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { Input, ToolSelector } from './types.js';
+import type { Input, TelemetryEnv, ToolSelector } from './types.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 

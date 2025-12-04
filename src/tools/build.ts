@@ -1,18 +1,10 @@
-import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
-
-import { ApifyClient } from '../apify-client.js';
-import { ACTOR_README_MAX_LENGTH, HelperTools } from '../const.js';
+import type { ApifyClient } from '../apify-client.js';
+import { ACTOR_README_MAX_LENGTH } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
-    InternalToolArgs,
     ISchemaProperties,
-    ToolEntry,
-    ToolInputSchema,
 } from '../types.js';
-import { ajv } from '../utils/ajv.js';
-import { filterSchemaProperties, shortenProperties } from './utils.js';
 
 /**
  * Get Actor input schema by Actor name.
@@ -101,58 +93,3 @@ function truncateActorReadme(readme: string, limit = ACTOR_README_MAX_LENGTH): s
     const prunedReadme = lines.filter((line) => line.startsWith('#'));
     return `${readmeFirst}\n\nREADME was truncated because it was too long. Remaining headers:\n${prunedReadme.join(', ')}`;
 }
-
-const getActorDefinitionArgsSchema = z.object({
-    actorName: z.string()
-        .min(1)
-        .describe('Retrieve input, readme, and other details for Actor ID or Actor full name. '
-            + 'Actor name is always composed from `username/name`'),
-    limit: z.number()
-        .int()
-        .default(ACTOR_README_MAX_LENGTH)
-        .describe(`Truncate the README to this limit. Default value is ${ACTOR_README_MAX_LENGTH}.`),
-});
-
-/**
- * https://docs.apify.com/api/v2/actor-build-get
- */
-export const actorDefinitionTool: ToolEntry = {
-    type: 'internal',
-    name: HelperTools.ACTOR_GET_DETAILS,
-    description: 'Get documentation, readme, input schema and other details about an Actor. '
-        + 'For example, when user says, I need to know more about web crawler Actor.'
-        + 'Get details for an Actor with with Actor ID or Actor full name, i.e. username/name.'
-        + `Limit the length of the README if needed.`,
-    inputSchema: zodToJsonSchema(getActorDefinitionArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getActorDefinitionArgsSchema)),
-    annotations: {
-        title: 'Get Actor definition',
-        readOnlyHint: true,
-        openWorldHint: false,
-    },
-    call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
-
-        const parsed = getActorDefinitionArgsSchema.parse(args);
-        const apifyClient = new ApifyClient({ token: apifyToken });
-        try {
-            const v = await getActorDefinition(parsed.actorName, apifyClient, parsed.limit);
-            if (!v) {
-                return { content: [{ type: 'text', text: `Actor '${parsed.actorName}' not found.` }], isError: true };
-            }
-            if (v && v.input && 'properties' in v.input && v.input) {
-                const properties = filterSchemaProperties(v.input.properties as { [key: string]: ISchemaProperties });
-                v.input.properties = shortenProperties(properties);
-            }
-            return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
-        } catch (error) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Failed to fetch Actor definition: ${error instanceof Error ? error.message : String(error)}`,
-                }],
-                isError: true,
-            };
-        }
-    },
-} as const;

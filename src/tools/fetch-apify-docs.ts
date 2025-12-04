@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
-import { HelperTools } from '../const.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -43,9 +43,13 @@ USAGE EXAMPLES:
 
         // Only allow URLs starting with https://docs.apify.com
         if (!url.startsWith('https://docs.apify.com')) {
-            return buildMCPResponse([`Invalid URL: "${url}".
+            return buildMCPResponse({
+                texts: [`Invalid URL: "${url}".
 Only URLs starting with "https://docs.apify.com" are allowed.
-Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`], true);
+Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         // Cache URL without fragment to avoid fetching the same page multiple times
@@ -59,9 +63,15 @@ Please provide a valid Apify documentation URL. You can find documentation URLs 
                         statusCode: response.status,
                     });
                     logHttpError(error, 'Failed to fetch the documentation page', { url, statusText: response.statusText });
-                    return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
+                    // HTTP 4xx = user error (soft_fail), 5xx = server error (will be caught by catch block)
+                    const isUserError = response.status >= 400 && response.status < 500;
+                    return buildMCPResponse({
+                        texts: [`Failed to fetch the documentation page at "${url}".
 HTTP Status: ${response.status} ${response.statusText}.
-Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`], true);
+Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`],
+                        isError: true,
+                        toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
+                    });
                 }
                 const html = await response.text();
                 markdown = htmlToMarkdown(html);
@@ -70,12 +80,17 @@ Please verify the URL is correct and accessible. You can search for available do
                 fetchApifyDocsCache.set(urlWithoutFragment, markdown);
             } catch (error) {
                 logHttpError(error, 'Failed to fetch the documentation page', { url });
-                return buildMCPResponse([`Failed to fetch the documentation page at "${url}".
+                // Network/fetch errors are typically user errors (bad URL, connectivity issues)
+                return buildMCPResponse({
+                    texts: [`Failed to fetch the documentation page at "${url}".
 Error: ${error instanceof Error ? error.message : String(error)}.
-Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`], true);
+Please verify the URL is correct and accessible. You can search for available documentation pages using the ${HelperTools.DOCS_SEARCH} tool.`],
+                    isError: true,
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                });
             }
         }
 
-        return buildMCPResponse([`Fetched content from ${url}:\n\n${markdown}`]);
+        return buildMCPResponse({ texts: [`Fetched content from ${url}:\n\n${markdown}`] });
     },
 } as const;
