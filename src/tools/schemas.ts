@@ -143,7 +143,7 @@ export const actorSearchOutputSchema = {
             description: 'List of Actor cards matching the search query',
         },
         query: { type: 'string', description: 'The search query used' },
-        count: { type: 'number', description: 'Number of actors returned' },
+        count: { type: 'number', description: 'Number of Actors returned' },
     },
     required: ['actors', 'query', 'count'],
 };
