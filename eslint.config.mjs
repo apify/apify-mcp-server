@@ -11,7 +11,7 @@
  *
  * Project-specific overrides:
  * - import/no-extraneous-dependencies: Adds vitest.config.ts and evals/** patterns
- * - @typescript-eslint/consistent-type-definitions: Prefers 'interface' over 'type'
+ * - @typescript-eslint/consistent-type-definitions: Prefers 'type' over 'interface' (use interface only for class implementations)
  * - import/no-default-export: Allows default exports in config files
  */
 import apifyTypeScriptConfig from '@apify/eslint-config/ts.js';
@@ -62,10 +62,9 @@ export default [
     {
         files: ['**/*.ts', '**/*.tsx'],
         rules: {
-            // Prefer 'interface' over 'type' for object type definitions
-            // Interfaces can be extended and merged, making them more flexible
-            // Note: This matches apify-core CONTRIBUTING.md guidance
-            '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+            // Prefer 'type' over 'interface' for flexibility
+            // Use 'interface' only when required for class implementations (implements)
+            '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
         },
     },
     // Override rules for configuration files

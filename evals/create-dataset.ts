@@ -21,14 +21,14 @@ import { loadTestCases, filterByCategory, filterById, type TestCase } from './ev
 log.setLevel(log.LEVELS.INFO);
 
 /**
- * Interface for command line arguments
+ * Type for command line arguments
  */
-interface CliArgs {
+type CliArgs = {
     testCases?: string;
     category?: string;
     id?: string;
     datasetName?: string;
-}
+};
 
 // Load environment variables from .env file if present
 dotenv.config({ path: '.env' });

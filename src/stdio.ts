@@ -37,12 +37,12 @@ import type { Input, TelemetryEnv, ToolSelector } from './types.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
-// Keeping this interface here and not types.ts since
+// Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
 /**
- * Interface for command line arguments
+ * Type for command line arguments
  */
-interface CliArgs {
+type CliArgs = {
     actors?: string;
     enableAddingActors: boolean;
     /** @deprecated */

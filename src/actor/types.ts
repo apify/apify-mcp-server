@@ -1,4 +1,4 @@
-export interface ActorRunData {
+export type ActorRunData = {
     id?: string;
     actId?: string;
     userId?: string;
@@ -19,4 +19,4 @@ export interface ActorRunData {
     buildNumber?: string;
     containerUrl?: string;
     standbyUrl?: string;
-}
+};

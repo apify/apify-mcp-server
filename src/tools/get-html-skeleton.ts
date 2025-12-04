@@ -10,14 +10,14 @@ import { isValidHttpUrl } from '../utils/generic.js';
 import { stripHtml } from '../utils/html.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 
-interface ScrapedPageItem {
+type ScrapedPageItem = {
     crawl: {
         httpStatusCode: number;
         httpStatusMessage: string;
-    }
+    };
     metadata: {
         url: string;
-    }
+    };
     query: string;
     html?: string;
 }

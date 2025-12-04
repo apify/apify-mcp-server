@@ -80,11 +80,8 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 
 ### Types and interfaces
 
-- Prefer `interface` over `type` for object type definitions (enforced by ESLint)
-- Use `type` for unions, intersections, and utility types.
-- Do not export types or functions unless you need to share them across multiple components.
-- Do not introduce new types or values to the global namespace.
-- Avoid using `any` or `unknown` unless absolutely necessary - always define proper types or interfaces.
+- Prefer `type` for flexibility.
+- Use `interface` only when it's required for class implementations (`implements`).
 
 ### Comments
 

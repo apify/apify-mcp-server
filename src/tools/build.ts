@@ -3,7 +3,7 @@ import { ACTOR_README_MAX_LENGTH } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
-    ISchemaProperties,
+    SchemaProperties,
 } from '../types.js';
 
 /**
@@ -69,7 +69,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
             ? {
                 ...response.input,
                 type: response.input.type as string,
-                properties: response.input.properties as Record<string, ISchemaProperties>,
+                properties: response.input.properties as Record<string, SchemaProperties>,
             }
             : undefined,
         description: response.description,

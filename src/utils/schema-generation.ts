@@ -3,33 +3,33 @@ import toJsonSchema from 'to-json-schema';
 /**
  * Minimal JSON Schema typings for array/object schemas used in generateSchemaFromItems
  */
-export interface JsonSchemaProperty {
+export type JsonSchemaProperty = {
     type: 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array' | 'null';
     properties?: Record<string, JsonSchemaProperty>;
     items?: JsonSchemaProperty;
-}
+};
 
-export interface JsonSchemaObject {
+export type JsonSchemaObject = {
     type: 'object';
     properties: Record<string, JsonSchemaProperty>;
-}
+};
 
-export interface JsonSchemaArray {
+export type JsonSchemaArray = {
     type: 'array';
     items: JsonSchemaObject | JsonSchemaProperty;
-}
+};
 
 /**
  * Options for schema generation
  */
-export interface SchemaGenerationOptions {
+export type SchemaGenerationOptions = {
     /** Maximum number of items to use for schema generation. Default is 5. */
     limit?: number;
     /** If true, uses only non-empty items and skips hidden fields. Default is true. */
     clean?: boolean;
     /** Strategy for handling arrays. "first" uses first item as template, "all" merges all items. Default is "all". */
     arrayMode?: 'first' | 'all';
-}
+};
 
 /**
  * Function to recursively remove empty arrays from an object
@@ -91,17 +91,15 @@ export function generateSchemaFromItems(
 
     // Try to generate schema with full options first
     try {
-        const schema = toJsonSchema(processedItems, {
+        return toJsonSchema(processedItems, {
             arrays: { mode: arrayMode },
         }) as JsonSchemaArray;
-        return schema;
     } catch { /* ignore */ }
 
     try {
-        const fallbackSchema = toJsonSchema(processedItems, {
+        return toJsonSchema(processedItems, {
             arrays: { mode: 'first' },
         }) as JsonSchemaArray;
-        return fallbackSchema;
     } catch { /* ignore */ }
 
     // If all attempts fail, return null

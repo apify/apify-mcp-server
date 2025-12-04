@@ -19,18 +19,18 @@ const client = algoliasearch(ALGOLIA.appId, ALGOLIA.apiKey);
 /**
  * Represents a single search hit from Algolia's response.
  */
-interface AlgoliaResultHit {
+type AlgoliaResultHit = {
     url_without_anchor?: string;
     anchor?: string;
     content?: string;
-}
+};
 
 /**
  * Represents a single Algolia search result containing hits.
  */
-interface AlgoliaResult {
+type AlgoliaResult = {
     hits?: AlgoliaResultHit[];
-}
+};
 
 /**
  * Searches the Apify documentation using Algolia and returns relevant results.

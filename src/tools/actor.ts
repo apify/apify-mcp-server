@@ -32,13 +32,13 @@ import { getActorDefinition } from './build.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile } from './utils.js';
 
 // Define a named return type for callActorGetDataset
-export interface CallActorGetDatasetResult {
+export type CallActorGetDatasetResult = {
     runId: string;
     datasetId: string;
     itemCount: number;
     schema: JsonSchemaProperty;
     previewItems: DatasetItem[];
-}
+};
 
 /**
  * Calls an Apify Actor and retrieves metadata about the dataset results.
