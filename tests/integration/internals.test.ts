@@ -2,11 +2,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import log from '@apify/log';
 
-import { actorNameToToolName } from '../../dist/tools/utils.js';
 import { ApifyClient } from '../../src/apify-client.js';
 import { ActorsMcpServer } from '../../src/index.js';
 import { addTool } from '../../src/tools/helpers.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
+import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { Input } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools-loader.js';
 import { ACTOR_PYTHON_EXAMPLE } from '../const.js';
