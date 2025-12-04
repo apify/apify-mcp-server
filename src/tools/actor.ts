@@ -373,6 +373,7 @@ Step 2: Call Actor (step="call")
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
     inputSchema: zodToJsonSchema(callActorArgs) as ToolInputSchema,
+    // For now we are not adding the strucuted output schema since this tool is quite complex and has multiple possible ends states
     ajvValidate: ajv.compile({
         ...zodToJsonSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
@@ -445,13 +446,11 @@ EXAMPLES:
                     // Regular Actor: return schema
                     const details = await fetchActorDetails(apifyClientForDefinition, baseActorName);
                     if (!details) {
-                        return buildMCPResponse({
-                            texts: [`Actor information for '${baseActorName}' was not found.
+                        return buildMCPResponse({ texts: [`Actor information for '${baseActorName}' was not found.
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
-                            isError: true,
-                            toolStatus: TOOL_STATUS.SOFT_FAIL,
-                        });
+                        isError: true,
+                        toolStatus: TOOL_STATUS.SOFT_FAIL });
                     }
                     const content = [
                         `Actor name: ${actorName}`,
@@ -541,13 +540,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {
-                return buildMCPResponse({
-                    texts: [`Actor '${actorName}' was not found.
+                return buildMCPResponse({ texts: [`Actor '${actorName}' was not found.
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
-                    isError: true,
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
-                });
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL });
             }
 
             if (!actor.ajvValidate(input)) {
@@ -583,12 +580,10 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, performStep });
             // Let the server classify the error; we only mark it as an MCP error response
-            return buildMCPResponse({
-                texts: [`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
+            return buildMCPResponse({ texts: [`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
-                isError: true,
-            });
+            isError: true });
         }
     },
 };

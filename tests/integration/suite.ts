@@ -1,12 +1,17 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
+import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify-client.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools } from '../../src/const.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER } from '../../src/const.js';
+import { fetchActorDetailsTool } from '../../src/tools/fetch-actor-details.js';
+import { fetchApifyDocsTool } from '../../src/tools/fetch-apify-docs.js';
 import { addTool } from '../../src/tools/helpers.js';
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
+import { searchApifyDocsTool } from '../../src/tools/search-apify-docs.js';
+import { searchActors } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tools.js';
@@ -66,6 +71,40 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
     const actual = content[0];
     expect(extractJsonFromMarkdown(actual.text)).toEqual(JSON.parse(expected.text));
     expect(actual.type).toBe(expected.type);
+}
+
+function validateStructuredOutput(
+    result: unknown,
+    toolOutputSchema: unknown,
+    toolName: string,
+): void {
+    // Ensure result has structured content
+    const resultWithStructured = result as Record<string, unknown>;
+    if (!resultWithStructured.structuredContent) {
+        return;
+    }
+
+    const { structuredContent } = resultWithStructured;
+
+    // Verify tool has an outputSchema
+    expect(toolOutputSchema).toBeDefined();
+
+    if (toolOutputSchema) {
+        // Create AJV validator instance
+        const ajv = new Ajv();
+        const validate = ajv.compile(toolOutputSchema as Record<string, unknown>);
+
+        // Validate structured content against the schema
+        const isValid = validate(structuredContent);
+
+        if (!isValid) {
+            // eslint-disable-next-line no-console
+            console.error(`Validation errors for ${toolName}:`, validate.errors);
+        }
+
+        expect(isValid).toBe(true);
+        expect(validate.errors).toBeNull();
+    }
 }
 
 export function createIntegrationTestsSuite(
@@ -142,6 +181,23 @@ export function createIntegrationTestsSuite(
             expect(names.length).toEqual(2);
             expect(names).toContain('add-actor');
             expect(names).toContain('get-actor-output');
+            await client.close();
+        });
+
+        it('should return outputSchema, title, and icons in tools list response', async () => {
+            client = await createClientFn();
+            const response = await client.listTools();
+
+            // Find a tool with outputSchema (e.g., search-apify-docs)
+            const searchApiifyDocsTool = response.tools.find((tool) => tool.name === 'search-apify-docs');
+            expect(searchApiifyDocsTool).toBeDefined();
+
+            // Verify that outputSchema is present
+            expect(searchApiifyDocsTool?.outputSchema).toBeDefined();
+            expect(typeof searchApiifyDocsTool?.outputSchema).toBe('object');
+            expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('type');
+            expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('properties');
+
             await client.close();
         });
 
@@ -557,11 +613,10 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({
                 tools: ['docs'],
             });
-            const toolName = HelperTools.DOCS_FETCH;
 
             const documentUrl = 'https://docs.apify.com/academy/getting-started/creating-actors';
             const result = await client.callTool({
-                name: toolName,
+                name: HelperTools.DOCS_FETCH,
                 arguments: {
                     url: documentUrl,
                 },
@@ -571,6 +626,91 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(documentUrl);
+        });
+
+        it('should return structured output for search-apify-docs matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['docs'],
+            });
+            const toolName = HelperTools.DOCS_SEARCH;
+
+            const query = 'standby actor';
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    query,
+                    limit: 5,
+                    offset: 0,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            validateStructuredOutput(result, searchApifyDocsTool.outputSchema, toolName);
+        });
+
+        it('should return structured output for fetch-actor-details matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.ACTOR_GET_DETAILS;
+
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    actor: RAG_WEB_BROWSER,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            validateStructuredOutput(result, fetchActorDetailsTool.outputSchema, toolName);
+        });
+
+        it('should return structured output for search-actors matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.STORE_SEARCH;
+
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    keywords: 'rag web browser',
+                    limit: 5,
+                    offset: 0,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            validateStructuredOutput(result, searchActors.outputSchema, toolName);
+        });
+
+        it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['docs'],
+            });
+            const toolName = HelperTools.DOCS_FETCH;
+
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    url: 'https://docs.apify.com/platform/actors/development',
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            validateStructuredOutput(result, fetchApifyDocsTool.outputSchema, toolName);
         });
 
         it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {

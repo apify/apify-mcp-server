@@ -31,10 +31,10 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
-- [🤖 MCP clients and examples](#-mcp-clients-and-examples)
+- [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [🛠️ Tools, resources, and prompts](#-tools-resources-and-prompts)
-- [📊 Telemetry](#telemetry)
+- [📊 Telemetry](#-telemetry)
 - [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
 - [⚙️ Development](#-development)
 - [🤝 Contributing](#-contributing)

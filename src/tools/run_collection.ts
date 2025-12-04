@@ -5,6 +5,7 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 
 const getUserRunsListArgs = z.object({
     offset: z.number()
@@ -50,6 +51,8 @@ USAGE EXAMPLES:
         const parsed = getUserRunsListArgs.parse(args);
         const client = new ApifyClient({ token: apifyToken });
         const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(runs)}\n\`\`\`` }] };
+        return buildMCPResponse({
+            texts: [`\`\`\`json\n${JSON.stringify(runs)}\n\`\`\``],
+        });
     },
 } as const;
