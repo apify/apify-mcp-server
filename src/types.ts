@@ -8,6 +8,7 @@ import type z from 'zod';
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { toolCategories } from './tools/index.js';
+import type { StructuredPricingInfo } from './utils/pricing-info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
 export type SchemaProperties = {
@@ -370,4 +371,27 @@ export type ActorsMcpServerOptions = {
      * instead of APIFY_TOKEN environment variable, so it can be passed to the server
      */
     token?: string;
-};
+}
+
+export type StructuredActorCard = {
+    title?: string;
+    url: string;
+    fullName: string;
+    developer: {
+        username: string;
+        isOfficialApify: boolean;
+        url: string;
+    };
+    description: string;
+    categories: string[];
+    pricing: StructuredPricingInfo;
+    stats?: {
+        totalUsers: number;
+        monthlyUsers: number;
+        successRate?: number;
+        bookmarks?: number;
+    };
+    rating?: number;
+    modifiedAt?: string;
+    isDeprecated: boolean;
+}

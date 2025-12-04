@@ -8,6 +8,7 @@ import { ajv } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { fetchApifyDocsToolOutputSchema } from './structured-output-schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
     url: z.string()
@@ -28,6 +29,7 @@ USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
     inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
+    outputSchema: fetchApifyDocsToolOutputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
     annotations: {
         title: 'Fetch Apify docs',
@@ -43,13 +45,11 @@ USAGE EXAMPLES:
 
         // Only allow URLs starting with https://docs.apify.com
         if (!url.startsWith('https://docs.apify.com')) {
-            return buildMCPResponse({
-                texts: [`Invalid URL: "${url}".
+            return buildMCPResponse({ texts: [`Invalid URL: "${url}".
 Only URLs starting with "https://docs.apify.com" are allowed.
 Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
-                isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-            });
+            isError: true,
+            toolStatus: TOOL_STATUS.SOFT_FAIL });
         }
 
         // Cache URL without fragment to avoid fetching the same page multiple times
@@ -91,6 +91,6 @@ Please verify the URL is correct and accessible. You can search for available do
             }
         }
 
-        return buildMCPResponse({ texts: [`Fetched content from ${url}:\n\n${markdown}`] });
+        return buildMCPResponse({ texts: [`Fetched content from ${url}:\n\n${markdown}`], structuredContent: { url, content: markdown } });
     },
 } as const;

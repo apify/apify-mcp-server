@@ -7,6 +7,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -29,6 +30,7 @@ USAGE EXAMPLES:
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,
     inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
+    outputSchema: actorDetailsOutputSchema,
     ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
     annotations: {
         title: 'Fetch Actor details',
@@ -65,6 +67,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         }
         // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
         // This allows better formatting in the final output
-        return buildMCPResponse({ texts });
+        const structuredContent = {
+            actorInfo: details.actorCardStructured,
+            readme: details.readme,
+            inputSchema: details.inputSchema,
+        };
+        return buildMCPResponse({ texts, structuredContent });
     },
 } as const;

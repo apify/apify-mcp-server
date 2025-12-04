@@ -9,22 +9,27 @@ import type { ToolStatus } from '../types.js';
  * @param options.toolStatus - Optional internal tool status used for telemetry. When provided,
  *                             it will be attached as `_toolStatus` so the server can read it
  *                             and strip it before sending the response to the MCP client.
+ * @param options.structuredContent - Optional structured content of unknown type
  */
+
 export function buildMCPResponse(options: {
     texts: string[];
     isError?: boolean;
     toolStatus?: ToolStatus;
+    structuredContent?: unknown;
 }) {
     const {
         texts,
         isError = false,
         toolStatus,
+        structuredContent,
     } = options;
 
     const response: {
         content: { type: 'text'; text: string }[];
         isError: boolean;
         internalToolStatus?: ToolStatus;
+        structuredContent?: unknown;
     } = {
         content: texts.map((text) => ({ type: 'text', text })),
         isError,
@@ -34,5 +39,11 @@ export function buildMCPResponse(options: {
     if (toolStatus) {
         response.internalToolStatus = toolStatus;
     }
+
+    // Add structured content if provided
+    if (structuredContent !== undefined) {
+        response.structuredContent = structuredContent;
+    }
+
     return response;
 }

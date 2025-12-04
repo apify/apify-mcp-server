@@ -4,6 +4,31 @@ import { ACTOR_PRICING_MODEL } from '../const.js';
 import type { ExtendedPricingInfo } from '../types.js';
 
 /**
+ * Custom type to transform raw API pricing data into a clean, client-friendly format
+ * that matches the style of the unstructured text output instead of using the raw API format.
+ */
+export type StructuredPricingInfo = {
+    model: string;
+    isFree: boolean;
+    pricePerUnit?: number;
+    unitName?: string;
+    trialMinutes?: number;
+    tieredPricing?: {
+        tier: string;
+        pricePerUnit: number;
+    }[];
+    events?: {
+        title: string;
+        description: string;
+        priceUsd?: number;
+        tieredPricing?: {
+            tier: string;
+            priceUsd: number;
+        }[];
+    }[];
+}
+
+/**
  * Returns the most recent valid pricing information from a list of pricing infos,
  * based on the provided current date.
  *
@@ -106,4 +131,57 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
         return payPerEventPricingToString(pricingInfo.pricingPerEvent);
     }
     return 'Pricing information is not available.';
+}
+
+/**
+ * Transform and normalize API response to match unstructured text output format
+ * instead of just dumping raw API data - ensures consistency across structured & unstructured modes.
+ */
+export function pricingInfoToStructured(pricingInfo: ExtendedPricingInfo | null): StructuredPricingInfo {
+    const structuredPricing: StructuredPricingInfo = {
+        model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE,
+        isFree: !pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE,
+    };
+
+    if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
+        return structuredPricing;
+    }
+
+    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
+        structuredPricing.pricePerUnit = pricingInfo.pricePerUnitUsd || 0;
+        structuredPricing.unitName = pricingInfo.unitName || 'result';
+
+        if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
+            structuredPricing.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
+                tier,
+                pricePerUnit: obj.tieredPricePerUnitUsd,
+            }));
+        }
+    } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
+        structuredPricing.pricePerUnit = pricingInfo.pricePerUnitUsd;
+        structuredPricing.trialMinutes = pricingInfo.trialMinutes;
+
+        if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
+            structuredPricing.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
+                tier,
+                pricePerUnit: obj.tieredPricePerUnitUsd,
+            }));
+        }
+    } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
+        if (pricingInfo.pricingPerEvent?.actorChargeEvents) {
+            structuredPricing.events = Object.values(pricingInfo.pricingPerEvent.actorChargeEvents).map((event) => ({
+                title: event.eventTitle,
+                description: event.eventDescription || '',
+                priceUsd: typeof event.eventPriceUsd === 'number' ? event.eventPriceUsd : undefined,
+                tieredPricing: event.eventTieredPricingUsd
+                    ? Object.entries(event.eventTieredPricingUsd).map(([tier, price]) => ({
+                        tier,
+                        priceUsd: price.tieredEventPriceUsd,
+                    }))
+                    : undefined,
+            }));
+        }
+    }
+
+    return structuredPricing;
 }

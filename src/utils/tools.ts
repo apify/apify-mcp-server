@@ -8,9 +8,12 @@ import type { ToolBase, ToolCategory, ToolEntry } from '../types.js';
 export function getToolPublicFieldOnly(tool: ToolBase) {
     return {
         name: tool.name,
+        title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations,
+        icons: tool.icons,
     };
 }
 

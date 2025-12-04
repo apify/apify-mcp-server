@@ -48,11 +48,9 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return buildMCPResponse({
-                texts: [`Run with ID '${parsed.runId}' not found.`],
+            return buildMCPResponse({ texts: [`Run with ID '${parsed.runId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-            });
+                toolStatus: TOOL_STATUS.SOFT_FAIL });
         }
         const texts = [`\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``];
         return buildMCPResponse({ texts });
@@ -84,6 +82,7 @@ USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
+    // It does not make sense to add structured output here since the log API just returns plain text
     ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
     annotations: {
         title: 'Get Actor run log',
