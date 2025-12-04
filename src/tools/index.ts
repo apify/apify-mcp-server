@@ -1,5 +1,6 @@
 // Import specific tools that are being used
 import type { ToolCategory } from '../types.js';
+import { getExpectedToolsByCategories } from '../utils/tools.js';
 import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
@@ -14,7 +15,6 @@ import { getActorRun, getActorRunLog } from './run.js';
 import { getUserRunsList } from './run_collection.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
-import { getExpectedToolsByCategories } from '../utils/tools.js';
 
 /* list of tools that can be used without authentication */
 export const unauthEnabledTools: string[] = [

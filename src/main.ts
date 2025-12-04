@@ -3,9 +3,10 @@
  * This file needs to be named `main.ts` to be recognized by the Apify platform.
  */
 
-import log from '@apify/log';
 import { Actor } from 'apify';
 import type { ActorCallOptions } from 'apify-client';
+
+import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
 import { ApifyClient } from './apify-client.js';

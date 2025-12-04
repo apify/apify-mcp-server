@@ -2,13 +2,17 @@
  * ESLint Configuration
  *
  * This configuration follows the apify-core style and uses the shared @apify/eslint-config package.
- * It enforces consistent code style, TypeScript best practices, and import organization.
+ * It follows the shared config as much as possible, only adding project-specific overrides where necessary.
  *
- * Key changes from previous version:
- * - Updated to @apify/eslint-config@1.1.0 (from 1.0.0) for latest rules and improvements
- * - Added import/no-extraneous-dependencies rule to prevent importing devDependencies in production code
- * - Added exception for config files to allow default exports (ESLint configs typically use default exports)
- * - Uses flat config format (ESLint 9+) which is more flexible and maintainable
+ * The shared config provides:
+ * - Import ordering via simple-import-sort/imports (groups: side effects, node:, external, @apify/, @apify-packages/, relative)
+ * - max-len rule (160 chars, ignores URLs and template literals)
+ * - TypeScript-specific rules and best practices
+ *
+ * Project-specific overrides:
+ * - import/no-extraneous-dependencies: Adds vitest.config.ts and evals/** patterns
+ * - @typescript-eslint/consistent-type-definitions: Prefers 'interface' over 'type'
+ * - import/no-default-export: Allows default exports in config files
  */
 import apifyTypeScriptConfig from '@apify/eslint-config/ts.js';
 
@@ -42,40 +46,6 @@ export default [
                     ],
                 },
             ],
-            // Enforce maximum line length (matches EditorConfig max_line_length = 160)
-            // This improves code readability and consistency
-            'max-len': [
-                'error',
-                {
-                    code: 160,
-                    ignoreUrls: true, // Allow long URLs
-                    ignoreComments: true, // Allow long comments
-                    ignoreStrings: true, // Allow long strings (often contain URLs or user-facing text)
-                    ignoreTemplateLiterals: true, // Allow long template literals
-                },
-            ],
-            // Enforce consistent import ordering and grouping
-            // Groups: builtin -> external -> parent/sibling -> index -> object
-            // Alphabetizes within groups and requires newlines between groups
-            // This improves code organization and makes imports easier to scan
-            'import/order': [
-                'error',
-                {
-                    'groups': ['builtin', 'external', ['parent', 'sibling'], 'index', 'object'],
-                    'alphabetize': {
-                        'order': 'asc',
-                        'caseInsensitive': true,
-                    },
-                    'newlines-between': 'always',
-                },
-            ],
-            // Enforce consistent quote style for object properties
-            // Prevents mixing quoted and unquoted property names unnecessarily
-            'quote-props': ['error', 'consistent'],
-            // Disable simple-import-sort since we're using import/order instead
-            // This prevents conflicts between the two import sorting rules
-            'simple-import-sort/imports': 'off',
-            'simple-import-sort/exports': 'off',
         },
         languageOptions: {
             // Use ES modules (import/export syntax)

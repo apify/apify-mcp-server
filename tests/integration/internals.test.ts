@@ -1,5 +1,6 @@
-import log from '@apify/log';
 import { beforeAll, describe, expect, it } from 'vitest';
+
+import log from '@apify/log';
 
 import { actorNameToToolName } from '../../dist/tools/utils.js';
 import { ApifyClient } from '../../src/apify-client.js';

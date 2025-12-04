@@ -1,8 +1,9 @@
-import log from '@apify/log';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ActorCallOptions, ActorRun } from 'apify-client';
 import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
+
+import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_MAX_MEMORY_MBYTES,
@@ -13,22 +14,22 @@ import { ACTOR_MAX_MEMORY_MBYTES,
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
     TOOL_STATUS } from '../const.js';
-import { getActorDefinition } from './build.js';
-import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile } from './utils.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { ajv } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { getActorDefinition } from './build.js';
+import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile } from './utils.js';
 
 // Define a named return type for callActorGetDataset
 export interface CallActorGetDatasetResult {

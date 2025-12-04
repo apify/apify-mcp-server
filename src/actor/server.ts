@@ -4,18 +4,19 @@
 
 import { randomUUID } from 'node:crypto';
 
-import log from '@apify/log';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../apify-client.js';
-import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
-import { getActorRunData } from './utils.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import { parseBooleanFromString } from '../utils/generic.js';
+import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
+import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,

@@ -18,7 +18,6 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import log from '@apify/log';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import yargs from 'yargs';
@@ -26,6 +25,8 @@ import yargs from 'yargs';
 // Using .js or /index.js didn't resolve it due to the @types package issues.
 // eslint-disable-next-line import/extensions
 import { hideBin } from 'yargs/helpers';
+
+import log from '@apify/log';
 
 import { ApifyClient } from './apify-client.js';
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
