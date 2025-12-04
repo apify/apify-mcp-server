@@ -2,7 +2,7 @@ import type { Actor, Build } from 'apify-client';
 
 import type { ApifyClient } from '../apify-client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { IActorInputSchema, type StructuredActorCard } from '../types.js';
+import type { IActorInputSchema, StructuredActorCard } from '../types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
 
