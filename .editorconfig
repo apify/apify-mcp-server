@@ -1,5 +1,10 @@
+# EditorConfig is a file format and collection of text editor plugins
+# for maintaining consistent coding styles between different editors and IDEs
+# See https://editorconfig.org for more information
+
 root = true
 
+# Apply to all files
 [*]
 indent_style = space
 indent_size = 4
@@ -7,3 +12,21 @@ charset = utf-8
 trim_trailing_whitespace = true
 insert_final_newline = true
 end_of_line = lf
+# Maximum line length (160 characters)
+# Note: editorconfig-tools is unable to ignore long strings or URLs, so this is informational
+# ESLint will enforce this limit with its max-len rule
+max_line_length = 160
+
+# IntelliJ IDEA / WebStorm specific settings
+# These settings configure code formatting behavior in JetBrains IDEs
+# They ensure consistent formatting when using IDE auto-format features
+#   - Adds spaces within TypeScript import braces: import { a, b } instead of import {a,b}
+ij_typescript_spaces_within_imports = true
+#   - Adds spaces within JavaScript import braces: import { a, b } instead of import {a,b}
+ij_javascript_spaces_within_imports = true
+#   - Adds spaces within TypeScript union types: string | number instead of string|number
+ij_typescript_spaces_within_union_types = true
+
+# YAML files use 2-space indentation (YAML standard)
+[{*.yaml, *.yml}]
+indent_size = 2

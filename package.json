@@ -62,7 +62,7 @@
   },
   "devDependencies": {
     "@ai-sdk/openai": "^2.0.52",
-    "@apify/eslint-config": "^1.0.0",
+    "@apify/eslint-config": "^1.1.0",
     "@apify/tsconfig": "^0.1.0",
     "@arizeai/phoenix-client": "^4.2.0",
     "@arizeai/phoenix-evals": "^0.2.2",
