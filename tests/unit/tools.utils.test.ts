@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
 import { buildApifySpecificProperties, decodeDotPropertyNames, encodeDotPropertyNames,
-    inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, shortenEnum, shortenProperties,
+    inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, filterAndShortenEnum, shortenProperties,
     transformActorInputSchemaProperties } from '../../src/tools/utils.js';
 import type { IActorInputSchema, ISchemaProperties } from '../../src/types.js';
 
@@ -888,17 +888,17 @@ describe('inferArrayItemsTypeIfMissing', () => {
     });
 });
 
-describe('shortenEnum', () => {
+describe('filterAndShortenEnum', () => {
     it('shorten enum list', () => {
         const enumList: string[] = [];
         const wordLength = 100;
         const wordCount = ACTOR_ENUM_MAX_LENGTH / wordLength + 1; // exceed the limit
 
-        for (let i = 0; i < wordCount; i++) {
+        for (let i = 1; i < wordCount; i++) {
             enumList.push('a'.repeat(wordLength));
         }
 
-        const shortenedList = shortenEnum(enumList);
+        const shortenedList = filterAndShortenEnum(enumList);
 
         expect(shortenedList?.length || 0).toBe(ACTOR_ENUM_MAX_LENGTH / wordLength);
     });
