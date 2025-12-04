@@ -69,7 +69,7 @@ export const pricingSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         model: { type: 'string', description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)' },
-        isFree: { type: 'boolean', description: 'Whether the actor is free to use' },
+        isFree: { type: 'boolean', description: 'Whether the Actor is free to use' },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
         unitName: { type: 'string', description: 'Unit name for pricing' },
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
