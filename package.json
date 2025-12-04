@@ -87,7 +87,6 @@
     "build": "tsc -b src",
     "build:watch": "tsc -b src -w",
     "type-check": "tsc --noEmit",
-    "inspector": "npm run build && npx @modelcontextprotocol/inspector dist/stdio.js",
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
