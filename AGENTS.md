@@ -7,6 +7,7 @@ The codebase is built with TypeScript using ES modules and follows a modular arc
 The server can run in multiple modes:
 - **Standard Input/Output (stdio)**: For local integrations and command-line tools like Claude Desktop
 - **HTTP Streamable**: For hosted deployments and web-based MCP clients
+- **Legacy SSE over HTTP**: Legacy version of the protocol for hosted deployments and web-based clients (deprecated and will be removed in the future)
 
 ### Root directories
 - `src/`: Main TypeScript source code
@@ -115,6 +116,7 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
   - Newlines between groups
 - Use `import type` for type-only imports
 - Do not duplicate imports - always reuse existing imports if present
+- Do not use dynamic imports unless explicitly told to do so
 
 ### Error handling
 
