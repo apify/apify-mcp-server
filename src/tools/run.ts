@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
@@ -48,7 +48,9 @@ USAGE EXAMPLES:
         const client = new ApifyClient({ token: apifyToken });
         const v = await client.run(parsed.runId).get();
         if (!v) {
-            return buildMCPResponse({ texts: [`Run with ID '${parsed.runId}' not found.`], isError: true });
+            return buildMCPResponse({ texts: [`Run with ID '${parsed.runId}' not found.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL });
         }
         const texts = [`\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``];
         return buildMCPResponse({ texts });

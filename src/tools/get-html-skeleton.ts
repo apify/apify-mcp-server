@@ -2,7 +2,7 @@ import { z } from 'zod';
 import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
-import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS } from '../const.js';
+import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
 import { getHtmlSkeletonCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ajv } from '../utils/ajv.js';
@@ -62,7 +62,11 @@ USAGE EXAMPLES:
         const parsed = getHtmlSkeletonArgs.parse(args);
 
         if (!isValidHttpUrl(parsed.url)) {
-            return buildMCPResponse({ texts: [`The provided URL is not a valid HTTP or HTTPS URL: ${parsed.url}`], isError: true });
+            return buildMCPResponse({
+                texts: [`The provided URL is not a valid HTTP or HTTPS URL: ${parsed.url}`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         // Try to get from cache first
@@ -81,16 +85,25 @@ USAGE EXAMPLES:
 
             const datasetItems = await client.dataset(run.defaultDatasetId).listItems();
             if (datasetItems.items.length === 0) {
-                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
+                return buildMCPResponse({
+                    texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any output for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`],
+                    isError: true,
+                });
             }
 
             const firstItem = datasetItems.items[0] as unknown as ScrapedPageItem;
             if (firstItem.crawl.httpStatusMessage.toLocaleLowerCase() !== 'ok') {
-                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
+                return buildMCPResponse({
+                    texts: [`The scraping Actor (${RAG_WEB_BROWSER}) returned an HTTP status ${firstItem.crawl.httpStatusCode} (${firstItem.crawl.httpStatusMessage}) for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`],
+                    isError: true,
+                });
             }
 
             if (!firstItem.html) {
-                return buildMCPResponse({ texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`], isError: true });
+                return buildMCPResponse({
+                    texts: [`The scraping Actor (${RAG_WEB_BROWSER}) did not return any HTML content for the URL: ${parsed.url}. Please check the Actor run for more details: ${run.id}`],
+                    isError: true,
+                });
             }
 
             strippedHtml = stripHtml(firstItem.html);
