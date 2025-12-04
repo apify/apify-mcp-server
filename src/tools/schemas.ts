@@ -80,7 +80,7 @@ export const pricingSchema = {
 };
 
 /**
- * Schema for actor statistics
+ * Schema for Actor statistics
  */
 export const statsSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
