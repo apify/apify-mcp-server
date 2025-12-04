@@ -119,7 +119,7 @@ export const actorInfoSchema = {
 };
 
 /**
- * Schema for actor details output (fetch-actor-details tool)
+ * Schema for Actor details output (fetch-actor-details tool)
  */
 export const actorDetailsOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
