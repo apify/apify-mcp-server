@@ -278,14 +278,16 @@ export function addEnumsToDescriptionsWithExamples(properties: Record<string, Sc
 }
 
 /**
- * Helper function to shorten the enum list if it is too long.
+ * Helper function to filter and shorten the enum list.
+ * Removes empty strings and truncates if the total character count exceeds the limit.
  *
- * @param {string[]} enumList - The list of enum values to be shortened.
- * @returns {string[] | undefined} - The shortened enum list or undefined if the list is too long.
+ * @param {string[]} enumList - The list of enum values to be filtered and shortened.
+ * @returns {string[] | undefined} - The filtered and shortened enum list or undefined if the list is too long.
  */
-export function shortenEnum(enumList: string[]): string[] | undefined {
+export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
     let charCount = 0;
     const resultEnumList = enumList.filter((enumValue) => {
+        if (enumValue === '') return false;
         charCount += enumValue.length;
         return charCount <= ACTOR_ENUM_MAX_LENGTH;
     });
@@ -308,11 +310,11 @@ export function shortenProperties(properties: { [key: string]: SchemaProperties 
         }
 
         if (property.enum && property.enum?.length > 0) {
-            property.enum = shortenEnum(property.enum);
+            property.enum = filterAndShortenEnum(property.enum);
         }
 
         if (property.items?.enum && property.items.enum.length > 0) {
-            property.items.enum = shortenEnum(property.items.enum);
+            property.items.enum = filterAndShortenEnum(property.items.enum);
         }
     }
 
