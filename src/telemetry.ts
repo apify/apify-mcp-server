@@ -1,8 +1,7 @@
 import * as crypto from 'node:crypto';
 
-import { Analytics } from '@segment/analytics-node';
-
 import log from '@apify/log';
+import { Analytics } from '@segment/analytics-node';
 
 import {
     DEFAULT_TELEMETRY_ENV,

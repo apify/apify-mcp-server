@@ -3,10 +3,9 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
+import log from '@apify/log';
 import type { ValidateFunction } from 'ajv';
 import type { ApifyClient } from 'apify';
-
-import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
 import { callActor } from '../tools/actor.js';

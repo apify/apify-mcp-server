@@ -23,13 +23,13 @@ describe('getValuesByDotKeys', () => {
     it('should return undefined for missing paths', () => {
         const obj = { foo: { bar: 1 } };
         const result = getValuesByDotKeys(obj, ['foo.baz', 'baz', 'foo.bar.baz']);
-        expect(result).toEqual({ 'foo.baz': undefined, baz: undefined, 'foo.bar.baz': undefined });
+        expect(result).toEqual({ 'foo.baz': undefined, 'baz': undefined, 'foo.bar.baz': undefined });
     });
 
     it('should handle non-object values in the path', () => {
         const obj = { a: { b: 5 }, x: 10 };
         const result = getValuesByDotKeys(obj, ['a.b', 'x.y', 'x']);
-        expect(result).toEqual({ 'a.b': 5, 'x.y': undefined, x: 10 });
+        expect(result).toEqual({ 'a.b': 5, 'x.y': undefined, 'x': 10 });
     });
 
     it('should work with empty keys array', () => {
@@ -41,7 +41,7 @@ describe('getValuesByDotKeys', () => {
     it('should work with empty object', () => {
         const obj = {};
         const result = getValuesByDotKeys(obj, ['a', 'b.c']);
-        expect(result).toEqual({ a: undefined, 'b.c': undefined });
+        expect(result).toEqual({ 'a': undefined, 'b.c': undefined });
     });
 
     it('should return whole object', () => {

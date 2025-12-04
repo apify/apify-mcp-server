@@ -94,7 +94,7 @@ export interface ActorTool extends ToolBase {
  * Arguments passed to internal tool calls.
  * Contains both the tool arguments and server references.
  */
-export type InternalToolArgs = {
+export interface InternalToolArgs {
     /** Arguments passed to the tool */
     args: Record<string, unknown>;
     /** Extra data given to request handlers.
@@ -207,7 +207,7 @@ export type ToolCategory = keyof typeof toolCategories;
  */
 export type ToolSelector = ToolCategory | string;
 
-export type Input = {
+export interface Input {
     /**
      * When `actors` is undefined that means the default Actors should be loaded.
      * If it as empty string or empty array then no Actors should be loaded.
@@ -229,7 +229,7 @@ export type Input = {
      * Otherwise the specified categories and/or concrete tool names should be loaded.
      */
     tools?: ToolSelector[] | string;
-};
+}
 
 // Utility type to get a union of values from an object type
 export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
@@ -254,7 +254,7 @@ export type ExtendedActorStoreList = ActorStoreList & {
     actorReviewRating?: number;
 };
 
-export type ActorDefinitionStorage = {
+export interface ActorDefinitionStorage {
     views: Record<
         string,
         {
@@ -269,7 +269,7 @@ export type ActorDefinitionStorage = {
             };
         }
     >;
-};
+}
 
 export interface ApifyDocsSearchResult {
     /** URL of the documentation page */

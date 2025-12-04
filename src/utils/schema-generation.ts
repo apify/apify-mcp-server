@@ -3,11 +3,11 @@ import toJsonSchema from 'to-json-schema';
 /**
  * Minimal JSON Schema typings for array/object schemas used in generateSchemaFromItems
  */
-export type JsonSchemaProperty = {
+export interface JsonSchemaProperty {
     type: 'string' | 'integer' | 'number' | 'boolean' | 'object' | 'array' | 'null';
     properties?: Record<string, JsonSchemaProperty>;
     items?: JsonSchemaProperty;
-};
+}
 
 export interface JsonSchemaObject {
     type: 'object';

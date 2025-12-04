@@ -475,7 +475,7 @@ describe('encodeDotPropertyNames', () => {
     it('should replace dots in property names with -dot-', () => {
         const input = {
             'foo.bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
-            baz: { type: 'number', title: 'Baz', description: 'desc2' },
+            'baz': { type: 'number', title: 'Baz', description: 'desc2' },
             'a.b.c': { type: 'boolean', title: 'A B C', description: 'desc3' },
         };
         const result = encodeDotPropertyNames(input);
@@ -500,7 +500,7 @@ describe('decodeDotPropertyNames', () => {
     it('should replace -dot- in property names with dots', () => {
         const input = {
             'foo-dot-bar': { type: 'string', title: 'Foo Bar', description: 'desc' },
-            baz: { type: 'number', title: 'Baz', description: 'desc2' },
+            'baz': { type: 'number', title: 'Baz', description: 'desc2' },
             'a-dot-b-dot-c': { type: 'boolean', title: 'A B C', description: 'desc3' },
         };
         const result = decodeDotPropertyNames(input);
@@ -542,56 +542,56 @@ describe('transformActorInputSchemaProperties', () => {
                 'dotted.name',
             ],
             properties: {
-                resourcePicker: {
+                'resourcePicker': {
                     type: 'array',
                     title: 'Resource Picker',
                     description: 'Pick a resource',
                     editor: 'resourcePicker',
                 },
-                keyValue: {
+                'keyValue': {
                     type: 'array',
                     title: 'Key Value',
                     description: 'Key value pairs',
                     editor: 'keyValue',
                 },
-                globs: {
+                'globs': {
                     type: 'array',
                     title: 'Globs',
                     description: 'Globs array',
                     editor: 'globs',
                 },
-                pseudoUrls: {
+                'pseudoUrls': {
                     type: 'array',
                     title: 'PseudoUrls',
                     description: 'PseudoUrls array',
                     editor: 'pseudoUrls',
                 },
-                proxy: {
+                'proxy': {
                     type: 'object',
                     title: 'Proxy',
                     description: 'Proxy config',
                     editor: 'proxy',
                     properties: {},
                 },
-                requestListSources: {
+                'requestListSources': {
                     type: 'array',
                     title: 'Request List Sources',
                     description: 'Sources',
                     editor: 'requestListSources',
                 },
-                simpleString: {
+                'simpleString': {
                     type: 'string',
                     title: 'Simple String',
                     description: 'A simple string',
                 },
-                enumString: {
+                'enumString': {
                     type: 'string',
                     title: 'Enum String',
                     description: 'A string with enum',
                     enum: ['A', 'B', 'C'],
                     default: 'A',
                 },
-                arrayOfStrings: {
+                'arrayOfStrings': {
                     type: 'array',
                     title: 'Array of Strings',
                     description: 'An array of strings',
@@ -685,26 +685,26 @@ describe('transformActorInputSchemaProperties', () => {
                     title: 'Foo Bar',
                     description: 'desc',
                 },
-                proxy: {
+                'proxy': {
                     type: 'object',
                     editor: 'proxy',
                     title: 'Proxy',
                     description: 'Proxy desc',
                     properties: {},
                 },
-                sources: {
+                'sources': {
                     type: 'array',
                     editor: 'requestListSources',
                     title: 'Sources',
                     description: 'Sources desc',
                 },
-                enumProp: {
+                'enumProp': {
                     type: 'string',
                     title: 'Enum',
                     description: 'Enum desc',
                     enum: Array.from({ length: 30 }, (_, i) => `val${i}`),
                 },
-                longDesc: {
+                'longDesc': {
                     type: 'string',
                     title: 'Long',
                     description: 'a'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH + 10),

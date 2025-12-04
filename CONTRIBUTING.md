@@ -9,7 +9,7 @@ All pull requests are subject to automated and manual review against these guide
 
 All commits and PR titles must follow the **[Conventional Commits](https://www.conventionalcommits.org/)** format.
 Both the **type** (`feat`, `fix`, `chore`, etc.) and the **scope** (the component in parentheses) are required.
-To indicate a **breaking change**, append `!` after the scope (e.g., `feat(mcp)!: ...`).
+To indicate a **breaking change**, append `!` after the scope (e.g., `feat!: ...`).
 
 We use this format to determine version bumps and to generate changelogs.
 It applies to both commit messages and PR titles, since PRs are merged using squash and the PR title becomes the commit message.
@@ -17,11 +17,11 @@ It applies to both commit messages and PR titles, since PRs are merged using squ
 ### Examples of Good Messages
 
 ```text
-feat(mcp): add new tool for fetching actor details
-feat(tools)!: migrate to new MCP SDK version [internal]
-fix(server): handle connection errors gracefully
-refactor(types): improve type definitions [ignore]
-chore(deps): update dependencies
+feat: add new tool for fetching actor details
+feat!: migrate to new MCP SDK version [internal]
+fix: handle connection errors gracefully
+refactor: improve type definitions [ignore]
+chore: update dependencies
 ```
 
 ---

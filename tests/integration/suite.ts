@@ -51,7 +51,7 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
         },
     });
 
-    type ContentItem = { text: string; type: string };
+    interface ContentItem { text: string; type: string }
     const content = result.content as ContentItem[];
     // The result is { content: [ ... ] }, and the last content is the sum
     const expected = {

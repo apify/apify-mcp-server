@@ -2,8 +2,8 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import { fixedAjvCompile } from '../tools/utils.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
-import { ajv } from '../utils/ajv.js';
 import { getMCPServerID, getProxyMCPServerToolName } from './utils.js';
+import { ajv } from '../utils/ajv.js';
 
 export async function getMCPServerTools(
     actorID: string,

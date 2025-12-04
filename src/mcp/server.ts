@@ -2,6 +2,7 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import log from '@apify/log';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -23,8 +24,6 @@ import {
 import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions } from 'apify-client';
 
-import log from '@apify/log';
-
 import { ApifyClient } from '../apify-client.js';
 import {
     DEFAULT_TELEMETRY_ENABLED,
@@ -38,8 +37,11 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
+import { connectMCPClient } from './client.js';
 import { prompts } from '../prompts/index.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
+import { processParamsGetTools } from './utils.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
@@ -61,9 +63,6 @@ import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
-import { connectMCPClient } from './client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 

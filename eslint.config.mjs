@@ -42,6 +42,40 @@ export default [
                     ],
                 },
             ],
+            // Enforce maximum line length (matches EditorConfig max_line_length = 160)
+            // This improves code readability and consistency
+            'max-len': [
+                'error',
+                {
+                    code: 160,
+                    ignoreUrls: true, // Allow long URLs
+                    ignoreComments: true, // Allow long comments
+                    ignoreStrings: true, // Allow long strings (often contain URLs or user-facing text)
+                    ignoreTemplateLiterals: true, // Allow long template literals
+                },
+            ],
+            // Enforce consistent import ordering and grouping
+            // Groups: builtin -> external -> parent/sibling -> index -> object
+            // Alphabetizes within groups and requires newlines between groups
+            // This improves code organization and makes imports easier to scan
+            'import/order': [
+                'error',
+                {
+                    'groups': ['builtin', 'external', ['parent', 'sibling'], 'index', 'object'],
+                    'alphabetize': {
+                        'order': 'asc',
+                        'caseInsensitive': true,
+                    },
+                    'newlines-between': 'always',
+                },
+            ],
+            // Enforce consistent quote style for object properties
+            // Prevents mixing quoted and unquoted property names unnecessarily
+            'quote-props': ['error', 'consistent'],
+            // Disable simple-import-sort since we're using import/order instead
+            // This prevents conflicts between the two import sorting rules
+            'simple-import-sort/imports': 'off',
+            'simple-import-sort/exports': 'off',
         },
         languageOptions: {
             // Use ES modules (import/export syntax)
@@ -51,6 +85,17 @@ export default [
                 // This ensures TypeScript-aware linting works for all files
                 project: './tsconfig.eslint.json',
             },
+        },
+    },
+    // TypeScript-specific rules (applied only to .ts files)
+    // These rules require the @typescript-eslint plugin which is included in apifyTypeScriptConfig
+    {
+        files: ['**/*.ts', '**/*.tsx'],
+        rules: {
+            // Prefer 'interface' over 'type' for object type definitions
+            // Interfaces can be extended and merged, making them more flexible
+            // Note: This matches apify-core CONTRIBUTING.md guidance
+            '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
         },
     },
     // Override rules for configuration files

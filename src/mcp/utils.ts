@@ -5,8 +5,8 @@ import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
 import type { Input } from '../types.js';
-import { loadToolsFromInput } from '../utils/tools-loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
+import { loadToolsFromInput } from '../utils/tools-loader.js';
 
 /**
  * Generates a unique server ID based on the provided URL.
