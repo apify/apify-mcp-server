@@ -5,6 +5,7 @@
         "skipLibCheck": true,
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "tests/**/*"
     ]
 }

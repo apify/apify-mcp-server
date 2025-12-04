@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
 import { buildApifySpecificProperties, decodeDotPropertyNames, encodeDotPropertyNames,
-    inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, filterAndShortenEnum, shortenProperties,
+    filterAndShortenEnum, inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, shortenProperties,
     transformActorInputSchemaProperties } from '../../src/tools/utils.js';
-import type { IActorInputSchema, ISchemaProperties } from '../../src/types.js';
+import type { ActorInputSchema, SchemaProperties } from '../../src/types.js';
 
 describe('buildApifySpecificProperties', () => {
     it('should add resource picker structure to array items with editor resourcePicker', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             resources: {
                 type: 'array',
                 title: 'Resources',
@@ -35,7 +35,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
     it('should add key and value structure to array items with editor keyValue', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             keyValuePairs: {
                 type: 'array',
                 title: 'Key-Value Pairs',
@@ -63,7 +63,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
     it('should add globs structure to array items with editor globs', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             globs: {
                 type: 'array',
                 title: 'Globs',
@@ -97,7 +97,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
     it('should add pseudoUrls structure to array items with items.editor pseudoUrls', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             pseudoUrls: {
                 type: 'array',
                 title: 'PseudoUrls',
@@ -131,7 +131,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
     it('should add useApifyProxy, apifyProxyGroups, and proxyUrls properties to proxy objects', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             proxy: {
                 type: 'object',
                 editor: 'proxy',
@@ -175,7 +175,7 @@ describe('buildApifySpecificProperties', () => {
     });
 
     it('should add URL structure to requestListSources array items', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             sources: {
                 type: 'array',
                 editor: 'requestListSources',
@@ -202,7 +202,7 @@ describe('buildApifySpecificProperties', () => {
     });
 
     it('should not modify properties that don\'t match special cases', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             regularObject: {
                 type: 'object',
                 title: 'Regular object',
@@ -234,7 +234,7 @@ describe('buildApifySpecificProperties', () => {
     });
 
     it('should handle empty properties object', () => {
-        const properties: Record<string, ISchemaProperties> = {};
+        const properties: Record<string, SchemaProperties> = {};
         const result = buildApifySpecificProperties(properties);
         expect(result).toEqual({});
     });
@@ -242,7 +242,7 @@ describe('buildApifySpecificProperties', () => {
 
 describe('markInputPropertiesAsRequired', () => {
     it('should add REQUIRED prefix to required properties', () => {
-        const input: IActorInputSchema = {
+        const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
             required: ['requiredProp1', 'requiredProp2'],
@@ -276,7 +276,7 @@ describe('markInputPropertiesAsRequired', () => {
     });
 
     it('should handle input without required fields', () => {
-        const input: IActorInputSchema = {
+        const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
             properties: {
@@ -300,7 +300,7 @@ describe('markInputPropertiesAsRequired', () => {
     });
 
     it('should handle empty required array', () => {
-        const input: IActorInputSchema = {
+        const input: ActorInputSchema = {
             title: 'Test Schema',
             type: 'object',
             required: [],
@@ -323,7 +323,7 @@ describe('markInputPropertiesAsRequired', () => {
 describe('shortenProperties', () => {
     it('should truncate long descriptions', () => {
         const longDescription = 'a'.repeat(ACTOR_MAX_DESCRIPTION_LENGTH + 100);
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
                 title: 'Property 1',
@@ -340,7 +340,7 @@ describe('shortenProperties', () => {
 
     it('should not modify descriptions that are within limits', () => {
         const description = 'This is a normal description';
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
                 title: 'Property 1',
@@ -358,7 +358,7 @@ describe('shortenProperties', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
         const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
                 title: 'Property 1',
@@ -388,7 +388,7 @@ describe('shortenProperties', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
         const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'array',
                 title: 'Property 1',
@@ -419,7 +419,7 @@ describe('shortenProperties', () => {
     });
 
     it('should handle properties without enum or items.enum', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
                 title: 'Property 1',
@@ -444,7 +444,7 @@ describe('shortenProperties', () => {
     });
 
     it('should handle empty enum arrays', () => {
-        const properties: Record<string, ISchemaProperties> = {
+        const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
                 title: 'Property 1',
@@ -526,7 +526,7 @@ describe('decodeDotPropertyNames', () => {
 // ----------------------
 describe('transformActorInputSchemaProperties', () => {
     it('should correctly transform a schema with all Apify-specific types and features', () => {
-        const input: IActorInputSchema = {
+        const input: ActorInputSchema = {
             title: 'Complex Schema',
             type: 'object',
             required: [
@@ -790,7 +790,7 @@ describe('transformActorInputSchemaProperties', () => {
     });
 
     it('should build array items property correctly for stringList editor with place IDs', () => {
-        const input: IActorInputSchema = {
+        const input: ActorInputSchema = {
             type: 'object',
             schemaVersion: 1,
             properties: {
@@ -836,7 +836,7 @@ describe('inferArrayItemType', () => {
     });
 
     it('infers string type for stringList editor with place IDs input', () => {
-        const property: ISchemaProperties = {
+        const property: SchemaProperties = {
             title: 'Place IDs',
             type: 'array',
             description: 'List of place IDs.',
@@ -849,7 +849,7 @@ describe('inferArrayItemType', () => {
 
 describe('inferArrayItemsTypeIfMissing', () => {
     it('should infer and set items type for array property with stringList editor', () => {
-        const properties: { [key: string]: ISchemaProperties } = {
+        const properties: { [key: string]: SchemaProperties } = {
             placeIds: {
                 title: '🗃 Place IDs',
                 type: 'array',
@@ -867,7 +867,7 @@ describe('inferArrayItemsTypeIfMissing', () => {
     });
 
     it('should not modify array properties that already have items.type defined', () => {
-        const properties: { [key: string]: ISchemaProperties } = {
+        const properties: { [key: string]: SchemaProperties } = {
             existingArray: {
                 title: 'Existing Array',
                 type: 'array',
