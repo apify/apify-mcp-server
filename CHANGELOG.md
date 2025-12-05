@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.1) (2025-12-05)
+
+### 🐛 Bug Fixes
+
+- Filter out empty enum strings that cause issues with mcp inspector and google adk ([#354](https://github.com/apify/apify-mcp-server/pull/354)) ([91b9b90](https://github.com/apify/apify-mcp-server/commit/91b9b90a02c6c860158800c15476753c8cdf4aca)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.6.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.0) (2025-12-04)
 
 ### 🚀 Features
