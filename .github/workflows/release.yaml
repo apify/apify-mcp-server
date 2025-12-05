@@ -21,6 +21,10 @@ on:
                 type: string
                 default: ""
 
+permissions:
+  id-token: write
+  contents: write
+
 concurrency:
     group: release
     cancel-in-progress: false
@@ -143,10 +147,7 @@ jobs:
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
+                run: npm ci
             -   name: Build module
                 run: npm run build
             - name: Prepare MCPB package
@@ -215,16 +216,11 @@ jobs:
                     node-version: 22
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
+                    registry-url: 'https://registry.npmjs.org'
+                    always-auth: 'true'
             -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
+                run: npm ci
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
                 run: npm publish --tag latest
-
-env:
-    NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
-    NPM_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
