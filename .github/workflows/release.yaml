@@ -60,10 +60,10 @@ jobs:
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
 
             -   name: Update package version in package.json
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
@@ -140,10 +140,10 @@ jobs:
                      fi
 
                      echo "✓ Version check passed: server.json has correct version $ACTUAL_VERSION"
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
@@ -210,10 +210,10 @@ jobs:
                      fi
 
                      echo "✓ Version check passed: package.json has correct version $ACTUAL_VERSION"
-            -   name: Use Node.js 22
+            -   name: Use Node.js
                 uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
                     registry-url: 'https://registry.npmjs.org'
