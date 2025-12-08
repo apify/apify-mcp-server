@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.2) (2025-12-08)
+
+### 🚀 Features
+
+- Trusted publishing of npm package ([d3cff7c](https://github.com/apify/apify-mcp-server/commit/d3cff7cdab36b82b984b8103ca85a7c565238940)) by [@drobnikj](https://github.com/drobnikj)
+- Trusted publishing of npm package ([#355](https://github.com/apify/apify-mcp-server/pull/355)) ([1f0b374](https://github.com/apify/apify-mcp-server/commit/1f0b374041a0717f798fce5e9a0353e7b22c9cce)) by [@drobnikj](https://github.com/drobnikj)
+
+
 ## [0.6.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.1) (2025-12-05)
 
 ### 🐛 Bug Fixes
