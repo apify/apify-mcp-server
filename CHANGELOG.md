@@ -8,6 +8,15 @@ All notable changes to this project will be documented in this file.
 
 - Update node setup in releasing wf ([9a34990](https://github.com/apify/apify-mcp-server/commit/9a34990cee481c918ec21fa15f9b92779a1759f8)) by [@drobnikj](https://github.com/drobnikj)
 - Release workflow using --access public param ([fad9ad6](https://github.com/apify/apify-mcp-server/commit/fad9ad60fbfab311c55c9af28debf2544d3646a6)) by [@drobnikj](https://github.com/drobnikj)
+- Remove latest tag from npm publish release.yaml ([b1de40e](https://github.com/apify/apify-mcp-server/commit/b1de40e0ffd81e61a136ac1b1dabe9b5a9865f66)) by [@drobnikj](https://github.com/drobnikj)
+
+
+## [0.6.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.2) (2025-12-08)
+
+### 🐛 Bug Fixes
+
+- Update node setup in releasing wf ([9a34990](https://github.com/apify/apify-mcp-server/commit/9a34990cee481c918ec21fa15f9b92779a1759f8)) by [@drobnikj](https://github.com/drobnikj)
+- Release workflow using --access public param ([fad9ad6](https://github.com/apify/apify-mcp-server/commit/fad9ad60fbfab311c55c9af28debf2544d3646a6)) by [@drobnikj](https://github.com/drobnikj)
 
 
 ## [0.6.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.2) (2025-12-08)
