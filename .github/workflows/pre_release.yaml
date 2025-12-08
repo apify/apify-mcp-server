@@ -39,10 +39,10 @@ jobs:
                     ref: ${{ github.event.pull_request.head.ref }}
                     repository: ${{ github.event.pull_request.head.repo.full_name }}
 
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
 
