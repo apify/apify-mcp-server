@@ -1,7 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ActorCallOptions, ActorRun } from 'apify-client';
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
+
 
 import log from '@apify/log';
 
@@ -22,7 +22,7 @@ import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, Intern
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { ajv } from '../utils/ajv.js';
+import { ajv, compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
@@ -372,10 +372,10 @@ Step 2: Call Actor (step="call")
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
-    inputSchema: zodToJsonSchema(callActorArgs) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
     // For now we are not adding the strucuted output schema since this tool is quite complex and has multiple possible ends states
-    ajvValidate: ajv.compile({
-        ...zodToJsonSchema(callActorArgs),
+    ajvValidate: compileSchema({
+        ...z.toJSONSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),

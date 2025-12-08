@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
+
 
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { htmlToMarkdown } from '../utils/html-to-md.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
@@ -28,9 +28,9 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
 - user_input: Fetch https://docs.apify.com/academy`,
-    inputSchema: zodToJsonSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
     outputSchema: fetchApifyDocsToolOutputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(fetchApifyDocsToolArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(fetchApifyDocsToolArgsSchema)),
     annotations: {
         title: 'Fetch Apify docs',
         readOnlyHint: true,

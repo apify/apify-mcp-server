@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
+
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
@@ -56,8 +56,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
-    inputSchema: zodToJsonSchema(getDatasetArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetArgs)),
+    inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
@@ -97,8 +97,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
-    inputSchema: zodToJsonSchema(getDatasetItemsArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetItemsArgs)),
+    inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
@@ -165,8 +165,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
-    inputSchema: zodToJsonSchema(getDatasetSchemaArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getDatasetSchemaArgs)),
+    inputSchema: z.toJSONSchema(getDatasetSchemaArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getDatasetSchemaArgs)),
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,

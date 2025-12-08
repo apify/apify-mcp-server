@@ -29,8 +29,6 @@ const argsSchema = fixedAjvCompile(ajv, {
         ...Object.fromEntries(args.map((arg) => [arg.name, {
             type: 'string',
             description: arg.description,
-            default: arg.default,
-            examples: arg.examples,
         }])),
     },
     required: [...args.filter((arg) => arg.required).map((arg) => arg.name)],

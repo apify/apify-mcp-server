@@ -1,10 +1,10 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
+
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 
 const getActorRunArgs = z.object({
@@ -35,8 +35,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
-    inputSchema: zodToJsonSchema(getActorRunArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getActorRunArgs)),
+    inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
@@ -81,9 +81,9 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show last 20 lines of logs for run y2h7sK3Wc
 - user_input: Get logs for run y2h7sK3Wc`,
-    inputSchema: zodToJsonSchema(GetRunLogArgs) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
     // It does not make sense to add structured output here since the log API just returns plain text
-    ajvValidate: ajv.compile(zodToJsonSchema(GetRunLogArgs)),
+    ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
@@ -116,8 +116,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
-    inputSchema: zodToJsonSchema(abortRunArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(abortRunArgs)),
+    inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
     annotations: {
         title: 'Abort Actor run',
         openWorldHint: false,

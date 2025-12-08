@@ -1,5 +1,5 @@
 import { toolCategories } from '../tools/index.js';
-import type { ToolBase, ToolCategory, ToolEntry } from '../types.js';
+import type { HelperTool, ToolBase, ToolCategory, ToolEntry } from '../types.js';
 
 /**
  * Returns a public version of the tool containing only fields that should be exposed publicly.
@@ -50,7 +50,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     // Restore the original functions
     cloned.ajvValidate = originalAjvValidate;
     if (toolEntry.type === 'internal' && originalCall) {
-        cloned.call = originalCall;
+        (cloned as HelperTool).call = originalCall;
     }
 
     return cloned;

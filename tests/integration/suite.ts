@@ -787,7 +787,12 @@ export function createIntegrationTestsSuite(
 
             const message = prompt.messages[0];
             expect(message).toBeDefined();
-            expect(message.content.text).toContain(topic);
+            expect(message.content).toBeDefined();
+            expect(message.content.type).toBe('text');
+            // So typescript is happy
+            if (message.content.type === 'text') {
+                expect(message.content.text).toContain(topic);
+            }
         });
 
         // Session termination is only possible for streamable HTTP transport.
