@@ -211,13 +211,12 @@ jobs:
 
                      echo "✓ Version check passed: package.json has correct version $ACTUAL_VERSION"
             -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+                uses: actions/setup-node@v6
                 with:
                     node-version: 22
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
                     registry-url: 'https://registry.npmjs.org'
-                    always-auth: 'true'
             -   name: Install dependencies
                 run: npm ci
             -   name: Build module
