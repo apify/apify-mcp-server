@@ -21,6 +21,10 @@ on:
                 type: string
                 default: ""
 
+permissions:
+  id-token: write
+  contents: write
+
 concurrency:
     group: release
     cancel-in-progress: false
@@ -56,10 +60,10 @@ jobs:
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
 
             -   name: Update package version in package.json
                 run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
@@ -136,17 +140,14 @@ jobs:
                      fi
 
                      echo "✓ Version check passed: server.json has correct version $ACTUAL_VERSION"
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
+                run: npm ci
             -   name: Build module
                 run: npm run build
             - name: Prepare MCPB package
@@ -209,22 +210,16 @@ jobs:
                      fi
 
                      echo "✓ Version check passed: package.json has correct version $ACTUAL_VERSION"
-            -   name: Use Node.js 22
-                uses: actions/setup-node@v4
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
                 with:
-                    node-version: 22
+                    node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
+                    registry-url: 'https://registry.npmjs.org'
             -   name: Install dependencies
-                run: |
-                    echo "access=public" >> .npmrc
-                    echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" >> .npmrc
-                    npm ci
+                run: npm ci
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
-                run: npm publish --tag latest
-
-env:
-    NODE_AUTH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
-    NPM_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_NPM_TOKEN }}
+                run: npm publish
