@@ -1,5 +1,5 @@
-import Ajv from 'ajv';
 import type { ValidateFunction } from 'ajv';
+import Ajv from 'ajv';
 
 export const ajv = new Ajv({ coerceTypes: 'array', strict: false });
 
@@ -8,13 +8,13 @@ export const ajv = new Ajv({ coerceTypes: 'array', strict: false });
  * The z.toJSONSchema() function in Zod 4.x has two issues:
  * 1. Includes a $schema reference that can cause issues when compiling with AJV
  * 2. Incorrectly marks fields with default values as required
- * 
+ *
  * This function fixes both issues to ensure proper schema validation.
  */
 function cleanJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
     const cleaned = { ...schema };
     delete cleaned.$schema;
-    
+
     // Fix the required array: remove fields that have default values
     if (Array.isArray(cleaned.required) && typeof cleaned.properties === 'object' && cleaned.properties !== null) {
         const properties = cleaned.properties as Record<string, unknown>;
@@ -26,7 +26,7 @@ function cleanJsonSchema(schema: Record<string, unknown>): Record<string, unknow
             },
         );
     }
-    
+
     return cleaned;
 }
 

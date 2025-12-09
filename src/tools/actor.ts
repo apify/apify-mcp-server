@@ -2,7 +2,6 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { ActorCallOptions, ActorRun } from 'apify-client';
 import { z } from 'zod';
 
-
 import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
