@@ -62,6 +62,30 @@ MANDATORY: Always check for TypeScript compilation errors before running tests o
 - Follow existing test patterns in the codebase
 - Ensure all tests pass before submitting a PR
 
+### Manual testing as MCP client
+
+You can manually test the MCP server by acting as an MCP client and invoking tools directly with real API calls.
+
+**How to test:**
+1. Connect to the MCP server (e.g., using `/mcp` command in Claude Code)
+2. Test each tool with both valid inputs (happy path) and invalid inputs (edge cases)
+3. Verify outputs match expected formats and error messages are clear
+
+**Available tools to test:**
+- **search-actors** - Search Apify Store (test: valid keywords, empty keywords, non-existent platforms)
+- **fetch-actor-details** - Get Actor info (test: valid actor, non-existent actor)
+- **call-actor** - Execute Actor in two steps: `step="info"` to get schema, then `step="call"` to run
+- **apify/rag-web-browser** - Scrape web content (test: URL, search query)
+- **get-actor-output** - Retrieve Actor results (test: valid datasetId, field filtering, non-existent dataset)
+- **search-apify-docs** - Search documentation (test: relevant terms, non-existent topics)
+- **fetch-apify-docs** - Fetch doc page (test: valid URL, non-existent page)
+
+**Key behaviors to verify:**
+- **call-actor** requires two-step workflow (info → call)
+- All tools return helpful error messages with suggestions
+- **get-actor-output** supports field filtering using dot notation
+- Search tools support pagination with `limit` and `offset`
+
 ## Coding guidelines
 
 ### Indentation
