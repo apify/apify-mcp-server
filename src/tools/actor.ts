@@ -201,6 +201,10 @@ Actor description: ${actorDefinitionPruned.description}`;
                 title: actorDefinitionPruned.actorFullName,
                 openWorldHint: true,
             },
+            // Allow long running tasks for Actor tools, make it optional for now
+            execution: {
+                taskSupport: 'optional',
+            },
         });
     }
     return tools;

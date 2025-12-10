@@ -4,9 +4,10 @@
 
 import { randomUUID } from 'node:crypto';
 
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -25,6 +26,7 @@ export function createExpressApp(
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
     const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+    const taskStore = new InMemoryTaskStore();
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
         if (statusCode >= 500) {
@@ -88,6 +90,7 @@ export function createExpressApp(
                 ?? true;
 
             const mcpServer = new ActorsMcpServer({
+                taskStore,
                 setupSigintHandler: false,
                 transportType: 'sse',
                 telemetry: {
@@ -95,6 +98,9 @@ export function createExpressApp(
                 },
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
+
+            // Generate a unique session ID for this SSE connection
+            const mcpSessionId = transport.sessionId;
 
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
@@ -104,6 +110,22 @@ export function createExpressApp(
 
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
+
+            // Create a proxy for transport.onmessage to inject session ID into all requests
+            const originalOnMessage = transport.onmessage;
+            transport.onmessage = (message: JSONRPCMessage) => {
+                const msgRecord = message as Record<string, unknown>;
+                // Inject session ID into all requests with params
+                if (msgRecord.params) {
+                    const params = msgRecord.params as Record<string, unknown>;
+                    params.mcpSessionId = mcpSessionId;
+                }
+                // Call the original onmessage handler
+                if (originalOnMessage) {
+                    originalOnMessage(message);
+                }
+            };
+
             await mcpServer.connect(transport);
 
             res.on('close', () => {
@@ -158,8 +180,6 @@ export function createExpressApp(
         }
     });
 
-    // express.json() middleware to parse JSON bodies.
-    // It must be used before the POST /mcp route but after the GET /sse route :shrug:
     app.use(express.json());
     app.post(Routes.MCP, async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
@@ -169,10 +189,14 @@ export function createExpressApp(
             let transport: StreamableHTTPServerTransport;
 
             if (sessionId && transports[sessionId]) {
-            // Reuse existing transport
+                // Reuse existing transport
                 transport = transports[sessionId];
+                // Inject session ID into request params for existing sessions
+                if (req.body && req.body.params) {
+                    req.body.params.mcpSessionId = sessionId;
+                }
             } else if (!sessionId && isInitializeRequest(req.body)) {
-            // New initialization request
+                // New initialization request
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
@@ -186,6 +210,7 @@ export function createExpressApp(
                     ?? true;
 
                 const mcpServer = new ActorsMcpServer({
+                    taskStore,
                     setupSigintHandler: false,
                     initializeRequestData: req.body as InitializeRequest,
                     transportType: 'http',
@@ -213,7 +238,7 @@ export function createExpressApp(
                 }
                 return; // Already handled
             } else {
-            // Invalid request - no session ID or not initialization request
+                // Invalid request - no session ID or not initialization request
                 res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
@@ -223,6 +248,11 @@ export function createExpressApp(
                     id: null,
                 });
                 return;
+            }
+
+            // Inject session ID into request params for all requests
+            if (req.body && req.body.params && sessionId) {
+                req.body.params.mcpSessionId = sessionId;
             }
 
             // Handle the request with existing transport - no need to reconnect

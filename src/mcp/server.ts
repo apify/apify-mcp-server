@@ -2,18 +2,27 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
+    CancelTaskRequestSchema,
     ErrorCode,
     GetPromptRequestSchema,
+    GetTaskPayloadRequestSchema,
+    GetTaskRequestSchema,
     ListPromptsRequestSchema,
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
+    ListTasksRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
@@ -27,6 +36,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
@@ -77,6 +87,7 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
+    public readonly taskStore: TaskStore;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -84,6 +95,15 @@ export class ActorsMcpServer {
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
+
+        // for stdio use in memory task store, otherwise use provided task store
+        if (this.options.transportType === 'stdio') {
+            this.taskStore = new InMemoryTaskStore();
+        } else if (this.options.taskStore) {
+            this.taskStore = this.options.taskStore;
+        } else {
+            throw new Error('Task store must be provided for non-stdio transport types');
+        }
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -93,7 +113,18 @@ export class ActorsMcpServer {
             },
             {
                 capabilities: {
-                    tools: { listChanged: true },
+                    tools: {
+                        listChanged: true,
+                    },
+                    // Long running tasks support only if the task store is configured
+                    tasks: {
+                        list: {},
+                        requests: {
+                            tools: {
+                                call: {},
+                            },
+                        },
+                    },
                     /**
                      * Declaring resources even though we are not using them
                      * to prevent clients like Claude desktop from failing.
@@ -116,6 +147,7 @@ export class ActorsMcpServer {
          * We need to handle resource requests to prevent clients like Claude desktop from failing.
          */
         this.setupResourceHandlers();
+        this.setupTaskHandlers();
     }
 
     /**
@@ -483,6 +515,90 @@ export class ActorsMcpServer {
         });
     }
 
+    /**
+      * Sets up MCP request handlers for long-running tasks.
+      */
+    private setupTaskHandlers(): void {
+        // List tasks
+        this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
+            const params = request.params as { cursor?: string; mcpSessionId?: string };
+            const { cursor, mcpSessionId } = params;
+            log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
+            const result = await this.taskStore.listTasks(cursor, mcpSessionId);
+            return { tasks: result.tasks, nextCursor: result.nextCursor };
+        });
+
+        // Get task status
+        this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
+            const params = request.params as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (!task) {
+                log.error('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" not found`,
+                );
+            }
+            return task;
+        });
+
+        // Get task result payload
+        this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
+            const params = request.params as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (!task) {
+                log.error('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" not found`,
+                );
+            }
+            if (task.status !== 'completed' && task.status !== 'failed') {
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
+                );
+            }
+            const result = await this.taskStore.getTaskResult(taskId, mcpSessionId);
+            return result;
+        });
+
+        // Cancel task
+        this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
+            const params = request.params as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
+
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (!task) {
+                log.error('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" not found`,
+                );
+            }
+            if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
+                log.error('[CancelTaskRequestSchema] Task already in terminal state', {
+                    taskId,
+                    mcpSessionId,
+                    status: task.status,
+                });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Cannot cancel task "${taskId}" with status "${task.status}"`,
+                );
+            }
+            await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
+            const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
+            log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
+            return updatedTask!;
+        });
+    }
+
     private setupToolHandlers(): void {
         /**
          * Handles the request to list tools.
@@ -506,14 +622,16 @@ export class ActorsMcpServer {
             const { progressToken } = meta || {};
             const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
-            // mcpSessionId was injected upstream by stdio; optional (for telemetry purposes only)
+            // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = typeof request.params.mcpSessionId === 'string' ? request.params.mcpSessionId : undefined;
+            if (!mcpSessionId) {
+                log.error('MCP Session ID is missing in tool call request. This should never happen.');
+                throw new Error('MCP Session ID is required for tool calls');
+            }
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
             // Remove other custom params passed from apify-mcp-server
             delete request.params.userRentedActorIds;
-            // Remove mcpSessionId
-            delete request.params.mcpSessionId;
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode && !this.options.allowUnauthMode) {
@@ -581,6 +699,50 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     msg,
                 );
             }
+            // Check if tool call is a long running task and the tool supports that
+            // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
+            const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
+            if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
+                const msg = `Tool "${tool.name}" does not support long running task calls.
+Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.`;
+                log.softFail(msg, { statusCode: 400 });
+                await this.server.sendLoggingMessage({ level: 'error', data: msg });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    msg,
+                );
+            }
+
+            // Handle long-running task request
+            if (request.params.task) {
+                const task = await this.taskStore.createTask(
+                    {
+                        ttl: request.params.task.ttl,
+                        pollInterval: request.params.task.pollInterval,
+                    },
+                    `call-tool-${name}-${randomUUID()}`,
+                    request,
+                );
+                log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name });
+
+                // Execute the tool asynchronously and update task status
+                setImmediate(async () => {
+                    await this.executeToolAndUpdateTask(
+                        task.taskId,
+                        tool,
+                        args,
+                        apifyToken,
+                        userRentedActorIds,
+                        progressToken,
+                        extra,
+                        mcpSessionId,
+                    );
+                });
+
+                // Return task immediately; execution continues asynchronously
+                return { task };
+            }
+
             const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
 
             const startTime = Date.now();
@@ -775,8 +937,150 @@ Please verify the tool name and ensure the tool is properly registered.`;
         trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
     }
 
+    /**
+      * Executes a tool asynchronously for a long-running task and updates task status.
+      *
+      * @param taskId - The task identifier
+      * @param tool - The tool to execute
+      * @param args - Tool arguments
+      * @param apifyToken - Apify API token
+      * @param userRentedActorIds - Array of user-rented actor IDs
+      * @param progressToken - Progress token for notifications
+      * @param extra - Extra request handler context
+      * @param mcpSessionId - MCP session ID for telemetry
+      */
+
+    private async executeToolAndUpdateTask(
+        taskId: string,
+        tool: ToolEntry,
+        args: Record<string, unknown>,
+        apifyToken: string,
+        userRentedActorIds: string[] | undefined,
+        progressToken: string | number | undefined,
+        extra: RequestHandlerExtra<Request, Notification>,
+        mcpSessionId: string | undefined,
+    ): Promise<void> {
+        let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
+        const startTime = Date.now();
+
+        log.debug('[executeToolAndUpdateTask] Starting task execution', {
+            taskId,
+            toolName: tool.name,
+            mcpSessionId,
+        });
+
+        try {
+            const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+
+            log.debug('[executeToolAndUpdateTask] Updating task status to working', {
+                taskId,
+                mcpSessionId,
+            });
+            await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+
+            // Execute the tool and get the result
+            let result: Record<string, unknown> = {};
+
+            // Handle internal tool
+            if (tool.type === 'internal') {
+                const progressTracker = tool.name === 'call-actor'
+                    ? createProgressTracker(progressToken, extra.sendNotification)
+                    : null;
+
+                log.info('Calling internal tool for task', { taskId, name: tool.name, input: args });
+                const res = await tool.call({
+                    args,
+                    extra,
+                    apifyMcpServer: this,
+                    mcpServer: this.server,
+                    apifyToken,
+                    userRentedActorIds,
+                    progressTracker,
+                }) as object;
+
+                if (progressTracker) {
+                    progressTracker.stop();
+                }
+
+                const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
+                if (internalToolStatus !== undefined) {
+                    toolStatus = internalToolStatus;
+                } else if ('isError' in rest && rest.isError) {
+                    toolStatus = TOOL_STATUS.FAILED;
+                } else {
+                    toolStatus = TOOL_STATUS.SUCCEEDED;
+                }
+                result = rest;
+            } else if (tool.type === 'actor') {
+                if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
+                    result = buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS] });
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                } else {
+                    const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
+                    const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
+                    const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                    const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
+                        ? new ApifyClient({ skyfirePayId })
+                        : new ApifyClient({ token: apifyToken });
+
+                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
+                    const callResult = await callActorGetDataset(
+                        tool.actorFullName,
+                        actorArgs,
+                        apifyClient,
+                        callOptions,
+                        progressTracker,
+                        extra.signal,
+                    );
+
+                    if (!callResult) {
+                        toolStatus = TOOL_STATUS.ABORTED;
+                        result = {};
+                    } else {
+                        const content = buildActorResponseContent(tool.actorFullName, callResult);
+                        result = { content };
+                    }
+
+                    if (progressTracker) {
+                        progressTracker.stop();
+                    }
+                }
+            }
+
+            // Store the result in the task store
+            log.debug('[executeToolAndUpdateTask] Storing completed result', {
+                taskId,
+                mcpSessionId,
+            });
+            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
+            log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
+
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+        } catch (error) {
+            log.error('Error executing tool for task', { taskId, mcpSessionId, error });
+            toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+            const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+            log.debug('[executeToolAndUpdateTask] Storing failed result', {
+                taskId,
+                mcpSessionId,
+                error: errorMessage,
+            });
+            await this.taskStore.storeTaskResult(taskId, 'failed', {
+                content: [{
+                    type: 'text' as const,
+                    text: `Error calling tool: ${errorMessage}. Please verify the tool name, input parameters, and ensure all required resources are available.`,
+                }],
+                isError: true,
+                internalToolStatus: toolStatus,
+            }, mcpSessionId);
+
+            const { telemetryData: errorTelemetryData, userId: errorUserId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+            this.finalizeAndTrackTelemetry(errorTelemetryData, errorUserId, startTime, toolStatus);
+        }
+    }
+
     /*
-    * Creates telemetry data for a tool call.
+     * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,

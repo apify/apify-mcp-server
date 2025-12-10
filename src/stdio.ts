@@ -198,8 +198,8 @@ async function main() {
             // Update mcpServer options with initialize request data
             (mcpServer.options as Record<string, unknown>).initializeRequestData = msgRecord as Record<string, unknown>;
         }
-        // Inject session ID into tool call messages
-        if (msgRecord.method === 'tools/call' && msgRecord.params) {
+        // Inject session ID into all requests with params for task isolation and session tracking
+        if (msgRecord.params) {
             const params = msgRecord.params as Record<string, unknown>;
             params.mcpSessionId = mcpSessionId;
         }

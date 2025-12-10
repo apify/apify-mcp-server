@@ -1219,5 +1219,54 @@ export function createIntegrationTestsSuite(
             expect(tools.tools.length).toBeGreaterThan(0);
             await client.close();
         });
+
+        it('should be able to call a long running task tool call', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 1,
+                        second_number: 2,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let lastStatus = '';
+            let resultReceived = false;
+            for await (const message of stream) {
+                switch (message.type) {
+                    case 'taskCreated':
+                        // Task created successfully with ID: message.task.taskId
+                        break;
+                    case 'taskStatus':
+                        if (lastStatus !== message.task.status) {
+                            // Task status: message.task.status with optional message.task.statusMessage
+                        }
+                        lastStatus = message.task.status;
+                        break;
+                    case 'result':
+                        // Task completed successfully
+                        message.result.content.forEach((item) => {
+                            expect(item).toHaveProperty('type');
+                        });
+                        // Mark that we received the result
+                        resultReceived = true;
+                        break;
+                    case 'error':
+                        throw message.error;
+                    default:
+                        throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                }
+            }
+            expect(resultReceived).toBe(true);
+        });
     });
 }

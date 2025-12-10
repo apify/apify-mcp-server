@@ -1,3 +1,4 @@
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import log from '@apify/log';
@@ -18,7 +19,7 @@ beforeAll(() => {
 
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
-        const actorsMcpServer = new ActorsMcpServer({ setupSigintHandler: false });
+        const actorsMcpServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore() });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const initialTools = await loadToolsFromInput({
             enableAddingActors: true,
@@ -61,7 +62,7 @@ describe('MCP server internals integration tests', () => {
             toolNotificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false });
+        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore() });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient);
         actorsMCPServer.upsertTools(seeded);
@@ -99,7 +100,7 @@ describe('MCP server internals integration tests', () => {
             notificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false });
+        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore() });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient);
         actorsMCPServer.upsertTools(seeded);

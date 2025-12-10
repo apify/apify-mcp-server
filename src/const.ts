@@ -144,6 +144,8 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
+export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;
+
 export const SERVER_INSTRUCTIONS = `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
 These tools are called **Actors**. They enable you to extract structured data from social media, e-commerce, search engines, maps, travel sites, and many other sources.
