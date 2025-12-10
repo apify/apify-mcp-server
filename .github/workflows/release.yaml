@@ -147,7 +147,7 @@ jobs:
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
-                run: npm ci
+                run: npm ci --force
             -   name: Build module
                 run: npm run build
             - name: Prepare MCPB package
@@ -218,7 +218,7 @@ jobs:
                     cache-dependency-path: 'package-lock.json'
                     registry-url: 'https://registry.npmjs.org'
             -   name: Install dependencies
-                run: npm ci
+                run: npm ci --force
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
