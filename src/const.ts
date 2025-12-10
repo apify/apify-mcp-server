@@ -144,6 +144,7 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
+// Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;
 
 export const SERVER_INSTRUCTIONS = `
