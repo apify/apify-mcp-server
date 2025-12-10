@@ -180,6 +180,8 @@ export function createExpressApp(
         }
     });
 
+    // express.json() middleware to parse JSON bodies.
+    // It must be used before the POST /mcp route but after the GET /sse route :shrug:
     app.use(express.json());
     app.post(Routes.MCP, async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);

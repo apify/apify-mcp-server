@@ -1220,6 +1220,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        // TODO: if we add more streamable task tool call tests it migth be worth it to abscract the common logic but now it's not worth it
         it('should be able to call a long running task tool call', async () => {
             client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
 
