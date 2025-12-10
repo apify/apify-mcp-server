@@ -73,7 +73,7 @@ import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { processParamsGetTools } from './utils.js';
+import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -96,8 +96,8 @@ export class ActorsMcpServer {
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
-        // for stdio use in memory task store, otherwise use provided task store
-        if (this.options.transportType === 'stdio') {
+        // for stdio use in memory task store if not provided, otherwise use provided task store
+        if (this.options.transportType === 'stdio' && !this.options.taskStore) {
             this.taskStore = new InMemoryTaskStore();
         } else if (this.options.taskStore) {
             this.taskStore = this.options.taskStore;
@@ -116,7 +116,7 @@ export class ActorsMcpServer {
                     tools: {
                         listChanged: true,
                     },
-                    // Long running tasks support only if the task store is configured
+                    // Declare long running task support
                     tasks: {
                         list: {},
                         requests: {
@@ -521,7 +521,8 @@ export class ActorsMcpServer {
     private setupTaskHandlers(): void {
         // List tasks
         this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
-            const params = request.params as { cursor?: string; mcpSessionId?: string };
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { cursor?: string; mcpSessionId?: string };
             const { cursor, mcpSessionId } = params;
             log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
             const result = await this.taskStore.listTasks(cursor, mcpSessionId);
@@ -530,7 +531,8 @@ export class ActorsMcpServer {
 
         // Get task status
         this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
-            const params = request.params as { taskId: string; mcpSessionId?: string };
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
             const { taskId, mcpSessionId } = params;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
@@ -546,7 +548,8 @@ export class ActorsMcpServer {
 
         // Get task result payload
         this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
-            const params = request.params as { taskId: string; mcpSessionId?: string };
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
             const { taskId, mcpSessionId } = params;
             log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
@@ -569,7 +572,8 @@ export class ActorsMcpServer {
 
         // Cancel task
         this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
-            const params = request.params as { taskId: string; mcpSessionId?: string };
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
             const { taskId, mcpSessionId } = params;
             log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
 
@@ -969,8 +973,23 @@ Please verify the tool name and ensure the tool is properly registered.`;
             mcpSessionId,
         });
 
+        // Prepare telemetry before try-catch so it's accessible to both paths.
+        // This avoids re-fetching user data in the error handler.
+        const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+
         try {
-            const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+            // Check if task was already cancelled before we start execution.
+            // Critical: if a client cancels the task immediately after creation (race condition),
+            // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
+            // because terminal states cannot transition to other states. We must check before calling updateTaskStatus.
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled before execution started, skipping', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.ABORTED);
+                return;
+            }
 
             log.debug('[executeToolAndUpdateTask] Updating task status to working', {
                 taskId,
@@ -1047,6 +1066,16 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 }
             }
 
+            // Check if task was cancelled before storing result
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                return;
+            }
+
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
                 taskId,
@@ -1060,6 +1089,19 @@ Please verify the tool name and ensure the tool is properly registered.`;
             log.error('Error executing tool for task', { taskId, mcpSessionId, error });
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+
+            // Check if task was cancelled before storing result
+            // TODO: In future, we should actually stop execution via AbortController,
+            // but coordinating cancellation across distributed nodes would be complex
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                return;
+            }
+
             log.debug('[executeToolAndUpdateTask] Storing failed result', {
                 taskId,
                 mcpSessionId,
@@ -1074,8 +1116,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
 
-            const { telemetryData: errorTelemetryData, userId: errorUserId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
-            this.finalizeAndTrackTelemetry(errorTelemetryData, errorUserId, startTime, toolStatus);
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
         }
     }
 

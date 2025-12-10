@@ -1268,5 +1268,83 @@ export function createIntegrationTestsSuite(
             }
             expect(resultReceived).toBe(true);
         });
+
+        it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 3,
+                        second_number: 4,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+
+                    // Now we can get the task status
+                    const taskStatus = await client.experimental.tasks.getTask(taskId);
+                    expect(taskStatus).toHaveProperty('status');
+                    expect(taskStatus.status).toBe('working');
+
+                    // List and verify the task is present
+                    const tasks = await client.experimental.tasks.listTasks();
+                    const taskIds = tasks.tasks.map((task) => task.taskId);
+                    expect(taskIds).toContain(taskId);
+                } else if (message.type === 'result') {
+                    // So typescript is happy
+                    if (!taskId) throw new Error('Task ID should be set before receiving result');
+                    // Task completed retrieve the result separately
+                    const result = await client.experimental.tasks.getTaskResult(taskId, CallToolResultSchema);
+                    expect(result.content).toBeDefined();
+                    const content = result.content as { text: string; type: string }[];
+                    expect(content.length).toBe(2);
+                }
+            }
+        });
+
+        it('should be able to call a long running task and then cancel it midway', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 5,
+                        second_number: 6,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+
+                    await client.experimental.tasks.cancelTask(taskId);
+                } else if (message.type === 'taskStatus') {
+                    expect(message.task.status).toBe('cancelled');
+                } else if (message.type === 'result') {
+                    throw new Error('Task should have been cancelled before completion');
+                }
+            }
+        });
     });
 }
