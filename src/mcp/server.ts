@@ -27,6 +27,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
+    APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
@@ -90,6 +91,7 @@ export class ActorsMcpServer {
             {
                 name: SERVER_NAME,
                 version: SERVER_VERSION,
+                websiteUrl: APIFY_MCP_URL,
             },
             {
                 capabilities: {
