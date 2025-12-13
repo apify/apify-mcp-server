@@ -96,8 +96,8 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Avoid `else`**: Return early to reduce indentation and keep logic flat
 - **Keep functions small**: Small, focused functions are easier to understand and test
 - **Minimal parameters**: Functions should only accept what they actually use
-  - Use comma-separated parameters for up to 3 parameters
-  - Use a single object parameter for more than 3 parameters
+  - Use comma-separated parameters for up to three parameters
+  - Use a single object parameter for more than three parameters
 - **Declare variables close to use**: Variables should be declared near their first use
 - **Extract reusable logic**: Extract complex or reusable logic into named helper functions
 
@@ -115,7 +115,7 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
   - Alphabetized within groups
   - Newlines between groups
 - Use `import type` for type-only imports
-- Do not duplicate imports - always reuse existing imports if present
+- Do not duplicate imports – always reuse existing imports if present
 - Do not use dynamic imports unless explicitly told to do so
 
 ### Error handling
