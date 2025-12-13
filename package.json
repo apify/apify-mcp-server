@@ -55,9 +55,9 @@
     "express": "^4.21.2",
     "mcp-client-capabilities": "^0.0.5",
     "to-json-schema": "^0.2.5",
-     "turndown": "^7.2.0",
-     "yargs": "^17.7.2",
-     "zod": "^4.1.13"
+    "turndown": "^7.2.0",
+    "yargs": "^17.7.2",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@ai-sdk/openai": "^2.0.52",
@@ -71,7 +71,7 @@
     "@types/yargs-parser": "^21.0.3",
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
-    "openai": "^4.77.0",
+    "openai": "^6.10.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
