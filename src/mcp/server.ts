@@ -116,7 +116,7 @@ export class ActorsMcpServer {
                     tools: {
                         listChanged: true,
                     },
-                    // Declare long running task support
+                    // Declare long-running task support
                     tasks: {
                         list: {},
                         requests: {
@@ -1024,10 +1024,10 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
             // Handle actor tool
             if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                result = buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS] });
+                result = buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS], isError: true });
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } else {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
+                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
                 const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
                 const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                 const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
