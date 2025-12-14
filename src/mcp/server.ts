@@ -564,8 +564,7 @@ export class ActorsMcpServer {
                     `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
                 );
             }
-            const result = await this.taskStore.getTaskResult(taskId, mcpSessionId);
-            return result;
+            return await this.taskStore.getTaskResult(taskId, mcpSessionId);
         });
 
         // Cancel task
