@@ -536,15 +536,11 @@ export class ActorsMcpServer {
             const { taskId, mcpSessionId } = params;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // logging as this may not be just a soft fail but related to issue with the task store
-                log.error('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" not found`,
-                );
-            }
-            return task;
+            if (task) return task;
+
+            // logging as this may not be just a soft fail but related to issue with the task store
+            log.error('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId });
+            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
         });
 
         // Get task result payload
