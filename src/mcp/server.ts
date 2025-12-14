@@ -119,6 +119,7 @@ export class ActorsMcpServer {
                     // Declare long-running task support
                     tasks: {
                         list: {},
+                        cancel: {},
                         requests: {
                             tools: {
                                 call: {},
