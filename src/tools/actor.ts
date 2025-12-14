@@ -197,6 +197,9 @@ Actor description: ${actorDefinitionPruned.description}`;
             inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
             memoryMbytes,
+            icons: actorDefinitionPruned.pictureUrl
+                ? [{ src: actorDefinitionPruned.pictureUrl, mimeType: 'image/png' }]
+                : undefined,
             annotations: {
                 title: actorDefinitionPruned.actorFullName,
                 openWorldHint: true,

@@ -59,6 +59,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'> & {
         webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+        pictureUrl?: string; // Optional, URL to the Actor's icon/picture
     };
 
 /**

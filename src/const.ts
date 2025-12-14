@@ -114,6 +114,7 @@ export const ALGOLIA = {
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 
 export const APIFY_STORE_URL = 'https://apify.com';
+export const APIFY_MCP_URL = 'https://mcp.apify.com';
 
 // Telemetry
 export const TELEMETRY_ENV = {

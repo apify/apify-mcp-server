@@ -39,6 +39,8 @@ export async function getActorDefinition(
             actorDefinitions.description = actor.description || '';
             actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
+            // Pass pictureUrl from actor object (untyped property but present in API response)
+            (actorDefinitions as Record<string, unknown>).pictureUrl = (actor as unknown as Record<string, unknown>).pictureUrl;
             return pruneActorDefinition(actorDefinitions);
         }
         return null;
@@ -75,6 +77,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
         webServerMcpPath: 'webServerMcpPath' in response ? response.webServerMcpPath as string : undefined,
+        pictureUrl: 'pictureUrl' in response ? response.pictureUrl as string | undefined : undefined,
     };
 }
 /** Prune Actor README if it is too long
