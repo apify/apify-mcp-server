@@ -2,12 +2,22 @@
 
 ## Overview
 
+This is an MCP (Model Context Protocol) server that exposes [Apify Actors](https://apify.com/store) as tools.
+It enables AI assistants to discover and use thousands of web scraping and automation tools from the Apify Store.
+
 The codebase is built with TypeScript using ES modules and follows a modular architecture with clear separation of concerns.
 
 The server can run in multiple modes:
 - **Standard Input/Output (stdio)**: For local integrations and command-line tools like Claude Desktop
 - **HTTP Streamable**: For hosted deployments and web-based MCP clients
 - **Legacy SSE over HTTP**: Legacy version of the protocol for hosted deployments and web-based clients (deprecated and will be removed in the future)
+
+### Key concepts
+
+- **MCP**: Model Context Protocol defines tools, resources, and prompts that AI agents can use
+- **Apify Actors**: Reusable automation tools (web scrapers, data extractors) available on Apify Store
+- **Tool discovery**: Actors are dynamically converted to MCP tools based on their input schemas
+- **Two-step Actor execution**: `call-actor` requires `step="info"` to get schema, then `step="call"` to execute
 
 ### Root directories
 - `src/`: Main TypeScript source code
@@ -61,6 +71,40 @@ MANDATORY: Always check for TypeScript compilation errors before running tests o
 - Use descriptive test names that explain what is being tested
 - Follow existing test patterns in the codebase
 - Ensure all tests pass before submitting a PR
+
+### Manual testing as an MCP client
+
+To test the MCP server, a human must first configure the MCP server.
+Once configured, the server exposes tools that become available to the coding agent.
+
+#### 1. Human setup (required before testing)
+
+1. **Configure the MCP server** in your environment (e.g., Claude code, VS Code, Cursor)
+2. **Verify connection**: The client should connect and list available tools automatically
+3. **Tools are now available**: Once connected, all MCP tools are exposed and ready to use
+
+#### 2. Coding agent testing workflow
+
+**Note**: Only execute this testing workflow when explicitly requested by the user.
+
+Once the server is configured, test the MCP tools by:
+
+1. **Invoke each tool** through the MCP client (e.g., ask the AI agent to "search for actors" or "fetch actor details for apify/rag-web-browser")
+2. **Test with valid inputs** (happy path) – verify outputs match expected formats
+3. **Test with invalid inputs** (edge cases) – verify error messages are clear and helpful
+4. **Verify key behaviors**:
+   - **call-actor** requires two-step workflow (`step="info"` then `step="call"`)
+   - All tools return helpful error messages with suggestions
+   - **get-actor-output** supports field filtering using dot notation
+   - Search tools support pagination with `limit` and `offset`
+
+**Tools to test:**
+- **search-actors** - Search Apify Store (test: valid keywords, empty keywords, non-existent platforms)
+- **fetch-actor-details** - Get Actor info (test: valid actor, non-existent actor)
+- **call-actor** - Execute Actor in two steps: `step="info"` to get schema, then `step="call"` to run
+- **get-actor-output** - Retrieve Actor results (test: valid datasetId, field filtering, non-existent dataset)
+- **search-apify-docs** - Search documentation (test: relevant terms, non-existent topics)
+- **fetch-apify-docs** - Fetch doc page (test: valid URL, non-existent page)
 
 ## Coding guidelines
 
@@ -132,6 +176,22 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - Avoid mutating function parameters (use immutability when possible)
 - If mutation is necessary, clearly document and explain it with a comment
 - Clean up temporary files, scripts, or helper files created during development
+
+### Common patterns
+
+- **Tool implementation**: Tools are defined in `src/tools/` using Zod schemas for validation
+- **Actor interaction**: Use `src/utils/apify-client.ts` for Apify API calls, never call Apify API directly
+- **Error responses**: Return user-friendly error messages with suggestions
+- **Input validation**: Always validate tool inputs with Zod before processing
+- **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl-lru.ts`)
+
+### Anti-patterns
+
+- **Don't** call Apify API directly – always use the Apify client utilities
+- **Don't** mutate function parameters without clear documentation
+- **Don't** skip input validation – all tool inputs must be validated with Zod
+- **Don't** use `Promise.then()` - prefer `async/await`
+- **Don't** create tools without proper error handling and user-friendly messages
 
 ## External dependencies
 
