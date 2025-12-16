@@ -253,6 +253,27 @@ export function createIntegrationTestsSuite(
             expect(names).not.toContain('fetch-apify-docs');
         });
 
+        it('should return tool with execution field when listing tools with apify/python-example', async () => {
+            const actors = [ACTOR_PYTHON_EXAMPLE];
+            client = await createClientFn({ tools: actors });
+            const tools = await client.listTools();
+
+            // Find the tool for apify/python-example
+            const pythonExampleTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
+            expect(pythonExampleTool).toBeDefined();
+
+            // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
+            expect(pythonExampleTool).toHaveProperty('execution');
+            expect(pythonExampleTool?.execution).toBeDefined();
+
+            // Verify other expected fields are present
+            expect(pythonExampleTool).toHaveProperty('name');
+            expect(pythonExampleTool).toHaveProperty('description');
+            expect(pythonExampleTool).toHaveProperty('inputSchema');
+
+            await client.close();
+        });
+
         it('should not load any tools when enableAddingActors is true and tools param is empty', async () => {
             client = await createClientFn({ enableAddingActors: true, tools: [] });
             const names = getToolNames(await client.listTools());

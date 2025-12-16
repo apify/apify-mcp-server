@@ -14,6 +14,7 @@ export function getToolPublicFieldOnly(tool: ToolBase) {
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
         icons: tool.icons,
+        execution: tool.execution,
     };
 }
 
