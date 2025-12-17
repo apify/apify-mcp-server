@@ -58,6 +58,13 @@ MANDATORY: Always check for TypeScript compilation errors before running tests o
 - **Unit tests**: `npm run test:unit` (runs `vitest run tests/unit`)
 - **Integration tests**: `npm run test:integration` (requires build first, requires `APIFY_TOKEN`)
 
+### Important: Integration tests require APIFY_TOKEN
+
+**⚠️ DO NOT attempt to run integration tests as an agent.** Integration tests require a valid `APIFY_TOKEN` environment variable, which only humans have access to. As an agent, you should:
+- Run `npm run type-check` and `npm run build` to validate TypeScript changes
+- Run `npm run test:unit` for unit tests which don't require authentication
+- Skip integration tests - these must be run by humans with valid Apify credentials
+
 ### Test structure
 
 - `tests/unit/` - Unit tests for individual modules

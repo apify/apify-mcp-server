@@ -1,3 +1,4 @@
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -329,6 +330,10 @@ export type ToolCallTelemetryProperties = {
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
+    /**
+     * Task store for long running tasks support.
+     */
+    taskStore?: TaskStore;
     setupSigintHandler?: boolean;
     /**
      * Switch to enable Skyfire agentic payment mode.
@@ -361,6 +366,8 @@ export type ActorsMcpServerOptions = {
     };
     /**
      * Transport type for telemetry tracking.
+     * Important: this is also used for the long running tasks logic
+     *  which is different for local and remote server based on the transport type.
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
      * - 'sse': Remote Server-Sent Events (SSE) connection

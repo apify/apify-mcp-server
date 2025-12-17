@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 
 const getKeyValueStoreArgs = z.object({
     storeId: z.string()
@@ -27,8 +26,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreArgs)),
+    inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,
@@ -72,8 +71,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreKeysArgs)),
+    inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
@@ -115,8 +114,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
-    inputSchema: zodToJsonSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(getKeyValueStoreRecordArgs)),
+    inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,

@@ -42,7 +42,7 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
-    "@modelcontextprotocol/sdk": "^1.18.1",
+    "@modelcontextprotocol/sdk": "^1.24.3",
     "@segment/analytics-node": "^2.3.0",
     "@types/cheerio": "^0.22.35",
     "@types/turndown": "^5.0.5",
@@ -57,8 +57,7 @@
     "to-json-schema": "^0.2.5",
     "turndown": "^7.2.0",
     "yargs": "^17.7.2",
-    "zod": "^3.24.1",
-    "zod-to-json-schema": "^3.24.1"
+    "zod": "^4.1.13"
   },
   "devDependencies": {
     "@ai-sdk/openai": "^2.0.52",
@@ -72,28 +71,29 @@
     "@types/yargs-parser": "^21.0.3",
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
-    "openai": "^4.77.0",
+    "openai": "^6.10.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
     "vitest": "^3.0.8"
   },
-  "scripts": {
-    "start": "npm run start:dev",
-    "start:prod": "node dist/main.js",
-    "start:dev": "tsx src/main.ts",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
-    "build": "tsc -b src",
-    "build:watch": "tsc -b src -w",
-    "type-check": "tsc --noEmit",
-    "test": "npm run test:unit",
-    "test:unit": "vitest run tests/unit",
-    "test:integration": "npm run build && vitest run tests/integration",
-    "clean": "tsc -b src --clean",
-    "evals:create-dataset": "tsx evals/create-dataset.ts",
-    "evals:run": "tsx evals/run-evaluation.ts"
-  },
+   "scripts": {
+     "start": "npm run start:dev",
+     "start:prod": "node dist/main.js",
+     "start:dev": "tsx src/main.ts",
+     "lint": "eslint .",
+     "lint:fix": "eslint . --fix",
+     "check": "npm run type-check && npm run lint:fix",
+     "build": "tsc -b src",
+     "build:watch": "tsc -b src -w",
+     "type-check": "tsc --noEmit",
+     "test": "npm run test:unit",
+     "test:unit": "vitest run tests/unit",
+     "test:integration": "npm run build && vitest run tests/integration",
+     "clean": "tsc -b src --clean",
+     "evals:create-dataset": "tsx evals/create-dataset.ts",
+     "evals:run": "tsx evals/run-evaluation.ts"
+   },
   "author": "Apify",
   "license": "MIT"
 }

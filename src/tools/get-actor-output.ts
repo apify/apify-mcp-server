@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 
@@ -84,11 +83,11 @@ USAGE EXAMPLES:
 - user_input: Return only crawl.statusCode and url from dataset aab123
 
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
-    inputSchema: zodToJsonSchema(getActorOutputArgs) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(getActorOutputArgs) as ToolInputSchema,
     /**
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
-    ajvValidate: ajv.compile({ ...zodToJsonSchema(getActorOutputArgs), additionalProperties: true }),
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getActorOutputArgs), additionalProperties: true }),
     annotations: {
         title: 'Get Actor output',
         readOnlyHint: true,

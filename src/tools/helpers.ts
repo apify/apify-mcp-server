@@ -1,10 +1,9 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 
 export const addToolArgsSchema = z.object({
     actor: z.string()
@@ -25,8 +24,8 @@ USAGE:
 USAGE EXAMPLES:
 - user_input: Add apify/rag-web-browser as a tool
 - user_input: Add apify/instagram-scraper as a tool`,
-    inputSchema: zodToJsonSchema(addToolArgsSchema) as ToolInputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(addToolArgsSchema)),
+    inputSchema: z.toJSONSchema(addToolArgsSchema) as ToolInputSchema,
+    ajvValidate: compileSchema(z.toJSONSchema(addToolArgsSchema)),
     annotations: {
         title: 'Add tool',
         openWorldHint: true,

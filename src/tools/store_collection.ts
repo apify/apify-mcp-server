@@ -1,12 +1,11 @@
 import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
@@ -124,9 +123,9 @@ Returns list of Actor cards with the following info:
 - **Stats:** Usage, success rate, bookmarks
 - **Rating:** Out of 5 (if available)
 `,
-    inputSchema: zodToJsonSchema(searchActorsArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(searchActorsArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,

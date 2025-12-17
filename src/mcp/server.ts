@@ -2,18 +2,27 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
+import { randomUUID } from 'node:crypto';
+
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
+import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
+    CancelTaskRequestSchema,
     ErrorCode,
     GetPromptRequestSchema,
+    GetTaskPayloadRequestSchema,
+    GetTaskRequestSchema,
     ListPromptsRequestSchema,
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
+    ListTasksRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
@@ -27,6 +36,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import {
+    ALLOWED_TASK_TOOL_EXECUTION_MODES,
     APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
@@ -64,7 +74,7 @@ import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { processParamsGetTools } from './utils.js';
+import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -78,6 +88,7 @@ export class ActorsMcpServer {
     private sigintHandler: (() => Promise<void>) | undefined;
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
+    public readonly taskStore: TaskStore;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -85,6 +96,15 @@ export class ActorsMcpServer {
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
+
+        // for stdio use in memory task store if not provided, otherwise use provided task store
+        if (this.options.transportType === 'stdio' && !this.options.taskStore) {
+            this.taskStore = new InMemoryTaskStore();
+        } else if (this.options.taskStore) {
+            this.taskStore = this.options.taskStore;
+        } else {
+            throw new Error('Task store must be provided for non-stdio transport types');
+        }
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -95,7 +115,19 @@ export class ActorsMcpServer {
             },
             {
                 capabilities: {
-                    tools: { listChanged: true },
+                    tools: {
+                        listChanged: true,
+                    },
+                    // Declare long-running task support
+                    tasks: {
+                        list: {},
+                        cancel: {},
+                        requests: {
+                            tools: {
+                                call: {},
+                            },
+                        },
+                    },
                     /**
                      * Declaring resources even though we are not using them
                      * to prevent clients like Claude desktop from failing.
@@ -118,6 +150,7 @@ export class ActorsMcpServer {
          * We need to handle resource requests to prevent clients like Claude desktop from failing.
          */
         this.setupResourceHandlers();
+        this.setupTaskHandlers();
     }
 
     /**
@@ -485,6 +518,92 @@ export class ActorsMcpServer {
         });
     }
 
+    /**
+      * Sets up MCP request handlers for long-running tasks.
+      */
+    private setupTaskHandlers(): void {
+        // List tasks
+        this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { cursor?: string; mcpSessionId?: string };
+            const { cursor, mcpSessionId } = params;
+            log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
+            const result = await this.taskStore.listTasks(cursor, mcpSessionId);
+            return { tasks: result.tasks, nextCursor: result.nextCursor };
+        });
+
+        // Get task status
+        this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (task) return task;
+
+            // logging as this may not be just a soft fail but related to issue with the task store
+            log.error('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId });
+            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
+        });
+
+        // Get task result payload
+        this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (!task) {
+                // logging as this may not be just a soft fail but related to issue with the task store
+                log.error('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" not found`,
+                );
+            }
+            if (task.status !== 'completed' && task.status !== 'failed') {
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
+                );
+            }
+            return await this.taskStore.getTaskResult(taskId, mcpSessionId);
+        });
+
+        // Cancel task
+        this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
+            // mcpSessionId is injected at transport layer for session isolation in task stores
+            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
+            const { taskId, mcpSessionId } = params;
+            log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
+
+            const task = await this.taskStore.getTask(taskId, mcpSessionId);
+            if (!task) {
+                // logging as this may not be just a soft fail but related to issue with the task store
+                log.error('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Task "${taskId}" not found`,
+                );
+            }
+            if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
+                log.error('[CancelTaskRequestSchema] Task already in terminal state', {
+                    taskId,
+                    mcpSessionId,
+                    status: task.status,
+                });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    `Cannot cancel task "${taskId}" with status "${task.status}"`,
+                );
+            }
+            await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
+            const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
+            log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
+            return updatedTask!;
+        });
+    }
+
     private setupToolHandlers(): void {
         /**
          * Handles the request to list tools.
@@ -508,14 +627,16 @@ export class ActorsMcpServer {
             const { progressToken } = meta || {};
             const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
-            // mcpSessionId was injected upstream by stdio; optional (for telemetry purposes only)
+            // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = typeof request.params.mcpSessionId === 'string' ? request.params.mcpSessionId : undefined;
+            if (!mcpSessionId) {
+                log.error('MCP Session ID is missing in tool call request. This should never happen.');
+                throw new Error('MCP Session ID is required for tool calls');
+            }
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
             // Remove other custom params passed from apify-mcp-server
             delete request.params.userRentedActorIds;
-            // Remove mcpSessionId
-            delete request.params.mcpSessionId;
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode && !this.options.allowUnauthMode) {
@@ -583,6 +704,50 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
                     msg,
                 );
             }
+            // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
+            // Check if tool call is a long running task and the tool supports that
+            // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
+            const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
+            if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
+                const msg = `Tool "${tool.name}" does not support long running task calls.
+Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.`;
+                log.softFail(msg, { statusCode: 400 });
+                await this.server.sendLoggingMessage({ level: 'error', data: msg });
+                throw new McpError(
+                    ErrorCode.InvalidParams,
+                    msg,
+                );
+            }
+
+            // Handle long-running task request
+            if (request.params.task) {
+                const task = await this.taskStore.createTask(
+                    {
+                        ttl: request.params.task.ttl,
+                        pollInterval: request.params.task.pollInterval,
+                    },
+                    `call-tool-${name}-${randomUUID()}`,
+                    request,
+                );
+                log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name });
+
+                // Execute the tool asynchronously and update task status
+                setImmediate(async () => {
+                    await this.executeToolAndUpdateTask({
+                        taskId: task.taskId,
+                        tool,
+                        args,
+                        apifyToken,
+                        progressToken,
+                        extra,
+                        mcpSessionId,
+                    });
+                });
+
+                // Return task immediately; execution continues asynchronously
+                return { task };
+            }
+
             const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
 
             const startTime = Date.now();
@@ -777,8 +942,175 @@ Please verify the tool name and ensure the tool is properly registered.`;
         trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
     }
 
+    // TODO: this function quite duplicates the main tool call login the CallToolRequestSchema handler, we should refactor
+    /**
+     * Executes a tool asynchronously for a long-running task and updates task status.
+     *
+     * @param params - Tool execution parameters
+     * @param params.taskId - The task identifier
+     * @param params.tool - The tool to execute
+     * @param params.args - Tool arguments
+     * @param params.apifyToken - Apify API token
+     * @param params.progressToken - Progress token for notifications
+     * @param params.extra - Extra request handler context
+     * @param params.mcpSessionId - MCP session ID for telemetry
+     */
+
+    private async executeToolAndUpdateTask(params: {
+        taskId: string;
+        tool: ToolEntry;
+        args: Record<string, unknown>;
+        apifyToken: string;
+        progressToken: string | number | undefined;
+        extra: RequestHandlerExtra<Request, Notification>;
+        mcpSessionId: string | undefined;
+    }): Promise<void> {
+        const { taskId, tool, args, apifyToken, progressToken, extra, mcpSessionId } = params;
+        let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
+        const startTime = Date.now();
+
+        log.debug('[executeToolAndUpdateTask] Starting task execution', {
+            taskId,
+            toolName: tool.name,
+            mcpSessionId,
+        });
+
+        // Prepare telemetry before try-catch so it's accessible to both paths.
+        // This avoids re-fetching user data in the error handler.
+        const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+
+        try {
+            // Only support actor tool types for long-running tasks
+            if (tool.type !== 'actor') {
+                const msg = `Tool "${tool.name}" does not support long-running task execution. Only actor tools are supported in task mode.`;
+                log.softFail(msg, { statusCode: 400 });
+                await this.server.sendLoggingMessage({ level: 'error', data: msg });
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
+                await this.taskStore.storeTaskResult(taskId, 'failed', {
+                    content: [{
+                        type: 'text' as const,
+                        text: msg,
+                    }],
+                    isError: true,
+                    internalToolStatus: toolStatus,
+                }, mcpSessionId);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                return;
+            }
+
+            // Check if task was already cancelled before we start execution.
+            // Critical: if a client cancels the task immediately after creation (race condition),
+            // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
+            // because terminal states cannot transition to other states. We must check before calling updateTaskStatus.
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled before execution started, skipping', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.ABORTED);
+                return;
+            }
+
+            log.debug('[executeToolAndUpdateTask] Updating task status to working', {
+                taskId,
+                mcpSessionId,
+            });
+            await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+
+            // Execute the tool and get the result
+            let result: Record<string, unknown> = {};
+
+            // Handle actor tool
+            if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
+                result = buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS], isError: true });
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
+            } else {
+                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
+                const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
+                const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
+                    ? new ApifyClient({ skyfirePayId })
+                    : new ApifyClient({ token: apifyToken });
+
+                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
+                const callResult = await callActorGetDataset(
+                    tool.actorFullName,
+                    actorArgs,
+                    apifyClient,
+                    callOptions,
+                    progressTracker,
+                    extra.signal,
+                );
+
+                if (!callResult) {
+                    toolStatus = TOOL_STATUS.ABORTED;
+                    result = {};
+                } else {
+                    const content = buildActorResponseContent(tool.actorFullName, callResult);
+                    result = { content };
+                }
+
+                if (progressTracker) {
+                    progressTracker.stop();
+                }
+            }
+
+            // Check if task was cancelled before storing result
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                return;
+            }
+
+            // Store the result in the task store
+            log.debug('[executeToolAndUpdateTask] Storing completed result', {
+                taskId,
+                mcpSessionId,
+            });
+            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
+            log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
+
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+        } catch (error) {
+            log.error('Error executing tool for task', { taskId, mcpSessionId, error });
+            toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+            const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+
+            // Check if task was cancelled before storing result
+            // TODO: In future, we should actually stop execution via AbortController,
+            // but coordinating cancellation across distributed nodes would be complex
+            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
+                    taskId,
+                    mcpSessionId,
+                });
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                return;
+            }
+
+            log.debug('[executeToolAndUpdateTask] Storing failed result', {
+                taskId,
+                mcpSessionId,
+                error: errorMessage,
+            });
+            await this.taskStore.storeTaskResult(taskId, 'failed', {
+                content: [{
+                    type: 'text' as const,
+                    text: `Error calling tool: ${errorMessage}. Please verify the tool name, input parameters, and ensure all required resources are available.`,
+                }],
+                isError: true,
+                internalToolStatus: toolStatus,
+            }, mcpSessionId);
+
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+        }
+    }
+
     /*
-    * Creates telemetry data for a tool call.
+     * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,

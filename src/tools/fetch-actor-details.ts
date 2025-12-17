@@ -1,11 +1,10 @@
 import { z } from 'zod';
-import zodToJsonSchema from 'zod-to-json-schema';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails } from '../utils/actor-details.js';
-import { ajv } from '../utils/ajv.js';
+import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
@@ -29,9 +28,9 @@ USAGE EXAMPLES:
 - user_input: How to use apify/rag-web-browser
 - user_input: What is the input schema for apify/rag-web-browser?
 - user_input: What is the pricing for apify/instagram-scraper?`,
-    inputSchema: zodToJsonSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
-    ajvValidate: ajv.compile(zodToJsonSchema(fetchActorDetailsToolArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,

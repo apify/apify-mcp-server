@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { parse } from 'node:querystring';
 
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
@@ -50,4 +51,21 @@ export function parseInputParamsFromUrl(url: string): Input {
     const query = url.split('?')[1] || '';
     const params = parse(query) as unknown as Input;
     return processInput(params);
+}
+
+/**
+ * Checks if a task was cancelled, preventing state transitions from terminal states.
+ * Critical for task execution: prevents SDK errors when trying to transition from 'cancelled' to 'working'.
+ * @param taskId - The task identifier
+ * @param mcpSessionId - The MCP session ID
+ * @param taskStore - The task store instance
+ * @returns true if task is cancelled, false otherwise
+ */
+export async function isTaskCancelled(
+    taskId: string,
+    mcpSessionId: string | undefined,
+    taskStore: TaskStore,
+): Promise<boolean> {
+    const task = await taskStore.getTask(taskId, mcpSessionId);
+    return task?.status === 'cancelled';
 }

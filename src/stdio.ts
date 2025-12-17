@@ -198,11 +198,12 @@ async function main() {
             // Update mcpServer options with initialize request data
             (mcpServer.options as Record<string, unknown>).initializeRequestData = msgRecord as Record<string, unknown>;
         }
-        // Inject session ID into tool call messages
-        if (msgRecord.method === 'tools/call' && msgRecord.params) {
-            const params = msgRecord.params as Record<string, unknown>;
-            params.mcpSessionId = mcpSessionId;
-        }
+        // Inject session ID into all requests for task isolation and session tracking.
+        // CRITICAL: Always create params object if missing (some requests like listTasks/getTasks don't have params),
+        // otherwise mcpSessionId injection fails, breaking session isolation in multi-node setups.
+        const params = (msgRecord.params || {}) as Record<string, unknown>;
+        params.mcpSessionId = mcpSessionId;
+        msgRecord.params = params;
 
         // Call the original onmessage handler
         if (originalOnMessage) {

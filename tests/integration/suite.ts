@@ -253,6 +253,27 @@ export function createIntegrationTestsSuite(
             expect(names).not.toContain('fetch-apify-docs');
         });
 
+        it('should return tool with execution field when listing tools with apify/python-example', async () => {
+            const actors = [ACTOR_PYTHON_EXAMPLE];
+            client = await createClientFn({ tools: actors });
+            const tools = await client.listTools();
+
+            // Find the tool for apify/python-example
+            const pythonExampleTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
+            expect(pythonExampleTool).toBeDefined();
+
+            // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
+            expect(pythonExampleTool).toHaveProperty('execution');
+            expect(pythonExampleTool?.execution).toBeDefined();
+
+            // Verify other expected fields are present
+            expect(pythonExampleTool).toHaveProperty('name');
+            expect(pythonExampleTool).toHaveProperty('description');
+            expect(pythonExampleTool).toHaveProperty('inputSchema');
+
+            await client.close();
+        });
+
         it('should not load any tools when enableAddingActors is true and tools param is empty', async () => {
             client = await createClientFn({ enableAddingActors: true, tools: [] });
             const names = getToolNames(await client.listTools());
@@ -787,7 +808,12 @@ export function createIntegrationTestsSuite(
 
             const message = prompt.messages[0];
             expect(message).toBeDefined();
-            expect(message.content.text).toContain(topic);
+            expect(message.content).toBeDefined();
+            expect(message.content.type).toBe('text');
+            // So typescript is happy
+            if (message.content.type === 'text') {
+                expect(message.content.text).toContain(topic);
+            }
         });
 
         // Session termination is only possible for streamable HTTP transport.
@@ -1213,6 +1239,134 @@ export function createIntegrationTestsSuite(
             // Verify tools are loaded correctly
             expect(tools.tools.length).toBeGreaterThan(0);
             await client.close();
+        });
+
+        // TODO: if we add more streamable task tool call tests it migth be worth it to abscract the common logic but now it's not worth it
+        it('should be able to call a long running task tool call', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 1,
+                        second_number: 2,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let lastStatus = '';
+            let resultReceived = false;
+            for await (const message of stream) {
+                switch (message.type) {
+                    case 'taskCreated':
+                        // Task created successfully with ID: message.task.taskId
+                        break;
+                    case 'taskStatus':
+                        if (lastStatus !== message.task.status) {
+                            // Task status: message.task.status with optional message.task.statusMessage
+                        }
+                        lastStatus = message.task.status;
+                        break;
+                    case 'result':
+                        // Task completed successfully
+                        message.result.content.forEach((item) => {
+                            expect(item).toHaveProperty('type');
+                        });
+                        // Mark that we received the result
+                        resultReceived = true;
+                        break;
+                    case 'error':
+                        throw message.error;
+                    default:
+                        throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                }
+            }
+            expect(resultReceived).toBe(true);
+        });
+
+        it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 3,
+                        second_number: 4,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+
+                    // Now we can get the task status
+                    const taskStatus = await client.experimental.tasks.getTask(taskId);
+                    expect(taskStatus).toHaveProperty('status');
+                    expect(taskStatus.status).toBe('working');
+
+                    // List and verify the task is present
+                    const tasks = await client.experimental.tasks.listTasks();
+                    const taskIds = tasks.tasks.map((task) => task.taskId);
+                    expect(taskIds).toContain(taskId);
+                } else if (message.type === 'result') {
+                    // So typescript is happy
+                    if (!taskId) throw new Error('Task ID should be set before receiving result');
+                    // Task completed retrieve the result separately
+                    const result = await client.experimental.tasks.getTaskResult(taskId, CallToolResultSchema);
+                    expect(result.content).toBeDefined();
+                    const content = result.content as { text: string; type: string }[];
+                    expect(content.length).toBe(2);
+                }
+            }
+        });
+
+        it('should be able to call a long running task and then cancel it midway', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 5,
+                        second_number: 6,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+
+                    await client.experimental.tasks.cancelTask(taskId);
+                } else if (message.type === 'taskStatus') {
+                    expect(message.task.status).toBe('cancelled');
+                } else if (message.type === 'result') {
+                    throw new Error('Task should have been cancelled before completion');
+                }
+            }
         });
     });
 }
