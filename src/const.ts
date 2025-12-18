@@ -105,11 +105,51 @@ export const ACTOR_SEARCH_ABOVE_LIMIT = 50;
 
 export const MCP_STREAMABLE_ENDPOINT = '/mcp';
 
-export const ALGOLIA = {
-    appId: 'N8EOCSBQGH',
-    apiKey: 'e97714a64e2b4b8b8fe0b01cd8592870', // search only (public) API key
-    indexName: 'test_test_apify_sdk',
-};
+export const DOCS_SOURCES = [
+    {
+        id: 'apify',
+        label: 'Apify',
+        appId: 'N8EOCSBQGH',
+        apiKey: 'e97714a64e2b4b8b8fe0b01cd8592870',
+        indexName: 'test_test_apify_sdk',
+        supportsFragments: true,
+        filters: 'version:latest',
+        description:
+            'Apify Platform documentation including: Platform features, SDKs (JS, Python), CLI, '
+            + 'REST API, Academy (web scraping fundamentals), Actor development and deployment',
+    },
+    {
+        id: 'crawlee-js',
+        label: 'Crawlee (JavaScript)',
+        appId: '5JC94MPMLY',
+        apiKey: '267679200b833c2ca1255ab276731869',
+        indexName: 'crawlee',
+        supportsFragments: false,
+        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1) to avoid fragment clutter from sections/subsections
+        facetFilters: ['language:en', ['docusaurus_tag:default', 'docusaurus_tag:docs-default-3.15']],
+        description:
+            'Crawlee is a web scraping library for JavaScript. '
+            + 'It handles blocking, crawling, proxies, and browsers for you.',
+    },
+    {
+        id: 'crawlee-py',
+        label: 'Crawlee (Python)',
+        appId: '5JC94MPMLY',
+        apiKey: '878493fcd7001e3c179b6db6796a999b',
+        indexName: 'crawlee_python',
+        supportsFragments: false,
+        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1) to avoid fragment clutter from sections/subsections
+        facetFilters: ['language:en', ['docusaurus_tag:docs-default-current']],
+        description:
+            'Crawlee is a web scraping library for Python. '
+            + 'It handles blocking, crawling, proxies, and browsers for you.',
+    },
+] as const;
+
+export const ALLOWED_DOC_DOMAINS = [
+    'https://docs.apify.com',
+    'https://crawlee.dev',
+] as const;
 
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 

@@ -77,11 +77,12 @@
     "typescript-eslint": "^8.23.0",
     "vitest": "^3.0.8"
   },
-   "scripts": {
-     "start": "npm run start:dev",
-     "start:prod": "node dist/main.js",
-     "start:dev": "tsx src/main.ts",
-     "lint": "eslint .",
+    "scripts": {
+      "start": "npm run start:dev",
+      "start:prod": "node dist/main.js",
+      "start:dev": "tsx src/main.ts",
+      "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" npm run start:dev",
+      "lint": "eslint .",
      "lint:fix": "eslint . --fix",
      "check": "npm run type-check && npm run lint:fix",
      "build": "tsc -b src",

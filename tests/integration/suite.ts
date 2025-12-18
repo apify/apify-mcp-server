@@ -649,6 +649,52 @@ export function createIntegrationTestsSuite(
             expect(content[0].text).toContain(documentUrl);
         });
 
+        it('should reject fetch-apify-docs with forbidden URL (not from allowed domains)', async () => {
+            client = await createClientFn({
+                tools: ['docs'],
+            });
+
+            const forbiddenUrl = 'https://example.com/some-page';
+            const result = await client.callTool({
+                name: HelperTools.DOCS_FETCH,
+                arguments: {
+                    url: forbiddenUrl,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+            // Verify it's an error response
+            expect(result.isError).toBe(true);
+            // Verify the error message contains helpful information
+            expect(content[0].text).toContain('Invalid URL');
+            expect(content[0].text).toContain('https://docs.apify.com');
+            expect(content[0].text).toContain('https://crawlee.dev');
+        });
+
+        it('should allow fetch-apify-docs from Crawlee domain (https://crawlee.dev)', async () => {
+            client = await createClientFn({
+                tools: ['docs'],
+            });
+
+            const crawleeDocsUrl = 'https://crawlee.dev/js/docs/quick-start';
+            const result = await client.callTool({
+                name: HelperTools.DOCS_FETCH,
+                arguments: {
+                    url: crawleeDocsUrl,
+                },
+            });
+
+            // Should not have error status
+            expect(result.isError).not.toBe(true);
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.length).toBeGreaterThan(0);
+            // Verify the response contains the URL we fetched
+            expect(content[0].text).toContain('Fetched content from');
+        });
+
         it('should return structured output for search-apify-docs matching outputSchema', async () => {
             client = await createClientFn({
                 tools: ['docs'],

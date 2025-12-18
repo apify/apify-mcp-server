@@ -151,6 +151,10 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
   - Use a single object parameter for more than three parameters
 - **Declare variables close to use**: Variables should be declared near their first use
 - **Extract reusable logic**: Extract complex or reusable logic into named helper functions
+- **Avoid intermediate variables for single-use expressions**: Don't create constants or variables if they're only used once. Inline them directly. For example:
+  - ❌ Don't: `const docSourceEnum = z.enum([...]); const schema = z.object({ docSource: docSourceEnum })`
+  - ✅ Do: `const schema = z.object({ docSource: z.enum([...]) })`
+  - Exception: Only create intermediate variables if they improve readability for complex expressions or serve a documentation purpose
 
 ### Async functions
 

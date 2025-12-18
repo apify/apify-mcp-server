@@ -279,8 +279,8 @@ export type ApifyDocsSearchResult = {
     url: string;
     /** Fragment identifier, e.g. "document-heading-1" so LLM knows what section to use when fetching whole document */
     fragment?: string;
-    /** Piece of content that matches the search query from Algolia */
-    content: string;
+    /** Piece of content that matches the search query from Algolia (optional since Crawlee docs do not provide content) */
+    content?: string;
 };
 
 export type PromptBase = Prompt & {

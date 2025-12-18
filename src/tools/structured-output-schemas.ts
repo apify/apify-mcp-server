@@ -161,7 +161,7 @@ export const searchApifyDocsToolOutputSchema = {
                     fragment: { type: 'string', description: 'Fragment identifier within the document, if available.' },
                     content: { type: 'string', description: 'A limited piece of content that matches the search query.' },
                 },
-                required: ['url', 'content'],
+                required: ['url'],
             },
         },
         instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
