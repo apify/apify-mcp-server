@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -77,23 +77,23 @@
     "typescript-eslint": "^8.23.0",
     "vitest": "^3.0.8"
   },
-   "scripts": {
-     "start": "npm run start:dev",
-     "start:prod": "node dist/main.js",
-     "start:dev": "tsx src/main.ts",
-     "lint": "eslint .",
-     "lint:fix": "eslint . --fix",
-     "check": "npm run type-check && npm run lint:fix",
-     "build": "tsc -b src",
-     "build:watch": "tsc -b src -w",
-     "type-check": "tsc --noEmit",
-     "test": "npm run test:unit",
-     "test:unit": "vitest run tests/unit",
-     "test:integration": "npm run build && vitest run tests/integration",
-     "clean": "tsc -b src --clean",
-     "evals:create-dataset": "tsx evals/create-dataset.ts",
-     "evals:run": "tsx evals/run-evaluation.ts"
-   },
+  "scripts": {
+    "start": "npm run start:dev",
+    "start:prod": "node dist/main.js",
+    "start:dev": "tsx src/main.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "check": "npm run type-check && npm run lint:fix",
+    "build": "tsc -b src",
+    "build:watch": "tsc -b src -w",
+    "type-check": "tsc --noEmit",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "npm run build && vitest run tests/integration",
+    "clean": "tsc -b src --clean",
+    "evals:create-dataset": "tsx evals/create-dataset.ts",
+    "evals:run": "tsx evals/run-evaluation.ts"
+  },
   "author": "Apify",
   "license": "MIT"
 }
