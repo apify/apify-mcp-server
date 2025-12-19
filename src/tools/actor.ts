@@ -28,7 +28,7 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
-import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile } from './utils.js';
+import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {
@@ -150,7 +150,7 @@ export async function callActorGetDataset(
  * 4. Properties are shortened using shortenProperties()
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
- * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath and actorDefinitionPruned.
+ * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and actor.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
@@ -159,22 +159,22 @@ export async function getNormalActorsAsTools(
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
-        const { actorDefinitionPruned } = actorInfo;
+        const { definition } = actorInfo;
 
-        if (!actorDefinitionPruned) continue;
+        if (!definition) continue;
 
-        const isRag = actorDefinitionPruned.actorFullName === RAG_WEB_BROWSER;
-        const { inputSchema } = buildActorInputSchema(actorDefinitionPruned.actorFullName, actorDefinitionPruned.input, isRag);
+        const isRag = definition.actorFullName === RAG_WEB_BROWSER;
+        const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
 
-        let description = `This tool calls the Actor "${actorDefinitionPruned.actorFullName}" and retrieves its output results.
+        let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
 Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests this specific Actor.
-Actor description: ${actorDefinitionPruned.description}`;
+Actor description: ${definition.description}`;
         if (isRag) {
             description += RAG_WEB_BROWSER_ADDITIONAL_DESC;
         }
 
         const memoryMbytes = Math.min(
-            actorDefinitionPruned.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES,
+            definition.defaultRunOptions?.memoryMbytes || ACTOR_MAX_MEMORY_MBYTES,
             ACTOR_MAX_MEMORY_MBYTES,
         );
 
@@ -183,7 +183,7 @@ Actor description: ${actorDefinitionPruned.description}`;
             ajvValidate = fixedAjvCompile(ajv, { ...inputSchema, additionalProperties: true });
         } catch (e) {
             log.error('Failed to compile schema', {
-                actorName: actorDefinitionPruned.actorFullName,
+                actorName: definition.actorFullName,
                 error: e,
             });
             continue;
@@ -191,17 +191,17 @@ Actor description: ${actorDefinitionPruned.description}`;
 
         tools.push({
             type: 'actor',
-            name: actorNameToToolName(actorDefinitionPruned.actorFullName),
-            actorFullName: actorDefinitionPruned.actorFullName,
+            name: actorNameToToolName(definition.actorFullName),
+            actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
             memoryMbytes,
-            icons: actorDefinitionPruned.pictureUrl
-                ? [{ src: actorDefinitionPruned.pictureUrl, mimeType: 'image/png' }]
+            icons: definition.pictureUrl
+                ? [{ src: definition.pictureUrl, mimeType: 'image/png' }]
                 : undefined,
             annotations: {
-                title: actorDefinitionPruned.actorFullName,
+                title: definition.actorFullName,
                 openWorldHint: true,
             },
             // Allow long running tasks for Actor tools, make it optional for now
@@ -227,21 +227,21 @@ async function getMCPServersAsTools(
 
     // Process all actors in parallel
     const actorToolPromises = actorsInfo.map(async (actorInfo) => {
-        const actorId = actorInfo.actorDefinitionPruned.id;
+        const actorId = actorInfo.definition.id;
         if (!actorInfo.webServerMcpPath) {
             log.warning('Actor does not have a web server MCP path, skipping', {
-                actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+                actorFullName: actorInfo.definition.actorFullName,
                 actorId,
             });
             return [];
         }
 
         const mcpServerUrl = await getActorMCPServerURL(
-            actorInfo.actorDefinitionPruned.id, // Real ID of the Actor
+            actorInfo.definition.id, // Real ID of the Actor
             actorInfo.webServerMcpPath,
         );
         log.debug('Retrieved MCP server URL for Actor', {
-            actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+            actorFullName: actorInfo.definition.actorFullName,
             actorId,
             mcpServerUrl,
         });
@@ -256,7 +256,7 @@ async function getMCPServersAsTools(
             return await getMCPServerTools(actorId, client, mcpServerUrl);
         } catch (error) {
             logHttpError(error, 'Failed to connect to MCP server', {
-                actorFullName: actorInfo.actorDefinitionPruned.actorFullName,
+                actorFullName: actorInfo.definition.actorFullName,
                 actorId,
             });
             return [];
@@ -280,26 +280,28 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorDefinitionPrunedCached = actorDefinitionPrunedCache.get(actorIdOrName);
-            if (actorDefinitionPrunedCached) {
+            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(actorIdOrName);
+            if (actorDefinitionWithInfoCached) {
                 return {
-                    actorDefinitionPruned: actorDefinitionPrunedCached,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPrunedCached),
+                    definition: actorDefinitionWithInfoCached.definition,
+                    actor: actorDefinitionWithInfoCached.info,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfoCached.definition),
 
                 } as ActorInfo;
             }
 
             try {
-                const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
-                if (!actorDefinitionPruned) {
+                const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
+                if (!actorDefinitionWithInfo) {
                     log.softFail('Actor not found or definition is not available', { actorName: actorIdOrName, statusCode: 404 });
                     return null;
                 }
-                // Cache the pruned Actor definition
-                actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionPruned);
+                // Cache the Actor definition with info
+                actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionWithInfo);
                 return {
-                    actorDefinitionPruned,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionPruned),
+                    definition: actorDefinitionWithInfo.definition,
+                    actor: actorDefinitionWithInfo.info,
+                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
                 } as ActorInfo;
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
@@ -312,9 +314,14 @@ export async function getActorsAsTools(
 
     const clonedActors = structuredClone(actorsInfo);
 
-    // Filter out nulls and separate Actors with MCP servers and normal Actors
-    const actorMCPServersInfo = clonedActors.filter((actorInfo) => actorInfo && actorInfo.webServerMcpPath) as ActorInfo[];
-    const normalActorsInfo = clonedActors.filter((actorInfo) => actorInfo && !actorInfo.webServerMcpPath) as ActorInfo[];
+    // Filter out nulls
+    const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
+
+    // Separate Actors with MCP servers and normal Actors
+    // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled
+    const actorMCPServersInfo = nonNullActors.filter((actorInfo) => isActorInfoMcpServer(actorInfo));
+    // all others
+    const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo),

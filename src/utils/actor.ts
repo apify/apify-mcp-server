@@ -21,10 +21,11 @@ export async function getActorMcpUrlCached(
     }
 
     try {
-        const actorDefinitionPruned = await getActorDefinition(actorIdOrName, apifyClient);
-        const mcpPath = actorDefinitionPruned && getActorMCPServerPath(actorDefinitionPruned);
-        if (actorDefinitionPruned && mcpPath) {
-            const url = await getActorMCPServerURL(actorDefinitionPruned.id, mcpPath);
+        const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
+        const definition = actorDefinitionWithInfo?.definition;
+        const mcpPath = definition && getActorMCPServerPath(definition);
+        if (definition && mcpPath) {
+            const url = await getActorMCPServerURL(definition.id, mcpPath);
             mcpServerCache.set(actorIdOrName, url);
             return url;
         }

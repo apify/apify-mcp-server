@@ -3,7 +3,7 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import type { ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
+import type { Actor, ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
 import type z from 'zod';
 
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
@@ -61,6 +61,15 @@ export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
         webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
         pictureUrl?: string; // Optional, URL to the Actor's icon/picture
     };
+
+/**
+ * Actor definition combined with full actor metadata.
+ * Contains both the pruned definition (for schemas) and complete actor info.
+ */
+export type ActorDefinitionWithInfo = {
+    definition: ActorDefinitionPruned;
+    info: Actor;
+};
 
 /**
  * Base type for all tools in the MCP server.
@@ -248,7 +257,8 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
  */
 export type ActorInfo = {
     webServerMcpPath: string | null; // To determined if the Actor is an MCP server
-    actorDefinitionPruned: ActorDefinitionPruned;
+    definition: ActorDefinitionPruned;
+    actor: Actor;
 };
 
 export type ExtendedActorStoreList = ActorStoreList & {
