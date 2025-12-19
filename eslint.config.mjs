@@ -12,6 +12,7 @@
  * Project-specific overrides:
  * - import/no-extraneous-dependencies: Adds vitest.config.ts and evals/** patterns
  * - @typescript-eslint/consistent-type-definitions: Prefers 'type' over 'interface' (use interface only for class implementations)
+ * - @typescript-eslint/no-unused-vars: Detects unused variables, functions, and parameters (allows _ prefix)
  * - import/no-default-export: Allows default exports in config files
  */
 import apifyTypeScriptConfig from '@apify/eslint-config/ts.js';
@@ -65,6 +66,19 @@ export default [
             // Prefer 'type' over 'interface' for flexibility
             // Use 'interface' only when required for class implementations (implements)
             '@typescript-eslint/consistent-type-definitions': ['error', 'type'],
+            // Detect unused variables, functions, and parameters
+            // This prevents dead code and helps maintain clean code
+            '@typescript-eslint/no-unused-vars': [
+                'error',
+                {
+                    // Allow variables starting with underscore (intentionally unused)
+                    argsIgnorePattern: '^_',
+                    // Allow destructured variables starting with underscore
+                    destructuredArrayIgnorePattern: '^_',
+                    // Allow variables starting with underscore
+                    varsIgnorePattern: '^_',
+                },
+            ],
         },
     },
     // Override rules for configuration files

@@ -181,14 +181,3 @@ export async function searchDocsBySourceCached(
     searchApifyDocsCache.set(cacheKey, results);
     return results;
 }
-
-/**
- * Searches the Apify documentation using Algolia and caches the results.
- * Kept for backward compatibility. Defaults to 'apify' source.
- *
- * @param {string} query - The search query string.
- * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
- */
-export async function searchApifyDocsCached(query: string): Promise<ApifyDocsSearchResult[]> {
-    return searchDocsBySourceCached('apify', query);
-}
