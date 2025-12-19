@@ -24,6 +24,7 @@ The server can run in multiple modes:
 - `tests/`: Unit and integration tests
 - `dist/`: Compiled JavaScript output (generated during build)
 - `evals/`: Evaluation scripts and test cases for AI agent interactions
+- `res/`: Resources directory containing technical documentation, insights, and analysis about complex subsystems (see [res/INDEX.md](./res/INDEX.md))
 
 ### Core architecture (`src/` directory)
 
@@ -195,6 +196,12 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Error responses**: Return user-friendly error messages with suggestions
 - **Input validation**: Always validate tool inputs with Zod before processing
 - **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl-lru.ts`)
+
+### Input validation best practices
+
+- **No double validation**: When using Zod schemas with AJV validation (`ajvValidate` in tool definitions), do NOT add additional manual validation checks in the tool implementation. The Zod schema and AJV both validate inputs before the tool is executed. Any checks redundant to the schema definition should be removed.
+  - ❌ Don't: Define enum validation in Zod, then manually check the enum again in the tool function
+  - ✅ Do: Let Zod and AJV handle all validation; use the parsed data directly in the tool implementation
 
 ### Anti-patterns
 

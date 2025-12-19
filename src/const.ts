@@ -112,7 +112,6 @@ export const DOCS_SOURCES = [
         appId: 'N8EOCSBQGH',
         apiKey: 'e97714a64e2b4b8b8fe0b01cd8592870',
         indexName: 'test_test_apify_sdk',
-        supportsFragments: true,
         filters: 'version:latest',
         description:
             'Apify Platform documentation including: Platform features, SDKs (JS, Python), CLI, '
@@ -124,8 +123,7 @@ export const DOCS_SOURCES = [
         appId: '5JC94MPMLY',
         apiKey: '267679200b833c2ca1255ab276731869',
         indexName: 'crawlee',
-        supportsFragments: false,
-        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1) to avoid fragment clutter from sections/subsections
+        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
         facetFilters: ['language:en', ['docusaurus_tag:default', 'docusaurus_tag:docs-default-3.15']],
         description:
             'Crawlee is a web scraping library for JavaScript. '
@@ -137,8 +135,7 @@ export const DOCS_SOURCES = [
         appId: '5JC94MPMLY',
         apiKey: '878493fcd7001e3c179b6db6796a999b',
         indexName: 'crawlee_python',
-        supportsFragments: false,
-        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1) to avoid fragment clutter from sections/subsections
+        typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
         facetFilters: ['language:en', ['docusaurus_tag:docs-default-current']],
         description:
             'Crawlee is a web scraping library for Python. '

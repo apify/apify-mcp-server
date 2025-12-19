@@ -1,8 +1,6 @@
 import { z } from 'zod';
 
-import log from '@apify/log';
-
-import { DOCS_SOURCES, HelperTools, TOOL_STATUS } from '../const.js';
+import { DOCS_SOURCES, HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { searchDocsBySourceCached } from '../utils/apify-docs.js';
@@ -33,7 +31,7 @@ You must explicitly select which documentation source to search using the docSou
 
 ${sources}
 
-The results will include the URL of the documentation page, a fragment identifier (if available),
+The results will include the URL of the documentation page (which may include an anchor),
 and a limited piece of content that matches the search query.
 
 Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.`;
@@ -84,17 +82,6 @@ export const searchApifyDocsTool: ToolEntry = {
 
         const parsed = searchApifyDocsToolArgsSchema.parse(args);
 
-        // Validate docSource is one of the available indexes
-        if (!DOCS_SOURCES.find((idx) => idx.id === parsed.docSource)) {
-            const availableSources = DOCS_SOURCES.map((idx) => `"${idx.id}"`).join(', ');
-            log.softFail(`[search-apify-docs] Invalid docSource: "${parsed.docSource}". Available: ${availableSources}`);
-            return buildMCPResponse({
-                texts: [`Invalid documentation source: "${parsed.docSource}". Available sources: ${availableSources}.`],
-                isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-            });
-        }
-
         const query = parsed.query.trim();
         const resultsRaw = await searchDocsBySourceCached(parsed.docSource, query);
 
@@ -113,9 +100,6 @@ Search results for "${query}" in ${parsed.docSource}:
 
 ${results.map((result) => {
             let line = `- Document URL: ${result.url}`;
-            if (result.fragment) {
-                line += `\n  Fragment: ${result.fragment}`;
-            }
             if (result.content) {
                 line += `\n  Content: ${result.content}`;
             }
@@ -125,10 +109,9 @@ ${results.map((result) => {
         const structuredContent = {
             results: results.map((result) => ({
                 url: result.url,
-                ...(result.fragment ? { fragment: result.fragment } : {}),
                 ...(result.content ? { content: result.content } : {}),
             })),
-            instructions: `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. The document fragment refers to the section of the content containing the relevant part for the search result item.`,
+            instructions: `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL.`,
         };
         return buildMCPResponse({ texts: [textContent], structuredContent });
     },

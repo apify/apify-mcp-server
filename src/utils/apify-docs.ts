@@ -44,11 +44,88 @@ type AlgoliaResult = {
 };
 
 /**
+ * Builds an Algolia search request with conditional filters based on documentation source configuration.
+ *
+ * @param {object} indexConfig - The documentation source configuration from DOCS_SOURCES
+ * @param {string} query - The search query string
+ * @returns {object} Algolia search request object with index name, query, and conditional filters
+ */
+function prepareAlgoliaRequest(
+    indexConfig: (typeof DOCS_SOURCES)[number],
+    query: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const searchRequest: any = {
+        indexName: indexConfig.indexName,
+        query: query.trim(),
+    };
+
+    // Apply filters if configured
+    if ('filters' in indexConfig && indexConfig.filters) {
+        searchRequest.filters = indexConfig.filters;
+    }
+
+    // Apply type filter if configured (e.g., for Crawlee to filter to lvl1 pages only)
+    if ('typeFilter' in indexConfig && indexConfig.typeFilter) {
+        const typeFilter = `type:${indexConfig.typeFilter}`;
+        if (searchRequest.filters) {
+            // Combine with existing filters using AND
+            searchRequest.filters = `${searchRequest.filters} AND ${typeFilter}`;
+        } else {
+            searchRequest.filters = typeFilter;
+        }
+    }
+
+    // Apply facet filters if configured
+    if ('facetFilters' in indexConfig && indexConfig.facetFilters) {
+        searchRequest.facetFilters = indexConfig.facetFilters;
+    }
+
+    return searchRequest;
+}
+
+/**
+ * Processes Algolia search response and transforms hits into ApifyDocsSearchResult array.
+ *
+ * @param {AlgoliaResult[]} results - Raw Algolia search results
+ * @returns {ApifyDocsSearchResult[]} Processed search results with URL (may include anchor) and optional content
+ */
+function processAlgoliaResponse(results: AlgoliaResult[]): ApifyDocsSearchResult[] {
+    const searchResults: ApifyDocsSearchResult[] = [];
+
+    for (const result of results) {
+        if (!result.hits?.length) {
+            continue;
+        }
+
+        for (const hit of result.hits) {
+            if (!hit.url_without_anchor) {
+                continue;
+            }
+
+            // Build URL with anchor if present
+            let url = hit.url_without_anchor;
+            if (hit.anchor && hit.anchor.trim()) {
+                url += `#${hit.anchor}`;
+            }
+
+            searchResults.push({
+                url,
+                ...(hit.content ? { content: hit.content } : {}),
+            });
+        }
+    }
+
+    return searchResults;
+}
+
+/**
  * Searches a specific documentation source by ID using Algolia.
  *
  * @param {string} docSource - The documentation source ID ('apify', 'crawlee-js', or 'crawlee-py').
  * @param {string} query - The search query string.
- * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL, optional fragment, and content.
+ * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
 export async function searchDocsBySource(
     docSource: string,
@@ -65,80 +142,13 @@ export async function searchDocsBySource(
     const client = getAlgoliaClient(indexConfig.appId, indexConfig.apiKey);
 
     try {
-        // Build request with conditional filtering based on source
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const searchRequest: any = {
-            indexName: indexConfig.indexName,
-            query: query.trim(),
-        };
-
-        // Apply filters based on source configuration
-        if ('filters' in indexConfig && indexConfig.filters) {
-            searchRequest.filters = indexConfig.filters;
-        }
-
-        // Apply type filter if configured (e.g., for Crawlee to filter to lvl1 pages only)
-        if ('typeFilter' in indexConfig && indexConfig.typeFilter) {
-            const typeFilter = `type:${indexConfig.typeFilter}`;
-            if (searchRequest.filters) {
-                // Combine with existing filters using AND
-                searchRequest.filters = `${searchRequest.filters} AND ${typeFilter}`;
-            } else {
-                searchRequest.filters = typeFilter;
-            }
-        }
-
-        if ('facetFilters' in indexConfig && indexConfig.facetFilters) {
-            searchRequest.facetFilters = indexConfig.facetFilters;
-        }
-
+        const searchRequest = prepareAlgoliaRequest(indexConfig, query);
         const response = await client.search({
             requests: [searchRequest],
         });
 
         const results = response.results as unknown as AlgoliaResult[];
-        const searchResults: ApifyDocsSearchResult[] = [];
-
-        for (const result of results) {
-            if (result.hits && result.hits.length > 0) {
-                for (const hit of result.hits) {
-                    if (!hit.url_without_anchor) {
-                        continue;
-                    }
-
-                    // Check if this documentation source supports fragments
-                    const supportsFragments = indexConfig.supportsFragments ?? true;
-                    const hasFragment = hit.anchor && hit.anchor.trim() !== '';
-
-                    // If source doesn't support fragments and there's no fragment, return URL only
-                    if (!supportsFragments && !hasFragment) {
-                        searchResults.push({
-                            url: hit.url_without_anchor,
-                        });
-                        continue;
-                    }
-
-                    // Use content if available, fallback to hierarchy info
-                    let hitContent = hit.content;
-                    if (!hitContent && hit.hierarchy) {
-                        // Build content from hierarchy (useful for lvl1, lvl2 hits etc)
-                        hitContent = Object.values(hit.hierarchy)
-                            .filter((v) => v !== null)
-                            .join(' > ');
-                    }
-
-                    if (!hitContent) {
-                        continue;
-                    }
-
-                    searchResults.push({
-                        url: hit.url_without_anchor,
-                        ...(hasFragment ? { fragment: hit.anchor } : {}),
-                        content: hitContent,
-                    });
-                }
-            }
-        }
+        const searchResults = processAlgoliaResponse(results);
 
         log.info(`[Algolia] Search completed successfully. Found ${searchResults.length} results for "${docSource}"`);
         return searchResults;
@@ -153,7 +163,7 @@ export async function searchDocsBySource(
  *
  * @param {string} docSource - The documentation source ID ('apify', 'crawlee-js', or 'crawlee-py').
  * @param {string} query - The search query string.
- * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL, optional fragment, and content.
+ * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
 export async function searchDocsBySourceCached(
     docSource: string,
@@ -177,7 +187,7 @@ export async function searchDocsBySourceCached(
  * Kept for backward compatibility. Defaults to 'apify' source.
  *
  * @param {string} query - The search query string.
- * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL, optional fragment, and content.
+ * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
 export async function searchApifyDocsCached(query: string): Promise<ApifyDocsSearchResult[]> {
     return searchDocsBySourceCached('apify', query);
