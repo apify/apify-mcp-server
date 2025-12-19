@@ -90,11 +90,11 @@ Once configured, the server exposes tools that become available to the coding ag
 2. **Verify connection**: The client should connect and list available tools automatically
 3. **Tools are now available**: Once connected, all MCP tools are exposed and ready to use
 
-#### 2. Coding agent testing workflow
+#### 2. Coding agent for MCP server testing
 
-**Note**: Only execute this testing workflow when explicitly requested by the user.
+**Note**: Only execute the tests when explicitly requested by the user.
 
-Once the server is configured, test the MCP tools by:
+Once the MCP server is configured, test the MCP tools by:
 
 1. **Invoke each tool** through the MCP client (e.g., ask the AI agent to "search for actors" or "fetch actor details for apify/rag-web-browser")
 2. **Test with valid inputs** (happy path) – verify outputs match expected formats
