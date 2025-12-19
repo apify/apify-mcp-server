@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.3) (2025-12-19)
+
+### 🚀 Features
+
+- Add icons for Actor tools ([#361](https://github.com/apify/apify-mcp-server/pull/361)) ([c82a14e](https://github.com/apify/apify-mcp-server/commit/c82a14e6480b417f3dff4bb3061b15d98be124ad)) by [@MQ37](https://github.com/MQ37), closes [#267](https://github.com/apify/apify-mcp-server/issues/267)
+- Long running tasks ([#360](https://github.com/apify/apify-mcp-server/pull/360)) ([ef2d35d](https://github.com/apify/apify-mcp-server/commit/ef2d35dccd1a4a9dfe53df3f5927e8335c2aca20)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Update node setup in releasing wf ([9a34990](https://github.com/apify/apify-mcp-server/commit/9a34990cee481c918ec21fa15f9b92779a1759f8)) by [@drobnikj](https://github.com/drobnikj)
+- Release workflow using --access public param ([fad9ad6](https://github.com/apify/apify-mcp-server/commit/fad9ad60fbfab311c55c9af28debf2544d3646a6)) by [@drobnikj](https://github.com/drobnikj)
+- Remove latest tag from npm publish release.yaml ([b1de40e](https://github.com/apify/apify-mcp-server/commit/b1de40e0ffd81e61a136ac1b1dabe9b5a9865f66)) by [@drobnikj](https://github.com/drobnikj)
+- Update node to v24 ([#356](https://github.com/apify/apify-mcp-server/pull/356)) ([17a349b](https://github.com/apify/apify-mcp-server/commit/17a349b085fb1b3773a677d2de09d9f2334f12c5)) by [@drobnikj](https://github.com/drobnikj)
+- Update AGENTS.md with mcp testing ([#358](https://github.com/apify/apify-mcp-server/pull/358)) ([e81d3e8](https://github.com/apify/apify-mcp-server/commit/e81d3e8369cdb83aaebd7eea5a219954a20ce5a2)) by [@jirispilka](https://github.com/jirispilka)
+- Increase timeout for abort tests to reduce flakiness ([#370](https://github.com/apify/apify-mcp-server/pull/370)) ([35a103d](https://github.com/apify/apify-mcp-server/commit/35a103da28911c7576f5804c71f0f66df2901ccf)) by [@MQ37](https://github.com/MQ37), closes [#261](https://github.com/apify/apify-mcp-server/issues/261)
+- Return structured content for empty search results in search-apify-docs and store_collection ([#371](https://github.com/apify/apify-mcp-server/pull/371)) ([13af156](https://github.com/apify/apify-mcp-server/commit/13af1568ab2c50cece7163eb9b2da8d2468850ab)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.6.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.2) (2025-12-08)
 
 ### :wrench: General

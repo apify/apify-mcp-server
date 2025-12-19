@@ -88,15 +88,22 @@ export const searchApifyDocsTool: ToolEntry = {
         const results = resultsRaw.slice(parsed.offset, parsed.offset + parsed.limit);
 
         if (results.length === 0) {
-            return buildMCPResponse({
-                texts: [`No results found for the query "${query}" in the "${parsed.docSource}" documentation source.
+            const instructions = `No results found for the query "${query}" in the "${parsed.docSource}" documentation source.
 Please try a different query with different keywords, or adjust the limit and offset parameters.
-You can also try using more specific or alternative keywords related to your search topic.`],
-            });
+You can also try using more specific or alternative keywords related to your search topic.`;
+            const structuredContent = {
+                results: [],
+                query,
+                count: 0,
+                instructions,
+            };
+            return buildMCPResponse({ texts: [instructions], structuredContent });
         }
 
-        const textContent = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL.
-Search results for "${query}" in ${parsed.docSource}:
+        // Instructions for LLM to use the docs fetch tool when retrieving full document content
+        const instructions = 'You can use the Apify docs fetch tool to retrieve the full content of a document by its URL.';
+        // Actual unstructured text result
+        const textResult = `Search results for "${query}" in ${parsed.docSource}:
 
 ${results.map((result) => {
             let line = `- Document URL: ${result.url}`;
@@ -111,8 +118,11 @@ ${results.map((result) => {
                 url: result.url,
                 ...(result.content ? { content: result.content } : {}),
             })),
-            instructions: `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL.`,
+            query,
+            count: results.length,
+            instructions,
         };
-        return buildMCPResponse({ texts: [textContent], structuredContent });
+        // We put the instructions at the end so that they are more likely to be acknowledged by the LLM
+        return buildMCPResponse({ texts: [textResult, instructions], structuredContent });
     },
 } as const;

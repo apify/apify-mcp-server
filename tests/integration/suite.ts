@@ -893,7 +893,7 @@ export function createIntegrationTestsSuite(
                 .catch(() => undefined);
 
             // Abort right away
-            setTimeout(() => controller.abort(), 1000);
+            setTimeout(() => controller.abort(), 3000);
 
             // Ensure the request completes/cancels before proceeding
             await requestPromise;
@@ -912,7 +912,7 @@ export function createIntegrationTestsSuite(
                     return run.status === 'ABORTED' || run.status === 'ABORTING';
                 }
                 return false;
-            }, { timeout: 3000, interval: 500 });
+            }, { timeout: 10000, interval: 500 });
         });
 
         // Cancellation test using call-actor tool: start a long-running actor via call-actor and cancel immediately, then verify it was aborted
@@ -938,7 +938,7 @@ export function createIntegrationTestsSuite(
                 .catch(() => undefined);
 
             // Abort right away
-            setTimeout(() => controller.abort(), 1000);
+            setTimeout(() => controller.abort(), 3000);
 
             // Ensure the request completes/cancels before proceeding
             await requestPromise;
@@ -957,7 +957,7 @@ export function createIntegrationTestsSuite(
                     return run.status === 'ABORTED' || run.status === 'ABORTING';
                 }
                 return false;
-            }, { timeout: 3000, interval: 500 });
+            }, { timeout: 10000, interval: 500 });
         });
 
         // Environment variable tests - only applicable to stdio transport
