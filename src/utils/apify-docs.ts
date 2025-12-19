@@ -134,28 +134,21 @@ export async function searchDocsBySource(
     const indexConfig = DOCS_SOURCES.find((idx) => idx.id === docSource);
 
     if (!indexConfig) {
-        const error = `Unknown documentation source: ${docSource}`;
-        log.error(`[Algolia] ${error}`);
-        throw new Error(error);
+        throw new Error(`Unknown documentation source: ${docSource}`);
     }
 
     const client = getAlgoliaClient(indexConfig.appId, indexConfig.apiKey);
 
-    try {
-        const searchRequest = prepareAlgoliaRequest(indexConfig, query);
-        const response = await client.search({
-            requests: [searchRequest],
-        });
+    const searchRequest = prepareAlgoliaRequest(indexConfig, query);
+    const response = await client.search({
+        requests: [searchRequest],
+    });
 
-        const results = response.results as unknown as AlgoliaResult[];
-        const searchResults = processAlgoliaResponse(results);
+    const results = response.results as unknown as AlgoliaResult[];
+    const searchResults = processAlgoliaResponse(results);
 
-        log.info(`[Algolia] Search completed successfully. Found ${searchResults.length} results for "${docSource}"`);
-        return searchResults;
-    } catch (error) {
-        log.error(`[Algolia] Search failed for "${docSource}" with query "${query}"`, error as Error);
-        throw error;
-    }
+    log.info(`[Algolia] Search completed successfully. Found ${searchResults.length} results for "${docSource}"`);
+    return searchResults;
 }
 
 /**

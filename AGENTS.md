@@ -180,6 +180,21 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Internal Errors**: Use appropriate error codes (5xx for server errors), log with `log.exception` or `log.error`
 - Always handle and propagate errors clearly
 - Use custom error classes from `src/errors.ts` when appropriate
+- **Don't log then throw**: Do NOT call `log.error()` immediately before throwing. Errors are already logged by the caller or error handler. This creates duplicate logs and violates separation of concerns.
+  - ❌ Don't:
+    ```typescript
+    if (!indexConfig) {
+        const error = `Unknown documentation source: ${docSource}`;
+        log.error(`[Algolia] ${error}`);
+        throw new Error(error);
+    }
+    ```
+  - ✅ Do:
+    ```typescript
+    if (!indexConfig) {
+        throw new Error(`Unknown documentation source: ${docSource}`);
+    }
+    ```
 
 ### Code quality
 
