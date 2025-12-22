@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.5) (2025-12-22)
+
+### 🐛 Bug Fixes
+
+- Temporarily disable MCP Session ID error handling to resolve stdio transport issues ([#373](https://github.com/apify/apify-mcp-server/pull/373)) ([bad1163](https://github.com/apify/apify-mcp-server/commit/bad116323c118f819f51d2b38aff2f2401bc5940)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.6.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.4) (2025-12-22)
 
 ### 🚀 Features
