@@ -14,7 +14,7 @@ import type {
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithInfo | null>} - The actor definition with info or null if not found.
+ * @returns {Promise<ActorDefinitionWithInfo | null>} - The Actor definition with info or null if not found.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
