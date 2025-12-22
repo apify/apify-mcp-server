@@ -25,6 +25,7 @@ export default [
             '**/dist', // Build output directory
             '**/.venv', // Python virtual environment (if present)
             'evals/**', // Evaluation scripts directory
+            'src/web/**', // Web directory has its own TypeScript project and build system
         ],
     },
     // Apply the shared Apify TypeScript ESLint configuration

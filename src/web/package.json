@@ -1,0 +1,26 @@
+{
+    "name": "@apify/mcp-web-widget",
+    "version": "0.1.0",
+    "type": "module",
+    "scripts": {
+        "dev": "node build.js --watch",
+        "build": "node build.js"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "dependencies": {
+        "react": "^18.3.1",
+        "react-dom": "^18.3.1"
+    },
+    "devDependencies": {
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "autoprefixer": "^10.4.20",
+        "esbuild": "^0.24.2",
+        "postcss": "^8.4.49",
+        "tailwindcss": "^3.4.17",
+        "typescript": "^5.6.3"
+    }
+}
