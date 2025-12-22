@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.4) (2025-12-22)
+
+### 🚀 Features
+
+- Enhance documentation tools with Crawlee support ([#369](https://github.com/apify/apify-mcp-server/pull/369)) ([a3b34c0](https://github.com/apify/apify-mcp-server/commit/a3b34c077799a0c47991ab7db90f85938011905a)) by [@MQ37](https://github.com/MQ37), closes [#366](https://github.com/apify/apify-mcp-server/issues/366)
+
+### 🐛 Bug Fixes
+
+- Update actor definition handling to include full metadata and improve MCP server identification ([#372](https://github.com/apify/apify-mcp-server/pull/372)) ([37ab8cb](https://github.com/apify/apify-mcp-server/commit/37ab8cb7fae23b3340a089539243c95639d6dc6a)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.6.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.3) (2025-12-19)
 
 ### 🚀 Features
