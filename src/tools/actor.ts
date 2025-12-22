@@ -314,7 +314,7 @@ export async function getActorsAsTools(
 
     const clonedActors = structuredClone(actorsInfo);
 
-    // Filter out nulls
+    // Filter out nulls - actorInfo can be null if the Actor was not found or an error occurred
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
     // Separate Actors with MCP servers and normal Actors
