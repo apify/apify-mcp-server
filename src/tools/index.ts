@@ -2,9 +2,11 @@
 import type { ToolCategory } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tools.js';
 import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
+import { callActorWidget, getActorRunStatus } from './actor-widget.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
 import { fetchActorDetailsTool } from './fetch-actor-details.js';
+import { fetchActorDetailsWidgetTool } from './fetch-actor-details-widget.js';
 import { fetchApifyDocsTool } from './fetch-apify-docs.js';
 import { getActorOutput } from './get-actor-output.js';
 import { getHtmlSkeleton } from './get-html-skeleton.js';
@@ -31,6 +33,9 @@ export const toolCategories = {
         fetchActorDetailsTool,
         searchActors,
         callActor,
+        callActorWidget,
+        fetchActorDetailsWidgetTool,
+        getActorRunStatus,
     ],
     docs: [
         searchApifyDocsTool,

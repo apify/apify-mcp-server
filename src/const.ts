@@ -44,6 +44,9 @@ export enum HelperTools {
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
     GET_HTML_SKELETON = 'get-html-skeleton',
+    CALL_ACTOR_WIDGET = 'call-actor-widget',
+    GET_ACTOR_RUN_STATUS = 'get-actor-run-status',
+    FETCH_ACTOR_DETAILS_WIDGET = 'fetch-actor-details-widget',
 }
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
@@ -227,4 +230,6 @@ These tools are called **Actors**. They enable you to extract structured data fr
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs ${HelperTools.ACTOR_CALL}:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in Apify store.
+- **Async vs sync Actor tools (${HelperTools.ACTOR_CALL} vs ${HelperTools.CALL_ACTOR_WIDGET}):**
+  Default to \`${HelperTools.ACTOR_CALL}\` (synchronous, no widget) when the user asks to “run/call” and does not request background/progress/UI. Use \`${HelperTools.CALL_ACTOR_WIDGET}\` only when the user wants background/progress/UI. After starting an async run and obtaining runId, do NOT start another async run—only poll with \`${HelperTools.GET_ACTOR_RUN_STATUS}\` using that runId.
 `;
