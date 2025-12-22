@@ -24,7 +24,7 @@ export async function getActorMcpUrlCached(
         const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
         const definition = actorDefinitionWithInfo?.definition;
         const mcpPath = definition && getActorMCPServerPath(definition);
-        if (definition && mcpPath) {
+        if (mcpPath) {
             const url = await getActorMCPServerURL(definition.id, mcpPath);
             mcpServerCache.set(actorIdOrName, url);
             return url;
