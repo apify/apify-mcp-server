@@ -3,6 +3,7 @@ import { ACTOR_README_MAX_LENGTH } from '../const.js';
 import type {
     ActorDefinitionPruned,
     ActorDefinitionWithDesc,
+    ActorDefinitionWithInfo,
     SchemaProperties,
 } from '../types.js';
 
@@ -13,13 +14,13 @@ import type {
  * @param {string} actorIdOrName - Actor ID or Actor full name.
  * @param {ApifyClient} apifyClient - The Apify client instance.
  * @param {number} limit - Truncate the README to this limit.
- * @returns {Promise<ActorDefinitionWithDesc | null>} - The actor definition with description or null if not found.
+ * @returns {Promise<ActorDefinitionWithInfo | null>} - The Actor definition with info or null if not found.
  */
 export async function getActorDefinition(
     actorIdOrName: string,
     apifyClient: ApifyClient,
     limit: number = ACTOR_README_MAX_LENGTH,
-): Promise<ActorDefinitionPruned | null> {
+): Promise<ActorDefinitionWithInfo | null> {
     const actorClient = apifyClient.actor(actorIdOrName);
     try {
         // Fetch Actor details
@@ -41,7 +42,10 @@ export async function getActorDefinition(
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
             // Pass pictureUrl from actor object (untyped property but present in API response)
             (actorDefinitions as Record<string, unknown>).pictureUrl = (actor as unknown as Record<string, unknown>).pictureUrl;
-            return pruneActorDefinition(actorDefinitions);
+            return {
+                definition: pruneActorDefinition(actorDefinitions),
+                info: actor,
+            };
         }
         return null;
     } catch (error) {

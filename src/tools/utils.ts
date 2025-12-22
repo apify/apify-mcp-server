@@ -2,7 +2,7 @@ import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
-import type { ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
+import type { ActorInfo, ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -11,6 +11,13 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify-properties.js';
+
+/*
+ * Checks if the given ActorInfo represents an MCP server Actor.
+ */
+export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
+    return !!((actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled));
+}
 
 export function actorNameToToolName(actorName: string): string {
     return actorName
