@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../const.js';
+import log from '@apify/log';
+
+import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../const.js';
 import { fetchApifyDocsCache } from '../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
@@ -18,7 +20,7 @@ const fetchApifyDocsToolArgsSchema = z.object({
 export const fetchApifyDocsTool: ToolEntry = {
     type: 'internal',
     name: HelperTools.DOCS_FETCH,
-    description: `Fetch the full content of an Apify documentation page by its URL.
+    description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
 Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.
 
 USAGE:
@@ -26,7 +28,8 @@ USAGE:
 
 USAGE EXAMPLES:
 - user_input: Fetch https://docs.apify.com/platform/actors/running#builds
-- user_input: Fetch https://docs.apify.com/academy`,
+- user_input: Fetch https://docs.apify.com/academy
+- user_input: Fetch https://crawlee.dev/docs/guides/basic-concepts`,
     inputSchema: z.toJSONSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema,
     outputSchema: fetchApifyDocsToolOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchApifyDocsToolArgsSchema)),
@@ -42,13 +45,18 @@ USAGE EXAMPLES:
         const url = parsed.url.trim();
         const urlWithoutFragment = url.split('#')[0];
 
-        // Only allow URLs starting with https://docs.apify.com
-        if (!url.startsWith('https://docs.apify.com')) {
-            return buildMCPResponse({ texts: [`Invalid URL: "${url}".
-Only URLs starting with "https://docs.apify.com" are allowed.
-Please provide a valid Apify documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
-            isError: true,
-            toolStatus: TOOL_STATUS.SOFT_FAIL });
+        // Allow URLs from Apify and Crawlee documentation
+        const isAllowedDomain = ALLOWED_DOC_DOMAINS.some((domain) => url.startsWith(domain));
+
+        if (!isAllowedDomain) {
+            log.softFail(`[fetch-apify-docs] Invalid URL domain: ${url}`);
+            return buildMCPResponse({
+                texts: [`Invalid URL: "${url}".
+Only documentation URLs from Apify and Crawlee are allowed (starting with ${ALLOWED_DOC_DOMAINS.map((d) => `"${d}"`).join(' or ')}).
+Please provide a valid documentation URL. You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
 
         // Cache URL without fragment to avoid fetching the same page multiple times
