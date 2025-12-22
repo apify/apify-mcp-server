@@ -150,7 +150,7 @@ export async function callActorGetDataset(
  * 4. Properties are shortened using shortenProperties()
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
- * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and actor.
+ * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
