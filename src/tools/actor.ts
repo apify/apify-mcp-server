@@ -205,9 +205,10 @@ Actor description: ${definition.description}`;
                 openWorldHint: true,
             },
             // Allow long running tasks for Actor tools, make it optional for now
-            execution: {
-                taskSupport: 'optional',
-            },
+            // TEMP: disable for now as it causes issues with session id error for stdio transport
+            // execution: {
+            //     taskSupport: 'optional',
+            // },
         });
     }
     return tools;
