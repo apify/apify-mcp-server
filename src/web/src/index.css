@@ -1,0 +1,131 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+  /* Theme-aware brand colors */
+  :root {
+    --color-code-orange: #FF6B00;
+    --color-code-bg: rgba(13, 13, 13, 0.05);
+    --color-code-text: #5d5d5d;
+    --color-type-blue-bg: rgba(72, 170, 255, 0.1);
+    --color-type-blue: #48aaff;
+    --color-card-bg: #ffffff;
+    --color-card-bg-alt: #ffffff;
+    --color-text-primary: #0d0d0d;
+    --color-text-secondary: #5d5d5d;
+    --color-text-tertiary: #999;
+    --color-border: #e0e0e0;
+    --color-button-bg: #212121;
+    --color-button-text: #ffffff;
+    --color-success: #40c977;
+    --color-success-soft: rgba(64, 201, 119, 0.1);
+    --color-success-bg: #f0fff0;
+    --color-success-border: #c0ffc0;
+    --color-error: #ef4444;
+    --color-error-soft: rgba(239, 68, 68, 0.1);
+    --color-error-bg: #fff5f5;
+    --color-error-border: #ffdddd;
+    --color-warning: #ff9013;
+    --color-warning-soft: rgba(255, 144, 19, 0.1);
+    --color-secondary-soft: rgba(0, 0, 0, 0.05);
+  }
+
+  [data-theme="dark"] {
+    --color-code-orange: #FF9013;
+    --color-code-bg: #414141;
+    --color-code-text: #cdcdcd;
+    --color-type-blue-bg: rgba(72, 170, 255, 0.2);
+    --color-type-blue: #48aaff;
+    --color-card-bg: #303030;
+    --color-card-bg-alt: #212121;
+    --color-text-primary: #ffffff;
+    --color-text-secondary: #cdcdcd;
+    --color-text-tertiary: #7a7a7a;
+    --color-border: #303030;
+    --color-button-bg: #303030;
+    --color-button-text: #ffffff;
+    --color-success: #40c977;
+    --color-success-soft: rgba(64, 201, 119, 0.2);
+    --color-success-bg: #1a2a1a;
+    --color-success-border: #2a4a2a;
+    --color-error: #ef4444;
+    --color-error-soft: rgba(239, 68, 68, 0.2);
+    --color-error-bg: #2a1a1a;
+    --color-error-border: #4a2a2a;
+    --color-warning: #ff9013;
+    --color-warning-soft: rgba(255, 144, 19, 0.2);
+    --color-secondary-soft: rgba(255, 255, 255, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --color-code-orange: #FF9013;
+      --color-code-bg: #414141;
+      --color-code-text: #cdcdcd;
+      --color-type-blue-bg: rgba(72, 170, 255, 0.2);
+      --color-type-blue: #48aaff;
+      --color-card-bg: #303030;
+      --color-card-bg-alt: #212121;
+      --color-text-primary: #ffffff;
+      --color-text-secondary: #cdcdcd;
+      --color-text-tertiary: #7a7a7a;
+      --color-border: #303030;
+      --color-button-bg: #303030;
+      --color-button-text: #ffffff;
+      --color-success: #40c977;
+      --color-success-soft: rgba(64, 201, 119, 0.2);
+      --color-success-bg: #1a2a1a;
+      --color-success-border: #2a4a2a;
+      --color-error: #ef4444;
+      --color-error-soft: rgba(239, 68, 68, 0.2);
+      --color-error-bg: #2a1a1a;
+      --color-error-border: #4a2a2a;
+      --color-warning: #ff9013;
+      --color-warning-soft: rgba(255, 144, 19, 0.2);
+      --color-secondary-soft: rgba(255, 255, 255, 0.05);
+    }
+  }
+
+@layer utilities {
+  .overflow-auto > *,
+  .overflow-scroll > *,
+  .overflow-x-auto > *,
+  .overflow-y-auto > * {
+    scrollbar-color: auto;
+  }
+
+  /* Base style for scrollable elements */
+  .overflow-auto,
+  .overflow-scroll,
+  .overflow-x-auto,
+  .overflow-y-auto,
+  .overflow-x-scroll,
+  .overflow-y-scroll {
+    scrollbar-color: rgb(0, 0, 0, 0.1) transparent;
+
+    @media (prefers-color-scheme: dark) {
+      scrollbar-color: rgb(255, 255, 255, 0.1) transparent;
+    }
+  }
+
+  /* Hover state directly on the scrollable element */
+  .overflow-auto:hover,
+  .overflow-scroll:hover,
+  .overflow-x-auto:hover,
+  .overflow-y-auto:hover {
+    scrollbar-color: rgb(0, 0, 0, 0.2) transparent;
+
+    @media (prefers-color-scheme: dark) {
+      scrollbar-color: rgb(255, 255, 255, 0.2) transparent;
+    }
+  }
+}
