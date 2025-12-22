@@ -1414,5 +1414,12 @@ export function createIntegrationTestsSuite(
                 }
             }
         });
+
+        it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
+            client = await createClientFn({ useEnv: true, uiMode: 'openai' });
+            const tools = await client.listTools();
+            expect(tools.tools.length).toBeGreaterThan(0);
+            await client.close();
+        });
     });
 }
