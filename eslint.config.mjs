@@ -24,6 +24,7 @@ export default [
             '**/dist', // Build output directory
             '**/.venv', // Python virtual environment (if present)
             'evals/**', // Evaluation scripts directory
+            'src/web/**', // Web directory has its own TypeScript project and build system
         ],
     },
     // Apply the shared Apify TypeScript ESLint configuration
@@ -44,6 +45,13 @@ export default [
                         '**/{test,tests}/**/*.{js,ts,jsx,tsx,mjs,mts,cjs,cts}', // Test directories
                         'evals/**/*.{js,ts,jsx,tsx,mjs,mts,cjs,cts}', // Evaluation scripts
                     ],
+                },
+            ],
+            // Allow _meta property (required by OpenAI/GPT Apps API specification)
+            'no-underscore-dangle': [
+                'error',
+                {
+                    allow: ['_meta'],
                 },
             ],
         },

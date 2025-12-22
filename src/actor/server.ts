@@ -14,6 +14,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
+import type { UiMode } from '../types.js';
 import { parseBooleanFromString } from '../utils/generic.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
@@ -87,12 +88,16 @@ export function createExpressApp(
                 ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
+            const uiModeParam = urlParams.get('ui') as UiMode | undefined;
+            const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
+
             const mcpServer = new ActorsMcpServer({
                 setupSigintHandler: false,
                 transportType: 'sse',
                 telemetry: {
                     enabled: telemetryEnabled,
                 },
+                uiMode,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -185,6 +190,9 @@ export function createExpressApp(
                     ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
+                const uiModeParam = urlParams.get('ui') as UiMode | undefined;
+                const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
+
                 const mcpServer = new ActorsMcpServer({
                     setupSigintHandler: false,
                     initializeRequestData: req.body as InitializeRequest,
@@ -192,6 +200,7 @@ export function createExpressApp(
                     telemetry: {
                         enabled: telemetryEnabled,
                     },
+                    uiMode,
                 });
 
                 // Load MCP server tools

@@ -325,6 +325,11 @@ export type ToolCallTelemetryProperties = {
 };
 
 /**
+ * UI mode for tool responses.
+ */
+export type UiMode = 'openai';
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -371,6 +376,12 @@ export type ActorsMcpServerOptions = {
      * instead of APIFY_TOKEN environment variable, so it can be passed to the server
      */
     token?: string;
+    /**
+     * UI mode for tool responses.
+     * - 'openai': OpenAI specific widget rendering
+     * If not specified, there will be no widget rendering.
+     */
+    uiMode?: UiMode;
 }
 
 export type StructuredActorCard = {
