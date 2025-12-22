@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
@@ -126,6 +126,19 @@ Returns list of Actor cards with the following info:
     inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
+    _meta: {
+        'openai/outputTemplate': 'ui://widget/search-actors.html',
+        'openai/toolInvocation/invoking': 'Searching Apify Store...',
+        'openai/toolInvocation/invoked': 'Found actors matching your criteria',
+        'openai/widgetAccessible': true,
+        'openai/resultCanProduceWidget': true,
+        // TODO: replace with real CSP domains
+        'openai/widgetCSP': {
+            connect_domains: ['https://api.example.com'],
+            resource_domains: ['https://persistent.oaistatic.com'],
+        },
+        'openai/widgetDomain': 'https://chatgpt.com',
+    },
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
@@ -160,8 +173,57 @@ You can also try using more specific or alternative keywords related to your sea
 
         const actorsText = actorCards.join('\n\n');
 
-        // Generate structured cards for the actors
+        // Always return schema-compliant format in structuredContent for validation
+        // When widget mode is enabled, also include widget format as additional property for the widget UI
         const structuredActorCards = actors.map(formatActorToStructuredCard);
+        const structuredContent: {
+            actors: typeof structuredActorCards;
+            query: string;
+            count: number;
+            instructions?: string;
+            // Widget format actors (not validated by schema, but available for widget UI)
+            widgetActors?: ReturnType<typeof formatActorForWidget>[];
+        } = {
+            actors: structuredActorCards,
+            query: parsed.keywords,
+            count: actorCards.length,
+            instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+ If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.`,
+        };
+
+        // Add widget format actors when widget mode is enabled
+        if (apifyMcpServer.options.uiMode === 'openai') {
+            structuredContent.widgetActors = actors.map(formatActorForWidget);
+        }
+
+        // When widget mode is enabled, return minimal text with widget metadata
+        // When widget mode is disabled, return full text response without widget metadata
+        if (apifyMcpServer.options.uiMode === 'openai') {
+            const texts = [`
+ # Search results:
+ - **Search query:** ${parsed.keywords}
+ - **Number of Actors found:** ${actorCards.length}
+
+View the interactive widget below for detailed Actor information.
+`];
+
+            return buildMCPResponse({
+                texts,
+                structuredContent,
+                _meta: {
+                    'openai/outputTemplate': 'ui://widget/search-actors.html',
+                    'openai/widgetAccessible': true,
+                    'openai/resultCanProduceWidget': true,
+                    'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,
+                    // TODO: replace with real CSP domains
+                    'openai/widgetCSP': {
+                        connect_domains: ['https://api.example.com'],
+                        resource_domains: ['https://persistent.oaistatic.com'],
+                    },
+                    'openai/widgetDomain': 'https://chatgpt.com',
+                },
+            });
+        }
 
         const instructions = `
  # Search results:
@@ -176,13 +238,9 @@ You can also try using more specific or alternative keywords related to your sea
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
  `;
 
-        const structuredContent = {
-            actors: structuredActorCards,
-            query: parsed.keywords,
-            count: actorCards.length,
-            instructions,
-        };
-
-        return buildMCPResponse({ texts: [instructions], structuredContent });
+        return buildMCPResponse({
+            texts: [instructions],
+            structuredContent,
+        });
     },
 } as const;

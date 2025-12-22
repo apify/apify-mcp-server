@@ -431,43 +431,160 @@ export class ActorsMcpServer {
 
     private setupResourceHandlers(): void {
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+            const resources = [];
+
             /**
-             * Return the usage guide resource only if Skyfire mode is enabled. No resources otherwise for normal mode.
+             * Return the usage guide resource only if Skyfire mode is enabled.
              */
             if (this.options.skyfireMode) {
-                return {
-                    resources: [
-                        {
-                            uri: 'file://readme.md',
-                            name: 'readme',
-                            description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
-                            mimeType: 'text/markdown',
-                        },
-                    ],
-                };
+                resources.push({
+                    uri: 'file://readme.md',
+                    name: 'readme',
+                    description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
+                    mimeType: 'text/markdown',
+                });
             }
-            return { resources: [] };
+
+            if (this.options.uiMode === 'openai') {
+                resources.push({
+                    uri: 'ui://widget/search-actors.html',
+                    name: 'search-actors-widget',
+                    description: 'Interactive Actor search results widget',
+                    mimeType: 'text/html+skybridge',
+                    _meta: {
+                        'openai/outputTemplate': 'ui://widget/search-actors.html',
+                        'openai/toolInvocation/invoking': 'Searching Apify Store...',
+                        'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
+                        'openai/widgetAccessible': true,
+                        'openai/resultCanProduceWidget': true,
+                        // TODO: replace with real CSP domains
+                        'openai/widgetCSP': {
+                            connect_domains: ['https://api.example.com'],
+                            resource_domains: ['https://persistent.oaistatic.com'],
+                        },
+                        'openai/widgetDomain': 'https://chatgpt.com',
+                    },
+                });
+
+                resources.push({
+                    uri: 'ui://widget/actor-run.html',
+                    name: 'actor-run-widget',
+                    description: 'Interactive Actor run widget',
+                    mimeType: 'text/html+skybridge',
+                    _meta: {
+                        'openai/outputTemplate': 'ui://widget/actor-run.html',
+                        'openai/widgetAccessible': true,
+                        'openai/resultCanProduceWidget': true,
+                        // TODO: replace with real CSP domains
+                        'openai/widgetCSP': {
+                            connect_domains: ['https://api.example.com'],
+                            resource_domains: ['https://persistent.oaistatic.com'],
+                        },
+                        'openai/widgetDomain': 'https://chatgpt.com',
+                    },
+                });
+            }
+
+            return { resources };
         });
 
-        if (this.options.skyfireMode) {
-            this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-                const { uri } = request.params;
-                if (uri === 'file://readme.md') {
+        this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+            const { uri } = request.params;
+            if (this.options.skyfireMode && uri === 'file://readme.md') {
+                return {
+                    contents: [{
+                        uri: 'file://readme.md',
+                        mimeType: 'text/markdown',
+                        text: SKYFIRE_README_CONTENT,
+                    }],
+                };
+            }
+
+            if (this.options.uiMode === 'openai' && uri.startsWith('ui://widget/')) {
+                try {
+                    log.debug('Reading widget files', { uri });
+                    const fs = await import('node:fs');
+                    const path = await import('node:path');
+                    const { fileURLToPath } = await import('node:url');
+
+                    // Get the directory of this file
+                    const filename = fileURLToPath(import.meta.url);
+                    const dirName = path.dirname(filename);
+
+                    let widgetJsFilename = '';
+                    let widgetTitle = '';
+
+                    if (uri === 'ui://widget/search-actors.html') {
+                        widgetJsFilename = 'search-actors-widget.js';
+                        widgetTitle = 'Apify Actor Search';
+                    } else if (uri === 'ui://widget/actor-run.html') {
+                        widgetJsFilename = 'actor-run-widget.js';
+                        widgetTitle = 'Apify Actor Run';
+                    } else {
+                        return {
+                            contents: [{
+                                uri, mimeType: 'text/plain', text: `Widget resource ${uri} not found`,
+                            }],
+                        };
+                    }
+
+                    const widgetJsPath = path.resolve(dirName, `../web/dist/${widgetJsFilename}`);
+
+                    log.debug('Reading widget file', { widgetJsPath });
+
+                    const widgetJs = fs.readFileSync(widgetJsPath, 'utf-8');
+
+                    const widgetHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${widgetTitle}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">${widgetJs}</script>
+  </body>
+</html>`;
+
                     return {
                         contents: [{
-                            uri: 'file://readme.md',
-                            mimeType: 'text/markdown',
-                            text: SKYFIRE_README_CONTENT,
+                            uri,
+                            mimeType: 'text/html+skybridge',
+                            text: widgetHtml,
+                            html: widgetHtml,
+                            _meta: {
+                                'openai/widgetPrefersBorder': true,
+                                'openai/outputTemplate': uri,
+                                'openai/widgetAccessible': true,
+                                'openai/resultCanProduceWidget': true,
+                                // TODO: replace with real CSP domains
+                                'openai/widgetCSP': {
+                                    connect_domains: ['https://api.example.com'],
+                                    resource_domains: ['https://persistent.oaistatic.com'],
+                                },
+                                'openai/widgetDomain': 'https://chatgpt.com',
+                            },
+                        }],
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        contents: [{
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Failed to load widget: ${errorMessage}`,
                         }],
                     };
                 }
-                return {
-                    contents: [{
-                        uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
-                    }],
-                };
-            });
-        }
+            }
+
+            return {
+                contents: [{
+                    uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
+                }],
+            };
+        });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
             // No resource templates available, return empty response
@@ -616,7 +733,10 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool));
+            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
+                uiMode: this.options.uiMode,
+                filterOpenAiMeta: true,
+            }));
             return { tools };
         });
 

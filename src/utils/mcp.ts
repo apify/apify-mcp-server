@@ -10,19 +10,21 @@ import type { ToolStatus } from '../types.js';
  *                             it will be attached as `_toolStatus` so the server can read it
  *                             and strip it before sending the response to the MCP client.
  * @param options.structuredContent - Optional structured content of unknown type
+ * @param options._meta - Optional metadata for widget rendering (e.g., OpenAI widget metadata)
  */
-
 export function buildMCPResponse(options: {
     texts: string[];
     isError?: boolean;
     toolStatus?: ToolStatus;
     structuredContent?: unknown;
+    _meta?: Record<string, unknown>;
 }) {
     const {
         texts,
         isError = false,
         toolStatus,
         structuredContent,
+        _meta,
     } = options;
 
     const response: {
@@ -30,6 +32,7 @@ export function buildMCPResponse(options: {
         isError: boolean;
         internalToolStatus?: ToolStatus;
         structuredContent?: unknown;
+        _meta?: Record<string, unknown>;
     } = {
         content: texts.map((text) => ({ type: 'text', text })),
         isError,
@@ -43,6 +46,11 @@ export function buildMCPResponse(options: {
     // Add structured content if provided
     if (structuredContent !== undefined) {
         response.structuredContent = structuredContent;
+    }
+
+    // Add metadata if provided (e.g., for widget rendering)
+    if (_meta !== undefined) {
+        response._meta = _meta;
     }
 
     return response;

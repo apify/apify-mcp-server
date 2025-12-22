@@ -359,6 +359,22 @@ export const callActor: ToolEntry = {
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: `Call any Actor from the Apify Store using a mandatory two-step workflow.
+**SYNCHRONOUS / NO WIDGET**: Waits for the Actor to finish and returns results in the response.
+
+**WHEN TO USE THIS TOOL:**
+- User wants immediate results (e.g., "get results", "fetch data", "scrape now")
+- User needs the output right away
+- Quick-running Actors where waiting is acceptable
+- User doesn't mention "start", "run in background", "monitor progress", "widget", or "UI"
+
+**WHEN NOT TO USE THIS TOOL:**
+- User explicitly wants to "start" a run or mentions "background" or "async"
+- Long-running Actors where waiting would timeout
+- User wants to monitor progress in a UI widget
+→ In these cases, use ${HelperTools.CALL_ACTOR_WIDGET} instead
+
+This tool stays synchronous: it waits for completion and returns the results in the response. Do not pair it with ${HelperTools.CALL_ACTOR_WIDGET} for the same task.
+
 This ensures you first get the Actor’s input schema and details before executing it safely.
 
 There are two ways to run Actors:
@@ -373,6 +389,7 @@ To fetch the full output, use the ${HelperTools.ACTOR_OUTPUT_GET} tool with the 
 USAGE:
 - Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
+- PREFER this tool when user wants immediate results
 
 MANDATORY TWO-STEP-WORKFLOW:
 Step 1: Get Actor Info (step="info", default)
@@ -394,6 +411,18 @@ EXAMPLES:
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),
+    _meta: {
+        'openai/toolInvocation/invoking': 'Calling Actor synchronously...',
+        'openai/toolInvocation/invoked': 'Actor run finished (sync)',
+        'openai/widgetAccessible': false,
+        'openai/resultCanProduceWidget': false,
+        // TODO: replace with real CSP domains
+        'openai/widgetCSP': {
+            connect_domains: ['https://api.example.com'],
+            resource_domains: ['https://persistent.oaistatic.com'],
+        },
+        'openai/widgetDomain': 'https://chatgpt.com',
+    },
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

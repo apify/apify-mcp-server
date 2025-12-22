@@ -33,7 +33,7 @@ import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector } from './types.js';
+import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
@@ -53,6 +53,10 @@ type CliArgs = {
     telemetryEnabled: boolean;
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
+    /** UI mode for tool responses.
+     * - 'openai': OpenAI specific widget rendering. If not specified, there will be no widget rendering.
+     */
+    uiMode: UiMode;
 }
 
 /**
@@ -119,6 +123,14 @@ Default: true (enabled)`,
 - 'DEV': Send events to development Segment workspace
 Only used when --telemetry-enabled is true`,
     })
+    .option('uiMode', {
+        type: 'string',
+        choices: ['openai'],
+        default: undefined,
+        describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
+- 'openai': OpenAI specific widget rendering
+Default: undefined (no widget rendering)`,
+    })
     .help('help')
     .alias('h', 'help')
     .version(false)
@@ -161,6 +173,7 @@ async function main() {
             env: getTelemetryEnv(argv.telemetryEnv),
         },
         token: apifyToken,
+        uiMode: argv.uiMode,
     });
 
     // Create an Input object from CLI arguments
