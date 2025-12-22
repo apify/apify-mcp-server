@@ -631,7 +631,8 @@ export class ActorsMcpServer {
             const mcpSessionId = typeof request.params.mcpSessionId === 'string' ? request.params.mcpSessionId : undefined;
             if (!mcpSessionId) {
                 log.error('MCP Session ID is missing in tool call request. This should never happen.');
-                throw new Error('MCP Session ID is required for tool calls');
+                // TEMP: do not throw for now as it causes issues with stdio transport
+                // throw new Error('MCP Session ID is required for tool calls');
             }
             // Remove apifyToken from request.params just in case
             delete request.params.apifyToken;
