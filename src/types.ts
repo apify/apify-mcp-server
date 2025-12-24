@@ -411,3 +411,27 @@ export type StructuredActorCard = {
     modifiedAt?: string;
     isDeprecated: boolean;
 }
+
+/**
+ * MCP request parameters with Apify-specific extensions.
+ * Extends the standard MCP params object with Apify custom fields in the _meta object.
+ */
+export type ApifyRequestParams = {
+    /**
+     * Metadata object for MCP and Apify-specific fields.
+     */
+    _meta?: {
+        /** Session ID for tracking MCP requests across the Apify server */
+        mcpSessionId?: string;
+        /** Apify API token for authentication */
+        apifyToken?: string;
+        /** List of Actor IDs that the user has rented */
+        userRentedActorIds?: string[];
+        /** Progress token for out-of-band progress notifications (standard MCP) */
+        progressToken?: string | number;
+        /** Allow other metadata fields */
+        [key: string]: unknown;
+    };
+    /** Allow any other request parameters */
+    [key: string]: unknown;
+};

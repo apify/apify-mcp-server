@@ -33,7 +33,7 @@ import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { Input, TelemetryEnv, ToolSelector } from './types.js';
+import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector } from './types.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
@@ -201,8 +201,9 @@ async function main() {
         // Inject session ID into all requests for task isolation and session tracking.
         // CRITICAL: Always create params object if missing (some requests like listTasks/getTasks don't have params),
         // otherwise mcpSessionId injection fails, breaking session isolation in multi-node setups.
-        const params = (msgRecord.params || {}) as Record<string, unknown>;
-        params.mcpSessionId = mcpSessionId;
+        const params = (msgRecord.params || {}) as ApifyRequestParams;
+        params._meta ??= {};
+        params._meta.mcpSessionId = mcpSessionId;
         msgRecord.params = params;
 
         // Call the original onmessage handler

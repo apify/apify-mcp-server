@@ -57,6 +57,7 @@ import type {
     ActorMcpTool,
     ActorsMcpServerOptions,
     ActorTool,
+    ApifyRequestParams,
     HelperTool,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -525,8 +526,9 @@ export class ActorsMcpServer {
         // List tasks
         this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
             // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as { cursor?: string; mcpSessionId?: string };
-            const { cursor, mcpSessionId } = params;
+            const params = (request.params || {}) as ApifyRequestParams & { cursor?: string };
+            const { cursor } = params;
+            const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
             const result = await this.taskStore.listTasks(cursor, mcpSessionId);
             return { tasks: result.tasks, nextCursor: result.nextCursor };
@@ -535,8 +537,9 @@ export class ActorsMcpServer {
         // Get task status
         this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
             // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
-            const { taskId, mcpSessionId } = params;
+            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
+            const { taskId } = params;
+            const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
             if (task) return task;
@@ -549,8 +552,9 @@ export class ActorsMcpServer {
         // Get task result payload
         this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
             // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
-            const { taskId, mcpSessionId } = params;
+            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
+            const { taskId } = params;
+            const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
             if (!task) {
@@ -573,8 +577,9 @@ export class ActorsMcpServer {
         // Cancel task
         this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
             // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as { taskId: string; mcpSessionId?: string };
-            const { taskId, mcpSessionId } = params;
+            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
+            const { taskId } = params;
+            const mcpSessionId = params._meta?.mcpSessionId;
             log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
 
             const task = await this.taskStore.getTask(taskId, mcpSessionId);
@@ -622,22 +627,19 @@ export class ActorsMcpServer {
          * @throws {McpError} - based on the McpServer class code from the typescript MCP SDK
          */
         this.server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
+            const params = request.params as ApifyRequestParams & { name: string; arguments?: Record<string, unknown> };
             // eslint-disable-next-line prefer-const
-            let { name, arguments: args, _meta: meta } = request.params;
-            const { progressToken } = meta || {};
-            const apifyToken = (request.params.apifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
-            const userRentedActorIds = request.params.userRentedActorIds as string[] | undefined;
+            let { name, arguments: args, _meta: meta } = params;
+            const progressToken = meta?.progressToken;
+            const metaApifyToken = meta?.apifyToken;
+            const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
+            const userRentedActorIds = meta?.userRentedActorIds;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
-            const mcpSessionId = typeof request.params.mcpSessionId === 'string' ? request.params.mcpSessionId : undefined;
+            const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
                 log.error('MCP Session ID is missing in tool call request. This should never happen.');
-                // TEMP: do not throw for now as it causes issues with stdio transport
-                // throw new Error('MCP Session ID is required for tool calls');
+                throw new Error('MCP Session ID is required for tool calls');
             }
-            // Remove apifyToken from request.params just in case
-            delete request.params.apifyToken;
-            // Remove other custom params passed from apify-mcp-server
-            delete request.params.userRentedActorIds;
 
             // Validate token
             if (!apifyToken && !this.options.skyfireMode && !this.options.allowUnauthMode) {
@@ -690,7 +692,7 @@ Please provide the required arguments for this tool. Check the tool's input sche
             }
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
-            args = decodeDotPropertyNames(args);
+            args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
             log.debug('Validate arguments for tool', { toolName: tool.name, input: args });
             if (!tool.ajvValidate(args)) {
                 const errors = tool?.ajvValidate.errors || [];

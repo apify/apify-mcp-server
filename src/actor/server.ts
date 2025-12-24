@@ -15,6 +15,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
+import type { ApifyRequestParams } from '../types.js';
 import { parseBooleanFromString } from '../utils/generic.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
@@ -117,8 +118,9 @@ export function createExpressApp(
                 const msgRecord = message as Record<string, unknown>;
                 // Inject session ID into all requests with params
                 if (msgRecord.params) {
-                    const params = msgRecord.params as Record<string, unknown>;
-                    params.mcpSessionId = mcpSessionId;
+                    const params = msgRecord.params as ApifyRequestParams;
+                    params._meta ??= {};
+                    params._meta.mcpSessionId = mcpSessionId;
                 }
                 // Call the original onmessage handler
                 if (originalOnMessage) {
@@ -194,8 +196,9 @@ export function createExpressApp(
                 // Reuse existing transport
                 transport = transports[sessionId];
                 // Inject session ID into request params for existing sessions
-                if (req.body && req.body.params) {
-                    req.body.params.mcpSessionId = sessionId;
+                if (req.body?.params) {
+                    req.body.params._meta ??= {};
+                    req.body.params._meta.mcpSessionId = sessionId;
                 }
             } else if (!sessionId && isInitializeRequest(req.body)) {
                 // New initialization request
@@ -253,8 +256,9 @@ export function createExpressApp(
             }
 
             // Inject session ID into request params for all requests
-            if (req.body && req.body.params && sessionId) {
-                req.body.params.mcpSessionId = sessionId;
+            if (req.body?.params && sessionId) {
+                req.body.params._meta ??= {};
+                req.body.params._meta.mcpSessionId = sessionId;
             }
 
             // Handle the request with existing transport - no need to reconnect

@@ -47,6 +47,13 @@ export default [
                     ],
                 },
             ],
+            // Allow _meta as it's a standard MCP protocol field for metadata
+            'no-underscore-dangle': [
+                'error',
+                {
+                    allow: ['_meta'],
+                },
+            ],
         },
         languageOptions: {
             // Use ES modules (import/export syntax)
