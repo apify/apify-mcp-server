@@ -119,6 +119,7 @@ USAGE EXAMPLES:
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
     annotations: {
         title: 'Abort Actor run',
+        destructiveHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
