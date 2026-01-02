@@ -202,6 +202,7 @@ Actor description: ${definition.description}`;
                 : undefined,
             annotations: {
                 title: definition.actorFullName,
+                destructiveHint: false,
                 openWorldHint: true,
             },
             // Allow long running tasks for Actor tools, make it optional for now
@@ -395,6 +396,7 @@ EXAMPLES:
     }),
     annotations: {
         title: 'Call Actor',
+        destructiveHint: false,
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
