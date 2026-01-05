@@ -54,6 +54,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get HTML skeleton',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {

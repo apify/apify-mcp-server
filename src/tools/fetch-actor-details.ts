@@ -34,6 +34,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

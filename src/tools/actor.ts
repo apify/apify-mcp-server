@@ -202,10 +202,11 @@ Actor description: ${definition.description}`;
                 : undefined,
             annotations: {
                 title: definition.actorFullName,
-                destructiveHint: false,
+                readOnlyHint: false,
+                destructiveHint: true,
                 openWorldHint: true,
             },
-            // Allow long running tasks for Actor tools, make it optional for now
+            // Allow long-running tasks for Actor tools, make it optional for now
             execution: {
                 taskSupport: 'optional',
             },
@@ -220,7 +221,7 @@ async function getMCPServersAsTools(
 ): Promise<ToolEntry[]> {
     /**
      * This is case for the Skyfire request without any Apify token, we do not support
-     * standby Actors in this case so we can skip MCP servers since they would fail anyway (they are standby Actors).
+     * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
     */
     if (apifyToken === null || apifyToken === undefined) {
         return [];
@@ -387,7 +388,7 @@ Step 2: Call Actor (step="call")
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
     inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
-    // For now we are not adding the strucuted output schema since this tool is quite complex and has multiple possible ends states
+    // For now we are not adding the structured output schema since this tool is quite complex and has multiple possible ends states
     ajvValidate: compileSchema({
         ...z.toJSONSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
@@ -395,7 +396,9 @@ EXAMPLES:
     }),
     annotations: {
         title: 'Call Actor',
-        destructiveHint: false,
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {

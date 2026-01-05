@@ -44,6 +44,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user datasets list',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

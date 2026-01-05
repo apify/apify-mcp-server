@@ -60,6 +60,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -101,6 +102,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -169,6 +171,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

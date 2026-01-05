@@ -31,6 +31,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -76,6 +77,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -119,6 +121,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

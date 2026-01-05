@@ -28,7 +28,9 @@ USAGE EXAMPLES:
     ajvValidate: compileSchema(z.toJSONSchema(addToolArgsSchema)),
     annotations: {
         title: 'Add tool',
+        readOnlyHint: false,
         destructiveHint: false,
+        idempotentHint: true,
         openWorldHint: true,
     },
     // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool

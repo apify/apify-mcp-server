@@ -36,6 +36,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Fetch Apify docs',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
