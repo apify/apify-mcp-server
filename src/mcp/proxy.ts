@@ -27,6 +27,8 @@ export async function getMCPServerTools(
             description: tool.description || '',
             inputSchema: tool.inputSchema,
             ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
+            // Preserve annotations from the proxied tool
+            annotations: tool.annotations,
         };
 
         compiledTools.push(mcpTool);

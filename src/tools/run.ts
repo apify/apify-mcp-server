@@ -39,6 +39,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -86,6 +87,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
@@ -119,7 +121,9 @@ USAGE EXAMPLES:
     ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
     annotations: {
         title: 'Abort Actor run',
+        readOnlyHint: false,
         destructiveHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {

@@ -202,10 +202,11 @@ Actor description: ${definition.description}`;
                 : undefined,
             annotations: {
                 title: definition.actorFullName,
-                destructiveHint: false,
+                readOnlyHint: false,
+                destructiveHint: true,
                 openWorldHint: true,
             },
-            // Allow long running tasks for Actor tools, make it optional for now
+            // Allow long-running tasks for Actor tools, make it optional for now
             // TEMP: disable for now as it causes issues with session id error for stdio transport
             // execution: {
             //     taskSupport: 'optional',
@@ -221,7 +222,7 @@ async function getMCPServersAsTools(
 ): Promise<ToolEntry[]> {
     /**
      * This is case for the Skyfire request without any Apify token, we do not support
-     * standby Actors in this case so we can skip MCP servers since they would fail anyway (they are standby Actors).
+     * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
     */
     if (apifyToken === null || apifyToken === undefined) {
         return [];
@@ -396,7 +397,9 @@ EXAMPLES:
     }),
     annotations: {
         title: 'Call Actor',
-        destructiveHint: false,
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {

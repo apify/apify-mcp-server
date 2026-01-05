@@ -43,6 +43,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user runs list',
         readOnlyHint: true,
+        idempotentHint: true,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
