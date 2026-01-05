@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.6) (2026-01-05)
+
+### 🚀 Features
+
+- Add missing destructiveHint annotations to tools ([#380](https://github.com/apify/apify-mcp-server/pull/380)) ([fe796e1](https://github.com/apify/apify-mcp-server/commit/fe796e19edecda0d4544c54bb50f26d8c1a1551b)) by [@triepod-ai](https://github.com/triepod-ai)
+
+### 🐛 Bug Fixes
+
+- Migrate custom request parameters to _meta structure for SDK compatibility ([#379](https://github.com/apify/apify-mcp-server/pull/379)) ([6329c4c](https://github.com/apify/apify-mcp-server/commit/6329c4c03d737f6c2eb080fc7ce3a3b40ac10afa)) by [@MQ37](https://github.com/MQ37)
+- Add idempotentHint annotations to various tools. For Actors, the destructiveHint is set to true as an Actor can perform any type of operation at Apify platform ([#381](https://github.com/apify/apify-mcp-server/pull/381)) ([c6a69e4](https://github.com/apify/apify-mcp-server/commit/c6a69e433b8ccce4fd6cb1522470f367b6b748fa)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.6.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.5) (2025-12-22)
 
 ### 🐛 Bug Fixes
