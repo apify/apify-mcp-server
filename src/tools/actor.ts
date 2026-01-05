@@ -207,10 +207,9 @@ Actor description: ${definition.description}`;
                 openWorldHint: true,
             },
             // Allow long-running tasks for Actor tools, make it optional for now
-            // TEMP: disable for now as it causes issues with session id error for stdio transport
-            // execution: {
-            //     taskSupport: 'optional',
-            // },
+            execution: {
+                taskSupport: 'optional',
+            },
         });
     }
     return tools;
@@ -389,7 +388,7 @@ Step 2: Call Actor (step="call")
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
     inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
-    // For now we are not adding the strucuted output schema since this tool is quite complex and has multiple possible ends states
+    // For now we are not adding the structured output schema since this tool is quite complex and has multiple possible ends states
     ajvValidate: compileSchema({
         ...z.toJSONSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
