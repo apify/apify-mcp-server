@@ -93,7 +93,8 @@
     "test:integration": "npm run build && vitest run tests/integration",
     "clean": "tsc -b src --clean",
     "evals:create-dataset": "tsx evals/create-dataset.ts",
-    "evals:run": "tsx evals/run-evaluation.ts"
+    "evals:run": "tsx evals/run-evaluation.ts",
+    "evals:workflow": "tsx evals/workflows/run-workflow-evals.ts"
   },
   "author": "Apify",
   "license": "MIT"

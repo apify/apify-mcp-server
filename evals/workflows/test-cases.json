@@ -1,0 +1,28 @@
+[
+  {
+    "id": "search-google-maps",
+    "category": "search",
+    "prompt": "Find actors for scraping Google Maps",
+    "requirements": "The agent must search for actors related to Google Maps and return at least 3 results with their names and descriptions."
+  },
+  {
+    "id": "search-add-python-actor",
+    "tools": ["add-actor", "actors"],
+    "category": "search",
+    "prompt": "Find example Python Actor and add it to the MCP server",
+    "requirements": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool."
+  },
+  {
+    "id": "search-add-call-python-actor",
+    "tools": ["add-actor", "actors"],
+    "category": "search",
+    "prompt": "Find example Python Actor and add it to the MCP server and then call it with random sample input and present the results",
+    "requirements": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool. Then, it must call the added Actor with sample input and return the output."
+  },
+  {
+    "id": "instagram-search-hashtag-posts",
+    "category": "social",
+    "prompt": "Find me 10 recent Instagram posts with the hashtag #travel and present the results with their URLs.",
+    "requirements": "The agent must search Instagram for recent posts with the hashtag #travel and return at least 10 post URLs."
+  }
+]
