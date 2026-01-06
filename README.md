@@ -17,15 +17,16 @@
 </p>
 
 
-The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, or any other website using thousands of ready-made scrapers, crawlers, and automation tools available on the [Apify Store](https://apify.com/store).
+The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, and any other website using thousands of ready-made scrapers, crawlers, and automation tools from the [Apify Store](https://apify.com/store). It supports OAuth, allowing you to connect from clients like Claude.ai or Visual Studio Code using just the URL.
 
-> **🚀 Try the hosted Apify MCP Server!**
+> **🚀 Use the hosted Apify MCP Server!**
 >
-> For the easiest setup and most powerful features, including the ability to find and use any Actor from Apify Store, connect your AI assistant to our hosted server:
+> For the easiest setup and most powerful features, connect your AI assistant to our hosted server:
 >
 > **[`https://mcp.apify.com`](https://mcp.apify.com)**
->
-> It supports OAuth, so you can connect from clients like Claude.ai or Visual Studio Code with just the URL.
+
+Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
+Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
 
 ![Apify-MCP-server](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-mcp-server.png)
 
