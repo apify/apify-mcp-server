@@ -727,7 +727,6 @@ Please remove the "task" parameter from the tool call request or use a different
                 const task = await this.taskStore.createTask(
                     {
                         ttl: request.params.task.ttl,
-                        pollInterval: request.params.task.pollInterval,
                     },
                     `call-tool-${name}-${randomUUID()}`,
                     request,
