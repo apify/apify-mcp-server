@@ -14,7 +14,7 @@ import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import type { Input, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
-import { getExpectedToolsByCategories } from './tools.js';
+import { getExpectedToolsByCategories } from './tool-categories-helpers.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
 let INTERNAL_TOOL_BY_NAME_CACHE: Map<string, ToolEntry> | null = null;

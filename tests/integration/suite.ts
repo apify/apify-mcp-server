@@ -6,17 +6,22 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { ApifyClient } from '../../src/apify-client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER } from '../../src/const.js';
-import { fetchActorDetailsTool } from '../../src/tools/fetch-actor-details.js';
-import { fetchApifyDocsTool } from '../../src/tools/fetch-apify-docs.js';
-import { addTool } from '../../src/tools/helpers.js';
+// Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
-import { searchApifyDocsTool } from '../../src/tools/search-apify-docs.js';
-import { searchActors } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { ToolCategory } from '../../src/types.js';
-import { getExpectedToolNamesByCategories } from '../../src/utils/tools.js';
-import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
+import type { ToolCategory, ToolEntry } from '../../src/types.js';
+import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
+import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
+
+// Helper to find tool by name from toolCategories (avoids circular dependency)
+function findToolByName(name: string): ToolEntry | undefined {
+    for (const tools of Object.values(toolCategories)) {
+        const tool = tools.find((t) => t.name === name);
+        if (tool) return tool;
+    }
+    return undefined;
+}
 
 type IntegrationTestsSuiteOptions = {
     suiteName: string;
@@ -148,7 +153,7 @@ export function createIntegrationTestsSuite(
             expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
             const names = getToolNames(tools);
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             expect(names).toContain('get-actor-output');
             await client.close();
@@ -206,7 +211,7 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             expect(names).toContain('get-actor-output');
 
@@ -444,32 +449,25 @@ export function createIntegrationTestsSuite(
             );
         });
 
-        it('should enforce two-step process for call-actor tool', async () => {
+        it('should call Actor directly with required input', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: Get info (should work)
-            const infoResult = await client.callTool({
+            // Should fail without input (AJV validation error)
+            await expect(client!.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'info',
                 },
-            });
+            })).rejects.toThrow(/must have required property 'input'/);
 
-            expect(infoResult.content).toBeDefined();
-            const content = infoResult.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
-
-            // Step 2: Call with proper input (should work)
+            // Should succeed with input
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'call',
                     input: { first_number: 1, second_number: 2 },
                 },
             });
-
             expect(callResult.content).toBeDefined();
         });
 
@@ -577,18 +575,18 @@ export function createIntegrationTestsSuite(
         it('should call MCP server Actor via call-actor and invoke fetch-apify-docs tool', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: info - ensure the MCP server Actor lists tools including fetch-apify-docs
-            const infoResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
+            // Step 1: Get MCP tools using fetch-actor-details
+            const detailsResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    step: 'info',
+                    output: ['mcp-tools'],
                 },
             });
 
-            expect(infoResult.content).toBeDefined();
-            const infoContent = infoResult.content as { text: string }[];
-            expect(infoContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+            expect(detailsResult.content).toBeDefined();
+            const detailsContent = detailsResult.content as { text: string }[];
+            expect(detailsContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
 
             // Step 2: call - invoke the MCP tool fetch-apify-docs via actor:tool syntax
             const DOCS_URL = 'https://docs.apify.com';
@@ -596,7 +594,6 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
-                    step: 'call',
                     input: { url: DOCS_URL },
                 },
             });
@@ -715,7 +712,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, searchApifyDocsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_SEARCH)?.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-actor-details matching outputSchema', async () => {
@@ -735,7 +732,225 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, fetchActorDetailsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return only input schema when output=["input-schema"]', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['input-schema'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain schema but NOT readme or actor card
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(false);
+        });
+
+        it('should return only description and stats when specified', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['description', 'stats'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain actor info but NOT readme or schema
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+        });
+
+        it('should list MCP tools when output=["mcp-tools"] for MCP server Actor', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    output: ['mcp-tools'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
+            expect(content.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+        });
+
+        it('should return graceful note when output=["mcp-tools"] for regular Actor', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['mcp-tools'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
+        });
+
+        it('should return structured output for fetch-actor-details with selective output matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.ACTOR_GET_DETAILS;
+
+            // Test with output=['mcp-tools'] - should validate against schema even with selective fields
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    output: ['mcp-tools'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            // This should validate successfully - structured output must match schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return structured output for fetch-actor-details with output=[description,readme] matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.ACTOR_GET_DETAILS;
+
+            // Test with output=['description', 'readme'] - inputSchema should be undefined
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['description', 'readme'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            // This should validate successfully - structured output must match schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return only pricing when output=["pricing"]', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['pricing'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain actor info (pricing is part of actor card) but NOT readme or schema
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(false);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+
+            // Validate structured output
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should return only readme when output=["readme"]', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['readme'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain README but NOT actor info card or input schema
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(false);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+
+            // Validate structured output
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should reject empty output array with validation error', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // AJV validation should reject empty array before tool execution
+            await expect(client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: [],
+                },
+            })).rejects.toThrow(/must NOT have fewer than 1 items/);
+        });
+
+        it('should return all fields when output includes all standard options', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['description', 'stats', 'pricing', 'readme', 'input-schema'],
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+
+            // Should contain all sections in text
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+
+            // Validate structured output exists and has all fields
+            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; readme?: string; inputSchema?: unknown } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.actorInfo).toBeDefined();
+            expect(resultWithStructured.structuredContent?.readme).toBeDefined();
+            expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
+
+            // Validate against schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return structured output for search-actors matching outputSchema', async () => {
@@ -757,7 +972,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, searchActors.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.STORE_SEARCH)?.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
@@ -777,7 +992,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, fetchApifyDocsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_FETCH)?.outputSchema, toolName);
         });
 
         it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {
@@ -804,20 +1019,20 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            expect(toolNames).toContain(addTool.name);
+            expect(toolNames).toContain(HelperTools.ACTOR_ADD);
         });
 
         it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
             client = await createClientFn({
                 enableAddingActors: false,
-                tools: [addTool.name],
+                tools: [HelperTools.ACTOR_ADD],
             });
 
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
             // Must include add-actor since it was selected directly
-            expect(toolNames).toContain(addTool.name);
+            expect(toolNames).toContain(HelperTools.ACTOR_ADD);
         });
 
         it('should handle multiple tool category keys input correctly', async () => {
@@ -974,7 +1189,7 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
 
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
             expect(names).toContain('get-actor-output');
 
@@ -1262,7 +1477,6 @@ export function createIntegrationTestsSuite(
                 name: 'call-actor',
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    step: 'call',
                     input: { url: 'https://docs.apify.com' },
                 },
             });

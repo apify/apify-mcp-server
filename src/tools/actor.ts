@@ -19,7 +19,6 @@ import { getMCPServerTools } from '../mcp/proxy.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
-import { fetchActorDetails } from '../utils/actor-details.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
@@ -335,12 +334,16 @@ export async function getActorsAsTools(
 
 const callActorArgs = z.object({
     actor: z.string()
-        .describe('The name of the Actor to call. For example, "apify/rag-web-browser".'),
-    step: z.enum(['info', 'call'])
-        .describe(`Step to perform: "info" to get Actor details and input schema (required first step), "call" to run the Actor (only after getting info).`),
+        .describe(`The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
+
+For MCP server Actors (Actors that expose multiple tools), use the format "actorName:toolName" to call a specific tool.
+Example: "apify/actors-mcp-server:fetch-apify-docs" calls the fetch-apify-docs tool from the apify/actors-mcp-server Actor.
+
+Use the fetch-actor-details tool with output=['mcp-tools'] to list available tools for MCP server Actors.`),
     input: z.object({}).passthrough()
-        .optional()
-        .describe(`The input JSON to pass to the Actor. For example, {"query": "apify", "maxResults": 5}. Must be used only when step="call".`),
+        .describe(`The input JSON to pass to the Actor. Required.
+
+IMPORTANT: Use fetch-actor-details tool with output=['input-schema'] first to understand the required input parameters.`),
     callOptions: z.object({
         memory: z.number()
             .min(128, 'Memory must be at least 128 MB')
@@ -358,32 +361,24 @@ const callActorArgs = z.object({
 export const callActor: ToolEntry = {
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
-    description: `Call any Actor from the Apify Store using a mandatory two-step workflow.
-This ensures you first get the Actor’s input schema and details before executing it safely.
+    description: `Call any Actor from the Apify Store.
+
+WORKFLOW:
+1. Use fetch-actor-details with output=['input-schema'] to get the Actor's input schema (recommended to save tokens)
+2. Call this tool with the actor name and proper input based on the schema
+
+For MCP server Actors:
+- Use fetch-actor-details with output=['mcp-tools'] to list available tools
+- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")
+
+IMPORTANT:
+- Typically returns a datasetId and preview of output items
+- Use get-actor-output tool with the datasetId to fetch full results
+- Use dedicated Actor tools when available (e.g., apify-slash-rag-web-browser) for better experience
 
 There are two ways to run Actors:
 1. Dedicated Actor tools (e.g., ${actorNameToToolName('apify/rag-web-browser')}): These are pre-configured tools, offering a simpler and more direct experience.
 2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
-
-**Important:**
-
-Typically, a successful run returns a \`datasetId\` (the Actor's output stored as an Apify dataset) and a short preview of items.
-To fetch the full output, use the ${HelperTools.ACTOR_OUTPUT_GET} tool with the \`datasetId\`.
-
-USAGE:
-- Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
-- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
-
-MANDATORY TWO-STEP-WORKFLOW:
-Step 1: Get Actor Info (step="info", default)
-- First call this tool with step="info" to get Actor details and input schema
-- This returns the Actor description, documentation, and required input schema
-- You MUST do this step first - it's required to understand how to call the Actor
-
-Step 2: Call Actor (step="call")
-- Only after step 1, call this tool again with step="call" and proper input based on the schema
-- This runs the Actor. It will create an output as an Apify dataset (with datasetId).
-- This step returns a dataset preview, typically JSON-formatted tabular data.
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
@@ -401,12 +396,13 @@ EXAMPLES:
         idempotentHint: false,
         openWorldHint: true,
     },
+    execution: {
+        // Support long-running tasks
+        taskSupport: 'optional',
+    },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
-        const { actor: actorName, step, input, callOptions } = callActorArgs.parse(args);
-
-        // If input is provided but step is not "call", we assume the user wants to call the Actor
-        const performStep = input && step !== 'call' ? 'call' : step;
+        const { actor: actorName, input, callOptions } = callActorArgs.parse(args);
 
         // Parse special format: actor:tool
         const mcpToolMatch = actorName.match(/^(.+):(.+)$/);
@@ -434,56 +430,6 @@ EXAMPLES:
         }
 
         try {
-            if (performStep === 'info') {
-                if (isActorMcpServer) {
-                    // MCP server: list tools
-                    const mcpServerUrl = mcpServerUrlOrFalse;
-                    let client: Client | null = null;
-                    // Nested try to ensure client is closed
-                    try {
-                        client = await connectMCPClient(mcpServerUrl, apifyToken);
-                        if (!client) {
-                            return buildMCPResponse({
-                                texts: [`Failed to connect to MCP server ${mcpServerUrl}`],
-                                isError: true,
-                                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                            });
-                        }
-                        const toolsResponse = await client.listTools();
-
-                        const toolsInfo = toolsResponse.tools.map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``,
-                        ).join('\n\n');
-
-                        return buildMCPResponse({
-                            texts: [`This is an MCP Server Actor with the following tools:\n\n${toolsInfo}\n\nTo call a tool, use step="call" with actor name format: "${baseActorName}:{toolName}"`],
-                        });
-                    } finally {
-                        if (client) await client.close();
-                    }
-                } else {
-                    // Regular Actor: return schema
-                    const details = await fetchActorDetails(apifyClientForDefinition, baseActorName);
-                    if (!details) {
-                        return buildMCPResponse({ texts: [`Actor information for '${baseActorName}' was not found.
-Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
-                        isError: true,
-                        toolStatus: TOOL_STATUS.SOFT_FAIL });
-                    }
-                    const content = [
-                        `Actor name: ${actorName}`,
-                        `Input schema:\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``,
-                        `To run Actor, use step="call" with Actor name format: "${actorName}"`,
-                    ];
-                        // Add Skyfire instructions also in the info performStep since clients are most likely truncating
-                        // the long tool description of the call-actor.
-                    if (apifyMcpServer.options.skyfireMode) {
-                        content.push(SKYFIRE_TOOL_INSTRUCTIONS);
-                    }
-                    return buildMCPResponse({ texts: content });
-                }
-            }
-
             /**
             * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
             * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
@@ -504,11 +450,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
 
-            // Step 2: Call the Actor
+            // Validate input parameter is provided
             if (!input) {
                 // Missing input is most likely an LLM error, so NOT marking as a soft-fail to track potential issues with tool description
                 return buildMCPResponse({
-                    texts: [`Input is required when step="call". Please provide the input parameter based on the Actor's input schema.`],
+                    texts: [`Input is required. Please provide the input parameter based on the Actor's input schema. Use fetch-actor-details tool with output=['input-schema'] to get the Actor's input schema first.`],
                     isError: true,
                 });
             }
@@ -596,7 +542,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
             return { content };
         } catch (error) {
-            logHttpError(error, 'Failed to call Actor', { actorName, performStep });
+            logHttpError(error, 'Failed to call Actor', { actorName });
             // Let the server classify the error; we only mark it as an MCP error response
             return buildMCPResponse({ texts: [`Failed to call Actor '${actorName}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
