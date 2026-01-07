@@ -134,3 +134,36 @@ export function formatDetailedResult(result: EvaluationResult): string {
 
     return lines.join('\n');
 }
+
+/**
+ * Single test result record stored in results database
+ */
+export type TestResultRecord = {
+    /** ISO timestamp when test was run */
+    timestamp: string;
+    /** Agent LLM model used */
+    agentModel: string;
+    /** Judge LLM model used */
+    judgeModel: string;
+    /** Test case ID */
+    testId: string;
+    /** Test verdict (PASS or FAIL) */
+    verdict: 'PASS' | 'FAIL';
+    /** Judge reasoning or error message */
+    reason: string;
+    /** Test duration in milliseconds */
+    durationMs: number;
+    /** Number of conversation turns */
+    turns: number;
+    /** Error message if execution failed, null otherwise */
+    error: string | null;
+}
+
+/**
+ * Results database structure
+ * Keys are in format: "{agentModel}:{judgeModel}:{testId}"
+ */
+export type ResultsDatabase = {
+    version: string;
+    results: Record<string, TestResultRecord>;
+}

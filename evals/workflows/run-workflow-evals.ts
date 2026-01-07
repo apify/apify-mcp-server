@@ -12,6 +12,8 @@
  *   npm run evals:workflow -- --concurrency 10
  */
 
+import path from 'node:path';
+
 import pLimit from 'p-limit';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
@@ -22,6 +24,11 @@ import { LlmClient } from './llm-client.js';
 import { McpClient } from './mcp-client.js';
 import type { EvaluationResult } from './output-formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output-formatter.js';
+import {
+    loadResultsDatabase,
+    saveResultsDatabase,
+    updateResultsWithEvaluations,
+} from './results-writer.js';
 import type { WorkflowTestCase } from './test-cases-loader.js';
 import { filterTestCases, loadTestCases } from './test-cases-loader.js';
 import { evaluateConversation } from './workflow-judge.js';
@@ -35,6 +42,7 @@ type CliArgs = {
     judgeModel?: string;
     toolTimeout?: number;
     concurrency?: number;
+    output?: boolean;
 }
 
 /**
@@ -71,6 +79,9 @@ async function runSingleTest(
         // Start MCP server with test-specific tools (if configured)
         await mcpClient.start(apifyToken, testCase.tools);
 
+        // Get server instructions (if provided)
+        const serverInstructions = mcpClient.getInstructions();
+
         // Execute conversation (tools fetched dynamically inside)
         const conversation = await executeConversation({
             userPrompt: testCase.query,
@@ -78,6 +89,7 @@ async function runSingleTest(
             llmClient,
             maxTurns: testCase.maxTurns,
             model: argv.agentModel,
+            serverInstructions,
         });
 
         // Judge conversation
@@ -174,6 +186,12 @@ async function main() {
             description: 'Number of tests to run in parallel (default: 4)',
             default: 4,
         })
+        .option('output', {
+            alias: 'o',
+            type: 'boolean',
+            description: 'Save test results to JSON file (evals/workflows/results.json)',
+            default: false,
+        })
         .help()
         .argv as CliArgs;
 
@@ -243,6 +261,27 @@ async function main() {
 
     // Wait for all tests to complete
     const results = await Promise.all(resultPromises);
+
+    // Save results to file if --output flag is present
+    if (argv.output) {
+        const resultsPath = path.join(process.cwd(), 'evals/workflows/results.json');
+        try {
+            const database = loadResultsDatabase(resultsPath);
+            const updatedDatabase = updateResultsWithEvaluations(
+                database,
+                results,
+                argv.agentModel!,
+                argv.judgeModel!,
+            );
+            saveResultsDatabase(resultsPath, updatedDatabase);
+            console.log(`✅ Results saved to: ${resultsPath}`);
+            console.log();
+        } catch (error) {
+            console.error(`❌ Failed to save results: ${error}`);
+            console.error('   Results will still be displayed but not persisted.');
+            console.log();
+        }
+    }
 
     // Display results
     console.log(formatResultsTable(results));

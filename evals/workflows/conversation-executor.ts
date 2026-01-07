@@ -23,6 +23,8 @@ export type ConversationExecutorOptions = {
     maxTurns?: number;
     /** Model to use (optional, uses config default) */
     model?: string;
+    /** Additional instructions from MCP server (optional) */
+    serverInstructions?: string | null;
 }
 
 /**
@@ -38,11 +40,19 @@ export async function executeConversation(
         llmClient,
         maxTurns = MAX_CONVERSATION_TURNS,
         model = MODELS.agent,
+        serverInstructions,
     } = options;
 
     const turns: ConversationTurn[] = [];
+
+    // Build system prompt with optional server instructions
+    let systemPrompt = AGENT_SYSTEM_PROMPT;
+    if (serverInstructions) {
+        systemPrompt += `\n\n## MCP Server Instructions\n\n${serverInstructions}`;
+    }
+
     const messages: ChatCompletionMessageParam[] = [
-        { role: 'system', content: AGENT_SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
     ];
 

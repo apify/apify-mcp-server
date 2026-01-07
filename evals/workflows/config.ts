@@ -1,6 +1,8 @@
 /**
  * Configuration for workflow evaluation system
  * Includes model settings and prompts specific to workflow evaluations
+ *
+ * Note: Temperature is set to 0.15 for deterministic results (see llm-client.ts)
  */
 
 // Re-export shared config for convenience
@@ -22,6 +24,7 @@ export const MODELS = {
 
 /**
  * System prompt for the agent
+ * Note: MCP server instructions are automatically appended to this prompt if provided by the server
  */
 export const AGENT_SYSTEM_PROMPT = `You are a helpful AI assistant with access to Apify tools for web scraping and automation.
 

@@ -37,6 +37,12 @@ npm run evals:workflow -- --verbose
 
 # Increase timeout for long-running Actors (default: 60s)
 npm run evals:workflow -- --tool-timeout 300
+
+# Run tests in parallel (default: 4)
+npm run evals:workflow -- --concurrency 8
+
+# Save results to JSON file
+npm run evals:workflow -- --output
 ```
 
 **Exit codes:**
@@ -52,6 +58,7 @@ Tests AI agents executing tasks using Apify MCP server tools through multi-turn 
 **Core features:**
 - Multi-turn conversations with tool calling
 - Dynamic tool discovery during execution
+- MCP server instructions automatically added to agent system prompt
 - LLM-based evaluation against requirements
 - Isolated MCP server per test
 - Configurable tool call timeout (default: 60 seconds)
@@ -167,16 +174,49 @@ Separation allows independent optimization for speed vs evaluation quality.
 
 **Location:** `config.ts`
 
+### 7. MCP Server Instructions in System Prompt
+
+**Decision:** Automatically append MCP server instructions to agent system prompt.
+
+**Why:**
+- MCP servers can provide usage guidelines via the `instructions` field in the initialize response
+- Instructions contain important context about tool dependencies and disambiguation
+- Agents perform better when they understand tool relationships (e.g., `call-actor` requires two steps)
+- Avoids duplicating server instructions in our agent prompt
+
+**Implementation:**
+```typescript
+// Retrieve instructions after connecting to MCP server
+await mcpClient.start(apifyToken);
+const serverInstructions = mcpClient.getInstructions();
+
+// Append to agent system prompt
+const conversation = await executeConversation({
+    userPrompt: testCase.query,
+    mcpClient,
+    llmClient,
+    serverInstructions, // Automatically appended to system prompt
+});
+```
+
+**Instructions content:**
+- Actor concepts and execution workflow
+- Tool dependencies (e.g., `call-actor` two-step process)
+- Tool disambiguation (e.g., `search-actors` vs `apify/rag-web-browser`)
+- Storage types (datasets vs key-value stores)
+
+**Location:** `mcp-client.ts`, `conversation-executor.ts`
+
 ## System Components
 
 ### Core Files
 
 - `types.ts` - Type definitions
 - `config.ts` - Models, prompts, constants
-- `mcp-client.ts` - MCP server wrapper (spawn, connect, call)
+- `mcp-client.ts` - MCP server wrapper (spawn, connect, call, retrieve instructions)
 - `llm-client.ts` - OpenRouter wrapper
 - `convert-mcp-tools.ts` - MCP → OpenAI tool format
-- `conversation-executor.ts` - Multi-turn loop with dynamic tools
+- `conversation-executor.ts` - Multi-turn loop with dynamic tools and server instructions
 - `workflow-judge.ts` - Judge evaluation
 - `test-cases-loader.ts` - Load/filter test cases
 - `output-formatter.ts` - Results formatting
@@ -193,16 +233,37 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 
 ### CLI Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--category <name>` | Filter tests by category | All categories |
-| `--id <id>` | Run specific test by ID | All tests |
-| `--verbose` | Show detailed conversation logs | `false` |
-| `--test-cases-path <path>` | Custom test cases file path | `test-cases.json` |
-| `--agent-model <model>` | Override agent model | `anthropic/claude-haiku-4.5` |
-| `--judge-model <model>` | Override judge model | `x-ai/grok-4.1-fast` |
-| `--tool-timeout <seconds>` | Tool call timeout | `60` |
-| `--help` | Show help message | - |
+| Option | Alias | Description | Default |
+|--------|-------|-------------|---------|
+| `--category <name>` | | Filter tests by category | All categories |
+| `--id <id>` | | Run specific test by ID | All tests |
+| `--verbose` | | Show detailed conversation logs | `false` |
+| `--test-cases-path <path>` | | Custom test cases file path | `test-cases.json` |
+| `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
+| `--judge-model <model>` | | Override judge model | `x-ai/grok-4.1-fast` |
+| `--tool-timeout <seconds>` | | Tool call timeout | `60` |
+| `--concurrency <number>` | `-c` | Number of tests to run in parallel | `4` |
+| `--output` | `-o` | Save results to JSON file | `false` |
+| `--help` | | Show help message | - |
+
+### Concurrency
+
+The `--concurrency` (or `-c`) option controls how many tests run in parallel.
+
+**Concurrency recommendations:**
+- **Default (4)**: Balanced performance for most systems
+- **8-12**: High-performance systems with good network bandwidth
+- **1**: Debug mode, run tests sequentially
+- **Higher values**: May hit API rate limits or resource constraints
+
+**Example:**
+```bash
+# Run 8 tests in parallel
+npm run evals:workflow -- --concurrency 8
+npm run evals:workflow -- -c 8
+```
+
+**Note:** Each test spawns its own MCP server instance, so higher concurrency uses more system resources.
 
 ### Tool Timeout
 
@@ -223,6 +284,75 @@ The `--tool-timeout` option sets the maximum time (in seconds) to wait for a sin
 # Long-running Actor calls
 npm run evals:workflow -- --tool-timeout 300
 ```
+
+### Saving Results to File
+
+The `--output` (or `-o`) option saves test results to `evals/workflows/results.json` for tracking over time.
+
+**How it works:**
+- Results are stored per combination of: `agentModel:judgeModel:testId`
+- Running the same test with the same models **overwrites** the previous result
+- Running with different model combinations **adds** new entries
+- Results are **versioned in git** for historical tracking
+
+**Data structure:**
+```json
+{
+  "version": "1.0",
+  "results": {
+    "anthropic/claude-haiku-4.5:x-ai/grok-4.1-fast:search-google-maps": {
+      "timestamp": "2026-01-07T10:45:23.123Z",
+      "agentModel": "anthropic/claude-haiku-4.5",
+      "judgeModel": "x-ai/grok-4.1-fast",
+      "testId": "search-google-maps",
+      "verdict": "PASS",
+      "reason": "Agent successfully searched for Google Maps actors",
+      "durationMs": 5234,
+      "turns": 3,
+      "error": null
+    }
+  }
+}
+```
+
+**Each result contains:**
+- `timestamp` - ISO timestamp when test was run
+- `agentModel` - LLM model used for the agent
+- `judgeModel` - LLM model used for judging
+- `testId` - Test case identifier
+- `verdict` - `PASS` or `FAIL`
+- `reason` - Judge reasoning or error message
+- `durationMs` - Test duration in milliseconds
+- `turns` - Number of conversation turns
+- `error` - Error message if execution failed, `null` otherwise
+
+**Examples:**
+```bash
+# Basic usage - save all test results
+npm run evals:workflow -- --output
+npm run evals:workflow -- -o
+
+# Save results for specific category
+npm run evals:workflow -- --category search --output
+
+# Compare different agent models
+npm run evals:workflow -- --agent-model anthropic/claude-haiku-4.5 --output
+npm run evals:workflow -- --agent-model openai/gpt-4o --output
+# Results file now contains entries for both models
+
+# Compare different judge models
+npm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
+npm run evals:workflow -- --judge-model openai/gpt-4o --output
+```
+
+**Partial runs:**
+When using filters (`--category`, `--id`), only the filtered tests are updated in the results file. Other entries remain unchanged.
+
+**Version control:**
+The `results.json` file is tracked in git, allowing you to:
+- See result changes over time in commits
+- Compare results across branches
+- Track performance regressions in PRs
 
 ### Test Case Format
 

@@ -56,7 +56,7 @@ export class LlmClient {
         const response = await this.openai.chat.completions.create({
             model,
             messages,
-            temperature: 0.7,
+            temperature: 0.15, // Low temperature for deterministic evaluation results
             ...(tools && tools.length > 0 ? { tools } : {}),
             ...(responseFormat ? { response_format: responseFormat } : {}),
         });

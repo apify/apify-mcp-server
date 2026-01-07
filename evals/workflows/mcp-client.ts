@@ -12,6 +12,7 @@ export class McpClient {
     private client: Client | null = null;
     private transport: StdioClientTransport | null = null;
     private tools: McpTool[] = [];
+    private instructions: string | null = null;
     private toolTimeoutMs: number;
 
     /**
@@ -75,8 +76,9 @@ export class McpClient {
 
         await this.client.connect(this.transport);
 
-        // Load available tools
+        // Load available tools and instructions
         await this.loadTools();
+        this.instructions = this.client.getInstructions() || null;
     }
 
     /**
@@ -96,6 +98,13 @@ export class McpClient {
      */
     getTools(): McpTool[] {
         return this.tools;
+    }
+
+    /**
+     * Get server instructions (if provided by the server)
+     */
+    getInstructions(): string | null {
+        return this.instructions;
     }
 
     /**
@@ -149,6 +158,7 @@ export class McpClient {
         }
 
         this.tools = [];
+        this.instructions = null;
     }
 
     /**
