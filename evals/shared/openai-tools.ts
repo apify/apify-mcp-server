@@ -4,12 +4,13 @@
  */
 
 import type OpenAI from 'openai';
+
 import type { McpTool } from './types.js';
 
 /**
  * Generic tool interface that matches both ToolBase and McpTool
  */
-interface GenericTool {
+type GenericTool = {
     name: string;
     description?: string;
     inputSchema: Record<string, unknown>;

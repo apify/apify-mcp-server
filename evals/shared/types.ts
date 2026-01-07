@@ -5,7 +5,7 @@
 /**
  * Base test case interface - common fields for all test types
  */
-export interface BaseTestCase {
+export type BaseTestCase = {
     /** Unique test case ID */
     id: string;
     /** Category for grouping (e.g., "search-actors", "call-actor", "fetch-actor-details") */
@@ -20,33 +20,33 @@ export interface BaseTestCase {
  * Test case for tool selection evaluation (Phoenix-based)
  * Used in: evals/run-evaluation.ts, evals/create-dataset.ts
  */
-export interface ToolSelectionTestCase extends BaseTestCase {
+export type ToolSelectionTestCase = {
     /** Expected tools that should be called */
     expectedTools?: string[];
     /** Conversation context (for multi-turn scenarios) */
-    context?: string | Array<{
+    context?: string | {
         role: string;
         content: string;
         tool?: string;
         input?: Record<string, unknown>;
-    }>;
-}
+    }[];
+} & BaseTestCase
 
 /**
  * Test case for workflow evaluation (multi-turn agent conversations)
  * Used in: evals/workflows/
  */
-export interface WorkflowTestCase extends BaseTestCase {
+export type WorkflowTestCase = {
     /** Maximum number of turns allowed (optional, defaults to config value) */
     maxTurns?: number;
     /** Tools to enable for this test (optional, e.g., ["actors", "docs", "apify/rag-web-browser"]) */
     tools?: string[];
-}
+} & BaseTestCase
 
 /**
  * Test data structure wrapping test cases with version
  */
-export interface TestData {
+export type TestData = {
     /** Version of the test cases */
     version: string;
     /** Array of test cases */
@@ -56,7 +56,7 @@ export interface TestData {
 /**
  * MCP Tool definition from the server
  */
-export interface McpTool {
+export type McpTool = {
     /** Tool name */
     name: string;
     /** Tool description */

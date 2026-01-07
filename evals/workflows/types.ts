@@ -5,7 +5,7 @@
 /**
  * Represents a tool call made to the MCP server
  */
-export interface McpToolCall {
+export type McpToolCall = {
     /** Name of the tool being called */
     name: string;
     /** Arguments passed to the tool */
@@ -15,7 +15,7 @@ export interface McpToolCall {
 /**
  * Represents the result of an MCP tool execution
  */
-export interface McpToolResult {
+export type McpToolResult = {
     /** Name of the tool that was called */
     toolName: string;
     /** Whether the tool execution succeeded */
@@ -29,7 +29,7 @@ export interface McpToolResult {
 /**
  * MCP Tool definition from the server
  */
-export interface McpTool {
+export type McpTool = {
     /** Tool name */
     name: string;
     /** Tool description */
@@ -46,14 +46,14 @@ export interface McpTool {
 /**
  * A single turn in the conversation (agent action)
  */
-export interface ConversationTurn {
+export type ConversationTurn = {
     /** Turn number (1-indexed) */
     turnNumber: number;
     /** Tool calls made in this turn (if any) */
-    toolCalls: Array<{
+    toolCalls: {
         name: string;
         arguments: Record<string, unknown>;
-    }>;
+    }[];
     /** Tool results for this turn (if any) */
     toolResults: McpToolResult[];
     /** Final text response from agent (if no more tool calls) */
@@ -63,7 +63,7 @@ export interface ConversationTurn {
 /**
  * Complete conversation history
  */
-export interface ConversationHistory {
+export type ConversationHistory = {
     /** Initial user prompt */
     userPrompt: string;
     /** All turns in the conversation */

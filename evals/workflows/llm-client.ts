@@ -4,21 +4,23 @@
  */
 
 import OpenAI from 'openai';
+// eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+
 import { OPENROUTER_CONFIG } from './config.js';
 
 /**
  * Response from LLM - either text or tool calls
  */
-export interface LlmResponse {
+export type LlmResponse = {
     /** Text content from LLM (if no tool calls) */
     content: string | null;
     /** Tool calls requested by LLM (if any) */
-    toolCalls?: Array<{
+    toolCalls?: {
         id: string;
         name: string;
         arguments: string;
-    }>;
+    }[];
 }
 
 /**
@@ -64,7 +66,7 @@ export class LlmClient {
         if (message.tool_calls && message.tool_calls.length > 0) {
             return {
                 content: message.content,
-                toolCalls: message.tool_calls.map(tc => {
+                toolCalls: message.tool_calls.map((tc) => {
                     // Handle both function and custom tool calls
                     if (tc.type === 'function') {
                         return {

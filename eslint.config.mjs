@@ -24,7 +24,9 @@ export default [
         ignores: [
             '**/dist', // Build output directory
             '**/.venv', // Python virtual environment (if present)
-            'evals/**', // Evaluation scripts directory
+            'evals/*.ts', // Top-level evaluation scripts
+            'evals/*.md', // Documentation files
+            'evals/*.json', // Test case data files
         ],
     },
     // Apply the shared Apify TypeScript ESLint configuration

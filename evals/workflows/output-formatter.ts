@@ -2,14 +2,14 @@
  * Output formatter for evaluation results
  */
 
+import type { WorkflowTestCase } from './test-cases-loader.js';
 import type { ConversationHistory } from './types.js';
 import type { JudgeResult } from './workflow-judge.js';
-import type { WorkflowTestCase } from './test-cases-loader.js';
 
 /**
  * Single evaluation result
  */
-export interface EvaluationResult {
+export type EvaluationResult = {
     testCase: WorkflowTestCase;
     conversation: ConversationHistory;
     judgeResult: JudgeResult;
@@ -31,22 +31,25 @@ export function formatResultsTable(results: EvaluationResult[]): string {
 
     // Individual results
     for (const result of results) {
-        const status = result.error 
-            ? '🔥 ERROR'
-            : result.judgeResult.verdict === 'PASS' 
-                ? '✅ PASS' 
-                : '❌ FAIL';
+        let status: string;
+        if (result.error) {
+            status = '🔥 ERROR';
+        } else if (result.judgeResult.verdict === 'PASS') {
+            status = '✅ PASS';
+        } else {
+            status = '❌ FAIL';
+        }
 
         lines.push(`${status} | ${result.testCase.id} | ${result.testCase.category}`);
         lines.push(`  Query: ${result.testCase.query.slice(0, 80)}${result.testCase.query.length > 80 ? '...' : ''}`);
-        
+
         if (result.error) {
             lines.push(`  Error: ${result.error}`);
         } else {
             lines.push(`  Turns: ${result.conversation.totalTurns} | Duration: ${result.durationMs}ms`);
             lines.push(`  Reason: ${result.judgeResult.reason}`);
         }
-        
+
         lines.push('');
     }
 
@@ -55,9 +58,9 @@ export function formatResultsTable(results: EvaluationResult[]): string {
 
     // Summary stats at the END
     const totalTests = results.length;
-    const passedTests = results.filter(r => !r.error && r.judgeResult.verdict === 'PASS').length;
-    const failedTests = results.filter(r => !r.error && r.judgeResult.verdict === 'FAIL').length;
-    const errorTests = results.filter(r => r.error).length;
+    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
+    const failedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'FAIL').length;
+    const errorTests = results.filter((r) => r.error).length;
 
     lines.push(`📊 Summary:`);
     lines.push(`  Total tests: ${totalTests}`);
@@ -108,13 +111,13 @@ export function formatDetailedResult(result: EvaluationResult): string {
     lines.push(`💬 Conversation (${result.conversation.totalTurns} turns):`);
     for (const turn of result.conversation.turns) {
         lines.push(`  Turn ${turn.turnNumber}:`);
-        
+
         if (turn.toolCalls.length > 0) {
             for (const tc of turn.toolCalls) {
                 lines.push(`    🔧 ${tc.name}(${JSON.stringify(tc.arguments)})`);
             }
         }
-        
+
         if (turn.finalResponse) {
             const preview = turn.finalResponse.slice(0, 150);
             lines.push(`    💬 ${preview}${turn.finalResponse.length > 150 ? '...' : ''}`);

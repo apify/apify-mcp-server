@@ -1,26 +1,32 @@
 #!/usr/bin/env node
+/* eslint-disable no-console */
+/* eslint-disable import/extensions */
 /**
  * Main CLI entry point for workflow evaluations
- * 
+ *
  * Usage:
  *   npm run evals:workflow
  *   npm run evals:workflow -- --category basic
  *   npm run evals:workflow -- --id test-001
  *   npm run evals:workflow -- --verbose
+ *   npm run evals:workflow -- --concurrency 10
  */
 
+import pLimit from 'p-limit';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
-import { MODELS, DEFAULT_TOOL_TIMEOUT_SECONDS } from './config.js';
+
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
 import { executeConversation } from './conversation-executor.js';
 import { LlmClient } from './llm-client.js';
 import { McpClient } from './mcp-client.js';
 import type { EvaluationResult } from './output-formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output-formatter.js';
+import type { WorkflowTestCase } from './test-cases-loader.js';
 import { filterTestCases, loadTestCases } from './test-cases-loader.js';
 import { evaluateConversation } from './workflow-judge.js';
 
-interface CliArgs {
+type CliArgs = {
     category?: string;
     id?: string;
     verbose?: boolean;
@@ -28,6 +34,103 @@ interface CliArgs {
     agentModel?: string;
     judgeModel?: string;
     toolTimeout?: number;
+    concurrency?: number;
+}
+
+/**
+ * Helper function to log messages with test ID prefix
+ */
+function logWithPrefix(testId: string, message: string): void {
+    const lines = message.split('\n');
+    for (const line of lines) {
+        console.log(`[${testId}] ${line}`);
+    }
+}
+
+/**
+ * Run a single test case evaluation
+ */
+async function runSingleTest(
+    testCase: WorkflowTestCase,
+    index: number,
+    total: number,
+    argv: CliArgs,
+    llmClient: LlmClient,
+    apifyToken: string,
+): Promise<EvaluationResult> {
+    const testId = testCase.id;
+
+    logWithPrefix(testId, `[${index + 1}/${total}] Running...`);
+
+    // Create FRESH MCP instance per test for isolation
+    const mcpClient = new McpClient(argv.toolTimeout);
+    const startTime = Date.now();
+    let result: EvaluationResult;
+
+    try {
+        // Start MCP server with test-specific tools (if configured)
+        await mcpClient.start(apifyToken, testCase.tools);
+
+        // Execute conversation (tools fetched dynamically inside)
+        const conversation = await executeConversation({
+            userPrompt: testCase.query,
+            mcpClient,
+            llmClient,
+            maxTurns: testCase.maxTurns,
+            model: argv.agentModel,
+        });
+
+        // Judge conversation
+        const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
+
+        const durationMs = Date.now() - startTime;
+
+        result = {
+            testCase,
+            conversation,
+            judgeResult,
+            durationMs,
+        };
+
+        logWithPrefix(testId, `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`);
+    } catch (error) {
+        const durationMs = Date.now() - startTime;
+
+        result = {
+            testCase,
+            conversation: {
+                userPrompt: testCase.query,
+                turns: [],
+                completed: false,
+                hitMaxTurns: false,
+                totalTurns: 0,
+            },
+            judgeResult: {
+                verdict: 'FAIL',
+                reason: 'Error during execution',
+                rawResponse: '',
+            },
+            durationMs,
+            error: error instanceof Error ? error.message : String(error),
+        };
+
+        logWithPrefix(testId, `  🔥 ERROR (${durationMs}ms)`);
+    } finally {
+        // ALWAYS cleanup MCP client for this test
+        try {
+            await mcpClient.cleanup();
+        } catch (cleanupError) {
+            logWithPrefix(testId, `  ⚠️  Cleanup failed: ${cleanupError}`);
+        }
+    }
+
+    // Show detailed output if verbose
+    if (argv.verbose) {
+        logWithPrefix(testId, '');
+        logWithPrefix(testId, formatDetailedResult(result));
+    }
+
+    return result;
 }
 
 async function main() {
@@ -64,6 +167,12 @@ async function main() {
             type: 'number',
             description: `Tool call timeout in seconds (default: ${DEFAULT_TOOL_TIMEOUT_SECONDS})`,
             default: DEFAULT_TOOL_TIMEOUT_SECONDS,
+        })
+        .option('concurrency', {
+            alias: 'c',
+            type: 'number',
+            description: 'Number of tests to run in parallel (default: 4)',
+            default: 4,
         })
         .help()
         .argv as CliArgs;
@@ -107,7 +216,7 @@ async function main() {
         console.log('');
         console.log('Available test cases:');
         for (const tc of testCases) {
-            console.log(`  - ${tc.id} (${tc.category}): ${tc.prompt}`);
+            console.log(`  - ${tc.id} (${tc.category}): ${tc.query}`);
         }
         process.exit(0);
     }
@@ -119,99 +228,33 @@ async function main() {
     const llmClient = new LlmClient();
 
     // Run evaluations
-    console.log(`▶️  Running ${filteredTestCases.length} evaluation(s)...`);
+    console.log(`▶️  Running ${filteredTestCases.length} evaluation(s) with concurrency ${argv.concurrency}...`);
     console.log();
 
-    const results: EvaluationResult[] = [];
+    // Create concurrency limiter
+    const limit = pLimit(argv.concurrency!);
 
-    for (let i = 0; i < filteredTestCases.length; i++) {
-        const testCase = filteredTestCases[i];
-        console.log(`[${i + 1}/${filteredTestCases.length}] Running: ${testCase.id}...`);
+    // Execute tests in parallel with concurrency control
+    const resultPromises = filteredTestCases.map(async (testCase, index) => {
+        return limit(async () => {
+            return runSingleTest(testCase, index, filteredTestCases.length, argv, llmClient, apifyToken);
+        });
+    });
 
-        // Create FRESH MCP instance per test for isolation
-        const mcpClient = new McpClient(argv.toolTimeout);
-        const startTime = Date.now();
-        let result: EvaluationResult;
-
-        try {
-            // Start MCP server with test-specific tools (if configured)
-            await mcpClient.start(apifyToken, testCase.tools);
-
-            // Execute conversation (tools fetched dynamically inside)
-            const conversation = await executeConversation({
-                userPrompt: testCase.query,
-                mcpClient,
-                llmClient,
-                maxTurns: testCase.maxTurns,
-                model: argv.agentModel,
-            });
-
-            // Judge conversation
-            const judgeResult = await evaluateConversation(testCase, conversation, llmClient, argv.judgeModel);
-
-            const durationMs = Date.now() - startTime;
-
-            result = {
-                testCase,
-                conversation,
-                judgeResult,
-                durationMs,
-            };
-
-            console.log(`  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`);
-        } catch (error) {
-            const durationMs = Date.now() - startTime;
-            
-            result = {
-                testCase,
-                conversation: {
-                    userPrompt: testCase.query,
-                    turns: [],
-                    completed: false,
-                    hitMaxTurns: false,
-                    totalTurns: 0,
-                },
-                judgeResult: {
-                    verdict: 'FAIL',
-                    reason: 'Error during execution',
-                    rawResponse: '',
-                },
-                durationMs,
-                error: error instanceof Error ? error.message : String(error),
-            };
-
-            console.log(`  🔥 ERROR (${durationMs}ms)`);
-        } finally {
-            // ALWAYS cleanup MCP client for this test
-            try {
-                await mcpClient.cleanup();
-            } catch (cleanupError) {
-                console.error(`  ⚠️  Cleanup failed: ${cleanupError}`);
-            }
-        }
-
-        results.push(result);
-
-        // Show detailed output if verbose
-        if (argv.verbose) {
-            console.log();
-            console.log(formatDetailedResult(result));
-        }
-
-        console.log();
-    }
+    // Wait for all tests to complete
+    const results = await Promise.all(resultPromises);
 
     // Display results
     console.log(formatResultsTable(results));
 
     // Exit with appropriate code - ALL tests must pass
     const totalTests = results.length;
-    const passedTests = results.filter(r => !r.error && r.judgeResult.verdict === 'PASS').length;
-    const errorTests = results.filter(r => r.error).length;
+    const passedTests = results.filter((r) => !r.error && r.judgeResult.verdict === 'PASS').length;
+    const errorTests = results.filter((r) => r.error).length;
 
     // Exit 0 only if ALL tests passed with no errors
     const allPassed = totalTests > 0 && passedTests === totalTests && errorTests === 0;
     process.exit(allPassed ? 0 : 1);
 }
 
-main();
+void main();

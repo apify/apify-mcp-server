@@ -3,9 +3,10 @@
  * Uses shared utilities with workflow-specific validation
  */
 
-import fs from 'fs';
-import path from 'path';
-import { loadTestCases as loadTestCasesShared, filterTestCases as filterTestCasesShared } from '../shared/test-case-loader.js';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { filterTestCases as filterTestCasesShared, loadTestCases as loadTestCasesShared } from '../shared/test-case-loader.js';
 import type { WorkflowTestCase } from '../shared/types.js';
 
 // Re-export WorkflowTestCase type for backwards compatibility
@@ -16,7 +17,7 @@ export type { WorkflowTestCase } from '../shared/types.js';
  */
 export function loadTestCases(filePath?: string): WorkflowTestCase[] {
     const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test-cases.json');
-    
+
     if (!fs.existsSync(testCasesPath)) {
         throw new Error(`Test cases file not found: ${testCasesPath}`);
     }
@@ -27,31 +28,31 @@ export function loadTestCases(filePath?: string): WorkflowTestCase[] {
 
     // Validate test cases
     const seenIds = new Set<string>();
-    
+
     for (let i = 0; i < testCases.length; i++) {
         const tc = testCases[i];
         const testCaseRef = `Test case #${i + 1} (id: ${tc.id || 'missing'})`;
-        
+
         // Check required fields
         const missingFields: string[] = [];
         if (!tc.id) missingFields.push('id');
         if (!tc.category) missingFields.push('category');
         if (!tc.query) missingFields.push('query');
         if (!tc.reference) missingFields.push('reference');
-        
+
         if (missingFields.length > 0) {
             throw new Error(
-                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n` +
-                `Required fields: id, category, query, reference\n` +
-                `Test case: ${JSON.stringify(tc, null, 2)}`
+                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n`
+                + `Required fields: id, category, query, reference\n`
+                + `Test case: ${JSON.stringify(tc, null, 2)}`,
             );
         }
-        
+
         // Check for duplicate IDs
         if (seenIds.has(tc.id)) {
             throw new Error(
-                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n` +
-                `Each test case must have a unique ID.`
+                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n`
+                + `Each test case must have a unique ID.`,
             );
         }
         seenIds.add(tc.id);
@@ -66,7 +67,7 @@ export function loadTestCases(filePath?: string): WorkflowTestCase[] {
  */
 export function filterTestCases(
     testCases: WorkflowTestCase[],
-    options: { id?: string; category?: string }
+    options: { id?: string; category?: string },
 ): WorkflowTestCase[] {
     return filterTestCasesShared(testCases, options);
 }

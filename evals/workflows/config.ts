@@ -3,8 +3,6 @@
  * Includes model settings and prompts specific to workflow evaluations
  */
 
-import { OPENROUTER_CONFIG } from '../shared/config.js';
-
 // Re-export shared config for convenience
 export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars } from '../shared/config.js';
 
@@ -17,7 +15,7 @@ export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars } from '../shar
 export const MODELS = {
     // Agent model - the AI that performs tasks using tools
     agent: 'anthropic/claude-haiku-4.5',
-    
+
     // Judge model - evaluates conversation quality
     judge: 'x-ai/grok-4.1-fast',
 };
@@ -46,7 +44,7 @@ export const MAX_CONVERSATION_TURNS = 10;
 /**
  * Default timeout for MCP tool calls (in seconds)
  * This is the maximum time to wait for a single tool call to complete.
- * 
+ *
  * Note: Actor runs that take longer than this will timeout.
  * For long-running Actors, increase this value via CLI: --tool-timeout 600
  */
@@ -54,7 +52,7 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 
 /**
  * Judge prompt template for evaluating conversations
- * 
+ *
  * Variables:
  * - {{reference}}: The requirements the agent should meet
  * - {{conversation}}: The formatted conversation to evaluate

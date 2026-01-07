@@ -2,15 +2,15 @@
  * LLM Judge for evaluating conversation quality
  */
 
-import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import { LlmClient } from './llm-client.js';
-import type { ConversationHistory } from './types.js';
 import type { WorkflowTestCase } from '../shared/types.js';
+import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
+import type { LlmClient } from './llm-client.js';
+import type { ConversationHistory } from './types.js';
 
 /**
  * Judge evaluation result
  */
-export interface JudgeResult {
+export type JudgeResult = {
     /** PASS or FAIL verdict */
     verdict: 'PASS' | 'FAIL';
     /** Explanation from judge */
@@ -55,13 +55,13 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
  */
 function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
     const lines = response.trim().split('\n');
-    
+
     let verdict: 'PASS' | 'FAIL' | null = null;
     let reason = '';
 
     for (const line of lines) {
         const trimmedLine = line.trim();
-        
+
         if (trimmedLine.startsWith('VERDICT:')) {
             const verdictText = trimmedLine.replace('VERDICT:', '').trim().toUpperCase();
             if (verdictText === 'PASS' || verdictText === 'FAIL') {
@@ -118,8 +118,8 @@ export async function evaluateConversation(
         };
     } catch (error) {
         throw new Error(
-            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n` +
-            `Raw response: ${rawResponse}`
+            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n`
+            + `Raw response: ${rawResponse}`,
         );
     }
 }

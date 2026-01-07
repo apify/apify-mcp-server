@@ -5,6 +5,7 @@
 
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
 import type { McpTool, McpToolCall, McpToolResult } from './types.js';
 
 export class McpClient {
@@ -17,7 +18,7 @@ export class McpClient {
      * Create MCP client
      * @param toolTimeoutSeconds - Timeout for tool calls in seconds (default: 60)
      */
-    constructor(toolTimeoutSeconds: number = 60) {
+    constructor(toolTimeoutSeconds = 60) {
         this.toolTimeoutMs = toolTimeoutSeconds * 1000;
     }
 
@@ -32,20 +33,20 @@ export class McpClient {
         }
 
         // Check that dist/stdio.js exists
-        const fs = await import('fs');
-        const path = await import('path');
+        const fs = await import('node:fs');
+        const path = await import('node:path');
         const stdioBinPath = path.resolve(process.cwd(), 'dist/stdio.js');
-        
+
         if (!fs.existsSync(stdioBinPath)) {
             throw new Error(
-                'MCP server binary not found at dist/stdio.js. ' +
-                'Please run "npm run build" first.'
+                'MCP server binary not found at dist/stdio.js. '
+                + 'Please run "npm run build" first.',
             );
         }
 
         // Build args for MCP server
         const args = [stdioBinPath];
-        
+
         // Add --tools argument if provided
         if (tools && tools.length > 0) {
             args.push(`--tools=${tools.join(',')}`);
@@ -69,7 +70,7 @@ export class McpClient {
             },
             {
                 capabilities: {},
-            }
+            },
         );
 
         await this.client.connect(this.transport);
@@ -115,7 +116,7 @@ export class McpClient {
                 {
                     timeout: this.toolTimeoutMs,
                     resetTimeoutOnProgress: true, // Reset timeout on progress notifications
-                }
+                },
             );
 
             return {
@@ -141,7 +142,7 @@ export class McpClient {
             await this.client.close();
             this.client = null;
         }
-        
+
         if (this.transport) {
             await this.transport.close();
             this.transport = null;

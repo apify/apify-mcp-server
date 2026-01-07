@@ -3,14 +3,16 @@
  * Handles the loop: LLM → Tool calls → Execute tools → Add to messages → Repeat
  */
 
+// eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
-import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
+
 import { mcpToolsToOpenAiTools } from '../shared/openai-tools.js';
-import { LlmClient } from './llm-client.js';
-import { McpClient } from './mcp-client.js';
+import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
+import type { LlmClient } from './llm-client.js';
+import type { McpClient } from './mcp-client.js';
 import type { ConversationHistory, ConversationTurn } from './types.js';
 
-export interface ConversationExecutorOptions {
+export type ConversationExecutorOptions = {
     /** User's initial prompt */
     userPrompt: string;
     /** MCP client for tool execution and dynamic tool fetching */
@@ -28,7 +30,7 @@ export interface ConversationExecutorOptions {
  * Tools are fetched dynamically from MCP after each turn
  */
 export async function executeConversation(
-    options: ConversationExecutorOptions
+    options: ConversationExecutorOptions,
 ): Promise<ConversationHistory> {
     const {
         userPrompt,
@@ -73,7 +75,7 @@ export async function executeConversation(
         // LLM wants to call tools
         const turn: ConversationTurn = {
             turnNumber,
-            toolCalls: llmResponse.toolCalls.map(tc => ({
+            toolCalls: llmResponse.toolCalls.map((tc) => ({
                 name: tc.name,
                 arguments: JSON.parse(tc.arguments),
             })),
@@ -84,7 +86,7 @@ export async function executeConversation(
         messages.push({
             role: 'assistant',
             content: llmResponse.content,
-            tool_calls: llmResponse.toolCalls.map(tc => ({
+            tool_calls: llmResponse.toolCalls.map((tc) => ({
                 id: tc.id,
                 type: 'function' as const,
                 function: {
