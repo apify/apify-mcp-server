@@ -1,6 +1,6 @@
 {
   "name": "@apify/actors-mcp-server",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "type": "module",
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
@@ -42,7 +42,7 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
-    "@modelcontextprotocol/sdk": "^1.24.3",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "@segment/analytics-node": "^2.3.0",
     "@types/cheerio": "^0.22.35",
     "@types/turndown": "^5.0.5",
@@ -72,6 +72,7 @@
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
     "openai": "^6.10.0",
+    "p-limit": "^6.1.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
@@ -93,7 +94,8 @@
     "test:integration": "npm run build && vitest run tests/integration",
     "clean": "tsc -b src --clean",
     "evals:create-dataset": "tsx evals/create-dataset.ts",
-    "evals:run": "tsx evals/run-evaluation.ts"
+    "evals:run": "tsx evals/run-evaluation.ts",
+    "evals:workflow": "tsx evals/workflows/run-workflow-evals.ts"
   },
   "author": "Apify",
   "license": "MIT"

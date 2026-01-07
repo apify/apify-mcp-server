@@ -1,0 +1,277 @@
+{
+  "version": "1.0",
+  "testCases": [
+    {
+      "id": "search-google-maps",
+      "category": "search",
+      "query": "Find actors for scraping Google Maps",
+      "reference": "The agent must search for actors related to Google Maps and return at least 3 results with their names and descriptions."
+    },
+    {
+      "id": "search-add-python-actor",
+      "tools": ["add-actor", "actors"],
+      "category": "search",
+      "query": "Find example Python Actor and add it to the MCP server",
+      "reference": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool."
+    },
+    {
+      "id": "search-add-call-python-actor",
+      "tools": ["add-actor", "actors"],
+      "category": "call",
+      "query": "Find example Python Actor and add it to the MCP server and then call it with random sample input and present the results",
+      "reference": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool. Then, it must call the added Actor with sample input and return the output."
+    },
+    {
+      "id": "instagram-search-hashtag-posts",
+      "category": "call",
+      "query": "Find me 10 recent Instagram posts with the hashtag #travel and present the results with their URLs.",
+      "reference": "The agent must search Instagram for recent posts with the hashtag #travel and return at least 10 post URLs."
+    },
+    {
+      "id": "call-actor-mcp-weather",
+      "category": "mcp",
+      "query": "Find a weather mcp Actor and use it through the call-actor tool to show me the current weather in Prague",
+      "reference": "The agent must find a weather-related Actor on the MCP server and use the call-actor tool to get and return the current weather in Prague and present the results."
+    },
+    {
+      "id": "search-instagram-scrapers",
+      "category": "search",
+      "query": "What Actors can scrape Instagram posts?",
+      "reference": "The agent must use search-actors to find Instagram post scrapers and return at least 3 relevant results."
+    },
+    {
+      "id": "search-best-instagram-scrapers",
+      "category": "search",
+      "query": "What are the best Instagram scrapers?",
+      "reference": "The agent must use search-actors to find Instagram scrapers and present the top results with their descriptions."
+    },
+    {
+      "id": "search-social-media-actors",
+      "category": "search",
+      "query": "Find actors for scraping social media",
+      "reference": "The agent must use search-actors to find social media scraping actors and return relevant results."
+    },
+    {
+      "id": "search-twitter-tools",
+      "category": "search",
+      "query": "Show me Twitter scraping tools",
+      "reference": "The agent must use search-actors to find Twitter scrapers and present the results."
+    },
+    {
+      "id": "search-tiktok-actors",
+      "category": "search",
+      "query": "What actors can scrape TikTok content?",
+      "reference": "The agent must use search-actors to find TikTok scraping actors and return relevant results."
+    },
+    {
+      "id": "search-facebook-actor",
+      "category": "search",
+      "query": "Find an Actor to get Facebook data",
+      "reference": "The agent must use search-actors to find Facebook data scraping actors."
+    },
+    {
+      "id": "search-news-scrapers",
+      "category": "search",
+      "query": "Find actors that can scrape news articles",
+      "reference": "The agent must use search-actors with appropriate keywords like 'news articles' to find relevant scrapers."
+    },
+    {
+      "id": "search-ecommerce-tools",
+      "category": "search",
+      "query": "What tools can extract data from e-commerce sites?",
+      "reference": "The agent must use search-actors to find e-commerce data extraction tools."
+    },
+    {
+      "id": "search-amazon-scrapers",
+      "category": "search",
+      "query": "Show me Amazon product scrapers",
+      "reference": "The agent must use search-actors to find Amazon product scraping actors."
+    },
+    {
+      "id": "search-playwright-mcp",
+      "category": "search",
+      "query": "Search for Playwright browser MCP server",
+      "reference": "The agent must use search-actors to find Playwright-related MCP server actors."
+    },
+    {
+      "id": "search-amazon-products-solution",
+      "category": "search",
+      "query": "I need to find solution to scrape details of Amazon products",
+      "reference": "The agent must use search-actors to find Amazon product scraping solutions."
+    },
+    {
+      "id": "search-twitter-ai-posts",
+      "category": "search",
+      "query": "Find an Actor to fetch posts from Twitter about AI",
+      "reference": "The agent must use search-actors to find Twitter scraping actors."
+    },
+    {
+      "id": "search-flight-info-actor",
+      "category": "search",
+      "query": "Find an Actor to get flight information from Skyscanner",
+      "reference": "The agent must use search-actors to find flight information scraping actors."
+    },
+    {
+      "id": "search-weather-actors",
+      "category": "search",
+      "query": "Can you find actors to scrape weather data?",
+      "reference": "The agent must use search-actors to find weather data scraping actors."
+    },
+    {
+      "id": "search-data-extraction-actors",
+      "category": "search",
+      "query": "Find actors for data extraction tasks",
+      "reference": "The agent must use search-actors to find data extraction actors since the query explicitly asks about 'actors'."
+    },
+    {
+      "id": "search-instagram-posts-about-rock",
+      "category": "search",
+      "query": "Find posts about the Rock on Instagram. Only search for the Actor that can do this but do not run it.",
+      "reference": "The agent must use search-actors to find Instagram scraping actors and return the search results. Do not attempt to scrape Instagram directly or run any Actor."
+    },
+    {
+      "id": "search-instagram-ai-posts",
+      "category": "search",
+      "query": "Scrape Instagram posts about AI. Only search for the Actor that can do this but do not run it.",
+      "reference": "The agent must use search-actors to find Instagram scraping actors and return the search results. Do not attempt to scrape Instagram directly or run any Actor."
+    },
+    {
+      "id": "search-weather-data-tools",
+      "category": "search",
+      "query": "Search for weather data scraping tools",
+      "reference": "The agent must use search-actors to find weather data scraping tools."
+    },
+    {
+      "id": "search-flight-data-actor",
+      "category": "search",
+      "query": "Find an Actor that scrapes flight data from booking sites",
+      "reference": "The agent must use search-actors to find flight data scraping actors."
+    },
+    {
+      "id": "search-flight-extraction-actors",
+      "category": "search",
+      "query": "Find actors for flight data extraction",
+      "reference": "The agent must use search-actors to find flight data extraction actors."
+    },
+    {
+      "id": "search-stackoverflow-scraper",
+      "category": "search",
+      "query": "Use Apify to scrape StackOverflow for the top 10 most upvoted quicksort implementations in Python. Only search for the Actor that can do this but do not run it.",
+      "reference": "The agent must use search-actors to find StackOverflow scraping actors. The agent may optionally use fetch-actor-details to provide more information about relevant actors. Do not attempt to call-actor or scrape StackOverflow directly."
+    },
+    {
+      "id": "search-instagram-profile-actor",
+      "category": "search",
+      "query": "I need to find Actor for instagram profile scraping",
+      "reference": "The agent must use search-actors to find Instagram profile scraping actors."
+    },
+    {
+      "id": "search-tiktok-comments-actor",
+      "category": "search",
+      "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
+      "reference": "The agent must use search-actors to find TikTok comment scraping actors and return the search results."
+    },
+    {
+      "id": "search-instagram-actor-ambiguous",
+      "category": "search",
+      "query": "Find an Actor to get instagram posts",
+      "reference": "The agent must use search-actors to find Instagram post scraping actors."
+    },
+    {
+      "id": "search-instagram-posts-ai-confusion",
+      "category": "search",
+      "query": "Find posts about AI on Instagram. Only search for the Actor that can do this but do not run it.",
+      "reference": "The agent must use search-actors to find Instagram scraping actors and return the search results. Do not attempt to use rag-web-browser or run any Actor."
+    },
+    {
+      "id": "tool-selection-ai-articles",
+      "category": "tool-selection",
+      "query": "Find recent articles about AI from tech blogs",
+      "reference": "The agent must use apify/rag-web-browser to fetch current articles, not search-actors."
+    },
+    {
+      "id": "tool-selection-climate-articles",
+      "category": "tool-selection",
+      "query": "Fetch recent articles about climate change",
+      "reference": "The agent must use apify/rag-web-browser to fetch articles directly."
+    },
+    {
+      "id": "tool-selection-weather-sf",
+      "category": "tool-selection",
+      "query": "Get the latest weather forecast for San Francisco",
+      "reference": "The agent must use apify/rag-web-browser to get weather information directly."
+    },
+    {
+      "id": "tool-selection-example-com",
+      "category": "tool-selection",
+      "query": "Get data from example.com",
+      "reference": "The agent must use apify/rag-web-browser to fetch data from the specified URL."
+    },
+    {
+      "id": "tool-selection-tech-news",
+      "category": "tool-selection",
+      "query": "Get the latest tech industry news",
+      "reference": "The agent must use apify/rag-web-browser to fetch current tech news."
+    },
+    {
+      "id": "tool-selection-ai-wired-verge",
+      "category": "tool-selection",
+      "query": "Get current articles about AI from Wired and The Verge",
+      "reference": "The agent must use apify/rag-web-browser to fetch articles from specific sources."
+    },
+    {
+      "id": "tool-selection-weather-ny",
+      "category": "tool-selection",
+      "query": "Get the latest weather forecast for New York",
+      "reference": "The agent must use apify/rag-web-browser to get weather information directly."
+    },
+    {
+      "id": "tool-selection-flight-prices",
+      "category": "tool-selection",
+      "query": "Get flight prices from New York to London for tomorrow",
+      "reference": "The agent must use apify/rag-web-browser to fetch current flight pricing information."
+    },
+    {
+      "id": "tool-selection-news-ai",
+      "category": "tool-selection",
+      "query": "Look for news articles on AI",
+      "reference": "The agent must use apify/rag-web-browser to fetch current AI news articles."
+    },
+    {
+      "id": "tool-selection-ai-news-cnn-bbc",
+      "category": "tool-selection",
+      "query": "Fetch AI-related news from CNN and BBC",
+      "reference": "The agent must use apify/rag-web-browser to fetch news from specific sources."
+    },
+    {
+      "id": "tool-selection-ai-tech-blogs",
+      "category": "tool-selection",
+      "query": "Find recent AI articles on tech blogs",
+      "reference": "The agent must use apify/rag-web-browser to fetch current articles, not search for actors."
+    },
+    {
+      "id": "tool-selection-weather-today-sf",
+      "category": "tool-selection",
+      "query": "What's the weather like today in San Francisco?",
+      "reference": "The agent must use apify/rag-web-browser to get current weather information, not search for actors."
+    },
+    {
+      "id": "call-amazon-product-data",
+      "category": "call",
+      "query": "Get pricing and details for iPhone 15 on Amazon",
+      "reference": "The agent must search for Amazon product scraper, call it with iPhone 15 search query, and return structured product data including title, price, and rating."
+    },
+    {
+      "id": "call-google-maps-restaurants",
+      "category": "call",
+      "query": "Find the top 10 restaurants in Prague using Google Maps",
+      "reference": "The agent must find Google Maps scraper, call it with 'restaurants Prague' query, and return list of restaurant names with ratings and addresses."
+    },
+    {
+      "id": "call-actor-with-field-filtering",
+      "category": "call",
+      "query": "Search for Amazon laptop products and return only the product titles and prices using field filtering",
+      "reference": "The agent must search for Amazon scraper, execute it with a laptop search query, then use get-actor-output with field filtering (using dot notation like 'title' and 'price') to return only the requested fields from the dataset."
+    }
+  ]
+}
