@@ -5,7 +5,7 @@
 
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
-import { mcpToolsToOpenAiTools } from './convert-mcp-tools.js';
+import { mcpToolsToOpenAiTools } from '../shared/openai-tools.js';
 import { LlmClient } from './llm-client.js';
 import { McpClient } from './mcp-client.js';
 import type { ConversationHistory, ConversationTurn } from './types.js';

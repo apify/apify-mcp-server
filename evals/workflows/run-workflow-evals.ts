@@ -12,7 +12,6 @@
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 import { MODELS, DEFAULT_TOOL_TIMEOUT_SECONDS } from './config.js';
-import { mcpToolsToOpenAiTools } from './convert-mcp-tools.js';
 import { executeConversation } from './conversation-executor.js';
 import { LlmClient } from './llm-client.js';
 import { McpClient } from './mcp-client.js';
@@ -140,7 +139,7 @@ async function main() {
 
             // Execute conversation (tools fetched dynamically inside)
             const conversation = await executeConversation({
-                userPrompt: testCase.prompt,
+                userPrompt: testCase.query,
                 mcpClient,
                 llmClient,
                 maxTurns: testCase.maxTurns,
@@ -166,7 +165,7 @@ async function main() {
             result = {
                 testCase,
                 conversation: {
-                    userPrompt: testCase.prompt,
+                    userPrompt: testCase.query,
                     turns: [],
                     completed: false,
                     hitMaxTurns: false,

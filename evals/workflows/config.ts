@@ -1,15 +1,12 @@
 /**
  * Configuration for workflow evaluation system
- * Includes OpenRouter API config, model settings, and prompts
+ * Includes model settings and prompts specific to workflow evaluations
  */
 
-/**
- * OpenRouter API configuration
- */
-export const OPENROUTER_CONFIG = {
-    baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY || '',
-};
+import { OPENROUTER_CONFIG } from '../shared/config.js';
+
+// Re-export shared config for convenience
+export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars } from '../shared/config.js';
 
 /**
  * Default model configuration for agent and judge
@@ -59,13 +56,13 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
  * Judge prompt template for evaluating conversations
  * 
  * Variables:
- * - {{requirements}}: The requirements the agent should meet
+ * - {{reference}}: The requirements the agent should meet
  * - {{conversation}}: The formatted conversation to evaluate
  */
 export const JUDGE_PROMPT_TEMPLATE = `You are evaluating whether an AI agent successfully completed a user's task using available tools.
 
 TASK REQUIREMENTS:
-{{requirements}}
+{{reference}}
 
 AGENT CONVERSATION:
 {{conversation}}
@@ -90,4 +87,3 @@ VERDICT: [PASS or FAIL]
 REASON: [Brief explanation in 1-2 sentences explaining why the agent passed or failed]
 
 Do not include any other text before or after this format.`;
-

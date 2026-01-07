@@ -38,7 +38,7 @@ export function formatResultsTable(results: EvaluationResult[]): string {
                 : '❌ FAIL';
 
         lines.push(`${status} | ${result.testCase.id} | ${result.testCase.category}`);
-        lines.push(`  Prompt: ${result.testCase.prompt.slice(0, 80)}${result.testCase.prompt.length > 80 ? '...' : ''}`);
+        lines.push(`  Query: ${result.testCase.query.slice(0, 80)}${result.testCase.query.length > 80 ? '...' : ''}`);
         
         if (result.error) {
             lines.push(`  Error: ${result.error}`);
@@ -91,12 +91,12 @@ export function formatDetailedResult(result: EvaluationResult): string {
     lines.push('='.repeat(100));
     lines.push('');
 
-    lines.push(`📝 Prompt:`);
-    lines.push(`  ${result.testCase.prompt}`);
+    lines.push(`📝 Query:`);
+    lines.push(`  ${result.testCase.query}`);
     lines.push('');
 
     lines.push(`📋 Requirements:`);
-    lines.push(`  ${result.testCase.requirements}`);
+    lines.push(`  ${result.testCase.reference}`);
     lines.push('');
 
     if (result.error) {

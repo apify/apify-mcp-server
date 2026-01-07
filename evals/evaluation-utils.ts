@@ -2,10 +2,6 @@
  * Shared evaluation utilities extracted from run-evaluation.ts
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname as pathDirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
 import OpenAI from 'openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { asEvaluator } from '@arizeai/phoenix-client/experiments';
@@ -24,50 +20,24 @@ import {
     TEMPERATURE,
     sanitizeHeaderValue
 } from './config.js';
+import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test-case-loader.js';
+import { transformToolsToOpenAIFormat } from './shared/openai-tools.js';
+import type { ToolSelectionTestCase, TestData } from './shared/types.js';
+
+// Re-export types for backwards compatibility
+export type TestCase = ToolSelectionTestCase;
+export type { TestData } from './shared/types.js';
+
+// Re-export shared functions for backwards compatibility
+export { filterByCategory, filterById } from './shared/test-case-loader.js';
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 
-export type TestCase = {
-    id: string;
-    category: string;
-    query: string;
-    context?: string | string[];
-    expectedTools?: string[];
-    reference?: string;
-};
-
-export type TestData = {
-    version: string;
-    testCases: TestCase[];
-};
-
-// eslint-disable-next-line consistent-return
+/**
+ * Load test cases from a JSON file (wrapper around shared function)
+ */
 export function loadTestCases(filePath: string): TestData {
-    const filename = fileURLToPath(import.meta.url);
-    const dirname = pathDirname(filename);
-    const testCasesPath = join(dirname, filePath);
-
-    try {
-        const fileContent = readFileSync(testCasesPath, 'utf-8');
-        return JSON.parse(fileContent) as TestData;
-    } catch {
-        log.error(`Error: Test cases file not found at ${testCasesPath}`);
-        process.exit(1);
-    }
-}
-
-export function filterByCategory(testCases: TestCase[], category: string): TestCase[] {
-    // Convert wildcard pattern to regex
-    const pattern = category.replace(/\*/g, '.*');
-    const regex = new RegExp(`^${pattern}$`);
-
-    return testCases.filter((testCase) => regex.test(testCase.category));
-}
-
-export function filterById(testCases: TestCase[], idPattern: string): TestCase[] {
-    const regex = new RegExp(idPattern);
-
-    return testCases.filter((testCase) => regex.test(testCase.id));
+    return loadTestCasesShared(filePath);
 }
 
 export async function loadTools(): Promise<ToolBase[]> {
@@ -76,22 +46,11 @@ export async function loadTools(): Promise<ToolBase[]> {
     return urlTools.map((t: ToolEntry) => getToolPublicFieldOnly(t)) as ToolBase[];
 }
 
-export function transformToolsToOpenAIFormat(tools: ToolBase[]): OpenAI.Chat.Completions.ChatCompletionTool[] {
-    return tools.map((tool) => ({
-        type: 'function',
-        function: {
-            name: tool.name,
-            description: tool.description,
-            parameters: tool.inputSchema as OpenAI.Chat.ChatCompletionTool['function']['parameters'],
-        },
-    }));
-}
-
 export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
     const toolsOpenAI = transformToolsToOpenAIFormat(tools);
 
     return async (example: ExampleInputOnly): Promise<{
-        tool_calls: Array<{ function?: { name?: string } }>;
+        tool_calls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[];
         llm_response: string;
         query: string;
         context: string;

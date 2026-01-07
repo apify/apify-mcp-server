@@ -6,6 +6,9 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+// Re-export shared config
+export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
+
 // Read version from test-cases.json
 function getTestCasesVersion(): string {
     const currentFilename = fileURLToPath(import.meta.url);
@@ -156,24 +159,24 @@ The response must be exactly:
 Decision: either "correct" or "incorrect".
 Explanation: brief explanation of the decision.
 `
-export function getRequiredEnvVars(): Record<string, string | undefined> {
+/**
+ * Get required environment variables for Phoenix-based evaluations
+ * Extends shared config with Phoenix-specific variables
+ * Note: OPENROUTER_BASE_URL is optional (defaults to https://openrouter.ai/api/v1)
+ */
+export function getPhoenixEnvVars(): Record<string, string | undefined> {
     return {
         PHOENIX_BASE_URL: process.env.PHOENIX_BASE_URL,
         PHOENIX_API_KEY: process.env.PHOENIX_API_KEY,
         OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
-        OPENROUTER_BASE_URL: process.env.OPENROUTER_BASE_URL,
     };
 }
 
-// Removes newlines and trims whitespace. Useful for Authorization header values
-// because CI secrets sometimes include trailing newlines or quotes.
-export function sanitizeHeaderValue(value?: string): string | undefined {
-    if (value == null) return value;
-    return value.replace(/[\r\n]/g, '').trim().replace(/^"|"$/g, '');
-}
-
-export function validateEnvVars(): boolean {
-    const envVars = getRequiredEnvVars();
+/**
+ * Validate Phoenix-specific environment variables
+ */
+export function validatePhoenixEnvVars(): boolean {
+    const envVars = getPhoenixEnvVars();
     const missing = Object.entries(envVars)
         .filter(([, value]) => !value)
         .map(([key]) => key);

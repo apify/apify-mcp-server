@@ -28,7 +28,7 @@ import {
     EVALUATOR_NAMES,
     type EvaluatorName,
     sanitizeHeaderValue,
-    validateEnvVars
+    validatePhoenixEnvVars
 } from './config.js';
 
 type EvaluatorResult = {
@@ -202,7 +202,7 @@ function printResults(results: EvaluatorResult[]): void {
 async function main(datasetName: string): Promise<number> {
     log.info('Starting MCP tool calling evaluation');
 
-    if (!validateEnvVars()) {
+    if (!validatePhoenixEnvVars()) {
         return 1;
     }
 

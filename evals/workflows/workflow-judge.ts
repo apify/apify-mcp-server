@@ -5,18 +5,7 @@
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
 import { LlmClient } from './llm-client.js';
 import type { ConversationHistory } from './types.js';
-
-/**
- * Test case for evaluation (minimal structure needed for judge)
- */
-export interface TestCase {
-    /** Test case ID */
-    id: string;
-    /** User prompt */
-    prompt: string;
-    /** Requirements that must be met */
-    requirements: string;
-}
+import type { WorkflowTestCase } from '../shared/types.js';
 
 /**
  * Judge evaluation result
@@ -98,7 +87,7 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
  * Evaluate a conversation using the judge LLM
  */
 export async function evaluateConversation(
-    testCase: TestCase,
+    testCase: WorkflowTestCase,
     conversation: ConversationHistory,
     llmClient: LlmClient,
     judgeModel: string = MODELS.judge,
@@ -106,9 +95,9 @@ export async function evaluateConversation(
     // Format conversation for judge
     const formattedConversation = formatConversationForJudge(conversation);
 
-    // Create judge prompt
+    // Create judge prompt using reference field
     const judgePrompt = JUDGE_PROMPT_TEMPLATE
-        .replace('{{requirements}}', testCase.requirements)
+        .replace('{{reference}}', testCase.reference || '')
         .replace('{{conversation}}', formattedConversation);
 
     // Call judge LLM

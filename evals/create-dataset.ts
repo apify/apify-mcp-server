@@ -14,7 +14,7 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { sanitizeHeaderValue, validateEnvVars } from './config.js';
+import { sanitizeHeaderValue, validatePhoenixEnvVars } from './config.js';
 import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation-utils.js';
 
 // Set log level to debug
@@ -81,7 +81,7 @@ async function createDatasetFromTestCases(
     log.info('Creating Phoenix dataset from test cases...');
 
     // Validate environment variables
-    if (!validateEnvVars()) {
+    if (!validatePhoenixEnvVars()) {
         process.exit(1);
     }
 
