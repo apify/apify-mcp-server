@@ -52,6 +52,7 @@ export const DEFAULT_TOOL_TIMEOUT_SECONDS = 60;
 
 /**
  * Judge prompt template for evaluating conversations
+ * Uses structured output (JSON schema) - no format instructions needed
  *
  * Variables:
  * - {{reference}}: The requirements the agent should meet
@@ -79,9 +80,4 @@ Important notes:
 - Tool results are not shown (only tool calls and agent responses)
 - Minor inefficiencies are acceptable if the task was completed
 
-Respond with EXACTLY this format:
-
-VERDICT: [PASS or FAIL]
-REASON: [Brief explanation in 1-2 sentences explaining why the agent passed or failed]
-
-Do not include any other text before or after this format.`;
+Provide your evaluation with a verdict (PASS or FAIL) and a brief explanation (1-2 sentences).`;

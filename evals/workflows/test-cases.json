@@ -26,6 +26,12 @@
       "category": "social",
       "query": "Find me 10 recent Instagram posts with the hashtag #travel and present the results with their URLs.",
       "reference": "The agent must search Instagram for recent posts with the hashtag #travel and return at least 10 post URLs."
+    },
+    {
+      "id": "call-actor-mcp-weather",
+      "category": "mcp",
+      "query": "Find a weather mcp Actor and use it through the call-actor tool to show me the current weather in Prague",
+      "reference": "The agent must find a weather-related Actor on the MCP server and use the call-actor tool to get and return the current weather in Prague and present the results."
     }
   ]
 }

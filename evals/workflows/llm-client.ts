@@ -6,6 +6,8 @@
 import OpenAI from 'openai';
 // eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
+// eslint-disable-next-line import/extensions
+import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import { OPENROUTER_CONFIG } from './config.js';
 
@@ -43,17 +45,20 @@ export class LlmClient {
     /**
      * Call LLM with messages and optional tools
      * Phase 3: Added tools parameter
+     * Phase 4: Added responseFormat for structured outputs
      */
     async callLlm(
         messages: ChatCompletionMessageParam[],
         model: string,
         tools?: ChatCompletionTool[],
+        responseFormat?: ResponseFormatJSONSchema,
     ): Promise<LlmResponse> {
         const response = await this.openai.chat.completions.create({
             model,
             messages,
             temperature: 0.7,
             ...(tools && tools.length > 0 ? { tools } : {}),
+            ...(responseFormat ? { response_format: responseFormat } : {}),
         });
 
         const message = response.choices[0]?.message;

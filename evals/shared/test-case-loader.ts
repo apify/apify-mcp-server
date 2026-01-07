@@ -75,11 +75,11 @@ export function filterTestCases<T extends BaseTestCase>(
     let filtered = testCases;
 
     if (options.id) {
-        filtered = filtered.filter((tc) => tc.id === options.id);
+        filtered = filterById(filtered, options.id);
     }
 
     if (options.category) {
-        filtered = filtered.filter((tc) => tc.category === options.category);
+        filtered = filterByCategory(filtered, options.category);
     }
 
     return filtered;

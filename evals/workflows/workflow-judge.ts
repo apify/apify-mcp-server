@@ -1,6 +1,10 @@
 /**
  * LLM Judge for evaluating conversation quality
+ * Uses structured output (JSON schema) for robust parsing
  */
+
+// eslint-disable-next-line import/extensions
+import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import type { WorkflowTestCase } from '../shared/types.js';
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
@@ -18,6 +22,34 @@ export type JudgeResult = {
     /** Raw response from judge (for debugging) */
     rawResponse: string;
 }
+
+/**
+ * JSON schema for structured judge output
+ * Guarantees the LLM returns valid JSON matching this schema
+ */
+const JUDGE_RESPONSE_SCHEMA: ResponseFormatJSONSchema = {
+    type: 'json_schema',
+    json_schema: {
+        name: 'judge_evaluation',
+        strict: true,
+        schema: {
+            type: 'object',
+            properties: {
+                verdict: {
+                    type: 'string',
+                    enum: ['PASS', 'FAIL'],
+                    description: 'Whether the agent passed or failed the evaluation',
+                },
+                reason: {
+                    type: 'string',
+                    description: 'Brief explanation in 1-2 sentences explaining why the agent passed or failed',
+                },
+            },
+            required: ['verdict', 'reason'],
+            additionalProperties: false,
+        },
+    },
+};
 
 /**
  * Format conversation for judge evaluation
@@ -51,36 +83,28 @@ function formatConversationForJudge(conversation: ConversationHistory): string {
 }
 
 /**
- * Parse judge response to extract verdict and reason
+ * Parse structured JSON response from judge
  */
 function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reason: string } {
-    const lines = response.trim().split('\n');
+    try {
+        const parsed = JSON.parse(response) as { verdict: 'PASS' | 'FAIL'; reason: string };
 
-    let verdict: 'PASS' | 'FAIL' | null = null;
-    let reason = '';
-
-    for (const line of lines) {
-        const trimmedLine = line.trim();
-
-        if (trimmedLine.startsWith('VERDICT:')) {
-            const verdictText = trimmedLine.replace('VERDICT:', '').trim().toUpperCase();
-            if (verdictText === 'PASS' || verdictText === 'FAIL') {
-                verdict = verdictText;
-            }
-        } else if (trimmedLine.startsWith('REASON:')) {
-            reason = trimmedLine.replace('REASON:', '').trim();
+        // Validate the structure (should be guaranteed by schema, but double-check)
+        if (!parsed.verdict || (parsed.verdict !== 'PASS' && parsed.verdict !== 'FAIL')) {
+            throw new Error(`Invalid verdict: ${parsed.verdict}`);
         }
-    }
 
-    if (!verdict) {
-        throw new Error(`Failed to parse judge verdict from response: ${response}`);
-    }
+        if (!parsed.reason || typeof parsed.reason !== 'string') {
+            throw new Error(`Invalid reason: ${parsed.reason}`);
+        }
 
-    if (!reason) {
-        throw new Error(`Failed to parse judge reason from response: ${response}`);
+        return parsed;
+    } catch (error) {
+        throw new Error(
+            `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n`
+            + `Raw response: ${response}`,
+        );
     }
-
-    return { verdict, reason };
 }
 
 /**
@@ -100,10 +124,12 @@ export async function evaluateConversation(
         .replace('{{reference}}', testCase.reference || '')
         .replace('{{conversation}}', formattedConversation);
 
-    // Call judge LLM
+    // Call judge LLM with structured output schema
     const response = await llmClient.callLlm(
         [{ role: 'user', content: judgePrompt }],
         judgeModel,
+        undefined, // No tools
+        JUDGE_RESPONSE_SCHEMA, // Use structured output
     );
 
     const rawResponse = response.content || '';
