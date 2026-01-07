@@ -72,6 +72,7 @@
     "eslint": "^9.19.0",
     "eventsource": "^3.0.2",
     "openai": "^6.10.0",
+    "p-limit": "^6.1.0",
     "tsx": "^4.20.6",
     "typescript": "^5.3.3",
     "typescript-eslint": "^8.23.0",
@@ -93,7 +94,8 @@
     "test:integration": "npm run build && vitest run tests/integration",
     "clean": "tsc -b src --clean",
     "evals:create-dataset": "tsx evals/create-dataset.ts",
-    "evals:run": "tsx evals/run-evaluation.ts"
+    "evals:run": "tsx evals/run-evaluation.ts",
+    "evals:workflow": "tsx evals/workflows/run-workflow-evals.ts"
   },
   "author": "Apify",
   "license": "MIT"
