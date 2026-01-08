@@ -413,6 +413,23 @@ export type StructuredActorCard = {
 }
 
 /**
+ * Options for controlling which sections to include in an Actor card.
+ * All options default to true for backwards compatibility.
+ */
+export type ActorCardOptions = {
+    /** Include description text only */
+    includeDescription?: boolean;
+    /** Include usage statistics (users, runs, success rate, bookmarks) */
+    includeStats?: boolean;
+    /** Include pricing information */
+    includePricing?: boolean;
+    /** Include rating */
+    includeRating?: boolean;
+    /** Include metadata (developer, categories, last modified date, deprecation warning) */
+    includeMetadata?: boolean;
+}
+
+/**
  * MCP request parameters with Apify-specific extensions.
  * Extends the standard MCP params object with Apify custom fields in the _meta object.
  */

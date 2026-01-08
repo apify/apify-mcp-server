@@ -953,6 +953,212 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
+        it('should support granular output controls for rating and metadata', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // Test 1: Only pricing (should include pricing, NOT other sections)
+            const pricingOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['pricing'],
+                },
+            });
+
+            const pricingContent = pricingOnlyResult.content as { text: string }[];
+            const pricingText = pricingContent.map((item) => item.text).join('\n');
+            // Should include actor card header and pricing
+            expect(pricingText).toContain('Actor information');
+            expect(pricingText).toContain('Pricing');
+            // Should NOT include other sections
+            expect(pricingText).not.toContain('Description:');
+            expect(pricingText).not.toContain('Stats:');
+            expect(pricingText).not.toContain('Rating:');
+            expect(pricingText).not.toContain('Developed by:');
+            expect(pricingText).not.toContain('Categories:');
+            expect(pricingText).not.toContain('Last modified:');
+            expect(pricingText).not.toContain('README');
+
+            // Test 2: Only rating (should include rating for apify/rag-web-browser which has rating in stats)
+            const ragWebBrowser = 'apify/rag-web-browser';
+            const ratingOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ragWebBrowser,
+                    output: ['rating'],
+                },
+            });
+
+            const ratingContent = ratingOnlyResult.content as { text: string }[];
+            const ratingText = ratingContent.map((item) => item.text).join('\n');
+            // Should include actor card header and rating
+            expect(ratingText).toContain('Actor information');
+            expect(ratingText).toContain('Rating:');
+            // Should NOT include other sections
+            expect(ratingText).not.toContain('Description:');
+            expect(ratingText).not.toContain('Stats:');
+            expect(ratingText).not.toContain('Pricing');
+            expect(ratingText).not.toContain('Developed by:');
+            expect(ratingText).not.toContain('Categories:');
+            expect(ratingText).not.toContain('Last modified:');
+            expect(ratingText).not.toContain('README');
+
+            // Test 3: Only metadata (should include developer, categories, last modified, deprecation status)
+            const metadataOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: ['metadata'],
+                },
+            });
+
+            const metadataContent = metadataOnlyResult.content as { text: string }[];
+            const metadataText = metadataContent.map((item) => item.text).join('\n');
+            // Should include developer, categories, and last modified date
+            expect(metadataText).toContain('Developed by:');
+            expect(metadataText).toContain('Categories:');
+            expect(metadataText).toContain('Last modified:');
+            // Should NOT include other sections
+            expect(metadataText).not.toContain('Description:');
+            expect(metadataText).not.toContain('Stats:');
+            expect(metadataText).not.toContain('Pricing');
+            expect(metadataText).not.toContain('Rating:');
+            expect(metadataText).not.toContain('README');
+
+            // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
+            const combinationResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ragWebBrowser,
+                    output: ['pricing', 'rating', 'metadata'],
+                },
+            });
+
+            const combinationContent = combinationResult.content as { text: string }[];
+            const combinationText = combinationContent.map((item) => item.text).join('\n');
+            // Should include: pricing, rating, metadata (developer, categories, last modified)
+            expect(combinationText).toContain('Pricing');
+            expect(combinationText).toContain('Rating:');
+            expect(combinationText).toContain('Developed by:');
+            expect(combinationText).toContain('Categories:');
+            expect(combinationText).toContain('Last modified:');
+            // Should NOT include: description, stats, readme, input-schema
+            expect(combinationText).not.toContain('Description:');
+            expect(combinationText).not.toContain('Stats:');
+            expect(combinationText).not.toContain('README');
+            expect(combinationText).not.toContain('Input schema');
+
+            // Validate structured output for all test cases
+            validateStructuredOutput(pricingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(ratingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(metadataOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(combinationResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should dynamically test all output options and verify section presence/absence', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // Use apify/rag-web-browser which has all sections (description, stats, pricing, rating, metadata)
+            const testActor = 'apify/rag-web-browser';
+
+            // Define all output options with their expected markers in text
+            const outputOptions = [
+                {
+                    name: 'description',
+                    markers: ['Description:'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'stats',
+                    markers: ['Stats:', 'total users', 'monthly users'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'pricing',
+                    markers: ['Pricing'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'rating',
+                    markers: ['Rating:', 'out of 5'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Pricing', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'metadata',
+                    markers: ['Developed by:', 'Categories:', 'Last modified:'],
+                    notMarkers: ['Description:', 'Stats:', 'Pricing', 'Rating:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'input-schema',
+                    markers: ['Input schema', '```json'],
+                    notMarkers: ['Developed by:', 'Description:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README'],
+                },
+                {
+                    name: 'readme',
+                    markers: ['README'],
+                    notMarkers: ['Input schema'],
+                },
+            ] as const;
+
+            // Test each output option individually
+            for (const option of outputOptions) {
+                const result = await client.callTool({
+                    name: HelperTools.ACTOR_GET_DETAILS,
+                    arguments: {
+                        actor: testActor,
+                        output: [option.name],
+                    },
+                });
+
+                const content = result.content as { text: string }[];
+                const text = content.map((item) => item.text).join('\n');
+
+                // Verify expected markers are present
+                for (const marker of option.markers) {
+                    expect(text, `output=${option.name} should contain "${marker}"`).toContain(marker);
+                }
+
+                // Verify unwanted markers are absent
+                for (const notMarker of option.notMarkers) {
+                    expect(text, `output=${option.name} should NOT contain "${notMarker}"`).not.toContain(notMarker);
+                }
+
+                // Validate structured output
+                validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            }
+
+            // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
+            const allCardSectionsResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: testActor,
+                    output: ['description', 'stats', 'pricing', 'rating', 'metadata'],
+                },
+            });
+
+            const allCardContent = allCardSectionsResult.content as { text: string }[];
+            const allCardText = allCardContent.map((item) => item.text).join('\n');
+
+            // Should include all actor card sections
+            expect(allCardText).toContain('Description:');
+            expect(allCardText).toContain('Stats:');
+            expect(allCardText).toContain('Pricing');
+            expect(allCardText).toContain('Rating:');
+            expect(allCardText).toContain('Developed by:');
+            expect(allCardText).toContain('Categories:');
+            expect(allCardText).toContain('Last modified:');
+
+            // Should NOT include readme or input-schema
+            expect(allCardText).not.toContain('README');
+            expect(allCardText).not.toContain('Input schema');
+
+            validateStructuredOutput(allCardSectionsResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
         it('should return structured output for search-actors matching outputSchema', async () => {
             client = await createClientFn({
                 tools: ['actors'],
