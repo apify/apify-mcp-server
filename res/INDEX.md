@@ -12,6 +12,24 @@ Technical analysis of Algolia search API responses for each documentation source
 - Recommendations for response processing logic
 - **Use case**: Understand what data is actually returned by Algolia to inform simplification decisions
 
+### [MCP_SERVER_REFACTOR_ANALYSIS.md](./MCP_SERVER_REFACTOR_ANALYSIS.md)
+Implementation plan for migrating from low-level `Server` to high-level `McpServer` API.
+
+**Structure:**
+1. **Executive Summary** - High-level overview for stakeholders
+2. **Executive Implementation Plan** - Technical summary for developers
+3. **Detailed Implementation Guide** - Step-by-step guide for coding agents
+
+**Key approach:** Callback-per-tool architecture where each tool's callback encapsulates its execution logic.
+
+**Estimated effort:** 8-13 developer days
+
+- Feature preservation matrix
+- Code examples (before/after)
+- Migration steps with specific file changes
+- Testing strategy
+- **Use case**: Reference for implementing the MCP SDK migration
+
 ---
 
 ## Purpose
