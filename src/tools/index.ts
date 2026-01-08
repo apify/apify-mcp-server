@@ -1,88 +1,32 @@
-// Import specific tools that are being used
+import { HelperTools } from '../const.js';
 import type { ToolCategory } from '../types.js';
-import { getExpectedToolsByCategories } from '../utils/tools.js';
-import { callActor, callActorGetDataset, getActorsAsTools } from './actor.js';
-import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
-import { getUserDatasetsList } from './dataset_collection.js';
-import { fetchActorDetailsTool } from './fetch-actor-details.js';
-import { fetchApifyDocsTool } from './fetch-apify-docs.js';
-import { getActorOutput } from './get-actor-output.js';
-import { getHtmlSkeleton } from './get-html-skeleton.js';
-import { addTool } from './helpers.js';
-import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './key_value_store.js';
-import { getUserKeyValueStoresList } from './key_value_store_collection.js';
-import { getActorRun, getActorRunLog } from './run.js';
-import { getUserRunsList } from './run_collection.js';
-import { searchApifyDocsTool } from './search-apify-docs.js';
-import { searchActors } from './store_collection.js';
+import { getExpectedToolsByCategories } from '../utils/tool-categories-helpers.js';
+import { callActorGetDataset, getActorsAsTools } from './actor.js';
+import { toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
 
-/* list of tools that can be used without authentication */
+// Use string constants instead of importing tool objects to avoid circular dependency
 export const unauthEnabledTools: string[] = [
-    // docs
-    searchApifyDocsTool.name,
-    fetchApifyDocsTool.name,
+    HelperTools.DOCS_SEARCH,
+    HelperTools.DOCS_FETCH,
 ];
 
-export const toolCategories = {
-    experimental: [
-        addTool,
-    ],
-    actors: [
-        fetchActorDetailsTool,
-        searchActors,
-        callActor,
-    ],
-    docs: [
-        searchApifyDocsTool,
-        fetchApifyDocsTool,
-    ],
-    runs: [
-        getActorRun,
-        getUserRunsList,
-        getActorRunLog,
-    ],
-    storage: [
-        getDataset,
-        getDatasetItems,
-        getDatasetSchema,
-        getActorOutput,
-        getKeyValueStore,
-        getKeyValueStoreKeys,
-        getKeyValueStoreRecord,
-        getUserDatasetsList,
-        getUserKeyValueStoresList,
-    ],
-    dev: [
-        getHtmlSkeleton,
-    ],
-};
+// Re-export from categories.ts
+// This is actually needed to avoid circular dependency issues
+export { toolCategories, toolCategoriesEnabledByDefault };
 
-export const toolCategoriesEnabledByDefault: ToolCategory[] = [
-    'actors',
-    'docs',
-];
+// Computed here (not in helper file) to avoid module initialization issues
+export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
 
 /**
- * Builds the list of tool categories that are enabled for unauthenticated users.
- * A category is included if all tools in it are in the unauthEnabledTools list.
+ * Returns the list of tool categories that are enabled for unauthenticated users.
+ * A category is included only if all tools in it are in the unauthEnabledTools list.
  */
-function buildUnauthEnabledToolCategories(): ToolCategory[] {
+export function getUnauthEnabledToolCategories(): ToolCategory[] {
     const unauthEnabledToolsSet = new Set(unauthEnabledTools);
-
     return (Object.entries(toolCategories) as [ToolCategory, typeof toolCategories[ToolCategory]][])
-        .filter(([, tools]) => {
-            // Include category only if all tools are in the unauthEnabledTools list
-            return tools.every((tool) => unauthEnabledToolsSet.has(tool.name));
-        })
+        .filter(([, tools]) => tools.every((tool) => unauthEnabledToolsSet.has(tool.name)))
         .map(([category]) => category);
 }
 
-export const unauthEnabledToolCategories = buildUnauthEnabledToolCategories();
-
-export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
-
-// Export only the tools that are being used
-export {
-    getActorsAsTools,
-    callActorGetDataset,
-};
+// Export actor-related tools
+export { callActorGetDataset, getActorsAsTools };

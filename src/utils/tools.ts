@@ -1,5 +1,4 @@
-import { toolCategories } from '../tools/index.js';
-import type { HelperTool, ToolBase, ToolCategory, ToolEntry } from '../types.js';
+import type { HelperTool, ToolBase, ToolEntry } from '../types.js';
 
 /**
  * Returns a public version of the tool containing only fields that should be exposed publicly.
@@ -16,21 +15,6 @@ export function getToolPublicFieldOnly(tool: ToolBase) {
         icons: tool.icons,
         execution: tool.execution,
     };
-}
-
-/**
- * Returns the tool objects for the given category names using toolCategories.
- */
-export function getExpectedToolsByCategories(categories: ToolCategory[]): ToolEntry[] {
-    return categories
-        .flatMap((category) => toolCategories[category] || []);
-}
-
-/**
- * Returns the tool names for the given category names using getExpectedToolsByCategories.
- */
-export function getExpectedToolNamesByCategories(categories: ToolCategory[]): string[] {
-    return getExpectedToolsByCategories(categories).map((tool) => tool.name);
 }
 
 /**

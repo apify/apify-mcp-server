@@ -128,10 +128,12 @@ export class McpClient {
                 },
             );
 
+            // Populate error field when isError is true so LLM receives the error message
             return {
                 toolName: toolCall.name,
                 success: !response.isError,
-                result: response.content,
+                result: response.isError ? undefined : response.content,
+                error: response.isError ? JSON.stringify(response.content) : undefined,
             };
         } catch (error) {
             // Return raw error message from SDK without modification
@@ -145,18 +147,47 @@ export class McpClient {
 
     /**
      * Cleanup and shutdown the MCP client
+     * Uses a timeout to prevent indefinite waiting during cleanup
      */
-    async cleanup(): Promise<void> {
-        if (this.client) {
-            await this.client.close();
-            this.client = null;
-        }
+    async cleanup(cleanupTimeoutMs = 2000): Promise<void> {
+        // Create timeout promise
+        const timeoutPromise = new Promise<void>((resolve) => {
+            setTimeout(() => resolve(), cleanupTimeoutMs);
+        });
 
+        // Attempt graceful cleanup with timeout
+        const cleanupPromise = (async () => {
+            if (this.client) {
+                await this.client.close();
+            }
+
+            if (this.transport) {
+                await this.transport.close();
+            }
+        })();
+
+        // Race between cleanup and timeout
+        await Promise.race([cleanupPromise, timeoutPromise]);
+
+        // Force kill transport process if it's still running
         if (this.transport) {
-            await this.transport.close();
-            this.transport = null;
+            try {
+                // Access the underlying child process and force kill it
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const transportAny = this.transport as any;
+                // eslint-disable-next-line no-underscore-dangle
+                if (transportAny._process && transportAny._process.kill) {
+                    // eslint-disable-next-line no-underscore-dangle
+                    transportAny._process.kill('SIGKILL');
+                }
+            } catch {
+                // Ignore errors during force kill
+            }
         }
 
+        // Always reset state regardless of cleanup success
+        this.client = null;
+        this.transport = null;
         this.tools = [];
         this.instructions = null;
     }

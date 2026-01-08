@@ -118,6 +118,21 @@ export function formatDetailedResult(result: EvaluationResult): string {
             }
         }
 
+        // Print tool results in verbose mode
+        if (turn.toolResults.length > 0) {
+            for (const tr of turn.toolResults) {
+                const status = tr.success ? '✅' : '❌';
+                lines.push(`    ${status} Result for ${tr.toolName}:`);
+                if (tr.error) {
+                    lines.push(`       Error: ${tr.error}`);
+                } else if (tr.result) {
+                    const resultStr = JSON.stringify(tr.result, null, 2);
+                    const resultPreview = resultStr.slice(0, 500);
+                    lines.push(`       ${resultPreview}${resultStr.length > 500 ? '...' : ''}`);
+                }
+            }
+        }
+
         if (turn.finalResponse) {
             const preview = turn.finalResponse.slice(0, 150);
             lines.push(`    💬 ${preview}${turn.finalResponse.length > 150 ? '...' : ''}`);

@@ -272,6 +272,42 @@
       "category": "call",
       "query": "Search for Amazon laptop products and return only the product titles and prices using field filtering",
       "reference": "The agent must search for Amazon scraper, execute it with a laptop search query, then use get-actor-output with field filtering (using dot notation like 'title' and 'price') to return only the requested fields from the dataset."
+    },
+    {
+      "id": "fetch-details-minimal-output-input-schema-only",
+      "category": "fetch",
+      "query": "Get only the input schema for apify/python-example Actor",
+      "reference": "The agent must use fetch-actor-details with output=['input-schema'] to retrieve only the input schema, demonstrating token optimization. The response should contain the schema but not the README or full actor card."
+    },
+    {
+      "id": "fetch-details-mcp-tools-list",
+      "category": "mcp",
+      "query": "Show me what tools are available in the apify/actors-mcp-server MCP server",
+      "reference": "The agent must use fetch-actor-details with output=['mcp-tools'] to list available tools. The response should present the list of tools with their names and descriptions."
+    },
+    {
+      "id": "fetch-details-mcp-tools-then-call",
+      "category": "mcp",
+      "query": "List tools from apify/actors-mcp-server and then call the fetch-apify-docs tool to get docs from https://docs.apify.com",
+      "reference": "The agent must first use fetch-actor-details with output=['mcp-tools'] to discover tools, then use call-actor with actor='apify/actors-mcp-server:fetch-apify-docs' and proper input to call the specific tool."
+    },
+    {
+      "id": "fetch-details-non-mcp-actor-graceful",
+      "category": "fetch",
+      "query": "Show me MCP tools for apify/instagram-scraper",
+      "reference": "The agent must use fetch-actor-details with output=['mcp-tools'] for a regular (non-MCP) Actor. The response should gracefully indicate that this Actor is not an MCP server, not throw an error."
+    },
+    {
+      "id": "workflow-search-fetch-schema-call",
+      "category": "call",
+      "query": "Find a TikTok scraper, check what input it needs, and run it to get 5 videos from user @example",
+      "reference": "The agent must: 1) use search-actors to find TikTok scraper, 2) use fetch-actor-details with output=['input-schema'] to get required input, 3) use call-actor with proper input. This tests the complete new workflow pattern."
+    },
+    {
+      "id": "workflow-mcp-discover-and-execute",
+      "category": "mcp",
+      "query": "Find what an MCP weather Actor can do and use it to get weather for London",
+      "reference": "The agent must: 1) search for weather MCP Actor, 2) use fetch-actor-details with output=['mcp-tools'] to list tools, 3) use call-actor with actor:tool format to execute. Tests full MCP server discovery and execution workflow."
     }
   ]
 }

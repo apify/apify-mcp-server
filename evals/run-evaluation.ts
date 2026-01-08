@@ -99,34 +99,16 @@ const toolsExactMatch = asEvaluator({
             };
         }
 
-        // Normalize tool names: treat call-actor with step="info" as equivalent to fetch-actor-details
+        // No special normalization needed - tools are independent
         const normalizeToolName = (toolName: string): string => {
-            // Normalize call-actor to fetch-actor-details (bidirectional equivalence)
-            if (toolName === 'call-actor' || toolName === 'fetch-actor-details') {
-                return 'fetch-actor-details';
-            }
             return toolName;
         };
 
         const normalizeToolCall = (toolCall: any): string => {
-            const toolName = toolCall.function?.name || '';
-
-            // If it's call-actor with step="info", treat it as fetch-actor-details
-            if (toolName === 'call-actor') {
-                try {
-                    const args = JSON.parse(toolCall.function?.arguments || '{}');
-                    if (args.step === 'info') {
-                        return 'fetch-actor-details';
-                    }
-                } catch (e) {
-                    // If we can't parse arguments, just return the tool name
-                }
-            }
-
-            return toolName;
+            return toolCall.function?.name || '';
         };
 
-        // Normalize expected tools (both call-actor and fetch-actor-details → fetch-actor-details)
+        // Normalize expected tools
         const normalizedExpectedTools = [...expectedTools]
             .map(normalizeToolName)
             .sort();

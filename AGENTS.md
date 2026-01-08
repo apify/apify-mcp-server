@@ -52,6 +52,18 @@ MANDATORY: Always check for TypeScript compilation errors before running tests o
 - Run `npm run build` to compile TypeScript files and check for errors
 - Fix all compilation errors before running tests or committing changes
 
+### Quick validation workflow
+
+**When to use `type-check` only:**
+- When you just want to verify TypeScript compilation without updating `dist/`
+- For quick validation during development iterations
+- When reviewing code changes before committing
+- Faster than `build` since it skips JavaScript output generation
+
+**When to use `build`:**
+- Before running integration tests (they require compiled JavaScript in `dist/`)
+- When you need the compiled output for testing or deployment
+
 ## Testing
 
 ### Running tests

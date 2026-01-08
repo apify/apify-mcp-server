@@ -215,8 +215,9 @@ These tools are called **Actors**. They enable you to extract structured data fr
 
 ### Tool dependencies
 - \`${HelperTools.ACTOR_CALL}\`:
-  - First call with \`step="info"\` or use \`${HelperTools.ACTOR_GET_DETAILS}\` to obtain the Actor’s schema.
-  - Then call with \`step="call"\` to execute the Actor.
+  - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema
+  - Then call with proper input to execute the Actor
+  - For MCP server Actors, use format "actorName:toolName" to call specific tools
 
 ### Tool disambiguation
 - **${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}:**

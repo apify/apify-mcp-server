@@ -120,6 +120,7 @@ export const actorInfoSchema = {
 
 /**
  * Schema for Actor details output (fetch-actor-details tool)
+ * All fields are optional since the tool supports selective output via the 'output' parameter
  */
 export const actorDetailsOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
@@ -128,7 +129,6 @@ export const actorDetailsOutputSchema = {
         readme: { type: 'string', description: 'Actor README documentation.' },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
     },
-    required: ['actorInfo', 'readme', 'inputSchema'],
 };
 
 /**

@@ -143,7 +143,7 @@ Returns list of Actor cards with the following info:
             apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
         );
         actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-        const actorCards = actors.length === 0 ? [] : actors.map(formatActorToActorCard);
+        const actorCards = actors.length === 0 ? [] : actors.map((actor) => formatActorToActorCard(actor));
 
         if (actorCards.length === 0) {
             const instructions = `No Actors were found for the search query "${parsed.keywords}".
@@ -161,7 +161,7 @@ You can also try using more specific or alternative keywords related to your sea
         const actorsText = actorCards.join('\n\n');
 
         // Generate structured cards for the actors
-        const structuredActorCards = actors.map(formatActorToStructuredCard);
+        const structuredActorCards = actors.map((actor) => formatActorToStructuredCard(actor));
 
         const instructions = `
  # Search results:

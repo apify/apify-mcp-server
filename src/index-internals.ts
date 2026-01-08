@@ -6,12 +6,13 @@ import { ApifyClient } from './apify-client.js';
 import { defaults, HelperTools } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { addTool } from './tools/helpers.js';
-import { defaultTools, getActorsAsTools, toolCategories,
-    toolCategoriesEnabledByDefault, unauthEnabledToolCategories, unauthEnabledTools } from './tools/index.js';
+import { defaultTools, getActorsAsTools, getUnauthEnabledToolCategories, toolCategories,
+    toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ToolCategory } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList } from './utils/generic.js';
-import { getExpectedToolNamesByCategories, getToolPublicFieldOnly } from './utils/tools.js';
+import { getExpectedToolNamesByCategories } from './utils/tool-categories-helpers.js';
+import { getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl-lru.js';
 
 export {
@@ -29,7 +30,7 @@ export {
     processParamsGetTools,
     getActorsAsTools,
     getToolPublicFieldOnly,
-    unauthEnabledToolCategories,
+    getUnauthEnabledToolCategories,
     unauthEnabledTools,
     parseCommaSeparatedList,
     parseQueryParamList,
