@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.8) (2026-01-08)
+
+### 🚀 Features
+
+- **evals:** Add llm driven workflow evals with llm as a judge ([#383](https://github.com/apify/apify-mcp-server/pull/383)) ([4270b02](https://github.com/apify/apify-mcp-server/commit/4270b02ef49946ccaa9864370c67f25c86ed26ca)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Update @modelcontextprotocol&#x2F;sdk to version 1.25.1 in package.json and package-lock.json ([#384](https://github.com/apify/apify-mcp-server/pull/384)) ([d1f7dc7](https://github.com/apify/apify-mcp-server/commit/d1f7dc7a198f583b95e9094bb33d2af4064d2cc9)) by [@MQ37](https://github.com/MQ37)
+- Update @modelcontextprotocol&#x2F;sdk to version 1.25.2 in package.json and package-lock.json ([#385](https://github.com/apify/apify-mcp-server/pull/385)) ([31c3bdd](https://github.com/apify/apify-mcp-server/commit/31c3bdd936a115e9fe0a4e9a87cbcd0046076fbc)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.6.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.7) (2026-01-06)
 
 ### 🐛 Bug Fixes
