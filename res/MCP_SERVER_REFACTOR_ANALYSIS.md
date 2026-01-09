@@ -916,3 +916,52 @@ Create `src/mcp/tool-registration.ts`:
 - [ ] Tool change notifications work
 - [ ] Progress tracking works
 - [ ] Telemetry works
+
+---
+
+### 11. Alternative: FastMCP Framework
+
+**FastMCP** ([punkpeye/fastmcp](https://github.com/punkpeye/fastmcp)) is a third-party TypeScript framework built on top of the official MCP SDK that could potentially simplify this codebase further.
+
+#### What FastMCP Provides
+
+FastMCP is essentially an opinionated wrapper around the low-level `Server` class (the same one we currently use) that handles many implementation details automatically:
+
+- **Simple Tool API**: `server.addTool()` / `removeTool()` with automatic `tools/list_changed` notifications
+- **Built-in Schema Support**: Uses Standard Schema spec (Zod, ArkType, Valibot) — no JSON Schema conversion needed
+- **Session Management**: Built-in `FastMCPSession` class handles per-connection state
+- **Multi-Transport**: Stdio, HTTP streaming, and SSE support via `mcp-proxy` dependency
+- **Progress & Streaming**: `reportProgress()` and `streamContent()` available in tool context
+- **OAuth & Auth**: Built-in authentication and OAuth proxy support
+- **Health Endpoints**: Built-in `/health` and `/ready` endpoints for HTTP transports
+
+#### Potential Benefits for apify-mcp-server
+
+| Feature | Current Implementation | With FastMCP |
+|---------|----------------------|--------------|
+| Tool registration | Manual `Map<string, ToolEntry>` + handler dispatch | `server.addTool()` with callbacks |
+| Dynamic tool changes | Manual `sendToolListChanged()` | Automatic on `addTool()`/`removeTool()` |
+| Schema handling | AJV validation with JSON Schema | Native Zod via Standard Schema |
+| HTTP transport | Custom implementation | Built-in via `mcp-proxy` |
+| Progress notifications | Custom `ProgressTracker` | Built-in `reportProgress()` context |
+
+#### Concerns and Considerations
+
+1. **External Dependency**: Adds another abstraction layer and dependency (`fastmcp` + `mcp-proxy`)
+2. **Less Control**: FastMCP is opinionated — custom behaviors like Actor-MCP proxy forwarding may need workarounds
+3. **Maintenance Risk**: Depends on third-party maintenance vs. official SDK
+4. **Actor-MCP Proxy**: Our proxy tool pattern (forwarding to external MCP servers) may require custom implementation
+5. **Hosted Server Integration**: `apify-mcp-server-internal` coordination may be more complex
+
+#### Recommendation
+
+FastMCP could simplify the codebase, but a **detailed analysis is needed** to verify:
+- Whether Actor-MCP proxy tools can be implemented cleanly
+- Compatibility with our telemetry and hosted server requirements
+- Migration effort compared to the McpServer high-level API approach
+
+**Next Steps** (if pursuing FastMCP):
+1. Create a proof-of-concept branch migrating internal tools to FastMCP
+2. Evaluate Actor-MCP proxy tool implementation feasibility
+3. Test integration with `apify-mcp-server-internal`
+4. Compare complexity/LOC reduction vs. McpServer migration

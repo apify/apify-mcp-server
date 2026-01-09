@@ -30,6 +30,26 @@ Implementation plan for migrating from low-level `Server` to high-level `McpServ
 - Testing strategy
 - **Use case**: Reference for implementing the MCP SDK migration
 
+### [PATTERNS_FOR_SIMPLIFICATION.md](./PATTERNS_FOR_SIMPLIFICATION.md)
+Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
+
+**Key patterns identified:**
+1. **Callback-Per-Tool Registration** - Eliminate central dispatcher (~250 LOC reduction)
+2. **Unified Tool Context** - Cleaner tool execution interface
+3. **Zod-First Validation** - Replace AJV with direct Zod validation
+4. **Automatic Notifications** - Self-managing tool list changes
+5. **Progress via Context** - Simplified progress reporting
+6. **Structured Error Handling** - Consistent UserError pattern
+7. **Type-Safe Registration** - Generic tool definitions
+8. **Session-Aware Operations** - Context-based session access
+
+**Estimated total effort:** 10-14 days for full implementation
+
+- Prioritized implementation phases
+- Before/after code examples
+- Benefits for each pattern
+- **Use case**: Reference for incremental codebase improvements
+
 ---
 
 ## Purpose
