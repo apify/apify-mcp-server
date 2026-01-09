@@ -44,9 +44,6 @@ export enum HelperTools {
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
     GET_HTML_SKELETON = 'get-html-skeleton',
-    CALL_ACTOR_WIDGET = 'call-actor-widget',
-    GET_ACTOR_RUN_STATUS = 'get-actor-run-status',
-    FETCH_ACTOR_DETAILS_WIDGET = 'fetch-actor-details-widget',
 }
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';
@@ -218,8 +215,11 @@ These tools are called **Actors**. They enable you to extract structured data fr
 
 ### Tool dependencies
 - \`${HelperTools.ACTOR_CALL}\`:
-  - First call with \`step="info"\` or use \`${HelperTools.ACTOR_GET_DETAILS}\` to obtain the Actor’s schema.
+  - First call with \`step="info"\` or use \`${HelperTools.ACTOR_GET_DETAILS}\` to obtain the Actor's schema.
   - Then call with \`step="call"\` to execute the Actor.
+  - When \`step="call"\`, supports async execution via the \`async\` parameter:
+    - When \`async: false\` or not provided (default when UI mode is disabled): Waits for completion and returns results immediately.
+    - When \`async: true\` (default when UI mode is enabled): Starts the run and returns immediately with runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and retrieve results.
 
 ### Tool disambiguation
 - **${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}:**
@@ -230,6 +230,6 @@ These tools are called **Actors**. They enable you to extract structured data fr
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs ${HelperTools.ACTOR_CALL}:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in Apify store.
-- **Async vs sync Actor tools (${HelperTools.ACTOR_CALL} vs ${HelperTools.CALL_ACTOR_WIDGET}):**
-  Default to \`${HelperTools.ACTOR_CALL}\` (synchronous, no widget) when the user asks to “run/call” and does not request background/progress/UI. Use \`${HelperTools.CALL_ACTOR_WIDGET}\` only when the user wants background/progress/UI. After starting an async run and obtaining runId, do NOT start another async run—only poll with \`${HelperTools.GET_ACTOR_RUN_STATUS}\` using that runId.
+- **Async parameter for ${HelperTools.ACTOR_CALL} (when step="call"):**
+  \`${HelperTools.ACTOR_CALL}\` supports async execution via the \`async\` boolean parameter when \`step="call"\`. When \`async: false\` or not provided, waits for completion and returns results (default when UI mode is disabled). When \`async: true\`, starts the run and returns immediately with runId (default when UI mode is enabled). Use \`async: true\` when the user wants background/progress/UI. After starting an async run and obtaining runId, do NOT start another run—only poll with \`${HelperTools.ACTOR_RUNS_GET}\` using that runId.
 `;

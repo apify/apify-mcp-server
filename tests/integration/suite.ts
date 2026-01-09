@@ -473,6 +473,72 @@ export function createIntegrationTestsSuite(
             expect(callResult.content).toBeDefined();
         });
 
+        it('should support sync mode in call-actor (default behavior)', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            // Step 1: Get info
+            await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'info',
+                },
+            });
+
+            // Step 2: Call with sync mode (explicit or default)
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
+                    input: { first_number: 1, second_number: 2 },
+                    async: false,
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+            // Sync mode should return dataset items directly
+            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+        });
+
+        it('should support async mode in call-actor and return runId', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            // Step 1: Get info
+            await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'info',
+                },
+            });
+
+            // Step 2: Call with async mode
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    step: 'call',
+                    input: { first_number: 1, second_number: 2 },
+                    async: true,
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+            // Async mode should return runId immediately
+            expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
+            expect(content.some((item) => item.text.includes(HelperTools.ACTOR_RUNS_GET))).toBe(true);
+
+            // Check for structured content with runId
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.runId).toBeDefined();
+            expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
+        });
+
         it('should find Actors in store search', async () => {
             const query = 'python-example';
             client = await createClientFn({
@@ -1419,6 +1485,14 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();
             expect(tools.tools.length).toBeGreaterThan(0);
+
+            // Verify that tools have OpenAI metadata when UI mode is enabled
+            const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
+            expect(searchActorsTool).toBeDefined();
+            expect(searchActorsTool?._meta).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/widgetAccessible']).toBe(true);
+
             await client.close();
         });
     });
