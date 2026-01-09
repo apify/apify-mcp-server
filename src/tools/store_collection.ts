@@ -132,12 +132,16 @@ Returns list of Actor cards with the following info:
         'openai/toolInvocation/invoked': 'Found actors matching your criteria',
         'openai/widgetAccessible': true,
         'openai/resultCanProduceWidget': true,
-        // TODO: replace with real CSP domains
+        'openai/widgetDomain': 'https://apify.com',
         'openai/widgetCSP': {
-            connect_domains: ['https://api.example.com'],
-            resource_domains: ['https://persistent.oaistatic.com'],
+            connect_domains: [
+                'https://api.apify.com',
+            ],
+            resource_domains: [
+                'https://mcp.apify.com',
+                'https://images.apifyusercontent.com',
+            ],
         },
-        'openai/widgetDomain': 'https://chatgpt.com',
     },
     annotations: {
         title: 'Search Actors',
@@ -215,12 +219,16 @@ View the interactive widget below for detailed Actor information.
                     'openai/widgetAccessible': true,
                     'openai/resultCanProduceWidget': true,
                     'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,
-                    // TODO: replace with real CSP domains
+                    'openai/widgetDomain': 'https://apify.com',
                     'openai/widgetCSP': {
-                        connect_domains: ['https://api.example.com'],
-                        resource_domains: ['https://persistent.oaistatic.com'],
+                        connect_domains: [
+                            'https://api.apify.com',
+                        ],
+                        resource_domains: [
+                            'https://mcp.apify.com',
+                            'https://images.apifyusercontent.com',
+                        ],
                     },
-                    'openai/widgetDomain': 'https://chatgpt.com',
                 },
             });
         }

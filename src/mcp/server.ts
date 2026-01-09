@@ -457,12 +457,16 @@ export class ActorsMcpServer {
                         'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
                         'openai/widgetAccessible': true,
                         'openai/resultCanProduceWidget': true,
-                        // TODO: replace with real CSP domains
+                        'openai/widgetDomain': 'https://apify.com',
                         'openai/widgetCSP': {
-                            connect_domains: ['https://api.example.com'],
-                            resource_domains: ['https://persistent.oaistatic.com'],
+                            connect_domains: [
+                                'https://api.apify.com',
+                            ],
+                            resource_domains: [
+                                'https://mcp.apify.com',
+                                'https://images.apifyusercontent.com',
+                            ],
                         },
-                        'openai/widgetDomain': 'https://chatgpt.com',
                     },
                 });
 
@@ -475,12 +479,16 @@ export class ActorsMcpServer {
                         'openai/outputTemplate': 'ui://widget/actor-run.html',
                         'openai/widgetAccessible': true,
                         'openai/resultCanProduceWidget': true,
-                        // TODO: replace with real CSP domains
+                        'openai/widgetDomain': 'https://apify.com',
                         'openai/widgetCSP': {
-                            connect_domains: ['https://api.example.com'],
-                            resource_domains: ['https://persistent.oaistatic.com'],
+                            connect_domains: [
+                                'https://api.apify.com',
+                            ],
+                            resource_domains: [
+                                'https://mcp.apify.com',
+                                'https://images.apifyusercontent.com',
+                            ],
                         },
-                        'openai/widgetDomain': 'https://chatgpt.com',
                     },
                 });
             }
@@ -558,12 +566,16 @@ export class ActorsMcpServer {
                                 'openai/outputTemplate': uri,
                                 'openai/widgetAccessible': true,
                                 'openai/resultCanProduceWidget': true,
-                                // TODO: replace with real CSP domains
+                                'openai/widgetDomain': 'https://apify.com',
                                 'openai/widgetCSP': {
-                                    connect_domains: ['https://api.example.com'],
-                                    resource_domains: ['https://persistent.oaistatic.com'],
+                                    connect_domains: [
+                                        'https://api.apify.com',
+                                    ],
+                                    resource_domains: [
+                                        'https://mcp.apify.com',
+                                        'https://images.apifyusercontent.com',
+                                    ],
                                 },
-                                'openai/widgetDomain': 'https://chatgpt.com',
                             },
                         }],
                     };

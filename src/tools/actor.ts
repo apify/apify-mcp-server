@@ -620,12 +620,16 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                         'openai/widgetAccessible': true,
                         'openai/resultCanProduceWidget': true,
                         'openai/widgetDescription': `Actor run progress for ${actorName}`,
-                        // TODO: replace with real CSP domains
+                        'openai/widgetDomain': 'https://apify.com',
                         'openai/widgetCSP': {
-                            connect_domains: ['https://api.example.com'],
-                            resource_domains: ['https://persistent.oaistatic.com'],
+                            connect_domains: [
+                                'https://api.apify.com',
+                            ],
+                            resource_domains: [
+                                'https://mcp.apify.com',
+                                'https://images.apifyusercontent.com',
+                            ],
                         },
-                        'openai/widgetDomain': 'https://chatgpt.com',
                     };
                 }
 
