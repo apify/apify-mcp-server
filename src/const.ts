@@ -44,9 +44,6 @@ export enum HelperTools {
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
     GET_HTML_SKELETON = 'get-html-skeleton',
-    CALL_ACTOR_WIDGET = 'call-actor-widget',
-    GET_ACTOR_RUN_STATUS = 'get-actor-run-status',
-    FETCH_ACTOR_DETAILS_WIDGET = 'fetch-actor-details-widget',
 }
 
 export const RAG_WEB_BROWSER = 'apify/rag-web-browser';

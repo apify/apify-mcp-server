@@ -384,7 +384,6 @@ There are two ways to run Actors:
 USAGE:
 - Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
-- PREFER this tool when user wants immediate results
 
 - This tool supports async execution via the \`async\` parameter:
   - **When \`async: false\` or not provided** (default when UI mode is disabled): Waits for completion and returns results immediately with dataset preview.
