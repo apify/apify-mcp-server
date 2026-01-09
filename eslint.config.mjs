@@ -27,6 +27,7 @@ export default [
             'evals/*.ts', // Top-level evaluation scripts
             'evals/*.md', // Documentation files
             'evals/*.json', // Test case data files
+            'src/web/**', // Web directory has its own TypeScript project and build system
         ],
     },
     // Apply the shared Apify TypeScript ESLint configuration
