@@ -336,14 +336,9 @@ const callActorArgs = z.object({
     actor: z.string()
         .describe(`The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
 
-For MCP server Actors (Actors that expose multiple tools), use the format "actorName:toolName" to call a specific tool.
-Example: "apify/actors-mcp-server:fetch-apify-docs" calls the fetch-apify-docs tool from the apify/actors-mcp-server Actor.
-
-Use the fetch-actor-details tool with output=['mcp-tools'] to list available tools for MCP server Actors.`),
+For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").`),
     input: z.object({}).passthrough()
-        .describe(`The input JSON to pass to the Actor. Required.
-
-IMPORTANT: Use fetch-actor-details tool with output=['input-schema'] first to understand the required input parameters.`),
+        .describe('The input JSON to pass to the Actor. Required.'),
     callOptions: z.object({
         memory: z.number()
             .min(128, 'Memory must be at least 128 MB')
@@ -364,11 +359,11 @@ export const callActor: ToolEntry = {
     description: `Call any Actor from the Apify Store.
 
 WORKFLOW:
-1. Use fetch-actor-details with output=['input-schema'] to get the Actor's input schema (recommended to save tokens)
+1. Use fetch-actor-details with output={ inputSchema: true } to get the Actor's input schema (recommended to save tokens)
 2. Call this tool with the actor name and proper input based on the schema
 
 For MCP server Actors:
-- Use fetch-actor-details with output=['mcp-tools'] to list available tools
+- Use fetch-actor-details with output={ mcpTools: true } to list available tools
 - Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")
 
 IMPORTANT:
@@ -450,15 +445,6 @@ EXAMPLES:
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
 
-            // Validate input parameter is provided
-            if (!input) {
-                // Missing input is most likely an LLM error, so NOT marking as a soft-fail to track potential issues with tool description
-                return buildMCPResponse({
-                    texts: [`Input is required. Please provide the input parameter based on the Actor's input schema. Use fetch-actor-details tool with output=['input-schema'] to get the Actor's input schema first.`],
-                    isError: true,
-                });
-            }
-
             // Handle the case where LLM does not respect instructions when calling MCP server Actors
             // and does not provide the tool name.
             const isMcpToolNameInvalid = mcpToolName === undefined || mcpToolName.trim().length === 0;
@@ -474,6 +460,14 @@ EXAMPLES:
                 if (!isActorMcpServer) {
                     return buildMCPResponse({
                         texts: [`Actor '${baseActorName}' is not an MCP server.`],
+                        isError: true,
+                    });
+                }
+
+                // Validate input for MCP tool calls
+                if (!input) {
+                    return buildMCPResponse({
+                        texts: [`Input is required for MCP tool '${mcpToolName}'. Please provide the input parameter based on the tool's input schema.`],
                         isError: true,
                     });
                 }
@@ -500,7 +494,7 @@ EXAMPLES:
                 }
             }
 
-            // Handle regular Actor calls
+            // Handle regular Actor calls - fetch actor early to provide schema in error messages
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {
@@ -509,6 +503,16 @@ Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
                 isError: true,
                 toolStatus: TOOL_STATUS.SOFT_FAIL });
+            }
+
+            // Validate input parameter is provided (now with schema available)
+            if (!input) {
+                const content = [
+                    `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
+                    `The input schema for this Actor was retrieved and is shown below:`,
+                    `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
+                ];
+                return buildMCPResponse({ texts: content, isError: true });
             }
 
             if (!actor.ajvValidate(input)) {

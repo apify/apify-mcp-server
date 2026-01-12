@@ -55,21 +55,28 @@ const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
-    output: z.array(z.enum(['description', 'stats', 'pricing', 'rating', 'metadata', 'input-schema', 'readme', 'mcp-tools']))
-        .min(1)
+    output: z.object({
+        description: z.boolean().default(true).describe('Include Actor description text only.'),
+        stats: z.boolean().default(true).describe('Include usage statistics (users, runs, success rate).'),
+        pricing: z.boolean().default(true).describe('Include pricing model and costs.'),
+        rating: z.boolean().default(true).describe('Include user rating (out of 5 stars).'),
+        metadata: z.boolean().default(true).describe('Include developer, categories, last modified date, and deprecation status.'),
+        inputSchema: z.boolean().default(true).describe('Include required input parameters schema.'),
+        readme: z.boolean().default(true).describe('Include full README documentation.'),
+        mcpTools: z.boolean().default(false).describe('List available tools (only for MCP server Actors).'),
+    })
         .optional()
-        .default(['description', 'stats', 'pricing', 'rating', 'metadata', 'readme', 'input-schema'])
-        .describe(`Specify which information to include in the response. Options:
-- 'description': Actor description text only
-- 'stats': Usage statistics (users, runs, success rate)
-- 'pricing': Pricing model and costs
-- 'rating': User rating (out of 5 stars)
-- 'metadata': Developer, categories, last modified date, and deprecation status
-- 'input-schema': Required input parameters schema
-- 'readme': Full README documentation
-- 'mcp-tools': List of available tools (only for MCP server Actors)
-
-Default: ['description', 'stats', 'pricing', 'rating', 'metadata', 'readme', 'input-schema']. Use specific options to save tokens.`),
+        .default({
+            description: true,
+            stats: true,
+            pricing: true,
+            rating: true,
+            metadata: true,
+            inputSchema: true,
+            readme: true,
+            mcpTools: false,
+        })
+        .describe('Specify which information to include in the response to save tokens.'),
 });
 
 export const fetchActorDetailsTool: ToolEntry = {
@@ -77,30 +84,17 @@ export const fetchActorDetailsTool: ToolEntry = {
     name: HelperTools.ACTOR_GET_DETAILS,
     description: `Get detailed information about an Actor by its ID or full name (format: "username/name", e.g., "apify/rag-web-browser").
 
-Use the 'output' parameter to control which information is returned:
-- Default: Returns all available info (description, stats, pricing, rating, metadata, README, and input schema)
-- Minimal: Use output=['input-schema'] for token-efficient schema retrieval
-- Description Only: Use output=['description'] to get just the Actor's description text
-- Pricing Only: Use output=['pricing'] to get only pricing information
-- Metadata: Use output=['metadata'] to get developer, categories, and dates
-- MCP Tools: Use output=['mcp-tools'] to list available tools for MCP server Actors
+Use 'output' parameter with boolean flags to control returned information:
+- Default: All fields true except mcpTools
+- Selective: Set desired fields to true (e.g., output: { inputSchema: true })
+- Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors
 
-USAGE:
-- Use when a user asks about an Actor's details, input schema, README, or how to use it
-- Use output=['description'] when user asks "what does this Actor do?"
-- Use output=['input-schema'] before calling an Actor to get required parameters
-- Use output=['pricing'] when user asks specifically about Actor costs
-- Use output=['rating'] when user asks about Actor quality or reviews
-- Use output=['metadata'] when user asks about developer or categories
-- Use output=['mcp-tools'] to discover tools exposed by MCP server Actors
+Use when querying Actor details, documentation, input requirements, or MCP tools.
 
-USAGE EXAMPLES:
-- user_input: What does apify/rag-web-browser do?
-- user_input: How to use apify/rag-web-browser
-- user_input: What is the input schema for apify/rag-web-browser?
-- user_input: What tools does apify/actors-mcp-server provide?
-- user_input: What is the pricing for apify/instagram-scraper?
-- user_input: Who developed apify/web-scraper?`,
+EXAMPLES:
+- What does apify/rag-web-browser do?
+- What is the input schema for apify/web-scraper?
+- What tools does apify/actors-mcp-server provide?`,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
@@ -117,11 +111,11 @@ USAGE EXAMPLES:
 
         // Build granular card options based on requested output
         const cardOptions: ActorCardOptions = {
-            includeDescription: parsed.output.includes('description'),
-            includeStats: parsed.output.includes('stats'),
-            includePricing: parsed.output.includes('pricing'),
-            includeRating: parsed.output.includes('rating'),
-            includeMetadata: parsed.output.includes('metadata'),
+            includeDescription: parsed.output.description,
+            includeStats: parsed.output.stats,
+            includePricing: parsed.output.pricing,
+            includeRating: parsed.output.rating,
+            includeMetadata: parsed.output.metadata,
         };
 
         const details = await fetchActorDetails(apifyClient, parsed.actor, cardOptions);
@@ -155,17 +149,17 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         }
 
         // Add README if requested
-        if (parsed.output.includes('readme')) {
+        if (parsed.output.readme) {
             texts.push(`${details.readme}`);
         }
 
         // Add input schema if requested
-        if (parsed.output.includes('input-schema')) {
+        if (parsed.output.inputSchema) {
             texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
         }
 
         // Handle MCP tools
-        if (parsed.output.includes('mcp-tools')) {
+        if (parsed.output.mcpTools) {
             const message = await getMcpToolsMessage(parsed.actor, apifyClient, apifyToken, apifyMcpServer);
             texts.push(message);
         }
@@ -173,8 +167,8 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         // Update structured output
         const structuredContent: Record<string, unknown> = {
             actorInfo: needsCard ? details.actorCardStructured : undefined,
-            readme: parsed.output.includes('readme') ? details.readme : undefined,
-            inputSchema: parsed.output.includes('input-schema') ? details.inputSchema : undefined,
+            readme: parsed.output.readme ? details.readme : undefined,
+            inputSchema: parsed.output.inputSchema ? details.inputSchema : undefined,
         };
 
         return buildMCPResponse({ texts, structuredContent });

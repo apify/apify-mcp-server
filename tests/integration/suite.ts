@@ -580,7 +580,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    output: ['mcp-tools'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
                 },
             });
 
@@ -735,7 +744,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
         });
 
-        it('should return only input schema when output=["input-schema"]', async () => {
+        it('should return only input schema when output={ inputSchema: true }', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -744,7 +753,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['input-schema'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: true,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -764,7 +782,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['description', 'stats'],
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -775,7 +802,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
         });
 
-        it('should list MCP tools when output=["mcp-tools"] for MCP server Actor', async () => {
+        it('should list MCP tools when output={ mcpTools: true } for MCP server Actor', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -784,7 +811,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    output: ['mcp-tools'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
                 },
             });
 
@@ -794,7 +830,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
         });
 
-        it('should return graceful note when output=["mcp-tools"] for regular Actor', async () => {
+        it('should return graceful note when output={ mcpTools: true } for regular Actor', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -803,7 +839,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['mcp-tools'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
                 },
             });
 
@@ -818,12 +863,21 @@ export function createIntegrationTestsSuite(
             });
             const toolName = HelperTools.ACTOR_GET_DETAILS;
 
-            // Test with output=['mcp-tools'] - should validate against schema even with selective fields
+            // Test with output={ mcpTools: true } - should validate against schema even with selective fields
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    output: ['mcp-tools'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
                 },
             });
 
@@ -835,18 +889,27 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
         });
 
-        it('should return structured output for fetch-actor-details with output=[description,readme] matching outputSchema', async () => {
+        it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
             const toolName = HelperTools.ACTOR_GET_DETAILS;
 
-            // Test with output=['description', 'readme'] - inputSchema should be undefined
+            // Test with output={ description: true, readme: true } - inputSchema should be undefined
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['description', 'readme'],
+                    output: {
+                        description: true,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: true,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -858,7 +921,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
         });
 
-        it('should return only pricing when output=["pricing"]', async () => {
+        it('should return only pricing when output={ pricing: true }', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -867,7 +930,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['pricing'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -882,7 +954,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
-        it('should return only readme when output=["readme"]', async () => {
+        it('should return only readme when output={ readme: true }', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -891,7 +963,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['readme'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: true,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -906,19 +987,27 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
-        it('should reject empty output array with validation error', async () => {
+        it('should use default values when output object is not provided', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
 
-            // AJV validation should reject empty array before tool execution
-            await expect(client.callTool({
+            // When output is not provided, all fields should default to their default values
+            const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: [],
                 },
-            })).rejects.toThrow(/must NOT have fewer than 1 items/);
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
+            // but NOT mcpTools (which defaults to false)
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
         });
 
         it('should return all fields when output includes all standard options', async () => {
@@ -930,7 +1019,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['description', 'stats', 'pricing', 'readme', 'input-schema'],
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: true,
+                        readme: true,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -963,7 +1061,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['pricing'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -987,7 +1094,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ragWebBrowser,
-                    output: ['rating'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: true,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -1010,7 +1126,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    output: ['metadata'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -1032,7 +1157,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ragWebBrowser,
-                    output: ['pricing', 'rating', 'metadata'],
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: true,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 
@@ -1069,36 +1203,43 @@ export function createIntegrationTestsSuite(
             const outputOptions = [
                 {
                     name: 'description',
+                    field: 'description',
                     markers: ['Description:'],
                     notMarkers: ['Developed by:', 'Categories:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
                 },
                 {
                     name: 'stats',
+                    field: 'stats',
                     markers: ['Stats:', 'total users', 'monthly users'],
                     notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
                 },
                 {
                     name: 'pricing',
+                    field: 'pricing',
                     markers: ['Pricing'],
                     notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Rating:', 'Last modified:', 'README', 'Input schema'],
                 },
                 {
                     name: 'rating',
+                    field: 'rating',
                     markers: ['Rating:', 'out of 5'],
                     notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Pricing', 'Last modified:', 'README', 'Input schema'],
                 },
                 {
                     name: 'metadata',
+                    field: 'metadata',
                     markers: ['Developed by:', 'Categories:', 'Last modified:'],
                     notMarkers: ['Description:', 'Stats:', 'Pricing', 'Rating:', 'README', 'Input schema'],
                 },
                 {
                     name: 'input-schema',
+                    field: 'inputSchema',
                     markers: ['Input schema', '```json'],
                     notMarkers: ['Developed by:', 'Description:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README'],
                 },
                 {
                     name: 'readme',
+                    field: 'readme',
                     markers: ['README'],
                     notMarkers: ['Input schema'],
                 },
@@ -1110,7 +1251,16 @@ export function createIntegrationTestsSuite(
                     name: HelperTools.ACTOR_GET_DETAILS,
                     arguments: {
                         actor: testActor,
-                        output: [option.name],
+                        output: {
+                            description: option.field === 'description',
+                            stats: option.field === 'stats',
+                            pricing: option.field === 'pricing',
+                            rating: option.field === 'rating',
+                            metadata: option.field === 'metadata',
+                            inputSchema: option.field === 'inputSchema',
+                            readme: option.field === 'readme',
+                            mcpTools: false,
+                        },
                     },
                 });
 
@@ -1136,7 +1286,16 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: testActor,
-                    output: ['description', 'stats', 'pricing', 'rating', 'metadata'],
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: true,
+                        rating: true,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
                 },
             });
 

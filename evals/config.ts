@@ -99,8 +99,8 @@ You must judge whether this agent made the correct selection.
 - For MCP server Actors, use format "actorName:toolName"
 
 **fetch-actor-details**: Gets Actor documentation, input schema, and details without running it.
-- Use output parameter to request specific information (e.g., output=['input-schema'] for minimal response)
-- Use output=['mcp-tools'] to list available tools for MCP server Actors
+- Use output parameter to request specific information (e.g., output={ inputSchema: true } for minimal response)
+- Use output={{ mcpTools: true }} to list available tools for MCP server Actors
 
 **search-apify-docs**: Searches Apify documentation for general info about Apify platform/features.
 - Use when query asks about Apify concepts, features, or how to use the platform
