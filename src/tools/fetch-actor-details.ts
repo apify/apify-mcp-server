@@ -57,14 +57,14 @@ const fetchActorDetailsToolArgsSchema = z.object({
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
     output: z.object({
-        description: z.boolean().default(true).describe('Include Actor description text only.'),
-        stats: z.boolean().default(true).describe('Include usage statistics (users, runs, success rate).'),
-        pricing: z.boolean().default(true).describe('Include pricing model and costs.'),
-        rating: z.boolean().default(true).describe('Include user rating (out of 5 stars).'),
-        metadata: z.boolean().default(true).describe('Include developer, categories, last modified date, and deprecation status.'),
-        inputSchema: z.boolean().default(true).describe('Include required input parameters schema.'),
-        readme: z.boolean().default(true).describe('Include full README documentation.'),
-        mcpTools: z.boolean().default(false).describe('List available tools (only for MCP server Actors).'),
+        description: z.boolean().default(true).optional().describe('Include Actor description text only.'),
+        stats: z.boolean().default(true).optional().describe('Include usage statistics (users, runs, success rate).'),
+        pricing: z.boolean().default(true).optional().describe('Include pricing model and costs.'),
+        rating: z.boolean().default(true).optional().describe('Include user rating (out of 5 stars).'),
+        metadata: z.boolean().default(true).optional().describe('Include developer, categories, last modified date, and deprecation status.'),
+        inputSchema: z.boolean().default(true).optional().describe('Include required input parameters schema.'),
+        readme: z.boolean().default(true).optional().describe('Include full README documentation.'),
+        mcpTools: z.boolean().default(false).optional().describe('List available tools (only for MCP server Actors).'),
     })
         .optional()
         .default({
