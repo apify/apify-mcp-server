@@ -18,8 +18,8 @@ setupMockOpenAi({
         lastUpdateTime: Date.now(),
     },
     callTool: async (name: string, args: any) => {
-        // Simulate get-actor-run-status tool
-        if (name === "get-actor-run-status") {
+        // Simulate get-actor-run tool
+        if (name === "get-actor-run") {
             const runtime = Date.now() - new Date(mockRunData.startedAt).getTime();
             const isComplete = runtime > 10000; // Complete after 10 seconds
 

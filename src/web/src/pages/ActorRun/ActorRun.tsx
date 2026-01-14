@@ -132,7 +132,7 @@ export const ActorRun: React.FC = () => {
             let keepPolling = true;
 
             while (keepPolling) {
-                const response = await window.openai.callTool("get-actor-run-status", {
+                const response = await window.openai.callTool("get-actor-run", {
                     runId: latestData.runId,
                 });
 
