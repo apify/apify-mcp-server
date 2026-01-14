@@ -250,3 +250,87 @@ export function formatActorToStructuredCard(
 
     return structuredData;
 }
+
+/**
+ * Formats Actor from store list into the structure needed by widget UI components.
+ * This is used by store_collection when widget mode is enabled.
+ * @param actor - Actor information from the store API
+ * @returns Formatted actor data for widget UI
+ */
+export function formatActorForWidget(
+    actor: ExtendedActorStoreList,
+): {
+    id: string;
+    name: string;
+    username: string;
+    fullName: string;
+    title: string;
+    description: string;
+    categories: string[];
+    pictureUrl: string;
+    stats: {
+        totalBuilds: number;
+        totalRuns: number;
+        totalUsers: number;
+        totalBookmarks: number;
+    };
+    currentPricingInfo: {
+        pricingModel: string;
+        pricePerResultUsd: number;
+        monthlyChargeUsd: number;
+    };
+    userActorRuns: {
+        successRate: number | null;
+    };
+} {
+    // Calculate success rate from publicActorRunStats30Days if available
+    let successRate: number | null = null;
+    const actorStats = actor.stats as typeof actor.stats & {
+        publicActorRunStats30Days?: {
+            SUCCEEDED: number;
+            TOTAL: number;
+        };
+    };
+    if (actorStats?.publicActorRunStats30Days) {
+        const runStats = actorStats.publicActorRunStats30Days;
+        if (runStats.TOTAL > 0) {
+            successRate = Math.round((runStats.SUCCEEDED / runStats.TOTAL) * 100);
+        }
+    }
+
+    const pricingInfo = actor.currentPricingInfo as ExtendedPricingInfo | undefined;
+    const pricing = {
+        pricingModel: pricingInfo?.pricingModel || 'FREE',
+        pricePerResultUsd: pricingInfo?.pricePerUnitUsd || 0,
+        monthlyChargeUsd: pricingInfo?.pricingModel === 'FLAT_PRICE_PER_MONTH' ? (pricingInfo?.pricePerUnitUsd || 0) : 0,
+    };
+
+    // Handle tiered pricing
+    if (pricingInfo?.pricingModel === 'PRICE_PER_DATASET_ITEM' && pricingInfo.tieredPricing) {
+        const tieredEntries = Object.values(pricingInfo.tieredPricing);
+        if (tieredEntries.length > 0 && tieredEntries[0]) {
+            pricing.pricePerResultUsd = tieredEntries[0].tieredPricePerUnitUsd || 0;
+        }
+    }
+
+    return {
+        id: actor.id,
+        name: actor.name,
+        username: actor.username,
+        fullName: `${actor.username}/${actor.name}`,
+        title: actor.title || actor.name,
+        description: actor.description || 'No description available',
+        categories: actor.categories || [],
+        pictureUrl: actor.pictureUrl || '',
+        stats: {
+            totalBuilds: actor.stats?.totalBuilds || 0,
+            totalRuns: actor.stats?.totalRuns || 0,
+            totalUsers: actor.stats?.totalUsers || 0,
+            totalBookmarks: actor.bookmarkCount || 0,
+        },
+        currentPricingInfo: pricing,
+        userActorRuns: {
+            successRate,
+        },
+    };
+}

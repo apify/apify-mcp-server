@@ -17,7 +17,6 @@ The server can run in multiple modes:
 - **MCP**: Model Context Protocol defines tools, resources, and prompts that AI agents can use
 - **Apify Actors**: Reusable automation tools (web scrapers, data extractors) available on Apify Store
 - **Tool discovery**: Actors are dynamically converted to MCP tools based on their input schemas
-- **Two-step Actor execution**: `call-actor` requires `step="info"` to get schema, then `step="call"` to execute
 
 ### Root directories
 - `src/`: Main TypeScript source code
@@ -113,7 +112,6 @@ Once the MCP server is configured, test the MCP tools by:
 2. **Test with valid inputs** (happy path) – verify outputs match expected formats
 3. **Test with invalid inputs** (edge cases) – verify error messages are clear and helpful
 4. **Verify key behaviors**:
-   - **call-actor** requires two-step workflow (`step="info"` then `step="call"`)
    - All tools return helpful error messages with suggestions
    - **get-actor-output** supports field filtering using dot notation
    - Search tools support pagination with `limit` and `offset`
@@ -121,7 +119,7 @@ Once the MCP server is configured, test the MCP tools by:
 **Tools to test:**
 - **search-actors** - Search Apify Store (test: valid keywords, empty keywords, non-existent platforms)
 - **fetch-actor-details** - Get Actor info (test: valid actor, non-existent actor)
-- **call-actor** - Execute Actor in two steps: `step="info"` to get schema, then `step="call"` to run
+- **call-actor** - Execute Actor with input
 - **get-actor-output** - Retrieve Actor results (test: valid datasetId, field filtering, non-existent dataset)
 - **search-apify-docs** - Search documentation (test: relevant terms, non-existent topics)
 - **fetch-apify-docs** - Fetch doc page (test: valid URL, non-existent page)

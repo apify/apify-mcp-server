@@ -13,7 +13,8 @@ import { callActor } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { Input, InternalToolArgs, ToolCategory, ToolEntry } from '../types.js';
+import { getActorRun } from '../tools/run.js';
+import type { Input, InternalToolArgs, ToolCategory, ToolEntry, UiMode } from '../types.js';
 import { getExpectedToolsByCategories } from './tool-categories-helpers.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -34,11 +35,13 @@ function getInternalToolByNameMap(): Map<string, ToolEntry> {
  *
  * @param input The processed Input object
  * @param apifyClient The Apify client instance
+ * @param uiMode Optional UI mode.
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
+    uiMode?: UiMode,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -137,6 +140,15 @@ export async function loadToolsFromInput(
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
     if (hasCallActor || hasActorTools || hasAddActorTool) {
         result.push(getActorOutput);
+    }
+
+    /**
+     * If call-actor tool is present or UI mode is enabled, automatically include get-actor-run
+     * to allow checking run status and retrieving results.
+     */
+    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
+    if (!hasGetActorRun && (hasCallActor || uiMode === 'openai')) {
+        result.push(getActorRun);
     }
 
     // TEMP: for now we disable this swapping logic as the add-actor tool was misbehaving in some clients

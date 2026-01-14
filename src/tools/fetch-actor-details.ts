@@ -6,9 +6,10 @@ import { connectMCPClient } from '../mcp/client.js';
 import type { ActorsMcpServer } from '../mcp/server.js';
 import type { ActorCardOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { getActorMcpUrlCached } from '../utils/actor.js';
-import { fetchActorDetails } from '../utils/actor-details.js';
+import { fetchActorDetails, processActorDetailsForResponse } from '../utils/actor-details.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 /**
@@ -98,6 +99,9 @@ EXAMPLES:
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
+    },
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
@@ -129,9 +133,38 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             });
         }
 
-        const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-        // Add link to README title
-        details.readme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
+        const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
+
+        const structuredContent = {
+            actorInfo: details.actorCardStructured,
+            readme: formattedReadme,
+            inputSchema: details.inputSchema,
+        };
+
+        if (apifyMcpServer.options.uiMode === 'openai') {
+            const widgetStructuredContent = {
+                ...structuredContent,
+                actorDetails: processedStructuredContent.actorDetails,
+            };
+
+            const texts = [`
+# Actor information:
+- **Actor:** ${parsed.actor}
+- **URL:** ${actorUrl}
+
+View the interactive widget below for detailed Actor information.
+`];
+
+            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
+            return buildMCPResponse({
+                texts,
+                structuredContent: widgetStructuredContent,
+                _meta: {
+                    ...widgetConfig?.meta,
+                    'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
+                },
+            });
+        }
 
         const texts: string[] = [];
 
@@ -150,7 +183,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
         // Add README if requested
         if (parsed.output.readme) {
-            texts.push(`${details.readme}`);
+            texts.push(formattedReadme);
         }
 
         // Add input schema if requested
@@ -165,12 +198,12 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         }
 
         // Update structured output
-        const structuredContent: Record<string, unknown> = {
+        const responseStructuredContent: Record<string, unknown> = {
             actorInfo: needsCard ? details.actorCardStructured : undefined,
-            readme: parsed.output.readme ? details.readme : undefined,
+            readme: parsed.output.readme ? formattedReadme : undefined,
             inputSchema: parsed.output.inputSchema ? details.inputSchema : undefined,
         };
 
-        return buildMCPResponse({ texts, structuredContent });
+        return buildMCPResponse({ texts, structuredContent: responseStructuredContent });
     },
 } as const;

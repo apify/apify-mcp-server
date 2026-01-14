@@ -73,6 +73,8 @@ import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
+import type { AvailableWidget } from '../utils/widgets.js';
+import { resolveAvailableWidgets } from '../utils/widgets.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
@@ -94,6 +96,9 @@ export class ActorsMcpServer {
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
     private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
+
+    // List of widgets that are ready to be served
+    private availableWidgets: Map<string, AvailableWidget> = new Map();
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
@@ -304,7 +309,7 @@ export class ActorsMcpServer {
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient);
+        const tools = await processParamsGetTools(url, apifyClient, this.options.uiMode);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -431,43 +436,109 @@ export class ActorsMcpServer {
 
     private setupResourceHandlers(): void {
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+            const resources = [];
+
             /**
-             * Return the usage guide resource only if Skyfire mode is enabled. No resources otherwise for normal mode.
+             * Return the usage guide resource only if Skyfire mode is enabled.
              */
             if (this.options.skyfireMode) {
-                return {
-                    resources: [
-                        {
-                            uri: 'file://readme.md',
-                            name: 'readme',
-                            description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
-                            mimeType: 'text/markdown',
-                        },
-                    ],
-                };
+                resources.push({
+                    uri: 'file://readme.md',
+                    name: 'readme',
+                    description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
+                    mimeType: 'text/markdown',
+                });
             }
-            return { resources: [] };
+
+            if (this.options.uiMode === 'openai') {
+                // Only register widgets that are available
+                for (const widget of this.availableWidgets.values()) {
+                    if (widget.exists) {
+                        resources.push({
+                            uri: widget.uri,
+                            name: widget.name,
+                            description: widget.description,
+                            mimeType: 'text/html+skybridge',
+                            _meta: widget.meta,
+                        });
+                    }
+                }
+            }
+
+            return { resources };
         });
 
-        if (this.options.skyfireMode) {
-            this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-                const { uri } = request.params;
-                if (uri === 'file://readme.md') {
+        this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+            const { uri } = request.params;
+            if (this.options.skyfireMode && uri === 'file://readme.md') {
+                return {
+                    contents: [{
+                        uri: 'file://readme.md',
+                        mimeType: 'text/markdown',
+                        text: SKYFIRE_README_CONTENT,
+                    }],
+                };
+            }
+
+            if (this.options.uiMode === 'openai' && uri.startsWith('ui://widget/')) {
+                const widget = this.availableWidgets.get(uri);
+
+                if (!widget || !widget.exists) {
                     return {
                         contents: [{
-                            uri: 'file://readme.md',
-                            mimeType: 'text/markdown',
-                            text: SKYFIRE_README_CONTENT,
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
                         }],
                     };
                 }
-                return {
-                    contents: [{
-                        uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
-                    }],
-                };
-            });
-        }
+
+                try {
+                    log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
+                    const fs = await import('node:fs');
+
+                    const widgetJs = fs.readFileSync(widget.jsPath, 'utf-8');
+
+                    const widgetHtml = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>${widget.title}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">${widgetJs}</script>
+  </body>
+</html>`;
+
+                    return {
+                        contents: [{
+                            uri,
+                            mimeType: 'text/html+skybridge',
+                            text: widgetHtml,
+                            html: widgetHtml,
+                            _meta: widget.meta,
+                        }],
+                    };
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    return {
+                        contents: [{
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Failed to load widget: ${errorMessage}`,
+                        }],
+                    };
+                }
+            }
+
+            return {
+                contents: [{
+                    uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
+                }],
+            };
+        });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
             // No resource templates available, return empty response
@@ -616,7 +687,10 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool));
+            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
+                uiMode: this.options.uiMode,
+                filterOpenAiMeta: true,
+            }));
             return { tools };
         });
 
@@ -1149,7 +1223,55 @@ Please verify the tool name and ensure the tool is properly registered.`;
         return { telemetryData, userId };
     }
 
+    /**
+     * Resolves widgets and determines which ones are ready to be served.
+     */
+    private async resolveWidgets(): Promise<void> {
+        if (this.options.uiMode !== 'openai') {
+            return;
+        }
+
+        try {
+            const { fileURLToPath } = await import('node:url');
+            const path = await import('node:path');
+
+            const filename = fileURLToPath(import.meta.url);
+            const dirName = path.dirname(filename);
+
+            const resolved = await resolveAvailableWidgets(dirName);
+            this.availableWidgets = resolved;
+
+            const readyWidgets: string[] = [];
+            const missingWidgets: string[] = [];
+
+            for (const [uri, widget] of resolved.entries()) {
+                if (widget.exists) {
+                    readyWidgets.push(widget.name);
+                } else {
+                    missingWidgets.push(widget.name);
+                    log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
+                }
+            }
+
+            if (readyWidgets.length > 0) {
+                log.debug('Ready widgets', { widgets: readyWidgets });
+            }
+
+            if (missingWidgets.length > 0) {
+                log.softFail('Some widgets are not ready', {
+                    widgets: missingWidgets,
+                    note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.softFail(`Failed to resolve widgets: ${errorMessage}`);
+            // Continue without widgets
+        }
+    }
+
     async connect(transport: Transport): Promise<void> {
+        await this.resolveWidgets();
         await this.server.connect(transport);
     }
 

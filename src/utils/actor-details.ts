@@ -48,3 +48,42 @@ export async function fetchActorDetails(
         return null;
     }
 }
+
+/**
+ * Process actor details for response formatting.
+ * Formats README with link, builds text content, and creates structured content.
+ * @param details - Raw actor details from fetchActorDetails
+ * @returns Processed actor details with formatted content
+ */
+export function processActorDetailsForResponse(details: ActorDetailsResult) {
+    const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+    // Add link to README title
+    const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
+
+    const texts = [
+        `# Actor information\n${details.actorCard}`,
+        formattedReadme,
+    ];
+
+    // Include input schema if it has properties
+    const hasInputSchema = details.inputSchema.properties && Object.keys(details.inputSchema.properties).length !== 0;
+    if (hasInputSchema) {
+        texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
+    }
+
+    const structuredContent = {
+        actorDetails: {
+            actorInfo: details.actorInfo,
+            actorCard: details.actorCard,
+            readme: formattedReadme,
+            inputSchema: details.inputSchema,
+        },
+    };
+
+    return {
+        actorUrl,
+        texts,
+        structuredContent,
+        formattedReadme,
+    };
+}

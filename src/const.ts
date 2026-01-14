@@ -218,6 +218,9 @@ These tools are called **Actors**. They enable you to extract structured data fr
   - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema
   - Then call with proper input to execute the Actor
   - For MCP server Actors, use format "actorName:toolName" to call specific tools
+  - Supports async execution via the \`async\` parameter:
+  - When \`async: false\` or not provided (default when UI mode is disabled): Waits for completion and returns results immediately.
+  - When \`async: true\` (default when UI mode is enabled): Starts the run and returns immediately with runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and retrieve results.
 
 ### Tool disambiguation
 - **${HelperTools.ACTOR_OUTPUT_GET} vs ${HelperTools.DATASET_GET_ITEMS}:**
@@ -228,4 +231,6 @@ These tools are called **Actors**. They enable you to extract structured data fr
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs ${HelperTools.ACTOR_CALL}:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in Apify store.
+- **Async parameter for ${HelperTools.ACTOR_CALL}:**
+  \`${HelperTools.ACTOR_CALL}\` supports async execution via the \`async\` boolean parameter. When \`async: false\` or not provided, waits for completion and returns results (default when UI mode is disabled). When \`async: true\`, starts the run and returns immediately with runId (default when UI mode is enabled). Use \`async: true\` when the user wants background/progress/UI. After starting an async run and obtaining runId, do NOT start another run—only poll with \`${HelperTools.ACTOR_RUNS_GET}\` using that runId.
 `;
