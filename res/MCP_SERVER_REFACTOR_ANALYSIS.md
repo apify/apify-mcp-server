@@ -39,7 +39,7 @@ Request → McpServer → Tool's callback (knows how to execute itself)
 ### Key Changes
 
 1. **Replace `Server` with `McpServer`** - Use high-level API as foundation
-2. **Convert JSON Schema to Zod** - Use `json-schema-to-zod` library for Actor schemas
+2. **Convert JSON Schema to Zod** - Use Zod v4 native JSON Schema conversion for Actor schemas
 3. **Move execution logic to callbacks** - Each tool type has its own registration pattern
 4. **Remove central dispatcher** - Delete ~300 lines of handler code
 5. **Simplify tool storage** - Replace complex `ToolEntry` type with `RegisteredTool`
@@ -58,7 +58,7 @@ Request → McpServer → Tool's callback (knows how to execute itself)
 
 ### Dependencies
 
-- Add `json-schema-to-zod` npm package
+- No new dependency required for schema conversion (Zod v4 supports this natively)
 - Coordinate with `apify-mcp-server-internal` repository
 
 ---
@@ -230,11 +230,10 @@ server.registerTool('tool-name', config, async (args, extra) => {
 
 #### 4.1 JSON Schema to Zod Conversion
 
-**Dependency**: `json-schema-to-zod` (npm package)
+**Dependency**: None (use Zod v4 native JSON Schema conversion)
 
 ```typescript
 // src/utils/schema-conversion.ts (NEW FILE)
-import { jsonSchemaToZod } from 'json-schema-to-zod';
 import { z } from 'zod';
 
 /**
@@ -245,8 +244,8 @@ import { z } from 'zod';
  */
 export function convertActorSchemaToZod(jsonSchema: Record<string, unknown>): z.ZodTypeAny {
     try {
-        // json-schema-to-zod returns a Zod schema
-        return jsonSchemaToZod(jsonSchema);
+        // Zod v4 provides native JSON Schema conversion (use the official API name)
+        return zodFromJsonSchema(jsonSchema);
     } catch (error) {
         // Fallback: accept any object if conversion fails
         log.warning('Failed to convert JSON Schema to Zod, using permissive schema', {
@@ -738,25 +737,15 @@ async (args, extra) => {
 
 ### 6. Migration Steps
 
-#### Step 1: Add Dependencies
+#### Step 1: Confirm Zod v4 JSON Schema Support
 
-```bash
-npm install json-schema-to-zod
-```
-
-Update `package.json`:
-```json
-{
-  "dependencies": {
-    "json-schema-to-zod": "^2.7.0"
-  }
-}
-```
+- Use Zod v4 native JSON Schema conversion (no extra dependency)
+- Align on the exact Zod v4 API name during implementation
 
 #### Step 2: Create Schema Conversion Utility
 
 Create `src/utils/schema-conversion.ts`:
-- `convertActorSchemaToZod()` function
+- `convertActorSchemaToZod()` function using Zod v4 conversion
 - Error handling for conversion failures
 - Unit tests for various schema patterns
 
@@ -881,7 +870,7 @@ Create `src/mcp/tool-registration.ts`:
 | `src/tools/actor.ts` | Update `getActorsAsTools()` |
 | `src/tools/helpers.ts` | Update tool exports |
 | `src/mcp/proxy.ts` | Update `getMCPServerTools()` |
-| `package.json` | Add `json-schema-to-zod` dependency |
+| `package.json` | No change required for schema conversion |
 
 #### Removed Code
 
