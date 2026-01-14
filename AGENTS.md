@@ -19,6 +19,15 @@ The server can run in multiple modes:
 - **Tool discovery**: Actors are dynamically converted to MCP tools based on their input schemas
 - **Two-step Actor execution**: `call-actor` requires `step="info"` to get schema, then `step="call"` to execute
 
+### Core Philosophy
+
+- Simple is better than complex
+- If the implementation is hard to explain, it's (usually) a bad idea.
+- **Ruthlessly minimal**: Only implement what's explicitly in scope
+- **Lightweight**: Measure complexity by lines of code, not abstractions
+- **No over-engineering**: Solve the current problem, not hypothetical future ones
+- **No unsolicited features**: Don't add anything not explicitly requested by human operator
+
 ### Root directories
 - `src/`: Main TypeScript source code
 - `tests/`: Unit and integration tests
@@ -42,15 +51,39 @@ The codebase is organized into logical modules:
   - `src/main.ts` - Actor entry point (for Apify platform)
   - `src/input.ts` - Input processing and validation
 
-## Validating TypeScript changes
+## ⚠️ MANDATORY: Verification after every implementation
 
-MANDATORY: Always check for TypeScript compilation errors before running tests or declaring work complete.
+**THIS IS NON-NEGOTIABLE. DO NOT SKIP.**
 
-### TypeScript compilation steps
+After completing ANY code change (feature, fix, refactor), you MUST:
 
-- Run `npm run type-check` to check for TypeScript errors without building
-- Run `npm run build` to compile TypeScript files and check for errors
-- Fix all compilation errors before running tests or committing changes
+1. **Type check**: `npm run type-check`
+   - Fix ALL TypeScript errors before proceeding
+   - Zero tolerance for type errors
+
+2. **Build**: `npm run build`
+   - Ensures compilation succeeds
+   - Fix all compilation errors before running tests
+
+3. **Lint**: `npm run lint`
+   - Fix ALL lint errors before proceeding
+   - Use `npm run lint:fix` for auto-fixable issues
+
+4. **Unit tests**: `npm run test:unit`
+   - ALL tests must pass
+   - If a test fails, fix it before moving on
+
+**When to run verification:**
+- After implementing a feature
+- After fixing a bug
+- After any refactor
+- Before marking any task as complete
+
+**What to do if verification fails:**
+1. DO NOT proceed to the next task
+2. Fix the issue immediately
+3. Re-run verification until green
+4. Only then continue
 
 ## Testing
 
@@ -225,6 +258,16 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Don't** skip input validation – all tool inputs must be validated with Zod
 - **Don't** use `Promise.then()` - prefer `async/await`
 - **Don't** create tools without proper error handling and user-friendly messages
+
+### What NOT to do (beyond code)
+
+- Don't add features not in the requirements
+- Don't refactor working code unless asked
+- Don't add error handling for impossible scenarios
+- Don't create abstractions for one-time operations
+- Don't optimize prematurely
+- Don't add configuration for things that won't change
+- Don't suggest "improvements" outside current task scope
 
 ## External dependencies
 
