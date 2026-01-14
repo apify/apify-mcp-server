@@ -3,9 +3,10 @@ import { z } from 'zod';
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { fetchActorDetails } from '../utils/actor-details.js';
+import { fetchActorDetails, processActorDetailsForResponse } from '../utils/actor-details.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
@@ -31,6 +32,9 @@ USAGE EXAMPLES:
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
+    },
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
@@ -38,7 +42,7 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
         const details = await fetchActorDetails(apifyClient, parsed.actor);
@@ -52,26 +56,48 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             });
         }
 
-        const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-        // Add link to README title
-        details.readme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
+        const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
+
+        const structuredContent = {
+            actorInfo: details.actorCardStructured,
+            readme: formattedReadme,
+            inputSchema: details.inputSchema,
+        };
+
+        if (apifyMcpServer.options.uiMode === 'openai') {
+            const widgetStructuredContent = {
+                ...structuredContent,
+                actorDetails: processedStructuredContent.actorDetails,
+            };
+
+            const texts = [`
+# Actor information:
+- **Actor:** ${parsed.actor}
+- **URL:** ${actorUrl}
+
+View the interactive widget below for detailed Actor information.
+`];
+
+            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
+            return buildMCPResponse({
+                texts,
+                structuredContent: widgetStructuredContent,
+                _meta: {
+                    ...widgetConfig?.meta,
+                    'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
+                },
+            });
+        }
 
         const texts = [
             `# Actor information\n${details.actorCard}`,
-            `${details.readme}`,
+            formattedReadme,
         ];
 
         // Include input schema if it has properties
         if (details.inputSchema.properties || Object.keys(details.inputSchema.properties).length !== 0) {
             texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
         }
-        // Return the actor card, README, and input schema (if it has non-empty properties) as separate text blocks
-        // This allows better formatting in the final output
-        const structuredContent = {
-            actorInfo: details.actorCardStructured,
-            readme: details.readme,
-            inputSchema: details.inputSchema,
-        };
         return buildMCPResponse({ texts, structuredContent });
     },
 } as const;

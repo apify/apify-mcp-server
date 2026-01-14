@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { TelemetryEnv, ToolCategory } from '../src/types.js';
+import type { TelemetryEnv, ToolCategory, UiMode } from '../src/types.js';
 
 export type McpClientOptions = {
     actors?: string[];
@@ -17,6 +17,7 @@ export type McpClientOptions = {
         enabled?: boolean; // Enable or disable telemetry (default: false for tests)
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
+    uiMode?: UiMode; // UI mode for tool responses. 'openai' for OpenAI specific widget rendering.
 }
 
 function checkApifyToken(): void {
@@ -26,7 +27,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry } = options || {};
+    const { actors, enableAddingActors, tools, telemetry, uiMode } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -39,6 +40,9 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     // Append telemetry parameters (default to false for tests when not explicitly set)
     const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
     url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
+    if (uiMode !== undefined) {
+        url.searchParams.append('ui', uiMode);
+    }
 }
 
 export async function createMcpSseClient(
@@ -101,7 +105,7 @@ export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
     checkApifyToken();
-    const { actors, enableAddingActors, tools, useEnv, telemetry } = options || {};
+    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -124,6 +128,9 @@ export async function createMcpStdioClient(
         if (telemetry?.env !== undefined) {
             env.TELEMETRY_ENV = telemetry.env;
         }
+        if (uiMode !== undefined) {
+            env.UI_MODE = uiMode;
+        }
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -140,6 +147,9 @@ export async function createMcpStdioClient(
         }
         if (telemetry?.env !== undefined && telemetry?.enabled !== false) {
             args.push('--telemetry-env', telemetry.env);
+        }
+        if (uiMode !== undefined) {
+            args.push('--uiMode', uiMode);
         }
     }
 

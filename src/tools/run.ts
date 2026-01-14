@@ -1,10 +1,15 @@
 import { z } from 'zod';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()
@@ -36,6 +41,9 @@ USAGE EXAMPLES:
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
+    },
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
@@ -43,17 +51,93 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
         const client = new ApifyClient({ token: apifyToken });
-        const v = await client.run(parsed.runId).get();
-        if (!v) {
-            return buildMCPResponse({ texts: [`Run with ID '${parsed.runId}' not found.`],
+
+        try {
+            const run = await client.run(parsed.runId).get();
+
+            if (!run) {
+                return buildMCPResponse({
+                    texts: [`Run with ID '${parsed.runId}' not found.`],
+                    isError: true,
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                });
+            }
+
+            log.debug('Get actor run', { runId: parsed.runId, status: run.status });
+
+            const structuredContent: {
+                runId: string;
+                actorName?: string;
+                status: string;
+                startedAt: string;
+                finishedAt?: string;
+                stats?: unknown;
+                dataset?: {
+                    datasetId: string;
+                    itemCount: number;
+                    schema: unknown;
+                    previewItems: unknown[];
+                };
+            } = {
+                runId: run.id,
+                status: run.status,
+                startedAt: run.startedAt?.toISOString() || '',
+                finishedAt: run.finishedAt?.toISOString(),
+                stats: run.stats,
+            };
+
+            // If completed, fetch dataset results
+            if (run.status === 'SUCCEEDED' && run.defaultDatasetId) {
+                const dataset = client.dataset(run.defaultDatasetId);
+                const datasetItems = await dataset.listItems({ limit: 5 });
+
+                const generatedSchema = generateSchemaFromItems(datasetItems.items, {
+                    clean: true,
+                    arrayMode: 'all',
+                });
+
+                structuredContent.dataset = {
+                    datasetId: run.defaultDatasetId,
+                    itemCount: datasetItems.count,
+                    schema: generatedSchema || { type: 'object', properties: {} },
+                    previewItems: datasetItems.items,
+                };
+            }
+
+            // When UI mode is enabled, return minimal text with widget metadata
+            // When UI mode is disabled, return full text response without widget metadata
+            if (apifyMcpServer.options.uiMode === 'openai') {
+                const statusText = run.status === 'SUCCEEDED' && structuredContent.dataset
+                    ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. View details in the widget below.`
+                    : `Actor run ${parsed.runId} status: ${run.status}. View progress in the widget below.`;
+
+                const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+                return buildMCPResponse({
+                    texts: [statusText],
+                    structuredContent,
+                    _meta: {
+                        ...widgetConfig?.meta,
+                    },
+                });
+            }
+
+            const texts = [
+                `# Actor Run Information\n\`\`\`json\n${JSON.stringify(run, null, 2)}\n\`\`\``,
+            ];
+
+            return buildMCPResponse({ texts, structuredContent });
+        } catch (error) {
+            logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
+            return buildMCPResponse({
+                texts: [`Failed to get Actor run '${parsed.runId}': ${error instanceof Error ? error.message : String(error)}.
+Please verify the run ID and ensure that the run exists.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL });
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+            });
         }
-        const texts = [`\`\`\`json\n${JSON.stringify(v, null, 2)}\n\`\`\``];
-        return buildMCPResponse({ texts });
     },
 } as const;
 
