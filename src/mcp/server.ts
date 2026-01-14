@@ -73,6 +73,8 @@ import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
+import type { AvailableWidget } from '../utils/widgets.js';
+import { resolveAvailableWidgets } from '../utils/widgets.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
@@ -94,6 +96,9 @@ export class ActorsMcpServer {
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
     private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
+
+    // List of widgets that are ready to be served
+    private availableWidgets: Map<string, AvailableWidget> = new Map();
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
@@ -446,51 +451,18 @@ export class ActorsMcpServer {
             }
 
             if (this.options.uiMode === 'openai') {
-                resources.push({
-                    uri: 'ui://widget/search-actors.html',
-                    name: 'search-actors-widget',
-                    description: 'Interactive Actor search results widget',
-                    mimeType: 'text/html+skybridge',
-                    _meta: {
-                        'openai/outputTemplate': 'ui://widget/search-actors.html',
-                        'openai/toolInvocation/invoking': 'Searching Apify Store...',
-                        'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
-                        'openai/widgetAccessible': true,
-                        'openai/resultCanProduceWidget': true,
-                        'openai/widgetDomain': 'https://apify.com',
-                        'openai/widgetCSP': {
-                            connect_domains: [
-                                'https://api.apify.com',
-                            ],
-                            resource_domains: [
-                                'https://mcp.apify.com',
-                                'https://images.apifyusercontent.com',
-                            ],
-                        },
-                    },
-                });
-
-                resources.push({
-                    uri: 'ui://widget/actor-run.html',
-                    name: 'actor-run-widget',
-                    description: 'Interactive Actor run widget',
-                    mimeType: 'text/html+skybridge',
-                    _meta: {
-                        'openai/outputTemplate': 'ui://widget/actor-run.html',
-                        'openai/widgetAccessible': true,
-                        'openai/resultCanProduceWidget': true,
-                        'openai/widgetDomain': 'https://apify.com',
-                        'openai/widgetCSP': {
-                            connect_domains: [
-                                'https://api.apify.com',
-                            ],
-                            resource_domains: [
-                                'https://mcp.apify.com',
-                                'https://images.apifyusercontent.com',
-                            ],
-                        },
-                    },
-                });
+                // Only register widgets that are available
+                for (const widget of this.availableWidgets.values()) {
+                    if (widget.exists) {
+                        resources.push({
+                            uri: widget.uri,
+                            name: widget.name,
+                            description: widget.description,
+                            mimeType: 'text/html+skybridge',
+                            _meta: widget.meta,
+                        });
+                    }
+                }
             }
 
             return { resources };
@@ -509,45 +481,30 @@ export class ActorsMcpServer {
             }
 
             if (this.options.uiMode === 'openai' && uri.startsWith('ui://widget/')) {
+                const widget = this.availableWidgets.get(uri);
+
+                if (!widget || !widget.exists) {
+                    return {
+                        contents: [{
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
+                        }],
+                    };
+                }
+
                 try {
-                    log.debug('Reading widget files', { uri });
+                    log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
                     const fs = await import('node:fs');
-                    const path = await import('node:path');
-                    const { fileURLToPath } = await import('node:url');
 
-                    // Get the directory of this file
-                    const filename = fileURLToPath(import.meta.url);
-                    const dirName = path.dirname(filename);
-
-                    let widgetJsFilename = '';
-                    let widgetTitle = '';
-
-                    if (uri === 'ui://widget/search-actors.html') {
-                        widgetJsFilename = 'search-actors-widget.js';
-                        widgetTitle = 'Apify Actor Search';
-                    } else if (uri === 'ui://widget/actor-run.html') {
-                        widgetJsFilename = 'actor-run-widget.js';
-                        widgetTitle = 'Apify Actor Run';
-                    } else {
-                        return {
-                            contents: [{
-                                uri, mimeType: 'text/plain', text: `Widget resource ${uri} not found`,
-                            }],
-                        };
-                    }
-
-                    const widgetJsPath = path.resolve(dirName, `../web/dist/${widgetJsFilename}`);
-
-                    log.debug('Reading widget file', { widgetJsPath });
-
-                    const widgetJs = fs.readFileSync(widgetJsPath, 'utf-8');
+                    const widgetJs = fs.readFileSync(widget.jsPath, 'utf-8');
 
                     const widgetHtml = `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${widgetTitle}</title>
+    <title>${widget.title}</title>
   </head>
   <body>
     <div id="root"></div>
@@ -561,22 +518,7 @@ export class ActorsMcpServer {
                             mimeType: 'text/html+skybridge',
                             text: widgetHtml,
                             html: widgetHtml,
-                            _meta: {
-                                'openai/widgetPrefersBorder': true,
-                                'openai/outputTemplate': uri,
-                                'openai/widgetAccessible': true,
-                                'openai/resultCanProduceWidget': true,
-                                'openai/widgetDomain': 'https://apify.com',
-                                'openai/widgetCSP': {
-                                    connect_domains: [
-                                        'https://api.apify.com',
-                                    ],
-                                    resource_domains: [
-                                        'https://mcp.apify.com',
-                                        'https://images.apifyusercontent.com',
-                                    ],
-                                },
-                            },
+                            _meta: widget.meta,
                         }],
                     };
                 } catch (error) {
@@ -1281,7 +1223,55 @@ Please verify the tool name and ensure the tool is properly registered.`;
         return { telemetryData, userId };
     }
 
+    /**
+     * Resolves widgets and determines which ones are ready to be served.
+     */
+    private async resolveWidgets(): Promise<void> {
+        if (this.options.uiMode !== 'openai') {
+            return;
+        }
+
+        try {
+            const { fileURLToPath } = await import('node:url');
+            const path = await import('node:path');
+
+            const filename = fileURLToPath(import.meta.url);
+            const dirName = path.dirname(filename);
+
+            const resolved = await resolveAvailableWidgets(dirName);
+            this.availableWidgets = resolved;
+
+            const readyWidgets: string[] = [];
+            const missingWidgets: string[] = [];
+
+            for (const [uri, widget] of resolved.entries()) {
+                if (widget.exists) {
+                    readyWidgets.push(widget.name);
+                } else {
+                    missingWidgets.push(widget.name);
+                    log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
+                }
+            }
+
+            if (readyWidgets.length > 0) {
+                log.debug('Ready widgets', { widgets: readyWidgets });
+            }
+
+            if (missingWidgets.length > 0) {
+                log.softFail('Some widgets are not ready', {
+                    widgets: missingWidgets,
+                    note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
+                });
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            log.softFail(`Failed to resolve widgets: ${errorMessage}`);
+            // Continue without widgets
+        }
+    }
+
     async connect(transport: Transport): Promise<void> {
+        await this.resolveWidgets();
         await this.server.connect(transport);
     }
 

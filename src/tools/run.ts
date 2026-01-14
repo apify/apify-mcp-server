@@ -9,6 +9,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()
@@ -110,23 +111,12 @@ USAGE EXAMPLES:
                     ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. View details in the widget below.`
                     : `Actor run ${parsed.runId} status: ${run.status}. View progress in the widget below.`;
 
+                const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
                 return buildMCPResponse({
                     texts: [statusText],
                     structuredContent,
                     _meta: {
-                        'openai/outputTemplate': 'ui://widget/actor-run.html',
-                        'openai/widgetAccessible': true,
-                        'openai/resultCanProduceWidget': true,
-                        'openai/widgetDomain': 'https://apify.com',
-                        'openai/widgetCSP': {
-                            connect_domains: [
-                                'https://api.apify.com',
-                            ],
-                            resource_domains: [
-                                'https://mcp.apify.com',
-                                'https://images.apifyusercontent.com',
-                            ],
-                        },
+                        ...widgetConfig?.meta,
                     },
                 });
             }

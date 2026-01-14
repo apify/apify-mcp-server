@@ -6,6 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { fetchActorDetails, processActorDetailsForResponse } from '../utils/actor-details.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
@@ -74,24 +75,13 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 View the interactive widget below for detailed Actor information.
 `];
 
+            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
             return buildMCPResponse({
                 texts,
                 structuredContent: widgetStructuredContent,
                 _meta: {
-                    'openai/outputTemplate': 'ui://widget/search-actors.html',
-                    'openai/widgetAccessible': true,
-                    'openai/resultCanProduceWidget': true,
+                    ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
-                    'openai/widgetDomain': 'https://apify.com',
-                    'openai/widgetCSP': {
-                        connect_domains: [
-                            'https://api.apify.com',
-                        ],
-                        resource_domains: [
-                            'https://mcp.apify.com',
-                            'https://images.apifyusercontent.com',
-                        ],
-                    },
                 },
             });
         }

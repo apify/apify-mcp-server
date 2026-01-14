@@ -29,6 +29,7 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { getActorDefinition } from './build.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 
@@ -615,21 +616,10 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 };
 
                 if (apifyMcpServer.options.uiMode === 'openai') {
+                    const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
                     response._meta = {
-                        'openai/outputTemplate': 'ui://widget/actor-run.html',
-                        'openai/widgetAccessible': true,
-                        'openai/resultCanProduceWidget': true,
+                        ...widgetConfig?.meta,
                         'openai/widgetDescription': `Actor run progress for ${actorName}`,
-                        'openai/widgetDomain': 'https://apify.com',
-                        'openai/widgetCSP': {
-                            connect_domains: [
-                                'https://api.apify.com',
-                            ],
-                            resource_domains: [
-                                'https://mcp.apify.com',
-                                'https://images.apifyusercontent.com',
-                            ],
-                        },
                     };
                 }
 

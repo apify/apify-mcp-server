@@ -7,6 +7,7 @@ import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolE
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
 export async function searchActorsByKeywords(
@@ -127,21 +128,7 @@ Returns list of Actor cards with the following info:
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
     _meta: {
-        'openai/outputTemplate': 'ui://widget/search-actors.html',
-        'openai/toolInvocation/invoking': 'Searching Apify Store...',
-        'openai/toolInvocation/invoked': 'Found actors matching your criteria',
-        'openai/widgetAccessible': true,
-        'openai/resultCanProduceWidget': true,
-        'openai/widgetDomain': 'https://apify.com',
-        'openai/widgetCSP': {
-            connect_domains: [
-                'https://api.apify.com',
-            ],
-            resource_domains: [
-                'https://mcp.apify.com',
-                'https://images.apifyusercontent.com',
-            ],
-        },
+        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },
     annotations: {
         title: 'Search Actors',
@@ -211,24 +198,13 @@ You can also try using more specific or alternative keywords related to your sea
 View the interactive widget below for detailed Actor information.
 `];
 
+            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
             return buildMCPResponse({
                 texts,
                 structuredContent,
                 _meta: {
-                    'openai/outputTemplate': 'ui://widget/search-actors.html',
-                    'openai/widgetAccessible': true,
-                    'openai/resultCanProduceWidget': true,
+                    ...widgetConfig?.meta,
                     'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,
-                    'openai/widgetDomain': 'https://apify.com',
-                    'openai/widgetCSP': {
-                        connect_domains: [
-                            'https://api.apify.com',
-                        ],
-                        resource_domains: [
-                            'https://mcp.apify.com',
-                            'https://images.apifyusercontent.com',
-                        ],
-                    },
                 },
             });
         }
