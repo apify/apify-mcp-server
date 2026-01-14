@@ -335,6 +335,11 @@ export type ToolCallTelemetryProperties = {
 };
 
 /**
+ * UI mode for tool responses.
+ */
+export type UiMode = 'openai';
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -387,6 +392,12 @@ export type ActorsMcpServerOptions = {
      * instead of APIFY_TOKEN environment variable, so it can be passed to the server
      */
     token?: string;
+    /**
+     * UI mode for tool responses.
+     * - 'openai': OpenAI specific widget rendering
+     * If not specified, there will be no widget rendering.
+     */
+    uiMode?: UiMode;
 }
 
 export type StructuredActorCard = {
@@ -410,6 +421,23 @@ export type StructuredActorCard = {
     rating?: number;
     modifiedAt?: string;
     isDeprecated: boolean;
+}
+
+/**
+ * Options for controlling which sections to include in an Actor card.
+ * All options default to true for backwards compatibility.
+ */
+export type ActorCardOptions = {
+    /** Include description text only */
+    includeDescription?: boolean;
+    /** Include usage statistics (users, runs, success rate, bookmarks) */
+    includeStats?: boolean;
+    /** Include pricing information */
+    includePricing?: boolean;
+    /** Include rating */
+    includeRating?: boolean;
+    /** Include metadata (developer, categories, last modified date, deprecation warning) */
+    includeMetadata?: boolean;
 }
 
 /**

@@ -1,11 +1,36 @@
-import { toolCategories } from '../tools/index.js';
-import type { HelperTool, ToolBase, ToolCategory, ToolEntry } from '../types.js';
+import type { ActorsMcpServerOptions, HelperTool, ToolBase, ToolEntry } from '../types.js';
+
+type ToolPublicFieldOptions = {
+    uiMode?: ActorsMcpServerOptions['uiMode'];
+    filterOpenAiMeta?: boolean;
+};
+
+/**
+ * Strips OpenAI specific metadata from the tool metadata. U
+ * @param meta - The tool metadata.
+ * @returns The tool metadata with OpenAI specific metadata stripped.
+ */
+function stripOpenAiMeta(meta?: ToolBase['_meta']) {
+    if (!meta) return meta;
+
+    const filteredEntries = Object.entries(meta)
+        .filter(([key]) => !key.startsWith('openai/'));
+
+    if (filteredEntries.length === 0) return undefined;
+
+    return Object.fromEntries(filteredEntries);
+}
 
 /**
  * Returns a public version of the tool containing only fields that should be exposed publicly.
  * Used for the tools list request.
  */
-export function getToolPublicFieldOnly(tool: ToolBase) {
+export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
+    const { uiMode, filterOpenAiMeta = false } = options;
+    const meta = filterOpenAiMeta && uiMode !== 'openai'
+        ? stripOpenAiMeta(tool._meta)
+        : tool._meta;
+
     return {
         name: tool.name,
         title: tool.title,
@@ -15,22 +40,8 @@ export function getToolPublicFieldOnly(tool: ToolBase) {
         annotations: tool.annotations,
         icons: tool.icons,
         execution: tool.execution,
+        _meta: meta,
     };
-}
-
-/**
- * Returns the tool objects for the given category names using toolCategories.
- */
-export function getExpectedToolsByCategories(categories: ToolCategory[]): ToolEntry[] {
-    return categories
-        .flatMap((category) => toolCategories[category] || []);
-}
-
-/**
- * Returns the tool names for the given category names using getExpectedToolsByCategories.
- */
-export function getExpectedToolNamesByCategories(categories: ToolCategory[]): string[] {
-    return getExpectedToolsByCategories(categories).map((tool) => tool.name);
 }
 
 /**

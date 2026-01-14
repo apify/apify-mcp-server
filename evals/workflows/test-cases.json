@@ -4,13 +4,13 @@
     {
       "id": "search-google-maps",
       "category": "search",
-      "query": "Find actors for scraping Google Maps",
+      "query": "Find actors for scraping Google Maps. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must search for actors related to Google Maps and return at least 3 results with their names and descriptions."
     },
     {
       "id": "search-add-python-actor",
       "tools": ["add-actor", "actors"],
-      "category": "search",
+      "category": "add",
       "query": "Find example Python Actor and add it to the MCP server",
       "reference": "The agent must find apify/python-example Actor or any similar and add it to the MCP server using the add-actor tool."
     },
@@ -36,91 +36,91 @@
     {
       "id": "search-instagram-scrapers",
       "category": "search",
-      "query": "What Actors can scrape Instagram posts?",
+      "query": "What Actors can scrape Instagram posts? Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Instagram post scrapers and return at least 3 relevant results."
     },
     {
       "id": "search-best-instagram-scrapers",
       "category": "search",
-      "query": "What are the best Instagram scrapers?",
+      "query": "What are the best Instagram scrapers? Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Instagram scrapers and present the top results with their descriptions."
     },
     {
       "id": "search-social-media-actors",
       "category": "search",
-      "query": "Find actors for scraping social media",
+      "query": "Find actors for scraping social media. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find social media scraping actors and return relevant results."
     },
     {
       "id": "search-twitter-tools",
       "category": "search",
-      "query": "Show me Twitter scraping tools",
+      "query": "Show me Twitter scraping tools. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Twitter scrapers and present the results."
     },
     {
       "id": "search-tiktok-actors",
       "category": "search",
-      "query": "What actors can scrape TikTok content?",
+      "query": "What actors can scrape TikTok content? Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find TikTok scraping actors and return relevant results."
     },
     {
       "id": "search-facebook-actor",
       "category": "search",
-      "query": "Find an Actor to get Facebook data",
+      "query": "Find an Actor to get Facebook data. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Facebook data scraping actors."
     },
     {
       "id": "search-news-scrapers",
       "category": "search",
-      "query": "Find actors that can scrape news articles",
+      "query": "Find actors that can scrape news articles. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors with appropriate keywords like 'news articles' to find relevant scrapers."
     },
     {
       "id": "search-ecommerce-tools",
       "category": "search",
-      "query": "What tools can extract data from e-commerce sites?",
+      "query": "What tools can extract data from e-commerce sites? Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find e-commerce data extraction tools."
     },
     {
       "id": "search-amazon-scrapers",
       "category": "search",
-      "query": "Show me Amazon product scrapers",
+      "query": "Show me Amazon product scrapers. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Amazon product scraping actors."
     },
     {
       "id": "search-playwright-mcp",
       "category": "search",
-      "query": "Search for Playwright browser MCP server",
+      "query": "Search for Playwright browser MCP server. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Playwright-related MCP server actors."
     },
     {
       "id": "search-amazon-products-solution",
       "category": "search",
-      "query": "I need to find solution to scrape details of Amazon products",
+      "query": "I need to find solution to scrape details of Amazon products. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Amazon product scraping solutions."
     },
     {
       "id": "search-twitter-ai-posts",
       "category": "search",
-      "query": "Find an Actor to fetch posts from Twitter about AI",
+      "query": "Find an Actor to fetch posts from Twitter about AI. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Twitter scraping actors."
     },
     {
       "id": "search-flight-info-actor",
       "category": "search",
-      "query": "Find an Actor to get flight information from Skyscanner",
+      "query": "Find an Actor to get flight information from Skyscanner. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find flight information scraping actors."
     },
     {
       "id": "search-weather-actors",
       "category": "search",
-      "query": "Can you find actors to scrape weather data?",
+      "query": "Can you find actors to scrape weather data? Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find weather data scraping actors."
     },
     {
       "id": "search-data-extraction-actors",
       "category": "search",
-      "query": "Find actors for data extraction tasks",
+      "query": "Find actors for data extraction tasks. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find data extraction actors since the query explicitly asks about 'actors'."
     },
     {
@@ -138,19 +138,19 @@
     {
       "id": "search-weather-data-tools",
       "category": "search",
-      "query": "Search for weather data scraping tools",
+      "query": "Search for weather data scraping tools. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find weather data scraping tools."
     },
     {
       "id": "search-flight-data-actor",
       "category": "search",
-      "query": "Find an Actor that scrapes flight data from booking sites",
+      "query": "Find an Actor that scrapes flight data from booking sites. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find flight data scraping actors."
     },
     {
       "id": "search-flight-extraction-actors",
       "category": "search",
-      "query": "Find actors for flight data extraction",
+      "query": "Find actors for flight data extraction. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find flight data extraction actors."
     },
     {
@@ -162,19 +162,19 @@
     {
       "id": "search-instagram-profile-actor",
       "category": "search",
-      "query": "I need to find Actor for instagram profile scraping",
+      "query": "I need to find Actor for instagram profile scraping. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Instagram profile scraping actors."
     },
     {
       "id": "search-tiktok-comments-actor",
       "category": "search",
-      "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
+      "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find TikTok comment scraping actors and return the search results."
     },
     {
       "id": "search-instagram-actor-ambiguous",
       "category": "search",
-      "query": "Find an Actor to get instagram posts",
+      "query": "Find an Actor to get instagram posts. Do not actually run any tools, only find the appropriate tools and explain which tools you would use and why.",
       "reference": "The agent must use search-actors to find Instagram post scraping actors."
     },
     {
@@ -272,6 +272,42 @@
       "category": "call",
       "query": "Search for Amazon laptop products and return only the product titles and prices using field filtering",
       "reference": "The agent must search for Amazon scraper, execute it with a laptop search query, then use get-actor-output with field filtering (using dot notation like 'title' and 'price') to return only the requested fields from the dataset."
+    },
+    {
+      "id": "fetch-details-minimal-output-input-schema-only",
+      "category": "fetch",
+      "query": "Get only the input schema for apify/python-example Actor",
+      "reference": "The agent must use fetch-actor-details with output=['input-schema'] to retrieve only the input schema, demonstrating token optimization. The response should contain the schema but not the README or full actor card."
+    },
+    {
+      "id": "fetch-details-mcp-tools-list",
+      "category": "mcp",
+      "query": "Show me what tools are available in the apify/actors-mcp-server MCP server",
+      "reference": "The agent must use fetch-actor-details with output=['mcp-tools'] to list available tools. The response should present the list of tools with their names and descriptions."
+    },
+    {
+      "id": "fetch-details-mcp-tools-then-call",
+      "category": "mcp",
+      "query": "List tools from apify/actors-mcp-server and then call the fetch-apify-docs tool to get docs from https://docs.apify.com",
+      "reference": "The agent must first use fetch-actor-details with output=['mcp-tools'] to discover tools, then use call-actor with actor='apify/actors-mcp-server:fetch-apify-docs' and proper input to call the specific tool."
+    },
+    {
+      "id": "fetch-details-non-mcp-actor-graceful",
+      "category": "fetch",
+      "query": "Show me MCP tools for apify/instagram-scraper",
+      "reference": "The agent must use fetch-actor-details with output=['mcp-tools'] for a regular (non-MCP) Actor. The response should gracefully indicate that this Actor is not an MCP server, not throw an error."
+    },
+    {
+      "id": "workflow-search-fetch-schema-call",
+      "category": "call",
+      "query": "Find a TikTok scraper, check what input it needs, and run it to get 5 videos from user @example",
+      "reference": "The agent must: 1) use search-actors to find TikTok scraper, 2) use fetch-actor-details with output=['input-schema'] to get required input, 3) use call-actor with proper input. This tests the complete new workflow pattern."
+    },
+    {
+      "id": "workflow-mcp-discover-and-execute",
+      "category": "mcp",
+      "query": "Find what an MCP weather Actor can do and use it to get weather for London",
+      "reference": "The agent must: 1) search for weather MCP Actor, 2) use fetch-actor-details with output=['mcp-tools'] to list tools, 3) use call-actor with actor:tool format to execute. Tests full MCP server discovery and execution workflow."
     }
   ]
 }

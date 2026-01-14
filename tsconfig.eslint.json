@@ -2,6 +2,7 @@
     "extends": "./tsconfig.json",
     "include": [
         "evals",
+        "scripts",
         "src",
         "test",
         "tests",

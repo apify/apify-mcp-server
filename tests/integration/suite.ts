@@ -6,17 +6,22 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import { ApifyClient } from '../../src/apify-client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER } from '../../src/const.js';
-import { fetchActorDetailsTool } from '../../src/tools/fetch-actor-details.js';
-import { fetchApifyDocsTool } from '../../src/tools/fetch-apify-docs.js';
-import { addTool } from '../../src/tools/helpers.js';
+// Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
-import { searchApifyDocsTool } from '../../src/tools/search-apify-docs.js';
-import { searchActors } from '../../src/tools/store_collection.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { ToolCategory } from '../../src/types.js';
-import { getExpectedToolNamesByCategories } from '../../src/utils/tools.js';
-import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, DEFAULT_TOOL_NAMES } from '../const.js';
+import type { ToolCategory, ToolEntry } from '../../src/types.js';
+import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
+import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
+
+// Helper to find tool by name from toolCategories (avoids circular dependency)
+function findToolByName(name: string): ToolEntry | undefined {
+    for (const tools of Object.values(toolCategories)) {
+        const tool = tools.find((t) => t.name === name);
+        if (tool) return tool;
+    }
+    return undefined;
+}
 
 type IntegrationTestsSuiteOptions = {
     suiteName: string;
@@ -145,12 +150,14 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + 1);
+            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + 2);
 
             const names = getToolNames(tools);
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain('get-actor-output');
+            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
             await client.close();
         });
 
@@ -165,12 +172,14 @@ export function createIntegrationTestsSuite(
             const expectedActors = ['apify-slash-rag-web-browser'];
 
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
-            expect(names).toHaveLength(expectedTotal.length + 1);
+            expect(names).toHaveLength(expectedTotal.length + 2);
 
             expectToolNamesToContain(names, expectedActorsTools);
             expectToolNamesToContain(names, expectedDocsTools);
             expectToolNamesToContain(names, expectedActors);
-            expect(names).toContain('get-actor-output');
+            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
             await client.close();
         });
@@ -204,11 +213,13 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors when enableAddingActors is false', async () => {
             client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 2);
 
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain('get-actor-output');
+            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
             await client.close();
         });
@@ -412,9 +423,11 @@ export function createIntegrationTestsSuite(
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
-            // Only the actors category, get-actor-output and add-actor should be loaded
-            const numberOfTools = toolCategories.actors.length + 2;
+            // Only the actors category, get-actor-output, get-actor-run, and add-actor should be loaded
+            const numberOfTools = toolCategories.actors.length + 3;
             expect(names).toHaveLength(numberOfTools);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
 
@@ -444,33 +457,70 @@ export function createIntegrationTestsSuite(
             );
         });
 
-        it('should enforce two-step process for call-actor tool', async () => {
+        it('should call Actor directly with required input', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: Get info (should work)
-            const infoResult = await client.callTool({
+            // Should fail without input (AJV validation error)
+            await expect(client!.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'info',
                 },
-            });
+            })).rejects.toThrow(/must have required property 'input'/);
 
-            expect(infoResult.content).toBeDefined();
-            const content = infoResult.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
-
-            // Step 2: Call with proper input (should work)
+            // Should succeed with input
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'call',
                     input: { first_number: 1, second_number: 2 },
+                },
+            });
+            expect(callResult.content).toBeDefined();
+        });
+
+        it('should support sync mode in call-actor (default behavior)', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    async: false,
                 },
             });
 
             expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+            // Sync mode should return dataset items directly
+            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+        });
+
+        it('should support async mode in call-actor and return runId', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    async: true,
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+            // Async mode should return runId immediately
+            expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
+            expect(content.some((item) => item.text.includes(HelperTools.ACTOR_RUNS_GET))).toBe(true);
+
+            // Check for structured content with runId
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.runId).toBeDefined();
+            expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
         });
 
         it('should find Actors in store search', async () => {
@@ -577,18 +627,27 @@ export function createIntegrationTestsSuite(
         it('should call MCP server Actor via call-actor and invoke fetch-apify-docs tool', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: info - ensure the MCP server Actor lists tools including fetch-apify-docs
-            const infoResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
+            // Step 1: Get MCP tools using fetch-actor-details
+            const detailsResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    step: 'info',
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
                 },
             });
 
-            expect(infoResult.content).toBeDefined();
-            const infoContent = infoResult.content as { text: string }[];
-            expect(infoContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+            expect(detailsResult.content).toBeDefined();
+            const detailsContent = detailsResult.content as { text: string }[];
+            expect(detailsContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
 
             // Step 2: call - invoke the MCP tool fetch-apify-docs via actor:tool syntax
             const DOCS_URL = 'https://docs.apify.com';
@@ -596,7 +655,6 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
-                    step: 'call',
                     input: { url: DOCS_URL },
                 },
             });
@@ -715,7 +773,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, searchApifyDocsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_SEARCH)?.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-actor-details matching outputSchema', async () => {
@@ -735,7 +793,581 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, fetchActorDetailsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return only input schema when output={ inputSchema: true }', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: true,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain schema but NOT readme or actor card
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(false);
+        });
+
+        it('should return only description and stats when specified', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain actor info but NOT readme or schema
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+        });
+
+        it('should list MCP tools when output={ mcpTools: true } for MCP server Actor', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
+            expect(content.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+        });
+
+        it('should return graceful note when output={ mcpTools: true } for regular Actor', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
+        });
+
+        it('should return structured output for fetch-actor-details with selective output matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.ACTOR_GET_DETAILS;
+
+            // Test with output={ mcpTools: true } - should validate against schema even with selective fields
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: true,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            // This should validate successfully - structured output must match schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+            const toolName = HelperTools.ACTOR_GET_DETAILS;
+
+            // Test with output={ description: true, readme: true } - inputSchema should be undefined
+            const result = await client.callTool({
+                name: toolName,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: true,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: true,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string; isError?: boolean }[];
+            expect(content.length).toBeGreaterThan(0);
+
+            // This should validate successfully - structured output must match schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+        });
+
+        it('should return only pricing when output={ pricing: true }', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain actor info (pricing is part of actor card) but NOT readme or schema
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(false);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+
+            // Validate structured output
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should return only readme when output={ readme: true }', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: true,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain README but NOT actor info card or input schema
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(false);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
+
+            // Validate structured output
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should use default values when output object is not provided', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // When output is not provided, all fields should default to their default values
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
+            // but NOT mcpTools (which defaults to false)
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
+        });
+
+        it('should return all fields when output includes all standard options', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: true,
+                        readme: true,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+
+            // Should contain all sections in text
+            expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
+            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
+
+            // Validate structured output exists and has all fields
+            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; readme?: string; inputSchema?: unknown } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.actorInfo).toBeDefined();
+            expect(resultWithStructured.structuredContent?.readme).toBeDefined();
+            expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
+
+            // Validate against schema
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should support granular output controls for rating and metadata', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // Test 1: Only pricing (should include pricing, NOT other sections)
+            const pricingOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: false,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            const pricingContent = pricingOnlyResult.content as { text: string }[];
+            const pricingText = pricingContent.map((item) => item.text).join('\n');
+            // Should include actor card header and pricing
+            expect(pricingText).toContain('Actor information');
+            expect(pricingText).toContain('Pricing');
+            // Should NOT include other sections
+            expect(pricingText).not.toContain('Description:');
+            expect(pricingText).not.toContain('Stats:');
+            expect(pricingText).not.toContain('Rating:');
+            expect(pricingText).not.toContain('Developed by:');
+            expect(pricingText).not.toContain('Categories:');
+            expect(pricingText).not.toContain('Last modified:');
+            expect(pricingText).not.toContain('README');
+
+            // Test 2: Only rating (should include rating for apify/rag-web-browser which has rating in stats)
+            const ragWebBrowser = 'apify/rag-web-browser';
+            const ratingOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ragWebBrowser,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: true,
+                        metadata: false,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            const ratingContent = ratingOnlyResult.content as { text: string }[];
+            const ratingText = ratingContent.map((item) => item.text).join('\n');
+            // Should include actor card header and rating
+            expect(ratingText).toContain('Actor information');
+            expect(ratingText).toContain('Rating:');
+            // Should NOT include other sections
+            expect(ratingText).not.toContain('Description:');
+            expect(ratingText).not.toContain('Stats:');
+            expect(ratingText).not.toContain('Pricing');
+            expect(ratingText).not.toContain('Developed by:');
+            expect(ratingText).not.toContain('Categories:');
+            expect(ratingText).not.toContain('Last modified:');
+            expect(ratingText).not.toContain('README');
+
+            // Test 3: Only metadata (should include developer, categories, last modified, deprecation status)
+            const metadataOnlyResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: false,
+                        rating: false,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            const metadataContent = metadataOnlyResult.content as { text: string }[];
+            const metadataText = metadataContent.map((item) => item.text).join('\n');
+            // Should include developer, categories, and last modified date
+            expect(metadataText).toContain('Developed by:');
+            expect(metadataText).toContain('Categories:');
+            expect(metadataText).toContain('Last modified:');
+            // Should NOT include other sections
+            expect(metadataText).not.toContain('Description:');
+            expect(metadataText).not.toContain('Stats:');
+            expect(metadataText).not.toContain('Pricing');
+            expect(metadataText).not.toContain('Rating:');
+            expect(metadataText).not.toContain('README');
+
+            // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
+            const combinationResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ragWebBrowser,
+                    output: {
+                        description: false,
+                        stats: false,
+                        pricing: true,
+                        rating: true,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            const combinationContent = combinationResult.content as { text: string }[];
+            const combinationText = combinationContent.map((item) => item.text).join('\n');
+            // Should include: pricing, rating, metadata (developer, categories, last modified)
+            expect(combinationText).toContain('Pricing');
+            expect(combinationText).toContain('Rating:');
+            expect(combinationText).toContain('Developed by:');
+            expect(combinationText).toContain('Categories:');
+            expect(combinationText).toContain('Last modified:');
+            // Should NOT include: description, stats, readme, input-schema
+            expect(combinationText).not.toContain('Description:');
+            expect(combinationText).not.toContain('Stats:');
+            expect(combinationText).not.toContain('README');
+            expect(combinationText).not.toContain('Input schema');
+
+            // Validate structured output for all test cases
+            validateStructuredOutput(pricingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(ratingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(metadataOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutput(combinationResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should dynamically test all output options and verify section presence/absence', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            // Use apify/rag-web-browser which has all sections (description, stats, pricing, rating, metadata)
+            const testActor = 'apify/rag-web-browser';
+
+            // Define all output options with their expected markers in text
+            const outputOptions = [
+                {
+                    name: 'description',
+                    field: 'description',
+                    markers: ['Description:'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'stats',
+                    field: 'stats',
+                    markers: ['Stats:', 'total users', 'monthly users'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Pricing', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'pricing',
+                    field: 'pricing',
+                    markers: ['Pricing'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Rating:', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'rating',
+                    field: 'rating',
+                    markers: ['Rating:', 'out of 5'],
+                    notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Pricing', 'Last modified:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'metadata',
+                    field: 'metadata',
+                    markers: ['Developed by:', 'Categories:', 'Last modified:'],
+                    notMarkers: ['Description:', 'Stats:', 'Pricing', 'Rating:', 'README', 'Input schema'],
+                },
+                {
+                    name: 'input-schema',
+                    field: 'inputSchema',
+                    markers: ['Input schema', '```json'],
+                    notMarkers: ['Developed by:', 'Description:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README'],
+                },
+                {
+                    name: 'readme',
+                    field: 'readme',
+                    markers: ['README'],
+                    notMarkers: ['Input schema'],
+                },
+            ] as const;
+
+            // Test each output option individually
+            for (const option of outputOptions) {
+                const result = await client.callTool({
+                    name: HelperTools.ACTOR_GET_DETAILS,
+                    arguments: {
+                        actor: testActor,
+                        output: {
+                            description: option.field === 'description',
+                            stats: option.field === 'stats',
+                            pricing: option.field === 'pricing',
+                            rating: option.field === 'rating',
+                            metadata: option.field === 'metadata',
+                            inputSchema: option.field === 'inputSchema',
+                            readme: option.field === 'readme',
+                            mcpTools: false,
+                        },
+                    },
+                });
+
+                const content = result.content as { text: string }[];
+                const text = content.map((item) => item.text).join('\n');
+
+                // Verify expected markers are present
+                for (const marker of option.markers) {
+                    expect(text, `output=${option.name} should contain "${marker}"`).toContain(marker);
+                }
+
+                // Verify unwanted markers are absent
+                for (const notMarker of option.notMarkers) {
+                    expect(text, `output=${option.name} should NOT contain "${notMarker}"`).not.toContain(notMarker);
+                }
+
+                // Validate structured output
+                validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            }
+
+            // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
+            const allCardSectionsResult = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: testActor,
+                    output: {
+                        description: true,
+                        stats: true,
+                        pricing: true,
+                        rating: true,
+                        metadata: true,
+                        inputSchema: false,
+                        readme: false,
+                        mcpTools: false,
+                    },
+                },
+            });
+
+            const allCardContent = allCardSectionsResult.content as { text: string }[];
+            const allCardText = allCardContent.map((item) => item.text).join('\n');
+
+            // Should include all actor card sections
+            expect(allCardText).toContain('Description:');
+            expect(allCardText).toContain('Stats:');
+            expect(allCardText).toContain('Pricing');
+            expect(allCardText).toContain('Rating:');
+            expect(allCardText).toContain('Developed by:');
+            expect(allCardText).toContain('Categories:');
+            expect(allCardText).toContain('Last modified:');
+
+            // Should NOT include readme or input-schema
+            expect(allCardText).not.toContain('README');
+            expect(allCardText).not.toContain('Input schema');
+
+            validateStructuredOutput(allCardSectionsResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return structured output for search-actors matching outputSchema', async () => {
@@ -757,7 +1389,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, searchActors.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.STORE_SEARCH)?.outputSchema, toolName);
         });
 
         it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
@@ -777,7 +1409,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, fetchApifyDocsTool.outputSchema, toolName);
+            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_FETCH)?.outputSchema, toolName);
         });
 
         it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {
@@ -804,20 +1436,20 @@ export function createIntegrationTestsSuite(
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
-            expect(toolNames).toContain(addTool.name);
+            expect(toolNames).toContain(HelperTools.ACTOR_ADD);
         });
 
         it('should include add-actor when enableAddingActors is false and add-actor is selected directly', async () => {
             client = await createClientFn({
                 enableAddingActors: false,
-                tools: [addTool.name],
+                tools: [HelperTools.ACTOR_ADD],
             });
 
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
             // Must include add-actor since it was selected directly
-            expect(toolNames).toContain(addTool.name);
+            expect(toolNames).toContain(HelperTools.ACTOR_ADD);
         });
 
         it('should handle multiple tool category keys input correctly', async () => {
@@ -972,11 +1604,13 @@ export function createIntegrationTestsSuite(
             // Test with enableAddingActors = false via env var
             client = await createClientFn({ enableAddingActors: false, useEnv: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 1);
+            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 2);
 
-            expectToolNamesToContain(names, DEFAULT_TOOL_NAMES);
+            expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain('get-actor-output');
+            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            // get-actor-run should be automatically included when call-actor is present
+            expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
             await client.close();
         });
@@ -1262,7 +1896,6 @@ export function createIntegrationTestsSuite(
                 name: 'call-actor',
                 arguments: {
                     actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    step: 'call',
                     input: { url: 'https://docs.apify.com' },
                 },
             });
@@ -1413,6 +2046,88 @@ export function createIntegrationTestsSuite(
                     throw new Error('Task should have been cancelled before completion');
                 }
             }
+        });
+
+        it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
+            client = await createClientFn({ useEnv: true, uiMode: 'openai' });
+            const tools = await client.listTools();
+            expect(tools.tools.length).toBeGreaterThan(0);
+
+            // Verify that tools have OpenAI metadata when UI mode is enabled
+            const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
+            expect(searchActorsTool).toBeDefined();
+            expect(searchActorsTool?._meta).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            const fetchActorDetailsToolFromList = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_GET_DETAILS);
+            expect(fetchActorDetailsToolFromList).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            const callActorTool = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_CALL);
+            expect(callActorTool).toBeDefined();
+            expect(callActorTool?._meta).toBeDefined();
+            expect(callActorTool?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(callActorTool?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use uiMode URL parameter when provided', async () => {
+            client = await createClientFn({ uiMode: 'openai' });
+            const tools = await client.listTools();
+            expect(tools.tools.length).toBeGreaterThan(0);
+
+            // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
+            const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
+            expect(searchActorsTool).toBeDefined();
+            expect(searchActorsTool?._meta).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(searchActorsTool?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            const fetchActorDetailsToolFromList = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_GET_DETAILS);
+            expect(fetchActorDetailsToolFromList).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(fetchActorDetailsToolFromList?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            const callActorTool = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_CALL);
+            expect(callActorTool).toBeDefined();
+            expect(callActorTool?._meta).toBeDefined();
+            expect(callActorTool?._meta?.['openai/outputTemplate']).toBeDefined();
+            expect(callActorTool?._meta?.['openai/widgetAccessible']).toBe(true);
+
+            await client.close();
+        });
+
+        it('should automatically include get-actor-run when uiMode is enabled', async () => {
+            client = await createClientFn({ uiMode: 'openai' });
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+
+            // When uiMode is enabled, default tools include call-actor, so get-actor-run should be included
+            expect(toolNames).toContain(HelperTools.ACTOR_CALL);
+            expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+
+            await client.close();
+        });
+
+        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should include get-actor-run without call-actor', async () => {
+            client = await createClientFn({ uiMode: 'openai', tools: ['docs'] });
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+
+            // get-actor-run should be included when uiMode is enabled, even if call-actor is not present
+            expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+            // Docs tools should be present
+            expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
+            expect(toolNames).toContain(HelperTools.DOCS_FETCH);
+            // call-actor should NOT be present since only 'docs' was selected
+            expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+
+            await client.close();
         });
     });
 }

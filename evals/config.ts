@@ -94,12 +94,13 @@ You must judge whether this agent made the correct selection.
 - Use when query has time indicators ("today", "recent", "current", "latest") or asks for immediate data
 - Example: "Get flight prices for tomorrow" or "What's the current weather?"
 
-**call-actor**: Has a mandatory two-step workflow: step="info" first (gets Actor details), then step="call" (runs Actor).
-- Calling with step="info" is CORRECT and required before execution
-- Do NOT penalize the info step - it's part of the normal workflow
+**call-actor**: Executes an Actor and returns results. Requires input parameter.
+- Use fetch-actor-details first to get the Actor's input schema
+- For MCP server Actors, use format "actorName:toolName"
 
-**fetch-actor-details**: Gets Actor documentation without running it. Overlaps with call-actor step="info".
-- Both fetch-actor-details AND call-actor step="info" are valid for getting Actor parameters/details
+**fetch-actor-details**: Gets Actor documentation, input schema, and details without running it.
+- Use output parameter to request specific information (e.g., output={ inputSchema: true } for minimal response)
+- Use output={{ mcpTools: true }} to list available tools for MCP server Actors
 
 **search-apify-docs**: Searches Apify documentation for general info about Apify platform/features.
 - Use when query asks about Apify concepts, features, or how to use the platform
