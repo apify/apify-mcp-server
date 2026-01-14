@@ -45,7 +45,7 @@ export const ActorSearch: React.FC = () => {
     const requestedActorId = widgetState?.requestedActorId;
 
     // When actorDetails is provided directly from tool (details-only call), ignore actors to force details view
-    // This handles the case when fetch-actor-details-widget is called directly (not from search)
+    // This handles the case when fetch-actor-details is called directly (not from search)
     const actors = hasToolActorDetails ? [] : actorsFromTool || [];
     const shouldForceDetailsView = hasToolActorDetails;
 
@@ -83,7 +83,7 @@ export const ActorSearch: React.FC = () => {
         });
 
         try {
-            const response = await window.openai.callTool("fetch-actor-details-widget", {
+            const response = await window.openai.callTool("fetch-actor-details", {
                 actor: `${actor.username}/${actor.name}`,
             });
 
