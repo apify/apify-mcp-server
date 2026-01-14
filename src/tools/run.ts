@@ -41,6 +41,9 @@ USAGE EXAMPLES:
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
+    },
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,

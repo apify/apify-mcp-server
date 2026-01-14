@@ -32,6 +32,9 @@ USAGE EXAMPLES:
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
+    },
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,

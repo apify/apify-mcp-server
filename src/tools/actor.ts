@@ -402,6 +402,9 @@ EXAMPLES:
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),
+    _meta: {
+        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
+    },
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

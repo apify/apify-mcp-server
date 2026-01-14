@@ -27,7 +27,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry } = options || {};
+    const { actors, enableAddingActors, tools, telemetry, uiMode } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -40,6 +40,9 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     // Append telemetry parameters (default to false for tests when not explicitly set)
     const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
     url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
+    if (uiMode !== undefined) {
+        url.searchParams.append('ui', uiMode);
+    }
 }
 
 export async function createMcpSseClient(
