@@ -33,11 +33,15 @@ export const getActorRun: ToolEntry = {
     description: `Get detailed information about a specific Actor run by runId.
 The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
 
+CRITICAL WARNING: NEVER call this tool immediately after call-actor in UI mode. The call-actor response includes a widget that automatically polls for updates. Calling this tool after call-actor is FORBIDDEN and unnecessary.
+
 USAGE:
-- Use when you need to inspect run status or retrieve associated resource IDs (e.g., datasetId for output).
+- Use ONLY when user explicitly asks about a specific run's status or details.
+- Use ONLY for runs that were started outside the current conversation.
+- DO NOT use this tool as part of the call-actor workflow in UI mode.
 
 USAGE EXAMPLES:
-- user_input: Show details of run y2h7sK3Wc
+- user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
