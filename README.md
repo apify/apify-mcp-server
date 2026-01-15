@@ -266,7 +266,7 @@ https://mcp.apify.com?tools=actors,docs&ui=openai
 The CLI can be configured using command-line flags. For example, to enable UI mode:
 
 ```bash
-npx @apify/actors-mcp-server --uiMode openai
+npx @apify/actors-mcp-server --ui openai
 ```
 
 You can also set it via the `UI_MODE` environment variable:
