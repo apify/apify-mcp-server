@@ -149,7 +149,7 @@ export async function createMcpStdioClient(
             args.push('--telemetry-env', telemetry.env);
         }
         if (uiMode !== undefined) {
-            args.push('--uiMode', uiMode);
+            args.push('--ui', uiMode);
         }
     }
 

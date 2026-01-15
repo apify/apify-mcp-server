@@ -56,7 +56,7 @@ type CliArgs = {
     /** UI mode for tool responses.
      * - 'openai': OpenAI specific widget rendering. If not specified, there will be no widget rendering.
      */
-    uiMode: UiMode;
+    ui: UiMode;
 }
 
 /**
@@ -123,10 +123,11 @@ Default: true (enabled)`,
 - 'DEV': Send events to development Segment workspace
 Only used when --telemetry-enabled is true`,
     })
-    .option('uiMode', {
+    .option('ui', {
         type: 'string',
         choices: ['openai'],
         default: undefined,
+        coerce: (arg) => arg || process.env.UI_MODE,
         describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
 - 'openai': OpenAI specific widget rendering
 Default: undefined (no widget rendering)`,
@@ -173,7 +174,7 @@ async function main() {
             env: getTelemetryEnv(argv.telemetryEnv),
         },
         token: apifyToken,
-        uiMode: argv.uiMode,
+        uiMode: argv.ui,
     });
 
     // Create an Input object from CLI arguments
@@ -188,7 +189,7 @@ async function main() {
 
     const apifyClient = new ApifyClient({ token: apifyToken });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.uiMode);
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui);
 
     mcpServer.upsertTools(tools);
 
