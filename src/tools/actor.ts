@@ -566,7 +566,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
                 // Build response text - simplified for widget auto-polling
                 let responseText = `Started Actor "${actorName}" (Run ID: ${actorRun.id}).`;
-                
+
                 if (apifyMcpServer.options.uiMode === 'openai') {
                     responseText += `
 
