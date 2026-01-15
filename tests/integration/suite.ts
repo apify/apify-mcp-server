@@ -514,7 +514,6 @@ export function createIntegrationTestsSuite(
             const content = callResult.content as { text: string }[];
             // Async mode should return runId immediately
             expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
-            expect(content.some((item) => item.text.includes(HelperTools.ACTOR_RUNS_GET))).toBe(true);
 
             // Check for structured content with runId
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
@@ -526,16 +525,6 @@ export function createIntegrationTestsSuite(
         it('should support sync mode in call-actor (default behavior)', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: Get info
-            await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'info',
-                },
-            });
-
-            // Step 2: Call with sync mode (explicit or default)
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
@@ -556,16 +545,6 @@ export function createIntegrationTestsSuite(
         it('should support async mode in call-actor and return runId', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
-            // Step 1: Get info
-            await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'info',
-                },
-            });
-
-            // Step 2: Call with async mode
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
@@ -580,7 +559,6 @@ export function createIntegrationTestsSuite(
             const content = callResult.content as { text: string }[];
             // Async mode should return runId immediately
             expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
-            expect(content.some((item) => item.text.includes(HelperTools.ACTOR_RUNS_GET))).toBe(true);
 
             // Check for structured content with runId
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };

@@ -96,6 +96,54 @@ export const ActorRun: React.FC = () => {
         }
     }, [toolOutput, runData]);
 
+    // Auto-polling: Fetch status updates automatically with gradual escalation
+    useEffect(() => {
+        if (!runData?.runId || !window.openai?.callTool) return;
+
+        const status = (runData.status || '').toUpperCase();
+        if (TERMINAL_STATUSES.has(status)) return;
+
+        let isCancelled = false;
+        let pollCount = 0;
+
+        // Gradual escalation: 5s, 5s, 10s, 10s, 15s, 15s... (max 60s)
+        const getNextDelay = (count: number): number => {
+            const baseDelay = Math.floor(count / 2) * 5 + 5;
+            return Math.min(baseDelay * 1000, 60000);
+        };
+
+        const pollStatus = async () => {
+            while (!isCancelled) {
+                await delay(getNextDelay(pollCount));
+                if (isCancelled) break;
+
+                try {
+                    const response = await window.openai.callTool('get-actor-run', {
+                        runId: runData.runId,
+                    });
+
+                    if (response.structuredContent) {
+                        const newData = response.structuredContent as unknown as ActorRunData;
+                        setRunData(newData);
+
+                        const newStatus = (newData.status || '').toUpperCase();
+                        if (TERMINAL_STATUSES.has(newStatus)) break;
+                    }
+
+                    pollCount++;
+                } catch (err) {
+                    console.error('[Auto-poll] Error:', err);
+                }
+            }
+        };
+
+        pollStatus();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [runData?.runId]);
+
     const flags = useMemo(() => {
         const status = (runData?.status || "").toUpperCase();
         const isRunning = status === "RUNNING";
@@ -124,39 +172,24 @@ export const ActorRun: React.FC = () => {
     const handleRefreshStatus = async () => {
         if (!runData || !window.openai?.callTool) return;
 
-        let snapshot: WidgetState = { ...widgetState, isRefreshing: true };
+        const snapshot: WidgetState = { ...widgetState, isRefreshing: true };
         await setWidgetState(snapshot);
 
         try {
-            let latestData = runData;
-            let keepPolling = true;
+            // Single poll only - auto-polling handles continuous updates
+            const response = await window.openai.callTool("get-actor-run", {
+                runId: runData.runId,
+            });
 
-            while (keepPolling) {
-                const response = await window.openai.callTool("get-actor-run", {
-                    runId: latestData.runId,
-                });
-
-                if (!response.structuredContent) break;
-
-                latestData = response.structuredContent as unknown as ActorRunData;
-                setRunData(latestData);
-
-                snapshot = { ...snapshot, lastUpdateTime: Date.now(), isRefreshing: true };
-                await setWidgetState(snapshot);
-
-                const status = (latestData.status || "").toUpperCase();
-                if (TERMINAL_STATUSES.has(status)) {
-                    keepPolling = false;
-                } else {
-                    await delay(10_000);
-                }
+            if (response.structuredContent) {
+                setRunData(response.structuredContent as unknown as ActorRunData);
+                await setWidgetState({ ...snapshot, lastUpdateTime: Date.now(), isRefreshing: false });
             }
         } catch (err) {
             console.error("Failed to fetch actor run status:", err);
             setError("Failed to fetch status update");
         } finally {
-            snapshot = { ...snapshot, isRefreshing: false };
-            await setWidgetState(snapshot);
+            await setWidgetState({ ...widgetState, isRefreshing: false });
         }
     };
 
@@ -212,6 +245,8 @@ const RunHeader: React.FC<{
     onRefresh: () => void;
     onOpenRun: () => void;
 }> = ({ actorName, status, isCompleted, isRefreshing, onRefresh, onOpenRun }) => {
+    const isRunning = (status || '').toUpperCase() === 'RUNNING';
+
     return (
         <div className="flex items-start justify-between w-full gap-4">
             <div className="flex-1 min-w-0">
@@ -221,6 +256,15 @@ const RunHeader: React.FC<{
 
                 <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant={getStatusVariant(status)}>{status}</Badge>
+
+                    {isRunning && (
+                        <Badge variant="secondary">
+                            <span className="flex items-center gap-1.5">
+                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                Auto-refreshing
+                            </span>
+                        </Badge>
+                    )}
 
                     {!isCompleted && (
                         <Button onClick={onRefresh} disabled={isRefreshing} loading={isRefreshing} variant="secondary" size="sm">

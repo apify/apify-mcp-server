@@ -48,6 +48,12 @@ jobs:
 
             -   name: Install dependencies
                 run: npm ci --force
+
+            -   name: Build web widgets
+                working-directory: src/web
+                run: |
+                    npm ci
+                    npm run build
                 
             -   name: Build
                 run: npm run build

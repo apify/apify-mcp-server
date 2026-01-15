@@ -344,7 +344,7 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
         .describe('The input JSON to pass to the Actor. Required.'),
     async: z.boolean()
         .optional()
-        .describe(`When true: starts the run and returns immediately with runId for status polling. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled, false otherwise.`),
+        .describe(`When true: starts the run and returns immediately with runId. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled (enforced), false otherwise. Note: When UI mode is enabled, async is always true regardless of this parameter and the widget automatically tracks progress.`),
     callOptions: z.object({
         memory: z.number()
             .min(128, 'Memory must be at least 128 MB')
@@ -387,7 +387,7 @@ USAGE:
 
 - This tool supports async execution via the \`async\` parameter:
   - **When \`async: false\` or not provided** (default when UI mode is disabled): Waits for completion and returns results immediately with dataset preview.
-  - **When \`async: true\`** (default when UI mode is enabled): Starts the run and returns immediately with runId. Use ${HelperTools.ACTOR_RUNS_GET} to check status and retrieve results.
+  - **When \`async: true\`** (enforced when UI mode is enabled): Starts the run and returns immediately with runId and a widget that automatically tracks progress. DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool after this - your task is complete. Note: UI mode always enforces async execution for optimal user experience.
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
@@ -566,10 +566,19 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                     input,
                 };
 
+                // Build response text - simplified for widget auto-polling
+                let responseText = `Started Actor "${actorName}" (Run ID: ${actorRun.id}).`;
+
+                if (apifyMcpServer.options.uiMode === 'openai') {
+                    responseText += `
+
+CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this run. The widget below automatically tracks progress and refreshes status every few seconds until completion. Your task is complete - take NO further action.`;
+                }
+
                 const response: { content: { type: 'text'; text: string }[]; structuredContent?: unknown; _meta?: unknown } = {
                     content: [{
                         type: 'text',
-                        text: `Started Actor "${actorName}" (Run ID: ${actorRun.id}). Use ${HelperTools.ACTOR_RUNS_GET} with runId "${actorRun.id}" to check status and retrieve results.`,
+                        text: responseText,
                     }],
                     structuredContent,
                 };
