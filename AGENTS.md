@@ -219,8 +219,8 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 
 ### Error handling
 
-- **User Errors**: Use appropriate error codes (4xx for client errors), log as `softFail`
-- **Internal Errors**: Use appropriate error codes (5xx for server errors), log with `log.exception` or `log.error`
+- **User errors**: Use appropriate error codes (4xx for client errors), log as `softFail`
+- **Internal errors**: Use appropriate error codes (5xx for server errors), log with `log.exception` or `log.error`
 - Always handle and propagate errors clearly
 - Use custom error classes from `src/errors.ts` when appropriate
 - **Don't log then throw**: Do NOT call `log.error()` immediately before throwing. Errors are already logged by the caller or error handler. This creates duplicate logs and violates separation of concerns.

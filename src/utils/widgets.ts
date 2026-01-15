@@ -10,6 +10,8 @@ const OPENAI_WIDGET_CSP = {
     resource_domains: [
         'https://mcp.apify.com',
         'https://images.apifyusercontent.com',
+        'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
+        'https://apify-image-uploads-prod.s3.amazonaws.com',
     ],
 } as const;
 
