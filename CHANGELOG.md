@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.7.0) (2026-01-15)
+
+### 🚀 Features
+
+- Simplify call-actor tool and add long rung running task support, ([#387](https://github.com/apify/apify-mcp-server/pull/387)) ([6ddf074](https://github.com/apify/apify-mcp-server/commit/6ddf07471a40107a687071b68837979b451b687a)) by [@MQ37](https://github.com/MQ37), closes [#365](https://github.com/apify/apify-mcp-server/issues/365)
+- Update AGENTS.md ([#388](https://github.com/apify/apify-mcp-server/pull/388)) ([2aa4994](https://github.com/apify/apify-mcp-server/commit/2aa4994068bed167dddf68984820ae5152c21cf3)) by [@jirispilka](https://github.com/jirispilka)
+- Implement migration plan from low-level Server API to high-level McpServer API ([#386](https://github.com/apify/apify-mcp-server/pull/386)) ([d9cc6bf](https://github.com/apify/apify-mcp-server/commit/d9cc6bf9bb94c73e73c61f5fe5c6aa3cfffa8655)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.6.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.6.8) (2026-01-08)
 
 ### 🚀 Features
