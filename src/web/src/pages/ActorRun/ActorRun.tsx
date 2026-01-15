@@ -148,7 +148,7 @@ export const ActorRun: React.FC = () => {
                 if (TERMINAL_STATUSES.has(status)) {
                     keepPolling = false;
                 } else {
-                    await delay(5000);
+                    await delay(10_000);
                 }
             }
         } catch (err) {

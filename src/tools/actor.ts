@@ -462,8 +462,10 @@ EXAMPLES:
                 ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
                 : new ApifyClient({ token: apifyToken });
 
-            // Determine execution mode: default to async if UI mode is enabled, otherwise sync
-            const isAsync = async ?? (apifyMcpServer.options.uiMode === 'openai');
+            // Determine execution mode: always async when UI mode is enabled, otherwise respect the parameter
+            const isAsync = apifyMcpServer.options.uiMode === 'openai'
+                ? true
+                : async ?? false;
 
             // Handle the case where LLM does not respect instructions when calling MCP server Actors
             // and does not provide the tool name.
