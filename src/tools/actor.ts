@@ -11,7 +11,6 @@ import {
     HelperTools,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
     TOOL_STATUS,
 } from '../const.js';
@@ -28,6 +27,7 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
 import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { getActorDefinition } from './build.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
@@ -442,25 +442,10 @@ EXAMPLES:
         }
 
         try {
-            /**
-            * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-            * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-            */
-            if (apifyMcpServer.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: SKYFIRE_TOOL_INSTRUCTIONS,
-                    }],
-                };
-            }
+            const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
+            if (skyfireError) return skyfireError;
 
-            /**
-            * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-            */
-            const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
-                ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
-                : new ApifyClient({ token: apifyToken });
+            const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
             // Determine execution mode: always async when UI mode is enabled, otherwise respect the parameter
             const isAsync = apifyMcpServer.options.uiMode === 'openai'

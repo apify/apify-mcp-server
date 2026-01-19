@@ -44,6 +44,7 @@ import {
     SERVER_INSTRUCTIONS,
     SERVER_NAME,
     SERVER_VERSION,
+    SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
@@ -69,6 +70,7 @@ import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
+import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
@@ -346,8 +348,7 @@ export class ActorsMcpServer {
 
                 // Handle Skyfire mode modifications
                 if (this.options.skyfireMode && (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_CALL)
-                    || (wrap.type === 'internal' && wrap.name === HelperTools.ACTOR_OUTPUT_GET))) {
+                    || (wrap.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(wrap.name as HelperTools)))) {
                     // Add Skyfire instructions to description if not already present
                     if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
                         clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
@@ -916,22 +917,16 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                        return buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS] });
-                    }
+                    const skyfireError = validateSkyfirePayId(this, args);
+                    if (skyfireError) return skyfireError;
 
                     // Create progress tracker if progressToken is available
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
                     const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
 
-                    /**
-                     * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-                     */
-                    const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
-                    const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
-                        ? new ApifyClient({ skyfirePayId })
-                        : new ApifyClient({ token: apifyToken });
+                    const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                    const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
                     try {
                         log.info('Calling Actor', { actorName: tool.actorFullName, input: actorArgs });
@@ -1097,16 +1092,15 @@ Please verify the tool name and ensure the tool is properly registered.`;
             let result: Record<string, unknown> = {};
 
             // Handle actor tool
-            if (this.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                result = buildMCPResponse({ texts: [SKYFIRE_TOOL_INSTRUCTIONS], isError: true });
+            const skyfireError = validateSkyfirePayId(this, args);
+            if (skyfireError) {
+                result = skyfireError;
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } else {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
                 const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
-                const { 'skyfire-pay-id': skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
-                const apifyClient = this.options.skyfireMode && typeof skyfirePayId === 'string'
-                    ? new ApifyClient({ skyfirePayId })
-                    : new ApifyClient({ token: apifyToken });
+                const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
                 log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
                 const callResult = await callActorGetDataset(

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -56,7 +56,10 @@ USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetArgs), additionalProperties: true }),
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
@@ -64,9 +67,13 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
+        if (skyfireError) return skyfireError;
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
             return buildMCPResponse({
@@ -98,7 +105,10 @@ USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetItemsArgs), additionalProperties: true }),
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
@@ -106,9 +116,13 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
+        if (skyfireError) return skyfireError;
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
         // Convert comma-separated strings to arrays
         const fields = parseCommaSeparatedList(parsed.fields);
@@ -167,7 +181,10 @@ USAGE EXAMPLES:
 - user_input: Generate schema for dataset 34das2 using 10 items
 - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: z.toJSONSchema(getDatasetSchemaArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getDatasetSchemaArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetSchemaArgs), additionalProperties: true }),
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,
@@ -175,9 +192,13 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
+        if (skyfireError) return skyfireError;
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
         // Get dataset items
         const datasetResponse = await client.dataset(parsed.datasetId).listItems({

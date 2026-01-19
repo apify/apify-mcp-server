@@ -18,6 +18,7 @@ export type McpClientOptions = {
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
     uiMode?: UiMode; // UI mode for tool responses. 'openai' for OpenAI specific widget rendering.
+    skyfireMode?: boolean; // Enable Skyfire mode (default: false)
 }
 
 function checkApifyToken(): void {
@@ -27,7 +28,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry, uiMode } = options || {};
+    const { actors, enableAddingActors, tools, telemetry, uiMode, skyfireMode } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -42,6 +43,9 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
     if (uiMode !== undefined) {
         url.searchParams.append('ui', uiMode);
+    }
+    if (skyfireMode) {
+        url.searchParams.append('payment', 'skyfire');
     }
 }
 
@@ -105,7 +109,7 @@ export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
     checkApifyToken();
-    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode } = options || {};
+    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode, skyfireMode } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -131,6 +135,9 @@ export async function createMcpStdioClient(
         if (uiMode !== undefined) {
             env.UI_MODE = uiMode;
         }
+        if (skyfireMode !== undefined) {
+            env.SKYFIRE_MODE = skyfireMode.toString();
+        }
     } else {
         // Use command line arguments as before
         if (actors !== undefined) {
@@ -150,6 +157,9 @@ export async function createMcpStdioClient(
         }
         if (uiMode !== undefined) {
             args.push('--ui', uiMode);
+        }
+        if (skyfireMode !== undefined) {
+            args.push('--skyfire', skyfireMode.toString());
         }
     }
 

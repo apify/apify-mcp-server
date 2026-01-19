@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools, SKYFIRE_TOOL_INSTRUCTIONS, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
+import { HelperTools, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -97,27 +97,10 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
 
-        /**
-             * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-             * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-             */
-        if (apifyMcpServer.options.skyfireMode
-                && args['skyfire-pay-id'] === undefined
-        ) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: SKYFIRE_TOOL_INSTRUCTIONS,
-                }],
-            };
-        }
+        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
+        if (skyfireError) return skyfireError;
 
-        /**
-             * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-             */
-        const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
-            ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
-            : new ApifyClient({ token: apifyToken });
+        const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const parsed = getActorOutputArgs.parse(args);
 
         // Parse fields into array
