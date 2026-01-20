@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
@@ -27,7 +27,11 @@ USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
     inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,
@@ -35,9 +39,10 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const store = await client.keyValueStore(parsed.storeId).get();
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
     },
@@ -73,7 +78,11 @@ USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreKeysArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
@@ -81,9 +90,10 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const keys = await client.keyValueStore(parsed.storeId).listKeys({
             exclusiveStartKey: parsed.exclusiveStartKey,
             limit: parsed.limit,
@@ -117,7 +127,11 @@ USAGE EXAMPLES:
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreRecordArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,
@@ -125,9 +139,10 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
     },

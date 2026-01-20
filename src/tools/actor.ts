@@ -4,14 +4,13 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     HelperTools,
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_MAX_OUTPUT_CHARS,
     TOOL_STATUS,
 } from '../const.js';
@@ -198,6 +197,7 @@ Actor description: ${definition.description}`;
             description,
             inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
+            requiresSkyfirePayId: true,
             memoryMbytes,
             icons: definition.pictureUrl
                 ? [{ src: definition.pictureUrl, mimeType: 'image/png' }]
@@ -398,6 +398,7 @@ EXAMPLES:
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),
+    requiresSkyfirePayId: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -442,25 +443,7 @@ EXAMPLES:
         }
 
         try {
-            /**
-            * In Skyfire mode, we check for the presence of `skyfire-pay-id`.
-            * If it is missing, we return instructions to the LLM on how to create it and pass it to the tool.
-            */
-            if (apifyMcpServer.options.skyfireMode && args['skyfire-pay-id'] === undefined) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: SKYFIRE_TOOL_INSTRUCTIONS,
-                    }],
-                };
-            }
-
-            /**
-            * Create Apify token, for Skyfire mode use `skyfire-pay-id` and for normal mode use `apifyToken`.
-            */
-            const apifyClient = apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
-                ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
-                : new ApifyClient({ token: apifyToken });
+            const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
             // Determine execution mode: always async when UI mode is enabled, otherwise respect the parameter
             const isAsync = apifyMcpServer.options.uiMode === 'openai'

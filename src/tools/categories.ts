@@ -13,7 +13,7 @@ import { getHtmlSkeleton } from './get-html-skeleton.js';
 import { addTool } from './helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './key_value_store.js';
 import { getUserKeyValueStoresList } from './key_value_store_collection.js';
-import { getActorRun, getActorRunLog } from './run.js';
+import { abortActorRun, getActorRun, getActorRunLog } from './run.js';
 import { getUserRunsList } from './run_collection.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
@@ -35,6 +35,7 @@ export const toolCategories = {
         getActorRun,
         getUserRunsList,
         getActorRunLog,
+        abortActorRun,
     ],
     storage: [
         getDataset,

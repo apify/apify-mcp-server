@@ -114,6 +114,8 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 
 - `tests/unit/` - Unit tests for individual modules
 - `tests/integration/` - Integration tests for MCP server functionality
+  - `tests/integration/suite.ts` - **Main integration test suite** where all test cases should be added
+  - Other files in this directory set up different transport modes (stdio, SSE, streamable-http) that all use suite.ts
 - `tests/helpers.ts` - Shared test utilities
 - `tests/const.ts` - Test constants
 
@@ -123,6 +125,33 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 - Use descriptive test names that explain what is being tested
 - Follow existing test patterns in the codebase
 - Ensure all tests pass before submitting a PR
+
+### Adding integration tests
+
+**IMPORTANT**: When adding integration test cases, add them to `tests/integration/suite.ts`, NOT as separate test files.
+
+The `suite.ts` file contains a test suite factory function `createIntegrationTestsSuite()` that is used by all transport modes (stdio, SSE, streamable-http). Adding tests here ensures they run across all transport types.
+
+**How to add a test case:**
+1. Open `tests/integration/suite.ts`
+2. Add your test case inside the `describe` block (before the closing braces at the end)
+3. Use `it()` or `it.runIf()` for conditional tests
+4. Follow the existing patterns for client creation and assertions
+5. Use `client = await createClientFn(options)` to create the test client
+6. Always call `await client.close()` when done
+
+**Example:**
+```typescript
+it('should do something awesome', async () => {
+    client = await createClientFn({ tools: ['actors'] });
+    const result = await client.callTool({
+        name: HelperTools.SOME_TOOL,
+        arguments: { /* ... */ },
+    });
+    expect(result.content).toBeDefined();
+    await client.close();
+});
+```
 
 ### Manual testing as an MCP client
 

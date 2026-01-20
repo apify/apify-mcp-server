@@ -93,6 +93,10 @@ export function createExpressApp(
             const uiModeParam = urlParams.get('ui') as UiMode | undefined;
             const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
 
+            // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
+            const paymentParam = urlParams.get('payment');
+            const skyfireMode = paymentParam === 'skyfire';
+
             const mcpServer = new ActorsMcpServer({
                 taskStore,
                 setupSigintHandler: false,
@@ -101,6 +105,7 @@ export function createExpressApp(
                     enabled: telemetryEnabled,
                 },
                 uiMode,
+                skyfireMode,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -221,6 +226,10 @@ export function createExpressApp(
                 const uiModeParam = urlParams.get('ui') as UiMode | undefined;
                 const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
 
+                // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
+                const paymentParam = urlParams.get('payment');
+                const skyfireMode = paymentParam === 'skyfire';
+
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
                     setupSigintHandler: false,
@@ -230,6 +239,7 @@ export function createExpressApp(
                         enabled: telemetryEnabled,
                     },
                     uiMode,
+                    skyfireMode,
                 });
 
                 // Load MCP server tools

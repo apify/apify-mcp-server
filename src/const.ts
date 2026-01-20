@@ -73,6 +73,24 @@ export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire PAY token ID used fo
 
 export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to interact with Apify Actors, storage, and documentation. Before running any Apify Actor, you need to set up a Skyfire PAY token for billing purposes. To set up the PAY token you need to use the create-pay-token tool from the Skyfire MCP server. The PAY token must be charged with a minimum of ${SKYFIRE_MIN_CHARGE_USD} USD to be valid.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When running an Actor using the call-actor tool, you must provide the Skyfire PAY token ID in the \`skyfire-pay-id\` input property. Similarly, when retrieving Actor output using the get-actor-output tool, you must also provide the same Skyfire PAY token ID in the \`skyfire-pay-id\` input property.`;
 
+/**
+ * Set of internal tool names that require Skyfire PAY token ID in Skyfire mode.
+ * These tools interact with Actor runs, datasets, or key-value stores and need billing support.
+ */
+export const SKYFIRE_ENABLED_TOOLS = new Set([
+    HelperTools.ACTOR_CALL,
+    HelperTools.ACTOR_OUTPUT_GET,
+    HelperTools.ACTOR_RUNS_GET,
+    HelperTools.ACTOR_RUNS_LOG,
+    HelperTools.ACTOR_RUNS_ABORT,
+    HelperTools.DATASET_GET,
+    HelperTools.DATASET_GET_ITEMS,
+    HelperTools.DATASET_SCHEMA_GET,
+    HelperTools.KEY_VALUE_STORE_GET,
+    HelperTools.KEY_VALUE_STORE_KEYS_GET,
+    HelperTools.KEY_VALUE_STORE_RECORD_GET,
+]);
+
 export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
 
 // Cache

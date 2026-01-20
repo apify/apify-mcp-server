@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
@@ -44,7 +44,11 @@ USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(getActorRunArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -57,7 +61,8 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
         try {
             const run = await client.run(parsed.runId).get();
@@ -171,7 +176,11 @@ USAGE EXAMPLES:
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
     // It does not make sense to add structured output here since the log API just returns plain text
-    ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(GetRunLogArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
@@ -179,9 +188,10 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.run(parsed.runId).log().get() ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
@@ -206,7 +216,11 @@ USAGE EXAMPLES:
 - user_input: Abort run y2h7sK3Wc
 - user_input: Gracefully abort run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(abortRunArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(abortRunArgs)),
+    /**
+     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
+     */
+    ajvValidate: compileSchema({ ...z.toJSONSchema(abortRunArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Abort Actor run',
         readOnlyHint: false,
@@ -215,9 +229,10 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
+
+        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },

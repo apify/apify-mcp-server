@@ -5,7 +5,7 @@ import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ApifyClient } from '../../src/apify-client.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER } from '../../src/const.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
 // Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
@@ -2092,6 +2092,62 @@ export function createIntegrationTestsSuite(
             }
         });
 
+        it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_PYTHON_EXAMPLE,
+                        input: {
+                            first_number: 10,
+                            second_number: 20,
+                        },
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let resultReceived = false;
+            let taskCreated = false;
+            for await (const message of stream) {
+                switch (message.type) {
+                    case 'taskCreated':
+                        taskCreated = true;
+                        expect(message.task.taskId).toBeDefined();
+                        break;
+                    case 'taskStatus':
+                        // Task should transition through statuses
+                        expect(['working', 'completed']).toContain(message.task.status);
+                        break;
+                    case 'result': {
+                        // Verify the result contains expected content
+                        expect(message.result.content).toBeDefined();
+                        const content = message.result.content as { text: string; type: string }[];
+                        expect(content.length).toBeGreaterThan(0);
+                        // Should contain dataset or run information
+                        const resultText = content.map((c) => c.text).join(' ');
+                        expect(resultText.length).toBeGreaterThan(0);
+                        resultReceived = true;
+                        break;
+                    }
+                    case 'error':
+                        throw message.error;
+                    default:
+                        throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                }
+            }
+
+            expect(taskCreated).toBe(true);
+            expect(resultReceived).toBe(true);
+        });
+
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();
@@ -2173,5 +2229,62 @@ export function createIntegrationTestsSuite(
 
             await client.close();
         });
+
+        // Skyfire mode only works with Streamable-HTTP transport.
+        it.runIf(options.transport === 'streamable-http')(
+            'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
+            async () => {
+                client = await createClientFn({
+                    skyfireMode: true,
+                    tools: Array.from(SKYFIRE_ENABLED_TOOLS),
+                });
+
+                const toolsList = await client.listTools();
+                const skyfireEnabledToolNames = Array.from(SKYFIRE_ENABLED_TOOLS);
+
+                // Check each skyfire-enabled tool
+                for (const toolName of skyfireEnabledToolNames) {
+                    const tool = toolsList.tools.find((t) => t.name === toolName);
+
+                    // Tool should exist
+                    expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
+
+                    if (!tool) continue;
+
+                    // Tool should have inputSchema with properties
+                    expect(tool.inputSchema, `Tool "${toolName}" should have inputSchema`).toBeDefined();
+                    expect(
+                        tool.inputSchema && 'properties' in tool.inputSchema,
+                        `Tool "${toolName}" should have inputSchema.properties`,
+                    ).toBe(true);
+
+                    if (!tool.inputSchema || !('properties' in tool.inputSchema)) continue;
+
+                    const properties = tool.inputSchema.properties as Record<string, unknown>;
+
+                    // skyfire-pay-id property should exist
+                    expect(
+                        properties['skyfire-pay-id'],
+                        `Tool "${toolName}" should have skyfire-pay-id property in inputSchema`,
+                    ).toBeDefined();
+
+                    // Verify skyfire-pay-id has correct structure
+                    const skyfireProperty = properties['skyfire-pay-id'] as Record<string, unknown>;
+                    expect(skyfireProperty.type, `skyfire-pay-id should have type "string"`).toBe('string');
+                    expect(
+                        skyfireProperty.description,
+                        `skyfire-pay-id should have description`,
+                    ).toBeDefined();
+
+                    // Tool description should contain skyfire instructions
+                    expect(
+                        tool.description?.includes('skyfire-pay-id'),
+                        `Tool "${toolName}" description should mention skyfire-pay-id`,
+                    ).toBe(true);
+                }
+
+                await client.close();
+            },
+        );
     });
 }
