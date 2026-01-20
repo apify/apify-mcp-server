@@ -5,6 +5,8 @@
  * at runtime.
  */
 
+import type { Resource } from '@modelcontextprotocol/sdk/types.js';
+
 const OPENAI_WIDGET_CSP = {
     connect_domains: ['https://api.apify.com'],
     resource_domains: [
@@ -28,24 +30,26 @@ export const WIDGET_URIS = {
     ACTOR_RUN: 'ui://widget/actor-run.html',
 } as const;
 
-export type WidgetConfig = {
-  uri: string;
-  name: string;
-  description: string;
-  jsFilename: string;
-  title: string;
-  meta: {
-    'openai/outputTemplate': string;
-    'openai/toolInvocation/invoking'?: string;
-    'openai/toolInvocation/invoked'?: string;
-    'openai/widgetAccessible': boolean;
-    'openai/resultCanProduceWidget': boolean;
-    'openai/widgetDomain': string;
-    'openai/widgetCSP': {
-      readonly connect_domains: readonly string[];
-      readonly resource_domains: readonly string[];
-    };
+type WidgetMeta = NonNullable<Resource['_meta']> & {
+  'openai/outputTemplate': string;
+  'openai/toolInvocation/invoking'?: string;
+  'openai/toolInvocation/invoked'?: string;
+  'openai/widgetAccessible': boolean;
+  'openai/resultCanProduceWidget': boolean;
+  'openai/widgetDomain': string;
+  'openai/widgetCSP': {
+    readonly connect_domains: readonly string[];
+    readonly resource_domains: readonly string[];
   };
+};
+
+export type WidgetConfig = {
+  uri: Resource['uri'];
+  name: Resource['name'];
+  description: NonNullable<Resource['description']>;
+  jsFilename: string;
+  title: NonNullable<Resource['title']>;
+  meta: WidgetMeta;
 };
 
 /**

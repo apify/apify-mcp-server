@@ -4,12 +4,12 @@ import { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { ActorsMcpServer } from '../mcp/server.js';
+import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorCardOptions, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { getActorMcpUrlCached } from '../utils/actor.js';
 import { fetchActorDetails, processActorDetailsForResponse } from '../utils/actor-details.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 /**

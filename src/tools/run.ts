@@ -3,6 +3,7 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import { HelperTools, TOOL_STATUS } from '../const.js';
+import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';

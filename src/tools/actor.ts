@@ -17,6 +17,7 @@ import {
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
+import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';

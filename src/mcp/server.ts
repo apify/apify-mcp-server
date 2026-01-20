@@ -46,11 +46,13 @@ import {
     SERVER_VERSION,
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-    SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
+import { createResourceService } from '../resources/resource_service.js';
+import type { AvailableWidget } from '../resources/widgets.js';
+import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
@@ -76,8 +78,6 @@ import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
-import type { AvailableWidget } from '../utils/widgets.js';
-import { resolveAvailableWidgets } from '../utils/widgets.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
@@ -437,114 +437,22 @@ export class ActorsMcpServer {
     }
 
     private setupResourceHandlers(): void {
+        const resourceService = createResourceService({
+            skyfireMode: this.options.skyfireMode,
+            uiMode: this.options.uiMode,
+            getAvailableWidgets: () => this.availableWidgets,
+        });
+
         this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-            const resources = [];
-
-            /**
-             * Return the usage guide resource only if Skyfire mode is enabled.
-             */
-            if (this.options.skyfireMode) {
-                resources.push({
-                    uri: 'file://readme.md',
-                    name: 'readme',
-                    description: `Apify MCP Server usage guide. Read this to understand how to use the server, especially in Skyfire mode before interacting with it.`,
-                    mimeType: 'text/markdown',
-                });
-            }
-
-            if (this.options.uiMode === 'openai') {
-                // Only register widgets that are available
-                for (const widget of this.availableWidgets.values()) {
-                    if (widget.exists) {
-                        resources.push({
-                            uri: widget.uri,
-                            name: widget.name,
-                            description: widget.description,
-                            mimeType: 'text/html+skybridge',
-                            _meta: widget.meta,
-                        });
-                    }
-                }
-            }
-
-            return { resources };
+            return await resourceService.listResources();
         });
 
         this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            const { uri } = request.params;
-            if (this.options.skyfireMode && uri === 'file://readme.md') {
-                return {
-                    contents: [{
-                        uri: 'file://readme.md',
-                        mimeType: 'text/markdown',
-                        text: SKYFIRE_README_CONTENT,
-                    }],
-                };
-            }
-
-            if (this.options.uiMode === 'openai' && uri.startsWith('ui://widget/')) {
-                const widget = this.availableWidgets.get(uri);
-
-                if (!widget || !widget.exists) {
-                    return {
-                        contents: [{
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
-                        }],
-                    };
-                }
-
-                try {
-                    log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
-                    const fs = await import('node:fs');
-
-                    const widgetJs = fs.readFileSync(widget.jsPath, 'utf-8');
-
-                    const widgetHtml = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>${widget.title}</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module">${widgetJs}</script>
-  </body>
-</html>`;
-
-                    return {
-                        contents: [{
-                            uri,
-                            mimeType: 'text/html+skybridge',
-                            text: widgetHtml,
-                            html: widgetHtml,
-                            _meta: widget.meta,
-                        }],
-                    };
-                } catch (error) {
-                    const errorMessage = error instanceof Error ? error.message : String(error);
-                    return {
-                        contents: [{
-                            uri,
-                            mimeType: 'text/plain',
-                            text: `Failed to load widget: ${errorMessage}`,
-                        }],
-                    };
-                }
-            }
-
-            return {
-                contents: [{
-                    uri, mimeType: 'text/plain', text: `Resource ${uri} not found`,
-                }],
-            };
+            return await resourceService.readResource(request.params.uri);
         });
 
         this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-            // No resource templates available, return empty response
-            return { resourceTemplates: [] };
+            return await resourceService.listResourceTemplates();
         });
     }
 
