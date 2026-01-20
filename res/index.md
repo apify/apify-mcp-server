@@ -30,6 +30,18 @@ Implementation plan for migrating from low-level `Server` to high-level `McpServ
 - Testing strategy
 - **Use case**: Reference for implementing the MCP SDK migration
 
+### [mcp-resources-analysis.md](./mcp-resources-analysis.md)
+Current MCP resources behavior and constraints (Skyfire readme and OpenAI widgets).
+- Handler locations and low-level MCP usage
+- Resource list/read behavior and error handling
+- **Use case**: Baseline reference before refactoring resources
+
+### [mcp-resources-refactor-analysis.md](./mcp-resources-refactor-analysis.md)
+Refactor plan for modularizing existing resource handling (no new resources).
+- Minimal resource service API (list/read/templates)
+- Behavior-preserving steps and non-goals
+- **Use case**: Step-by-step guide for refactoring without behavior change
+
 ### [patterns-for-simplification.md](./patterns-for-simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
 

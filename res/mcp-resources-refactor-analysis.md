@@ -1,62 +1,64 @@
-# MCP Resources Refactor Analysis (Modular, Extensible, Existing Resources Only)
+# MCP Resources Refactor Analysis (Implementation-Focused, Minimal, Extensible)
 
 ## Goals
 
-- Make the existing resource handling modular and easy to extend.
-- Keep the current low-level `Server` API approach.
-- Keep the code minimal.
-- Preserve behavior for existing resources (Skyfire usage guide and OpenAI UI widgets).
+- Keep the low-level `Server` API (no `McpServer` registry).
+- Preserve current resource behavior (Skyfire readme + OpenAI widgets).
+- Make the implementation easy to extend without extra abstractions.
+- Keep changes minimal and localized.
 - Do not add new resources or templates in this phase.
 
 ## Current State (Summary)
 
-- Resource handlers live in `ActorsMcpServer.setupResourceHandlers` (`src/mcp/server.ts`).
+- Resource handlers are thin and delegate to `createResourceService`.
+- Resource service lives in `src/resources/resource_service.ts`.
+- Widget registry lives in `src/resources/widgets.ts`.
 - Supported resources:
   - `file://readme.md` (Skyfire usage guide, gated by `skyfireMode`)
   - `ui://widget/*` (OpenAI UI widgets, gated by `uiMode === "openai"`)
-- Resource templates are not exposed (`ListResourceTemplatesRequestSchema` returns an empty list).
-- All resource logic is inline and coupled to server options.
+- Templates are not exposed (`ListResourceTemplatesRequestSchema` returns empty list).
 
-## Proposed Refactor (No Behavior Changes)
+## Implementation (Current, Behavior-Preserving)
 
-### 1. Introduce a Minimal Resource Service Layer
-Create a small resource service that owns listing and reading, and is invoked by the low-level request handlers.
-Keep it as a single module at first to avoid extra abstractions.
+### 1. Minimal Resource Service
+Create a single service module that owns list/read/templates logic and keeps handlers thin.
 
-- New module (example):
-  - `src/mcp/resource_service.ts`
+Location:
+- `src/resources/resource_service.ts`
 
-The service should expose:
-- `listResources(): Promise<Resource[]>`
-- `readResource(uri: string): Promise<ReadResourceResult>`
-- `listResourceTemplates(): Promise<{ resourceTemplates: [] }>` (empty for now)
+API:
+- `listResources(): Promise<ListResourcesResult>`
+- `readResource(uri: string): Promise<ReadResourceResult>` (extended to include `html` for widgets)
+- `listResourceTemplates(): Promise<ListResourceTemplatesResult>` (empty for now)
 
-### 2. Keep Low-Level MCP Request Handlers
+### 2. Thin MCP Handlers
+`ActorsMcpServer.setupResourceHandlers` delegates directly:
+- `ListResourcesRequestSchema` → `resourceService.listResources()`
+- `ReadResourceRequestSchema` → `resourceService.readResource(uri)`
+- `ListResourceTemplatesRequestSchema` → `resourceService.listResourceTemplates()`
 
-`ActorsMcpServer.setupResourceHandlers` should become thin glue:
-- `ListResourcesRequestSchema` => `resourceService.listResources()`
-- `ReadResourceRequestSchema` => `resourceService.readResource(uri)`
-- `ListResourceTemplatesRequestSchema` => `resourceService.listResourceTemplates()`
-
-No use of `registerResource` or `ResourceTemplate`, keeping low-level control intact.
-
-### 3. Preserve Existing Behavior
-
-- The Skyfire readme is still only exposed when `skyfireMode` is true.
-- Widgets are still only exposed when `uiMode === "openai"` and the widget exists.
-- Read failures continue to return plain-text errors to avoid client crashes.
+### 3. Behavior Preservation
+- Skyfire readme only when `skyfireMode` is true.
+- Widgets only when `uiMode === "openai"` and the widget file exists.
+- Read failures return plain-text content (no throw).
 
 ## Extension Points (Future-Friendly, Not Implemented Now)
 
-- Add a new provider class per new resource type.
-- Add optional resource template support by extending the service to return templates.
-- Add subscription handling by attaching a subscription manager to the resource service.
+- Add new resource types by extending `resource_service.ts`.
+- Add resource templates by returning non-empty `resourceTemplates`.
+- Add subscriptions/notifications by layering a small subscription manager in the service.
 
 ## Non-Goals
 
-- No new resources or templates.
-- No changes to the underlying low-level MCP `Server` usage.
-- No runtime behavior changes for current clients.
+- No new resource types or templates.
+- No change to low-level `Server` usage.
+- No behavior changes for current clients.
+
+## Implementation Notes (Simplicity + Extensibility)
+
+- Use MCP SDK types (`Resource`, `ListResourcesResult`, `ReadResourceResult`) for clarity.
+- Keep widget metadata in `_meta` with OpenAI keys as-is.
+- Keep service synchronous where possible and avoid extra indirection.
 
 ## Reference Implementations and Patterns
 
