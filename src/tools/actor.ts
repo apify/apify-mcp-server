@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
@@ -28,8 +28,6 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { getActorDefinition } from './build.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 

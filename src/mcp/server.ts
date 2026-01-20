@@ -34,7 +34,7 @@ import { type ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
     APIFY_MCP_URL,
@@ -72,7 +72,6 @@ import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
