@@ -2,7 +2,7 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { type AvailableWidget, getWidgetConfig, resolveAvailableWidgets, WIDGET_REGISTRY, WIDGET_URIS } from '../../src/utils/widgets.js';
+import { type AvailableWidget, getWidgetConfig, resolveAvailableWidgets, WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
 
 vi.mock('node:fs', () => ({
     default: {

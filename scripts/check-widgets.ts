@@ -8,7 +8,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { WIDGET_REGISTRY } from '../src/utils/widgets.js';
+import { WIDGET_REGISTRY } from '../src/resources/widgets.js';
 
 const filename = fileURLToPath(import.meta.url);
 const projectRoot = resolve(dirname(filename), '..');

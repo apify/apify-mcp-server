@@ -3,11 +3,11 @@ import { z } from 'zod';
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
 export async function searchActorsByKeywords(
