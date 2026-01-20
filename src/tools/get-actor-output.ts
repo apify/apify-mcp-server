@@ -5,7 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -88,6 +88,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getActorOutputArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get Actor output',
         readOnlyHint: true,
@@ -96,9 +97,6 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const parsed = getActorOutputArgs.parse(args);

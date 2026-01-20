@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
-import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
 
 const getKeyValueStoreArgs = z.object({
     storeId: z.string()
@@ -31,6 +31,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,
@@ -40,9 +41,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const store = await client.keyValueStore(parsed.storeId).get();
@@ -84,6 +82,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreKeysArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
@@ -93,9 +92,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const keys = await client.keyValueStore(parsed.storeId).listKeys({
@@ -135,6 +131,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreRecordArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,
@@ -144,9 +141,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);

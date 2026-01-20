@@ -818,6 +818,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         progressToken,
                         extra,
                         mcpSessionId,
+                        userRentedActorIds,
                     });
                 });
 
@@ -831,6 +832,15 @@ Please remove the "task" parameter from the tool call request or use a different
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
 
             try {
+                // Centralized skyfire validation for tools that require it
+                if (tool.requiresSkyfirePayId) {
+                    const skyfireError = validateSkyfirePayId(this, args);
+                    if (skyfireError) {
+                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        return skyfireError;
+                    }
+                }
+
                 // Handle internal tool
                 if (tool.type === 'internal') {
                     // Only create progress tracker for call-actor tool
@@ -917,9 +927,6 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    const skyfireError = validateSkyfirePayId(this, args);
-                    if (skyfireError) return skyfireError;
-
                     // Create progress tracker if progressToken is available
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
@@ -1035,8 +1042,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
         progressToken: string | number | undefined;
         extra: RequestHandlerExtra<Request, Notification>;
         mcpSessionId: string | undefined;
+        userRentedActorIds?: string[];
     }): Promise<void> {
-        const { taskId, tool, args, apifyToken, progressToken, extra, mcpSessionId } = params;
+        const { taskId, tool, args, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         const startTime = Date.now();
 
@@ -1051,24 +1059,6 @@ Please verify the tool name and ensure the tool is properly registered.`;
         const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
 
         try {
-            // Only support actor tool types for long-running tasks
-            if (tool.type !== 'actor') {
-                const msg = `Tool "${tool.name}" does not support long-running task execution. Only actor tools are supported in task mode.`;
-                log.softFail(msg, { statusCode: 400 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-                await this.taskStore.storeTaskResult(taskId, 'failed', {
-                    content: [{
-                        type: 'text' as const,
-                        text: msg,
-                    }],
-                    isError: true,
-                    internalToolStatus: toolStatus,
-                }, mcpSessionId);
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
-                return;
-            }
-
             // Check if task was already cancelled before we start execution.
             // Critical: if a client cancels the task immediately after creation (race condition),
             // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
@@ -1091,12 +1081,49 @@ Please verify the tool name and ensure the tool is properly registered.`;
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Handle actor tool
-            const skyfireError = validateSkyfirePayId(this, args);
-            if (skyfireError) {
-                result = skyfireError;
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-            } else {
+            // Centralized skyfire validation for tools that require it
+            if (tool.requiresSkyfirePayId) {
+                const skyfireError = validateSkyfirePayId(this, args);
+                if (skyfireError) {
+                    result = skyfireError;
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                }
+            }
+
+            // Handle internal tool execution in task mode
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
+                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
+
+                log.info('Calling internal tool for task', { taskId, name: tool.name, input: args });
+                const res = await tool.call({
+                    args,
+                    extra,
+                    apifyMcpServer: this,
+                    mcpServer: this.server,
+                    apifyToken,
+                    userRentedActorIds,
+                    progressTracker,
+                }) as object;
+
+                if (progressTracker) {
+                    progressTracker.stop();
+                }
+
+                // If tool provided internal status, use it; otherwise infer from isError flag
+                const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
+                if (internalToolStatus !== undefined) {
+                    toolStatus = internalToolStatus;
+                } else if ('isError' in rest && rest.isError) {
+                    toolStatus = TOOL_STATUS.FAILED;
+                } else {
+                    toolStatus = TOOL_STATUS.SUCCEEDED;
+                }
+
+                result = rest;
+            }
+
+            // Handle actor tool execution in task mode
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
                 const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;

@@ -2092,6 +2092,62 @@ export function createIntegrationTestsSuite(
             }
         });
 
+        it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_PYTHON_EXAMPLE,
+                        input: {
+                            first_number: 10,
+                            second_number: 20,
+                        },
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000, // Keep results for 60 seconds
+                    },
+                },
+            );
+
+            let resultReceived = false;
+            let taskCreated = false;
+            for await (const message of stream) {
+                switch (message.type) {
+                    case 'taskCreated':
+                        taskCreated = true;
+                        expect(message.task.taskId).toBeDefined();
+                        break;
+                    case 'taskStatus':
+                        // Task should transition through statuses
+                        expect(['working', 'completed']).toContain(message.task.status);
+                        break;
+                    case 'result': {
+                        // Verify the result contains expected content
+                        expect(message.result.content).toBeDefined();
+                        const content = message.result.content as { text: string; type: string }[];
+                        expect(content.length).toBeGreaterThan(0);
+                        // Should contain dataset or run information
+                        const resultText = content.map((c) => c.text).join(' ');
+                        expect(resultText.length).toBeGreaterThan(0);
+                        resultReceived = true;
+                        break;
+                    }
+                    case 'error':
+                        throw message.error;
+                    default:
+                        throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                }
+            }
+
+            expect(taskCreated).toBe(true);
+            expect(resultReceived).toBe(true);
+        });
+
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();

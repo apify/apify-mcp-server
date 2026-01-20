@@ -6,7 +6,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -60,6 +60,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
@@ -69,9 +70,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.dataset(parsed.datasetId).get();
@@ -109,6 +107,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetItemsArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
@@ -118,9 +117,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
@@ -185,6 +181,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetSchemaArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,
@@ -194,9 +191,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
