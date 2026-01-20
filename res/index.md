@@ -4,7 +4,7 @@ This directory contains useful documents and insights about the repository archi
 
 ## Files
 
-### [ALGOLIA.md](./ALGOLIA.md)
+### [algolia-analysis.md](./algolia.md)
 Technical analysis of Algolia search API responses for each documentation source.
 - Data structure overview for each doc source (apify, crawlee-js, crawlee-py)
 - Field availability patterns (content, hierarchy, anchors)
@@ -12,7 +12,7 @@ Technical analysis of Algolia search API responses for each documentation source
 - Recommendations for response processing logic
 - **Use case**: Understand what data is actually returned by Algolia to inform simplification decisions
 
-### [MCP_SERVER_REFACTOR_ANALYSIS.md](./MCP_SERVER_REFACTOR_ANALYSIS.md)
+### [mcp-server-refactor-analysis.md](./mcp-server-refactor-analysis.md)
 Implementation plan for migrating from low-level `Server` to high-level `McpServer` API.
 
 **Structure:**
@@ -30,7 +30,7 @@ Implementation plan for migrating from low-level `Server` to high-level `McpServ
 - Testing strategy
 - **Use case**: Reference for implementing the MCP SDK migration
 
-### [PATTERNS_FOR_SIMPLIFICATION.md](./PATTERNS_FOR_SIMPLIFICATION.md)
+### [patterns-for-simplification.md](./patterns-for-simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
 
 **Key patterns identified:**
