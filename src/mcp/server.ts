@@ -831,6 +831,15 @@ Please remove the "task" parameter from the tool call request or use a different
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
 
             try {
+                // Centralized skyfire validation for tools that require it
+                if (tool.requiresSkyfirePayId) {
+                    const skyfireError = validateSkyfirePayId(this, args);
+                    if (skyfireError) {
+                        toolStatus = TOOL_STATUS.SOFT_FAIL;
+                        return skyfireError;
+                    }
+                }
+
                 // Handle internal tool
                 if (tool.type === 'internal') {
                     // Only create progress tracker for call-actor tool
@@ -917,9 +926,6 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    const skyfireError = validateSkyfirePayId(this, args);
-                    if (skyfireError) return skyfireError;
-
                     // Create progress tracker if progressToken is available
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
@@ -1091,37 +1097,39 @@ Please verify the tool name and ensure the tool is properly registered.`;
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Handle actor tool
-            const skyfireError = validateSkyfirePayId(this, args);
-            if (skyfireError) {
-                result = skyfireError;
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
-            } else {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
-                const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
-                const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
-                const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
-
-                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
-                const callResult = await callActorGetDataset(
-                    tool.actorFullName,
-                    actorArgs,
-                    apifyClient,
-                    callOptions,
-                    progressTracker,
-                    extra.signal,
-                );
-
-                if (!callResult) {
-                    toolStatus = TOOL_STATUS.ABORTED;
-                    result = {};
+            // Centralized skyfire validation for tools that require it
+            if (tool.requiresSkyfirePayId) {
+                const skyfireError = validateSkyfirePayId(this, args);
+                if (skyfireError) {
+                    result = skyfireError;
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
                 } else {
-                    const content = buildActorResponseContent(tool.actorFullName, callResult);
-                    result = { content };
-                }
+                    const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
+                    const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
+                    const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
+                    const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
-                if (progressTracker) {
-                    progressTracker.stop();
+                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
+                    const callResult = await callActorGetDataset(
+                        tool.actorFullName,
+                        actorArgs,
+                        apifyClient,
+                        callOptions,
+                        progressTracker,
+                        extra.signal,
+                    );
+
+                    if (!callResult) {
+                        toolStatus = TOOL_STATUS.ABORTED;
+                        result = {};
+                    } else {
+                        const content = buildActorResponseContent(tool.actorFullName, callResult);
+                        result = { content };
+                    }
+
+                    if (progressTracker) {
+                        progressTracker.stop();
+                    }
                 }
             }
 

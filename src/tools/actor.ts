@@ -27,7 +27,7 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
 import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 import { getActorDefinition } from './build.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
@@ -198,6 +198,7 @@ Actor description: ${definition.description}`;
             description,
             inputSchema: inputSchema as ToolInputSchema,
             ajvValidate,
+            requiresSkyfirePayId: true,
             memoryMbytes,
             icons: definition.pictureUrl
                 ? [{ src: definition.pictureUrl, mimeType: 'image/png' }]
@@ -398,6 +399,7 @@ EXAMPLES:
         // Additional props true to allow skyfire-pay-id
         additionalProperties: true,
     }),
+    requiresSkyfirePayId: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -442,9 +444,6 @@ EXAMPLES:
         }
 
         try {
-            const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-            if (skyfireError) return skyfireError;
-
             const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
             // Determine execution mode: always async when UI mode is enabled, otherwise respect the parameter

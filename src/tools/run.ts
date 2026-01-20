@@ -8,7 +8,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { createApifyClientWithSkyfireSupport, validateSkyfirePayId } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
 import { getWidgetConfig, WIDGET_URIS } from '../utils/widgets.js';
 
 const getActorRunArgs = z.object({
@@ -48,6 +48,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(getActorRunArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -60,9 +61,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
@@ -182,6 +180,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(GetRunLogArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
@@ -191,9 +190,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.run(parsed.runId).log().get() ?? '';
@@ -224,6 +220,7 @@ USAGE EXAMPLES:
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
     ajvValidate: compileSchema({ ...z.toJSONSchema(abortRunArgs), additionalProperties: true }),
+    requiresSkyfirePayId: true,
     annotations: {
         title: 'Abort Actor run',
         readOnlyHint: false,
@@ -234,9 +231,6 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer } = toolArgs;
         const parsed = abortRunArgs.parse(args);
-
-        const skyfireError = validateSkyfirePayId(apifyMcpServer, args);
-        if (skyfireError) return skyfireError;
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
