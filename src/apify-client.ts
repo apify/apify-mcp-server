@@ -3,6 +3,8 @@ import { ApifyClient as _ApifyClient } from 'apify-client';
 import type { AxiosRequestConfig } from 'axios';
 
 import { USER_AGENT_ORIGIN } from './const.js';
+import type { ActorsMcpServer } from './mcp/server.js';
+import type { ApifyToken } from './types.js';
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
@@ -61,4 +63,23 @@ export class ApifyClient extends _ApifyClient {
             requestInterceptors,
         });
     }
+}
+
+/**
+ * Creates ApifyClient with appropriate credentials based on Skyfire mode.
+ * In Skyfire mode, uses skyfire-pay-id from args; otherwise uses apifyToken.
+ *
+ * @param apifyMcpServer - The MCP server instance with configuration options
+ * @param args - Tool arguments that may contain skyfire-pay-id
+ * @param apifyToken - Standard Apify token for non-Skyfire mode
+ * @returns ApifyClient instance configured for the appropriate mode
+ */
+export function createApifyClientWithSkyfireSupport(
+    apifyMcpServer: ActorsMcpServer,
+    args: Record<string, unknown>,
+    apifyToken: ApifyToken,
+): ApifyClient {
+    return apifyMcpServer.options.skyfireMode && typeof args['skyfire-pay-id'] === 'string'
+        ? new ApifyClient({ skyfirePayId: args['skyfire-pay-id'] })
+        : new ApifyClient({ token: apifyToken });
 }

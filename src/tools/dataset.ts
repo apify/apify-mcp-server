@@ -6,7 +6,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()

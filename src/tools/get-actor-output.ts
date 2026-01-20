@@ -5,7 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 
 /**
  * Zod schema for get-actor-output tool arguments

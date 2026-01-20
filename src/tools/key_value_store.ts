@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
-import { createApifyClientWithSkyfireSupport } from '../utils/skyfire.js';
+import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 
 const getKeyValueStoreArgs = z.object({
     storeId: z.string()
