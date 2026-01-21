@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.7.4) (2026-01-21)
+
+### 🚀 Features
+
+- Declare types in AGENTS.md for better structure and clarity ([#396](https://github.com/apify/apify-mcp-server/pull/396)) ([0207f3e](https://github.com/apify/apify-mcp-server/commit/0207f3e7befd88673b8aca52dbdf7609364b0bf9)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Refactor resource handling to a dedicated resources dir ([#394](https://github.com/apify/apify-mcp-server/pull/394)) ([e69f74f](https://github.com/apify/apify-mcp-server/commit/e69f74f9baafc9f9fced1cf088b6b9027fa3261b)) by [@jirispilka](https://github.com/jirispilka)
+- Skyfire parameter injection and missing tool registration ([#393](https://github.com/apify/apify-mcp-server/pull/393)) ([bc8aebd](https://github.com/apify/apify-mcp-server/commit/bc8aebdf43e6e6ff5f3b79953df4be2bc97be6fc)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.7.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.7.1) (2026-01-15)
 
 
