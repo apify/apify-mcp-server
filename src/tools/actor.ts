@@ -555,7 +555,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 if (apifyMcpServer.options.uiMode === 'openai') {
                     responseText += `
 
-CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this run. The widget below automatically tracks progress and refreshes status every few seconds until completion. Your task is complete - take NO further action.`;
+CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this run. The widget below automatically tracks progress and refreshes status every few seconds until completion. Do NOT use ${HelperTools.ACTOR_RUNS_GET} to get more items or to satisfy a requested limit. Your task is complete - take NO further action.`;
                 }
 
                 const response: { content: { type: 'text'; text: string }[]; structuredContent?: unknown; _meta?: unknown } = {

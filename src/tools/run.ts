@@ -34,6 +34,7 @@ export const getActorRun: ToolEntry = {
 The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
 
 CRITICAL WARNING: NEVER call this tool immediately after call-actor in UI mode. The call-actor response includes a widget that automatically polls for updates. Calling this tool after call-actor is FORBIDDEN and unnecessary.
+This tool does NOT return output items. Do NOT use it to satisfy a requested limit or to get more results.
 
 USAGE:
 - Use ONLY when user explicitly asks about a specific run's status or details.

@@ -235,6 +235,9 @@ These tools are called **Actors**. They enable you to extract structured data fr
 
 When you call \`${HelperTools.ACTOR_CALL}\` in async mode (UI mode), the response will include a widget that automatically polls for status updates. You must NOT call \`${HelperTools.ACTOR_RUNS_GET}\` or any other tool after this - your task is complete. The widget handles everything automatically.
 
+CRITICAL: Never call \`${HelperTools.ACTOR_RUNS_GET}\` to get more items or to satisfy a requested limit. It does NOT return output items.
+If the preview is short or the user asked for more items, STOP and tell the user to use \`${HelperTools.ACTOR_OUTPUT_GET}\` with the datasetId.
+
 This is FORBIDDEN and will result in unnecessary duplicate polling. Always stop after receiving the \`${HelperTools.ACTOR_CALL}\` response in UI mode.
 
 ## Tool dependencies and disambiguation

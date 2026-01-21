@@ -43,7 +43,8 @@ ${JSON.stringify(displaySchema)}
 
 Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
 
-If you need to retrieve additional data, use the "get-actor-output" tool with: datasetId: "${datasetId}". Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.
+Do NOT call "get-actor-run" to get more items or to satisfy a requested limit. It does NOT return output items.
+If you need more data, use the "get-actor-output" tool with: datasetId: "${datasetId}". Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.
 `;
 
     const itemsPreviewText = result.previewItems.length > 0
