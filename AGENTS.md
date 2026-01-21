@@ -208,6 +208,12 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - Prefer `type` for flexibility.
 - Use `interface` only when it's required for class implementations (`implements`).
 
+### Types organization
+
+- **Centralize shared/public types**: Put cross-module domain types and public API types in `src/types.ts`.
+- **Co-locate local types**: Keep module- or feature-specific types next to their usage (in the same file or a local `types.ts`).
+- **Use a folder-level `types.ts`** when multiple files in a folder share types, instead of inflating the root `src/types.ts`.
+
 ### Comments
 
 - Use JSDoc style comments (`/** */`) for functions, interfaces, enums, and classes
