@@ -27,6 +27,7 @@ export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
     ACTOR_GET_DETAILS = 'fetch-actor-details',
+    ACTOR_GET_SCHEMA = 'fetch-actor-schema',
     ACTOR_OUTPUT_GET = 'get-actor-output',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',
@@ -41,6 +42,7 @@ export enum HelperTools {
     KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
     KEY_VALUE_STORE_RECORD_GET = 'get-key-value-store-record',
     STORE_SEARCH = 'search-actors',
+    STORE_SEARCH_INTERNAL = 'search-actors-internal',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
     GET_HTML_SKELETON = 'get-html-skeleton',
@@ -241,7 +243,7 @@ This is FORBIDDEN and will result in unnecessary duplicate polling. Always stop 
 
 ### Tool dependencies
 - \`${HelperTools.ACTOR_CALL}\`:
-  - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema
+  - Use \`${HelperTools.ACTOR_GET_SCHEMA}\` first to obtain the Actor's input schema
   - Then call with proper input to execute the Actor
   - For MCP server Actors, use format "actorName:toolName" to call specific tools
   - Supports async execution via the \`async\` parameter:
@@ -253,6 +255,10 @@ This is FORBIDDEN and will result in unnecessary duplicate polling. Always stop 
   Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **${HelperTools.STORE_SEARCH} vs ${HelperTools.ACTOR_GET_DETAILS}:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
+- **Internal vs public Actor tools:**
+  - \`${HelperTools.STORE_SEARCH_INTERNAL}\` is for silent name resolution; \`${HelperTools.STORE_SEARCH}\` is for user-facing discovery
+  - \`${HelperTools.ACTOR_GET_SCHEMA}\` is for silent schema lookup; \`${HelperTools.ACTOR_GET_DETAILS}\` is for user-facing details
+  - When the next step is running an Actor, ALWAYS use \`${HelperTools.STORE_SEARCH_INTERNAL}\` for name resolution, never \`${HelperTools.STORE_SEARCH}\`
 - **${HelperTools.STORE_SEARCH} vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs ${HelperTools.ACTOR_CALL}:**

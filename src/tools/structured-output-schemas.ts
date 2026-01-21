@@ -132,6 +132,17 @@ export const actorDetailsOutputSchema = {
 };
 
 /**
+ * Schema for Actor schema output (fetch-actor-schema tool)
+ */
+export const actorSchemaOutputSchema = {
+    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    properties: {
+        inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
+    },
+    required: ['inputSchema'],
+};
+
+/**
  * Schema for search results output (store-search tool)
  */
 export const actorSearchOutputSchema = {
@@ -145,6 +156,30 @@ export const actorSearchOutputSchema = {
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
         instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
+    },
+    required: ['actors', 'query', 'count'],
+};
+
+/**
+ * Schema for internal search results (search-actors-internal tool)
+ */
+export const actorSearchInternalOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actors: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    fullName: { type: 'string', description: 'Full Actor name (username/name)' },
+                    title: { type: 'string', description: 'Actor title' },
+                    description: { type: 'string', description: 'Actor description' },
+                },
+                required: ['fullName'],
+            },
+        },
+        query: { type: 'string', description: 'The search query used' },
+        count: { type: 'number', description: 'Number of Actors returned' },
     },
     required: ['actors', 'query', 'count'],
 };

@@ -71,7 +71,7 @@ Examples:
  * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
  *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
  */
-function filterRentalActors(
+export function filterRentalActors(
     actors: ActorStoreList[],
     userRentedActorIds: string[],
 ): ActorStoreList[] {
@@ -91,6 +91,7 @@ export const searchActors: ToolEntry = {
     description: `
 Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
+Do NOT use this tool for helper name resolution before running an Actor; use ${HelperTools.STORE_SEARCH_INTERNAL} instead.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
@@ -219,7 +220,7 @@ View the interactive widget below for detailed Actor information.
 
  ${actorsText}
 
- If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_SCHEMA}.
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
  `;
 

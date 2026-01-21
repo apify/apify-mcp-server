@@ -365,8 +365,11 @@ export const callActor: ToolEntry = {
     description: `Call any Actor from the Apify Store.
 
 WORKFLOW:
-1. Use fetch-actor-details with output={ inputSchema: true } to get the Actor's input schema (recommended to save tokens)
+1. Use ${HelperTools.ACTOR_GET_SCHEMA} to get the Actor's input schema (recommended to save tokens)
 2. Call this tool with the actor name and proper input based on the schema
+
+If the actor name is not in "username/name" format, use ${HelperTools.STORE_SEARCH_INTERNAL} to resolve the correct Actor first.
+Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.
 
 For MCP server Actors:
 - Use fetch-actor-details with output={ mcpTools: true } to list available tools

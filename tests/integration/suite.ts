@@ -167,7 +167,13 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
+            const expectedActorsTools = [
+                'fetch-actor-details',
+                'fetch-actor-schema',
+                'search-actors',
+                'search-actors-internal',
+                'call-actor',
+            ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = ['apify-slash-rag-web-browser'];
 
