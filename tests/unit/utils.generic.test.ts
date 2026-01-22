@@ -184,24 +184,24 @@ describe('parseBooleanFromString', () => {
         expect(parseBooleanFromString('  0  ')).toBe(false);
     });
 
-    it('should return undefined for null and undefined', () => {
-        expect(parseBooleanFromString(null)).toBeUndefined();
-        expect(parseBooleanFromString(undefined)).toBeUndefined();
+    it('should return null for null and undefined', () => {
+        expect(parseBooleanFromString(null)).toBeNull();
+        expect(parseBooleanFromString(undefined)).toBeNull();
     });
 
-    it('should return undefined for empty strings', () => {
-        expect(parseBooleanFromString('')).toBeUndefined();
-        expect(parseBooleanFromString('   ')).toBeUndefined();
-        expect(parseBooleanFromString('\t')).toBeUndefined();
-        expect(parseBooleanFromString('\n')).toBeUndefined();
+    it('should return null for empty strings', () => {
+        expect(parseBooleanFromString('')).toBeNull();
+        expect(parseBooleanFromString('   ')).toBeNull();
+        expect(parseBooleanFromString('\t')).toBeNull();
+        expect(parseBooleanFromString('\n')).toBeNull();
     });
 
-    it('should return undefined for unrecognized strings', () => {
-        expect(parseBooleanFromString('yes')).toBeUndefined();
-        expect(parseBooleanFromString('no')).toBeUndefined();
-        expect(parseBooleanFromString('2')).toBeUndefined();
-        expect(parseBooleanFromString('maybe')).toBeUndefined();
-        expect(parseBooleanFromString('on')).toBeUndefined();
-        expect(parseBooleanFromString('off')).toBeUndefined();
+    it('should return null for unrecognized strings', () => {
+        expect(parseBooleanFromString('yes')).toBeNull();
+        expect(parseBooleanFromString('no')).toBeNull();
+        expect(parseBooleanFromString('2')).toBeNull();
+        expect(parseBooleanFromString('maybe')).toBeNull();
+        expect(parseBooleanFromString('on')).toBeNull();
+        expect(parseBooleanFromString('off')).toBeNull();
     });
 });
