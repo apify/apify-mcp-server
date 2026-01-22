@@ -21,6 +21,7 @@ async function getMcpToolsMessage(
     apifyClient: ApifyClient,
     apifyToken: string,
     apifyMcpServer: ActorsMcpServer,
+    customHeaders?: Record<string, string>,
 ): Promise<string> {
     const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
 
@@ -35,7 +36,7 @@ async function getMcpToolsMessage(
     }
 
     // Connect and list tools
-    const client = await connectMCPClient(mcpServerUrl, apifyToken);
+    const client = await connectMCPClient(mcpServerUrl, apifyToken, customHeaders);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }
@@ -109,7 +110,7 @@ EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, customHeaders } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -193,7 +194,7 @@ View the interactive widget below for detailed Actor information.
 
         // Handle MCP tools
         if (parsed.output.mcpTools) {
-            const message = await getMcpToolsMessage(parsed.actor, apifyClient, apifyToken, apifyMcpServer);
+            const message = await getMcpToolsMessage(parsed.actor, apifyClient, apifyToken, apifyMcpServer, customHeaders);
             texts.push(message);
         }
 

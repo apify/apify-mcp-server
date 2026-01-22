@@ -14,11 +14,13 @@ import { getMCPServerID } from './utils.js';
  * First tries streamable HTTP transport, then falls back to SSE transport.
  */
 export async function connectMCPClient(
-    url: string, token: string,
+    url: string,
+    token: string,
+    customHeaders?: Record<string, string>,
 ): Promise<Client | null> {
     let client: Client;
     try {
-        client = await createMCPStreamableClient(url, token);
+        client = await createMCPStreamableClient(url, token, customHeaders);
         return client;
     } catch (error) {
         // If streamable HTTP transport fails on not timeout error, continue with SSE transport
@@ -34,7 +36,7 @@ export async function connectMCPClient(
     }
 
     try {
-        client = await createMCPSSEClient(url, token);
+        client = await createMCPSSEClient(url, token, customHeaders);
         return client;
     } catch (error) {
         if (error instanceof TimeoutError) {
@@ -69,15 +71,21 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
  * Creates and connects a ModelContextProtocol client.
  */
 async function createMCPSSEClient(
-    url: string, token: string,
+    url: string,
+    token: string,
+    customHeaders?: Record<string, string>,
 ): Promise<Client> {
+    // Merge authorization header with custom headers
+    const allHeaders: Record<string, string> = {
+        authorization: `Bearer ${token}`,
+        ...customHeaders,
+    };
+
     const transport = new SSEClientTransport(
         new URL(url),
         {
             requestInit: {
-                headers: {
-                    authorization: `Bearer ${token}`,
-                },
+                headers: allHeaders,
             },
             eventSourceInit: {
                 // The EventSource package augments EventSourceInit with a "fetch" parameter.
@@ -85,7 +93,10 @@ async function createMCPSSEClient(
                 // Based on this example: https://github.com/modelcontextprotocol/typescript-sdk/issues/118
                 async fetch(input: Request | URL | string, init?: RequestInit) {
                     const headers = new Headers(init?.headers || {});
-                    headers.set('authorization', `Bearer ${token}`);
+                    // Set all headers including authorization and custom headers
+                    for (const [key, value] of Object.entries(allHeaders)) {
+                        headers.set(key, value);
+                    }
                     return fetch(input, { ...init, headers });
                 },
                 // We have to cast to "any" to use it, since it's non-standard
@@ -106,15 +117,21 @@ async function createMCPSSEClient(
  * Creates and connects a ModelContextProtocol client using the streamable HTTP transport.
  */
 async function createMCPStreamableClient(
-    url: string, token: string,
+    url: string,
+    token: string,
+    customHeaders?: Record<string, string>,
 ): Promise<Client> {
+    // Merge authorization header with custom headers
+    const allHeaders: Record<string, string> = {
+        authorization: `Bearer ${token}`,
+        ...customHeaders,
+    };
+
     const transport = new StreamableHTTPClientTransport(
         new URL(url),
         {
             requestInit: {
-                headers: {
-                    authorization: `Bearer ${token}`,
-                },
+                headers: allHeaders,
             },
         });
 

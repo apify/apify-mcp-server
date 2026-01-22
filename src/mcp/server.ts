@@ -617,6 +617,7 @@ export class ActorsMcpServer {
             const metaApifyToken = meta?.apifyToken;
             const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = meta?.userRentedActorIds;
+            const customHeaders = meta?.customHeaders as Record<string, string> | undefined;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
@@ -727,6 +728,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         extra,
                         mcpSessionId,
                         userRentedActorIds,
+                        customHeaders,
                     });
                 });
 
@@ -765,6 +767,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         apifyToken,
                         userRentedActorIds,
                         progressTracker,
+                        customHeaders,
                     }) as object;
 
                     if (progressTracker) {
@@ -788,7 +791,7 @@ Please remove the "task" parameter from the tool call request or use a different
                 if (tool.type === 'actor-mcp') {
                     let client: Client | null = null;
                     try {
-                        client = await connectMCPClient(tool.serverUrl, apifyToken);
+                        client = await connectMCPClient(tool.serverUrl, apifyToken, customHeaders);
                         if (!client) {
                             const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
 Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
@@ -951,8 +954,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
         extra: RequestHandlerExtra<Request, Notification>;
         mcpSessionId: string | undefined;
         userRentedActorIds?: string[];
+        customHeaders?: Record<string, string>;
     }): Promise<void> {
-        const { taskId, tool, args, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds } = params;
+        const { taskId, tool, args, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds, customHeaders } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         const startTime = Date.now();
 
@@ -1011,6 +1015,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     apifyToken,
                     userRentedActorIds,
                     progressTracker,
+                    customHeaders,
                 }) as object;
 
                 if (progressTracker) {

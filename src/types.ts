@@ -128,6 +128,8 @@ export type InternalToolArgs = {
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
+    /** Custom headers to forward to downstream MCP servers */
+    customHeaders?: Record<string, string>;
 };
 
 /**
