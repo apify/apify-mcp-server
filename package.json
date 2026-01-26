@@ -42,6 +42,7 @@
   "dependencies": {
     "@apify/datastructures": "^2.0.3",
     "@apify/log": "^2.5.16",
+    "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@segment/analytics-node": "^2.3.0",
     "@types/cheerio": "^0.22.35",

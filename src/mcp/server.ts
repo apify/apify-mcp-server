@@ -33,6 +33,7 @@ import type { ValidateFunction } from 'ajv';
 import { type ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
+import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import {
@@ -68,7 +69,6 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { parseBooleanFromString } from '../utils/generic.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
@@ -165,11 +165,11 @@ export class ActorsMcpServer {
      * Telemetry configuration with precedence: explicit options > env vars > defaults
      */
     private setupTelemetry() {
-        const explicitEnabled = parseBooleanFromString(this.options.telemetry?.enabled);
-        if (explicitEnabled !== undefined) {
+        const explicitEnabled = parseBooleanOrNull(this.options.telemetry?.enabled);
+        if (explicitEnabled !== null) {
             this.telemetryEnabled = explicitEnabled;
         } else {
-            const envEnabled = parseBooleanFromString(process.env.TELEMETRY_ENABLED);
+            const envEnabled = parseBooleanOrNull(process.env.TELEMETRY_ENABLED);
             this.telemetryEnabled = envEnabled ?? DEFAULT_TELEMETRY_ENABLED;
         }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { getValuesByDotKeys, isValidHttpUrl, parseBooleanFromString, parseCommaSeparatedList, parseQueryParamList } from '../../src/utils/generic.js';
+import { parseBooleanOrNull } from '@apify/utilities';
+
+import { getValuesByDotKeys, isValidHttpUrl, parseCommaSeparatedList, parseQueryParamList } from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
     it('should get value for a key without dot', () => {
@@ -160,48 +162,48 @@ describe('isValidUrl', () => {
     });
 });
 
-describe('parseBooleanFromString', () => {
+describe('parseBooleanOrNull', () => {
     it('should return boolean values directly', () => {
-        expect(parseBooleanFromString(true)).toBe(true);
-        expect(parseBooleanFromString(false)).toBe(false);
+        expect(parseBooleanOrNull(true)).toBe(true);
+        expect(parseBooleanOrNull(false)).toBe(false);
     });
 
     it('should parse "true" and "1" as true', () => {
-        expect(parseBooleanFromString('true')).toBe(true);
-        expect(parseBooleanFromString('TRUE')).toBe(true);
-        expect(parseBooleanFromString('True')).toBe(true);
-        expect(parseBooleanFromString('1')).toBe(true);
-        expect(parseBooleanFromString('  true  ')).toBe(true);
-        expect(parseBooleanFromString('  1  ')).toBe(true);
+        expect(parseBooleanOrNull('true')).toBe(true);
+        expect(parseBooleanOrNull('TRUE')).toBe(true);
+        expect(parseBooleanOrNull('True')).toBe(true);
+        expect(parseBooleanOrNull('1')).toBe(true);
+        expect(parseBooleanOrNull('  true  ')).toBe(true);
+        expect(parseBooleanOrNull('  1  ')).toBe(true);
     });
 
     it('should parse "false" and "0" as false', () => {
-        expect(parseBooleanFromString('false')).toBe(false);
-        expect(parseBooleanFromString('FALSE')).toBe(false);
-        expect(parseBooleanFromString('False')).toBe(false);
-        expect(parseBooleanFromString('0')).toBe(false);
-        expect(parseBooleanFromString('  false  ')).toBe(false);
-        expect(parseBooleanFromString('  0  ')).toBe(false);
+        expect(parseBooleanOrNull('false')).toBe(false);
+        expect(parseBooleanOrNull('FALSE')).toBe(false);
+        expect(parseBooleanOrNull('False')).toBe(false);
+        expect(parseBooleanOrNull('0')).toBe(false);
+        expect(parseBooleanOrNull('  false  ')).toBe(false);
+        expect(parseBooleanOrNull('  0  ')).toBe(false);
     });
 
-    it('should return undefined for null and undefined', () => {
-        expect(parseBooleanFromString(null)).toBeUndefined();
-        expect(parseBooleanFromString(undefined)).toBeUndefined();
+    it('should return null for null and undefined', () => {
+        expect(parseBooleanOrNull(null)).toBeNull();
+        expect(parseBooleanOrNull(undefined)).toBeNull();
     });
 
-    it('should return undefined for empty strings', () => {
-        expect(parseBooleanFromString('')).toBeUndefined();
-        expect(parseBooleanFromString('   ')).toBeUndefined();
-        expect(parseBooleanFromString('\t')).toBeUndefined();
-        expect(parseBooleanFromString('\n')).toBeUndefined();
+    it('should return null for empty strings', () => {
+        expect(parseBooleanOrNull('')).toBeNull();
+        expect(parseBooleanOrNull('   ')).toBeNull();
+        expect(parseBooleanOrNull('\t')).toBeNull();
+        expect(parseBooleanOrNull('\n')).toBeNull();
     });
 
-    it('should return undefined for unrecognized strings', () => {
-        expect(parseBooleanFromString('yes')).toBeUndefined();
-        expect(parseBooleanFromString('no')).toBeUndefined();
-        expect(parseBooleanFromString('2')).toBeUndefined();
-        expect(parseBooleanFromString('maybe')).toBeUndefined();
-        expect(parseBooleanFromString('on')).toBeUndefined();
-        expect(parseBooleanFromString('off')).toBeUndefined();
+    it('should return null for unrecognized strings', () => {
+        expect(parseBooleanOrNull('yes')).toBeNull();
+        expect(parseBooleanOrNull('no')).toBeNull();
+        expect(parseBooleanOrNull('2')).toBeNull();
+        expect(parseBooleanOrNull('maybe')).toBeNull();
+        expect(parseBooleanOrNull('on')).toBeNull();
+        expect(parseBooleanOrNull('off')).toBeNull();
     });
 });

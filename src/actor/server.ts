@@ -12,11 +12,11 @@ import type { Request, Response } from 'express';
 import express from 'express';
 
 import log from '@apify/log';
+import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from '../apify-client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import type { ApifyRequestParams, UiMode } from '../types.js';
-import { parseBooleanFromString } from '../utils/generic.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -86,8 +86,8 @@ export function createExpressApp(
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
             const telemetryEnabledParam = urlParams.get('telemetry-enabled');
             // URL param > env var > default (true)
-            const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
-                ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+            const telemetryEnabled = parseBooleanOrNull(telemetryEnabledParam)
+                ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
             const uiModeParam = urlParams.get('ui') as UiMode | undefined;
@@ -219,8 +219,8 @@ export function createExpressApp(
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
                 // URL param > env var > default (true)
-                const telemetryEnabled = parseBooleanFromString(telemetryEnabledParam)
-                    ?? parseBooleanFromString(process.env.TELEMETRY_ENABLED)
+                const telemetryEnabled = parseBooleanOrNull(telemetryEnabledParam)
+                    ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
                 const uiModeParam = urlParams.get('ui') as UiMode | undefined;
