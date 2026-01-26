@@ -288,7 +288,7 @@
     {
       "id": "fetch-details-mcp-tools-then-call",
       "category": "mcp",
-      "query": "List tools from apify/actors-mcp-server and then call the fetch-apify-docs tool to get docs from https://docs.apify.com",
+      "query": "List tools from apify/actors-mcp-server and then call the fetch-apify-docs tool from the Actor MCP server apify/actors-mcp-server to get docs from https://docs.apify.com",
       "reference": "The agent must first use fetch-actor-details with output=['mcp-tools'] to discover tools, then use call-actor with actor='apify/actors-mcp-server:fetch-apify-docs' and proper input to call the specific tool."
     },
     {
