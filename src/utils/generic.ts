@@ -86,10 +86,3 @@ export function isValidHttpUrl(urlString: string): boolean {
         return false;
     }
 }
-
-/**
- * Parses a boolean value from a string, boolean, null, or undefined.
- * This is a wrapper around @apify/utilities parseBooleanOrNull that maintains
- * the original API of returning undefined instead of null for invalid values.
- */
-export { parseBooleanOrNull as parseBooleanFromString } from '@apify/utilities';
