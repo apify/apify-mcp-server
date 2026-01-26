@@ -175,12 +175,12 @@ export function createExpressApp(
             if (transport) {
                 await transport.handlePostMessage(req, res);
             } else {
-                log.softFail('Server is not connected to the client.', { statusCode: 400 });
-                res.status(400).json({
+                log.softFail('Server is not connected to the client.', { statusCode: 404 });
+                res.status(404).json({
                     jsonrpc: '2.0',
                     error: {
                         code: -32000,
-                        message: 'Bad Request: Server is not connected to the client. '
+                        message: 'Not Found: Server is not connected to the client. '
                         + 'Connect to the server with GET request to /sse endpoint',
                     },
                     id: null,
@@ -262,11 +262,11 @@ export function createExpressApp(
                 return; // Already handled
             } else {
                 // Invalid request - no session ID or not initialization request
-                res.status(400).json({
+                res.status(404).json({
                     jsonrpc: '2.0',
                     error: {
                         code: -32000,
-                        message: 'Bad Request: No valid session ID provided or not initialization request',
+                        message: 'Not Found: No valid session ID provided or not initialization request',
                     },
                     id: null,
                 });
@@ -308,8 +308,8 @@ export function createExpressApp(
             return;
         }
 
-        log.softFail('Session not found', { sessionId, statusCode: 400 });
-        res.status(400).send('Bad Request: Session not found').end();
+        log.softFail('Session not found', { sessionId, statusCode: 404 });
+        res.status(404).send('Not Found: Session not found').end();
     });
 
     // Catch-all for undefined routes
