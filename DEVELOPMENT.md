@@ -48,7 +48,7 @@ This will spawn the MCP server at port `3001`.
 
 ### Testing with MCPJam
 
-You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP server.
+You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP server - run it using `npx @mcpjam/inspector@latest`.
 
 #### Setting Up the Connection
 
