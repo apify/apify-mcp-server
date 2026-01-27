@@ -32,6 +32,10 @@ npm run build-all
 
 This command builds the `src/web/` internal project, then runs `npm run build`, and copies the widgets into the `dist/` directory.
 
+If you only want to work on the React UI widgets, all widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, you will need to modify the corresponding MCP tool's output since widgets can only render data returned by the MCP tool call result.
+
+> **Important:** After changing widgets, you must rebuild the project with `npm run build-all` to refresh the React widgets in the `dist/` directory.
+
 ### Running the MCP Server Locally
 
 Start the MCP server locally using:
