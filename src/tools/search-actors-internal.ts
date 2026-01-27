@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { filterRentalActors, searchActorsByKeywords } from './store_collection.js';
 import { actorSearchInternalOutputSchema } from './structured-output-schemas.js';
 
 const searchActorsInternalArgsSchema = z.object({
@@ -30,11 +30,17 @@ const searchActorsInternalArgsSchema = z.object({
 export const searchActorsInternalTool: ToolEntry = {
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
-    description: `Internal-only Actor search.
+    openaiOnly: true,
+    description: `Search Actors internally (UI mode internal tool).
 
-Use this tool for helper/internal lookups to resolve an Actor name.
-Use it instead of ${HelperTools.STORE_SEARCH} when the next step is fetching schema or running an Actor.
-It returns only minimal fields needed for subsequent calls.`,
+This tool is available because the LLM is operating in UI mode. Use it for internal lookups 
+where data presentation to the user is NOT needed - this tool does NOT render a widget.
+
+Use this instead of ${HelperTools.STORE_SEARCH} when you need to find an Actor but the user 
+did NOT explicitly ask to search Actors. For example, when user says "scrape me google maps" 
+and you need to find the right Actor for the task, then fetch its schema and call it.
+
+Returns only minimal fields (fullName, title, description) needed for subsequent calls.`,
     inputSchema: z.toJSONSchema(searchActorsInternalArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchInternalOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsInternalArgsSchema)),
@@ -47,14 +53,14 @@ It returns only minimal fields needed for subsequent calls.`,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsInternalArgsSchema.parse(args);
-        let actors = await searchActorsByKeywords(
-            parsed.keywords,
+        const actors = await searchAndFilterActors({
+            keywords: parsed.keywords,
             apifyToken,
-            parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
-            parsed.offset,
-            apifyMcpServer.options.skyfireMode ? true : undefined,
-        );
-        actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
+            limit: parsed.limit,
+            offset: parsed.offset,
+            skyfireMode: apifyMcpServer.options.skyfireMode,
+            userRentedActorIds,
+        });
 
         const minimalActors = actors.map((actor) => ({
             fullName: `${actor.username}/${actor.name}`,
@@ -65,6 +71,10 @@ It returns only minimal fields needed for subsequent calls.`,
         return buildMCPResponse({
             texts: [
                 `Found ${minimalActors.length} Actors for "${parsed.keywords}".`,
+                '',
+                `Query: ${parsed.keywords}`,
+                '',
+                `Actors:\n\`\`\`json\n${JSON.stringify(minimalActors, null, 2)}\n\`\`\``,
             ],
             structuredContent: {
                 actors: minimalActors,

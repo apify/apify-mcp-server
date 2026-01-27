@@ -7,7 +7,7 @@ import { callActor } from './actor.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './dataset.js';
 import { getUserDatasetsList } from './dataset_collection.js';
 import { fetchActorDetailsTool } from './fetch-actor-details.js';
-import { fetchActorSchemaTool } from './fetch-actor-schema.js';
+import { fetchActorDetailsInternalTool } from './fetch-actor-details-internal.js';
 import { fetchApifyDocsTool } from './fetch-apify-docs.js';
 import { getActorOutput } from './get-actor-output.js';
 import { getHtmlSkeleton } from './get-html-skeleton.js';
@@ -26,10 +26,12 @@ export const toolCategories = {
     ],
     actors: [
         fetchActorDetailsTool,
-        fetchActorSchemaTool,
         searchActors,
-        searchActorsInternalTool,
         callActor,
+    ],
+    ui: [
+        fetchActorDetailsInternalTool,
+        searchActorsInternalTool,
     ],
     docs: [
         searchApifyDocsTool,

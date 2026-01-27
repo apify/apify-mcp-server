@@ -2,10 +2,11 @@ import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
+import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
@@ -140,14 +141,14 @@ Returns list of Actor cards with the following info:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);
-        let actors = await searchActorsByKeywords(
-            parsed.keywords,
+        const actors = await searchAndFilterActors({
+            keywords: parsed.keywords,
             apifyToken,
-            parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
-            parsed.offset,
-            apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
-        );
-        actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
+            limit: parsed.limit,
+            offset: parsed.offset,
+            skyfireMode: apifyMcpServer.options.skyfireMode,
+            userRentedActorIds,
+        });
         const actorCards = actors.length === 0 ? [] : actors.map((actor) => formatActorToActorCard(actor));
 
         if (actorCards.length === 0) {
@@ -220,7 +221,7 @@ View the interactive widget below for detailed Actor information.
 
  ${actorsText}
 
-If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_SCHEMA}.
+If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
  `;
 
