@@ -53,6 +53,6 @@ jobs:
                 run: npm --prefix src/web ci --force
 
             -   name: Build
-                run: npm run build
+                run: npm run build-all
 
             -   run: npx -y pkg-pr-new publish

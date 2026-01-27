@@ -151,7 +151,7 @@ jobs:
             -   name: Install Web Dependencies
                 run: npm --prefix src/web ci --force
             -   name: Build module
-                run: npm run build
+                run: npm run build-all
             - name: Prepare MCPB package
               run: |
                     mkdir mcpb
@@ -224,6 +224,6 @@ jobs:
             -   name: Install Web Dependencies
                 run: npm --prefix src/web ci --force
             -   name: Build module
-                run: npm run build
+                run: npm run build-all
             -   name: Publish to NPM
                 run: npm publish
