@@ -70,8 +70,6 @@ export const ActorSearchDetailSkeleton: React.FC = () => {
                 </div>
             </Card>
 
-            <SectionSkeleton title="Documentation" paragraphs={5} />
-            <SectionSkeleton title="Input Parameters" paragraphs={3} />
             <SectionSkeleton title="Technical Details" paragraphs={4} />
         </div>
     );
