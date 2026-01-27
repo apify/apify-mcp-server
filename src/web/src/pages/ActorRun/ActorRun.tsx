@@ -215,7 +215,7 @@ export const ActorRun: React.FC = () => {
         <WidgetLayout>
             <Card variant="alt" padding="lg" className="flex flex-col gap-4 w-full">
                 <RunHeader
-                    actorName={runData.actorName}
+                    actorName={toolOutput?.actorName || runData.actorName}
                     status={runData.status}
                     isCompleted={flags.isCompleted}
                     isRefreshing={!!widgetState?.isRefreshing}
