@@ -332,6 +332,8 @@ npx @apify/actors-mcp-server
 
 # ⚙️ Development
 
+For detailed development setup, project structure, and local testing instructions, see the [DEVELOPMENT.md](./DEVELOPMENT.md) guide.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/en) (v18 or higher)
