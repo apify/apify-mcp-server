@@ -29,6 +29,7 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
+import { callActorOutputSchema } from './structured-output-schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 
 // Define a named return type for callActorGetDataset
@@ -392,7 +393,7 @@ USAGE:
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`,
     inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
-    // For now we are not adding the structured output schema since this tool is quite complex and has multiple possible ends states
+    outputSchema: callActorOutputSchema,
     ajvValidate: compileSchema({
         ...z.toJSONSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
@@ -592,9 +593,9 @@ CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this r
                 return {};
             }
 
-            const content = buildActorResponseContent(actorName, callResult);
+            const { content, structuredContent } = buildActorResponseContent(actorName, callResult);
 
-            return { content };
+            return { content, structuredContent };
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, async: async ?? (apifyMcpServer.options.uiMode === 'openai') });
             // Let the server classify the error; we only mark it as an MCP error response

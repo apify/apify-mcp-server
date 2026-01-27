@@ -10,6 +10,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { getActorRunOutputSchema } from './structured-output-schemas.js';
 
 const getActorRunArgs = z.object({
     runId: z.string()
@@ -44,6 +45,7 @@ USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
 - user_input: What is the datasetId for run y2h7sK3Wc?`,
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
+    outputSchema: getActorRunOutputSchema,
     /**
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
