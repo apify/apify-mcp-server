@@ -199,15 +199,34 @@ export function createExpressApp(
         try {
             // Check for existing session ID
             const sessionId = req.headers['mcp-session-id'] as string | undefined;
+
+            // Extract custom headers to forward to downstream MCP servers
+            // We forward all headers except standard HTTP headers
+            const standardHeaders = new Set([
+                'host', 'connection', 'content-length', 'content-type',
+                'user-agent', 'accept', 'accept-encoding', 'accept-language',
+                'cache-control', 'pragma', 'upgrade-insecure-requests',
+                'mcp-session-id', // This is already handled separately
+            ]);
+            const customHeaders: Record<string, string> = {};
+            for (const [key, value] of Object.entries(req.headers)) {
+                if (!standardHeaders.has(key.toLowerCase()) && typeof value === 'string') {
+                    customHeaders[key] = value;
+                }
+            }
+
             let transport: StreamableHTTPServerTransport;
 
             if (sessionId && transports[sessionId]) {
                 // Reuse existing transport
                 transport = transports[sessionId];
-                // Inject session ID into request params for existing sessions
+                // Inject session ID and custom headers into request params for existing sessions
                 if (req.body?.params) {
                     req.body.params._meta ??= {};
                     req.body.params._meta.mcpSessionId = sessionId;
+                    if (Object.keys(customHeaders).length > 0) {
+                        req.body.params._meta.customHeaders = customHeaders;
+                    }
                 }
             } else if (!sessionId && isInitializeRequest(req.body)) {
                 // New initialization request
@@ -251,6 +270,14 @@ export function createExpressApp(
                 // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
 
+                // Inject custom headers into the initialize request
+                if (req.body?.params) {
+                    req.body.params._meta ??= {};
+                    if (Object.keys(customHeaders).length > 0) {
+                        req.body.params._meta.customHeaders = customHeaders;
+                    }
+                }
+
                 // After handling the request, if we get a session ID back, store the transport
                 await transport.handleRequest(req, res, req.body);
 
@@ -273,10 +300,13 @@ export function createExpressApp(
                 return;
             }
 
-            // Inject session ID into request params for all requests
+            // Inject session ID and custom headers into request params for all requests
             if (req.body?.params && sessionId) {
                 req.body.params._meta ??= {};
                 req.body.params._meta.mcpSessionId = sessionId;
+                if (Object.keys(customHeaders).length > 0) {
+                    req.body.params._meta.customHeaders = customHeaders;
+                }
             }
 
             // Handle the request with existing transport - no need to reconnect
