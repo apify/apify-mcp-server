@@ -148,11 +148,8 @@ jobs:
                     cache-dependency-path: 'package-lock.json'
             -   name: Install dependencies
                 run: npm ci --force
-            -   name: Build web widgets
-                working-directory: src/web
-                run: |
-                    npm ci
-                    npm run build
+            -   name: Install Web Dependencies
+                run: npm --prefix src/web ci --force
             -   name: Build module
                 run: npm run build
             - name: Prepare MCPB package
@@ -224,11 +221,8 @@ jobs:
                     registry-url: 'https://registry.npmjs.org'
             -   name: Install dependencies
                 run: npm ci --force
-            -   name: Build web widgets
-                working-directory: src/web
-                run: |
-                    npm ci
-                    npm run build
+            -   name: Install Web Dependencies
+                run: npm --prefix src/web ci --force
             -   name: Build module
                 run: npm run build
             -   name: Publish to NPM
