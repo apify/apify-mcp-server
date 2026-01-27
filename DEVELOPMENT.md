@@ -62,13 +62,11 @@ You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP ser
 
 To test how widgets are rendered per tool call:
 
-1. Navigate to the **"Tools"** section in the left sidebar
+1. Navigate to the **"App Builder"** section in the left sidebar
 2. Select a tool
 3. Fill in the required arguments
 4. Execute the tool
 5. View the rendered widget (or the raw MCP tool result if the tool doesn't return a widget)
-
-> **Note:** In recent versions, widget rendering in the Tools section can be clunky with limited scrolling. The Chat interface provides a better experience.
 
 #### Testing via Chat
 
