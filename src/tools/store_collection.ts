@@ -198,7 +198,7 @@ You can also try using more specific or alternative keywords related to your sea
  - **Search query:** ${parsed.keywords}
  - **Number of Actors found:** ${actorCards.length}
 
-View the interactive widget below for detailed Actor information.
+An interactive widget has been rendered with the search results.
 `];
 
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);

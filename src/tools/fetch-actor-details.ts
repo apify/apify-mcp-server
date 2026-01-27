@@ -85,7 +85,7 @@ EXAMPLES:
 - **Actor:** ${parsed.actor}
 - **URL:** ${actorUrl}
 
-View the interactive widget below for detailed Actor information.
+An interactive widget has been rendered with detailed Actor information.
 `];
 
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);

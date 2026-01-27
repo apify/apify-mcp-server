@@ -558,7 +558,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 if (apifyMcpServer.options.uiMode === 'openai') {
                     responseText += `
 
-CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this run. The widget below automatically tracks progress and refreshes status every few seconds until completion. Your task is complete - take NO further action.`;
+A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
+
+The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
+
+Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
                 }
 
                 const response: { content: { type: 'text'; text: string }[]; structuredContent?: unknown; _meta?: unknown } = {

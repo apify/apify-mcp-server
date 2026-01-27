@@ -116,12 +116,11 @@ USAGE EXAMPLES:
                 };
             }
 
-            // When UI mode is enabled, return minimal text with widget metadata
             // When UI mode is disabled, return full text response without widget metadata
             if (apifyMcpServer.options.uiMode === 'openai') {
                 const statusText = run.status === 'SUCCEEDED' && structuredContent.dataset
-                    ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. View details in the widget below.`
-                    : `Actor run ${parsed.runId} status: ${run.status}. View progress in the widget below.`;
+                    ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. A widget has been rendered with the details.`
+                    : `Actor run ${parsed.runId} status: ${run.status}. A progress widget has been rendered.`;
 
                 const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
                 return buildMCPResponse({

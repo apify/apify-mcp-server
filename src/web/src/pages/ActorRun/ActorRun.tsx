@@ -47,6 +47,11 @@ interface ToolOutput extends Record<string, unknown> {
 interface WidgetState extends Record<string, unknown> {
     isRefreshing?: boolean;
     lastUpdateTime?: number;
+    // Run completion state for model context (set when run finishes)
+    runStatus?: string;
+    datasetId?: string;
+    itemCount?: number;
+    runId?: string;
 }
 
 type StatusVariant = "success" | "danger" | "warning" | "secondary";
@@ -127,7 +132,18 @@ export const ActorRun: React.FC = () => {
                         setRunData(newData);
 
                         const newStatus = (newData.status || '').toUpperCase();
-                        if (TERMINAL_STATUSES.has(newStatus)) break;
+                        if (TERMINAL_STATUSES.has(newStatus)) {
+                            // Notify model that run is complete by updating widget state
+                            await setWidgetState({
+                                ...widgetState,
+                                runStatus: newStatus,
+                                runId: runData.runId,
+                                datasetId: newData.dataset?.datasetId,
+                                itemCount: newData.dataset?.itemCount,
+                                lastUpdateTime: Date.now(),
+                            });
+                            break;
+                        }
                     }
 
                     pollCount++;
