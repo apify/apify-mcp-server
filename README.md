@@ -33,6 +33,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
+- [⚠️ SSE transport deprecation](#-sse-transport-deprecation)
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [🛠️ Tools, resources, and prompts](#-tools-resources-and-prompts)
@@ -68,6 +69,13 @@ You can use the Apify MCP Server in two ways:
 - See `npx @apify/actors-mcp-server --help` for more options.
 
 You can find detailed instructions for setting up the MCP server in the [Apify documentation](https://docs.apify.com/platform/integrations/mcp).
+
+# ⚠️ SSE transport deprecation on April 1, 2026
+
+Udate your MCP client config before April 1, 2026.
+The Apify MCP server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
+
+Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for your client of choice, with a valid endpoint.
 
 # 🤖 MCP clients
 

@@ -225,9 +225,9 @@ export type ToolSelector = ToolCategory | string;
 
 export type Input = {
     /**
-     * When `actors` is undefined that means the default Actors should be loaded.
-     * If it as empty string or empty array then no Actors should be loaded.
-     * Otherwise the specified Actors should be loaded.
+     * When `actors` is undefined, that means the default Actors should be loaded.
+     * If it is as an empty string or empty array, then no Actors should be loaded.
+     * Otherwise, the specified Actors should be loaded.
      */
     actors?: string[] | string;
     /**
@@ -371,7 +371,7 @@ export type ActorsMcpServerOptions = {
         /**
          * Enable or disable telemetry tracking for tool calls.
          * Must be explicitly set when telemetry object is provided.
-         * When telemetry object is omitted entirely, defaults to true (via env var or default).
+         * When a telemetry object is omitted entirely, defaults to true (via env var or default).
          */
         enabled: boolean;
         /**
@@ -383,11 +383,11 @@ export type ActorsMcpServerOptions = {
     };
     /**
      * Transport type for telemetry tracking.
-     * Important: this is also used for the long running tasks logic
+     * Important: this is also used for the long-running tasks logic
      *  which is different for local and remote server based on the transport type.
      * - 'stdio': Direct/local stdio connection
      * - 'http': Remote HTTP streamable connection
-     * - 'sse': Remote Server-Sent Events (SSE) connection
+     * - 'sse': Remote Server-Sent Events (SSE) connection (deprecated, removal on 2026-04-01)
      */
     transportType?: 'stdio' | 'http' | 'sse';
     /**
