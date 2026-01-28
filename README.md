@@ -332,6 +332,8 @@ npx @apify/actors-mcp-server
 
 # ⚙️ Development
 
+Please see the [CONTRIBUTING.md](./CONTRIBUTING.md) guide for contribution guidelines and commit message conventions.
+
 For detailed development setup, project structure, and local testing instructions, see the [DEVELOPMENT.md](./DEVELOPMENT.md) guide.
 
 ## Prerequisites

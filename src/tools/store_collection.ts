@@ -2,10 +2,11 @@ import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
 import { ApifyClient } from '../apify-client.js';
-import { ACTOR_SEARCH_ABOVE_LIMIT, HelperTools } from '../const.js';
+import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
+import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
@@ -71,7 +72,7 @@ Examples:
  * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
  *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
  */
-function filterRentalActors(
+export function filterRentalActors(
     actors: ActorStoreList[],
     userRentedActorIds: string[],
 ): ActorStoreList[] {
@@ -91,6 +92,7 @@ export const searchActors: ToolEntry = {
     description: `
 Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
+Do NOT use this tool for helper name resolution before running an Actor; use ${HelperTools.STORE_SEARCH_INTERNAL} instead.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
@@ -139,17 +141,15 @@ Returns list of Actor cards with the following info:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);
-        let actors = await searchActorsByKeywords(
-            parsed.keywords,
+        const actors = await searchAndFilterActors({
+            keywords: parsed.keywords,
             apifyToken,
-            parsed.limit + ACTOR_SEARCH_ABOVE_LIMIT,
-            parsed.offset,
-            apifyMcpServer.options.skyfireMode ? true : undefined, // allowsAgenticUsers - filters Actors available for Agentic users
-        );
-        actors = filterRentalActors(actors || [], userRentedActorIds || []).slice(0, parsed.limit);
-        const actorCards = actors.length === 0 ? [] : actors.map((actor) => formatActorToActorCard(actor));
-
-        if (actorCards.length === 0) {
+            limit: parsed.limit,
+            offset: parsed.offset,
+            skyfireMode: apifyMcpServer.options.skyfireMode,
+            userRentedActorIds,
+        });
+        if (actors.length === 0) {
             const instructions = `No Actors were found for the search query "${parsed.keywords}".
 Try a different query with different keywords, or adjust the limit and offset parameters.
 You can also try using more specific or alternative keywords related to your search topic.`;
@@ -161,8 +161,6 @@ You can also try using more specific or alternative keywords related to your sea
             };
             return buildMCPResponse({ texts: [instructions], structuredContent });
         }
-
-        const actorsText = actorCards.join('\n\n');
 
         // Generate structured cards for the actors
         const structuredActorCards = actors.map((actor) => formatActorToStructuredCard(actor));
@@ -178,7 +176,7 @@ You can also try using more specific or alternative keywords related to your sea
         } = {
             actors: structuredActorCards,
             query: parsed.keywords,
-            count: actorCards.length,
+            count: actors.length,
             instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.`,
         };
@@ -194,9 +192,9 @@ You can also try using more specific or alternative keywords related to your sea
             const texts = [`
  # Search results:
  - **Search query:** ${parsed.keywords}
- - **Number of Actors found:** ${actorCards.length}
+ - **Number of Actors found:** ${actors.length}
 
-View the interactive widget below for detailed Actor information.
+An interactive widget has been rendered with the search results.
 `];
 
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
@@ -210,16 +208,18 @@ View the interactive widget below for detailed Actor information.
             });
         }
 
+        const actorCards = actors.map((actor) => formatActorToActorCard(actor));
+        const actorsText = actorCards.join('\n\n');
         const instructions = `
  # Search results:
  - **Search query:** ${parsed.keywords}
- - **Number of Actors found:** ${actorCards.length}
+ - **Number of Actors found:** ${actors.length}
 
  # Actors:
 
  ${actorsText}
 
- If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
  `;
 

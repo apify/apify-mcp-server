@@ -42,7 +42,6 @@ import {
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
-    SERVER_INSTRUCTIONS,
     SERVER_NAME,
     SERVER_VERSION,
     SKYFIRE_ENABLED_TOOLS,
@@ -72,6 +71,7 @@ import { buildActorResponseContent } from '../utils/actor-response.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
+import { getServerInstructions } from '../utils/server-instructions.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
@@ -144,7 +144,7 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
-                instructions: SERVER_INSTRUCTIONS,
+                instructions: getServerInstructions(options.uiMode),
             },
         );
         this.setupTelemetry();

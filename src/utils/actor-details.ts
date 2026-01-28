@@ -1,10 +1,15 @@
 import type { Actor, Build } from 'apify-client';
+import { z } from 'zod';
 
 import type { ApifyClient } from '../apify-client.js';
+import { HelperTools, TOOL_STATUS } from '../const.js';
+import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { ActorCardOptions, ActorInputSchema, StructuredActorCard } from '../types.js';
+import { getActorMcpUrlCached } from './actor.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
+import { buildMCPResponse } from './mcp.js';
 
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
@@ -86,4 +91,203 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
         structuredContent,
         formattedReadme,
     };
+}
+
+/**
+ * Shared schema for actor details output options.
+ * Used by both public and internal fetch-actor-details tools.
+ *
+ * Behavior:
+ * - If output is undefined or empty object: use defaults (all true except mcpTools)
+ * - If any property is explicitly set: only include sections with explicit true values
+ */
+export const actorDetailsOutputOptionsSchema = z.object({
+    description: z.boolean().optional().describe('Include Actor description text only.'),
+    stats: z.boolean().optional().describe('Include usage statistics (users, runs, success rate).'),
+    pricing: z.boolean().optional().describe('Include pricing model and costs.'),
+    rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
+    metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
+    inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
+    readme: z.boolean().optional().describe('Include full README documentation.'),
+    mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
+});
+
+export const actorDetailsOutputDefaults = {
+    description: true,
+    stats: true,
+    pricing: true,
+    rating: true,
+    metadata: true,
+    inputSchema: true,
+    readme: true,
+    mcpTools: false,
+};
+
+/**
+ * Resolve output options with smart defaults.
+ * If output is undefined/empty, returns defaults.
+ * If any property is explicitly set, undefined properties are treated as false.
+ */
+export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputOptionsSchema>) {
+    // Check if output has any explicit true/false values
+    const hasExplicitOptions = output && Object.values(output).some((v) => v !== undefined);
+
+    if (!hasExplicitOptions) {
+        return actorDetailsOutputDefaults;
+    }
+
+    // Return output with undefined treated as false (explicit true required)
+    return {
+        description: output?.description === true,
+        stats: output?.stats === true,
+        pricing: output?.pricing === true,
+        rating: output?.rating === true,
+        metadata: output?.metadata === true,
+        inputSchema: output?.inputSchema === true,
+        readme: output?.readme === true,
+        mcpTools: output?.mcpTools === true,
+    };
+}
+
+/**
+ * Gets MCP tools information for an Actor.
+ * Returns a message about available tools, error, or that the Actor is not an MCP server.
+ */
+export async function getMcpToolsMessage(
+    actorName: string,
+    apifyClient: ApifyClient,
+    apifyToken: string,
+    skyfireMode?: boolean,
+): Promise<string> {
+    const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
+
+    // Early return: not an MCP server
+    if (!mcpServerUrl || typeof mcpServerUrl !== 'string') {
+        return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
+    }
+
+    // Early return: Skyfire mode restriction
+    if (skyfireMode) {
+        return `This Actor is an MCP server and cannot be accessed in Skyfire mode.`;
+    }
+
+    // Connect and list tools
+    const client = await connectMCPClient(mcpServerUrl, apifyToken);
+    if (!client) {
+        return `Failed to connect to MCP server for Actor '${actorName}'.`;
+    }
+
+    try {
+        const toolsResponse = await client.listTools();
+        const mcpToolsInfo = toolsResponse.tools
+            .map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``)
+            .join('\n\n');
+
+        return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+    } finally {
+        await client.close();
+    }
+}
+
+/**
+ * Build card options from resolved output flags.
+ * Maps boolean output flags to card rendering options (explicit true required).
+ */
+export function buildCardOptions(output: {
+    description: boolean;
+    stats: boolean;
+    pricing: boolean;
+    rating: boolean;
+    metadata: boolean;
+}): ActorCardOptions {
+    return {
+        includeDescription: output.description,
+        includeStats: output.stats,
+        includePricing: output.pricing,
+        includeRating: output.rating,
+        includeMetadata: output.metadata,
+    };
+}
+
+/**
+ * Build error response for when actor is not found.
+ */
+export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof buildMCPResponse> {
+    return buildMCPResponse({
+        texts: [`Actor information for '${actorName}' was not found.
+Please verify Actor ID or name format and ensure that the Actor exists.
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
+        isError: true,
+        toolStatus: TOOL_STATUS.SOFT_FAIL,
+    });
+}
+
+/**
+ * Build text and structured response for actor details.
+ * Handles all resolved output options: description, stats, readme, inputSchema, mcpTools.
+ * All output properties should be boolean (resolved via resolveOutputOptions).
+ */
+export async function buildActorDetailsTextResponse(options: {
+    actorName: string;
+    details: ActorDetailsResult;
+    output: {
+        description: boolean;
+        stats: boolean;
+        pricing: boolean;
+        rating: boolean;
+        metadata: boolean;
+        readme: boolean;
+        inputSchema: boolean;
+        mcpTools: boolean;
+    };
+    cardOptions: ActorCardOptions;
+    apifyClient: ApifyClient;
+    apifyToken: string;
+    skyfireMode?: boolean;
+}): Promise<{
+    texts: string[];
+    structuredContent: Record<string, unknown>;
+}> {
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, skyfireMode } = options;
+
+    const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+    const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
+
+    const texts: string[] = [];
+
+    // Build actor card only if any card section is requested
+    const needsCard = cardOptions.includeDescription
+        || cardOptions.includeStats
+        || cardOptions.includePricing
+        || cardOptions.includeRating
+        || cardOptions.includeMetadata;
+
+    if (needsCard) {
+        texts.push(`# Actor information\n${details.actorCard}`);
+    }
+
+    // Add README if requested
+    if (output.readme) {
+        texts.push(formattedReadme);
+    }
+
+    // Add input schema if requested
+    if (output.inputSchema) {
+        texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
+    }
+
+    // Handle MCP tools
+    if (output.mcpTools) {
+        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode);
+        texts.push(message);
+    }
+
+    // Build structured content
+    const structuredContent: Record<string, unknown> = {
+        actorInfo: needsCard ? details.actorCardStructured : undefined,
+        readme: output.readme ? formattedReadme : undefined,
+        inputSchema: output.inputSchema ? details.inputSchema : undefined,
+    };
+
+    return { texts, structuredContent };
 }

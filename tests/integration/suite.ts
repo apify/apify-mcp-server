@@ -167,7 +167,12 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            const expectedActorsTools = ['fetch-actor-details', 'search-actors', 'call-actor'];
+            // Note: Internal tools (fetch-actor-details-internal, search-actors-internal) are only available in openai mode
+            const expectedActorsTools = [
+                'fetch-actor-details',
+                'search-actors',
+                'call-actor',
+            ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
             const expectedActors = ['apify-slash-rag-web-browser'];
 
@@ -1466,8 +1471,11 @@ export function createIntegrationTestsSuite(
 
             const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
             // Only assert that all tools from the selected category are present.
+            // Note: UI category tools are only loaded in openai mode, so they won't be present in default mode
             for (const expectedToolName of expectedToolNames) {
-                expect(toolNames).toContain(expectedToolName);
+                if (category !== 'ui') {
+                    expect(toolNames).toContain(expectedToolName);
+                }
             }
         });
 
@@ -2151,7 +2159,12 @@ export function createIntegrationTestsSuite(
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
+
+            // Verify that openai-only internal tools are present in openai mode
+            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled
             const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
@@ -2178,7 +2191,12 @@ export function createIntegrationTestsSuite(
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use uiMode URL parameter when provided', async () => {
             client = await createClientFn({ uiMode: 'openai' });
             const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
+
+            // Verify that openai-only internal tools are present in openai mode
+            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
             const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
