@@ -16,6 +16,7 @@ body {
     --color-code-orange: #FF6B00;
     --color-code-bg: rgba(13, 13, 13, 0.05);
     --color-code-text: #5d5d5d;
+    --color-link: #2563eb;
     --color-type-blue-bg: rgba(72, 170, 255, 0.1);
     --color-type-blue: #48aaff;
     --color-card-bg: #ffffff;
@@ -43,6 +44,7 @@ body {
     --color-code-orange: #FF9013;
     --color-code-bg: #414141;
     --color-code-text: #cdcdcd;
+    --color-link: #60a5fa;
     --color-type-blue-bg: rgba(72, 170, 255, 0.2);
     --color-type-blue: #48aaff;
     --color-card-bg: #303030;
@@ -71,6 +73,7 @@ body {
       --color-code-orange: #FF9013;
       --color-code-bg: #414141;
       --color-code-text: #cdcdcd;
+      --color-link: #60a5fa;
       --color-type-blue-bg: rgba(72, 170, 255, 0.2);
       --color-type-blue: #48aaff;
       --color-card-bg: #303030;

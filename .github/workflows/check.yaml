@@ -28,11 +28,14 @@ jobs:
             -   name: Install Dependencies
                 run: npm ci --force
 
+            -   name: Install Web Dependencies
+                run: npm --prefix src/web ci --force
+
             -   name: Lint
                 run: npm run lint
 
             -   name: Build
-                run: npm run build
+                run: npm run build-all
 
             -   name: Test
                 run: npm run test

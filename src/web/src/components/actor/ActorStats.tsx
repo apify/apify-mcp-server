@@ -20,7 +20,7 @@ export const ActorStats: React.FC<ActorStatsProps> = ({ totalUsers, totalRuns, s
             <Stat icon={<Play className={iconSize} />} text={`${formatNumber(totalRuns)} runs`} />
 
             {successRate !== null && (
-                <div className="flex items-center gap-1 text-[var(--color-success)]">
+                <div className="flex items-center gap-1">
                     <Check className={iconSize} />
                     <span>{successRate}% success</span>
                 </div>
