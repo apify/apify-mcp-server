@@ -149,9 +149,7 @@ Returns list of Actor cards with the following info:
             skyfireMode: apifyMcpServer.options.skyfireMode,
             userRentedActorIds,
         });
-        const actorCards = actors.length === 0 ? [] : actors.map((actor) => formatActorToActorCard(actor));
-
-        if (actorCards.length === 0) {
+        if (actors.length === 0) {
             const instructions = `No Actors were found for the search query "${parsed.keywords}".
 Try a different query with different keywords, or adjust the limit and offset parameters.
 You can also try using more specific or alternative keywords related to your search topic.`;
@@ -163,8 +161,6 @@ You can also try using more specific or alternative keywords related to your sea
             };
             return buildMCPResponse({ texts: [instructions], structuredContent });
         }
-
-        const actorsText = actorCards.join('\n\n');
 
         // Generate structured cards for the actors
         const structuredActorCards = actors.map((actor) => formatActorToStructuredCard(actor));
@@ -180,7 +176,7 @@ You can also try using more specific or alternative keywords related to your sea
         } = {
             actors: structuredActorCards,
             query: parsed.keywords,
-            count: actorCards.length,
+            count: actors.length,
             instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
  If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.`,
         };
@@ -196,7 +192,7 @@ You can also try using more specific or alternative keywords related to your sea
             const texts = [`
  # Search results:
  - **Search query:** ${parsed.keywords}
- - **Number of Actors found:** ${actorCards.length}
+ - **Number of Actors found:** ${actors.length}
 
 An interactive widget has been rendered with the search results.
 `];
@@ -212,10 +208,12 @@ An interactive widget has been rendered with the search results.
             });
         }
 
+        const actorCards = actors.map((actor) => formatActorToActorCard(actor));
+        const actorsText = actorCards.join('\n\n');
         const instructions = `
  # Search results:
  - **Search query:** ${parsed.keywords}
- - **Number of Actors found:** ${actorCards.length}
+ - **Number of Actors found:** ${actors.length}
 
  # Actors:
 

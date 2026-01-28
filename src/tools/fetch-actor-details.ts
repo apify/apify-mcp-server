@@ -66,15 +66,13 @@ EXAMPLES:
             return buildActorNotFoundResponse(parsed.actor);
         }
 
-        const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
-
-        const structuredContent = {
-            actorInfo: details.actorCardStructured,
-            readme: formattedReadme,
-            inputSchema: details.inputSchema,
-        };
-
         if (apifyMcpServer.options.uiMode === 'openai') {
+            const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
+            const structuredContent = {
+                actorInfo: details.actorCardStructured,
+                readme: formattedReadme,
+                inputSchema: details.inputSchema,
+            };
             const widgetStructuredContent = {
                 ...structuredContent,
                 actorDetails: processedStructuredContent.actorDetails,
