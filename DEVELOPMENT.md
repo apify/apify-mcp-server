@@ -50,8 +50,13 @@ npm install
 
 ### Working on the MCP Apps (ChatGPT Apps) UI widgets
 
-The MCP server uses UI widgets from the `src/web/` directory that need to be built before running the server. To build everything, including the UI widgets, run:
+The MCP server uses UI widgets from the `src/web/` directory.
+
 See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) for background on MCP Apps and widgets.
+
+### Production build
+
+If you need the compiled assets copied into the top-level `dist/web` for packaging or integration tests, build everything:
 
 ```bash
 npm run build
@@ -59,23 +64,28 @@ npm run build
 
 This command builds the core project and the `src/web/` widgets, then copies the widgets into the `dist/` directory.
 
-If you only want to work on the React UI widgets, all widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, you will need to modify the corresponding MCP tool's output since widgets can only render data returned by the MCP tool call result.
+All widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, modify the corresponding MCP tool's output, since widgets can only render data returned by the MCP tool call result.
 
 > **Important (UI mode):** Widget rendering is enabled only when the server runs in UI mode. Use the `ui=openai` query parameter (e.g., `/mcp?ui=openai`) or set `UI_MODE=openai`. Currently, `openai` is the only supported `ui` value.
 
-> **Important:** After changing widgets, you must rebuild the project with `npm run build` to refresh the React widgets in the `dist/` directory.
+### Hot-reload development
 
-### Running the MCP server locally
-
-Start the MCP server locally using:
+Run the orchestrator, which starts the web widgets builder in watch mode and the MCP server in standby mode:
 
 ```bash
-APIFY_TOKEN='your-apify-token' npm run start
+APIFY_TOKEN='your-apify-token' npm run dev
 ```
 
-This will spawn the MCP server at port `3001`.
-The HTTP server implementation used here is the standby Actor server in `src/actor/server.ts` (used by `src/main.ts` in STANDBY mode).
-The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
+What happens:
+- The `src/web` project runs `npm run dev` and continuously writes compiled files to `src/web/dist`.
+- The MCP server reads widget assets directly from `src/web/dist` (compiled JS/HTML only; no TypeScript or JSX at runtime).
+- Editing files under `src/web/src/widgets/*.tsx` triggers a rebuild; the next widget render will use the updated code without restarting the server.
+
+Notes:
+- Widget discovery happens when the server connects. Changing widget code is hot-reloaded; adding brand-new widget filenames typically requires reconnecting the MCP client (or restarting the server) to expose the new resource.
+- You can preview widgets quickly via the local esbuild dev server at `http://localhost:3000/index.html`.
+
+The MCP server listens on port `3001`. The HTTP server implementation used here is the standby Actor server in `src/actor/server.ts` (used by `src/main.ts` in STANDBY mode). The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
 ### Testing with MCPJam (optional)
 
