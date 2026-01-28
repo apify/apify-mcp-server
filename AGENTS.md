@@ -342,8 +342,10 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 
 ### Development commands
 
-- `npm run start:dev` - Start development server (uses `tsx` for direct TypeScript execution)
-- `npm run build` - Build TypeScript to JavaScript
+- `npm run start` - Start standby server (uses `tsx` for direct TypeScript execution)
+- `npm run dev` - Alias for `npm run start`
+- `npm run build` - Build TypeScript and UI widgets
+- `npm run build:web` - Build UI widgets only
 - `npm run lint` - Run ESLint
 - `npm run lint:fix` - Fix ESLint issues automatically
 - `npm run type-check` - Type check without building

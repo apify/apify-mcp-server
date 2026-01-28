@@ -54,23 +54,23 @@ The MCP server uses UI widgets from the `src/web/` directory that need to be bui
 See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) for background on MCP Apps and widgets.
 
 ```bash
-npm run build-all
+npm run build
 ```
 
-This command builds the `src/web/` internal project, then runs `npm run build`, and copies the widgets into the `dist/` directory.
+This command builds the core project and the `src/web/` widgets, then copies the widgets into the `dist/` directory.
 
 If you only want to work on the React UI widgets, all widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, you will need to modify the corresponding MCP tool's output since widgets can only render data returned by the MCP tool call result.
 
 > **Important (UI mode):** Widget rendering is enabled only when the server runs in UI mode. Use the `ui=openai` query parameter (e.g., `/mcp?ui=openai`) or set `UI_MODE=openai`. Currently, `openai` is the only supported `ui` value.
 
-> **Important:** After changing widgets, you must rebuild the project with `npm run build-all` to refresh the React widgets in the `dist/` directory.
+> **Important:** After changing widgets, you must rebuild the project with `npm run build` to refresh the React widgets in the `dist/` directory.
 
 ### Running the MCP server locally
 
 Start the MCP server locally using:
 
 ```bash
-APIFY_TOKEN='your-apify-token' npm run start:standby
+APIFY_TOKEN='your-apify-token' npm run start
 ```
 
 This will spawn the MCP server at port `3001`.
