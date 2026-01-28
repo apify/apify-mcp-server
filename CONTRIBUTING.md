@@ -182,24 +182,7 @@ Use comments to guide reviewers:
 
 ## 6. Development Setup
 
-### Prerequisites
-- Node.js >= 20.0.0
-- npm
-
-### Getting Started
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Run linting: `npm run lint`
-4. Run tests: `npm run test`
-5. Build: `npm run build`
-
-### Scripts
-- `npm run lint` - Run ESLint
-- `npm run lint:fix` - Fix ESLint issues automatically
-- `npm run test` - Run unit tests
-- `npm run test:integration` - Run integration tests
-- `npm run build` - Build the project
-- `npm run type-check` - Type check without building
+For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ---
 
