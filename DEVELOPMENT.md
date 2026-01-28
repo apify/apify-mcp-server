@@ -59,10 +59,10 @@ See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) 
 If you need the compiled assets copied into the top-level `dist/web` for packaging or integration tests, build everything:
 
 ```bash
-npm run build-all
+npm run build
 ```
 
-This builds the `src/web/` internal project, then runs `npm run build`, and copies the widgets into the `dist/` directory.
+This command builds the core project and the `src/web/` widgets, then copies the widgets into the `dist/` directory.
 
 All widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, modify the corresponding MCP tool's output, since widgets can only render data returned by the MCP tool call result.
 
@@ -73,7 +73,7 @@ All widget code lives in the self-contained `src/web/` React project. The widget
 Run the orchestrator, which starts the web widgets builder in watch mode and the MCP server in standby mode:
 
 ```bash
-APIFY_TOKEN='your-apify-token' npm run start:standby
+APIFY_TOKEN='your-apify-token' npm run dev
 ```
 
 What happens:
