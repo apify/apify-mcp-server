@@ -86,7 +86,7 @@
     "build": "npm run build:core && npm run build:web",
     "build:core": "tsc -b src",
     "build:watch": "tsc -b src -w",
-    "build:web": "npm --prefix src/web run build",
+    "build:web": "npm --prefix src/web install && npm --prefix src/web run build",
     "postbuild": "mkdir -p dist/web && (cp -r src/web/dist dist/web/ 2>/dev/null || :)",
     "clean": "tsc -b src --clean && rm -rf dist/web",
     "lint": "eslint .",
