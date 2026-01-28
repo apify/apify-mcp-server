@@ -9,7 +9,7 @@ import type { ApifyClient } from 'apify';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { callActor } from '../tools/actor.js';
+import { callActor, getCallActorDescription } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
@@ -204,6 +204,12 @@ export async function loadToolsFromInput(
             if (entry.type === 'internal' && funcs.call) {
                 entry.call = funcs.call;
             }
+        }
+    }
+
+    for (const entry of cloned) {
+        if (entry.name === HelperTools.ACTOR_CALL) {
+            entry.description = getCallActorDescription(uiMode);
         }
     }
     return cloned;
