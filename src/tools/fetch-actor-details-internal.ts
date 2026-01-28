@@ -49,7 +49,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, actorOutputSchema } = toolArgs;
         const parsed = fetchActorDetailsInternalArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -68,6 +68,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
             cardOptions,
             apifyClient,
             apifyToken,
+            actorOutputSchema,
             skyfireMode: apifyMcpServer?.options.skyfireMode,
         });
 

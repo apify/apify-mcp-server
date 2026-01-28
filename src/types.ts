@@ -128,6 +128,8 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
+    /** Actor output schema as type object (injected by internal server) */
+    actorOutputSchema?: Record<string, unknown> | null;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
 };
@@ -459,6 +461,8 @@ export type ApifyRequestParams = {
         apifyToken?: string;
         /** List of Actor IDs that the user has rented */
         userRentedActorIds?: string[];
+        /** Actor output schema as type object (injected by internal server) */
+        actorOutputSchema?: Record<string, unknown> | null;
         /** Progress token for out-of-band progress notifications (standard MCP) */
         progressToken?: string | number;
         /** Allow other metadata fields */

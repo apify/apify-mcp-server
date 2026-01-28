@@ -128,6 +128,7 @@ export const actorDetailsOutputSchema = {
         actorInfo: actorInfoSchema,
         readme: { type: 'string', description: 'Actor README documentation.' },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
+        outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
     },
 };
 
