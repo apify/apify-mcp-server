@@ -11,6 +11,7 @@ import { cn } from "../../utils/cn";
 import { ActorDetails, Actor } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
+import { Button } from "../../components/ui/Button";
 
 interface ToolOutput extends Record<string, unknown> {
     actors?: Actor[];
@@ -23,6 +24,7 @@ interface WidgetState extends Record<string, unknown> {
     isLoading?: boolean;
     showDetails?: boolean;
     requestedActorId?: string | null;
+    visibleCount?: number;
 }
 
 export const ActorSearch: React.FC = () => {
@@ -33,6 +35,7 @@ export const ActorSearch: React.FC = () => {
         isLoading: false,
         showDetails: false,
         requestedActorId: null,
+        visibleCount: 5,
     });
 
     const [localActorDetails, setLocalActorDetails] = useState<ActorDetails | null>(null);
@@ -43,10 +46,14 @@ export const ActorSearch: React.FC = () => {
     const actorDetails = toolOutput?.actorDetails || localActorDetails;
     const isFetchingDetails = Boolean(widgetState?.loadingDetails);
     const requestedActorId = widgetState?.requestedActorId;
+    const visibleCount = widgetState?.visibleCount ?? 5;
 
     // When actorDetails is provided directly from tool (details-only call), ignore actors to force details view
     // This handles the case when fetch-actor-details is called directly (not from search)
     const actors = hasToolActorDetails ? [] : actorsFromTool || [];
+    const visibleActors = actors.slice(0, visibleCount);
+    const hasMore = actors.length > visibleCount;
+
     const shouldForceDetailsView = hasToolActorDetails;
 
     const showDetails = (widgetState?.showDetails || shouldForceDetailsView) && Boolean(actorDetails);
@@ -119,10 +126,17 @@ export const ActorSearch: React.FC = () => {
         });
     };
 
+    const handleShowMore = async () => {
+        await setWidgetState({
+            ...widgetState,
+            visibleCount: visibleCount + 5,
+        });
+    };
+
     return (
         <WidgetLayout>
             <div className="flex flex-col gap-1 items-start w-full ">
-                <div className="pb-6 w-full">
+                <div className="w-full">
                     {showDetails ? (
                         <ActorSearchDetail
                             details={actorDetails!}
@@ -136,21 +150,36 @@ export const ActorSearch: React.FC = () => {
                     ) : actors.length === 0 ? (
                         <EmptyState title="No actors found" description="Try a different search query" />
                     ) : (
-                        <Card variant="alt" padding="sm" className="w-full flex flex-col items-start">
-                            {actors.map((actor: Actor, index: number) => (
-                                <ActorCard
-                                    key={actor.id}
-                                    actor={actor}
-                                    isFirst={index === 0}
-                                    isLast={index === actors.length - 1}
-                                    variant="list"
-                                    subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
-                                    onViewDetails={() => handleViewDetails(actor)}
-                                    isLoading={widgetState?.loadingDetails === actor.id}
-                                    description={actor.description}
-                                />
-                            ))}
-                        </Card>
+                        <div className="flex flex-col gap-4 w-full">
+                            <Card variant="alt" padding="sm" className="w-full flex flex-col items-start">
+                                {visibleActors.map((actor: Actor, index: number) => (
+                                    <ActorCard
+                                        key={actor.id}
+                                        actor={actor}
+                                        isFirst={index === 0}
+                                        isLast={index === visibleActors.length - 1}
+                                        variant="list"
+                                        subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
+                                        onViewDetails={() => handleViewDetails(actor)}
+                                        isLoading={widgetState?.loadingDetails === actor.id}
+                                        description={actor.description}
+                                    />
+                                ))}
+                            </Card>
+
+                            {hasMore && (
+                                <div className="flex justify-center w-full pt-2">
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={handleShowMore}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        Show more ({actors.length - visibleCount} remaining)
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     )}
                 </div>
             </div>

@@ -13,7 +13,7 @@ export const WidgetLayout: React.FC<WidgetLayoutProps> = ({ children, className 
 
     return (
         <div
-            className={cn("flex flex-col gap-6 items-start pb-10 pt-4 px-5 w-full overflow-y-auto", className)}
+            className={cn("flex flex-col gap-6 items-start pb-4 pt-4 px-5 w-full overflow-y-auto", className)}
             style={{
                 fontFamily: "SF Pro, -apple-system, BlinkMacSystemFont, sans-serif",
                 maxHeight: maxHeight ? `${maxHeight}px` : undefined,
