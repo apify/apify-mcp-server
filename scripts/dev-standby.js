@@ -31,7 +31,7 @@ const webDir = resolve(repoRoot, 'src/web');
 const web = run('npm', ['run', 'dev', '--silent'], { cwd: webDir });
 
 // 2) Start server in STANDBY dev mode (reads src/web/dist via resolveAvailableWidgets)
-const server = run('npm', ['run', 'start:dev'], { env: { APIFY_META_ORIGIN: 'STANDBY' } });
+const server = run('npm', ['run', 'start:standby'], { env: { APIFY_META_ORIGIN: 'STANDBY' } });
 
 // Forward signals so both children terminate cleanly
 function shutdown() {
