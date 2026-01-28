@@ -85,7 +85,7 @@ You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP ser
 
 1. Click **"Add new server"**
 2. Fill in a name for the server
-3. Enter the URL: `http://localhost:3001/mcp?ui=openai`
+3. Enter the URL: `http://localhost:3001/mcp?ui=openai` (Note: the `ui=openai` query parameter is required for widget rendering)
 4. Select **"No authentication"** as the auth method
 5. Click **Add**
 
@@ -104,5 +104,5 @@ To test how widgets are rendered per tool call:
 For a better testing experience with widget rendering:
 
 1. Navigate to the **"Chat"** section in the left sidebar
-2. Add your `OPENAI_API_KEY` (or Anthropic API key)
+2. Add your `OPENAI_API_KEY` (or Anthropic API key, or OpenRouter API key)
 3. Chat with the MCP server directly, widgets will be rendered inline
