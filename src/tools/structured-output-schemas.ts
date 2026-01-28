@@ -149,6 +149,30 @@ export const actorSearchOutputSchema = {
     required: ['actors', 'query', 'count'],
 };
 
+/**
+ * Schema for internal search results (search-actors-internal tool)
+ */
+export const actorSearchInternalOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        actors: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    fullName: { type: 'string', description: 'Full Actor name (username/name)' },
+                    title: { type: 'string', description: 'Actor title' },
+                    description: { type: 'string', description: 'Actor description' },
+                },
+                required: ['fullName'],
+            },
+        },
+        query: { type: 'string', description: 'The search query used' },
+        count: { type: 'number', description: 'Number of Actors returned' },
+    },
+    required: ['actors', 'query', 'count'],
+};
+
 export const searchApifyDocsToolOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {

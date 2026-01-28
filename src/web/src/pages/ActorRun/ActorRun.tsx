@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
@@ -47,6 +47,11 @@ interface ToolOutput extends Record<string, unknown> {
 interface WidgetState extends Record<string, unknown> {
     isRefreshing?: boolean;
     lastUpdateTime?: number;
+    // Run completion state for model context (set when run finishes)
+    runStatus?: string;
+    datasetId?: string;
+    itemCount?: number;
+    runId?: string;
 }
 
 type StatusVariant = "success" | "danger" | "warning" | "secondary";
@@ -76,9 +81,14 @@ export const ActorRun: React.FC = () => {
         isRefreshing: false,
         lastUpdateTime: Date.now(),
     });
+    const widgetStateRef = useRef(widgetState);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        widgetStateRef.current = widgetState;
+    }, [widgetState]);
 
     // Initialize from toolOutput once
     useEffect(() => {
@@ -127,7 +137,18 @@ export const ActorRun: React.FC = () => {
                         setRunData(newData);
 
                         const newStatus = (newData.status || '').toUpperCase();
-                        if (TERMINAL_STATUSES.has(newStatus)) break;
+                        if (TERMINAL_STATUSES.has(newStatus)) {
+                            // Notify model that run is complete by updating widget state
+                            await setWidgetState({
+                                ...widgetStateRef.current,
+                                runStatus: newStatus,
+                                runId: runData.runId,
+                                datasetId: newData.dataset?.datasetId,
+                                itemCount: newData.dataset?.itemCount,
+                                lastUpdateTime: Date.now(),
+                            });
+                            break;
+                        }
                     }
 
                     pollCount++;

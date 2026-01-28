@@ -19,7 +19,7 @@ import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema, UiMode } from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
@@ -359,14 +359,25 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
         .describe('Optional call options for the Actor run configuration.'),
 });
 
-export const callActor: ToolEntry = {
-    type: 'internal',
-    name: HelperTools.ACTOR_CALL,
-    description: `Call any Actor from the Apify Store.
+/**
+ * This is a bit of a hacky way to deal with it, but let's use it for now
+ */
+export function getCallActorDescription(uiMode?: UiMode): string {
+    const isUiMode = uiMode === 'openai';
+    const schemaTool = isUiMode ? HelperTools.ACTOR_GET_DETAILS_INTERNAL : HelperTools.ACTOR_GET_DETAILS;
+    const searchTool = isUiMode ? HelperTools.STORE_SEARCH_INTERNAL : HelperTools.STORE_SEARCH;
+    const searchToolWarning = isUiMode
+        ? `Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`
+        : '';
+
+    return `Call any Actor from the Apify Store.
 
 WORKFLOW:
-1. Use fetch-actor-details with output={ inputSchema: true } to get the Actor's input schema (recommended to save tokens)
+1. Use ${schemaTool} to get the Actor's input schema
 2. Call this tool with the actor name and proper input based on the schema
+
+If the actor name is not in "username/name" format, use ${searchTool} to resolve the correct Actor first.
+${searchToolWarning}
 
 For MCP server Actors:
 - Use fetch-actor-details with output={ mcpTools: true } to list available tools
@@ -390,7 +401,13 @@ USAGE:
   - **When \`async: true\`** (enforced when UI mode is enabled): Starts the run and returns immediately with runId and a widget that automatically tracks progress. DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool after this - your task is complete. Note: UI mode always enforces async execution for optimal user experience.
 
 EXAMPLES:
-- user_input: Get instagram posts using apify/instagram-scraper`,
+- user_input: Get instagram posts using apify/instagram-scraper`;
+}
+
+export const callActor: ToolEntry = {
+    type: 'internal',
+    name: HelperTools.ACTOR_CALL,
+    description: getCallActorDescription(),
     inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
     // For now we are not adding the structured output schema since this tool is quite complex and has multiple possible ends states
     ajvValidate: compileSchema({
@@ -555,7 +572,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 if (apifyMcpServer.options.uiMode === 'openai') {
                     responseText += `
 
-CRITICAL: DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool for this run. The widget below automatically tracks progress and refreshes status every few seconds until completion. Your task is complete - take NO further action.`;
+A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
+
+The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
+
+Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
                 }
 
                 const response: { content: { type: 'text'; text: string }[]; structuredContent?: unknown; _meta?: unknown } = {

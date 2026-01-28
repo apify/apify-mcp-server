@@ -9,7 +9,7 @@ import type { ApifyClient } from 'apify';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { callActor } from '../tools/actor.js';
+import { callActor, getCallActorDescription } from '../tools/actor.js';
 import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
@@ -125,6 +125,11 @@ export async function loadToolsFromInput(
         result.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
     }
 
+    // In openai mode, add UI-specific tools
+    if (uiMode === 'openai') {
+        result.push(...(toolCategories.ui || []));
+    }
+
     // Actor tools (if any)
     if (actorNamesToLoad.length > 0) {
         const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient);
@@ -164,7 +169,12 @@ export async function loadToolsFromInput(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    const filtered = result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+    const deduped = result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+
+    // Filter out openai-only tools when not in openai mode
+    const filtered = uiMode === 'openai'
+        ? deduped
+        : deduped.filter((entry) => !entry.openaiOnly);
 
     // TODO: rework this solition as it was quickly hacked together for hotfix
     // Deep clone except ajvValidate and call functions
@@ -194,6 +204,12 @@ export async function loadToolsFromInput(
             if (entry.type === 'internal' && funcs.call) {
                 entry.call = funcs.call;
             }
+        }
+    }
+
+    for (const entry of cloned) {
+        if (entry.name === HelperTools.ACTOR_CALL) {
+            entry.description = getCallActorDescription(uiMode);
         }
     }
     return cloned;
