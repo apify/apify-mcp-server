@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
@@ -81,9 +81,14 @@ export const ActorRun: React.FC = () => {
         isRefreshing: false,
         lastUpdateTime: Date.now(),
     });
+    const widgetStateRef = useRef(widgetState);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        widgetStateRef.current = widgetState;
+    }, [widgetState]);
 
     // Initialize from toolOutput once
     useEffect(() => {
@@ -135,7 +140,7 @@ export const ActorRun: React.FC = () => {
                         if (TERMINAL_STATUSES.has(newStatus)) {
                             // Notify model that run is complete by updating widget state
                             await setWidgetState({
-                                ...widgetState,
+                                ...widgetStateRef.current,
                                 runStatus: newStatus,
                                 runId: runData.runId,
                                 datasetId: newData.dataset?.datasetId,
