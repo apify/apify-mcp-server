@@ -65,6 +65,7 @@ export async function callActorGetDataset(
     callOptions: ActorCallOptions | undefined = undefined,
     progressTracker?: ProgressTracker | null,
     abortSignal?: AbortSignal,
+    previewOutput = true,
 ): Promise<CallActorGetDatasetResult | null> {
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
     const actorClient = apifyClient.actor(actorName);
@@ -123,7 +124,9 @@ export async function callActorGetDataset(
      */
     const storageDefinition = defaultBuild?.actorDefinition?.storages?.dataset as ActorDefinitionStorage | undefined;
     const importantProperties = getActorDefinitionStorageFieldNames(storageDefinition || {});
-    const previewItems = ensureOutputWithinCharLimit(datasetItems.items, importantProperties, TOOL_MAX_OUTPUT_CHARS);
+    const previewItems = previewOutput
+        ? ensureOutputWithinCharLimit(datasetItems.items, importantProperties, TOOL_MAX_OUTPUT_CHARS)
+        : [];
 
     return {
         runId: actorRun.id,
@@ -345,6 +348,9 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
     async: z.boolean()
         .optional()
         .describe(`When true: starts the run and returns immediately with runId. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled (enforced), false otherwise. Note: When UI mode is enabled, async is always true regardless of this parameter and the widget automatically tracks progress.`),
+    previewOutput: z.boolean()
+        .optional()
+        .describe('When true (default): includes preview items. When false: metadata only (reduces context). Use when fetching fields via get-actor-output.'),
     callOptions: z.object({
         memory: z.number()
             .min(128, 'Memory must be at least 128 MB')
@@ -432,7 +438,7 @@ export const callActor: ToolEntry = {
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
-        const { actor: actorName, input, async, callOptions } = callActorArgs.parse(args);
+        const { actor: actorName, input, async, previewOutput = true, callOptions } = callActorArgs.parse(args);
 
         // Parse special format: actor:tool
         const mcpToolMatch = actorName.match(/^(.+):(.+)$/);
@@ -605,6 +611,7 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 callOptions,
                 progressTracker,
                 extra.signal,
+                previewOutput,
             );
 
             if (!callResult) {
@@ -613,7 +620,7 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 return {};
             }
 
-            const content = buildActorResponseContent(actorName, callResult);
+            const content = buildActorResponseContent(actorName, callResult, previewOutput);
 
             return { content };
         } catch (error) {
