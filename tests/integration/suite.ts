@@ -8,8 +8,8 @@ import { ApifyClient } from '../../src/apify-client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
 // Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
 import { callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
+import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
@@ -2529,5 +2529,133 @@ export function createIntegrationTestsSuite(
                 await client.close();
             },
         );
+
+        it('should return required structuredContent fields for ActorRun widget (get-actor-run)', async () => {
+            client = await createClientFn({ tools: ['actors', 'runs'] });
+
+            // First, start an async actor run to get a runId
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    async: true,
+                },
+            });
+
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            const runId = resultWithStructured.structuredContent!.runId!;
+
+            // Now test get-actor-run
+            const runResult = await client.callTool({
+                name: HelperTools.ACTOR_RUNS_GET,
+                arguments: { runId },
+            });
+
+            const runContent = runResult as { structuredContent?: {
+                runId: string;
+                actorName: string;
+                status: string;
+                startedAt: string;
+                dataset?: {
+                    datasetId: string;
+                    itemCount: number;
+                };
+            } };
+
+            expect(runContent.structuredContent).toBeDefined();
+            expect(runContent.structuredContent?.runId).toBeDefined();
+            expect(runContent.structuredContent?.actorName).toBeDefined();
+            expect(runContent.structuredContent?.status).toBeDefined();
+            expect(runContent.structuredContent?.startedAt).toBeDefined();
+
+            // Wait for run to succeed to check dataset fields (might need polling in real scenario,
+            // but for integration test on python-example it might be fast enough or we check basic fields)
+            if (runContent.structuredContent?.status === 'SUCCEEDED') {
+                expect(runContent.structuredContent?.dataset).toBeDefined();
+                expect(runContent.structuredContent?.dataset?.datasetId).toBeDefined();
+                expect(runContent.structuredContent?.dataset?.itemCount).toBeDefined();
+            }
+        });
+
+        it('should return required structuredContent fields for ActorSearch widget (search-actors)', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+                uiMode: 'openai', // Enable UI mode to get widgetActors
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.STORE_SEARCH,
+                arguments: {
+                    keywords: 'python',
+                    limit: 5,
+                },
+            });
+
+            const content = result as { structuredContent?: {
+                actors: Record<string, unknown>[];
+                widgetActors?: Record<string, unknown>[];
+            } };
+
+            expect(content.structuredContent).toBeDefined();
+            expect(content.structuredContent?.actors).toBeDefined();
+            expect(Array.isArray(content.structuredContent?.actors)).toBe(true);
+
+            // Check widgetActors presence in OpenAI mode
+            expect(content.structuredContent?.widgetActors).toBeDefined();
+            expect(Array.isArray(content.structuredContent?.widgetActors)).toBe(true);
+
+            // Check first widget actor for required fields
+            if (content.structuredContent!.widgetActors && content.structuredContent!.widgetActors.length > 0) {
+                const actor = content.structuredContent!.widgetActors[0];
+                expect(actor).toHaveProperty('id');
+                expect(actor).toHaveProperty('name');
+                expect(actor).toHaveProperty('username');
+                expect(actor).toHaveProperty('description');
+            }
+        });
+
+        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+                uiMode: 'openai', // Enable UI mode to get widget structured content
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                },
+            });
+
+            const content = result as { structuredContent?: {
+                actorDetails?: {
+                    actorInfo: {
+                        id: string;
+                        name: string;
+                        username: string;
+                        description: string;
+                    };
+                    actorCard: string;
+                    readme: string;
+                };
+            } };
+
+            expect(content.structuredContent).toBeDefined();
+            expect(content.structuredContent?.actorDetails).toBeDefined();
+
+            const details = content.structuredContent!.actorDetails!;
+            expect(details.actorCard).toBeDefined();
+            expect(typeof details.actorCard).toBe('string');
+
+            expect(details.readme).toBeDefined();
+            expect(typeof details.readme).toBe('string');
+
+            expect(details.actorInfo).toBeDefined();
+            expect(details.actorInfo).toHaveProperty('id');
+            expect(details.actorInfo).toHaveProperty('name');
+            expect(details.actorInfo).toHaveProperty('username');
+            expect(details.actorInfo).toHaveProperty('description');
+        });
     });
 }

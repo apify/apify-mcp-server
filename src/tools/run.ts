@@ -79,6 +79,18 @@ USAGE EXAMPLES:
 
             log.debug('Get actor run', { runId: parsed.runId, status: run.status });
 
+            let actorName: string | undefined;
+            if (run.actId) {
+                try {
+                    const actor = await client.actor(run.actId).get();
+                    if (actor) {
+                        actorName = `${actor.username}/${actor.name}`;
+                    }
+                } catch (error) {
+                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { error });
+                }
+            }
+
             const structuredContent: {
                 runId: string;
                 actorName?: string;
@@ -94,6 +106,7 @@ USAGE EXAMPLES:
                 };
             } = {
                 runId: run.id,
+                actorName,
                 status: run.status,
                 startedAt: run.startedAt?.toISOString() || '',
                 finishedAt: run.finishedAt?.toISOString(),
