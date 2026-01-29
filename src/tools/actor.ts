@@ -29,6 +29,7 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
+import { callActorOutputSchema } from './structured-output-schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 
 // Define a named return type for callActorGetDataset
@@ -199,6 +200,8 @@ Actor description: ${definition.description}`;
             actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,
+            // reuse the common output schema
+            outputSchema: callActorOutputSchema,
             ajvValidate,
             requiresSkyfirePayId: true,
             memoryMbytes,
@@ -415,7 +418,7 @@ export const callActor: ToolEntry = {
     name: HelperTools.ACTOR_CALL,
     description: getCallActorDescription(),
     inputSchema: z.toJSONSchema(callActorArgs) as ToolInputSchema,
-    // For now we are not adding the structured output schema since this tool is quite complex and has multiple possible ends states
+    outputSchema: callActorOutputSchema,
     ajvValidate: compileSchema({
         ...z.toJSONSchema(callActorArgs),
         // Additional props true to allow skyfire-pay-id
@@ -620,9 +623,9 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 return {};
             }
 
-            const content = buildActorResponseContent(actorName, callResult, previewOutput);
+            const { content, structuredContent } = buildActorResponseContent(actorName, callResult, previewOutput);
 
-            return { content };
+            return { content, structuredContent };
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, async: async ?? (apifyMcpServer.options.uiMode === 'openai') });
             // Let the server classify the error; we only mark it as an MCP error response

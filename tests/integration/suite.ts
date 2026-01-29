@@ -8,6 +8,7 @@ import { ApifyClient } from '../../src/apify-client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
 // Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
+import { callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
@@ -460,6 +461,21 @@ export function createIntegrationTestsSuite(
                     type: 'text',
                 },
             );
+
+            // Validate structured output has actual actor results
+            const resultWithStructured = result as { structuredContent?: {
+                 runId?: string;
+                 datasetId?: string;
+                 itemCount?: number;
+                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 instructions?: string;
+             } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
         });
 
         it('should call Actor directly with required input', async () => {
@@ -501,6 +517,24 @@ export function createIntegrationTestsSuite(
             // Sync mode should return dataset items directly
             expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
             expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+
+            // Validate structured output matches schema
+            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+
+            // Validate structured content has actual actor results
+            const resultWithStructured = callResult as { structuredContent?: {
+                 runId?: string;
+                 datasetId?: string;
+                 itemCount?: number;
+                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 instructions?: string;
+             } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
         });
 
         it('should support async mode in call-actor and return runId', async () => {
@@ -525,6 +559,9 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent).toBeDefined();
             expect(resultWithStructured.structuredContent?.runId).toBeDefined();
             expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
+
+            // Validate structured output matches schema
+            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
         });
 
         it('should support sync mode in call-actor (default behavior)', async () => {
@@ -597,6 +634,14 @@ export function createIntegrationTestsSuite(
 
             // Should NOT have actual preview items JSON (the sum result)
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(false);
+
+            // Validate structured output matches schema
+            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+
+            // Validate structured content has empty items (preview disabled)
+            const resultWithStructured = callResult as { structuredContent?: { items?: unknown[] } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toEqual([]);
         });
 
         it('should return preview items by default in call-actor (previewOutput: true)', async () => {
@@ -616,6 +661,24 @@ export function createIntegrationTestsSuite(
 
             // Should have actual preview items with the sum result
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(true);
+
+            // Validate structured output matches schema
+            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+
+            // Validate structured content has actual actor results
+            const resultWithStructured = callResult as { structuredContent?: {
+                 runId?: string;
+                 datasetId?: string;
+                 itemCount?: number;
+                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 instructions?: string;
+             } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
         });
 
         it('should find Actors in store search', async () => {
@@ -1855,6 +1918,28 @@ export function createIntegrationTestsSuite(
             expect(output[0]).toHaveProperty('metadata.title');
             expect(typeof output[0]['metadata.title']).toBe('string');
 
+            // Validate structured output for direct actor tool call
+            const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
+            // Use imported callActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
+            validateStructuredOutput(result, callActorOutputSchema, ragWebBrowserToolName);
+
+            // Validate structured content has items with metadata and crawl
+            const resultWithStructured = result as { structuredContent?: {
+                 runId?: string;
+                 datasetId?: string;
+                 itemCount?: number;
+                 items?: { metadata?: { title?: string }; crawl?: object }[];
+                 instructions?: string;
+             } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('metadata');
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
+
+            // Validate structured output for get-actor-output
+            validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
+
             await client.close();
         });
 
@@ -1896,6 +1981,56 @@ export function createIntegrationTestsSuite(
             expect(output[0]).toHaveProperty('first_number', input.first_number);
             expect(output[0]).toHaveProperty('second_number', input.second_number);
             expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
+
+            // Validate structured output for direct actor tool
+            // Use imported callActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
+            validateStructuredOutput(result, callActorOutputSchema, selectedToolName);
+
+            // Validate structured content has actual actor results with sum
+            const resultWithStructured = result as { structuredContent?: {
+                 runId?: string;
+                 datasetId?: string;
+                 itemCount?: number;
+                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 instructions?: string;
+             } };
+            expect(resultWithStructured.structuredContent).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items).toBeDefined();
+            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 12);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 5);
+            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 7);
+
+            // Validate structured output for get-actor-output
+            validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
+        });
+
+        it('should return structured output for get-actor-run matching outputSchema', async () => {
+            client = await createClientFn({ tools: ['actors', 'runs'] });
+
+            // First, start an async actor run to get a runId
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    async: true,
+                },
+            });
+
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            expect(resultWithStructured.structuredContent?.runId).toBeDefined();
+            const runId = resultWithStructured.structuredContent!.runId!;
+
+            // Now test get-actor-run
+            const runResult = await client.callTool({
+                name: HelperTools.ACTOR_RUNS_GET,
+                arguments: { runId },
+            });
+
+            expect(runResult.content).toBeDefined();
+            // Validate structured output for get-actor-run
+            validateStructuredOutput(runResult, findToolByName(HelperTools.ACTOR_RUNS_GET)?.outputSchema, HelperTools.ACTOR_RUNS_GET);
         });
 
         it('should return Actor details both for full Actor name and ID', async () => {
@@ -1926,6 +2061,50 @@ export function createIntegrationTestsSuite(
             expect(contentById[0].text).toContain(actorName);
 
             await client.close();
+        });
+
+        it('should return structured output for get-dataset-items matching outputSchema', async () => {
+            client = await createClientFn({ tools: ['actors', 'storage'] });
+
+            // First, run an actor to get a datasetId
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 3, second_number: 4 },
+                    async: false,
+                },
+            });
+
+            const resultWithStructured = callResult as { structuredContent?: { datasetId?: string } };
+            expect(resultWithStructured.structuredContent?.datasetId).toBeDefined();
+            const datasetId = resultWithStructured.structuredContent!.datasetId!;
+
+            // Now test get-dataset-items
+            const datasetResult = await client.callTool({
+                name: HelperTools.DATASET_GET_ITEMS,
+                arguments: { datasetId },
+            });
+
+            expect(datasetResult.content).toBeDefined();
+            // Validate structured output for get-dataset-items
+            validateStructuredOutput(datasetResult, findToolByName(HelperTools.DATASET_GET_ITEMS)?.outputSchema, HelperTools.DATASET_GET_ITEMS);
+
+            // Validate structured content has items with actual results
+            const datasetWithStructured = datasetResult as { structuredContent?: {
+                 datasetId?: string;
+                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 itemCount?: number;
+                 totalItemCount?: number;
+                 offset?: number;
+                 limit?: number;
+             } };
+            expect(datasetWithStructured.structuredContent).toBeDefined();
+            expect(datasetWithStructured.structuredContent?.items).toBeDefined();
+            expect(datasetWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 7);
+            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 3);
+            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 4);
         });
 
         it('should connect to MCP server and at least one tool is available', async () => {
@@ -2350,5 +2529,133 @@ export function createIntegrationTestsSuite(
                 await client.close();
             },
         );
+
+        it('should return required structuredContent fields for ActorRun widget (get-actor-run)', async () => {
+            client = await createClientFn({ tools: ['actors', 'runs'] });
+
+            // First, start an async actor run to get a runId
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    async: true,
+                },
+            });
+
+            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
+            const runId = resultWithStructured.structuredContent!.runId!;
+
+            // Now test get-actor-run
+            const runResult = await client.callTool({
+                name: HelperTools.ACTOR_RUNS_GET,
+                arguments: { runId },
+            });
+
+            const runContent = runResult as { structuredContent?: {
+                runId: string;
+                actorName: string;
+                status: string;
+                startedAt: string;
+                dataset?: {
+                    datasetId: string;
+                    itemCount: number;
+                };
+            } };
+
+            expect(runContent.structuredContent).toBeDefined();
+            expect(runContent.structuredContent?.runId).toBeDefined();
+            expect(runContent.structuredContent?.actorName).toBeDefined();
+            expect(runContent.structuredContent?.status).toBeDefined();
+            expect(runContent.structuredContent?.startedAt).toBeDefined();
+
+            // Wait for run to succeed to check dataset fields (might need polling in real scenario,
+            // but for integration test on python-example it might be fast enough or we check basic fields)
+            if (runContent.structuredContent?.status === 'SUCCEEDED') {
+                expect(runContent.structuredContent?.dataset).toBeDefined();
+                expect(runContent.structuredContent?.dataset?.datasetId).toBeDefined();
+                expect(runContent.structuredContent?.dataset?.itemCount).toBeDefined();
+            }
+        });
+
+        it('should return required structuredContent fields for ActorSearch widget (search-actors)', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+                uiMode: 'openai', // Enable UI mode to get widgetActors
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.STORE_SEARCH,
+                arguments: {
+                    keywords: 'python',
+                    limit: 5,
+                },
+            });
+
+            const content = result as { structuredContent?: {
+                actors: Record<string, unknown>[];
+                widgetActors?: Record<string, unknown>[];
+            } };
+
+            expect(content.structuredContent).toBeDefined();
+            expect(content.structuredContent?.actors).toBeDefined();
+            expect(Array.isArray(content.structuredContent?.actors)).toBe(true);
+
+            // Check widgetActors presence in OpenAI mode
+            expect(content.structuredContent?.widgetActors).toBeDefined();
+            expect(Array.isArray(content.structuredContent?.widgetActors)).toBe(true);
+
+            // Check first widget actor for required fields
+            if (content.structuredContent!.widgetActors && content.structuredContent!.widgetActors.length > 0) {
+                const actor = content.structuredContent!.widgetActors[0];
+                expect(actor).toHaveProperty('id');
+                expect(actor).toHaveProperty('name');
+                expect(actor).toHaveProperty('username');
+                expect(actor).toHaveProperty('description');
+            }
+        });
+
+        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+                uiMode: 'openai', // Enable UI mode to get widget structured content
+            });
+
+            const result = await client.callTool({
+                name: HelperTools.ACTOR_GET_DETAILS,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                },
+            });
+
+            const content = result as { structuredContent?: {
+                actorDetails?: {
+                    actorInfo: {
+                        id: string;
+                        name: string;
+                        username: string;
+                        description: string;
+                    };
+                    actorCard: string;
+                    readme: string;
+                };
+            } };
+
+            expect(content.structuredContent).toBeDefined();
+            expect(content.structuredContent?.actorDetails).toBeDefined();
+
+            const details = content.structuredContent!.actorDetails!;
+            expect(details.actorCard).toBeDefined();
+            expect(typeof details.actorCard).toBe('string');
+
+            expect(details.readme).toBeDefined();
+            expect(typeof details.readme).toBe('string');
+
+            expect(details.actorInfo).toBeDefined();
+            expect(details.actorInfo).toHaveProperty('id');
+            expect(details.actorInfo).toHaveProperty('name');
+            expect(details.actorInfo).toHaveProperty('username');
+            expect(details.actorInfo).toHaveProperty('description');
+        });
     });
 }

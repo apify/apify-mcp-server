@@ -863,8 +863,8 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             return { };
                         }
 
-                        const content = buildActorResponseContent(tool.actorFullName, callResult);
-                        return { content };
+                        const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
+                        return { content, structuredContent };
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();
@@ -1053,8 +1053,8 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     toolStatus = TOOL_STATUS.ABORTED;
                     result = {};
                 } else {
-                    const content = buildActorResponseContent(tool.actorFullName, callResult);
-                    result = { content };
+                    const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
+                    result = { content, structuredContent };
                 }
 
                 if (progressTracker) {
