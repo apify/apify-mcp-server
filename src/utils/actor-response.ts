@@ -1,4 +1,20 @@
 import type { CallActorGetDatasetResult } from '../tools/actor.js';
+import type { DatasetItem } from '../types.js';
+
+/**
+ * Result from buildActorResponseContent function.
+ * Contains both text content and structured content.
+ */
+export type ActorResponseResult = {
+    content: ({ type: 'text'; text: string })[];
+    structuredContent: {
+        runId: string;
+        datasetId: string;
+        itemCount: number;
+        items: DatasetItem[];
+        instructions: string;
+    };
+};
 
 /**
  * Builds the response content for Actor tool calls.
@@ -14,13 +30,13 @@ import type { CallActorGetDatasetResult } from '../tools/actor.js';
  * @param actorName - The name of the actor.
  * @param result - The result from callActorGetDataset.
  * @param previewOutput - Whether to include preview items (default: true).
- * @returns The content array for the tool response.
+ * @returns The content array and structured content for the tool response.
  */
 export function buildActorResponseContent(
     actorName: string,
     result: CallActorGetDatasetResult,
     previewOutput = true,
-): ({ type: 'text'; text: string })[] {
+): ActorResponseResult {
     const { runId, datasetId, itemCount, schema } = result;
 
     // Extract item schema if schema is an array
@@ -28,6 +44,12 @@ export function buildActorResponseContent(
     if (schema && schema.type === 'array' && typeof schema.items === 'object' && schema.items !== null) {
         displaySchema = schema.items;
     }
+
+    // Build instructions for retrieving additional data
+    const previewNote = itemCount !== result.previewItems.length
+        ? ` Note: You have access only to a limited preview (${result.previewItems.length} of ${itemCount} items). Do not present this as the full output.`
+        : '';
+    const instructions = `If you need to retrieve additional data, use the "get-actor-output" tool with datasetId: "${datasetId}".${previewNote} Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.`;
 
     // Construct text content
     const textContent = `Actor "${actorName}" completed successfully!
@@ -45,7 +67,7 @@ ${JSON.stringify(displaySchema)}
 
 Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
 
-If you need to retrieve additional data, use the "get-actor-output" tool with: datasetId: "${datasetId}". Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.
+${instructions}
 `;
 
     const getEmptyPreviewMessage = () => {
@@ -60,11 +82,22 @@ If you need to retrieve additional data, use the "get-actor-output" tool with: d
         : getEmptyPreviewMessage();
 
     // Build content array
-    return [
+    const content: ({ type: 'text'; text: string })[] = [
         { type: 'text', text: itemsPreviewText },
         /**
          * The metadata and instructions text must be at the end otherwise the LLM does not acknowledge it.
          */
         { type: 'text', text: textContent },
     ];
+
+    // Build structured content
+    const structuredContent = {
+        runId: result.runId,
+        datasetId: result.datasetId,
+        itemCount: result.itemCount,
+        items: result.previewItems,
+        instructions,
+    };
+
+    return { content, structuredContent };
 }

@@ -289,6 +289,8 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Error responses**: Return user-friendly error messages with suggestions
 - **Input validation**: Always validate tool inputs with Zod before processing
 - **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl-lru.ts`)
+- **Constants and Tool Names**: Always use constants and never magic or hardcoded values. When referring to tools, ALWAYS use the `HelperTools` enum.
+  - **Exception**: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, helping to prevent accidental breaking changes.
 
 ### Input validation best practices
 

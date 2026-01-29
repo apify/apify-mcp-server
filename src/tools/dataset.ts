@@ -7,6 +7,7 @@ import { compileSchema } from '../utils/ajv.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
+import { datasetItemsOutputSchema } from './structured-output-schemas.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -103,6 +104,7 @@ USAGE EXAMPLES:
 - user_input: Get first 100 items from dataset abd123
 - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
+    outputSchema: datasetItemsOutputSchema,
     /**
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
@@ -141,7 +143,17 @@ USAGE EXAMPLES:
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
             });
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+
+        const structuredContent = {
+            datasetId: parsed.datasetId,
+            items: v.items,
+            itemCount: v.items.length,
+            totalItemCount: v.count,
+            offset: parsed.offset ?? 0,
+            limit: parsed.limit,
+        };
+
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };
     },
 } as const;
 

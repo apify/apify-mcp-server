@@ -201,3 +201,82 @@ export const fetchApifyDocsToolOutputSchema = {
     },
     required: ['url', 'content'],
 };
+
+/**
+ * Schema for call-actor and direct actor tool outputs.
+ * Contains Actor run metadata and dataset items (sync mode only).
+ * In async mode, only runId is present.
+ */
+export const callActorOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        runId: { type: 'string', description: 'Actor run ID' },
+        actorName: { type: 'string', description: 'Name of the Actor (only in async mode)' },
+        status: { type: 'string', description: 'Run status (only in async mode) - READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT' },
+        startedAt: { type: 'string', description: 'ISO timestamp when the run started (only in async mode)' },
+        input: { type: 'object' as const, description: 'Input parameters passed to the Actor (only in async mode)' },
+        datasetId: { type: 'string', description: 'Dataset ID containing the full results (sync mode only)' },
+        itemCount: { type: 'number', description: 'Total number of items in the dataset (sync mode only)' },
+        items: {
+            type: 'array' as const,
+            items: { type: 'object' as const },
+            description: 'Dataset items from the Actor run (sync mode only, may be truncated due to size limits)',
+        },
+        instructions: { type: 'string', description: 'Instructions for the LLM on how to process or retrieve additional data' },
+    },
+    required: ['runId'],
+};
+
+/**
+ * Schema for get-actor-run tool output.
+ * Contains full run information including status, timestamps, stats, and dataset preview.
+ */
+export const getActorRunOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        runId: { type: 'string', description: 'Actor run ID' },
+        actorName: { type: 'string', description: 'Name of the Actor' },
+        status: { type: 'string', description: 'Run status (READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT)' },
+        startedAt: { type: 'string', description: 'ISO timestamp when the run started' },
+        finishedAt: { type: 'string', description: 'ISO timestamp when the run finished (only for completed runs)' },
+        stats: {
+            type: 'object' as const,
+            description: 'Run statistics (compute units, memory, duration, etc.)',
+        },
+        dataset: {
+            type: 'object' as const,
+            description: 'Dataset information (only for completed runs with results)',
+            properties: {
+                datasetId: { type: 'string', description: 'Default dataset ID' },
+                itemCount: { type: 'number', description: 'Total number of items in dataset' },
+                schema: { type: 'object' as const, description: 'Auto-generated JSON schema from dataset items' },
+                previewItems: {
+                    type: 'array' as const,
+                    items: { type: 'object' as const },
+                    description: 'Preview of first 5 dataset items',
+                },
+            },
+            required: ['datasetId', 'itemCount', 'schema', 'previewItems'],
+        },
+    },
+    required: ['runId', 'status', 'startedAt'],
+};
+
+/**
+ * Schema for dataset items retrieval tools (get-actor-output, get-dataset-items).
+ * Contains dataset items with pagination and count information.
+ */
+export const datasetItemsOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        datasetId: { type: 'string', description: 'Dataset ID' },
+        items: { type: 'array' as const,
+            items: { type: 'object' as const },
+            description: 'Dataset items' },
+        itemCount: { type: 'number', description: 'Number of items returned' },
+        totalItemCount: { type: 'number', description: 'Total items in dataset' },
+        offset: { type: 'number', description: 'Offset used for pagination' },
+        limit: { type: 'number', description: 'Limit used for pagination' },
+    },
+    required: ['datasetId', 'items', 'itemCount'],
+};

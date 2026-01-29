@@ -6,6 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { datasetItemsOutputSchema } from './structured-output-schemas.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -84,6 +85,7 @@ USAGE EXAMPLES:
 
 Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
     inputSchema: z.toJSONSchema(getActorOutputArgs) as ToolInputSchema,
+    outputSchema: datasetItemsOutputSchema,
     /**
      * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
      */
@@ -145,6 +147,16 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
         if (truncated) {
             outputText += `\n\n[Output was truncated to ${TOOL_MAX_OUTPUT_CHARS} characters to comply with the tool output limits.]`;
         }
-        return { content: [{ type: 'text', text: outputText }] };
+
+        const structuredContent = {
+            datasetId: parsed.datasetId,
+            items: cleanedItems,
+            itemCount: cleanedItems.length,
+            totalItemCount: response.count,
+            offset: parsed.offset,
+            limit: parsed.limit,
+        };
+
+        return { content: [{ type: 'text', text: outputText }], structuredContent };
     },
 } as const;
