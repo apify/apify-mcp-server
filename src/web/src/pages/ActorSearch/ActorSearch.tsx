@@ -3,11 +3,8 @@ import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { Heading } from "../../components/ui/Heading";
-import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
+import { CardContainer, Heading, Message } from "@apify/ui-library";
 import { formatPricing } from "../../utils/formatting";
-import { cn } from "../../utils/cn";
 import { ActorDetails, Actor } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
@@ -136,21 +133,27 @@ export const ActorSearch: React.FC = () => {
                     ) : actors.length === 0 ? (
                         <EmptyState title="No actors found" description="Try a different search query" />
                     ) : (
-                        <Card variant="alt" padding="sm" className="w-full flex flex-col items-start">
-                            {actors.map((actor: Actor, index: number) => (
-                                <ActorCard
-                                    key={actor.id}
-                                    actor={actor}
-                                    isFirst={index === 0}
-                                    isLast={index === actors.length - 1}
-                                    variant="list"
-                                    subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
-                                    onViewDetails={() => handleViewDetails(actor)}
-                                    isLoading={widgetState?.loadingDetails === actor.id}
-                                    description={actor.description}
-                                />
-                            ))}
-                        </Card>
+                        <div className="w-full">
+                                <div className="flex flex-col items-start">
+                                    <Heading type="titleM" mb="space16">
+                                        Search results
+                                    </Heading>
+                                    {actors.map((actor: Actor, index: number) => (
+                                        <CardContainer header="" mb="space16" key={actor.id}>
+                                            <ActorCard
+                                                actor={actor}
+                                                isFirst={index === 0}
+                                                isLast={index === actors.length - 1}
+                                                variant="list"
+                                                subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
+                                                onViewDetails={() => handleViewDetails(actor)}
+                                                isLoading={widgetState?.loadingDetails === actor.id}
+                                                description={actor.description}
+                                            />
+                                        </CardContainer>
+                                    ))}
+                                </div>
+                        </div>
                     )}
                 </div>
             </div>
@@ -161,21 +164,13 @@ export const ActorSearch: React.FC = () => {
 interface EmptyStateProps {
     title: string;
     description?: string;
-    className?: string;
 }
 
 const EmptyState: React.FC<EmptyStateProps> = (props: EmptyStateProps) => {
-    const { title, description, className } = props;
+    const { title, description } = props;
     return (
-        <div className={cn("flex flex-col items-center justify-center p-8 text-center", className)}>
-            <Heading as="h3" className="mb-2">
-                {title}
-            </Heading>
-            {description && (
-                <Text size="sm" tone="secondary">
-                    {description}
-                </Text>
-            )}
-        </div>
+        <Message type="info" caption={title}>
+            {description ?? ""}
+        </Message>
     );
 };
