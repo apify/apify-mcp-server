@@ -233,3 +233,24 @@ jobs:
                 run: npm run build
             -   name: Publish to NPM
                 run: npm publish
+
+    publish_to_mcp_registry:
+        name: Publish to MCP Registry
+        needs: [ release_metadata, update_changelog ]
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.update_changelog.outputs.changelog_commitish }}
+            -   name: Install mcp-publisher
+                run: |
+                    curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+                    sudo mv mcp-publisher /usr/local/bin/
+            -   name: Login to MCP Registry
+                env:
+                    MCP_REGISTRY_PUBLISH_SECRET: ${{ secrets.MCP_REGISTRY_PUBLISH_SECRET }}
+                run: |
+                    set +x
+                    mcp-publisher login dns --domain "apify.com" --private-key "${MCP_REGISTRY_PUBLISH_SECRET}"
+            -   name: Publish to MCP Registry
+                run: mcp-publisher publish
