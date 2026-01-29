@@ -572,6 +572,52 @@ export function createIntegrationTestsSuite(
             expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
         });
 
+        it('should support previewOutput: false in call-actor and return metadata without preview items', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    previewOutput: false,
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+
+            // Should still have completion message with metadata
+            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Total items'))).toBe(true);
+
+            // Should indicate preview was skipped
+            expect(content.some((item) => item.text.includes('Preview skipped') || item.text.includes('previewOutput: false'))).toBe(true);
+
+            // Should NOT have actual preview items JSON (the sum result)
+            expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(false);
+        });
+
+        it('should return preview items by default in call-actor (previewOutput: true)', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: ACTOR_PYTHON_EXAMPLE,
+                    input: { first_number: 1, second_number: 2 },
+                    // previewOutput not specified, should default to true
+                },
+            });
+
+            expect(callResult.content).toBeDefined();
+            const content = callResult.content as { text: string }[];
+
+            // Should have actual preview items with the sum result
+            expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(true);
+        });
+
         it('should find Actors in store search', async () => {
             const query = 'python-example';
             client = await createClientFn({

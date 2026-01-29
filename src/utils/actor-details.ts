@@ -11,6 +11,50 @@ import { formatActorToActorCard, formatActorToStructuredCard } from './actor-car
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
+/**
+ * Convert a type object to TypeScript-like string representation.
+ * Used for human-readable text output.
+ *
+ * Example:
+ * Input:  { first_number: "number", tags: ["string"], user: { name: "string" } }
+ * Output: "{ first_number: number, tags: string[], user: { name: string } }"
+ */
+function typeObjectToString(obj: Record<string, unknown>): string {
+    const pairs: string[] = [];
+
+    for (const [key, value] of Object.entries(obj)) {
+        if (Array.isArray(value)) {
+            // Array type
+            const itemType = typeValueToString(value[0]);
+            pairs.push(`${key}: ${itemType}[]`);
+        } else if (typeof value === 'object' && value !== null) {
+            // Nested object type
+            const nestedStr = typeObjectToString(value as Record<string, unknown>);
+            pairs.push(`${key}: ${nestedStr}`);
+        } else if (typeof value === 'string') {
+            // Primitive type
+            pairs.push(`${key}: ${value}`);
+        }
+    }
+
+    return `{ ${pairs.join(', ')} }`;
+}
+
+/**
+ * Convert a single type value to string.
+ */
+function typeValueToString(value: unknown): string {
+    if (Array.isArray(value)) {
+        const itemType = typeValueToString(value[0]);
+        return `${itemType}[]`;
+    } if (typeof value === 'object' && value !== null) {
+        return typeObjectToString(value as Record<string, unknown>);
+    } if (typeof value === 'string') {
+        return value;
+    }
+    return 'unknown';
+}
+
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
@@ -98,7 +142,7 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
  * Used by both public and internal fetch-actor-details tools.
  *
  * Behavior:
- * - If output is undefined or empty object: use defaults (all true except mcpTools)
+ * - If output is undefined or empty object: use defaults (all true except mcpTools and outputSchema)
  * - If any property is explicitly set: only include sections with explicit true values
  */
 export const actorDetailsOutputOptionsSchema = z.object({
@@ -109,6 +153,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
     readme: z.boolean().optional().describe('Include full README documentation.'),
+    outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
 
@@ -120,6 +165,7 @@ export const actorDetailsOutputDefaults = {
     metadata: true,
     inputSchema: true,
     readme: true,
+    outputSchema: false,
     mcpTools: false,
 };
 
@@ -145,6 +191,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         metadata: output?.metadata === true,
         inputSchema: output?.inputSchema === true,
         readme: output?.readme === true,
+        outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
     };
 }
@@ -224,7 +271,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
 /**
  * Build text and structured response for actor details.
- * Handles all resolved output options: description, stats, readme, inputSchema, mcpTools.
+ * Handles all resolved output options: description, stats, readme, inputSchema, outputSchema, mcpTools.
  * All output properties should be boolean (resolved via resolveOutputOptions).
  */
 export async function buildActorDetailsTextResponse(options: {
@@ -238,17 +285,19 @@ export async function buildActorDetailsTextResponse(options: {
         metadata: boolean;
         readme: boolean;
         inputSchema: boolean;
+        outputSchema: boolean;
         mcpTools: boolean;
     };
     cardOptions: ActorCardOptions;
     apifyClient: ApifyClient;
     apifyToken: string;
+    actorOutputSchema?: Record<string, unknown> | null;
     skyfireMode?: boolean;
 }): Promise<{
     texts: string[];
     structuredContent: Record<string, unknown>;
 }> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, skyfireMode } = options;
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
     const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
@@ -276,6 +325,16 @@ export async function buildActorDetailsTextResponse(options: {
         texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
     }
 
+    // Add output schema if requested
+    if (output.outputSchema) {
+        if (actorOutputSchema && Object.keys(actorOutputSchema).length > 0) {
+            const typeString = typeObjectToString(actorOutputSchema);
+            texts.push(`# Output Schema (TypeScript)\nInferred from recent successful runs:\n\`\`\`typescript\ntype ActorOutput = ${typeString}\n\`\`\``);
+        } else {
+            texts.push(`# Output Schema\nNo output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.`);
+        }
+    }
+
     // Handle MCP tools
     if (output.mcpTools) {
         const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode);
@@ -287,6 +346,7 @@ export async function buildActorDetailsTextResponse(options: {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: output.readme ? formattedReadme : undefined,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
+        outputSchema: output.outputSchema ? actorOutputSchema : undefined,
     };
 
     return { texts, structuredContent };

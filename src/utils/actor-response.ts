@@ -29,11 +29,13 @@ export type ActorResponseResult = {
  *
  * @param actorName - The name of the actor.
  * @param result - The result from callActorGetDataset.
+ * @param previewOutput - Whether to include preview items (default: true).
  * @returns The content array and structured content for the tool response.
  */
 export function buildActorResponseContent(
     actorName: string,
     result: CallActorGetDatasetResult,
+    previewOutput = true,
 ): ActorResponseResult {
     const { runId, datasetId, itemCount, schema } = result;
 
@@ -68,9 +70,16 @@ Above this text block is a preview of the Actor output containing ${result.previ
 ${instructions}
 `;
 
+    const getEmptyPreviewMessage = () => {
+        if (previewOutput) {
+            return `No items available for preview—either the Actor did not return any items or they are too large for preview. Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results.`;
+        }
+        return `Preview skipped (previewOutput: false). Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results or specific fields.`;
+    };
+
     const itemsPreviewText = result.previewItems.length > 0
         ? JSON.stringify(result.previewItems)
-        : `No items available for preview—either the Actor did not return any items or they are too large for preview. In this case, use the "get-actor-output" tool.`;
+        : getEmptyPreviewMessage();
 
     // Build content array
     const content: ({ type: 'text'; text: string })[] = [
