@@ -200,6 +200,8 @@ Actor description: ${definition.description}`;
             actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,
+            // reuse the common output schema
+            outputSchema: callActorOutputSchema,
             ajvValidate,
             requiresSkyfirePayId: true,
             memoryMbytes,
