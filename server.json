@@ -1,5 +1,5 @@
 {
-  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "com.apify/apify-mcp-server",
   "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store ⚡",
   "status": "active",
@@ -16,8 +16,8 @@
         {
           "name": "Authorization",
           "description": "Apify API token for authentication with Apify platform services. For example 'Bearer <apify-api-token>'",
-          "is_required": true,
-          "is_secret": true
+          "isRequired": true,
+          "isSecret": true
         }
       ]
     }
