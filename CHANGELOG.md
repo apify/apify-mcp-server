@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.3) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+- Add unauthenticated access for search-actors ([#420](https://github.com/apify/apify-mcp-server/pull/420)) ([313101f](https://github.com/apify/apify-mcp-server/commit/313101f3748a90ddd6e45134419ded22e960d0f6)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.8.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.2) (2026-01-30)
 
 ### 🐛 Bug Fixes
