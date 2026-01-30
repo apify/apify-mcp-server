@@ -72,7 +72,7 @@ You can find detailed instructions for setting up the MCP server in the [Apify d
 
 # ⚠️ SSE transport deprecation on April 1, 2026
 
-Udate your MCP client config before April 1, 2026.
+Update your MCP client config before April 1, 2026.
 The Apify MCP server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
 
 Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for your client of choice, with a valid endpoint.
@@ -149,7 +149,7 @@ You can refer to the specific Actor's documentation for a list of available argu
 ### Helper tools
 
 One of the most powerful features of using MCP with Apify is dynamic tool discovery.
-It gives an AI agent the ability to find new tools (Actors) as needed and incorporate them.
+It allows an AI agent to find new tools (Actors) as needed and incorporate them.
 Here are some special MCP operations and how the Apify MCP Server supports them:
 
 - **Apify Actors**: Search for Actors, view their details, and use them as tools for the AI.
@@ -220,6 +220,7 @@ The hosted server can be configured using query parameters in the URL. For examp
 ```
 https://mcp.apify.com?tools=actors,docs,apify/rag-web-browser
 ```
+
 
 For minimal configuration, if you want to use only a single Actor tool - without any discovery or generic calling tools, the server can be configured as follows:
 
@@ -381,6 +382,12 @@ npx @modelcontextprotocol/inspector node ./dist/stdio.js
 ```
 
 Upon launching, the Inspector will display a URL that you can open in your browser to begin debugging.
+
+## Unauthenticated access
+
+When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
+Currently allowed tools: `search-actors`, `search-apify-docs`, `fetch-apify-docs`.
+Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases
 
