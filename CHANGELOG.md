@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.1) (2026-01-30)
+
+### 🚀 Features
+
+- Add internal tools for call-actor tool calls ([#398](https://github.com/apify/apify-mcp-server/pull/398)) ([e93c11b](https://github.com/apify/apify-mcp-server/commit/e93c11b6e739e0558e8ad3179367727ebc74b46c)) by [@jakcinmarina](https://github.com/jakcinmarina)
+- Update npm scripts and documentation for build and start commands ([#412](https://github.com/apify/apify-mcp-server/pull/412)) ([37d5b0e](https://github.com/apify/apify-mcp-server/commit/37d5b0e88c912eb8936fa2084d351fd160ec594c)) by [@jirispilka](https://github.com/jirispilka), closes [#410](https://github.com/apify/apify-mcp-server/issues/410)
+- Add hot reload to widgets [internal] ([#411](https://github.com/apify/apify-mcp-server/pull/411)) ([0ade868](https://github.com/apify/apify-mcp-server/commit/0ade868b97fe7ad08e2913885249d362317c8931)) by [@baldasseva](https://github.com/baldasseva)
+- Add outputSchema option to fetch-actor-details tools ([#413](https://github.com/apify/apify-mcp-server/pull/413)) ([5d2035f](https://github.com/apify/apify-mcp-server/commit/5d2035f6f74cee568fb2b971e2a0d05e5d0288ae)) by [@MQ37](https://github.com/MQ37)
+- Add structuredContent tool output with schema ([#415](https://github.com/apify/apify-mcp-server/pull/415)) ([f9512c4](https://github.com/apify/apify-mcp-server/commit/f9512c490827af195969eeedbd47129e8599fcf9)) by [@MQ37](https://github.com/MQ37)
+- **widget:** Setup shared Apify libraries ([#414](https://github.com/apify/apify-mcp-server/pull/414)) ([69492c0](https://github.com/apify/apify-mcp-server/commit/69492c0f61b9971550f3072f972d7d2305b5f7a2)) by [@baldasseva](https://github.com/baldasseva)
+
+### 🐛 Bug Fixes
+
+- Return 404 instead of 400 for invalid MCP-Session-Id ([#400](https://github.com/apify/apify-mcp-server/pull/400)) ([fed5e02](https://github.com/apify/apify-mcp-server/commit/fed5e02c244e424935524b0538cf8c932ee5f103)) by [@MQ37](https://github.com/MQ37), closes [#378](https://github.com/apify/apify-mcp-server/issues/378)
+- Replace parseBooleanFromString with shared utility from @apify&#x2F;utilities ([#401](https://github.com/apify/apify-mcp-server/pull/401)) ([f81b84f](https://github.com/apify/apify-mcp-server/commit/f81b84f3eb371d2253a16ea6f719d77ebaf73c5b)) by [@MQ37](https://github.com/MQ37), closes [#368](https://github.com/apify/apify-mcp-server/issues/368)
+- Move development setup details to DEVELOPMENT.md and update related references ([#409](https://github.com/apify/apify-mcp-server/pull/409)) ([69942c8](https://github.com/apify/apify-mcp-server/commit/69942c8df27ed363ab499967b27e039452f0848c)) by [@jirispilka](https://github.com/jirispilka)
+- Update type documentation and deprecate SSE transport in favor of Streamable HTTP ([#416](https://github.com/apify/apify-mcp-server/pull/416)) ([94fdac3](https://github.com/apify/apify-mcp-server/commit/94fdac3d9b61d17dda5bbd611d70b43068105189)) by [@jirispilka](https://github.com/jirispilka)
+- Upgrade server.json schema to 2025-12-11 and remove deprecated status ([#418](https://github.com/apify/apify-mcp-server/pull/418)) ([990b0b2](https://github.com/apify/apify-mcp-server/commit/990b0b2607fabb9651519f5f54e063bdf82495fb)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.7.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.7.4) (2026-01-21)
 
 ### 🚀 Features
