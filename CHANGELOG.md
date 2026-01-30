@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.2) (2026-01-30)
+
+### 🐛 Bug Fixes
+
+- Return empty object instead of undefined for outputSchema ([#419](https://github.com/apify/apify-mcp-server/pull/419)) ([dff7432](https://github.com/apify/apify-mcp-server/commit/dff7432aa5328e700cf2a83dd7dbf7f57e855404)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.8.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.1) (2026-01-30)
 
 ### 🚀 Features
