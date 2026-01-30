@@ -346,7 +346,7 @@ export async function buildActorDetailsTextResponse(options: {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: output.readme ? formattedReadme : undefined,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
-        outputSchema: output.outputSchema ? actorOutputSchema : undefined,
+        outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
     };
 
     return { texts, structuredContent };
