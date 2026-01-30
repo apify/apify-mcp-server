@@ -8,6 +8,7 @@ import { toolCategories, toolCategoriesEnabledByDefault } from './categories.js'
 export const unauthEnabledTools: string[] = [
     HelperTools.DOCS_SEARCH,
     HelperTools.DOCS_FETCH,
+    HelperTools.STORE_SEARCH,
 ];
 
 // Re-export from categories.ts
