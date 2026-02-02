@@ -169,10 +169,6 @@ const requiresAuthentication = isApiTokenRequired({
     enableAddingActors,
 });
 
-if (!requiresAuthentication) {
-    log.info('Running in unauthenticated mode (only public tools requested)');
-}
-
 // Validate environment
 if (requiresAuthentication && !apifyToken) {
     log.error('APIFY_TOKEN is required but not set in the environment variables or in ~/.apify/auth.json');

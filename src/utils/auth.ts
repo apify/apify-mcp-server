@@ -1,4 +1,5 @@
 import { getUnauthEnabledToolCategories, toolCategories, unauthEnabledTools } from '../tools/index.js';
+import type { ToolCategory } from '../types.js';
 
 /**
  * Determines if an API token is required based on requested tools and actors.
@@ -17,11 +18,12 @@ export function isApiTokenRequired(params: {
     }
 
     const unauthTokenSet = new Set(unauthEnabledTools);
-    const unauthCategorySet = new Set(getUnauthEnabledToolCategories());
+    // Convert ToolCategory[] to Set<string> for comparison with string keys
+    const unauthCategorySet = new Set<string>(getUnauthEnabledToolCategories() as ToolCategory[]);
 
     const areAllToolsSafe = toolCategoryKeys.every((key) => {
         // If it is a safe category
-        if (unauthCategorySet.has(key as any)) return true;
+        if (unauthCategorySet.has(key)) return true;
         // If it is a safe tool
         if (unauthTokenSet.has(key)) return true;
 

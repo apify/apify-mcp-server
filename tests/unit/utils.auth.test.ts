@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import { isApiTokenRequired } from '../../src/utils/auth.js';
 
 describe('isApiTokenRequired', () => {
