@@ -3,7 +3,7 @@ import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { CardContainer, Heading, Message } from "@apify/ui-library";
+import { Badge, CardContainer, Heading, Message } from "@apify/ui-library";
 import { formatPricing } from "../../utils/formatting";
 import { ActorDetails, Actor } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
@@ -138,6 +138,7 @@ export const ActorSearch: React.FC = () => {
                                     <Heading type="titleM" mb="space16">
                                         Search results
                                     </Heading>
+                                    <Badge>Hello</Badge>
                                     {actors.map((actor: Actor, index: number) => (
                                         <CardContainer header="" mb="space16" key={actor.id}>
                                             <ActorCard
