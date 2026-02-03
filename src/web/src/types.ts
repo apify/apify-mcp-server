@@ -119,6 +119,8 @@ export interface ActorStats {
   totalRuns: number;
   totalUsers: number;
   totalBookmarks: number;
+  actorReviewRating?: number;
+  actorReviewCount?: number;
 }
 
 export interface ActorDetails {

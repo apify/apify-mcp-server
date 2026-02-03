@@ -1,8 +1,6 @@
 import "../index.css";
 import React from "react";
-import { UiDependencyProvider } from "@apify/ui-library";
-import { tokens as lightCssVariables } from "@apify/ui-library/dist/src/design_system/colors/generated/css_variables.light.js";
-import { tokens as darkCssVariables } from "@apify/ui-library/dist/src/design_system/colors/generated/css_variables.dark.js";
+import { UiDependencyProvider, cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
 
@@ -74,17 +72,25 @@ export const renderWidget = (Component: React.FC) => {
                 head.appendChild(linkFonts);
             }
 
+            // Base root styles
+            if (!document.getElementById("apify-root-styles")) {
+                const styleRoot = document.createElement("style");
+                styleRoot.id = "apify-root-styles";
+                styleRoot.textContent = `:root { font-size: 10px; line-height: 1.15; }`;
+                head.appendChild(styleRoot);
+            }
+
             // CSS variables for light/dark themes
             if (!document.getElementById("apify-css-variables")) {
                 const styleLight = document.createElement("style");
                 styleLight.id = "apify-css-variables";
-                styleLight.textContent = `:root {${lightCssVariables}}`;
+                styleLight.textContent = `:root { ${cssColorsVariablesLight} }`;
                 head.appendChild(styleLight);
             }
             if (!document.getElementById("apify-dark-css-variables")) {
                 const styleDark = document.createElement("style");
                 styleDark.id = "apify-dark-css-variables";
-                styleDark.textContent = `:root[data-theme="dark"] { ${darkCssVariables} }`;
+                styleDark.textContent = `:root[data-theme="dark"] { ${cssColorsVariablesDark} }`;
                 head.appendChild(styleDark);
             }
         }

@@ -1,13 +1,123 @@
 import React, { useState, useEffect } from "react";
+import styled from "styled-components";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { CardContainer, Heading, Message } from "@apify/ui-library";
-import { formatPricing } from "../../utils/formatting";
+import { Message } from "@apify/ui-library";
 import { ActorDetails, Actor } from "../../types";
-import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
+import { theme, Text } from "@apify/ui-library";
+import { StarEmptyIcon, PeopleIcon } from "@apify/ui-icons";
+
+// Styled components
+const Container = styled.div`
+    background: ${theme.color.neutral.backgroundSubtle};
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-radius: 12px;
+    padding: 2px;
+    width: 100%;
+`;
+
+const Header = styled.div`
+    display: flex;
+    align-items: center;
+    padding: ${theme.space.space4} ${theme.space.space4} ${theme.space.space4} ${theme.space.space8};
+    border-radius: 12px 12px 0 0;
+`;
+
+const ActorCardContainer = styled.div`
+    background: ${theme.color.neutral.background};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-radius: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+    padding: ${theme.space.space12} ${theme.space.space16};
+    box-shadow: ${theme.shadow.shadow1};
+    width: 100%;
+`;
+
+const ActorHeader = styled.div`
+    display: flex;
+    gap: ${theme.space.space12};
+    align-items: flex-start;
+    width: 100%;
+`;
+
+const ActorIcon = styled.img`
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    object-fit: cover;
+    flex-shrink: 0;
+`;
+
+const ActorInfo = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+`;
+
+const ContentSection = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space6};
+    width: 100%;
+`;
+
+const MetadataRow = styled.div`
+    display: flex;
+    gap: ${theme.space.space8};
+    align-items: center;
+    padding: ${theme.space.space4} 0;
+    width: 100%;
+`;
+
+const DeveloperInfo = styled.div`
+    display: flex;
+    gap: ${theme.space.space4};
+    align-items: center;
+`;
+
+const DeveloperLogo = styled.img`
+    width: 20px;
+    height: 20px;
+`;
+
+const StatsContainer = styled.div`
+    display: flex;
+    gap: ${theme.space.space8};
+    align-items: center;
+`;
+
+const StatItem = styled.div`
+    display: flex;
+    gap: 2px;
+    align-items: center;
+`;
+
+const StatIcon = styled.div`
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: ${theme.color.neutral.textMuted};
+    flex-shrink: 0;
+`;
+
+const Divider = styled.div`
+    width: 0;
+    height: 8px;
+    border-left: 1px solid ${theme.color.neutral.separatorSubtle};
+`;
 
 interface ToolOutput extends Record<string, unknown> {
     actors?: Actor[];
@@ -118,46 +228,145 @@ export const ActorSearch: React.FC = () => {
 
     return (
         <WidgetLayout>
-            <div className="flex flex-col gap-1 items-start w-full ">
-                <div className="pb-6 w-full">
-                    {showDetails ? (
-                        <ActorSearchDetail
-                            details={actorDetails!}
-                            onBackToList={handleBackToList}
-                            showBackButton={!!widgetState?.requestedActorId && !hasToolActorDetails}
-                        />
-                    ) : shouldShowDetailSkeleton ? (
-                        <ActorSearchDetailSkeleton />
-                    ) : isInitialLoading ? (
-                        <ActorSearchResultsSkeleton items={3} />
-                    ) : actors.length === 0 ? (
-                        <EmptyState title="No actors found" description="Try a different search query" />
-                    ) : (
-                        <div className="w-full">
-                                <div className="flex flex-col items-start">
-                                    <Heading type="titleM" mb="space16">
-                                        Search results
-                                    </Heading>
-                                    {actors.map((actor: Actor, index: number) => (
-                                        <CardContainer header="" mb="space16" key={actor.id}>
-                                            <ActorCard
-                                                actor={actor}
-                                                isFirst={index === 0}
-                                                isLast={index === actors.length - 1}
-                                                variant="list"
-                                                subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
-                                                onViewDetails={() => handleViewDetails(actor)}
-                                                isLoading={widgetState?.loadingDetails === actor.id}
-                                                description={actor.description}
-                                            />
-                                        </CardContainer>
-                                    ))}
-                                </div>
-                        </div>
-                    )}
-                </div>
+            <div className="pb-6 w-full">
+                {showDetails ? (
+                    <ActorSearchDetail
+                        details={actorDetails!}
+                        onBackToList={handleBackToList}
+                        showBackButton={!!widgetState?.requestedActorId && !hasToolActorDetails}
+                    />
+                ) : shouldShowDetailSkeleton ? (
+                    <ActorSearchDetailSkeleton />
+                ) : isInitialLoading ? (
+                    <ActorSearchResultsSkeleton items={3} />
+                ) : actors.length === 0 ? (
+                    <EmptyState title="No actors found" description="Try a different search query" />
+                ) : (
+                    <Container>
+                        <Header>
+                            <Text type="body" size="regular" weight="medium">
+                                search-actors
+                            </Text>
+                        </Header>
+                        {actors.map((actor: Actor) => (
+                            <ActorCardItem
+                                key={actor.id}
+                                actor={actor}
+                                onViewDetails={() => handleViewDetails(actor)}
+                            />
+                        ))}
+                    </Container>
+                )}
             </div>
         </WidgetLayout>
+    );
+};
+
+// ActorCardItem component
+interface ActorCardItemProps {
+    actor: Actor;
+    onViewDetails: () => void;
+}
+
+const ActorCardItem: React.FC<ActorCardItemProps> = ({ actor, onViewDetails }) => {
+    const title = actor.title || actor.name;
+    const actorName = `${actor.username}/${actor.name}`;
+    const rating = actor.stats?.actorReviewRating || 0;
+    const ratingCount = actor.stats?.actorReviewCount || 0;
+    const totalUsers = actor.stats?.totalUsers || 0;
+
+    // Format numbers with k suffix
+    const formatCount = (num: number): string => {
+        if (num >= 1000) {
+            return `${Math.floor(num / 1000)}k`;
+        }
+        return num.toString();
+    };
+
+    return (
+        <ActorCardContainer onClick={onViewDetails} style={{ cursor: 'pointer' }}>
+            <ActorHeader>
+                <ActorIcon
+                    src={actor.pictureUrl || '/default-actor-icon.png'}
+                    alt={title}
+                    onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/default-actor-icon.png';
+                    }}
+                />
+                <ActorInfo>
+                    <Text
+                        type="body"
+                        size="regular"
+                        weight="medium"
+                        style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            width: '100%'
+                        }}
+                    >
+                        {title}
+                    </Text>
+                    <Text
+                        type="code"
+                        size="small"
+                        weight="medium"
+                        color={theme.color.neutral.textSubtle}
+                        style={{
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            width: '100%'
+                        }}
+                    >
+                        {actorName}
+                    </Text>
+                </ActorInfo>
+            </ActorHeader>
+
+            <ContentSection>
+                <Text type="body" size="small" weight="normal" color={theme.color.neutral.textMuted}>
+                    {actor.description}
+                </Text>
+
+                <MetadataRow>
+                    <DeveloperInfo>
+                        <DeveloperLogo
+                            src="https://apify.com/img/favicon.png"
+                            alt="Apify"
+                        />
+                        <Text type="body" size="small" weight="medium" color={theme.color.neutral.textMuted}>
+                            Apify
+                        </Text>
+                    </DeveloperInfo>
+
+                    <StatsContainer>
+                        <StatItem>
+                            <StatIcon>
+                                <StarEmptyIcon size="12" />
+                            </StatIcon>
+                            <Text type="body" size="small" weight="medium" color={theme.color.neutral.textMuted} as="span">
+                                {rating.toFixed(1)}{' '}
+                            </Text>
+                            <Text type="body" size="small" weight="normal" color={theme.color.neutral.textSubtle} as="span">
+                                ({formatCount(ratingCount)})
+                            </Text>
+                        </StatItem>
+
+                        <Divider />
+
+                        <StatItem>
+                            <StatIcon>
+                                <PeopleIcon size="12" />
+                            </StatIcon>
+                            <Text type="body" size="small" weight="medium" color={theme.color.neutral.textMuted} as="span">
+                                {formatCount(totalUsers)}
+                            </Text>
+                        </StatItem>
+                    </StatsContainer>
+                </MetadataRow>
+            </ContentSection>
+        </ActorCardContainer>
     );
 };
 

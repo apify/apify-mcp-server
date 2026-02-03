@@ -273,6 +273,8 @@ export function formatActorForWidget(
         totalRuns: number;
         totalUsers: number;
         totalBookmarks: number;
+        actorReviewRating?: number;
+        actorReviewCount?: number;
     };
     currentPricingInfo: {
         pricingModel: string;
@@ -313,6 +315,12 @@ export function formatActorForWidget(
         }
     }
 
+    // Check for rating in both locations (directly on actor or in stats)
+    // @ts-expect-error - outdated types
+    const rating = actor.actorReviewRating || actor.stats?.actorReviewRating;
+    // @ts-expect-error - outdated types
+    const ratingCount = actor.actorReviewCount || actor.stats?.actorReviewCount;
+
     return {
         id: actor.id,
         name: actor.name,
@@ -327,6 +335,8 @@ export function formatActorForWidget(
             totalRuns: actor.stats?.totalRuns || 0,
             totalUsers: actor.stats?.totalUsers || 0,
             totalBookmarks: actor.bookmarkCount || 0,
+            actorReviewRating: rating,
+            actorReviewCount: ratingCount,
         },
         currentPricingInfo: pricing,
         userActorRuns: {
