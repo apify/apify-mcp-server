@@ -7,10 +7,6 @@
         "figma": {
             "type": "http",
             "url": "https://mcp.figma.com/mcp"
-        },
-        "notion": {
-            "type": "sse",
-            "url": "https://mcp.notion.com/sse"
         }
     }
 }
