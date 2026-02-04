@@ -138,6 +138,22 @@ const SectionContent = styled(Box)<{ $expanded: boolean }>`
     color: ${theme.color.neutral.text};
 `;
 
+const DescriptionWrapper = styled(Box)`
+    display: flex;
+    gap: ${theme.space.space16};
+    flex-direction: column;
+`;
+
+const TruncatedText = styled.span`
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+`;
+
+const PreWrapText = styled.span`
+    white-space: pre-wrap;
+`;
+
 type ExpandableSectionProps = {
     title: string;
     icon: IconComponent;
@@ -294,7 +310,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
         <Container>
             <CardWrapper>
                 <HeaderSection px="space16" py="space12">
-                    <Box style={{ display: "flex", gap: theme.space.space16, flexDirection: 'column' }}>
+                    <DescriptionWrapper>
                         <HeaderTop>
                             {showBackButton && (
                                 <IconButton
@@ -312,7 +328,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                                 <Text
                                     weight="medium"
                                     color={theme.color.neutral.text}
-                                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    as={TruncatedText}
                                 >
                                     {actor.title || actor.name}
                                 </Text>
@@ -321,7 +337,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                                     size="small"
                                     weight="medium"
                                     color={theme.color.neutral.textSubtle}
-                                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                    as={TruncatedText}
                                 >
                                     {`${actor.username}/${actor.name}`}
                                 </Text>
@@ -332,11 +348,11 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                             size="regular"
                             weight="normal"
                             color={theme.color.neutral.text}
-                            style={{ whiteSpace: 'pre-wrap' }}
+                            as={PreWrapText}
                         >
                             {actor.description}
                         </Text>
-                    </Box>
+                    </DescriptionWrapper>
 
                     {usageCount && (
                         <BoxRow py="space4">
