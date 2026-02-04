@@ -320,11 +320,6 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - ✅ Read 1-3 similar components for patterns (max 3 files)
 - ✅ Verify zero hardcoded values before submitting
 
-**Token Quick Reference**:
-- Colors: `theme.color.{neutral|primary|success|warning|danger}.{text|background|border|icon|action}`
-- Spacing: `theme.space.space{4|8|12|16|24|32}`
-- Typography: `theme.typography.{category}.{size}.{fontSize|lineHeight}`
-
 **Figma Integration**: Call `mcp__figma__get_design_context` when working from designs.
 
 ### What NOT to do (beyond code)
