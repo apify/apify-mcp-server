@@ -2,7 +2,7 @@
     "mcpServers": {
         "storybook": {
             "type": "http",
-            "url": "http://localhost:6007/mcp"
+            "url": "https://baldasseva--storybook-mcp.apify.actor/mcp?token=APIFY_API_TOKEN"
         },
         "figma": {
             "type": "http",
