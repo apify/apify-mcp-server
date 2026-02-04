@@ -2,14 +2,15 @@
 
 **CRITICAL**: These instructions are MANDATORY for all UI/frontend work. Follow exactly as written.
 
-## Pre-Work Checklist (BLOCKING REQUIREMENT)
+## Pre-Work Checklist
 
 Before ANY UI/component work:
 
-1. **Check MCP availability**:
+1. **Check MCP availability (recommended)**:
    - Search for `mcp__storybook__*` tools
    - Search for `mcp__figma__*` tools
-   - If EITHER is missing: **STOP** and alert user to start required MCP server
+   - If available: Use them to get design context and component examples
+   - If missing: Continue with pattern discovery via code exploration
 
 2. **Load design context** (if MCPs available):
    ```
@@ -40,7 +41,7 @@ font-size: '14px'
 color: ${theme.color.primary.action}
 padding: ${theme.space.space8}
 border-radius: ${theme.radius.radius8}
-${theme.typography.shared.tablet.bodyMMedium}
+// For typography, prefer using <Text> or <Heading> components
 ```
 
 **Token Reference** (understand the patterns):
@@ -53,9 +54,6 @@ ${theme.typography.shared.tablet.bodyMMedium}
   - Examples: `radius4`, `radius6`, `radius8`, `radius12`, `radiusFull`
 - Shadows: `theme.shadow.{name}`
   - Examples: `shadow1`, `shadow2`, `shadow3`, `shadowActive`
-- Typography: `theme.typography.shared.{device}.{typeName}`
-  - Devices: `mobile`, `tablet`, `desktop`
-  - Examples: `bodyM`, `bodyMMedium`, `bodyS`, `titleL`, `codeM`
 
 **To discover available tokens**: Use Storybook MCP or Grep existing usage in `src/web/src`
 
@@ -136,20 +134,18 @@ background: ${theme.color.primary.action};
 
 ### 7. Typography Rules
 ```typescript
-// ✅ Use typography tokens (they include font-size, line-height, font-weight, font-family)
-${theme.typography.shared.tablet.bodyM}
-// or for responsive design:
-${theme.device.mobile} {
-    ${theme.typography.shared.mobile.bodyM}
-}
+// ✅ Use Text or Heading components from ui-library
+import { Text, Heading } from '@apify/ui-library';
 
-// ❌ NEVER hardcode
-font-size: 14px;
-line-height: 1.5;
-font-weight: 400;
+// Text component props: type, size, weight
+<Text type="body" size="regular" weight="normal">Content here</Text>
+
+// Heading component props: type
+<Heading type="titleL">Title here</Heading>
+
+// ❌ NEVER use typography tokens directly
+// ❌ NEVER hardcode font properties
 ```
-
-**Note**: Typography tokens are complete CSS strings containing all font properties. You don't access individual properties like `.fontSize`.
 
 ## Verification Protocol (Before Submitting)
 
@@ -191,9 +187,9 @@ Run this mental checklist:
    theme.color.primary.action // use actual property names
    ```
 
-3. **❌ Skipping MCP context**
-   - Always call Storybook MCP before starting
-   - Don't assume you know the patterns
+3. **❌ Not using available MCPs**
+   - If Storybook or Figma MCPs are available, use them
+   - They provide valuable context and patterns
 
 4. **❌ Over-reading for context**
    - Read max 3 similar components
@@ -234,9 +230,9 @@ When user provides Figma design:
 | Gap | `theme.space.space{N}` | `theme.space.space8` |
 | Border radius | `theme.radius.radius{N}` | `theme.radius.radius8` |
 | Shadow | `theme.shadow.{name}` | `theme.shadow.shadow2` |
-| Typography | `theme.typography.shared.{device}.{type}` | `theme.typography.shared.tablet.bodyM` |
+| Typography | `<Text>` or `<Heading>` components | `<Text type="body" size="regular">` |
 
-**Note**: Use Storybook MCP or Grep (`src/web/src`) to discover all available token values. Don't memorize exhaustive lists.
+**Note**: Use Storybook MCP or Grep (`src/web/src`) to discover all available token values.
 
 ## Error Recovery
 
@@ -249,9 +245,9 @@ If you realize you used hardcoded values:
 
 ## Summary: The Non-Negotiables
 
-1. ✅ Always check MCP availability BEFORE starting
-2. ✅ Call `mcp__storybook__get-ui-building-instructions` FIRST
-3. ✅ Use `theme.*` tokens for ALL styling values
+1. ✅ Check MCP availability and use if available (recommended)
+2. ✅ Use `theme.*` tokens for ALL styling values (colors, spacing, radius, shadows)
+3. ✅ Use `<Text>` and `<Heading>` components for typography (not tokens)
 4. ✅ Import components from `@apify/ui-library`
 5. ✅ Follow existing component patterns (read 1-3 examples)
 6. ✅ Use semantic color naming (category.property)
