@@ -18,8 +18,10 @@ Before ANY UI/component work:
    ```
 
 3. **Read existing patterns**:
-   - Find similar components using Glob: `src/packages/ui-library/src/components/**/*{keyword}*.{tsx,ts}`
-   - Read 1-2 similar components to understand patterns
+   - The Storybook MCP provides component examples and usage patterns
+   - Find similar widgets/components in the project: `src/web/src/**/*{keyword}*.{tsx,ts}`
+   - Use Grep to find token usage patterns: `theme\.color\.|theme\.space\.|theme\.radius\.`
+   - Read 1-2 similar components in the project to understand patterns
    - DO NOT read more than 3 files for context
 
 ## Strict Rules (Zero Tolerance)
@@ -37,18 +39,25 @@ font-size: '14px'
 // ✅ REQUIRED
 color: ${theme.color.primary.action}
 padding: ${theme.space.space8}
-border-radius: ${theme.radius.small}
-font-size: ${theme.typography.body.medium.fontSize}
+border-radius: ${theme.radius.radius8}
+${theme.typography.shared.tablet.bodyMMedium}
 ```
 
-**Token Reference** (memorize these):
+**Token Reference** (understand the patterns):
 - Colors: `theme.color.{category}.{property}`
-  - Categories: `neutral`, `primary`, `success`, `warning`, `danger`, `info`
-  - Properties: `text`, `background`, `border`, `icon`, `action`, `hover`, etc.
-- Spacing: `theme.space.space{2|4|6|8|10|12|16|24|32|40|64|80}`
-- Radius: `theme.radius.{small|medium|large|full}`
-- Shadows: `theme.shadow.{level}`
-- Typography: `theme.typography.{category}.{size}.{property}`
+  - Example categories: `neutral`, `primary`, `primaryBlack`, `success`, `warning`, `danger`
+  - Example properties: `text`, `textMuted`, `background`, `backgroundSubtle`, `action`, `actionHover`, `border`, `icon`, etc.
+- Spacing: `theme.space.space{N}`
+  - Examples: `space8`, `space16`, `space24` (incremental values available)
+- Radius: `theme.radius.radius{N}`
+  - Examples: `radius4`, `radius6`, `radius8`, `radius12`, `radiusFull`
+- Shadows: `theme.shadow.{name}`
+  - Examples: `shadow1`, `shadow2`, `shadow3`, `shadowActive`
+- Typography: `theme.typography.shared.{device}.{typeName}`
+  - Devices: `mobile`, `tablet`, `desktop`
+  - Examples: `bodyM`, `bodyMMedium`, `bodyS`, `titleL`, `codeM`
+
+**To discover available tokens**: Use Storybook MCP or Grep existing usage in `src/web/src`
 
 ### 2. Component Imports
 ```typescript
@@ -103,11 +112,11 @@ Component.displayName = 'Component';
 ### 5. Color Usage Rules
 
 **Semantic Naming Required**:
-- Text: `theme.color.{category}.text` or `.textMuted` or `.textSubtle`
-- Backgrounds: `theme.color.{category}.background` or `.backgroundSubtle`
+- Text: `theme.color.{category}.text`, `.textMuted`, `.textSubtle`, `.textDisabled`
+- Backgrounds: `theme.color.{category}.background`, `.backgroundSubtle`, `.backgroundMuted`
 - Interactive: `theme.color.{category}.action`, `.actionHover`, `.actionActive`
-- Borders: `theme.color.{category}.border` or `.fieldBorder`
-- Icons: `theme.color.{category}.icon` or `.iconSubtle`
+- Borders: `theme.color.{category}.border`, `.separatorSubtle`, `.fieldBorder`
+- Icons: `theme.color.{category}.icon`, `.iconSubtle`, `.iconDisabled`
 
 **State Variants**:
 ```typescript
@@ -127,15 +136,20 @@ background: ${theme.color.primary.action};
 
 ### 7. Typography Rules
 ```typescript
-// ✅ Use typography tokens
-font-size: ${theme.typography.body.medium.fontSize};
-line-height: ${theme.typography.body.medium.lineHeight};
-font-weight: ${theme.typography.body.medium.fontWeight};
+// ✅ Use typography tokens (they include font-size, line-height, font-weight, font-family)
+${theme.typography.shared.tablet.bodyM}
+// or for responsive design:
+${theme.device.mobile} {
+    ${theme.typography.shared.mobile.bodyM}
+}
 
 // ❌ NEVER hardcode
 font-size: 14px;
 line-height: 1.5;
+font-weight: 400;
 ```
+
+**Note**: Typography tokens are complete CSS strings containing all font properties. You don't access individual properties like `.fontSize`.
 
 ## Verification Protocol (Before Submitting)
 
@@ -166,13 +180,15 @@ Run this mental checklist:
    padding: ${theme.space.space16} ${theme.space.space10};
    ```
 
-2. **❌ Creating new color names**
+2. **❌ Using non-existent color properties**
    ```typescript
    // ❌ WRONG
-   theme.color.blue.main // doesn't exist
+   theme.color.neutral.textLight // doesn't exist
+   theme.color.primary.main // doesn't exist
 
    // ✅ CORRECT
-   theme.color.primary.action // use semantic names
+   theme.color.neutral.textMuted // use actual property names
+   theme.color.primary.action // use actual property names
    ```
 
 3. **❌ Skipping MCP context**
@@ -212,28 +228,15 @@ When user provides Figma design:
 
 | Property | Token Pattern | Example |
 |----------|---------------|---------|
-| Text color | `theme.color.{cat}.text` | `theme.color.neutral.text` |
-| Background | `theme.color.{cat}.background` | `theme.color.primary.background` |
+| Text color | `theme.color.{cat}.{prop}` | `theme.color.neutral.text` |
+| Background | `theme.color.{cat}.{prop}` | `theme.color.primary.background` |
 | Padding/Margin | `theme.space.space{N}` | `theme.space.space16` |
 | Gap | `theme.space.space{N}` | `theme.space.space8` |
-| Border radius | `theme.radius.{size}` | `theme.radius.medium` |
-| Shadow | `theme.shadow.{level}` | `theme.shadow.small` |
-| Font size | `theme.typography.{cat}.{size}.fontSize` | `theme.typography.body.medium.fontSize` |
+| Border radius | `theme.radius.radius{N}` | `theme.radius.radius8` |
+| Shadow | `theme.shadow.{name}` | `theme.shadow.shadow2` |
+| Typography | `theme.typography.shared.{device}.{type}` | `theme.typography.shared.tablet.bodyM` |
 
-## Token Discovery Process
-
-If uncertain about correct token:
-
-1. **Search Storybook MCP** first (most reliable)
-2. **Grep existing usage**:
-   ```
-   pattern: "theme\.color\.[a-z]+\.{property}"
-   path: src/packages/ui-library/src/components
-   ```
-3. **Read token definition files** (last resort):
-   - Colors: `src/packages/ui-library/src/design_system/colors/generated/properties_theme.ts`
-   - Spacing: `src/packages/ui-library/src/design_system/tokens/spaces.ts`
-   - Only read if absolutely necessary
+**Note**: Use Storybook MCP or Grep (`src/web/src`) to discover all available token values. Don't memorize exhaustive lists.
 
 ## Error Recovery
 
