@@ -271,9 +271,11 @@ interface ActorCardItemProps {
 const ActorCardItem: React.FC<ActorCardItemProps> = ({ actor, onViewDetails }) => {
     const title = actor.title || actor.name;
     const actorName = `${actor.username}/${actor.name}`;
-    const rating = actor.stats?.actorReviewRating || 0;
-    const ratingCount = actor.stats?.actorReviewCount || 0;
+    const rating = actor.actorReviewRating || 0;
+    const ratingCount = actor.actorReviewCount || 0;
     const totalUsers = actor.stats?.totalUsers || 0;
+    const userFullName = actor.userFullName;
+    const userPictureUrl = actor.userPictureUrl;
 
     // Format numbers with k suffix
     const formatCount = (num: number): string => {
@@ -332,11 +334,11 @@ const ActorCardItem: React.FC<ActorCardItemProps> = ({ actor, onViewDetails }) =
                 <MetadataRow>
                     <DeveloperInfo>
                         <DeveloperLogo
-                            src="https://apify.com/img/favicon.png"
+                            src={userPictureUrl}
                             alt="Apify"
                         />
                         <Text type="body" size="small" weight="medium" color={theme.color.neutral.textMuted}>
-                            Apify
+                            {userFullName}
                         </Text>
                     </DeveloperInfo>
 

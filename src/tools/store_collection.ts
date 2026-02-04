@@ -1,30 +1,14 @@
 import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
-import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import type { ActorPricingModel, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
 import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
-
-export async function searchActorsByKeywords(
-    search: string,
-    apifyToken: string,
-    limit: number | undefined = undefined,
-    offset: number | undefined = undefined,
-    allowsAgenticUsers: boolean | undefined = undefined,
-): Promise<ExtendedActorStoreList[]> {
-    const client = new ApifyClient({ token: apifyToken });
-    const storeClient = client.store();
-    if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
-
-    const results = await storeClient.list({ search, limit, offset });
-    return results.items;
-}
 
 export const searchActorsArgsSchema = z.object({
     limit: z.number()

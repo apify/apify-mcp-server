@@ -4,8 +4,9 @@
  * of the filtering step and reduce code duplication.
  */
 
+import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
-import { filterRentalActors, searchActorsByKeywords } from '../tools/store_collection.js';
+import { filterRentalActors } from '../tools/store_collection.js';
 import type { ExtendedActorStoreList } from '../types.js';
 
 export type SearchAndFilterActorsOptions = {
@@ -16,6 +17,21 @@ export type SearchAndFilterActorsOptions = {
     skyfireMode?: boolean;
     userRentedActorIds?: string[];
 };
+
+export async function searchActorsByKeywords(
+    search: string,
+    apifyToken: string,
+    limit: number | undefined = undefined,
+    offset: number | undefined = undefined,
+    allowsAgenticUsers: boolean | undefined = undefined,
+): Promise<ExtendedActorStoreList[]> {
+    const client = new ApifyClient({ token: apifyToken });
+    const storeClient = client.store();
+    if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
+
+    const results = await storeClient.list({ search, limit, offset });
+    return results.items;
+}
 
 /**
  * Search actors by keywords and filter rental actors.

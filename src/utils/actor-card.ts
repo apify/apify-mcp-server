@@ -263,6 +263,7 @@ export function formatActorForWidget(
     id: string;
     name: string;
     username: string;
+    userPictureUrl?: string;
     fullName: string;
     title: string;
     description: string;
@@ -273,9 +274,9 @@ export function formatActorForWidget(
         totalRuns: number;
         totalUsers: number;
         totalBookmarks: number;
-        actorReviewRating?: number;
-        actorReviewCount?: number;
     };
+    actorReviewRating?: number;
+    actorReviewCount?: number;
     currentPricingInfo: {
         pricingModel: string;
         pricePerResultUsd: number;
@@ -315,16 +316,12 @@ export function formatActorForWidget(
         }
     }
 
-    // Check for rating in both locations (directly on actor or in stats)
-    // @ts-expect-error - outdated types
-    const rating = actor.actorReviewRating || actor.stats?.actorReviewRating;
-    // @ts-expect-error - outdated types
-    const ratingCount = actor.actorReviewCount || actor.stats?.actorReviewCount;
-
     return {
         id: actor.id,
         name: actor.name,
         username: actor.username,
+        userPictureUrl: actor.userPictureUrl || undefined, // TODO haha we need to query the user now T_T
+        userFullName: actor.user?.fullName || undefined,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
@@ -335,9 +332,11 @@ export function formatActorForWidget(
             totalRuns: actor.stats?.totalRuns || 0,
             totalUsers: actor.stats?.totalUsers || 0,
             totalBookmarks: actor.bookmarkCount || 0,
-            actorReviewRating: rating,
-            actorReviewCount: ratingCount,
         },
+        // @ts-expect-error - outdated types on actor
+        actorReviewRating: actor.actorReviewRating || actor.stats?.actorReviewRating,
+        // @ts-expect-error - outdated types on actor
+        actorReviewCount: actor.actorReviewCount || actor.stats?.actorReviewCount,
         currentPricingInfo: pricing,
         userActorRuns: {
             successRate,

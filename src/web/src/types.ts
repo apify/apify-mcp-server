@@ -149,6 +149,8 @@ export interface Actor {
   id: string;
   name: string;
   username: string;
+  userPictureUrl?: string;
+  userFullName?: string;
   fullName?: string;
   title?: string;
   description: string;
@@ -159,4 +161,6 @@ export interface Actor {
   userActorRuns?: {
     successRate: number | null;
   };
+  actorReviewCount?: number;
+  actorReviewRating?: number;
 }
