@@ -87,6 +87,27 @@ Notes:
 
 The MCP server listens on port `3001`. The HTTP server implementation used here is the standby Actor server in `src/actor/server.ts` (used by `src/main.ts` in STANDBY mode). The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
+### Using MCP servers with Claude Code
+
+This repository includes a `.mcp.json` configuration file that allows you to use external MCP servers (like the Storybook MCP server) directly within Claude Code for enhanced development workflows.
+
+To use the Storybook MCP server (or any other MCP server that requires authentication), you need to configure your Apify API token in Claude Code's settings:
+
+1. Create or edit `.claude/settings.local.json` file
+2. Add the following environment variable configuration:
+
+```json
+{
+  "env": {
+    "APIFY_TOKEN": "<YOUR_APIFY_API_TOKEN>"
+  }
+}
+```
+
+3. Restart Claude Code for the changes to take effect
+
+The `.mcp.json` file uses environment variable expansion (`${APIFY_TOKEN}`) to securely reference your token without hardcoding it in the configuration file. This allows you to share the configuration with your team while keeping credentials private.
+
 ### Testing with MCPJam (optional)
 
 You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP server - run it using `npx @mcpjam/inspector@latest`.
