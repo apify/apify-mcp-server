@@ -74,7 +74,7 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
-import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { cloneToolEntry, getToolPublicFieldOnly, sortToolsForListing } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -596,7 +596,9 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
+            const toolEntries = Array.from(this.tools.values());
+            const sortedTools = sortToolsForListing(toolEntries);
+            const tools = sortedTools.map((tool) => getToolPublicFieldOnly(tool, {
                 uiMode: this.options.uiMode,
                 filterOpenAiMeta: true,
             }));
