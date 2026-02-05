@@ -208,7 +208,6 @@ When user provides Figma design:
 2. **Extract design tokens**:
    - Colors → Map to `theme.color.*`
    - Spacing → Map to `theme.space.*`
-   - Typography → Map to `theme.typography.*`
 
 3. **Get screenshots if needed**:
    ```
