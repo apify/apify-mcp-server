@@ -306,6 +306,22 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Don't** use `Promise.then()` - prefer `async/await`
 - **Don't** create tools without proper error handling and user-friendly messages
 
+
+### Design System Compliance (MANDATORY)
+
+**READ FIRST**: [DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md) - Complete design system rules
+
+**Quick Rules** (Zero tolerance):
+- ✅ ALWAYS use `theme.*` tokens (colors, spacing)
+- ❌ NEVER hardcode: `#hex`, `rgb()`, `Npx` values, font sizes
+- ✅ Import from `@apify/ui-library` only
+- ✅ Check `mcp__storybook__*` and `mcp__figma__*` availability before UI work
+- ✅ Call `mcp__storybook__get-ui-building-instructions` first
+- ✅ Read 1-3 similar components for patterns (max 3 files)
+- ✅ Verify zero hardcoded values before submitting
+
+**Figma Integration**: Call `mcp__figma__get_design_context` when working from designs.
+
 ### What NOT to do (beyond code)
 
 - Don't add features not in the requirements
