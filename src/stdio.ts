@@ -34,6 +34,7 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
+import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools-loader.js';
 
@@ -160,8 +161,16 @@ log.error = (...args: Parameters<typeof log.error>) => {
 // Get token from environment or auth file
 const apifyToken = process.env.APIFY_TOKEN || getTokenFromAuthFile();
 
+// Determine if authentication is required based on requested tools
+// Only public tools (like docs) can run without a token
+const requiresAuthentication = isApiTokenRequired({
+    toolCategoryKeys,
+    actorList,
+    enableAddingActors,
+});
+
 // Validate environment
-if (!apifyToken) {
+if (requiresAuthentication && !apifyToken) {
     log.error('APIFY_TOKEN is required but not set in the environment variables or in ~/.apify/auth.json');
     process.exit(1);
 }
@@ -175,6 +184,7 @@ async function main() {
         },
         token: apifyToken,
         uiMode: argv.ui,
+        allowUnauthMode: !requiresAuthentication,
     });
 
     // Create an Input object from CLI arguments
