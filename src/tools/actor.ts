@@ -520,6 +520,15 @@ export const callActor: ToolEntry = {
                     });
 
                     return { content: result.content };
+                } catch (error) {
+                    logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
+                        actorName: baseActorName,
+                        toolName: mcpToolName,
+                    });
+                    return buildMCPResponse({
+                        texts: [`Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
+                        isError: true,
+                    });
                 } finally {
                     if (client) await client.close();
                 }
