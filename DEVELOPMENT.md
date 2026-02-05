@@ -82,7 +82,7 @@ What happens:
 - Editing files under `src/web/src/widgets/*.tsx` triggers a rebuild; the next widget render will use the updated code without restarting the server.
 
 Notes:
-- You can get your `APIFY_TOKEN` from https://console.apify.com/settings/integrations
+- You can get your `APIFY_TOKEN` from [Apify Console](https://console.apify.com/settings/integrations)
 - Widget discovery happens when the server connects. Changing widget code is hot-reloaded; adding brand-new widget filenames typically requires reconnecting the MCP client (or restarting the server) to expose the new resource.
 - You can preview widgets quickly via the local esbuild dev server at `http://localhost:3000/index.html`.
 
@@ -94,7 +94,7 @@ This repository includes a `.mcp.json` configuration file that allows you to use
 
 To use the Storybook MCP server (or any other MCP server that requires authentication), you need to configure your Apify API token in Claude Code's settings:
 
-1. Get your Apify API token from https://console.apify.com/settings/integrations
+1. Get your Apify API token from [Apify Console](https://console.apify.com/settings/integrations)
 2. Create or edit `.claude/settings.local.json` file
 3. Add the following environment variable configuration:
 
