@@ -800,7 +800,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
-                        // Forward notifications from the proxied MCP server to our client
+                        // Only set up notification handlers if progressToken is provided by the client
                         if (progressToken) {
                             // Set up notification handlers for the client
                             for (const schema of ServerNotificationSchema.options) {
