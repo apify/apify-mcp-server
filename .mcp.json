@@ -2,15 +2,11 @@
     "mcpServers": {
         "storybook": {
             "type": "http",
-            "url": "http://localhost:6007/mcp"
+            "url": "https://baldasseva--storybook-mcp.apify.actor/mcp?token=${APIFY_TOKEN}"
         },
         "figma": {
             "type": "http",
             "url": "https://mcp.figma.com/mcp"
-        },
-        "notion": {
-            "type": "sse",
-            "url": "https://mcp.notion.com/sse"
         }
     }
 }
