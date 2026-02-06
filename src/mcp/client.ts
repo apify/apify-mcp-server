@@ -26,11 +26,8 @@ export async function connectMCPClient(
             log.warning('Connection to MCP server using streamable HTTP transport timed out', { url });
             return null;
         }
-
         // If streamable HTTP transport fails, fall back to SSE transport
-        log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
-            url,
-        });
+        log.debug('Streamable HTTP transport failed, falling back to SSE transport', { url });
     }
 
     try {
