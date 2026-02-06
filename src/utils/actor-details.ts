@@ -205,6 +205,7 @@ export async function getMcpToolsMessage(
     apifyClient: ApifyClient,
     apifyToken: string,
     skyfireMode?: boolean,
+    mcpSessionId?: string,
 ): Promise<string> {
     const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
 
@@ -219,7 +220,7 @@ export async function getMcpToolsMessage(
     }
 
     // Connect and list tools
-    const client = await connectMCPClient(mcpServerUrl, apifyToken);
+    const client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }
@@ -293,11 +294,12 @@ export async function buildActorDetailsTextResponse(options: {
     apifyToken: string;
     actorOutputSchema?: Record<string, unknown> | null;
     skyfireMode?: boolean;
+    mcpSessionId?: string;
 }): Promise<{
     texts: string[];
     structuredContent: Record<string, unknown>;
 }> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode } = options;
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode, mcpSessionId } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
     const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
@@ -337,7 +339,7 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Handle MCP tools
     if (output.mcpTools) {
-        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode);
+        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode, mcpSessionId);
         texts.push(message);
     }
 
