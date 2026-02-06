@@ -6,17 +6,16 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import log from '@apify/log';
+
 // Re-export shared config
 export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
 
 // Read version from test-cases.json
 function getTestCasesVersion(): string {
-    const currentFilename = fileURLToPath(import.meta.url);
-    const currentDirname = dirname(currentFilename);
-    const testCasesPath = join(currentDirname, 'test-cases.json');
-    const testCasesContent = readFileSync(testCasesPath, 'utf-8');
-    const testCases = JSON.parse(testCasesContent);
-    return testCases.version;
+    const dir = dirname(fileURLToPath(import.meta.url));
+    const raw = readFileSync(join(dir, 'test-cases.json'), 'utf-8');
+    return JSON.parse(raw).version;
 }
 
 // Evaluator names
@@ -185,8 +184,7 @@ export function validatePhoenixEnvVars(): boolean {
         .map(([key]) => key);
 
     if (missing.length > 0) {
-        // eslint-disable-next-line no-console
-        console.error(`Missing required environment variables: ${missing.join(', ')}`);
+        log.error(`Missing required environment variables: ${missing.join(', ')}`);
         return false;
     }
 

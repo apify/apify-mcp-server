@@ -201,8 +201,8 @@ async function main(datasetName: string): Promise<number> {
         },
     });
 
-    // Resolve dataset by name -> id (retry to handle transient Phoenix issues)
-    // I've also considered the retry package but I figured this simple loop with delay would be enough and tranparent
+    // Considered using a retry package, but opted for this simple loop with delay for clarity and transparency.
+    // A helper like withRetry could be used, but it would not significantly reduce code complexity here.
     let datasetId: string | undefined;
     for (let attempt = 1; attempt <= PHOENIX_MAX_RETRIES; attempt++) {
         try {
