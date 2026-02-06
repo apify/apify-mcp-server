@@ -52,3 +52,24 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
         log.error(message, { error, ...data });
     }
 }
+
+/**
+ * Sanitizes tool call parameters by redacting the skyfire-pay-id.
+ * Used for logging to avoid exposing the Skyfire payment token.
+ *
+ * @param params - The parameters object to sanitize
+ * @returns A new object with skyfire-pay-id replaced with '[REDACTED]'
+ */
+export function sanitizeParams(params: unknown): unknown {
+    if (params === null || params === undefined || typeof params !== 'object' || Array.isArray(params)) {
+        return params;
+    }
+
+    const record = params as Record<string, unknown>;
+    if (!('skyfire-pay-id' in record)) {
+        return params;
+    }
+
+    const { 'skyfire-pay-id': _, ...rest } = record;
+    return { ...rest, 'skyfire-pay-id': '[REDACTED]' };
+}

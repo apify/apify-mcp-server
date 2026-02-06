@@ -114,7 +114,7 @@ export function createExpressApp(
 
             // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
-            log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.SSE });
+            log.debug('Loading tools from URL', { mcpSessionId: transport.sessionId, tr: TransportType.SSE });
             const apifyClient = new ApifyClient({ token: apifyToken });
             await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
@@ -141,7 +141,7 @@ export function createExpressApp(
 
             res.on('close', () => {
                 log.info('Connection closed, cleaning up', {
-                    sessionId: transport.sessionId,
+                    mcpSessionId: transport.sessionId,
                 });
                 delete transportsSSE[transport.sessionId];
                 delete mcpServers[transport.sessionId];
@@ -244,7 +244,7 @@ export function createExpressApp(
 
                 // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
-                log.debug('Loading tools from URL', { sessionId: transport.sessionId, tr: TransportType.HTTP });
+                log.debug('Loading tools from URL', { mcpSessionId: transport.sessionId, tr: TransportType.HTTP });
                 const apifyClient = new ApifyClient({ token: apifyToken });
                 await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
@@ -302,13 +302,13 @@ export function createExpressApp(
                 mth: req.method,
                 rt: Routes.MESSAGE,
                 tr: TransportType.HTTP,
-                sessionId,
+                mcpSessionId: sessionId,
             });
             await transport.handleRequest(req, res, req.body);
             return;
         }
 
-        log.softFail('Session not found', { sessionId, statusCode: 404 });
+        log.softFail('Session not found', { mcpSessionId: sessionId, statusCode: 404 });
         res.status(404).send('Not Found: Session not found').end();
     });
 

@@ -54,7 +54,7 @@ EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, actorOutputSchema } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, actorOutputSchema, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -108,6 +108,7 @@ An interactive widget has been rendered with detailed Actor information.
             apifyToken,
             actorOutputSchema,
             skyfireMode: apifyMcpServer?.options.skyfireMode,
+            mcpSessionId,
         });
 
         return buildMCPResponse({ texts, structuredContent: responseStructuredContent });

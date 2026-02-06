@@ -61,7 +61,7 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
@@ -77,7 +77,7 @@ USAGE EXAMPLES:
                 });
             }
 
-            log.debug('Get actor run', { runId: parsed.runId, status: run.status });
+            log.debug('Get actor run', { runId: parsed.runId, status: run.status, mcpSessionId });
 
             let actorName: string | undefined;
             if (run.actId) {
@@ -87,7 +87,7 @@ USAGE EXAMPLES:
                         actorName = `${actor.username}/${actor.name}`;
                     }
                 } catch (error) {
-                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { error });
+                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { mcpSessionId, error });
                 }
             }
 

@@ -47,7 +47,7 @@ if (STANDBY_MODE) {
     const options = { memory: input.maxActorMemoryBytes } as ActorCallOptions;
 
     const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
-    const callResult = await callActorGetDataset(input.debugActor!, input.debugActorInput!, apifyClient, options);
+    const callResult = await callActorGetDataset({ actorName: input.debugActor!, input: input.debugActorInput!, apifyClient, callOptions: options });
 
     if (callResult && callResult.previewItems.length > 0) {
         await Actor.pushData(callResult.previewItems);
