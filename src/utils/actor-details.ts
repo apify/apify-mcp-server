@@ -218,7 +218,6 @@ export async function getMcpToolsMessage(
         return `This Actor is an MCP server and cannot be accessed in Skyfire mode.`;
     }
 
-    // Connect and list tools
     const client = await connectMCPClient(mcpServerUrl, apifyToken);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;

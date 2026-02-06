@@ -277,8 +277,6 @@ async function getMCPServersAsTools(
 
     // Wait for all actors to be processed in parallel
     const actorToolsArrays = await Promise.all(actorToolPromises);
-
-    // Flatten the arrays of tools
     return actorToolsArrays.flat();
 }
 
@@ -534,7 +532,7 @@ export const callActor: ToolEntry = {
                 }
             }
 
-            // Handle regular Actor calls - fetch actor early to provide schema in error messages
+            // Handle regular Actor calls - fetch an Actor early to provide schema in error messages
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {

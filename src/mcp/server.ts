@@ -800,17 +800,14 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
-                        // Only set up notification handlers if progressToken is provided by the client
+                        // Forward notifications from the proxied MCP server to our client
                         if (progressToken) {
                             // Set up notification handlers for the client
                             for (const schema of ServerNotificationSchema.options) {
                                 const method = schema.shape.method.value;
                                 // Forward notifications from the proxy client to the server
                                 client.setNotificationHandler(schema, async (notification) => {
-                                    log.debug('Sending MCP notification', {
-                                        method,
-                                        notification,
-                                    });
+                                    log.debug('Sending MCP notification', { method, notification });
                                     await extra.sendNotification(notification);
                                 });
                             }
@@ -830,6 +827,16 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         // For external MCP servers we do not try to infer soft_fail vs failed from isError.
                         // We treat the call as succeeded at the telemetry layer unless an actual error is thrown.
                         return { ...res };
+                    } catch (error) {
+                        logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
+                            actorId: tool.actorId,
+                            toolName: tool.originToolName,
+                        });
+                        toolStatus = TOOL_STATUS.FAILED;
+                        return buildMCPResponse({
+                            texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
+                            isError: true,
+                        });
                     } finally {
                         if (client) await client.close();
                     }
