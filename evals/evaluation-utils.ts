@@ -79,7 +79,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 
         messages.push({
             role: 'user',
-            content: `${query}`,
+            content: query,
         });
 
         log.info(`Messages to model: ${JSON.stringify(messages)}`);
@@ -105,7 +105,6 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 
 export function createClassifierEvaluator() {
     const openai = createOpenAI({
-        // custom settings, e.g.
         baseURL: process.env.OPENROUTER_BASE_URL,
         apiKey: process.env.OPENROUTER_API_KEY,
     });
