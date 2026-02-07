@@ -1,16 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import styled from "styled-components";
+import { Badge, Button, CodeBlock, Message, Text, theme } from "@apify/ui-library";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { formatDuration, formatBytes } from "../../utils/formatting";
-import { Button } from "../../components/ui/Button";
-import { Badge } from "../../components/ui/Badge";
-import { Alert } from "../../components/ui/Alert";
-import { Heading } from "../../components/ui/Heading";
 import { ProgressBar } from "../../components/ui/ProgressBar";
-import { JsonPreview } from "../../components/ui/JsonPreview";
-import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
 import { ActorRunSkeleton } from "./ActorRun.skeleton";
 
 interface ActorRunData {
@@ -47,19 +42,18 @@ interface ToolOutput extends Record<string, unknown> {
 interface WidgetState extends Record<string, unknown> {
     isRefreshing?: boolean;
     lastUpdateTime?: number;
-    // Run completion state for model context (set when run finishes)
     runStatus?: string;
     datasetId?: string;
     itemCount?: number;
     runId?: string;
 }
 
-type StatusVariant = "success" | "danger" | "warning" | "secondary";
+type BadgeVariant = "success" | "danger" | "warning" | "neutral";
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getStatusVariant = (status: string): StatusVariant => {
+const getStatusVariant = (status: string): BadgeVariant => {
     switch ((status || "").toUpperCase()) {
         case "SUCCEEDED":
             return "success";
@@ -70,9 +64,114 @@ const getStatusVariant = (status: string): StatusVariant => {
         case "RUNNING":
             return "warning";
         default:
-            return "secondary";
+            return "neutral";
     }
 };
+
+const Container = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space16};
+    width: 100%;
+    background: ${theme.color.neutral.background};
+    border-radius: ${theme.radius.radius12};
+    padding: ${theme.space.space24};
+`;
+
+const HeaderWrapper = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: ${theme.space.space16};
+`;
+
+const BadgeGroup = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+    flex-wrap: wrap;
+`;
+
+const ConsoleButton = styled(Button)`
+    height: 40px;
+`;
+
+const StatusDot = styled.span`
+    display: inline-block;
+    width: ${theme.space.space6};
+    height: ${theme.space.space6};
+    border-radius: ${theme.radius.radiusFull};
+    background: ${theme.color.primary.action};
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+        }
+        50% {
+            opacity: 0.5;
+        }
+    }
+`;
+
+const StatsGrid = styled.div`
+    display: flex;
+    gap: ${theme.space.space24};
+    flex-wrap: wrap;
+`;
+
+const StatItemWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space4};
+`;
+
+const ResultsContainer = styled.div`
+    background: ${theme.color.success.backgroundSubtle};
+    border-radius: ${theme.radius.radius8};
+    padding: ${theme.space.space16};
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space12};
+`;
+
+const ResultsHeader = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+`;
+
+const ResultsMetadata = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: ${theme.space.space12};
+    flex-wrap: wrap;
+`;
+
+const MetadataGroup = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+`;
+
+const RunIdFooterWrapper = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+    padding-top: ${theme.space.space12};
+    border-top: 1px solid ${theme.color.neutral.separatorSubtle};
+`;
+
+const CodeWrapper = styled.code`
+    padding: ${theme.space.space2} ${theme.space.space6};
+    border-radius: ${theme.radius.radius4};
+    background: ${theme.color.neutral.backgroundMuted};
+    color: ${theme.color.neutral.text};
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 12px;
+`;
 
 export const ActorRun: React.FC = () => {
     const toolOutput = useWidgetProps<ToolOutput>();
@@ -217,9 +316,9 @@ export const ActorRun: React.FC = () => {
     if (error) {
         return (
             <WidgetLayout>
-                <Alert variant="error" title="Error">
+                <Message type="danger" caption="Error">
                     {error}
-                </Alert>
+                </Message>
             </WidgetLayout>
         );
     }
@@ -234,9 +333,8 @@ export const ActorRun: React.FC = () => {
 
     return (
         <WidgetLayout>
-            <Card variant="alt" padding="lg" className="flex flex-col gap-4 w-full">
+            <Container>
                 <RunHeader
-                    actorName={runData.actorName}
                     status={runData.status}
                     isCompleted={flags.isCompleted}
                     isRefreshing={!!widgetState?.isRefreshing}
@@ -248,57 +346,54 @@ export const ActorRun: React.FC = () => {
 
                 {flags.isRunning && <ProgressBar variant="warning" />}
 
-                {flags.isSucceeded && runData.dataset ? <RunResults dataset={runData.dataset} onOpenDataset={handleOpenDataset} /> : null}
+                {flags.isSucceeded && runData.dataset ? (
+                    <RunResults dataset={runData.dataset} onOpenDataset={handleOpenDataset} />
+                ) : null}
 
                 {flags.isFailed ? <RunFailure /> : null}
 
                 <RunIdFooter runId={runData.runId} />
-            </Card>
+            </Container>
         </WidgetLayout>
     );
 };
 
 const RunHeader: React.FC<{
-    actorName: string;
     status: string;
     isCompleted: boolean;
     isRefreshing: boolean;
     onRefresh: () => void;
     onOpenRun: () => void;
-}> = ({ actorName, status, isCompleted, isRefreshing, onRefresh, onOpenRun }) => {
+}> = ({ status, isCompleted, isRefreshing, onRefresh, onOpenRun }) => {
     const isRunning = (status || '').toUpperCase() === 'RUNNING';
 
     return (
-        <div className="flex items-start justify-between w-full gap-4">
-            <div className="flex-1 min-w-0">
-                <Heading size="xl" className="mb-1">
-                    {actorName}
-                </Heading>
+        <HeaderWrapper>
+            <BadgeGroup>
+                <Badge variant={getStatusVariant(status)} size="small">
+                    {status}
+                </Badge>
 
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={getStatusVariant(status)}>{status}</Badge>
+                {isRunning && (
+                    <Badge variant="neutral_muted" size="small">
+                        <StatusDot />
+                        <Text type="body" size="small" weight="medium" as="span">
+                            Auto-refreshing
+                        </Text>
+                    </Badge>
+                )}
 
-                    {isRunning && (
-                        <Badge variant="secondary">
-                            <span className="flex items-center gap-1.5">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                Auto-refreshing
-                            </span>
-                        </Badge>
-                    )}
+                {!isCompleted && (
+                    <Button onClick={onRefresh} disabled={isRefreshing} variant="secondary" size="small">
+                        {isRefreshing ? "Loading..." : "Get Status"}
+                    </Button>
+                )}
+            </BadgeGroup>
 
-                    {!isCompleted && (
-                        <Button onClick={onRefresh} disabled={isRefreshing} loading={isRefreshing} variant="secondary" size="sm">
-                            {isRefreshing ? "Loading..." : "Get Status"}
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <Button onClick={onOpenRun} variant="primary" size="md">
+            <ConsoleButton onClick={onOpenRun} variant="secondary" size="medium">
                 View in Console
-            </Button>
-        </div>
+            </ConsoleButton>
+        </HeaderWrapper>
     );
 };
 
@@ -308,13 +403,13 @@ const RunStats: React.FC<{
     stats?: ActorRunData["stats"];
 }> = ({ startedAt, finishedAt, stats }) => {
     return (
-        <div className="flex flex-wrap gap-4">
+        <StatsGrid>
             <StatItem label="Runtime" value={formatDuration(startedAt, finishedAt)} />
 
             {typeof stats?.computeUnits === "number" && <StatItem label="Compute Units" value={stats.computeUnits.toFixed(4)} />}
 
             {typeof stats?.memoryMaxBytes === "number" && <StatItem label="Max Memory" value={formatBytes(stats.memoryMaxBytes)} />}
-        </div>
+        </StatsGrid>
     );
 };
 
@@ -325,56 +420,76 @@ const RunResults: React.FC<{
     const previewCount = Array.isArray(dataset.previewItems) ? dataset.previewItems.length : 0;
 
     return (
-        <Alert variant="success" title="✓ Results Ready">
-            <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <Text as="div" size="sm" tone="secondary" className="flex items-center gap-2">
-                        <span>{dataset.itemCount} items</span>
-                        <Text as="span" size="sm" tone="tertiary">
-                            •
-                        </Text>
-                        <span>Dataset ID: {dataset.datasetId}</span>
+        <ResultsContainer>
+            <ResultsMetadata>
+                <ResultsHeader>
+                    <Text type="body" size="regular" weight="medium" as="span" style={{ color: theme.color.success.text }}>
+                        ✓ Results Ready
                     </Text>
+                </ResultsHeader>
 
-                    <Button onClick={onOpenDataset} variant="primary" size="sm">
-                        View Dataset
-                    </Button>
+                <Button onClick={onOpenDataset} variant="secondary" size="small">
+                    View Dataset
+                </Button>
+            </ResultsMetadata>
+
+            <MetadataGroup>
+                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
+                    {dataset.itemCount} items
+                </Text>
+                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textSubtle }}>
+                    •
+                </Text>
+                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
+                    Dataset ID: {dataset.datasetId}
+                </Text>
+            </MetadataGroup>
+
+            {previewCount > 0 && (
+                <div>
+                    <Text type="body" size="small" weight="medium" as="div" mb="space8" style={{ color: theme.color.neutral.text }}>
+                        Preview (first {previewCount} items)
+                    </Text>
+                    <CodeBlock
+                        content={JSON.stringify(dataset.previewItems, null, 2)}
+                        language="json"
+                        hideLineNumbers={true}
+                        size="small"
+                    />
                 </div>
-
-                {previewCount > 0 && <JsonPreview value={dataset.previewItems} title={`Preview (first ${previewCount} items)`} />}
-            </div>
-        </Alert>
+            )}
+        </ResultsContainer>
     );
 };
 
 const RunFailure: React.FC = () => {
     return (
-        <Alert variant="error" title="Run Failed">
+        <Message type="danger" caption="Run Failed">
             The Actor run did not complete successfully. Check the console for details.
-        </Alert>
+        </Message>
     );
 };
 
 const RunIdFooter: React.FC<{ runId: string }> = ({ runId }) => {
     return (
-        <Text as="div" size="xs" tone="tertiary" className="flex items-center gap-2 pt-2 border-t border-[var(--color-border)]">
-            <span>Run ID:</span>
-            <code className="px-2 py-0.5 rounded bg-[var(--color-code-bg)]">
-                {runId}
-            </code>
-        </Text>
+        <RunIdFooterWrapper>
+            <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
+                Run ID:
+            </Text>
+            <CodeWrapper>{runId}</CodeWrapper>
+        </RunIdFooterWrapper>
     );
 };
 
 const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => {
     return (
-        <div className="flex flex-col gap-1">
-            <Text as="span" size="xs" tone="secondary">
+        <StatItemWrapper>
+            <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
                 {label}
             </Text>
-            <Text as="span" size="sm" weight="medium">
+            <Text type="body" size="regular" weight="medium" as="span">
                 {value}
             </Text>
-        </div>
+        </StatItemWrapper>
     );
 };
