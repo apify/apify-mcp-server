@@ -106,37 +106,30 @@ const mockActors = [
     },
 ];
 
-const shouldEnableMocks = typeof window !== "undefined" && !window.openai;
+// Set up mock window.openai for local development
+setupMockOpenAi({
+    toolOutput: {
+        actors: [], // Start with empty to show loading state
+        query: "web scraping",
+    },
+    initialWidgetState: {
+        loadingDetails: null,
+        isLoading: true, // Start in loading state
+    },
+});
 
-if (shouldEnableMocks) {
-    // Set up mock window.openai for local development
-    setupMockOpenAi({
+// Simulate async data loading
+setTimeout(() => {
+    updateMockOpenAiState({
         toolOutput: {
-            actors: [], // Start with empty to show loading state
+            actors: mockActors,
             query: "web scraping",
         },
-        initialWidgetState: {
+        widgetState: {
             loadingDetails: null,
-            isLoading: true, // Start in loading state
+            isLoading: false,
         },
     });
-
-    // Simulate async data loading
-    const toolOutput = window.openai?.toolOutput as any;
-    if (!toolOutput?.actors?.length) {
-        setTimeout(() => {
-            updateMockOpenAiState({
-                toolOutput: {
-                    actors: mockActors,
-                    query: "web scraping",
-                },
-                widgetState: {
-                    loadingDetails: null,
-                    isLoading: false,
-                },
-            });
-        }, 2000);
-    }
-}
+}, 2000);
 
 renderWidget(ActorSearch);

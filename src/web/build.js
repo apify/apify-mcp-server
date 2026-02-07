@@ -11,8 +11,10 @@ const filename = fileURLToPath(import.meta.url);
 const dirName = dirname(filename);
 
 const widgets = [
+    { name: 'landing-widget', entry: 'src/widgets/landing-widget.tsx' },
     { name: 'search-actors-widget', entry: 'src/widgets/search-actors-widget.tsx' },
     { name: 'actor-run-widget', entry: 'src/widgets/actor-run-widget.tsx' },
+    { name: 'actor-run-new-widget', entry: 'src/widgets/actor-run-new-widget.tsx' },
 ];
 
 // Check if we're in dev mode
