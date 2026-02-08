@@ -10,6 +10,7 @@ type ActorSearchDetailProps = {
     details: ActorDetails;
     onBackToList: () => void;
     showBackButton?: boolean;
+    pricingInfo?: PricingInfo;
 }
 
 const Container = styled(Box)`
@@ -315,7 +316,7 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo }) => {
     )
 }
 
-export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, onBackToList, showBackButton = true }) => {
+export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, pricingInfo, onBackToList, showBackButton = true }) => {
     const actor = details.actorInfo;
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
@@ -349,7 +350,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                         {actor.description}
                     </Text>
 
-                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={actor.currentPricingInfo} />}
+                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={pricingInfo} />}
                 </HeaderSection>
 
                 <ReadmeSection
@@ -365,7 +366,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                 />
 
                 <PricingSection
-                    pricingInfo={actor.currentPricingInfo}
+                    pricingInfo={pricingInfo}
                     expanded={expandedSections['pricing'] || false}
                     onToggle={() => toggleSection('pricing')}
                 />

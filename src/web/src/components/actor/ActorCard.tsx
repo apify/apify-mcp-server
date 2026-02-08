@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, StoreActorHeader, IconButton, ICON_BUTTON_VARIANTS, theme, Container } from "@apify/ui-library";
+import { Text, Box, StoreActorHeader, IconButton, ICON_BUTTON_VARIANTS, theme, Spinner } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon
  } from "@apify/ui-icons";
 import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
@@ -10,11 +10,8 @@ import { ActorStats, PricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;
-    isFirst?: boolean;
-    isLast?: boolean;
-    description: string;
+    // isLoading?: boolean;
     onViewDetails?: () => void;
-    isLoading?: boolean;
 }
 
 const Container = styled(Box)`
@@ -124,6 +121,10 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating }) => {
 }
 
 export const ActorCard: React.FC<ActorCardProps> = ({ actor, onViewDetails }) => {
+    // if (isLoading) {
+    //     // FIXME
+    // }
+
     return (
         <Container px="space16" py="space12">
             <BoxRow>
@@ -138,7 +139,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({ actor, onViewDetails }) =>
             </BoxRow>
 
             <Text
-                size="regular"
+                size="small"
                 weight="normal"
                 color={theme.color.neutral.text}
                 as={PreWrapText}

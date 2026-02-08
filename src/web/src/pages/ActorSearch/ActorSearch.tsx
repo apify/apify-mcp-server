@@ -3,8 +3,8 @@ import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { CardContainer, CodeBlock, Heading, Message, Box } from "@apify/ui-library";
-import { ActorDetails, Actor } from "../../types";
+import { Heading, Message, Box } from "@apify/ui-library";
+import { ActorDetails, Actor, PricingInfo } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
 import styled from "styled-components";
@@ -17,6 +17,12 @@ const ActorContainer = styled(Box)`
     &:last-child {
         margin-bottom: 0;
     }
+`;
+
+const ActorSearchResults = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    width: 100%;
 `;
 
 interface ToolOutput extends Record<string, unknown> {
@@ -43,6 +49,7 @@ export const ActorSearch: React.FC = () => {
     });
 
     const [localActorDetails, setLocalActorDetails] = useState<ActorDetails | null>(null);
+    const [selectedPricingInfo, setSelectedPricingInfo] = useState<PricingInfo | undefined>(undefined);
 
     // Prefer widget format actors if available (for widget mode), otherwise use schema-compliant format
     const hasToolActorDetails = Boolean(toolOutput?.actorDetails);
@@ -59,9 +66,11 @@ export const ActorSearch: React.FC = () => {
 
     const showDetails = (widgetState?.showDetails || shouldForceDetailsView) && Boolean(actorDetails);
     const hasLoadedOnce = Boolean(toolOutput && ("actors" in toolOutput || "actorDetails" in toolOutput));
+    console.log(toolOutput, "toolOutput")
     const isInitialLoading = !hasLoadedOnce && !actorDetails;
-    const shouldShowDetailSkeleton = (widgetState?.showDetails || requestedActorId || isFetchingDetails || shouldForceDetailsView)
-        && !actorDetails;
+    // const shouldShowDetailSkeleton = (widgetState?.showDetails || requestedActorId || isFetchingDetails || shouldForceDetailsView)
+        // && !actorDetails;
+    const shouldShowDetailSkeleton = true
 
     // When actorDetails is received directly from tool (not from button click), save it locally and show details view
     // This ensures the details persist even if toolOutput changes later
@@ -84,6 +93,8 @@ export const ActorSearch: React.FC = () => {
         if (!window.openai?.callTool) return;
 
         await window.openai?.requestDisplayMode({ mode: "fullscreen" });
+
+        setSelectedPricingInfo(actor.currentPricingInfo || undefined);
 
         await setWidgetState({
             ...widgetState,
@@ -132,43 +143,32 @@ export const ActorSearch: React.FC = () => {
 
     return (
         <WidgetLayout>
-            <div className="flex flex-col gap-1 items-start w-full ">
-                <div className="pb-6 w-full">
-                    {showDetails ? (
-                        <ActorSearchDetail
-                            details={actorDetails!}
-                            onBackToList={handleBackToList}
-                            showBackButton={!!widgetState?.requestedActorId && !hasToolActorDetails}
+            <ActorSearchResults>
+            {showDetails ? (
+                <ActorSearchDetail
+                    details={actorDetails!}
+                    pricingInfo={selectedPricingInfo}
+                    onBackToList={handleBackToList}
+                    showBackButton={!!widgetState?.requestedActorId && !hasToolActorDetails}
+                />
+            ) : shouldShowDetailSkeleton ? (
+                <ActorSearchDetailSkeleton />
+            ) : isInitialLoading ? (
+                <ActorSearchResultsSkeleton items={3} />
+            ) : actors.length === 0 ? (
+                <EmptyState title="No actors found" description="Try a different search query" />
+            ) : (
+                actors.map((actor: Actor) => (
+                    <ActorContainer key={actor.id} mb="space12">
+                        <ActorCard
+                            actor={actor}
+                            onViewDetails={() => handleViewDetails(actor)}
+                            // isLoading={true}
                         />
-                    ) : shouldShowDetailSkeleton ? (
-                        <ActorSearchDetailSkeleton />
-                    ) : isInitialLoading ? (
-                        <ActorSearchResultsSkeleton items={3} />
-                    ) : actors.length === 0 ? (
-                        <EmptyState title="No actors found" description="Try a different search query" />
-                    ) : (
-                        <div className="w-full">
-                            <div className="flex flex-col items-start">
-                                <Heading type="titleM" mb="space16">
-                                    Search results
-                                </Heading>
-                                {actors.map((actor: Actor, index: number) => (
-                                    <ActorContainer key={actor.id} mb="space12">
-                                        <ActorCard
-                                            actor={actor}
-                                            isFirst={index === 0}
-                                            isLast={index === actors.length - 1}
-                                            onViewDetails={() => handleViewDetails(actor)}
-                                            isLoading={widgetState?.loadingDetails === actor.id}
-                                            description={actor.description}
-                                        />
-                                    </ActorContainer>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+                    </ActorContainer>
+                ))
+            )}
+            </ActorSearchResults>
         </WidgetLayout>
     );
 };
