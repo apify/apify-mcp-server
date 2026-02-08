@@ -119,6 +119,8 @@ export interface ActorStats {
   totalRuns: number;
   totalUsers: number;
   totalBookmarks: number;
+  actorReviewCount: number;
+  actorReviewRating: number;
 }
 
 export interface ActorDetails {
@@ -126,7 +128,7 @@ export interface ActorDetails {
     id: string;
     name: string;
     username: string;
-    title?: string;
+    title: string;
     description: string;
     pictureUrl?: string;
     stats?: ActorStats;
@@ -134,6 +136,7 @@ export interface ActorDetails {
     userActorRuns?: {
       successRate: number | null;
     };
+    pricingInfos?: Array<PricingInfo>; // FIXME
   };
   actorCard: string;
   readme: string;

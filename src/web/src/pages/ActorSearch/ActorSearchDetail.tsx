@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { Badge, IconButton, Text, Box, Markdown, theme } from "@apify/ui-library";
-import { ArrowLeftIcon, PeopleIcon, BookOpenIcon, InputIcon, CoinIcon, ApiIcon, ChevronDownIcon } from "@apify/ui-icons";
+import { Badge, Text, Box, Markdown, StoreActorHeader, CodeBlock, theme } from "@apify/ui-library";
+import { PeopleIcon, BookOpenIcon, InputIcon, CoinIcon, ApiIcon, ChevronDownIcon, StarEmptyIcon } from "@apify/ui-icons";
 import { formatPricing } from "../../utils/formatting";
-import { ActorDetails } from "../../types";
+import { ActorDetails, ActorStats, PricingInfo } from "../../types";
 import type { IconComponent } from "@apify/ui-icons";
 
 type ActorSearchDetailProps = {
@@ -11,17 +11,6 @@ type ActorSearchDetailProps = {
     onBackToList: () => void;
     showBackButton?: boolean;
 }
-
-type InputSchema = {
-    properties?: Record<
-        string,
-        {
-            type?: string;
-            description?: string;
-            [key: string]: any;
-        }
-    >;
-};
 
 const Container = styled(Box)`
     display: flex;
@@ -47,28 +36,6 @@ const HeaderSection = styled(Box)`
     border-top-right-radius: ${theme.radius.radius8};
 `;
 
-const HeaderTop = styled(Box)`
-    display: flex;
-    gap: ${theme.space.space12};
-    align-items: center;
-`;
-
-const ActorLogo = styled.img`
-    width: 40px;
-    height: 40px;
-    border-radius: ${theme.radius.radius8};
-    border: 1px solid ${theme.color.neutral.separatorSubtle};
-    object-fit: cover;
-`;
-
-const TitleGroup = styled(Box)`
-    display: flex;
-    flex-direction: column;
-    gap: ${theme.space.space2};
-    flex: 1;
-    min-width: 0;
-`;
-
 const BoxRow = styled(Box)`
     display: flex;
     gap: ${theme.space.space8};
@@ -79,19 +46,6 @@ const BoxGroup = styled(Box)`
     display: flex;
     gap: ${theme.space.space4};
     align-items: center;
-`;
-
-const PublisherLogo = styled.div<{ $hasImage: boolean }>`
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: ${props => props.$hasImage ? 'transparent' : theme.color.neutral.backgroundSubtle};
-    border: 1px solid ${theme.color.neutral.separatorSubtle};
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-    flex-shrink: 0;
 `;
 
 const SectionWrapper = styled(Box)`
@@ -138,20 +92,14 @@ const SectionContent = styled(Box)<{ $expanded: boolean }>`
     color: ${theme.color.neutral.text};
 `;
 
-const DescriptionWrapper = styled(Box)`
-    display: flex;
-    gap: ${theme.space.space16};
-    flex-direction: column;
-`;
-
-const TruncatedText = styled.span`
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-`;
-
 const PreWrapText = styled.span`
     white-space: pre-wrap;
+`;
+
+const StyledSeparator = styled(Box)`
+    border-left: 1px solid ${theme.color.neutral.separatorSubtle};
+    height: 8px;
+    width: 1px;
 `;
 
 type ExpandableSectionProps = {
@@ -223,13 +171,6 @@ type InputSectionProps = {
 }
 
 const InputSection: React.FC<InputSectionProps> = ({ inputSchema, expanded, onToggle }) => {
-    const inputProps = useMemo(() => {
-        const schema = inputSchema as unknown as InputSchema | undefined;
-        const props = schema?.properties ?? {};
-        return Object.entries(props);
-    }, [inputSchema]);
-
-    if (inputProps.length === 0) return null;
 
     return (
         <ExpandableSection
@@ -238,7 +179,12 @@ const InputSection: React.FC<InputSectionProps> = ({ inputSchema, expanded, onTo
             expanded={expanded}
             onToggle={onToggle}
         >
-            <pre>{JSON.stringify(inputSchema, null, 2)}</pre>
+            {/* <JsonSchemaViewer definition={inputSchema} /> */}
+            <CodeBlock content={JSON.stringify(inputSchema, null, 4)}
+                language="json"
+                fullWidth
+                fullHeight
+            />
         </ExpandableSection>
     );
 };
@@ -293,6 +239,62 @@ const ApiSection: React.FC<ApiSectionProps> = ({ actorCard, expanded, onToggle }
     );
 };
 
+type StatProps = {
+    icon: React.JSX.Element
+    value: string
+    additionalInfo?: string
+}
+
+const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
+    return (
+        <BoxGroup>
+            {icon}
+            <Text
+                size="small"
+                weight="medium"
+                color={theme.color.neutral.textMuted}
+            >
+                {value}
+                {additionalInfo && <Text size="small" color={theme.color.neutral.textSubtle} as="span"> {additionalInfo}</Text>}
+            </Text>
+        </BoxGroup>
+    )
+}
+
+type StatsRowProps = {
+    stats: ActorStats
+    pricingInfo?: PricingInfo
+}
+
+const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo }) => {
+    const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
+    console.log(pricingInfo)
+    const {pricePerResultUsd} = pricingInfo || {};
+
+    return (
+        <BoxRow py="space4">
+            <Stat
+                icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
+                value={formatNumber(totalUsers)}
+            />
+            <StyledSeparator />
+            <Stat
+                icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
+                value={formatDecimalNumber(actorReviewRating)}
+                additionalInfo={`(${formatNumber(actorReviewCount)})`}
+            />
+            {pricePerResultUsd && <>
+                <StyledSeparator />
+                <Stat
+                    icon={<CoinIcon size="12" color={theme.color.neutral.icon} />}
+                    value={`$${formatDecimalNumber(pricePerResultUsd)}`}
+                    additionalInfo="per result"
+                />
+            </>}
+        </BoxRow>
+    )
+}
+
 export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, onBackToList, showBackButton = true }) => {
     const actor = details.actorInfo;
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -303,84 +305,34 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
             [sectionName]: !prev[sectionName]
         }));
     };
-
-    const usageCount = actor.stats?.totalUsers ? formatNumber(actor.stats.totalUsers) : null;
+    console.log(actor)
 
     return (
         <Container>
+            {/* <CodeBlock content={JSON.stringify(details, null, 4)}
+                language="json"
+                fullWidth
+                fullHeight
+            /> */}
             <CardWrapper>
                 <HeaderSection px="space16" py="space12">
-                    <DescriptionWrapper>
-                        <HeaderTop>
-                            {showBackButton && (
-                                <IconButton
-                                    Icon={ArrowLeftIcon}
-                                    onClick={onBackToList}
-                                    size="small"
-                                    title="Back to search results"
-                                />
-                            )}
-                            <ActorLogo
-                                src={actor.pictureUrl}
-                                alt={actor.title || actor.name}
-                            />
-                            <TitleGroup>
-                                <Text
-                                    weight="medium"
-                                    color={theme.color.neutral.text}
-                                    as={TruncatedText}
-                                >
-                                    {actor.title || actor.name}
-                                </Text>
-                                <Text
-                                    type="code"
-                                    size="small"
-                                    weight="medium"
-                                    color={theme.color.neutral.textSubtle}
-                                    as={TruncatedText}
-                                >
-                                    {`${actor.username}/${actor.name}`}
-                                </Text>
-                            </TitleGroup>
-                        </HeaderTop>
+                    <StoreActorHeader
+                        name={actor.name}
+                        title={actor.title}
+                        pictureUrl={actor.pictureUrl}
+                        username={actor.username}
+                    />
 
-                        <Text
-                            size="regular"
-                            weight="normal"
-                            color={theme.color.neutral.text}
-                            as={PreWrapText}
-                        >
-                            {actor.description}
-                        </Text>
-                    </DescriptionWrapper>
+                    <Text
+                        size="regular"
+                        weight="normal"
+                        color={theme.color.neutral.text}
+                        as={PreWrapText}
+                    >
+                        {actor.description}
+                    </Text>
 
-                    {usageCount && (
-                        <BoxRow py="space4">
-                            <BoxGroup>
-                                <PublisherLogo $hasImage={false}>
-                                    {/* Empty circle placeholder - publisher logo would go here */}
-                                </PublisherLogo>
-                                <Text
-                                    size="small"
-                                    weight="medium"
-                                    color={theme.color.neutral.textMuted}
-                                >
-                                    Apify
-                                </Text>
-                            </BoxGroup>
-
-                            <BoxGroup>
-                                <PeopleIcon size="12" color={theme.color.neutral.icon} />
-                                <Text
-                                    size="small"
-                                    weight="medium"
-                                    color={theme.color.neutral.textMuted}
-                                >
-                                    {usageCount}
-                                </Text>
-                            </BoxGroup>
-                        </BoxRow>
-                    )}
+                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={actor.pricingInfos ? actor.pricingInfos[0] : undefined} />}
                 </HeaderSection>
 
                 <ReadmeSection
@@ -418,5 +370,13 @@ function formatNumber(num: number): string {
     if (num >= 1000) {
         return (num / 1000).toFixed(0) + 'k';
     }
+
     return num.toString();
+}
+
+function formatDecimalNumber(value: number): string {
+    if (Number.isInteger(value)) {
+        return value.toString();
+    }
+    return value.toFixed(1);
 }
