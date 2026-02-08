@@ -161,6 +161,7 @@ export function formatActorToStructuredCard(
         description: '',
         categories: [],
         pricing: { model: 'FREE', isFree: true },
+        rating: { average: 0, count: 0 },
         isDeprecated: false,
     };
 
@@ -219,10 +220,15 @@ export function formatActorToStructuredCard(
 
     // Add rating if available (from ActorStoreList or Actor.stats)
     if (options.includeRating) {
-        const rating = ('actorReviewRating' in actor && actor.actorReviewRating)
+        const actorReviewRating = ('actorReviewRating' in actor && actor.actorReviewRating)
             || ('stats' in actor && actor.stats && 'actorReviewRating' in actor.stats && actor.stats.actorReviewRating);
-        if (rating) {
-            structuredData.rating = Number(rating);
+        const actorReviewCount = ('actorReviewCount' in actor && actor.actorReviewCount)
+            || ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
+        if (actorReviewRating && actorReviewCount) {
+            structuredData.rating = {
+                average: Number(actorReviewRating),
+                count: Number(actorReviewCount),
+            };
         }
     }
 
@@ -252,14 +258,9 @@ export function formatActorToStructuredCard(
 }
 
 /**
- * Formats Actor from store list into the structure needed by widget UI components.
- * This is used by store_collection when widget mode is enabled.
- * @param actor - Actor information from the store API
- * @returns Formatted actor data for widget UI
+ * Shared widget actor format type used by both search and details endpoints.
  */
-export function formatActorForWidget(
-    actor: ExtendedActorStoreList,
-): {
+export type WidgetActor = {
     id: string;
     name: string;
     username: string;
@@ -282,7 +283,21 @@ export function formatActorForWidget(
     userActorRuns: {
         successRate: number | null;
     };
-} {
+    rating: {
+        average: number | null;
+        count: number;
+    };
+};
+
+/**
+ * Formats Actor from store list into the structure needed by widget UI components.
+ * This is used by store_collection when widget mode is enabled.
+ * @param actor - Actor information from the store API
+ * @returns Formatted actor data for widget UI
+ */
+export function formatActorForWidget(
+    actor: ExtendedActorStoreList,
+): WidgetActor {
     // Calculate success rate from publicActorRunStats30Days if available
     let successRate: number | null = null;
     const actorStats = actor.stats as typeof actor.stats & {
@@ -331,6 +346,82 @@ export function formatActorForWidget(
         currentPricingInfo: pricing,
         userActorRuns: {
             successRate,
+        },
+        rating: {
+            average: actor.actorReviewRating || null,
+            count: 0, // Not available in store list API
+        },
+    };
+}
+
+/**
+ * Formats full Actor details (from actor.get()) into the structure needed by widget UI components.
+ * This is used by fetch-actor-details when widget mode is enabled.
+ * @param actor - Full Actor information from the actor API
+ * @returns Formatted actor data for widget UI
+ */
+export function formatActorDetailsForWidget(
+    actor: Actor,
+): WidgetActor {
+    // Calculate success rate from publicActorRunStats30Days if available
+    let successRate: number | null = null;
+    const actorStats = actor.stats as typeof actor.stats & {
+        publicActorRunStats30Days?: {
+            SUCCEEDED: number;
+            TOTAL: number;
+        };
+        bookmarkCount?: number;
+        actorReviewRating?: number;
+        actorReviewCount?: number;
+    };
+    if (actorStats?.publicActorRunStats30Days) {
+        const runStats = actorStats.publicActorRunStats30Days;
+        if (runStats.TOTAL > 0) {
+            successRate = Math.round((runStats.SUCCEEDED / runStats.TOTAL) * 100);
+        }
+    }
+
+    // Get current pricing from pricingInfos array
+    const currentPricingInfo = getCurrentPricingInfo(actor.pricingInfos || [], new Date()) as unknown as ExtendedPricingInfo | null;
+    const pricing = {
+        pricingModel: currentPricingInfo?.pricingModel || 'FREE',
+        pricePerResultUsd: currentPricingInfo?.pricePerUnitUsd || 0,
+        monthlyChargeUsd: currentPricingInfo?.pricingModel === 'FLAT_PRICE_PER_MONTH' ? (currentPricingInfo?.pricePerUnitUsd || 0) : 0,
+    };
+
+    // Handle tiered pricing
+    if (currentPricingInfo?.pricingModel === 'PRICE_PER_DATASET_ITEM' && currentPricingInfo.tieredPricing) {
+        const tieredEntries = Object.values(currentPricingInfo.tieredPricing);
+        if (tieredEntries.length > 0 && tieredEntries[0]) {
+            pricing.pricePerResultUsd = tieredEntries[0].tieredPricePerUnitUsd || 0;
+        }
+    }
+
+    // Cast actor to include optional properties that may exist at runtime
+    const extendedActor = actor as Actor & { pictureUrl?: string };
+
+    return {
+        id: actor.id,
+        name: actor.name,
+        username: actor.username,
+        fullName: `${actor.username}/${actor.name}`,
+        title: actor.title || actor.name,
+        description: actor.description || 'No description available',
+        categories: actor.categories || [],
+        pictureUrl: extendedActor.pictureUrl || '',
+        stats: {
+            totalBuilds: actor.stats?.totalBuilds || 0,
+            totalRuns: actor.stats?.totalRuns || 0,
+            totalUsers: actor.stats?.totalUsers || 0,
+            totalBookmarks: actorStats?.bookmarkCount || 0,
+        },
+        currentPricingInfo: pricing,
+        userActorRuns: {
+            successRate,
+        },
+        rating: {
+            average: actorStats?.actorReviewRating || null,
+            count: actorStats?.actorReviewCount || 0,
         },
     };
 }

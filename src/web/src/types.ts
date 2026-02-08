@@ -146,17 +146,21 @@ export interface ActorDetails {
   };
 }
 
-export interface Actor {
+export interface Actor { // FIXME: could be merged with structured actor ?
   id: string;
   name: string;
   username: string;
   fullName?: string;
-  title?: string;
+  title: string;
   description: string;
   categories?: string[];
   pictureUrl?: string;
   stats?: ActorStats;
   currentPricingInfo?: PricingInfo;
+  rating: {
+    average: number;
+    count: number;
+  }
   userActorRuns?: {
     successRate: number | null;
   };

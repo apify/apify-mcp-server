@@ -3,11 +3,21 @@ import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { Badge, CardContainer, Heading, Message } from "@apify/ui-library";
-import { formatPricing } from "../../utils/formatting";
+import { CardContainer, CodeBlock, Heading, Message, Box } from "@apify/ui-library";
 import { ActorDetails, Actor } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
+import styled from "styled-components";
+
+const ActorContainer = styled(Box)`
+    width: 100%;
+    &:first-child {
+        margin-top: 0;
+    }
+    &:last-child {
+        margin-bottom: 0;
+    }
+`;
 
 interface ToolOutput extends Record<string, unknown> {
     actors?: Actor[];
@@ -44,6 +54,7 @@ export const ActorSearch: React.FC = () => {
     // When actorDetails is provided directly from tool (details-only call), ignore actors to force details view
     // This handles the case when fetch-actor-details is called directly (not from search)
     const actors = hasToolActorDetails ? [] : actorsFromTool || [];
+    console.log(actors)
     const shouldForceDetailsView = hasToolActorDetails;
 
     const showDetails = (widgetState?.showDetails || shouldForceDetailsView) && Boolean(actorDetails);
@@ -71,6 +82,8 @@ export const ActorSearch: React.FC = () => {
 
     const handleViewDetails = async (actor: Actor) => {
         if (!window.openai?.callTool) return;
+
+        await window.openai?.requestDisplayMode({ mode: "fullscreen" });
 
         await setWidgetState({
             ...widgetState,
@@ -108,6 +121,7 @@ export const ActorSearch: React.FC = () => {
     };
 
     const handleBackToList = async () => {
+        await window.openai?.requestDisplayMode({ mode: "inline" });
         setLocalActorDetails(null);
         await setWidgetState({
             ...widgetState,
@@ -134,26 +148,23 @@ export const ActorSearch: React.FC = () => {
                         <EmptyState title="No actors found" description="Try a different search query" />
                     ) : (
                         <div className="w-full">
-                                <div className="flex flex-col items-start">
-                                    <Heading type="titleM" mb="space16">
-                                        Search results
-                                    </Heading>
-                                    <Badge>Hello</Badge>
-                                    {actors.map((actor: Actor, index: number) => (
-                                        <CardContainer header="" mb="space16" key={actor.id}>
-                                            <ActorCard
-                                                actor={actor}
-                                                isFirst={index === 0}
-                                                isLast={index === actors.length - 1}
-                                                variant="list"
-                                                subtitle={formatPricing(actor.currentPricingInfo || { pricingModel: "FREE", pricePerResultUsd: 0, monthlyChargeUsd: 0 })}
-                                                onViewDetails={() => handleViewDetails(actor)}
-                                                isLoading={widgetState?.loadingDetails === actor.id}
-                                                description={actor.description}
-                                            />
-                                        </CardContainer>
-                                    ))}
-                                </div>
+                            <div className="flex flex-col items-start">
+                                <Heading type="titleM" mb="space16">
+                                    Search results
+                                </Heading>
+                                {actors.map((actor: Actor, index: number) => (
+                                    <ActorContainer key={actor.id} mb="space12">
+                                        <ActorCard
+                                            actor={actor}
+                                            isFirst={index === 0}
+                                            isLast={index === actors.length - 1}
+                                            onViewDetails={() => handleViewDetails(actor)}
+                                            isLoading={widgetState?.loadingDetails === actor.id}
+                                            description={actor.description}
+                                        />
+                                    </ActorContainer>
+                                ))}
+                            </div>
                         </div>
                     )}
                 </div>

@@ -1,17 +1,17 @@
 import { PricingInfo } from '../types';
 
-export const formatPricing = (pricing: PricingInfo): string => {
-    if (pricing.pricingModel === "FREE") return "Free";
+export const getPricingInfo = (pricing: PricingInfo): { value: string, additionalInfo?: string } => {
+    if (pricing.pricingModel === "FREE") return { value: "Free" };
     if (pricing.pricingModel === "FLAT_PRICE_PER_MONTH") {
-        return `$${pricing.monthlyChargeUsd}/month`;
+        return { value: `$${pricing.monthlyChargeUsd}`, additionalInfo: "per month" };
     }
     if (pricing.pricingModel === "PRICE_PER_DATASET_ITEM") {
-        return `$${pricing.pricePerResultUsd}/result`;
+        return { value: `$${pricing.pricePerResultUsd}`, additionalInfo: "per result" };
     }
     if (pricing.pricingModel === "PAY_PER_EVENT") {
-        return "Pay per use";
+        return { value: "Pay per use" };
     }
-    return "N/A";
+    return { value: "N/A" };
 };
 
 export const formatNumber = (num: number): string => {
@@ -54,4 +54,11 @@ export const formatBytes = (bytes: number): string => {
         return `${(bytes / 1024).toFixed(2)} KB`;
     }
     return `${bytes} B`;
+};
+
+export const formatDecimalNumber = (value: number): string => {
+    if (Number.isInteger(value)) {
+        return value.toString();
+    }
+    return value.toFixed(1);
 };

@@ -1,10 +1,7 @@
 import React from "react";
-import { cn } from "../../utils/cn";
 import { SkeletonBlock } from "../../components/ui/SkeletonBlock";
 import { ListItemFrame } from "../../components/ui/ListItemFrame";
 import { Card } from "../../components/ui/Card";
-import { Heading } from "../../components/ui/Heading";
-import { Text } from "../../components/ui/Text";
 
 interface ActorListItemSkeletonProps {
     isFirst?: boolean;
@@ -13,29 +10,30 @@ interface ActorListItemSkeletonProps {
 
 const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = ({ isFirst, isLast }) => {
     return (
-        <ListItemFrame isFirst={isFirst} isLast={isLast} className={cn("gap-3")}>
-            <div className="flex gap-2 items-center w-full">
-                <div className="flex flex-1 gap-3 items-center min-w-0">
-                    <SkeletonBlock className="w-11 h-11 rounded-lg shrink-0" />
+        <ListItemFrame isFirst={isFirst} isLast={isLast}>
+            <div className="flex gap-3 items-start w-full">
+                {/* Larger actor logo placeholder (64px) */}
+                <SkeletonBlock className="w-16 h-16 rounded-lg shrink-0" />
 
-                    <div className="flex-1 flex flex-col gap-2 min-w-0">
-                        <SkeletonBlock className="h-4 w-3/5" />
-                        <SkeletonBlock className="h-3 w-2/5" />
+                {/* Content Column */}
+                <div className="flex-1 flex flex-col gap-1 min-w-0">
+                    {/* Title Row with Expand Button */}
+                    <div className="flex items-start justify-between gap-2">
+                        <SkeletonBlock className="h-5 w-2/3" />
+                        {/* Icon button placeholder */}
+                        <SkeletonBlock className="w-8 h-8 rounded-lg shrink-0" />
+                    </div>
+
+                    {/* Inline Stats placeholder */}
+                    <SkeletonBlock className="h-4 w-4/5 mt-1" />
+
+                    {/* Description (3 lines) */}
+                    <div className="w-full space-y-1 mt-1">
+                        <SkeletonBlock className="h-3 w-full" />
+                        <SkeletonBlock className="h-3 w-full" />
+                        <SkeletonBlock className="h-3 w-3/4" />
                     </div>
                 </div>
-
-                <SkeletonBlock className="w-[100px] h-8 rounded-lg" />
-            </div>
-
-            <div className="w-full space-y-2">
-                <SkeletonBlock className="h-3 w-full" />
-                <SkeletonBlock className="h-3 w-4/5" />
-            </div>
-
-            <div className="flex items-center gap-4">
-                <SkeletonBlock className="h-3 w-[60px]" />
-                <SkeletonBlock className="h-3 w-[60px]" />
-                <SkeletonBlock className="h-3 w-[60px]" />
             </div>
         </ListItemFrame>
     );
@@ -55,43 +53,49 @@ export const ActorSearchResultsSkeleton: React.FC<{ items?: number }> = ({ items
 
 export const ActorSearchDetailSkeleton: React.FC = () => {
     return (
-        <div className="flex flex-col gap-4 w-full">
-            <Card variant="default" padding="lg" rounded="3xl" className="w-full">
-                <div className="flex flex-col gap-3">
-                    <div className="flex items-center gap-3">
-                        <SkeletonBlock className="w-16 h-16 rounded-xl" />
-                        <div className="flex-1 flex flex-col gap-2 min-w-0">
-                            <SkeletonBlock className="h-5 w-1/2" />
-                            <SkeletonBlock className="h-4 w-1/3" />
-                            <SkeletonBlock className="h-3 w-2/3" />
+        <div className="flex flex-col w-full min-h-full" style={{ background: 'var(--color-card-bg-alt)', padding: '16px' }}>
+            {/* Centered Card Wrapper */}
+            <div className="w-full max-w-[800px] mx-auto">
+                <Card variant="default" padding="lg" rounded="lg" className="w-full">
+                    {/* Header Section */}
+                    <div className="flex flex-col gap-3 mb-4">
+                        <div className="flex items-center gap-3">
+                            {/* Smaller actor icon (32-40px) */}
+                            <SkeletonBlock className="w-10 h-10 rounded-lg" />
+                            <div className="flex-1 flex flex-col gap-2 min-w-0">
+                                <SkeletonBlock className="h-5 w-1/2" />
+                                <SkeletonBlock className="h-4 w-1/3" />
+                            </div>
                         </div>
+                        {/* Description */}
+                        <div className="space-y-2">
+                            <SkeletonBlock className="h-3 w-full" />
+                            <SkeletonBlock className="h-3 w-4/5" />
+                        </div>
+                        {/* Stats row */}
+                        <SkeletonBlock className="h-4 w-2/3" />
                     </div>
-                    <SkeletonBlock className="h-4 w-1/4" />
-                </div>
-            </Card>
 
-            <SectionSkeleton title="Documentation" paragraphs={5} />
-            <SectionSkeleton title="Input Parameters" paragraphs={3} />
-            <SectionSkeleton title="Technical Details" paragraphs={4} />
+                    {/* Expandable Sections */}
+                    <div className="flex flex-col gap-2">
+                        <SectionHeaderSkeleton />
+                        <SectionHeaderSkeleton />
+                        <SectionHeaderSkeleton />
+                        <SectionHeaderSkeleton />
+                        <SectionHeaderSkeleton />
+                    </div>
+                </Card>
+            </div>
         </div>
     );
 };
 
-const SectionSkeleton: React.FC<{ title: string; paragraphs?: number }> = ({ title, paragraphs = 3 }) => {
+const SectionHeaderSkeleton: React.FC = () => {
     return (
-        <Card variant="default" padding="lg" rounded="3xl" className="w-full">
-            <Heading as="h3" weight="bold" className="mb-4">
-                {title}
-            </Heading>
-            <div className="space-y-2">
-                {Array.from({ length: paragraphs }).map((_, i) => (
-                    <SkeletonBlock key={i} className="h-3 w-full" />
-                ))}
-            </div>
-            {title === "Documentation" && (
-                <Text as="p" size="sm" tone="secondary" className="italic mt-2" />
-            )}
-        </Card>
+        <div className="flex items-center justify-between p-3 bg-[var(--color-card-bg-alt)] rounded-lg">
+            <SkeletonBlock className="h-5 w-24" />
+            <SkeletonBlock className="h-4 w-16" />
+        </div>
     );
 };
 

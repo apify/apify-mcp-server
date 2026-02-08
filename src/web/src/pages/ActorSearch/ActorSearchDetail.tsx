@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { Badge, Text, Box, Markdown, StoreActorHeader, CodeBlock, theme } from "@apify/ui-library";
-import { PeopleIcon, BookOpenIcon, InputIcon, CoinIcon, ApiIcon, ChevronDownIcon, StarEmptyIcon } from "@apify/ui-icons";
-import { formatPricing } from "../../utils/formatting";
+import { Badge, Text, Box, Markdown, StoreActorHeader, CodeBlock, IconButton, theme } from "@apify/ui-library";
+import { ArrowLeftIcon, PeopleIcon, BookOpenIcon, InputIcon, CoinIcon, ApiIcon, StarEmptyIcon, ChevronDownIcon } from "@apify/ui-icons";
 import { ActorDetails, ActorStats, PricingInfo } from "../../types";
 import type { IconComponent } from "@apify/ui-icons";
+import { formatNumber, formatDecimalNumber, getPricingInfo } from "../../utils/formatting";
 
 type ActorSearchDetailProps = {
     details: ActorDetails;
@@ -15,16 +15,19 @@ type ActorSearchDetailProps = {
 const Container = styled(Box)`
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    align-items: center;
     width: 100%;
 `;
 
 const CardWrapper = styled(Box)`
-    background: ${theme.color.neutral.backgroundSubtle};
+    background: ${theme.color.neutral.background};
     border-radius: ${theme.radius.radius8};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
     display: flex;
     flex-direction: column;
-    gap: ${theme.space.space2};
     overflow: hidden;
+    max-width: 796px;
 `;
 
 const HeaderSection = styled(Box)`
@@ -32,32 +35,12 @@ const HeaderSection = styled(Box)`
     display: flex;
     flex-direction: column;
     gap: ${theme.space.space8};
-    border-top-left-radius: ${theme.radius.radius8};
-    border-top-right-radius: ${theme.radius.radius8};
 `;
 
-const BoxRow = styled(Box)`
+const BoxRow = styled(Box)<{ $gap: string }>`
     display: flex;
-    gap: ${theme.space.space8};
+    gap: ${props => props.$gap};
     align-items: center;
-`;
-
-const BoxGroup = styled(Box)`
-    display: flex;
-    gap: ${theme.space.space4};
-    align-items: center;
-`;
-
-const SectionWrapper = styled(Box)`
-    &:first-of-type {
-        border-top-left-radius: 0;
-        border-top-right-radius: 0;
-    }
-
-    &:last-child {
-        border-bottom-left-radius: ${theme.radius.radius8};
-        border-bottom-right-radius: ${theme.radius.radius8};
-    }
 `;
 
 const ExpandableSectionWrapper = styled(Box)`
@@ -67,6 +50,7 @@ const ExpandableSectionWrapper = styled(Box)`
     justify-content: space-between;
     cursor: pointer;
     transition: background-color ${theme.transition.fastEaseOut};
+    border-top: 1px solid ${theme.color.neutral.separatorSubtle};
 
     &:hover {
         background: ${theme.color.neutral.backgroundSubtle};
@@ -117,30 +101,30 @@ const ExpandableSection: React.FC<ExpandableSectionProps> = ({
     onToggle,
     children
 }) => (
-    <SectionWrapper>
+    <>
         <ExpandableSectionWrapper onClick={onToggle} px="space16" py="space12">
             <Badge size="regular" variant="neutral" LeadingIcon={icon}>
                 {title}
             </Badge>
-            <BoxGroup>
+            <BoxRow $gap={theme.space.space4}>
                 <Text
                     size="small"
                     weight="medium"
                     color={theme.color.neutral.text}
                 >
-                    View all
+                    {expanded ? "Hide" : "View all"}
                 </Text>
                 <ChevronIconWrapper $expanded={expanded}>
                     <ChevronDownIcon size="20" color={theme.color.neutral.icon} />
                 </ChevronIconWrapper>
-            </BoxGroup>
+            </BoxRow>
         </ExpandableSectionWrapper>
         <SectionContent $expanded={expanded}>
             <Box p="space16">
                 {children}
             </Box>
         </SectionContent>
-    </SectionWrapper>
+    </>
 );
 
 type ReadmeSectionProps = {
@@ -197,7 +181,7 @@ type PricingSectionProps = {
 
 const PricingSection: React.FC<PricingSectionProps> = ({ pricingInfo, expanded, onToggle }) => {
     const pricingText = useMemo(() => {
-        return formatPricing(
+        return getPricingInfo(
             pricingInfo || {
                 pricingModel: "FREE",
                 pricePerResultUsd: 0,
@@ -213,7 +197,10 @@ const PricingSection: React.FC<PricingSectionProps> = ({ pricingInfo, expanded, 
             expanded={expanded}
             onToggle={onToggle}
         >
-            <Text color={theme.color.neutral.text}>{pricingText}</Text>
+            <Text color={theme.color.neutral.text}>{pricingText.value}</Text>
+            {pricingText.additionalInfo && (
+                <Text size="small" color={theme.color.neutral.textSubtle} as="span"> {pricingText.additionalInfo}</Text>
+            )}
         </ExpandableSection>
     );
 };
@@ -239,6 +226,40 @@ const ApiSection: React.FC<ApiSectionProps> = ({ actorCard, expanded, onToggle }
     );
 };
 
+type ReviewsSectionProps = {
+    stats: ActorStats | undefined;
+    expanded: boolean;
+    onToggle: () => void;
+}
+
+const ReviewsSection: React.FC<ReviewsSectionProps> = ({ stats, expanded, onToggle }) => {
+    const rating = stats?.actorReviewRating || 0;
+    const reviewCount = stats?.actorReviewCount || 0;
+
+    return (
+        <ExpandableSection
+            title="Reviews"
+            icon={StarEmptyIcon}
+            expanded={expanded}
+            onToggle={onToggle}
+        >
+            <BoxRow $gap={theme.space.space4}>
+                <Text size="regular" color={theme.color.neutral.text}>
+                    {formatDecimalNumber(rating)} ⭐
+                </Text>
+                <Text size="regular" color={theme.color.neutral.textMuted}>
+                    ({formatNumber(reviewCount)} {reviewCount === 1 ? 'review' : 'reviews'})
+                </Text>
+            </BoxRow>
+            {reviewCount === 0 && (
+                <Text size="small" color={theme.color.neutral.textSubtle} style={{ marginTop: '8px' }}>
+                    No reviews yet. Be the first to review this actor!
+                </Text>
+            )}
+        </ExpandableSection>
+    );
+};
+
 type StatProps = {
     icon: React.JSX.Element
     value: string
@@ -247,7 +268,7 @@ type StatProps = {
 
 const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
     return (
-        <BoxGroup>
+        <BoxRow $gap={theme.space.space4}>
             {icon}
             <Text
                 size="small"
@@ -257,7 +278,7 @@ const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
                 {value}
                 {additionalInfo && <Text size="small" color={theme.color.neutral.textSubtle} as="span"> {additionalInfo}</Text>}
             </Text>
-        </BoxGroup>
+        </BoxRow>
     )
 }
 
@@ -268,11 +289,10 @@ type StatsRowProps = {
 
 const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo }) => {
     const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
-    console.log(pricingInfo)
-    const {pricePerResultUsd} = pricingInfo || {};
+    const {value: pricingValue, additionalInfo: pricingAdditionalInfo} = getPricingInfo(pricingInfo || {pricingModel: "FREE", monthlyChargeUsd: 0, pricePerResultUsd: 0});
 
     return (
-        <BoxRow py="space4">
+        <BoxRow py="space4" $gap={theme.space.space8}>
             <Stat
                 icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
                 value={formatNumber(totalUsers)}
@@ -283,12 +303,12 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo }) => {
                 value={formatDecimalNumber(actorReviewRating)}
                 additionalInfo={`(${formatNumber(actorReviewCount)})`}
             />
-            {pricePerResultUsd && <>
+            {pricingInfo && <>
                 <StyledSeparator />
                 <Stat
                     icon={<CoinIcon size="12" color={theme.color.neutral.icon} />}
-                    value={`$${formatDecimalNumber(pricePerResultUsd)}`}
-                    additionalInfo="per result"
+                    value={pricingValue}
+                    additionalInfo={pricingAdditionalInfo}
                 />
             </>}
         </BoxRow>
@@ -305,23 +325,20 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
             [sectionName]: !prev[sectionName]
         }));
     };
-    console.log(actor)
 
     return (
         <Container>
-            {/* <CodeBlock content={JSON.stringify(details, null, 4)}
-                language="json"
-                fullWidth
-                fullHeight
-            /> */}
             <CardWrapper>
                 <HeaderSection px="space16" py="space12">
-                    <StoreActorHeader
-                        name={actor.name}
-                        title={actor.title}
-                        pictureUrl={actor.pictureUrl}
-                        username={actor.username}
-                    />
+                    <BoxRow $gap={theme.space.space8}>
+                        {showBackButton && <IconButton Icon={ArrowLeftIcon} onClick={onBackToList} />}
+                        <StoreActorHeader
+                            name={actor.name}
+                            title={actor.title}
+                            pictureUrl={actor.pictureUrl}
+                            username={actor.username}
+                        />
+                    </BoxRow>
 
                     <Text
                         size="regular"
@@ -332,7 +349,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                         {actor.description}
                     </Text>
 
-                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={actor.pricingInfos ? actor.pricingInfos[0] : undefined} />}
+                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={actor.currentPricingInfo} />}
                 </HeaderSection>
 
                 <ReadmeSection
@@ -358,25 +375,13 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, o
                     expanded={expandedSections['api'] || false}
                     onToggle={() => toggleSection('api')}
                 />
+
+                <ReviewsSection
+                    stats={actor.stats}
+                    expanded={expandedSections['reviews'] || false}
+                    onToggle={() => toggleSection('reviews')}
+                />
             </CardWrapper>
         </Container>
     );
 };
-
-function formatNumber(num: number): string {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(0) + 'k';
-    }
-
-    return num.toString();
-}
-
-function formatDecimalNumber(value: number): string {
-    if (Number.isInteger(value)) {
-        return value.toString();
-    }
-    return value.toFixed(1);
-}

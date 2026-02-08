@@ -7,7 +7,7 @@ import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { ActorCardOptions, ActorInputSchema, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
-import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
+import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
@@ -102,7 +102,7 @@ export async function fetchActorDetails(
  * Process actor details for response formatting.
  * Formats README with link, builds text content, and creates structured content.
  * @param details - Raw actor details from fetchActorDetails
- * @returns Processed actor details with formatted content
+ * @returns Processed actor details with formatted content including widget data
  */
 export function processActorDetailsForResponse(details: ActorDetailsResult) {
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
@@ -120,9 +120,12 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
         texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
     }
 
+    // Format actor for widget display (consistent with search results)
+    const widgetActor = formatActorDetailsForWidget(details.actorInfo);
+
     const structuredContent = {
         actorDetails: {
-            actorInfo: details.actorInfo,
+            ...widgetActor, // Include all widget properties for consistent UI rendering
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,

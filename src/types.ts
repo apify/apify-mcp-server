@@ -424,7 +424,10 @@ export type StructuredActorCard = {
         successRate?: number;
         bookmarks?: number;
     };
-    rating?: number;
+    rating: {
+        average: number;
+        count: number;
+    };
     modifiedAt?: string;
     isDeprecated: boolean;
 }
