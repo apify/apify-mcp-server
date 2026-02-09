@@ -7,10 +7,13 @@ import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
 
 function resolveTheme(): "light" | "dark" {
-    const t = window.openai?.theme;
-    if (t === "dark") return "dark";
-    if (t === "light") return "light";
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    // Force light mode for development
+    return "light";
+
+    // const t = window.openai?.theme;
+    // if (t === "dark") return "dark";
+    // if (t === "light") return "light";
+    // return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
 function applyTheme(theme: "light" | "dark") {

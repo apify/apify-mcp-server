@@ -1,17 +1,22 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import { Badge, Button, CodeBlock, Message, Text, theme } from "@apify/ui-library";
+import { Badge, Button, InlineSpinner, Spinner, Text, theme, WarningMessage } from "@apify/ui-library";
+import { WidgetLayout } from "../../components/layout/WidgetLayout";
+import { CheckIcon, CrossIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
-import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { formatDuration, formatBytes } from "../../utils/formatting";
-import { ProgressBar } from "../../components/ui/ProgressBar";
-import { ActorRunSkeleton } from "./ActorRun.skeleton";
+import { formatDuration } from "../../utils/formatting";
 
+// Data interfaces
 interface ActorRunData {
     runId: string;
     actorName: string;
+    actorUsername: string;
+    actorImageUrl?: string;
     status: string;
+    cost?: number;
+    timestamp: string;
+    duration: string;
     startedAt: string;
     finishedAt?: string;
     stats?: {
@@ -22,21 +27,20 @@ interface ActorRunData {
     dataset?: {
         datasetId: string;
         itemCount: number;
-        schema: any;
-        previewItems: any[];
+        previewItems: Record<string, any>[];
     };
-    input?: any;
 }
 
 interface ToolOutput extends Record<string, unknown> {
     runId?: string;
     actorName?: string;
+    actorUsername?: string;
+    actorImageUrl?: string;
     status?: string;
     startedAt?: string;
     finishedAt?: string;
     stats?: any;
     dataset?: any;
-    input?: any;
 }
 
 interface WidgetState extends Record<string, unknown> {
@@ -48,129 +52,195 @@ interface WidgetState extends Record<string, unknown> {
     runId?: string;
 }
 
-type BadgeVariant = "success" | "danger" | "warning" | "neutral";
-
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+type BadgeVariant = "success" | "danger" | "primary_blue" | "neutral";
+
+
 const getStatusVariant = (status: string): BadgeVariant => {
-    switch ((status || "").toUpperCase()) {
+    switch (status.toUpperCase()) {
         case "SUCCEEDED":
             return "success";
         case "FAILED":
-        case "ABORTED":
-        case "TIMED-OUT":
             return "danger";
         case "RUNNING":
-            return "warning";
+            return "primary_blue";
         default:
             return "neutral";
     }
 };
 
+const getStatusVariantLeadingIcon = (status: string) => {
+    switch (status.toUpperCase()) {
+        case "SUCCEEDED":
+            return CheckIcon;
+        case "FAILED":
+        case "ABORTED":
+            return CrossIcon;
+        case "RUNNING":
+            return InlineSpinner;
+        default:
+            return undefined;
+    }
+};
+
+// Styled Components
 const Container = styled.div`
     display: flex;
     flex-direction: column;
-    gap: ${theme.space.space16};
+    gap: ${theme.space.space8};
     width: 100%;
     background: ${theme.color.neutral.background};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
     border-radius: ${theme.radius.radius12};
-    padding: ${theme.space.space24};
+    padding: ${theme.space.space16};
 `;
 
-const HeaderWrapper = styled.div`
+const ActorHeader = styled.div`
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: ${theme.space.space12};
     width: 100%;
-    gap: ${theme.space.space16};
+    min-height: 24px;
 `;
 
-const BadgeGroup = styled.div`
+// Temporary ActorAvatar component until it's available in ui-library
+const ActorAvatarWrapper = styled.div<{ size: number }>`
+    width: ${props => props.size}px;
+    height: ${props => props.size}px;
+    border-radius: ${theme.radius.radius4};
+    border: 1px solid ${theme.color.neutral.border};
+    overflow: hidden;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
-    gap: ${theme.space.space8};
-    flex-wrap: wrap;
+    justify-content: center;
+    background: ${theme.color.neutral.backgroundMuted};
 `;
 
-const ConsoleButton = styled(Button)`
-    height: 40px;
+const ActorAvatarImage = styled.img`
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
 `;
 
-const StatusDot = styled.span`
-    display: inline-block;
-    width: ${theme.space.space6};
-    height: ${theme.space.space6};
-    border-radius: ${theme.radius.radiusFull};
-    background: ${theme.color.primary.action};
-    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+const ActorAvatarInitials = styled.div<{ size: number }>`
+    font-size: ${props => Math.floor(props.size * 0.4)}px;
+    font-weight: 600;
+    color: ${theme.color.neutral.text};
+    text-transform: uppercase;
+`;
 
-    @keyframes pulse {
-        0%, 100% {
-            opacity: 1;
-        }
-        50% {
-            opacity: 0.5;
-        }
+
+const ActorNameLink = styled.a`
+    color: ${theme.color.neutral.text};
+    text-decoration: underline;
+    text-decoration-color: ${theme.color.neutral.text};
+    cursor: pointer;
+    ${theme.typography.shared.desktop.bodyMMedium};
+
+    &:hover {
+        color: ${theme.color.primary.action};
+        text-decoration-color: ${theme.color.primary.action};
     }
 `;
 
-const StatsGrid = styled.div`
-    display: flex;
-    gap: ${theme.space.space24};
-    flex-wrap: wrap;
-`;
-
-const StatItemWrapper = styled.div`
-    display: flex;
-    flex-direction: column;
-    gap: ${theme.space.space4};
-`;
-
-const ResultsContainer = styled.div`
-    background: ${theme.color.success.backgroundSubtle};
-    border-radius: ${theme.radius.radius8};
-    padding: ${theme.space.space16};
-    display: flex;
-    flex-direction: column;
-    gap: ${theme.space.space12};
-`;
-
-const ResultsHeader = styled.div`
+const MetadataRow = styled.div`
     display: flex;
     align-items: center;
     gap: ${theme.space.space8};
+    flex-wrap: nowrap;
 `;
 
-const ResultsMetadata = styled.div`
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: ${theme.space.space12};
-    flex-wrap: wrap;
-`;
-
-const MetadataGroup = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space8};
-`;
-
-const RunIdFooterWrapper = styled.div`
-    display: flex;
-    align-items: center;
-    gap: ${theme.space.space8};
-    padding-top: ${theme.space.space12};
-    border-top: 1px solid ${theme.color.neutral.separatorSubtle};
-`;
-
-const CodeWrapper = styled.code`
-    padding: ${theme.space.space2} ${theme.space.space6};
-    border-radius: ${theme.radius.radius4};
-    background: ${theme.color.neutral.backgroundMuted};
-    color: ${theme.color.neutral.text};
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+const Divider = styled.span`
+    color: ${theme.color.neutral.textMuted};
     font-size: 12px;
+    transform: rotate(0deg);
+    display: flex;
+    align-items: center;
+`;
+
+const TableContainer = styled.div`
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-radius: ${theme.radius.radius12};
+    background: ${theme.color.neutral.background};
+    position: relative;
+    max-height: 265px;
+`;
+
+const TableGradientOverlay = styled.div`
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 86px;
+    margin-top: -86px;
+    background: linear-gradient(179.32deg, rgba(255, 255, 255, 0) 13.4%, rgb(255, 255, 255) 95.38%);
+    pointer-events: none;
+    border-radius: 0 0 ${theme.radius.radius12} ${theme.radius.radius12};
+    z-index: 2;
+`;
+
+const Table = styled.table`
+    width: 100%;
+    border-collapse: collapse;
+`;
+
+const TableHeader = styled.thead`
+    background: ${theme.color.neutral.backgroundMuted};
+    position: sticky;
+    top: 0;
+    z-index: 1;
+`;
+
+const TableHeaderCell = styled.th`
+    text-align: left;
+    padding: ${theme.space.space8};
+    ${theme.typography.shared.desktop.titleXs};
+    color: ${theme.color.neutral.textMuted};
+    white-space: nowrap;
+    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
+
+    &:last-child {
+        border-right: none;
+    }
+`;
+
+const TableBody = styled.tbody``;
+
+const TableRow = styled.tr`
+    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
+
+    &:last-child {
+        border-bottom: none;
+    }
+`;
+
+const TableCell = styled.td`
+    padding: ${theme.space.space10} ${theme.space.space16};
+    color: ${theme.color.neutral.textMuted};
+    ${theme.typography.shared.desktop.bodyMMedium};
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
+    background: ${theme.color.neutral.background};
+
+    &:last-child {
+        border-right: none;
+    }
+`;
+
+const Footer = styled.div`
+    display: flex;
+    align-items: center;
 `;
 
 export const ActorRun: React.FC = () => {
@@ -192,15 +262,23 @@ export const ActorRun: React.FC = () => {
     // Initialize from toolOutput once
     useEffect(() => {
         if (toolOutput?.runId && !runData) {
+            const startedAt = toolOutput.startedAt as string;
+            const finishedAt = toolOutput.finishedAt;
+            const duration = formatDuration(startedAt, finishedAt);
+
             setRunData({
                 runId: toolOutput.runId,
-                actorName: toolOutput.actorName as string,
+                actorName: (toolOutput.actorName as string) || "Unknown Actor",
+                actorUsername: (toolOutput.actorUsername as string) || "unknown",
+                actorImageUrl: toolOutput.actorImageUrl as string | undefined,
                 status: (toolOutput.status as string) || "RUNNING",
-                startedAt: toolOutput.startedAt as string,
-                finishedAt: toolOutput.finishedAt,
+                startedAt,
+                finishedAt,
+                timestamp: new Date(startedAt).toLocaleString(),
+                duration,
+                cost: toolOutput.stats?.computeUnits,
                 stats: toolOutput.stats,
                 dataset: toolOutput.dataset,
-                input: toolOutput.input,
             });
         }
     }, [toolOutput, runData]);
@@ -214,6 +292,7 @@ export const ActorRun: React.FC = () => {
 
         let isCancelled = false;
         let pollCount = 0;
+        let consecutiveErrors = 0;
 
         // Gradual escalation: 5s, 5s, 10s, 10s, 15s, 15s... (max 60s)
         const getNextDelay = (count: number): number => {
@@ -232,8 +311,27 @@ export const ActorRun: React.FC = () => {
                     });
 
                     if (response.structuredContent) {
-                        const newData = response.structuredContent as unknown as ActorRunData;
-                        setRunData(newData);
+                        const newData = response.structuredContent as unknown as ToolOutput;
+                        const startedAt = newData.startedAt as string;
+                        const finishedAt = newData.finishedAt;
+                        const duration = formatDuration(startedAt, finishedAt);
+
+                        const updatedRunData: ActorRunData = {
+                            runId: newData.runId!,
+                            actorName: (newData.actorName as string) || runData.actorName,
+                            actorUsername: (newData.actorUsername as string) || runData.actorUsername,
+                            actorImageUrl: (newData.actorImageUrl as string | undefined) || runData.actorImageUrl,
+                            status: (newData.status as string) || "RUNNING",
+                            startedAt,
+                            finishedAt,
+                            timestamp: new Date(startedAt).toLocaleString(),
+                            duration,
+                            cost: newData.stats?.computeUnits,
+                            stats: newData.stats,
+                            dataset: newData.dataset,
+                        };
+
+                        setRunData(updatedRunData);
 
                         const newStatus = (newData.status || '').toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
@@ -249,10 +347,19 @@ export const ActorRun: React.FC = () => {
                             break;
                         }
                     }
-
                     pollCount++;
+                    consecutiveErrors = 0; // Reset error count on success
                 } catch (err) {
                     console.error('[Auto-poll] Error:', err);
+                    consecutiveErrors++;
+
+                    // Stop polling after 3 consecutive errors
+                    if (consecutiveErrors >= 3) break;
+
+                    // Stop polling on authentication errors
+                    if (err instanceof Error && (err.message.includes('401') || err.message.includes('Unauthorized'))) {
+                        break;
+                    }
                 }
             }
         };
@@ -262,16 +369,37 @@ export const ActorRun: React.FC = () => {
         return () => {
             isCancelled = true;
         };
-    }, [runData?.runId]);
+    }, [runData?.runId, runData?.status]);
 
-    const flags = useMemo(() => {
-        const status = (runData?.status || "").toUpperCase();
-        const isRunning = status === "RUNNING";
-        const isSucceeded = status === "SUCCEEDED";
-        const isFailed = ["FAILED", "ABORTED", "TIMED-OUT"].includes(status);
-        const isCompleted = isSucceeded || isFailed;
-        return { status, isRunning, isSucceeded, isFailed, isCompleted };
-    }, [runData?.status]);
+
+    if (!runData) {
+        return (
+            <WidgetLayout>
+                <Container>
+                    <div style={{
+                        padding: `${theme.space.space24} ${theme.space.space16}`,
+                        textAlign: 'center',
+                        color: theme.color.neutral.textMuted,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: theme.space.space8
+                    }}>
+                        <InlineSpinner />
+                        <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                            Loading actor run data...
+                        </Text>
+                    </div>
+                </Container>
+            </WidgetLayout>
+        );
+    }
+
+    // Extract table columns from first item
+    const columns = runData.dataset?.previewItems.length
+        ? Object.keys(runData.dataset.previewItems[0])
+        : [];
+
 
     const handleOpenRun = () => {
         if (runData && window.openai?.openExternal) {
@@ -281,215 +409,165 @@ export const ActorRun: React.FC = () => {
         }
     };
 
-    const handleOpenDataset = () => {
-        if (runData?.dataset && window.openai?.openExternal) {
+    const handleOpenActor = () => {
+        if (runData && window.openai?.openExternal) {
             window.openai.openExternal({
-                href: `https://console.apify.com/storage/datasets/${runData.dataset.datasetId}`,
+                href: `https://console.apify.com/actors/${runData.actorUsername}/${runData.actorName}`,
             });
         }
     };
 
-    const handleRefreshStatus = async () => {
-        if (!runData || !window.openai?.callTool) return;
+    // const handleRefreshStatus = async () => {
+    //     if (!runData || !window.openai?.callTool) return;
 
-        const snapshot: WidgetState = { ...widgetState, isRefreshing: true };
-        await setWidgetState(snapshot);
+    //     const snapshot: WidgetState = { ...widgetState, isRefreshing: true };
+    //     await setWidgetState(snapshot);
 
-        try {
-            // Single poll only - auto-polling handles continuous updates
-            const response = await window.openai.callTool("get-actor-run", {
-                runId: runData.runId,
-            });
+    //     try {
+    //         // Single poll only - auto-polling handles continuous updates
+    //         const response = await window.openai.callTool("get-actor-run", {
+    //             runId: runData.runId,
+    //         });
 
-            if (response.structuredContent) {
-                setRunData(response.structuredContent as unknown as ActorRunData);
-                await setWidgetState({ ...snapshot, lastUpdateTime: Date.now(), isRefreshing: false });
-            }
-        } catch (err) {
-            console.error("Failed to fetch actor run status:", err);
-            setError("Failed to fetch status update");
-        } finally {
-            await setWidgetState({ ...widgetState, isRefreshing: false });
-        }
-    };
+    //         if (response.structuredContent) {
+    //             setRunData(response.structuredContent as unknown as ActorRunData);
+    //             await setWidgetState({ ...snapshot, lastUpdateTime: Date.now(), isRefreshing: false });
+    //         }
+    //     } catch (err) {
+    //         console.error("Failed to fetch actor run status:", err);
+    //         setError("Failed to fetch status update");
+    //     } finally {
+    //         await setWidgetState({ ...widgetState, isRefreshing: false });
+    //     }
+    // };
 
     if (error) {
         return (
             <WidgetLayout>
-                <Message type="danger" caption="Error">
+                <WarningMessage caption="Error">
                     {error}
-                </Message>
-            </WidgetLayout>
-        );
-    }
-
-    if (!runData) {
-        return (
-            <WidgetLayout>
-                <ActorRunSkeleton />
+                </WarningMessage>
             </WidgetLayout>
         );
     }
 
     return (
         <WidgetLayout>
+            {/* Main Container */}
             <Container>
-                <RunHeader
-                    status={runData.status}
-                    isCompleted={flags.isCompleted}
-                    isRefreshing={!!widgetState?.isRefreshing}
-                    onRefresh={handleRefreshStatus}
-                    onOpenRun={handleOpenRun}
-                />
+                {/* Actor Header */}
+                <ActorHeader>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: theme.space.space16, height: 24 }}>
+                        {/* Actor Type with Icon */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: theme.space.space6 }}>
+                            <ActorAvatarWrapper size={20}>
+                                {runData.actorImageUrl ? (
+                                    <ActorAvatarImage src={runData.actorImageUrl} alt={runData.actorName} />
+                                ) : (
+                                    <ActorAvatarInitials size={20}>
+                                        {runData.actorName.charAt(0)}
+                                    </ActorAvatarInitials>
+                                )}
+                            </ActorAvatarWrapper>
 
-                <RunStats startedAt={runData.startedAt} finishedAt={runData.finishedAt} stats={runData.stats} />
+                            <ActorNameLink onClick={handleOpenActor}>
+                                {runData.actorName}
+                            </ActorNameLink>
+                        </div>
 
-                {flags.isRunning && <ProgressBar variant="warning" />}
+                        {/* Status Badge and Metadata */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: theme.space.space16, flexWrap: 'nowrap', overflow: 'hidden', flex: 1}}>
+                            {/* Status Badge */}
+                            <Badge variant={getStatusVariant(runData.status)} size="small" LeadingIcon={getStatusVariantLeadingIcon(runData.status)}>
+                                {runData.status.charAt(0) + runData.status.slice(1).toLowerCase()}
+                            </Badge>
 
-                {flags.isSucceeded && runData.dataset ? (
-                    <RunResults dataset={runData.dataset} onOpenDataset={handleOpenDataset} />
-                ) : null}
+                            {/* Metadata */}
+                            <MetadataRow>
+                                {typeof runData.cost === 'number' && (
+                                    <>
+                                        <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.text, fontWeight: 500 }}>
+                                            ${runData.cost.toFixed(3)}
+                                        </Text>
+                                        <Divider>|</Divider>
+                                    </>
+                                )}
 
-                {flags.isFailed ? <RunFailure /> : null}
+                                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.text, fontWeight: 500 }}>
+                                    {runData.timestamp}
+                                </Text>
 
-                <RunIdFooter runId={runData.runId} />
+                                <Divider>|</Divider>
+
+                                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.text, fontWeight: 500 }}>
+                                    {runData.duration}
+                                </Text>
+                            </MetadataRow>
+                        </div>
+                    </div>
+
+                    {/* TODO (KH): add expand view in next step */}
+                    {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
+                </ActorHeader>
+
+                {/* Results Table or Status Message */}
+                {runData.dataset && runData.dataset.previewItems.length > 0 ? (
+                    <TableContainer>
+                        <Table>
+                            <TableHeader>
+                                <tr>
+                                    {columns.map((column) => (
+                                        <TableHeaderCell key={column}>
+                                            {column.charAt(0).toUpperCase() + column.slice(1)}
+                                        </TableHeaderCell>
+                                    ))}
+                                </tr>
+                            </TableHeader>
+                            <TableBody>
+                                {runData.dataset.previewItems.map((item, index) => (
+                                    <TableRow key={index}>
+                                        {columns.map((column) => (
+                                            <TableCell key={column}>
+                                                {item[column]?.toString() || "—"}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        <TableGradientOverlay />
+                    </TableContainer>
+                ) : (
+                    <div style={{
+                        padding: `${theme.space.space24} ${theme.space.space16}`,
+                        textAlign: 'center',
+                        color: theme.color.neutral.textMuted,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: theme.space.space8
+                    }}>
+                        {runData.status.toUpperCase() === 'RUNNING' ? (
+                            <>
+                                <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                    Actor is running... Results will appear when available.
+                                </Text>
+                            </>
+                        ) : (
+                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                No results available
+                            </Text>
+                        )}
+                    </div>
+                )}
+
+                {/* Footer */}
+                <Footer>
+                    <Button onClick={handleOpenRun} variant="secondary" size="small">
+                        View in Console
+                    </Button>
+                </Footer>
             </Container>
         </WidgetLayout>
-    );
-};
-
-const RunHeader: React.FC<{
-    status: string;
-    isCompleted: boolean;
-    isRefreshing: boolean;
-    onRefresh: () => void;
-    onOpenRun: () => void;
-}> = ({ status, isCompleted, isRefreshing, onRefresh, onOpenRun }) => {
-    const isRunning = (status || '').toUpperCase() === 'RUNNING';
-
-    return (
-        <HeaderWrapper>
-            <BadgeGroup>
-                <Badge variant={getStatusVariant(status)} size="small">
-                    {status}
-                </Badge>
-
-                {isRunning && (
-                    <Badge variant="neutral_muted" size="small">
-                        <StatusDot />
-                        <Text type="body" size="small" weight="medium" as="span">
-                            Auto-refreshing
-                        </Text>
-                    </Badge>
-                )}
-
-                {!isCompleted && (
-                    <Button onClick={onRefresh} disabled={isRefreshing} variant="secondary" size="small">
-                        {isRefreshing ? "Loading..." : "Get Status"}
-                    </Button>
-                )}
-            </BadgeGroup>
-
-            <ConsoleButton onClick={onOpenRun} variant="secondary" size="medium">
-                View in Console
-            </ConsoleButton>
-        </HeaderWrapper>
-    );
-};
-
-const RunStats: React.FC<{
-    startedAt: string;
-    finishedAt?: string;
-    stats?: ActorRunData["stats"];
-}> = ({ startedAt, finishedAt, stats }) => {
-    return (
-        <StatsGrid>
-            <StatItem label="Runtime" value={formatDuration(startedAt, finishedAt)} />
-
-            {typeof stats?.computeUnits === "number" && <StatItem label="Compute Units" value={stats.computeUnits.toFixed(4)} />}
-
-            {typeof stats?.memoryMaxBytes === "number" && <StatItem label="Max Memory" value={formatBytes(stats.memoryMaxBytes)} />}
-        </StatsGrid>
-    );
-};
-
-const RunResults: React.FC<{
-    dataset: NonNullable<ActorRunData["dataset"]>;
-    onOpenDataset: () => void;
-}> = ({ dataset, onOpenDataset }) => {
-    const previewCount = Array.isArray(dataset.previewItems) ? dataset.previewItems.length : 0;
-
-    return (
-        <ResultsContainer>
-            <ResultsMetadata>
-                <ResultsHeader>
-                    <Text type="body" size="regular" weight="medium" as="span" style={{ color: theme.color.success.text }}>
-                        ✓ Results Ready
-                    </Text>
-                </ResultsHeader>
-
-                <Button onClick={onOpenDataset} variant="secondary" size="small">
-                    View Dataset
-                </Button>
-            </ResultsMetadata>
-
-            <MetadataGroup>
-                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
-                    {dataset.itemCount} items
-                </Text>
-                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textSubtle }}>
-                    •
-                </Text>
-                <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
-                    Dataset ID: {dataset.datasetId}
-                </Text>
-            </MetadataGroup>
-
-            {previewCount > 0 && (
-                <div>
-                    <Text type="body" size="small" weight="medium" as="div" mb="space8" style={{ color: theme.color.neutral.text }}>
-                        Preview (first {previewCount} items)
-                    </Text>
-                    <CodeBlock
-                        content={JSON.stringify(dataset.previewItems, null, 2)}
-                        language="json"
-                        hideLineNumbers={true}
-                        size="small"
-                    />
-                </div>
-            )}
-        </ResultsContainer>
-    );
-};
-
-const RunFailure: React.FC = () => {
-    return (
-        <Message type="danger" caption="Run Failed">
-            The Actor run did not complete successfully. Check the console for details.
-        </Message>
-    );
-};
-
-const RunIdFooter: React.FC<{ runId: string }> = ({ runId }) => {
-    return (
-        <RunIdFooterWrapper>
-            <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
-                Run ID:
-            </Text>
-            <CodeWrapper>{runId}</CodeWrapper>
-        </RunIdFooterWrapper>
-    );
-};
-
-const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => {
-    return (
-        <StatItemWrapper>
-            <Text type="body" size="small" as="span" style={{ color: theme.color.neutral.textMuted }}>
-                {label}
-            </Text>
-            <Text type="body" size="regular" weight="medium" as="span">
-                {value}
-            </Text>
-        </StatItemWrapper>
     );
 };
