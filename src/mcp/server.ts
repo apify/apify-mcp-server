@@ -68,7 +68,7 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { logHttpError, sanitizeParams } from '../utils/logging.js';
+import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
@@ -757,7 +757,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: sanitizeParams(args) });
+                    log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
                     const res = await tool.call({
                         args,
                         extra,
@@ -818,7 +818,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             }
                         }
 
-                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, mcpSessionId, input: sanitizeParams(args) });
+                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, mcpSessionId, input: redactSkyfirePayId(args) });
                         const res = await client.callTool({
                             name: tool.originToolName,
                             arguments: args,
@@ -848,7 +848,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
                     try {
-                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: sanitizeParams(actorArgs) });
+                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
                         const callResult = await callActorGetDataset({
                             actorName: tool.actorFullName,
                             input: actorArgs,
@@ -1007,7 +1007,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
 
-                log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: sanitizeParams(args) });
+                log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
                 const res = await tool.call({
                     args,
                     extra,
@@ -1043,7 +1043,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                 const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
-                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: sanitizeParams(actorArgs) });
+                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
                 const callResult = await callActorGetDataset({
                     actorName: tool.actorFullName,
                     input: actorArgs,

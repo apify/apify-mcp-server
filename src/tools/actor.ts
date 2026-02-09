@@ -23,7 +23,7 @@ import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, Intern
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
-import { logHttpError, sanitizeParams } from '../utils/logging.js';
+import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
@@ -108,7 +108,7 @@ export async function callActorGetDataset(options: {
     ]);
 
     if (potentialAbortedRun === CLIENT_ABORT) {
-        log.info('Actor run aborted by client', { actorName, mcpSessionId, input: sanitizeParams(input) });
+        log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
         return null;
     }
     const completedRun = potentialAbortedRun as ActorRun;

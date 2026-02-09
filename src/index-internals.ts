@@ -11,7 +11,7 @@ import { defaultTools, getActorsAsTools, getUnauthEnabledToolCategories, toolCat
 import { actorNameToToolName } from './tools/utils.js';
 import type { ToolCategory, UiMode } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList } from './utils/generic.js';
-import { sanitizeParams } from './utils/logging.js';
+import { redactSkyfirePayId } from './utils/logging.js';
 import { getExpectedToolNamesByCategories } from './utils/tool-categories-helpers.js';
 import { getToolPublicFieldOnly } from './utils/tools.js';
 import { TTLLRUCache } from './utils/ttl-lru.js';
@@ -36,5 +36,5 @@ export {
     unauthEnabledTools,
     parseCommaSeparatedList,
     parseQueryParamList,
-    sanitizeParams,
+    redactSkyfirePayId,
 };

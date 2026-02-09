@@ -53,6 +53,13 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     }
 }
 
+const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
+const REDACTED_VALUE = '[REDACTED]';
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+};
+
 /**
  * Sanitizes tool call parameters by redacting the skyfire-pay-id.
  * Used for logging to avoid exposing the Skyfire payment token.
@@ -60,16 +67,14 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
  * @param params - The parameters object to sanitize
  * @returns A new object with skyfire-pay-id replaced with '[REDACTED]'
  */
-export function sanitizeParams(params: unknown): unknown {
-    if (params === null || params === undefined || typeof params !== 'object' || Array.isArray(params)) {
+export function redactSkyfirePayId(params: unknown): unknown {
+    if (!isPlainRecord(params) || !(SKYFIRE_PAY_ID_KEY in params)) {
         return params;
     }
 
-    const record = params as Record<string, unknown>;
-    if (!('skyfire-pay-id' in record)) {
+    if (params[SKYFIRE_PAY_ID_KEY] === REDACTED_VALUE) {
         return params;
     }
 
-    const { 'skyfire-pay-id': _, ...rest } = record;
-    return { ...rest, 'skyfire-pay-id': '[REDACTED]' };
+    return { ...params, [SKYFIRE_PAY_ID_KEY]: REDACTED_VALUE };
 }
