@@ -124,8 +124,6 @@ export interface ActorStats {
   totalRuns: number;
   totalUsers: number;
   totalBookmarks: number;
-  actorReviewCount: number;
-  actorReviewRating: number;
 }
 
 export interface ActorDetails {
@@ -142,6 +140,8 @@ export interface Actor {
   id: string;
   name: string;
   username: string;
+  userPictureUrl?: string;
+  userFullName?: string;
   fullName?: string;
   title: string;
   description: string;

@@ -348,8 +348,10 @@ export function formatActorForWidget(
             successRate,
         },
         rating: {
-            average: actor.actorReviewRating || null,
-            count: 0, // Not available in store list API
+            // @ts-expect-error - outdated types on actor
+            average: actor.actorReviewRating || actor.stats?.actorReviewRating,
+            // @ts-expect-error - outdated types on actor
+            count: actor.actorReviewCount || actor.stats?.actorReviewCount,
         },
     };
 }
