@@ -7,15 +7,46 @@
     <style>
       body {
         margin: 0;
-        padding: 20px;
+        padding: 40px 20px;
         font-family: system-ui, -apple-system, sans-serif;
         background: #f5f5f5;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+        margin: 0 0 32px;
+      }
+      .widget-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      .widget-list a {
+        display: block;
+        padding: 14px 20px;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        color: #333;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.15s ease;
+      }
+      .widget-list a:hover {
+        border-color: #1890ff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
       }
     </style>
   </head>
   <body>
-    <div id="landing-root"></div>
-    <script type="module" src="/dist/landing-widget.js"></script>
+    <h1>Apify Widgets - Dev Preview</h1>
+    <div class="widget-list">
+      <a href="/index-actor-run-new.html" target="_blank">Actor Run Widget (New Design)</a>
+      <a href="/index-actor-search.html" target="_blank">Actor Search Widget</a>
+      <a href="/index-actor-run.html" target="_blank">Actor Run Widget (Original)</a>
+    </div>
   </body>
 </html>
-

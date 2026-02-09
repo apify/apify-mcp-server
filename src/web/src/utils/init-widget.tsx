@@ -21,9 +21,9 @@ function applyTheme(theme: "light" | "dark") {
     document.documentElement.classList.toggle("dark", theme === "dark");
 }
 
-export const renderWidget = (Component: React.FC, rootId: string = "root") => {
+export const renderWidget = (Component: React.FC) => {
     const initWidget = () => {
-        const rootElement = document.getElementById(rootId);
+        const rootElement = document.getElementById("root");
         if (!rootElement) return;
 
         applyTheme(resolveTheme());

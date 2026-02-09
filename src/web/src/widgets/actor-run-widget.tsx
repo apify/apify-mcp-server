@@ -53,4 +53,4 @@ setupMockOpenAi({
     },
 });
 
-renderWidget(ActorRun, "actor-run-root");
+renderWidget(ActorRun);
