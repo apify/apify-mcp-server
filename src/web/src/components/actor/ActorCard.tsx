@@ -11,7 +11,7 @@ import { ActorStats, PricingInfo } from "../../types";
 interface ActorCardProps {
     actor: Actor;
     onViewDetails?: () => void;
-    isDetail: boolean;
+    isDetail?: boolean;
     showViewDetailsButton?: boolean;
     pricingInfo?: PricingInfo;
     showBackButton?: boolean;
