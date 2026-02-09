@@ -14,7 +14,7 @@ import { getMCPServerID } from './utils.js';
  * First tries streamable HTTP transport, then falls back to SSE transport.
  */
 export async function connectMCPClient(
-    url: string, token: string,
+    url: string, token: string, mcpSessionId?: string,
 ): Promise<Client | null> {
     let client: Client;
     try {
@@ -23,11 +23,14 @@ export async function connectMCPClient(
     } catch (error) {
         // If streamable HTTP transport fails on not timeout error, continue with SSE transport
         if (error instanceof TimeoutError) {
-            log.warning('Connection to MCP server using streamable HTTP transport timed out', { url });
+            log.warning('Connection to MCP server using streamable HTTP transport timed out', { url, mcpSessionId });
             return null;
         }
         // If streamable HTTP transport fails, fall back to SSE transport
-        log.debug('Streamable HTTP transport failed, falling back to SSE transport', { url });
+        log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
+            url,
+            mcpSessionId,
+        });
     }
 
     try {
@@ -35,10 +38,10 @@ export async function connectMCPClient(
         return client;
     } catch (error) {
         if (error instanceof TimeoutError) {
-            log.warning('Connection to MCP server using SSE transport timed out', { url });
+            log.warning('Connection to MCP server using SSE transport timed out', { url, mcpSessionId });
             return null;
         }
-        logHttpError(error, 'Failed to connect to MCP server using SSE transport', { url, cause: error });
+        logHttpError(error, 'Failed to connect to MCP server using SSE transport', { url, mcpSessionId, cause: error });
         throw error;
     }
 }

@@ -68,7 +68,7 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
-import { logHttpError } from '../utils/logging.js';
+import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
@@ -630,7 +630,7 @@ export class ActorsMcpServer {
                 const msg = `Apify API token is required but was not provided.
 Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
 You can obtain your Apify token from https://console.apify.com/account/integrations.`;
-                log.softFail(msg, { statusCode: 400 });
+                log.softFail(msg, { mcpSessionId, statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -643,7 +643,7 @@ You can obtain your Apify token from https://console.apify.com/account/integrati
             if (name.startsWith('local__')) {
                 // we split the name by '__' and take the last part, which is the actual Actor name
                 const parts = name.split('__');
-                log.debug('Tool name with prefix detected', { toolName: name, lastPart: parts[parts.length - 1] });
+                log.debug('Tool name with prefix detected', { toolName: name, lastPart: parts[parts.length - 1], mcpSessionId });
                 if (parts.length > 1) {
                     name = parts[parts.length - 1];
                 }
@@ -657,7 +657,7 @@ You can obtain your Apify token from https://console.apify.com/account/integrati
                 const msg = `Tool "${name}" was not found.
 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
 Please verify the tool name is correct. You can list all available tools using the tools/list request.`;
-                log.softFail(msg, { statusCode: 404 });
+                log.softFail(msg, { mcpSessionId, statusCode: 404 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -667,7 +667,7 @@ Please verify the tool name is correct. You can list all available tools using t
             if (!args) {
                 const msg = `Missing arguments for tool "${name}".
 Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.`;
-                log.softFail(msg, { statusCode: 400 });
+                log.softFail(msg, { mcpSessionId, statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -677,14 +677,14 @@ Please provide the required arguments for this tool. Check the tool's input sche
             // Decode dot property names in arguments before validation,
             // since validation expects the original, non-encoded property names.
             args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
-            log.debug('Validate arguments for tool', { toolName: tool.name, input: args });
+            log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: args });
             if (!tool.ajvValidate(args)) {
                 const errors = tool?.ajvValidate.errors || [];
                 const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
                 const msg = `Invalid arguments for tool "${tool.name}".
 Validation errors: ${errorMessages}.
 Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.`;
-                log.softFail(msg, { statusCode: 400 });
+                log.softFail(msg, { mcpSessionId, statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -698,7 +698,7 @@ Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool
             if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
                 const msg = `Tool "${tool.name}" does not support long running task calls.
 Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.`;
-                log.softFail(msg, { statusCode: 400 });
+                log.softFail(msg, { mcpSessionId, statusCode: 400 });
                 await this.server.sendLoggingMessage({ level: 'error', data: msg });
                 throw new McpError(
                     ErrorCode.InvalidParams,
@@ -715,7 +715,7 @@ Please remove the "task" parameter from the tool call request or use a different
                     `call-tool-${name}-${randomUUID()}`,
                     request,
                 );
-                log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name });
+                log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
 
                 // Execute the tool asynchronously and update task status
                 setImmediate(async () => {
@@ -757,7 +757,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    log.info('Calling internal tool', { name: tool.name, input: args });
+                    log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
                     const res = await tool.call({
                         args,
                         extra,
@@ -767,6 +767,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         userRentedActorIds,
                         actorOutputSchema,
                         progressTracker,
+                        mcpSessionId,
                     }) as object;
 
                     if (progressTracker) {
@@ -790,11 +791,11 @@ Please remove the "task" parameter from the tool call request or use a different
                 if (tool.type === 'actor-mcp') {
                     let client: Client | null = null;
                     try {
-                        client = await connectMCPClient(tool.serverUrl, apifyToken);
+                        client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
                         if (!client) {
                             const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
 Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
-                            log.softFail(msg, { statusCode: 408 }); // 408 Request Timeout
+                            log.softFail(msg, { mcpSessionId, statusCode: 408 }); // 408 Request Timeout
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
                             return buildMCPResponse({ texts: [msg], isError: true });
@@ -807,13 +808,17 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                                 const method = schema.shape.method.value;
                                 // Forward notifications from the proxy client to the server
                                 client.setNotificationHandler(schema, async (notification) => {
-                                    log.debug('Sending MCP notification', { method, notification });
+                                    log.debug('Sending MCP notification', {
+                                        method,
+                                        mcpSessionId,
+                                        notification,
+                                    });
                                     await extra.sendNotification(notification);
                                 });
                             }
                         }
 
-                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, input: args });
+                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, mcpSessionId, input: redactSkyfirePayId(args) });
                         const res = await client.callTool({
                             name: tool.originToolName,
                             arguments: args,
@@ -853,15 +858,16 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
                     try {
-                        log.info('Calling Actor', { actorName: tool.actorFullName, input: actorArgs });
-                        const callResult = await callActorGetDataset(
-                            tool.actorFullName,
-                            actorArgs,
+                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
+                        const callResult = await callActorGetDataset({
+                            actorName: tool.actorFullName,
+                            input: actorArgs,
                             apifyClient,
                             callOptions,
                             progressTracker,
-                            extra.signal,
-                        );
+                            abortSignal: extra.signal,
+                            mcpSessionId,
+                        });
 
                         if (!callResult) {
                             toolStatus = TOOL_STATUS.ABORTED;
@@ -897,7 +903,7 @@ Please verify the server URL is correct and accessible, and ensure you have a va
             const msg = `Unknown tool type for "${name}".
 Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
 Please verify the tool name and ensure the tool is properly registered.`;
-            log.softFail(msg, { statusCode: 404 });
+            log.softFail(msg, { mcpSessionId, statusCode: 404 });
             await this.server.sendLoggingMessage({
                 level: 'error',
                 data: msg,
@@ -1011,7 +1017,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
 
-                log.info('Calling internal tool for task', { taskId, name: tool.name, input: args });
+                log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
                 const res = await tool.call({
                     args,
                     extra,
@@ -1020,6 +1026,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     apifyToken,
                     userRentedActorIds,
                     progressTracker,
+                    mcpSessionId,
                 }) as object;
 
                 if (progressTracker) {
@@ -1046,15 +1053,16 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                 const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
-                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, input: actorArgs });
-                const callResult = await callActorGetDataset(
-                    tool.actorFullName,
-                    actorArgs,
+                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
+                const callResult = await callActorGetDataset({
+                    actorName: tool.actorFullName,
+                    input: actorArgs,
                     apifyClient,
                     callOptions,
                     progressTracker,
-                    extra.signal,
-                );
+                    abortSignal: extra.signal,
+                    mcpSessionId,
+                });
 
                 if (!callResult) {
                     toolStatus = TOOL_STATUS.ABORTED;
@@ -1140,7 +1148,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
         if (apifyToken) {
             const apifyClient = new ApifyClient({ token: apifyToken });
             userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
-            log.debug('Telemetry: fetched userId', { userId });
+            log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
         }
         const capabilities = this.options.initializeRequestData?.params?.capabilities;
         const params = this.options.initializeRequestData?.params as InitializeRequest['params'];

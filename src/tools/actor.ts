@@ -23,7 +23,7 @@ import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, Intern
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
-import { logHttpError } from '../utils/logging.js';
+import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
@@ -53,21 +53,29 @@ export type CallActorGetDatasetResult = {
  * @param {string} actorName - The name of the Actor to call.
  * @param {unknown} input - The input to pass to the actor.
  * @param {ApifyClient} apifyClient - The Apify client to use for authentication.
- * @param {ActorCallOptions} callOptions - The options to pass to the Actor.
- * @param {ProgressTracker} progressTracker - Optional progress tracker for real-time updates.
- * @param {AbortSignal} abortSignal - Optional abort signal to cancel the actor run.
  * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
  */
-export async function callActorGetDataset(
-    actorName: string,
-    input: unknown,
-    apifyClient: ApifyClient,
-    callOptions: ActorCallOptions | undefined = undefined,
-    progressTracker?: ProgressTracker | null,
-    abortSignal?: AbortSignal,
-    previewOutput = true,
-): Promise<CallActorGetDatasetResult | null> {
+export async function callActorGetDataset(options: {
+    actorName: string;
+    input: unknown;
+    apifyClient: ApifyClient;
+    callOptions?: ActorCallOptions;
+    progressTracker?: ProgressTracker | null;
+    abortSignal?: AbortSignal;
+    previewOutput?: boolean;
+    mcpSessionId?: string;
+}): Promise<CallActorGetDatasetResult | null> {
+    const {
+        actorName,
+        input,
+        apifyClient,
+        callOptions,
+        progressTracker,
+        abortSignal,
+        previewOutput = true,
+        mcpSessionId,
+    } = options;
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
     const actorClient = apifyClient.actor(actorName);
 
@@ -100,7 +108,7 @@ export async function callActorGetDataset(
     ]);
 
     if (potentialAbortedRun === CLIENT_ABORT) {
-        log.info('Actor run aborted by client', { actorName, input });
+        log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
         return null;
     }
     const completedRun = potentialAbortedRun as ActorRun;
@@ -160,6 +168,7 @@ export async function callActorGetDataset(
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
+    mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     const tools: ToolEntry[] = [];
 
@@ -189,6 +198,7 @@ Actor description: ${definition.description}`;
         } catch (e) {
             log.error('Failed to compile schema', {
                 actorName: definition.actorFullName,
+                mcpSessionId,
                 error: e,
             });
             continue;
@@ -226,6 +236,7 @@ Actor description: ${definition.description}`;
 async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
     apifyToken: ApifyToken,
+    mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     /**
      * This is case for the Skyfire request without any Apify token, we do not support
@@ -242,6 +253,7 @@ async function getMCPServersAsTools(
             log.warning('Actor does not have a web server MCP path, skipping', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,
+                mcpSessionId,
             });
             return [];
         }
@@ -254,11 +266,12 @@ async function getMCPServersAsTools(
             actorFullName: actorInfo.definition.actorFullName,
             actorId,
             mcpServerUrl,
+            mcpSessionId,
         });
 
         let client: Client | null = null;
         try {
-            client = await connectMCPClient(mcpServerUrl, apifyToken);
+            client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
             if (!client) {
                 // Skip this Actor, connectMCPClient will log the error
                 return [];
@@ -268,6 +281,7 @@ async function getMCPServersAsTools(
             logHttpError(error, 'Failed to load tools from MCP server', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,
+                mcpSessionId,
             });
             return [];
         } finally {
@@ -283,8 +297,9 @@ async function getMCPServersAsTools(
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
+    mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
-    log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames });
+    log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames, mcpSessionId });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -301,7 +316,7 @@ export async function getActorsAsTools(
             try {
                 const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
                 if (!actorDefinitionWithInfo) {
-                    log.softFail('Actor not found or definition is not available', { actorName: actorIdOrName, statusCode: 404 });
+                    log.softFail('Actor not found or definition is not available', { actorName: actorIdOrName, mcpSessionId, statusCode: 404 });
                     return null;
                 }
                 // Cache the Actor definition with info
@@ -314,6 +329,7 @@ export async function getActorsAsTools(
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName: actorIdOrName,
+                    mcpSessionId,
                 });
                 return null;
             }
@@ -332,8 +348,8 @@ export async function getActorsAsTools(
     const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token),
+        getNormalActorsAsTools(normalActorsInfo, mcpSessionId),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
     return [...normalTools, ...mcpServerTools];
@@ -438,7 +454,7 @@ export const callActor: ToolEntry = {
         taskSupport: 'optional',
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, progressTracker, extra, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, progressTracker, extra, apifyMcpServer, mcpSessionId } = toolArgs;
         const { actor: actorName, input, async, previewOutput = true, callOptions } = callActorArgs.parse(args);
 
         // Parse special format: actor:tool
@@ -504,7 +520,7 @@ export const callActor: ToolEntry = {
                 const mcpServerUrl = mcpServerUrlOrFalse;
                 let client: Client | null = null;
                 try {
-                    client = await connectMCPClient(mcpServerUrl, apifyToken);
+                    client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
                     if (!client) {
                         return buildMCPResponse({
                             texts: [`Failed to connect to MCP server ${mcpServerUrl}`],
@@ -532,8 +548,8 @@ export const callActor: ToolEntry = {
                 }
             }
 
-            // Handle regular Actor calls - fetch an Actor early to provide schema in error messages
-            const [actor] = await getActorsAsTools([actorName], apifyClient);
+            // Handle regular Actor calls - fetch actor early to provide schema in error messages
+            const [actor] = await getActorsAsTools([actorName], apifyClient, mcpSessionId);
 
             if (!actor) {
                 return buildMCPResponse({
@@ -572,7 +588,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 const actorClient = apifyClient.actor(actorName);
                 const actorRun = await actorClient.start(input, callOptions);
 
-                log.debug('Started Actor run (async)', { actorName, runId: actorRun.id });
+                log.debug('Started Actor run (async)', { actorName, runId: actorRun.id, mcpSessionId });
 
                 const structuredContent = {
                     runId: actorRun.id,
@@ -614,15 +630,16 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 return response;
             }
 
-            const callResult = await callActorGetDataset(
+            const callResult = await callActorGetDataset({
                 actorName,
                 input,
                 apifyClient,
                 callOptions,
                 progressTracker,
-                extra.signal,
+                abortSignal: extra.signal,
                 previewOutput,
-            );
+                mcpSessionId,
+            });
 
             if (!callResult) {
                 // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request

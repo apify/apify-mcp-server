@@ -132,6 +132,8 @@ export type InternalToolArgs = {
     actorOutputSchema?: Record<string, unknown> | null;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
+    /** MCP session ID for logging context */
+    mcpSessionId?: string;
 };
 
 /**
