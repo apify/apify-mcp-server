@@ -346,6 +346,26 @@ export type ToolCallTelemetryProperties = {
 export type UiMode = 'openai';
 
 /**
+ * External store for Actor metadata that can be injected by the hosting environment.
+ * Provides access to Actor output schemas inferred from historical run data.
+ * When not provided, tools use generic output schemas without field-level detail.
+ */
+export type ActorStore = {
+    /**
+     * Returns the inferred JSON Schema properties for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object should be a JSON Schema `properties` object, e.g.:
+     * `{ url: { type: 'string' }, price: { type: 'number' } }`
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
+};
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -353,6 +373,12 @@ export type ActorsMcpServerOptions = {
      * Task store for long running tasks support.
      */
     taskStore?: TaskStore;
+    /**
+     * External store for Actor metadata (output schemas).
+     * When provided, Actor tools will have enriched output schemas with field-level detail.
+     * Only used by the streamable HTTP transport in hosted deployments.
+     */
+    actorStore?: ActorStore;
     setupSigintHandler?: boolean;
     /**
      * Switch to enable Skyfire agentic payment mode.

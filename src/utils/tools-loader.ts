@@ -14,7 +14,7 @@ import { getActorOutput } from '../tools/get-actor-output.js';
 import { addTool } from '../tools/helpers.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
 import { getActorRun } from '../tools/run.js';
-import type { Input, InternalToolArgs, ToolCategory, ToolEntry, UiMode } from '../types.js';
+import type { ActorStore, Input, InternalToolArgs, ToolCategory, ToolEntry, UiMode } from '../types.js';
 import { getExpectedToolsByCategories } from './tool-categories-helpers.js';
 
 // Lazily-computed cache of internal tools by name to avoid circular init issues.
@@ -42,6 +42,7 @@ export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     uiMode?: UiMode,
+    actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -132,7 +133,7 @@ export async function loadToolsFromInput(
 
     // Actor tools (if any)
     if (actorNamesToLoad.length > 0) {
-        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient);
+        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient, actorStore);
         result.push(...actorTools);
     }
 
