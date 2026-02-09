@@ -37,7 +37,7 @@ export const MODELS_TO_EVALUATE = [
     // 'google/gemini-2.5-pro',
     'openai/gpt-5',
     // 'openai/gpt-5-mini',
-    // 'openai/gpt-4o-mini',  //deprecated model
+    // 'openai/gpt-4o-mini', // deprecated model
 ];
 
 export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4.1';

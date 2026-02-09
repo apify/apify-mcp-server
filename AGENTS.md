@@ -350,6 +350,19 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - Coordinate breaking changes with the team
 - Check if changes require updates in `apify-mcp-server-internal`
 
+**Using pkg.pr.new for cross-repo testing:**
+
+PRs with the `beta` label automatically publish a preview package to [pkg.pr.new](https://pkg.pr.new). The internal repo can install it to verify compatibility before the core PR is merged:
+
+```bash
+# In apify-mcp-server-internal:
+npm i https://pkg.pr.new/apify/apify-mcp-server/@apify/actors-mcp-server@<PR_NUMBER>
+npm run type-check && npm run lint
+
+# After core PR merges and releases, restore:
+npm install @apify/actors-mcp-server@^<RELEASED_VERSION>
+```
+
 ## Development workflow
 
 ### Setup
