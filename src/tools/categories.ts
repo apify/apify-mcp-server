@@ -1,6 +1,12 @@
 /**
  * Tool categories and their associated tools.
  * This file is separate from index.ts to avoid circular dependencies.
+ *
+ * Tools within each category are ordered by the typical workflow:
+ * search/discover → get details → execute → check status → get results
+ *
+ * The final tool ordering presented to MCP clients is determined by tools-loader.ts,
+ * which also auto-injects get-actor-run and get-actor-output right after call-actor.
  */
 import type { ToolCategory } from '../types.js';
 import { callActor } from './actor.js';
@@ -20,41 +26,39 @@ import { searchActorsInternalTool } from './search-actors-internal.js';
 import { searchApifyDocsTool } from './search-apify-docs.js';
 import { searchActors } from './store_collection.js';
 
-// Tool categories with tools ordered by typical workflow:
-// 1. Search/discover → 2. Get details → 3. Execute → 4. Check status → 5. Get results
 export const toolCategories = {
     experimental: [
         addTool,
     ],
     actors: [
-        searchActors,           // 1. Search for actors
-        fetchActorDetailsTool,  // 2. Get details about an actor
-        callActor,              // 3. Run the actor
+        searchActors,
+        fetchActorDetailsTool,
+        callActor,
     ],
     ui: [
         searchActorsInternalTool,
         fetchActorDetailsInternalTool,
     ],
+    docs: [
+        searchApifyDocsTool,
+        fetchApifyDocsTool,
+    ],
     runs: [
-        getActorRun,            // 4. Check run status
-        getActorRunLog,         // 5. Get run logs
-        getUserRunsList,        // 6. List all runs
-        abortActorRun,          // 7. Abort if needed
+        getActorRun,
+        getUserRunsList,
+        getActorRunLog,
+        abortActorRun,
     ],
     storage: [
-        getActorOutput,         // 8. Get output (most common)
         getDataset,
         getDatasetItems,
         getDatasetSchema,
+        getActorOutput,
         getKeyValueStore,
         getKeyValueStoreKeys,
         getKeyValueStoreRecord,
         getUserDatasetsList,
         getUserKeyValueStoresList,
-    ],
-    docs: [
-        searchApifyDocsTool,    // Search docs
-        fetchApifyDocsTool,     // Fetch specific doc
     ],
     dev: [
         getHtmlSkeleton,

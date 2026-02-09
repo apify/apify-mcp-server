@@ -137,23 +137,31 @@ export async function loadToolsFromInput(
     }
 
     /**
-     * If there is any tool that in some way, even indirectly (like add-actor), allows calling
-     * Actor, then we need to ensure the get-actor-output tool is available.
+     * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
+     * Insert them right after call-actor to follow the logical workflow order:
+     * search → details → call → run status → output → docs → actor tools
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
-    if (hasCallActor || hasActorTools || hasAddActorTool) {
-        result.push(getActorOutput);
+    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
+    const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
+
+    const toolsToInject: ToolEntry[] = [];
+    if (!hasGetActorRun && (hasCallActor || uiMode === 'openai')) {
+        toolsToInject.push(getActorRun);
+    }
+    if (!hasGetActorOutput && (hasCallActor || hasActorTools || hasAddActorTool)) {
+        toolsToInject.push(getActorOutput);
     }
 
-    /**
-     * If call-actor tool is present or UI mode is enabled, automatically include get-actor-run
-     * to allow checking run status and retrieving results.
-     */
-    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
-    if (!hasGetActorRun && (hasCallActor || uiMode === 'openai')) {
-        result.push(getActorRun);
+    if (toolsToInject.length > 0) {
+        const callActorIndex = result.findIndex((entry) => entry.name === HelperTools.ACTOR_CALL);
+        if (callActorIndex !== -1) {
+            result.splice(callActorIndex + 1, 0, ...toolsToInject);
+        } else {
+            result.push(...toolsToInject);
+        }
     }
 
     // TEMP: for now we disable this swapping logic as the add-actor tool was misbehaving in some clients
