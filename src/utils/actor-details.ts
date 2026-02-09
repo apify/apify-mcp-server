@@ -218,7 +218,6 @@ export async function getMcpToolsMessage(
         return `This Actor is an MCP server and cannot be accessed in Skyfire mode.`;
     }
 
-    // Connect and list tools
     const client = await connectMCPClient(mcpServerUrl, apifyToken);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
@@ -231,6 +230,9 @@ export async function getMcpToolsMessage(
             .join('\n\n');
 
         return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+    } catch (error) {
+        logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
+        return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
     } finally {
         await client.close();
     }

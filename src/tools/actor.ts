@@ -265,7 +265,7 @@ async function getMCPServersAsTools(
             }
             return await getMCPServerTools(actorId, client, mcpServerUrl);
         } catch (error) {
-            logHttpError(error, 'Failed to connect to MCP server', {
+            logHttpError(error, 'Failed to load tools from MCP server', {
                 actorFullName: actorInfo.definition.actorFullName,
                 actorId,
             });
@@ -277,8 +277,6 @@ async function getMCPServersAsTools(
 
     // Wait for all actors to be processed in parallel
     const actorToolsArrays = await Promise.all(actorToolPromises);
-
-    // Flatten the arrays of tools
     return actorToolsArrays.flat();
 }
 
@@ -520,12 +518,21 @@ export const callActor: ToolEntry = {
                     });
 
                     return { content: result.content };
+                } catch (error) {
+                    logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
+                        actorName: baseActorName,
+                        toolName: mcpToolName,
+                    });
+                    return buildMCPResponse({
+                        texts: [`Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
+                        isError: true,
+                    });
                 } finally {
                     if (client) await client.close();
                 }
             }
 
-            // Handle regular Actor calls - fetch actor early to provide schema in error messages
+            // Handle regular Actor calls - fetch an Actor early to provide schema in error messages
             const [actor] = await getActorsAsTools([actorName], apifyClient);
 
             if (!actor) {
