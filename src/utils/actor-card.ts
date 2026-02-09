@@ -269,6 +269,7 @@ export type WidgetActor = {
     name: string;
     username: string;
     userPictureUrl?: string;
+    userFullName?: string;
     fullName: string;
     title: string;
     description: string;
@@ -298,10 +299,14 @@ export type WidgetActor = {
  * Formats Actor from store list into the structure needed by widget UI components.
  * This is used by store_collection when widget mode is enabled.
  * @param actor - Actor information from the store API
+ * @param userFullName - User's full name from profile
+ * @param userPictureUrl - User's picture URL from profile
  * @returns Formatted actor data for widget UI
  */
 export function formatActorForWidget(
     actor: ExtendedActorStoreList,
+    userFullName?: string,
+    userPictureUrl?: string,
 ): WidgetActor {
     // Calculate success rate from publicActorRunStats30Days if available
     let successRate: number | null = null;
@@ -337,6 +342,8 @@ export function formatActorForWidget(
         id: actor.id,
         name: actor.name,
         username: actor.username,
+        userPictureUrl,
+        userFullName,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
@@ -365,6 +372,8 @@ export function formatActorForWidget(
  * Formats full Actor details (from actor.get()) into the structure needed by widget UI components.
  * This is used by fetch-actor-details when widget mode is enabled.
  * @param actor - Full Actor information from the actor API
+ * @param userFullName - User's full name from profile
+ * @param userPictureUrl - User's picture URL from profile
  * @returns Formatted actor data for widget UI
  */
 export function formatActorDetailsForWidget(
@@ -374,6 +383,8 @@ export function formatActorDetailsForWidget(
             actorReviewCount?: number;
         };
     },
+    userFullName?: string,
+    userPictureUrl?: string,
 ): WidgetActor {
     // Calculate success rate from publicActorRunStats30Days if available
     let successRate: number | null = null;
@@ -416,6 +427,8 @@ export function formatActorDetailsForWidget(
         id: actor.id,
         name: actor.name,
         username: actor.username,
+        userPictureUrl,
+        userFullName,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',

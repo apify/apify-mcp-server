@@ -8,6 +8,7 @@ import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCa
 import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { fetchUserData } from '../utils/users.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
 export const searchActorsArgsSchema = z.object({
@@ -167,7 +168,18 @@ You can also try using more specific or alternative keywords related to your sea
 
         // Add widget format actors when widget mode is enabled
         if (apifyMcpServer.options.uiMode === 'openai') {
-            structuredContent.widgetActors = actors.map(formatActorForWidget);
+            // Fetch user data for each actor
+            const userDataPromises = actors.map(async (actor) => fetchUserData(actor.username, apifyToken).catch(() => null));
+            const usersData = await Promise.all(userDataPromises);
+
+            structuredContent.widgetActors = actors.map((actor, index) => {
+                const userData = usersData[index];
+                return formatActorForWidget(
+                    actor,
+                    userData?.profile?.name,
+                    userData?.profile?.pictureUrl,
+                );
+            });
         }
 
         // When widget mode is enabled, return minimal text with widget metadata

@@ -15,6 +15,7 @@ import {
 } from '../utils/actor-details.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { fetchUserData } from '../utils/users.js';
 import { actorDetailsOutputSchema } from './structured-output-schemas.js';
 
 const fetchActorDetailsToolArgsSchema = z.object({
@@ -67,7 +68,14 @@ EXAMPLES:
         }
 
         if (apifyMcpServer.options.uiMode === 'openai') {
-            const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
+            // Fetch user data for the actor owner
+            const userData = await fetchUserData(details.actorInfo.username, apifyToken).catch(() => null);
+
+            const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(
+                details,
+                userData?.profile?.name,
+                userData?.profile?.pictureUrl,
+            );
             const structuredContent = {
                 actorInfo: details.actorCardStructured,
                 readme: formattedReadme,
