@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme } from "@apify/ui-library";
+import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon, ArrowLeftIcon
  } from "@apify/ui-icons";
 import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
@@ -59,8 +59,9 @@ const StyledSeparator = styled(Box)`
     width: 1px;
 `;
 
-const PreWrapText = styled.span`
+const DescriptionText = styled(Text)<{ isDetail: boolean }>`
     white-space: pre-wrap;
+    ${({ isDetail }) => !isDetail && clampLines(2)};
 `;
 
 const ActorHeader = styled.div`
@@ -180,14 +181,14 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                 {showViewDetailsButton && <AlignEnd><IconButton Icon={FullscreenIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} onClick={onViewDetails} /></AlignEnd>}
             </BoxRow>
 
-            <Text
+            <DescriptionText
                 size="small"
                 weight="normal"
                 color={theme.color.neutral.text}
-                as={PreWrapText}
+                isDetail={isDetail}
             >
                 {actor.description}
-            </Text>
+            </DescriptionText>
 
             {actor.stats && isDetail && <StatsRow {...statsProps} />}
         </Container>
