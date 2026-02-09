@@ -29,6 +29,8 @@ const CardWrapper = styled(Box)`
     flex-direction: column;
     overflow: hidden;
     max-width: 796px;
+    min-width: 400px;
+    width: 100%;
 `;
 
 const HeaderSection = styled(Box)`

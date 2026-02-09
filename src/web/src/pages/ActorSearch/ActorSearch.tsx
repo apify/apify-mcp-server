@@ -68,9 +68,8 @@ export const ActorSearch: React.FC = () => {
     const hasLoadedOnce = Boolean(toolOutput && ("actors" in toolOutput || "actorDetails" in toolOutput));
     console.log(toolOutput, "toolOutput")
     const isInitialLoading = !hasLoadedOnce && !actorDetails;
-    // const shouldShowDetailSkeleton = (widgetState?.showDetails || requestedActorId || isFetchingDetails || shouldForceDetailsView)
-        // && !actorDetails;
-    const shouldShowDetailSkeleton = true
+    const shouldShowDetailSkeleton = (widgetState?.showDetails || requestedActorId || isFetchingDetails || shouldForceDetailsView)
+        && !actorDetails;
 
     // When actorDetails is received directly from tool (not from button click), save it locally and show details view
     // This ensures the details persist even if toolOutput changes later

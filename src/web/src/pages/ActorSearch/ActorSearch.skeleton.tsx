@@ -1,101 +1,204 @@
 import React from "react";
+import styled from "styled-components";
 import { SkeletonBlock } from "../../components/ui/SkeletonBlock";
-import { ListItemFrame } from "../../components/ui/ListItemFrame";
-import { Card } from "../../components/ui/Card";
+import { Box, theme } from "@apify/ui-library";
+
+const Container = styled(Box)`
+    background: ${theme.color.neutral.background};
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+    border-radius: ${theme.radius.radius8};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+`;
+
+const BoxRow = styled(Box)`
+    display: flex;
+    gap: ${theme.space.space8};
+    position: relative;
+`;
+
+const ContentColumn = styled(Box)`
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: ${theme.space.space6};
+    min-width: 0;
+    justify-content: center;
+`;
+
+const DescriptionGroup = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space4};
+    width: 100%;
+`;
+
+const AlignEnd = styled.div`
+    margin-left: auto;
+    align-self: flex-start;
+    position: absolute;
+    right: 0;
+    top: 0;
+`;
 
 interface ActorListItemSkeletonProps {
     isFirst?: boolean;
     isLast?: boolean;
 }
 
-const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = ({ isFirst, isLast }) => {
+const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = () => {
     return (
-        <ListItemFrame isFirst={isFirst} isLast={isLast}>
-            <div className="flex gap-3 items-start w-full">
-                {/* Larger actor logo placeholder (64px) */}
-                <SkeletonBlock className="w-16 h-16 rounded-lg shrink-0" />
+        <Container px="space16" py="space12">
+            <BoxRow>
+                {/* Actor logo placeholder - matches StoreActorHeader size */}
+                <SkeletonBlock style={{ width: '40px', height: '40px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
 
-                {/* Content Column */}
-                <div className="flex-1 flex flex-col gap-1 min-w-0">
-                    {/* Title Row with Expand Button */}
-                    <div className="flex items-start justify-between gap-2">
-                        <SkeletonBlock className="h-5 w-2/3" />
-                        {/* Icon button placeholder */}
-                        <SkeletonBlock className="w-8 h-8 rounded-lg shrink-0" />
-                    </div>
+                <ContentColumn>
+                    {/* Title placeholder */}
+                    <SkeletonBlock style={{ height: '20px', width: '66%' }} />
 
-                    {/* Inline Stats placeholder */}
-                    <SkeletonBlock className="h-4 w-4/5 mt-1" />
+                    {/* Stats row placeholder - matches stats row height */}
+                    <SkeletonBlock style={{ height: '16px', width: '80%' }} />
 
-                    {/* Description (3 lines) */}
-                    <div className="w-full space-y-1 mt-1">
-                        <SkeletonBlock className="h-3 w-full" />
-                        <SkeletonBlock className="h-3 w-full" />
-                        <SkeletonBlock className="h-3 w-3/4" />
-                    </div>
-                </div>
-            </div>
-        </ListItemFrame>
+                </ContentColumn>
+
+                {/* Icon button placeholder */}
+                <AlignEnd>
+                    <SkeletonBlock style={{ width: '32px', height: '32px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
+                </AlignEnd>
+            </BoxRow>
+
+                            {/* Description (2 lines) - matches Text size="small" */}
+                <DescriptionGroup>
+                    <SkeletonBlock style={{ height: '14px', width: '100%' }} />
+                    <SkeletonBlock style={{ height: '14px', width: '100%' }} />
+                </DescriptionGroup>
+        </Container>
     );
 };
+
+const ResultsContainer = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space12};
+    width: 100%;
+`;
 
 export const ActorSearchResultsSkeleton: React.FC<{ items?: number }> = ({ items = 3 }) => {
     return (
-        <Card variant="alt" padding="none" className="w-full overflow-hidden">
-            <div className="flex flex-col w-full">
-                {Array.from({ length: items }).map((_, i) => (
-                    <ActorListItemSkeleton key={i} isFirst={i === 0} isLast={i === items - 1} />
-                ))}
-            </div>
-        </Card>
+        <ResultsContainer>
+            {Array.from({ length: items }).map((_, i) => (
+                <ActorListItemSkeleton key={i} isFirst={i === 0} isLast={i === items - 1} />
+            ))}
+        </ResultsContainer>
     );
 };
+
+const DetailContainer = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+`;
+
+const CardWrapper = styled(Box)`
+    background: ${theme.color.neutral.background};
+    border-radius: ${theme.radius.radius8};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    max-width: 796px;
+    width: 100%;
+`;
+
+const HeaderSection = styled(Box)`
+    background: ${theme.color.neutral.background};
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+`;
+
+const HeaderRow = styled(Box)`
+    display: flex;
+    gap: ${theme.space.space8};
+    align-items: center;
+`;
+
+const HeaderColumn = styled(Box)`
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+    min-width: 0;
+`;
+
+const DescriptionLines = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+`;
+
+const SectionsGroup = styled(Box)`
+    display: flex;
+    flex-direction: column;
+`;
 
 export const ActorSearchDetailSkeleton: React.FC = () => {
     return (
-        <div className="flex flex-col w-full min-h-full" style={{ background: 'var(--color-card-bg-alt)', padding: '16px' }}>
-            {/* Centered Card Wrapper */}
-            <div className="w-full max-w-[800px] mx-auto">
-                <Card variant="default" padding="lg" rounded="lg" className="w-full">
-                    {/* Header Section */}
-                    <div className="flex flex-col gap-3 mb-4">
-                        <div className="flex items-center gap-3">
-                            {/* Smaller actor icon (32-40px) */}
-                            <SkeletonBlock className="w-10 h-10 rounded-lg" />
-                            <div className="flex-1 flex flex-col gap-2 min-w-0">
-                                <SkeletonBlock className="h-5 w-1/2" />
-                                <SkeletonBlock className="h-4 w-1/3" />
-                            </div>
-                        </div>
-                        {/* Description */}
-                        <div className="space-y-2">
-                            <SkeletonBlock className="h-3 w-full" />
-                            <SkeletonBlock className="h-3 w-4/5" />
-                        </div>
-                        {/* Stats row */}
-                        <SkeletonBlock className="h-4 w-2/3" />
-                    </div>
+        <DetailContainer>
+            <CardWrapper>
+                <HeaderSection px="space16" py="space12">
+                    <HeaderRow py="space2">
+                        {/* Actor icon - matches StoreActorHeader size */}
+                        <SkeletonBlock style={{ width: '64px', height: '64px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
+                        <HeaderColumn>
+                            {/* Title placeholder */}
+                            <SkeletonBlock style={{ height: '20px', width: '50%' }} />
+                            {/* Username placeholder */}
+                            <SkeletonBlock style={{ height: '16px', width: '33%' }} />
+                        </HeaderColumn>
+                    </HeaderRow>
 
-                    {/* Expandable Sections */}
-                    <div className="flex flex-col gap-2">
-                        <SectionHeaderSkeleton />
-                        <SectionHeaderSkeleton />
-                        <SectionHeaderSkeleton />
-                        <SectionHeaderSkeleton />
-                        <SectionHeaderSkeleton />
-                    </div>
-                </Card>
-            </div>
-        </div>
+                    {/* Description */}
+                    <DescriptionLines>
+                        <SkeletonBlock style={{ height: '16px', width: '100%' }} />
+                        <SkeletonBlock style={{ height: '16px', width: '80%' }} />
+                    </DescriptionLines>
+
+                    {/* Stats row */}
+                    <SkeletonBlock style={{ height: '16px', width: '66%' }} />
+                </HeaderSection>
+
+                {/* Expandable Sections */}
+                <SectionsGroup>
+                    <SectionHeaderSkeleton />
+                    <SectionHeaderSkeleton />
+                    <SectionHeaderSkeleton />
+                    <SectionHeaderSkeleton />
+                    <SectionHeaderSkeleton />
+                </SectionsGroup>
+            </CardWrapper>
+        </DetailContainer>
     );
 };
 
+const SectionHeaderWrapper = styled(Box)`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: ${theme.color.neutral.background};
+    border-top: 1px solid ${theme.color.neutral.separatorSubtle};
+`;
+
 const SectionHeaderSkeleton: React.FC = () => {
     return (
-        <div className="flex items-center justify-between p-3 bg-[var(--color-card-bg-alt)] rounded-lg">
-            <SkeletonBlock className="h-5 w-24" />
-            <SkeletonBlock className="h-4 w-16" />
-        </div>
+        <SectionHeaderWrapper px="space16" py="space12">
+            <SkeletonBlock style={{ height: '24px', width: '96px' }} />
+            <SkeletonBlock style={{ height: '16px', width: '64px' }} />
+        </SectionHeaderWrapper>
     );
 };
 
