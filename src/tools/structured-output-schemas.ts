@@ -111,7 +111,13 @@ export const actorInfoSchema = {
         },
         pricing: pricingSchema,
         stats: statsSchema,
-        rating: { type: 'number', description: 'Actor rating' },
+        rating: {
+            type: 'object' as const, // Literal type required for MCP SDK type compatibility
+            properties: {
+                average: { type: 'number', description: 'Average rating' },
+                count: { type: 'number', description: 'Number of ratings' },
+            },
+        },
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },

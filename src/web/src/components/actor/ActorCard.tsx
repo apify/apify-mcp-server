@@ -109,6 +109,7 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetai
                 />
             </>}
             {rating && <>
+                <StyledSeparator />
                 <Stat
                     icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
                     value={formatDecimalNumber(rating.average)}
