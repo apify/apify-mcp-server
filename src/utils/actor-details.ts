@@ -232,6 +232,9 @@ export async function getMcpToolsMessage(
             .join('\n\n');
 
         return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+    } catch (error) {
+        logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
+        return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
     } finally {
         await client.close();
     }

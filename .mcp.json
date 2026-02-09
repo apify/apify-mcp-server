@@ -1,0 +1,12 @@
+{
+    "mcpServers": {
+        "storybook": {
+            "type": "http",
+            "url": "https://baldasseva--storybook-mcp.apify.actor/mcp?token=${APIFY_TOKEN}"
+        },
+        "figma": {
+            "type": "http",
+            "url": "https://mcp.figma.com/mcp"
+        }
+    }
+}
