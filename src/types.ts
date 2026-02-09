@@ -410,6 +410,7 @@ export type StructuredActorCard = {
     title?: string;
     url: string;
     fullName: string;
+    pictureUrl?: string;
     developer: {
         username: string;
         isOfficialApify: boolean;

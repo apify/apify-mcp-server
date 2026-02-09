@@ -149,10 +149,14 @@ export function formatActorToStructuredCard(
     const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
 
     // Build structured data - always include title, url, fullName
+    // @ts-expect-error - pictureUrl is present in API response but missing from type definition
+    const extractedPictureUrl = (actor.pictureUrl as string | undefined) || undefined;
+
     const structuredData: StructuredActorCard = {
         title: actor.title,
         url: actorUrl,
         fullName: actorFullName,
+        pictureUrl: extractedPictureUrl,
         developer: {
             username: '',
             isOfficialApify: false,
@@ -264,6 +268,7 @@ export type WidgetActor = {
     id: string;
     name: string;
     username: string;
+    userPictureUrl?: string;
     fullName: string;
     title: string;
     description: string;
@@ -404,8 +409,8 @@ export function formatActorDetailsForWidget(
         }
     }
 
-    // Cast actor to include optional properties that may exist at runtime
-    const extendedActor = actor as Actor & { pictureUrl?: string };
+    // @ts-expect-error - pictureUrl is present in API response but missing from type definition
+    const pictureUrl = actor.pictureUrl as string | undefined;
 
     return {
         id: actor.id,
@@ -415,7 +420,7 @@ export function formatActorDetailsForWidget(
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
         categories: actor.categories || [],
-        pictureUrl: extendedActor.pictureUrl || '',
+        pictureUrl: pictureUrl || '',
         stats: {
             totalBuilds: actor.stats?.totalBuilds || 0,
             totalRuns: actor.stats?.totalRuns || 0,

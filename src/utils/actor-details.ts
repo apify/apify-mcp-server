@@ -5,9 +5,10 @@ import type { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { ActorCardOptions, ActorInputSchema, StructuredActorCard } from '../types.js';
+import type { ActorCardOptions, ActorInputSchema, ExtendedActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
 import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
+import { searchActorsByKeywords } from './actor-search.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
@@ -71,21 +72,30 @@ export async function fetchActorDetails(
     cardOptions?: ActorCardOptions,
 ): Promise<ActorDetailsResult | null> {
     try {
-        const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
+        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ExtendedActorStoreList[]] = await Promise.all([
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
+            // Fetch from store to get the processed pictureUrl (with resizing parameters)
+            searchActorsByKeywords(actorName, apifyClient.token || '', 1).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+
+        const storeActor = storeActors?.find((item: ExtendedActorStoreList) => item.id === actorInfo.id);
+        const pictureUrl = storeActor?.pictureUrl;
+
+        // @ts-expect-error - pictureUrl is present in API response but missing from type definition
+        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & { pictureUrl?: string };
+
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',
             properties: {},
         }) as ActorInputSchema;
         inputSchema.properties = filterSchemaProperties(inputSchema.properties);
         inputSchema.properties = shortenProperties(inputSchema.properties);
-        const actorCard = formatActorToActorCard(actorInfo, cardOptions);
-        const actorCardStructured = formatActorToStructuredCard(actorInfo, cardOptions);
+        const actorCard = formatActorToActorCard(actorInfoWithPicture, cardOptions);
+        const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
         return {
-            actorInfo,
+            actorInfo: actorInfoWithPicture,
             buildInfo,
             actorCard,
             actorCardStructured,
