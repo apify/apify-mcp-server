@@ -9,7 +9,7 @@ import { addTool } from './tools/helpers.js';
 import { defaultTools, getActorsAsTools, getUnauthEnabledToolCategories, toolCategories,
     toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
-import type { ToolCategory, UiMode } from './types.js';
+import type { ActorStore, ToolCategory, UiMode } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
 import { getExpectedToolNamesByCategories } from './utils/tool-categories-helpers.js';
@@ -27,6 +27,7 @@ export {
     addTool,
     toolCategories,
     toolCategoriesEnabledByDefault,
+    type ActorStore,
     type ToolCategory,
     type UiMode,
     processParamsGetTools,
