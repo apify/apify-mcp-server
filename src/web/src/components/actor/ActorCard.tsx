@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, StoreActorHeader, IconButton, ICON_BUTTON_VARIANTS, theme } from "@apify/ui-library";
+import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon, ArrowLeftIcon
  } from "@apify/ui-icons";
 import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
@@ -63,6 +63,18 @@ const PreWrapText = styled.span`
     white-space: pre-wrap;
 `;
 
+const ActorHeader = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+`;
+
+const ActorTitleWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space2};
+`;
+
 type StatProps = {
     icon: React.JSX.Element
     value: string
@@ -100,7 +112,7 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetai
     const {value: pricingValue, additionalInfo: pricingAdditionalInfo} = getPricingInfo(pricingInfo || {pricingModel: "FREE", monthlyChargeUsd: 0, pricePerResultUsd: 0});
 
     return (
-        <BoxRow py="space2">
+        <BoxRow>
             {totalUsers && <>
                 {!isDetail && <StyledSeparator />}
                 <Stat
@@ -148,13 +160,23 @@ export const ActorCard: React.FC<ActorCardProps> = ({
         <Container px="space16" py="space12" $withBorder={!isDetail}>
             <BoxRow>
                 {showBackButton && <IconButton Icon={ArrowLeftIcon} onClick={onBackClick} />}
-                <StoreActorHeader
-                    name={actor.name}
-                    title={actor.title}
-                    pictureUrl={actor.pictureUrl}
-                    username={actor.username}
-                />
-                {actor.stats && !isDetail && <AlignBottom><StatsRow {...statsProps} /></AlignBottom>}
+                <ActorHeader>
+                    <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
+                    <ActorTitleWrapper>
+                        <Text as="h3" weight="bold" color={theme.color.neutral.text}>{actor.title}</Text>
+                        <BoxRow>
+                            <Text
+                                size="small"
+                                weight="medium"
+                                type="code"
+                                color={theme.color.neutral.textSubtle}
+                            >
+                                {actor.username}/{actor.name}
+                            </Text>
+                            {actor.stats && !isDetail && <AlignBottom><StatsRow {...statsProps} /></AlignBottom>}
+                        </BoxRow>
+                    </ActorTitleWrapper>
+                </ActorHeader>
                 {showViewDetailsButton && <AlignEnd><IconButton Icon={FullscreenIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} onClick={onViewDetails} /></AlignEnd>}
             </BoxRow>
 
