@@ -61,12 +61,12 @@ export const ActorSearch: React.FC = () => {
     // When actorDetails is provided directly from tool (details-only call), ignore actors to force details view
     // This handles the case when fetch-actor-details is called directly (not from search)
     const actors = hasToolActorDetails ? [] : actorsFromTool || [];
-    console.log(actors)
+
     const shouldForceDetailsView = hasToolActorDetails;
 
     const showDetails = (widgetState?.showDetails || shouldForceDetailsView) && Boolean(actorDetails);
     const hasLoadedOnce = Boolean(toolOutput && ("actors" in toolOutput || "actorDetails" in toolOutput));
-    console.log(toolOutput, "toolOutput")
+
     const isInitialLoading = !hasLoadedOnce && !actorDetails;
     const shouldShowDetailSkeleton = (widgetState?.showDetails || requestedActorId || isFetchingDetails || shouldForceDetailsView)
         && !actorDetails;

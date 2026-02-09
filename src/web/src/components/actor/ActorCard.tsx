@@ -2,31 +2,35 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, StoreActorHeader, IconButton, ICON_BUTTON_VARIANTS, theme, Spinner } from "@apify/ui-library";
-import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon
+import { Text, Box, StoreActorHeader, IconButton, ICON_BUTTON_VARIANTS, theme } from "@apify/ui-library";
+import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon, ArrowLeftIcon
  } from "@apify/ui-icons";
 import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
 import { ActorStats, PricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;
-    // isLoading?: boolean;
     onViewDetails?: () => void;
+    isDetail: boolean;
+    showViewDetailsButton?: boolean;
+    pricingInfo?: PricingInfo;
+    showBackButton?: boolean;
+    onBackClick?: () => void;
 }
 
-const Container = styled(Box)`
+const Container = styled(Box)<{ $withBorder: boolean }>`
     background: ${theme.color.neutral.background};
     display: flex;
     flex-direction: column;
     gap: ${theme.space.space8};
     border-radius: ${theme.radius.radius8};
-    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border: ${props => props.$withBorder ? `1px solid ${theme.color.neutral.separatorSubtle}` : 'none'};
 `;
 
 const BoxRow = styled(Box)`
     display: flex;
     gap: ${theme.space.space8};
-    align-items: flex-start;
+    align-items: center;
     position: relative;
 `;
 
@@ -82,25 +86,28 @@ const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
 }
 
 type StatsRowProps = {
-    stats: ActorStats
+    stats?: ActorStats
     pricingInfo?: PricingInfo
     rating?: {
         average: number;
         count: number;
     }
+    isDetail: boolean;
 }
 
-const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating }) => {
+const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetail }) => {
     const {totalUsers} = stats || {}
     const {value: pricingValue, additionalInfo: pricingAdditionalInfo} = getPricingInfo(pricingInfo || {pricingModel: "FREE", monthlyChargeUsd: 0, pricePerResultUsd: 0});
 
     return (
         <BoxRow py="space2">
-            <StyledSeparator />
-            <Stat
-                icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
-                value={formatNumber(totalUsers)}
-            />
+            {totalUsers && <>
+                {!isDetail && <StyledSeparator />}
+                <Stat
+                    icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
+                    value={formatNumber(totalUsers)}
+                />
+            </>}
             {rating && <>
                 <Stat
                     icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
@@ -120,22 +127,34 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating }) => {
     )
 }
 
-export const ActorCard: React.FC<ActorCardProps> = ({ actor, onViewDetails }) => {
-    // if (isLoading) {
-    //     // FIXME
-    // }
+export const ActorCard: React.FC<ActorCardProps> = ({
+    actor,
+    onViewDetails,
+    isDetail = false,
+    showViewDetailsButton = true,
+    pricingInfo,
+    showBackButton = false,
+    onBackClick
+}) => {
+    const statsProps = {
+        stats: actor.stats,
+        pricingInfo: pricingInfo || actor.currentPricingInfo,
+        rating: actor.rating,
+        isDetail
+    };
 
     return (
-        <Container px="space16" py="space12">
+        <Container px="space16" py="space12" $withBorder={!isDetail}>
             <BoxRow>
+                {showBackButton && <IconButton Icon={ArrowLeftIcon} onClick={onBackClick} />}
                 <StoreActorHeader
                     name={actor.name}
                     title={actor.title}
                     pictureUrl={actor.pictureUrl}
                     username={actor.username}
                 />
-                {actor.stats && <AlignBottom><StatsRow stats={actor.stats} pricingInfo={actor.currentPricingInfo} rating={actor.rating} /></AlignBottom>}
-                <AlignEnd><IconButton Icon={FullscreenIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} onClick={onViewDetails} /></AlignEnd>
+                {actor.stats && !isDetail && <AlignBottom><StatsRow {...statsProps} /></AlignBottom>}
+                {showViewDetailsButton && <AlignEnd><IconButton Icon={FullscreenIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} onClick={onViewDetails} /></AlignEnd>}
             </BoxRow>
 
             <Text
@@ -146,6 +165,8 @@ export const ActorCard: React.FC<ActorCardProps> = ({ actor, onViewDetails }) =>
             >
                 {actor.description}
             </Text>
+
+            {actor.stats && isDetail && <StatsRow {...statsProps} />}
         </Container>
     );
 };

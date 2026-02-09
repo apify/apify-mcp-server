@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { Badge, Text, Box, Markdown, StoreActorHeader, CodeBlock, IconButton, theme } from "@apify/ui-library";
-import { ArrowLeftIcon, PeopleIcon, BookOpenIcon, InputIcon, CoinIcon, ApiIcon, StarEmptyIcon, ChevronDownIcon } from "@apify/ui-icons";
-import { ActorDetails, ActorStats, PricingInfo } from "../../types";
+import { Badge, Text, Box, Markdown, CodeBlock, theme } from "@apify/ui-library";
+import { BookOpenIcon, InputIcon, CoinIcon, ApiIcon, StarEmptyIcon, ChevronDownIcon } from "@apify/ui-icons";
+import { ActorDetails, PricingInfo, Rating } from "../../types";
 import type { IconComponent } from "@apify/ui-icons";
 import { formatNumber, formatDecimalNumber, getPricingInfo } from "../../utils/formatting";
+import { ActorCard } from "../../components/actor/ActorCard";
 
 type ActorSearchDetailProps = {
     details: ActorDetails;
@@ -31,13 +32,6 @@ const CardWrapper = styled(Box)`
     max-width: 796px;
     min-width: 400px;
     width: 100%;
-`;
-
-const HeaderSection = styled(Box)`
-    background: ${theme.color.neutral.background};
-    display: flex;
-    flex-direction: column;
-    gap: ${theme.space.space8};
 `;
 
 const BoxRow = styled(Box)<{ $gap: string }>`
@@ -77,16 +71,6 @@ const SectionContent = styled(Box)<{ $expanded: boolean }>`
     max-height: ${props => props.$expanded ? 'unset' : '0'};
     overflow: hidden;
     color: ${theme.color.neutral.text};
-`;
-
-const PreWrapText = styled.span`
-    white-space: pre-wrap;
-`;
-
-const StyledSeparator = styled(Box)`
-    border-left: 1px solid ${theme.color.neutral.separatorSubtle};
-    height: 8px;
-    width: 1px;
 `;
 
 type ExpandableSectionProps = {
@@ -230,14 +214,14 @@ const ApiSection: React.FC<ApiSectionProps> = ({ actorCard, expanded, onToggle }
 };
 
 type ReviewsSectionProps = {
-    stats: ActorStats | undefined;
+    rating: Rating | undefined;
     expanded: boolean;
     onToggle: () => void;
 }
 
-const ReviewsSection: React.FC<ReviewsSectionProps> = ({ stats, expanded, onToggle }) => {
-    const rating = stats?.actorReviewRating || 0;
-    const reviewCount = stats?.actorReviewCount || 0;
+const ReviewsSection: React.FC<ReviewsSectionProps> = ({ rating, expanded, onToggle }) => {
+    const averageRating = rating?.average || 0;
+    const reviewCount = rating?.count || 0;
 
     return (
         <ExpandableSection
@@ -248,7 +232,7 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ stats, expanded, onTogg
         >
             <BoxRow $gap={theme.space.space4}>
                 <Text size="regular" color={theme.color.neutral.text}>
-                    {formatDecimalNumber(rating)} ⭐
+                    {formatDecimalNumber(averageRating)} ⭐
                 </Text>
                 <Text size="regular" color={theme.color.neutral.textMuted}>
                     ({formatNumber(reviewCount)} {reviewCount === 1 ? 'review' : 'reviews'})
@@ -262,61 +246,6 @@ const ReviewsSection: React.FC<ReviewsSectionProps> = ({ stats, expanded, onTogg
         </ExpandableSection>
     );
 };
-
-type StatProps = {
-    icon: React.JSX.Element
-    value: string
-    additionalInfo?: string
-}
-
-const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
-    return (
-        <BoxRow $gap={theme.space.space4}>
-            {icon}
-            <Text
-                size="small"
-                weight="medium"
-                color={theme.color.neutral.textMuted}
-            >
-                {value}
-                {additionalInfo && <Text size="small" color={theme.color.neutral.textSubtle} as="span"> {additionalInfo}</Text>}
-            </Text>
-        </BoxRow>
-    )
-}
-
-type StatsRowProps = {
-    stats: ActorStats
-    pricingInfo?: PricingInfo
-}
-
-const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo }) => {
-    const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
-    const {value: pricingValue, additionalInfo: pricingAdditionalInfo} = getPricingInfo(pricingInfo || {pricingModel: "FREE", monthlyChargeUsd: 0, pricePerResultUsd: 0});
-
-    return (
-        <BoxRow py="space4" $gap={theme.space.space8}>
-            <Stat
-                icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
-                value={formatNumber(totalUsers)}
-            />
-            <StyledSeparator />
-            <Stat
-                icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
-                value={formatDecimalNumber(actorReviewRating)}
-                additionalInfo={`(${formatNumber(actorReviewCount)})`}
-            />
-            {pricingInfo && <>
-                <StyledSeparator />
-                <Stat
-                    icon={<CoinIcon size="12" color={theme.color.neutral.icon} />}
-                    value={pricingValue}
-                    additionalInfo={pricingAdditionalInfo}
-                />
-            </>}
-        </BoxRow>
-    )
-}
 
 export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, pricingInfo, onBackToList, showBackButton = true }) => {
     const actor = details.actorInfo;
@@ -332,28 +261,14 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, p
     return (
         <Container>
             <CardWrapper>
-                <HeaderSection px="space16" py="space12">
-                    <BoxRow $gap={theme.space.space8}>
-                        {showBackButton && <IconButton Icon={ArrowLeftIcon} onClick={onBackToList} />}
-                        <StoreActorHeader
-                            name={actor.name}
-                            title={actor.title}
-                            pictureUrl={actor.pictureUrl}
-                            username={actor.username}
-                        />
-                    </BoxRow>
-
-                    <Text
-                        size="regular"
-                        weight="normal"
-                        color={theme.color.neutral.text}
-                        as={PreWrapText}
-                    >
-                        {actor.description}
-                    </Text>
-
-                    {actor.stats && <StatsRow stats={actor.stats} pricingInfo={pricingInfo} />}
-                </HeaderSection>
+                <ActorCard
+                    actor={actor}
+                    showViewDetailsButton={false}
+                    pricingInfo={pricingInfo}
+                    showBackButton={showBackButton}
+                    onBackClick={onBackToList}
+                    isDetail
+                />
 
                 <ReadmeSection
                     readme={details.readme}
@@ -380,7 +295,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, p
                 />
 
                 <ReviewsSection
-                    stats={actor.stats}
+                    rating={actor.rating}
                     expanded={expandedSections['reviews'] || false}
                     onToggle={() => toggleSection('reviews')}
                 />

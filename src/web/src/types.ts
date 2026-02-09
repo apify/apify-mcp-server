@@ -114,6 +114,11 @@ export interface PricingInfo {
     monthlyChargeUsd: number;
 }
 
+export interface Rating {
+    average: number;
+    count: number;
+}
+
 export interface ActorStats {
   totalBuilds: number;
   totalRuns: number;
@@ -124,20 +129,7 @@ export interface ActorStats {
 }
 
 export interface ActorDetails {
-  actorInfo: {
-    id: string;
-    name: string;
-    username: string;
-    title: string;
-    description: string;
-    pictureUrl?: string;
-    stats?: ActorStats;
-    currentPricingInfo?: PricingInfo;
-    userActorRuns?: {
-      successRate: number | null;
-    };
-    pricingInfos?: Array<PricingInfo>; // FIXME
-  };
+  actorInfo: Actor;
   actorCard: string;
   readme: string;
   inputSchema?: {
@@ -146,7 +138,7 @@ export interface ActorDetails {
   };
 }
 
-export interface Actor { // FIXME: could be merged with structured actor ?
+export interface Actor {
   id: string;
   name: string;
   username: string;
@@ -157,11 +149,9 @@ export interface Actor { // FIXME: could be merged with structured actor ?
   pictureUrl?: string;
   stats?: ActorStats;
   currentPricingInfo?: PricingInfo;
-  rating: {
-    average: number;
-    count: number;
-  }
+  rating: Rating;
   userActorRuns?: {
     successRate: number | null;
   };
 }
+

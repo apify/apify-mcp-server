@@ -361,7 +361,12 @@ export function formatActorForWidget(
  * @returns Formatted actor data for widget UI
  */
 export function formatActorDetailsForWidget(
-    actor: Actor,
+    actor: Actor & {
+        stats: Actor['stats'] & {
+            actorReviewRating?: number;
+            actorReviewCount?: number;
+        };
+    },
 ): WidgetActor {
     // Calculate success rate from publicActorRunStats30Days if available
     let successRate: number | null = null;
@@ -420,8 +425,8 @@ export function formatActorDetailsForWidget(
             successRate,
         },
         rating: {
-            average: actorStats?.actorReviewRating || null,
-            count: actorStats?.actorReviewCount || 0,
+            average: actor.stats?.actorReviewRating || null,
+            count: actor.stats?.actorReviewCount || 0,
         },
     };
 }

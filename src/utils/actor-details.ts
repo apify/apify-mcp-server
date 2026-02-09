@@ -125,7 +125,7 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
 
     const structuredContent = {
         actorDetails: {
-            ...widgetActor, // Include all widget properties for consistent UI rendering
+            actorInfo: widgetActor, // Include all widget properties for consistent UI rendering
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,
