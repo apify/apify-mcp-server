@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import styled from "styled-components";
-import { Badge, Text, Box, Markdown, CodeBlock, theme } from "@apify/ui-library";
+import { Badge, Text, Box, Markdown, CodeBlock, theme, useActorTitleHeadingFilter } from "@apify/ui-library";
 import { BookOpenIcon, InputIcon, CoinIcon, ApiIcon, StarEmptyIcon, ChevronDownIcon } from "@apify/ui-icons";
 import { ActorDetails, PricingInfo, Rating } from "../../types";
 import type { IconComponent } from "@apify/ui-icons";
@@ -13,6 +13,12 @@ type ActorSearchDetailProps = {
     showBackButton?: boolean;
     pricingInfo?: PricingInfo;
 }
+
+const README_CLASSNAMES = {
+    MARKDOWN_WRAPPER: 'Readme-MarkdownWrapper',
+    MARKDOWN: 'Readme-Markdown',
+    ONELINE_SCROLLABLE_WRAPPER: 'OneLineCode-ScrollableWrapper',
+};
 
 const Container = styled(Box)`
     display: flex;
@@ -73,6 +79,43 @@ const SectionContent = styled(Box)<{ $expanded: boolean }>`
     color: ${theme.color.neutral.text};
 `;
 
+const ReadmeWrapper = styled.div`
+    display: grid;
+    grid-template-columns: 85% 15%;
+    grid-template-rows: auto;
+    grid-template-areas: 'readme readme';
+
+    .${README_CLASSNAMES.MARKDOWN_WRAPPER} {
+        grid-area: readme;
+    }
+    /* TODO: this is an exception from the design system, let's figure out how to not do overrides */
+    .${README_CLASSNAMES.MARKDOWN} {
+        p,
+        li,
+        strong,
+        b,
+        table,
+        code {
+            font-size: 1.2rem;
+        }
+
+        ul {
+            display: block;
+            list-style-type: disc;
+            margin-block-start: 1em;
+            margin-block-end: 1em;
+            padding-inline-start: 40px;
+            unicode-bidi: isolate;
+        }
+
+        div:not(.${README_CLASSNAMES.ONELINE_SCROLLABLE_WRAPPER}) > pre {
+            display: block;
+            padding-left: 1.6rem;
+            padding-right: 1.6rem;
+        }
+    }
+`;
+
 type ExpandableSectionProps = {
     title: string;
     icon: IconComponent;
@@ -123,6 +166,8 @@ type ReadmeSectionProps = {
 const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, expanded, onToggle }) => {
     if (!readme) return null
 
+    const allowElement = useActorTitleHeadingFilter("Readme");
+
     return (
         <ExpandableSection
             title="Readme"
@@ -130,7 +175,11 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, expanded, onToggl
             expanded={expanded}
             onToggle={onToggle}
         >
-            <Markdown markdown={readme} />
+            <ReadmeWrapper>
+                <div className={README_CLASSNAMES.MARKDOWN_WRAPPER}>
+                    <Markdown markdown={readme} className={README_CLASSNAMES.MARKDOWN} allowElement={allowElement} lazyLoadImages/>
+                </div>
+            </ReadmeWrapper>
         </ExpandableSection>
     );
 };
