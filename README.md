@@ -23,7 +23,7 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 >
 > For the best experience, connect your AI assistant to our hosted server at **[`https://mcp.apify.com`](https://mcp.apify.com)**. The hosted server supports the latest features - including output schema inference for structured Actor results - that are not available when running locally via stdio.
 
-💰 The server also supports [Skyfire agentic payments](#-skyfire-agentic-payments), allowing AI agents to pay for Actor runs autonomously without an API token.
+💰 The server also supports [Skyfire agentic payments](#-skyfire-agentic-payments), allowing AI agents to pay for Actor runs without an API token.
 
 Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
 Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
