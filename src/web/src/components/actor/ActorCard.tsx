@@ -3,20 +3,18 @@ import styled from "styled-components";
 
 import { Actor } from "../../types";
 import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
-import { PeopleIcon, CoinIcon, StarEmptyIcon, FullscreenIcon, ArrowLeftIcon
- } from "@apify/ui-icons";
+import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
 import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
 import { ActorStats, PricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;
-    onViewDetails?: () => void;
     isDetail?: boolean;
-    showViewDetailsButton?: boolean;
-    pricingInfo?: PricingInfo;
-    showBackButton?: boolean;
-    onBackClick?: () => void;
 }
+
+const makeActorRedirectUrl = (username: string, actorName: string) => {
+    return `https://apify.com/${username}/${actorName}`;
+};
 
 const Container = styled(Box)<{ $withBorder: boolean }>`
     background: ${theme.color.neutral.background};
@@ -143,24 +141,20 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetai
 
 export const ActorCard: React.FC<ActorCardProps> = ({
     actor,
-    onViewDetails,
     isDetail = false,
-    showViewDetailsButton = true,
-    pricingInfo,
-    showBackButton = false,
-    onBackClick
 }) => {
     const statsProps = {
         stats: actor.stats,
-        pricingInfo: pricingInfo || actor.currentPricingInfo,
+        pricingInfo: actor.currentPricingInfo,
         rating: actor.rating,
         isDetail
     };
 
+    const actorRedirectUrl = makeActorRedirectUrl(actor.username, actor.name);
+
     return (
         <Container px="space16" py="space12" $withBorder={!isDetail}>
             <BoxRow>
-                {showBackButton && <IconButton Icon={ArrowLeftIcon} onClick={onBackClick} />}
                 <ActorHeader>
                     <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
                     <ActorTitleWrapper>
@@ -178,7 +172,10 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                         </BoxRow>
                     </ActorTitleWrapper>
                 </ActorHeader>
-                {showViewDetailsButton && <AlignEnd><IconButton Icon={FullscreenIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} onClick={onViewDetails} /></AlignEnd>}
+                <AlignEnd>
+                    {/* @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button */}
+                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actorRedirectUrl} hideExternalIcon />
+                </AlignEnd>
             </BoxRow>
 
             <DescriptionText
