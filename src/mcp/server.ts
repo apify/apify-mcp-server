@@ -13,13 +13,8 @@ import type { InitializeRequest, Notification, Request } from '@modelcontextprot
 import {
     CallToolRequestSchema,
     ErrorCode,
-    GetPromptRequestSchema,
-    ListPromptsRequestSchema,
-    ListResourcesRequestSchema,
-    ListResourceTemplatesRequestSchema,
     ListToolsRequestSchema,
     McpError,
-    ReadResourceRequestSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
@@ -40,8 +35,6 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
-import { prompts } from '../prompts/index.js';
-import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
@@ -66,6 +59,8 @@ import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { LOG_LEVEL_MAP } from './const.js';
+import { registerPromptHandlers } from './prompt_handlers.js';
+import { registerResourceHandlers } from './resource_handlers.js';
 import { registerTaskHandlers } from './task_handlers.js';
 import { validateAndPrepareToolCall } from './tool_call_validation.js';
 import { executeToolForCall, executeToolForTask } from './tool_execution.js';
@@ -428,22 +423,11 @@ export class ActorsMcpServer {
     }
 
     private setupResourceHandlers(): void {
-        const resourceService = createResourceService({
+        registerResourceHandlers({
+            server: this.server,
             skyfireMode: this.options.skyfireMode,
             uiMode: this.options.uiMode,
             getAvailableWidgets: () => this.availableWidgets,
-        });
-
-        this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-            return await resourceService.listResources();
-        });
-
-        this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
-            return await resourceService.readResource(request.params.uri);
-        });
-
-        this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => {
-            return await resourceService.listResourceTemplates();
         });
     }
 
@@ -451,43 +435,8 @@ export class ActorsMcpServer {
      * Sets up MCP request handlers for prompts.
      */
     private setupPromptHandlers(): void {
-        /**
-         * Handles the prompts/list request.
-         */
-        this.server.setRequestHandler(ListPromptsRequestSchema, () => {
-            return { prompts };
-        });
-
-        /**
-         * Handles the prompts/get request.
-         */
-        this.server.setRequestHandler(GetPromptRequestSchema, (request) => {
-            const { name, arguments: args } = request.params;
-            const prompt = prompts.find((p) => p.name === name);
-            if (!prompt) {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Prompt ${name} not found. Available prompts: ${prompts.map((p) => p.name).join(', ')}`,
-                );
-            }
-            if (!prompt.ajvValidate(args)) {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Invalid arguments for prompt ${name}: args: ${JSON.stringify(args)} error: ${JSON.stringify(prompt.ajvValidate.errors)}`,
-                );
-            }
-            return {
-                description: prompt.description,
-                messages: [
-                    {
-                        role: 'user',
-                        content: {
-                            type: 'text',
-                            text: prompt.render(args || {}),
-                        },
-                    },
-                ],
-            };
+        registerPromptHandlers({
+            server: this.server,
         });
     }
 
