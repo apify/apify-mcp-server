@@ -164,7 +164,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in the Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor. | ✅ |
+| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README, pricing, and Actor output schema. | ✅ |
 | `call-actor`* | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ❔ |
 | [`apify-slash-rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
