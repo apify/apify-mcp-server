@@ -280,3 +280,30 @@ export const datasetItemsOutputSchema = {
     },
     required: ['datasetId', 'items', 'itemCount'],
 };
+
+/**
+ * Creates an enriched version of callActorOutputSchema where the `items` field
+ * contains actual property definitions inferred from Actor run history.
+ *
+ * @param itemProperties - JSON Schema properties object describing dataset item fields
+ *   (e.g., `{ url: { type: 'string' }, price: { type: 'number' } }`)
+ * @returns A copy of callActorOutputSchema with enriched items schema
+ */
+export function buildEnrichedCallActorOutputSchema(
+    itemProperties: Record<string, unknown>,
+): typeof callActorOutputSchema {
+    return {
+        ...callActorOutputSchema,
+        properties: {
+            ...callActorOutputSchema.properties,
+            items: {
+                type: 'array' as const,
+                items: {
+                    type: 'object' as const,
+                    properties: itemProperties,
+                } as unknown as { type: 'object' },
+                description: callActorOutputSchema.properties.items.description,
+            },
+        },
+    };
+}

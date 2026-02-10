@@ -19,7 +19,18 @@ import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import { actorDefinitionPrunedCache } from '../state.js';
-import type { ActorDefinitionStorage, ActorInfo, ApifyToken, DatasetItem, InternalToolArgs, ToolEntry, ToolInputSchema, UiMode } from '../types.js';
+import type {
+    ActorDefinitionStorage,
+    ActorInfo,
+    ActorStore,
+    ActorTool,
+    ApifyToken,
+    DatasetItem,
+    InternalToolArgs,
+    ToolEntry,
+    ToolInputSchema,
+    UiMode,
+} from '../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getActorMcpUrlCached } from '../utils/actor.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
@@ -29,7 +40,7 @@ import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorDefinition } from './build.js';
-import { callActorOutputSchema } from './structured-output-schemas.js';
+import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from './structured-output-schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from './utils.js';
 
 // Define a named return type for callActorGetDataset
@@ -168,8 +179,9 @@ export async function callActorGetDataset(options: {
  */
 export async function getNormalActorsAsTools(
     actorsInfo: ActorInfo[],
-    mcpSessionId?: string,
+    options?: { mcpSessionId?: string; actorStore?: ActorStore },
 ): Promise<ToolEntry[]> {
+    const { mcpSessionId, actorStore } = options ?? {};
     const tools: ToolEntry[] = [];
 
     for (const actorInfo of actorsInfo) {
@@ -230,7 +242,38 @@ Actor description: ${definition.description}`;
             },
         });
     }
+
+    // Enrich output schemas with field-level detail if actorStore is available
+    if (actorStore) {
+        await enrichActorToolOutputSchemas(tools, actorStore);
+    }
+
     return tools;
+}
+
+/**
+ * Enriches actor tool output schemas with field-level detail from the ActorStore.
+ * Uses Promise.allSettled to ensure individual failures don't block other tools.
+ */
+async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
+    const enrichPromises = tools
+        .filter((tool): tool is ActorTool => tool.type === 'actor')
+        .map(async (tool) => {
+            try {
+                const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
+                if (itemProperties && Object.keys(itemProperties).length > 0) {
+                    // eslint-disable-next-line no-param-reassign
+                    tool.outputSchema = buildEnrichedCallActorOutputSchema(itemProperties);
+                }
+            } catch (error) {
+                log.debug('Failed to enrich output schema for Actor', {
+                    actorName: tool.actorFullName,
+                    error: error instanceof Error ? error.message : String(error),
+                });
+            }
+        });
+
+    await Promise.allSettled(enrichPromises);
 }
 
 async function getMCPServersAsTools(
@@ -297,8 +340,9 @@ async function getMCPServersAsTools(
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
-    mcpSessionId?: string,
+    options?: { mcpSessionId?: string; actorStore?: ActorStore },
 ): Promise<ToolEntry[]> {
+    const { mcpSessionId, actorStore } = options ?? {};
     log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames, mcpSessionId });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
@@ -348,7 +392,7 @@ export async function getActorsAsTools(
     const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
 
     const [normalTools, mcpServerTools] = await Promise.all([
-        getNormalActorsAsTools(normalActorsInfo, mcpSessionId),
+        getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
         getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
@@ -549,7 +593,7 @@ export const callActor: ToolEntry = {
             }
 
             // Handle regular Actor calls - fetch actor early to provide schema in error messages
-            const [actor] = await getActorsAsTools([actorName], apifyClient, mcpSessionId);
+            const [actor] = await getActorsAsTools([actorName], apifyClient, { mcpSessionId });
 
             if (!actor) {
                 return buildMCPResponse({

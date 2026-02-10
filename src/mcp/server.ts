@@ -59,6 +59,7 @@ import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
     ActorMcpTool,
     ActorsMcpServerOptions,
+    ActorStore,
     ActorTool,
     ApifyRequestParams,
     HelperTool,
@@ -94,6 +95,7 @@ export class ActorsMcpServer {
     private currentLogLevel = 'info';
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
+    public readonly actorStore?: ActorStore;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -113,6 +115,7 @@ export class ActorsMcpServer {
         } else {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
+        this.actorStore = options.actorStore;
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -296,7 +299,7 @@ export class ActorsMcpServer {
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
     public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
-        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient);
+        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient, { actorStore: this.actorStore });
         if (actorTools.length > 0) {
             this.upsertTools(actorTools, true);
         }
@@ -311,7 +314,7 @@ export class ActorsMcpServer {
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient, this.options.uiMode);
+        const tools = await processParamsGetTools(url, apifyClient, this.options.uiMode, this.actorStore);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -617,7 +620,6 @@ export class ActorsMcpServer {
             const metaApifyToken = meta?.apifyToken;
             const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = meta?.userRentedActorIds;
-            const actorOutputSchema = meta?.actorOutputSchema;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
@@ -765,7 +767,6 @@ Please remove the "task" parameter from the tool call request or use a different
                         mcpServer: this.server,
                         apifyToken,
                         userRentedActorIds,
-                        actorOutputSchema,
                         progressTracker,
                         mcpSessionId,
                     }) as object;
