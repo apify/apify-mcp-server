@@ -620,7 +620,6 @@ export class ActorsMcpServer {
             const metaApifyToken = meta?.apifyToken;
             const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
             const userRentedActorIds = meta?.userRentedActorIds;
-            const actorOutputSchema = meta?.actorOutputSchema;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
@@ -768,7 +767,6 @@ Please remove the "task" parameter from the tool call request or use a different
                         mcpServer: this.server,
                         apifyToken,
                         userRentedActorIds,
-                        actorOutputSchema,
                         progressTracker,
                         mcpSessionId,
                     }) as object;

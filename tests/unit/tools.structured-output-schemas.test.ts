@@ -60,6 +60,12 @@ function createMockActorStore(schemas: Record<string, Record<string, unknown> | 
             }
             return schemas[actorFullName];
         },
+        getActorOutputSchemaAsTypeObject: async (actorFullName: string) => {
+            if (schemas[actorFullName] === undefined) {
+                return null;
+            }
+            return schemas[actorFullName];
+        },
     };
 }
 
@@ -180,6 +186,9 @@ describe('Structured Output Schemas', () => {
             const actorInfo = createMockActorInfo(actorName);
             const store: ActorStore = {
                 getActorOutputSchema: async () => {
+                    throw new Error('Database connection failed');
+                },
+                getActorOutputSchemaAsTypeObject: async () => {
                     throw new Error('Database connection failed');
                 },
             };

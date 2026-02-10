@@ -49,7 +49,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, actorOutputSchema, mcpSessionId } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsInternalArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -60,6 +60,11 @@ but the user did NOT explicitly ask for Actor details presentation.`,
         if (!details) {
             return buildActorNotFoundResponse(parsed.actor);
         }
+
+        // Fetch output schema from ActorStore if available and requested
+        const actorOutputSchema = resolvedOutput.outputSchema
+            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(parsed.actor).catch(() => null)
+            : undefined;
 
         const { texts, structuredContent } = await buildActorDetailsTextResponse({
             actorName: parsed.actor,

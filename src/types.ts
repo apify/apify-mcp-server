@@ -128,8 +128,6 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
-    /** Actor output schema as type object (injected by internal server) */
-    actorOutputSchema?: Record<string, unknown> | null;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
@@ -361,10 +359,27 @@ export type ActorStore = {
      * `{ url: { type: 'string' }, price: { type: 'number' } }`
      *
      * Returns null if no schema is available (e.g., new Actor with no runs).
+     * Internally calls `getActorOutputSchemaAsTypeObject` and converts the result.
      *
      * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
      */
     getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /**
+     * Returns the inferred output schema as a simplified type object for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object uses a compact type representation, e.g.:
+     * `{ url: "string", price: "number", tags: ["string"], user: { name: "string" } }`
+     *
+     * This is the core method that performs cache lookup, API resolution, and MongoDB queries.
+     * Results are cached with TTL to avoid repeated database queries.
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
 };
 
 /**
@@ -489,8 +504,6 @@ export type ApifyRequestParams = {
         apifyToken?: string;
         /** List of Actor IDs that the user has rented */
         userRentedActorIds?: string[];
-        /** Actor output schema as type object (injected by internal server) */
-        actorOutputSchema?: Record<string, unknown> | null;
         /** Progress token for out-of-band progress notifications (standard MCP) */
         progressToken?: string | number;
         /** Allow other metadata fields */
