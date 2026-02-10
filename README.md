@@ -21,9 +21,9 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 
 > **🚀 Use the hosted Apify MCP Server!**
 >
-> For the easiest setup and most powerful features, connect your AI assistant to our hosted server:
->
-> **[`https://mcp.apify.com`](https://mcp.apify.com)**
+> For the best experience, connect your AI assistant to our hosted server at **[`https://mcp.apify.com`](https://mcp.apify.com)**. The hosted server supports the latest features - including output schema inference for structured Actor results - that are not available when running locally via stdio.
+
+The server also supports [Skyfire agentic payments](#-skyfire-agentic-payments), allowing AI agents to pay for Actor runs autonomously without an API token.
 
 Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
 Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
@@ -33,13 +33,14 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 ## Table of Contents
 - [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
-- [⚠️ SSE transport deprecation](#-sse-transport-deprecation)
+- [⚠️ SSE transport deprecation](#%EF%B8%8F-sse-transport-deprecation)
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
-- [🛠️ Tools, resources, and prompts](#-tools-resources-and-prompts)
+- [💰 Skyfire agentic payments](#-skyfire-agentic-payments)
+- [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [📊 Telemetry](#-telemetry)
 - [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
-- [⚙️ Development](#-development)
+- [⚙️ Development](#%EF%B8%8F-development)
 - [🤝 Contributing](#-contributing)
 - [📚 Learn more](#-learn-more)
 
@@ -120,6 +121,45 @@ This interactive, chat-like interface provides an easy way to explore the capabi
 Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
 Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
+
+# 💰 Skyfire agentic payments
+
+The Apify MCP Server integrates with [Skyfire](https://www.skyfire.xyz/) to enable agentic payments - AI agents can autonomously pay for Actor runs without requiring an Apify API token. Instead of authenticating with `APIFY_TOKEN`, the agent uses Skyfire PAY tokens to cover billing for each tool call.
+
+**Prerequisites:**
+- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet
+- An MCP client that supports multiple servers (e.g., Claude Desktop, OpenCode, VS Code)
+
+**Setup:**
+
+Configure both the Skyfire MCP server and the Apify MCP server in your MCP client. Enable payment mode by adding the `payment=skyfire` query parameter to the Apify server URL:
+
+```json
+{
+  "mcpServers": {
+    "skyfire": {
+      "url": "https://api.skyfire.xyz/mcp/sse",
+      "headers": {
+        "skyfire-api-key": "<YOUR_SKYFIRE_API_KEY>"
+      }
+    },
+    "apify": {
+      "url": "https://mcp.apify.com?payment=skyfire"
+    }
+  }
+}
+```
+
+**How it works:**
+
+When Skyfire mode is enabled, the agent handles the full payment flow autonomously:
+
+1. The agent discovers relevant Actors via `search-actors` or `fetch-actor-details` (these remain free).
+2. Before executing an Actor, the agent creates a PAY token using the `create-pay-token` tool from the Skyfire MCP server (minimum $5.00 USD).
+3. The agent passes the PAY token in the `skyfire-pay-id` input property when calling the Actor tool.
+4. Results are returned as usual. Unused funds on the token remain available for future runs or are returned upon expiration.
+
+To learn more, see the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) and the [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) blog post.
 
 # 🛠️ Tools, resources, and prompts
 
