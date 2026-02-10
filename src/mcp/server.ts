@@ -12,15 +12,11 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
-    CancelTaskRequestSchema,
     ErrorCode,
     GetPromptRequestSchema,
-    GetTaskPayloadRequestSchema,
-    GetTaskRequestSchema,
     ListPromptsRequestSchema,
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
-    ListTasksRequestSchema,
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
@@ -70,6 +66,7 @@ import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { LOG_LEVEL_MAP } from './const.js';
+import { registerTaskHandlers } from './task_handlers.js';
 import { validateAndPrepareToolCall } from './tool_call_validation.js';
 import { executeToolForCall, executeToolForTask } from './tool_execution.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
@@ -498,89 +495,9 @@ export class ActorsMcpServer {
       * Sets up MCP request handlers for long-running tasks.
       */
     private setupTaskHandlers(): void {
-        // List tasks
-        this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as ApifyRequestParams & { cursor?: string };
-            const { cursor } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[ListTasksRequestSchema] Listing tasks', { mcpSessionId });
-            const result = await this.taskStore.listTasks(cursor, mcpSessionId);
-            return { tasks: result.tasks, nextCursor: result.nextCursor };
-        });
-
-        // Get task status
-        this.server.setRequestHandler(GetTaskRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[GetTaskRequestSchema] Getting task status', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (task) return task;
-
-            // logging as this may not be just a soft fail but related to issue with the task store
-            log.error('[GetTaskRequestSchema] Task not found', { taskId, mcpSessionId });
-            throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
-        });
-
-        // Get task result payload
-        this.server.setRequestHandler(GetTaskPayloadRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[GetTaskPayloadRequestSchema] Getting task result', { taskId, mcpSessionId });
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // logging as this may not be just a soft fail but related to issue with the task store
-                log.error('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" not found`,
-                );
-            }
-            if (task.status !== 'completed' && task.status !== 'failed') {
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
-                );
-            }
-            return await this.taskStore.getTaskResult(taskId, mcpSessionId);
-        });
-
-        // Cancel task
-        this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
-            // mcpSessionId is injected at transport layer for session isolation in task stores
-            const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
-            const { taskId } = params;
-            const mcpSessionId = params._meta?.mcpSessionId;
-            log.debug('[CancelTaskRequestSchema] Cancelling task', { taskId, mcpSessionId });
-
-            const task = await this.taskStore.getTask(taskId, mcpSessionId);
-            if (!task) {
-                // logging as this may not be just a soft fail but related to issue with the task store
-                log.error('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" not found`,
-                );
-            }
-            if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
-                log.error('[CancelTaskRequestSchema] Task already in terminal state', {
-                    taskId,
-                    mcpSessionId,
-                    status: task.status,
-                });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Cannot cancel task "${taskId}" with status "${task.status}"`,
-                );
-            }
-            await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
-            const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
-            log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
-            return updatedTask!;
+        registerTaskHandlers({
+            server: this.server,
+            taskStore: this.taskStore,
         });
     }
 
