@@ -4,7 +4,6 @@
 
 import { randomUUID } from 'node:crypto';
 
-import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -13,7 +12,6 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
-    CallToolResultSchema,
     CancelTaskRequestSchema,
     ErrorCode,
     GetPromptRequestSchema,
@@ -26,16 +24,14 @@ import {
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
-    ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import { type ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
+import { ApifyClient } from '../apify-client.js';
 import type { HelperTools } from '../const.js';
 import {
     APIFY_MCP_URL,
@@ -53,7 +49,7 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import type {
     ActorMcpTool,
     ActorsMcpServerOptions,
@@ -66,19 +62,16 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { buildActorResponseContent } from '../utils/actor-response.js';
-import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
+import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
-import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
-import { connectMCPClient } from './client.js';
-import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
+import { LOG_LEVEL_MAP } from './const.js';
 import { validateAndPrepareToolCall } from './tool_call_validation.js';
+import { executeToolForCall, executeToolForTask } from './tool_execution.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -665,150 +658,22 @@ export class ActorsMcpServer {
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
 
             try {
-                // Centralized skyfire validation for tools that require it
-                if (tool.requiresSkyfirePayId) {
-                    const skyfireError = validateSkyfirePayId(this, args);
-                    if (skyfireError) {
-                        toolStatus = TOOL_STATUS.SOFT_FAIL;
-                        return skyfireError;
-                    }
+                const toolExecutionResult = await executeToolForCall({
+                    tool,
+                    args,
+                    apifyToken,
+                    progressToken,
+                    extra,
+                    mcpSessionId,
+                    userRentedActorIds,
+                    apifyMcpServer: this,
+                    mcpServer: this.server,
+                });
+
+                toolStatus = toolExecutionResult.toolStatus;
+                if (toolExecutionResult.handled) {
+                    return toolExecutionResult.response ?? {};
                 }
-
-                // Handle internal tool
-                if (tool.type === 'internal') {
-                    // Only create progress tracker for call-actor tool
-                    const progressTracker = tool.name === 'call-actor'
-                        ? createProgressTracker(progressToken, extra.sendNotification)
-                        : null;
-
-                    log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
-                    const res = await tool.call({
-                        args,
-                        extra,
-                        apifyMcpServer: this,
-                        mcpServer: this.server,
-                        apifyToken,
-                        userRentedActorIds,
-                        progressTracker,
-                        mcpSessionId,
-                    }) as object;
-
-                    if (progressTracker) {
-                        progressTracker.stop();
-                    }
-
-                    // If tool provided internal status, use it; otherwise infer from isError flag
-                    const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
-                    if (internalToolStatus !== undefined) {
-                        toolStatus = internalToolStatus;
-                    } else if ('isError' in rest && rest.isError) {
-                        toolStatus = TOOL_STATUS.FAILED;
-                    } else {
-                        toolStatus = TOOL_STATUS.SUCCEEDED;
-                    }
-
-                    // Never expose internal _toolStatus field to MCP clients
-                    return { ...rest };
-                }
-
-                if (tool.type === 'actor-mcp') {
-                    let client: Client | null = null;
-                    try {
-                        client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
-                        if (!client) {
-                            const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
-Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
-                            log.softFail(msg, { mcpSessionId, statusCode: 408 }); // 408 Request Timeout
-                            await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                            toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            return buildMCPResponse({ texts: [msg], isError: true });
-                        }
-
-                        // Only set up notification handlers if progressToken is provided by the client
-                        if (progressToken) {
-                            // Set up notification handlers for the client
-                            for (const schema of ServerNotificationSchema.options) {
-                                const method = schema.shape.method.value;
-                                // Forward notifications from the proxy client to the server
-                                client.setNotificationHandler(schema, async (notification) => {
-                                    log.debug('Sending MCP notification', {
-                                        method,
-                                        mcpSessionId,
-                                        notification,
-                                    });
-                                    await extra.sendNotification(notification);
-                                });
-                            }
-                        }
-
-                        log.info('Calling Actor-MCP', { actorId: tool.actorId, toolName: tool.originToolName, mcpSessionId, input: redactSkyfirePayId(args) });
-                        const res = await client.callTool({
-                            name: tool.originToolName,
-                            arguments: args,
-                            _meta: {
-                                progressToken,
-                            },
-                        }, CallToolResultSchema, {
-                            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-                        });
-
-                        // For external MCP servers we do not try to infer soft_fail vs failed from isError.
-                        // We treat the call as succeeded at the telemetry layer unless an actual error is thrown.
-                        return { ...res };
-                    } catch (error) {
-                        logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
-                            actorId: tool.actorId,
-                            toolName: tool.originToolName,
-                        });
-                        toolStatus = TOOL_STATUS.FAILED;
-                        return buildMCPResponse({
-                            texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
-                            isError: true,
-                        });
-                    } finally {
-                        if (client) await client.close();
-                    }
-                }
-
-                // Handle actor tool
-                if (tool.type === 'actor') {
-                    // Create progress tracker if progressToken is available
-                    const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
-
-                    const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
-
-                    const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
-                    const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
-
-                    try {
-                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
-                        const callResult = await callActorGetDataset({
-                            actorName: tool.actorFullName,
-                            input: actorArgs,
-                            apifyClient,
-                            callOptions,
-                            progressTracker,
-                            abortSignal: extra.signal,
-                            mcpSessionId,
-                        });
-
-                        if (!callResult) {
-                            toolStatus = TOOL_STATUS.ABORTED;
-                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                            return { };
-                        }
-
-                        const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                        return { content, structuredContent };
-                    } finally {
-                        if (progressTracker) {
-                            progressTracker.stop();
-                        }
-                    }
-                }
-                // If we reached here without returning, it means the tool type was not recognized (user error)
-                toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
@@ -924,81 +789,21 @@ Please verify the tool name and ensure the tool is properly registered.`;
             });
             await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
 
-            // Execute the tool and get the result
-            let result: Record<string, unknown> = {};
+            const taskToolExecutionResult = await executeToolForTask({
+                tool,
+                args,
+                apifyToken,
+                progressToken,
+                extra,
+                mcpSessionId,
+                userRentedActorIds,
+                apifyMcpServer: this,
+                mcpServer: this.server,
+                taskId,
+            });
 
-            // Centralized skyfire validation for tools that require it
-            if (tool.requiresSkyfirePayId) {
-                const skyfireError = validateSkyfirePayId(this, args);
-                if (skyfireError) {
-                    result = skyfireError;
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                }
-            }
-
-            // Handle internal tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
-
-                log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
-                const res = await tool.call({
-                    args,
-                    extra,
-                    apifyMcpServer: this,
-                    mcpServer: this.server,
-                    apifyToken,
-                    userRentedActorIds,
-                    progressTracker,
-                    mcpSessionId,
-                }) as object;
-
-                if (progressTracker) {
-                    progressTracker.stop();
-                }
-
-                // If tool provided internal status, use it; otherwise infer from isError flag
-                const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
-                if (internalToolStatus !== undefined) {
-                    toolStatus = internalToolStatus;
-                } else if ('isError' in rest && rest.isError) {
-                    toolStatus = TOOL_STATUS.FAILED;
-                } else {
-                    toolStatus = TOOL_STATUS.SUCCEEDED;
-                }
-
-                result = rest;
-            }
-
-            // Handle actor tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
-                const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
-                const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
-                const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
-
-                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
-                const callResult = await callActorGetDataset({
-                    actorName: tool.actorFullName,
-                    input: actorArgs,
-                    apifyClient,
-                    callOptions,
-                    progressTracker,
-                    abortSignal: extra.signal,
-                    mcpSessionId,
-                });
-
-                if (!callResult) {
-                    toolStatus = TOOL_STATUS.ABORTED;
-                    result = {};
-                } else {
-                    const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                    result = { content, structuredContent };
-                }
-
-                if (progressTracker) {
-                    progressTracker.stop();
-                }
-            }
+            const { response: result } = taskToolExecutionResult;
+            toolStatus = taskToolExecutionResult.toolStatus;
 
             // Check if task was cancelled before storing result
             if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
