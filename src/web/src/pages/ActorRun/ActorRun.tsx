@@ -1,13 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import { Badge, Button, InlineSpinner, Text, theme, WarningMessage } from "@apify/ui-library";
+import { Badge, Button, InlineSpinner, Text, theme, type BadgeVariant } from "@apify/ui-library";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { formatDuration } from "../../utils/formatting";
-
-// Data interfaces
 interface ActorRunData {
     runId: string;
     actorName: string;
@@ -52,8 +50,6 @@ interface WidgetState extends Record<string, unknown> {
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-type BadgeVariant = "success" | "danger" | "primary_blue" | "neutral";
 
 const getStatusVariant = (status: string): BadgeVariant => {
     switch (status.toUpperCase()) {
@@ -306,7 +302,6 @@ export const ActorRun: React.FC = () => {
     const widgetStateRef = useRef(widgetState);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         widgetStateRef.current = widgetState;
@@ -464,40 +459,6 @@ export const ActorRun: React.FC = () => {
         }
     };
 
-    // Note: keeping handleRefreshStatus for now if needed later
-    // const handleRefreshStatus = async () => {
-    //     if (!runData || !window.openai?.callTool) return;
-
-    //     const snapshot: WidgetState = { ...widgetState, isRefreshing: true };
-    //     await setWidgetState(snapshot);
-
-    //     try {
-    //         // Single poll only - auto-polling handles continuous updates
-    //         const response = await window.openai.callTool("get-actor-run", {
-    //             runId: runData.runId,
-    //         });
-
-    //         if (response.structuredContent) {
-    //             setRunData(response.structuredContent as unknown as ActorRunData);
-    //             await setWidgetState({ ...snapshot, lastUpdateTime: Date.now(), isRefreshing: false });
-    //         }
-    //     } catch (err) {
-    //         console.error("Failed to fetch actor run status:", err);
-    //         setError("Failed to fetch status update");
-    //     } finally {
-    //         await setWidgetState({ ...widgetState, isRefreshing: false });
-    //     }
-    // };
-
-    if (error) {
-        return (
-            <WidgetLayout>
-                <WarningMessage caption="Error">
-                    {error}
-                </WarningMessage>
-            </WidgetLayout>
-        );
-    }
 
     return (
         <WidgetLayout>
@@ -520,7 +481,6 @@ export const ActorRun: React.FC = () => {
                             <Badge variant={getStatusVariant(runData.status)} size="small" LeadingIcon={getStatusVariantLeadingIcon(runData.status)}>
                                 {runData.status.charAt(0) + runData.status.slice(1).toLowerCase()}
                             </Badge>
-
                             <MetadataRow>
                                 {typeof runData.cost === 'number' && (
                                     <>
@@ -530,22 +490,18 @@ export const ActorRun: React.FC = () => {
                                         <Divider>|</Divider>
                                     </>
                                 )}
-
                                 <MetadataText type="body" size="small" as="span">
                                     {runData.timestamp}
                                 </MetadataText>
-
                                 <Divider>|</Divider>
-
                                 <MetadataText type="body" size="small" as="span">
                                     {runData.duration}
                                 </MetadataText>
                             </MetadataRow>
                         </StatusMetadataContainer>
                     </ActorInfoRow>
-
-                    {/* TODO (KH): add expand view in next step */}
-                    {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
+                {/* TODO (KH): add expand view in next step */}
+                {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
                 </ActorHeader>
 
                 {runData.dataset && runData.dataset.previewItems.length > 0 ? (
@@ -593,8 +549,6 @@ export const ActorRun: React.FC = () => {
                         )}
                     </EmptyStateContainer>
                 )}
-
-                {/* Footer */}
                 <Footer>
                     <Button onClick={handleOpenRun} variant="secondary" size="small">
                         View in Console
