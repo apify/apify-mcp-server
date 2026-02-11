@@ -316,9 +316,12 @@ The server does not yet provide any resources.
 The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
 By default, telemetry is **enabled** for all tool calls.
 
+The stdio transport also uses [Sentry](https://sentry.io) for error tracking, which helps us identify and fix issues faster.
+Sentry is automatically disabled when telemetry is opted out.
+
 ### Opting out of telemetry
 
-You can opt out of telemetry by setting the `--telemetry-enabled` CLI flag to `false` or the `TELEMETRY_ENABLED` environment variable to `false`.
+You can opt out of telemetry (including Sentry error tracking) by setting the `--telemetry-enabled` CLI flag to `false` or the `TELEMETRY_ENABLED` environment variable to `false`.
 CLI flags take precedence over environment variables.
 
 #### Examples
