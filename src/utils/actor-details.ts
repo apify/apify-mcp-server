@@ -109,11 +109,9 @@ export async function fetchActorDetails(
  * Process actor details for response formatting.
  * Formats README with link, builds text content, and creates structured content.
  * @param details - Raw actor details from fetchActorDetails
- * @returns Processed actor details with formatted content including widget data
+ * @returns Processed actor details with formatted content
  */
-export function processActorDetailsForResponse(
-    details: ActorDetailsResult,
-) {
+export function processActorDetailsForResponse(details: ActorDetailsResult) {
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
     // Add link to README title
     const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);

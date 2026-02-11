@@ -167,9 +167,7 @@ You can also try using more specific or alternative keywords related to your sea
 
         // Add widget format actors when widget mode is enabled
         if (apifyMcpServer.options.uiMode === 'openai') {
-            structuredContent.widgetActors = actors.map((actor) => {
-                return formatActorForWidget(actor);
-            });
+            structuredContent.widgetActors = actors.map(formatActorForWidget);
 
             const texts = [`
  # Search results:
