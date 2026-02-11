@@ -22,11 +22,14 @@ const mockActors = [
         },
         currentPricingInfo: {
             pricingModel: "PRICE_PER_DATASET_ITEM",
-            pricePerResultUsd: 0.0001,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0.0001,
         },
         userActorRuns: {
             successRate: 95.5,
+        },
+        rating: {
+            average: 4.7,
+            count: 250,
         },
     },
     {
@@ -47,11 +50,14 @@ const mockActors = [
         },
         currentPricingInfo: {
             pricingModel: "PAY_PER_EVENT",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0,
         },
         userActorRuns: {
             successRate: 98.2,
+        },
+        rating: {
+            average: 4.8,
+            count: 150,
         },
     },
     {
@@ -72,11 +78,14 @@ const mockActors = [
         },
         currentPricingInfo: {
             pricingModel: "FREE",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0,
         },
         userActorRuns: {
             successRate: null,
+        },
+        rating: {
+            average: 0,
+            count: 0,
         },
     },
     {
@@ -97,11 +106,14 @@ const mockActors = [
         },
         currentPricingInfo: {
             pricingModel: "FLAT_PRICE_PER_MONTH",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 49.99,
+            pricePerUnitUsd: 49.99,
         },
         userActorRuns: {
             successRate: 92.8,
+        },
+        rating: {
+            average: 4.5,
+            count: 120,
         },
     },
 ];

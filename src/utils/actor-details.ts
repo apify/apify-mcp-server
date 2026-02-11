@@ -1,11 +1,11 @@
-import type { Actor, Build } from 'apify-client';
+import type { Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { ActorCardOptions, ActorInputSchema, ExtendedActorStoreList, StructuredActorCard } from '../types.js';
+import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
 import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
 import { searchActorsByKeywords } from './actor-search.js';
@@ -72,7 +72,7 @@ export async function fetchActorDetails(
     cardOptions?: ActorCardOptions,
 ): Promise<ActorDetailsResult | null> {
     try {
-        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ExtendedActorStoreList[]] = await Promise.all([
+        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] = await Promise.all([
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
             // Fetch from store to get the processed pictureUrl (with resizing parameters)
@@ -80,11 +80,8 @@ export async function fetchActorDetails(
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
-        const storeActor = storeActors?.find((item: ExtendedActorStoreList) => item.id === actorInfo.id);
-        const pictureUrl = storeActor?.pictureUrl;
-
-        // @ts-expect-error - pictureUrl is present in API response but missing from type definition
-        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & { pictureUrl?: string };
+        const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
+        const actorInfoWithPicture = { ...actorInfo, pictureUrl: storeActor?.pictureUrl || actorInfo.pictureUrl };
 
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',
@@ -112,14 +109,10 @@ export async function fetchActorDetails(
  * Process actor details for response formatting.
  * Formats README with link, builds text content, and creates structured content.
  * @param details - Raw actor details from fetchActorDetails
- * @param userFullName - User's full name from profile
- * @param userPictureUrl - User's picture URL from profile
  * @returns Processed actor details with formatted content including widget data
  */
 export function processActorDetailsForResponse(
     details: ActorDetailsResult,
-    userFullName?: string,
-    userPictureUrl?: string,
 ) {
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
     // Add link to README title
@@ -136,16 +129,9 @@ export function processActorDetailsForResponse(
         texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
     }
 
-    // Format actor for widget display (consistent with search results)
-    const widgetActor = formatActorDetailsForWidget(
-        details.actorInfo,
-        userFullName,
-        userPictureUrl,
-    );
-
     const structuredContent = {
         actorDetails: {
-            actorInfo: widgetActor, // Include all widget properties for consistent UI rendering
+            actorInfo: formatActorDetailsForWidget(details.actorInfo, actorUrl),
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,

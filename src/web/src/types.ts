@@ -108,22 +108,31 @@ declare global {
 
 // --- App Specific Types ---
 
-export interface PricingInfo {
-    pricingModel: string;
-    pricePerResultUsd: number;
-    monthlyChargeUsd: number;
-}
-
-export interface Rating {
-    average: number;
-    count: number;
+export type StructuredPricingInfo = {
+    model: string;
+    isFree: boolean;
+    pricePerUnit?: number;
+    unitName?: string;
+    trialMinutes?: number;
+    tieredPricing?: {
+        tier: string;
+        pricePerUnit: number;
+    }[];
+    events?: {
+        title: string;
+        description: string;
+        priceUsd?: number;
+        tieredPricing?: {
+            tier: string;
+            priceUsd: number;
+        }[];
+    }[];
 }
 
 export interface ActorStats {
-  totalBuilds: number;
-  totalRuns: number;
-  totalUsers: number;
-  totalBookmarks: number;
+    totalUsers: number;
+    actorReviewRating: number;
+    actorReviewCount: number;
 }
 
 export interface ActorDetails {
@@ -140,18 +149,11 @@ export interface Actor {
   id: string;
   name: string;
   username: string;
-  userPictureUrl?: string;
-  userFullName?: string;
+  url: string;
   fullName?: string;
   title: string;
   description: string;
-  categories?: string[];
   pictureUrl?: string;
   stats?: ActorStats;
-  currentPricingInfo?: PricingInfo;
-  rating: Rating;
-  userActorRuns?: {
-    successRate: number | null;
-  };
+  currentPricingInfo?: StructuredPricingInfo;
 }
-

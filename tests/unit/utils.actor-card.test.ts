@@ -1,7 +1,7 @@
 import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import type { ExtendedActorStoreList } from '../../src/types.js';
+import type { ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor-card.js';
 
 // Mock Actor data for testing (based on real apify/rag-web-browser Actor)
@@ -45,7 +45,7 @@ const mockActor: Actor = {
     ],
 } as unknown as Actor;
 
-const mockActorStoreList: ExtendedActorStoreList = {
+const mockActorStoreList: ActorStoreList = {
     id: 'actor456',
     name: 'store-actor',
     username: 'community',
@@ -57,18 +57,23 @@ const mockActorStoreList: ExtendedActorStoreList = {
     actorReviewRating: 4.5,
     bookmarkCount: 250,
     currentPricingInfo: {
-        pricingModel: 'PER_ACTOR_RUN',
+        pricingModel: 'PRICE_PER_DATASET_ITEM',
         pricePerUnitUsd: 0.5,
     },
     stats: {
+        totalBuilds: 10,
+        totalRuns: 10,
         totalUsers: 2000,
         totalUsers30Days: 800,
+        bookmarkCount: 250,
+        actorReviewCount: 14,
+        actorReviewRating: 4.5,
         publicActorRunStats30Days: {
             SUCCEEDED: 85,
             TOTAL: 100,
         },
     },
-} as unknown as ExtendedActorStoreList;
+} as unknown as ActorStoreList;
 
 const mockDeprecatedActor: Actor = {
     ...mockActor,
@@ -354,7 +359,8 @@ describe('formatActorToStructuredCard', () => {
             expect(result.stats?.monthlyUsers).toBe(904);
 
             // Should include rating
-            expect(result.rating).toBe(4.94598340350167);
+            expect(result.rating.average).toBe(4.94598340350167);
+            expect(result.rating.count).toBe(14);
 
             // Should include metadata (developer, categories, dates, deprecation)
             expect(result.developer.username).toBe('apify');
@@ -366,7 +372,7 @@ describe('formatActorToStructuredCard', () => {
 
         it('should include rating for ActorStoreList', () => {
             const result = formatActorToStructuredCard(mockActorStoreList);
-            expect(result.rating).toBe(4.5);
+            expect(result.rating.average).toBe(4.5);
         });
     });
 
@@ -499,7 +505,8 @@ describe('formatActorToStructuredCard', () => {
                 includeMetadata: false,
             });
 
-            expect(result.rating).toBe(4.5);
+            expect(result.rating.average).toBe(4.5);
+            expect(result.rating.count).toBe(14);
         });
     });
 
@@ -563,7 +570,8 @@ describe('formatActorToStructuredCard', () => {
             });
 
             expect(result.stats).toBeDefined();
-            expect(result.rating).toBe(4.5);
+            expect(result.rating.average).toBe(4.5);
+            expect(result.rating.count).toBe(14);
             expect(result.developer.username).toBe('');
             expect(result.modifiedAt).toBeUndefined();
         });

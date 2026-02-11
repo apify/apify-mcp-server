@@ -1,8 +1,6 @@
-import type { Actor } from 'apify-client';
-
 import { APIFY_STORE_URL } from '../const.js';
-import type { ActorCardOptions, ExtendedActorStoreList, ExtendedPricingInfo, StructuredActorCard } from '../types.js';
-import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured } from './pricing-info.js';
+import type { Actor, ActorCardOptions, ActorStoreList, PricingInfo, StructuredActorCard } from '../types.js';
+import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured, type StructuredPricingInfo } from './pricing-info.js';
 
 // Helper function to format categories from uppercase with underscores to proper case
 function formatCategories(categories?: string[]): string[] {
@@ -26,7 +24,7 @@ function formatCategories(categories?: string[]): string[] {
  * @returns Formatted actor card
  */
 export function formatActorToActorCard(
-    actor: Actor | ExtendedActorStoreList,
+    actor: Actor | ActorStoreList,
     options: ActorCardOptions = {
         includeDescription: true,
         includeStats: true,
@@ -54,11 +52,11 @@ export function formatActorToActorCard(
         let pricingInfo: string;
         if ('currentPricingInfo' in actor) {
             // ActorStoreList has currentPricingInfo
-            pricingInfo = pricingInfoToString(actor.currentPricingInfo as ExtendedPricingInfo);
+            pricingInfo = pricingInfoToString(actor.currentPricingInfo);
         } else {
             // Actor has pricingInfos array
             const currentPricingInfo = getCurrentPricingInfo(actor.pricingInfos || [], new Date());
-            pricingInfo = pricingInfoToString(currentPricingInfo as (ExtendedPricingInfo | null));
+            pricingInfo = pricingInfoToString(currentPricingInfo);
         }
         markdownLines.push(`- **[Pricing](${actorUrl}/pricing):** ${pricingInfo}`);
     }
@@ -136,7 +134,7 @@ export function formatActorToActorCard(
  * @returns Structured actor card data for programmatic use
  */
 export function formatActorToStructuredCard(
-    actor: Actor | ExtendedActorStoreList,
+    actor: Actor | ActorStoreList,
     options: ActorCardOptions = {
         includeDescription: true,
         includeStats: true,
@@ -149,7 +147,6 @@ export function formatActorToStructuredCard(
     const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
 
     // Build structured data - always include title, url, fullName
-    // @ts-expect-error - pictureUrl is present in API response but missing from type definition
     const extractedPictureUrl = (actor.pictureUrl as string | undefined) || undefined;
 
     const structuredData: StructuredActorCard = {
@@ -165,7 +162,6 @@ export function formatActorToStructuredCard(
         description: '',
         categories: [],
         pricing: { model: 'FREE', isFree: true },
-        rating: { average: 0, count: 0 },
         isDeprecated: false,
     };
 
@@ -176,13 +172,13 @@ export function formatActorToStructuredCard(
 
     // Add pricing info
     if (options.includePricing) {
-        let pricingInfo: ExtendedPricingInfo | null = null;
+        let pricingInfo: PricingInfo | null = null;
         if ('currentPricingInfo' in actor) {
             // ActorStoreList has currentPricingInfo
-            pricingInfo = actor.currentPricingInfo as unknown as ExtendedPricingInfo;
+            pricingInfo = actor.currentPricingInfo;
         } else if ('pricingInfos' in actor && actor.pricingInfos && actor.pricingInfos.length > 0) {
             // Actor has pricingInfos array - get the current one
-            pricingInfo = getCurrentPricingInfo(actor.pricingInfos, new Date()) as unknown as ExtendedPricingInfo;
+            pricingInfo = getCurrentPricingInfo(actor.pricingInfos, new Date());
         }
         // If pricingInfo is still null, it means the actor is free (no pricing info means free)
         structuredData.pricing = pricingInfoToStructured(pricingInfo);
@@ -268,103 +264,43 @@ export type WidgetActor = {
     id: string;
     name: string;
     username: string;
-    userPictureUrl?: string;
-    userFullName?: string;
+    url: string;
     fullName: string;
     title: string;
     description: string;
-    categories: string[];
     pictureUrl: string;
     stats: {
-        totalBuilds: number;
-        totalRuns: number;
         totalUsers: number;
-        totalBookmarks: number;
+        actorReviewRating: number;
+        actorReviewCount: number;
     };
-    currentPricingInfo: {
-        pricingModel: string;
-        pricePerResultUsd: number;
-        monthlyChargeUsd: number;
-    };
-    userActorRuns: {
-        successRate: number | null;
-    };
-    rating: {
-        average: number | null;
-        count: number;
-    };
+    currentPricingInfo: StructuredPricingInfo;
 };
 
 /**
  * Formats Actor from store list into the structure needed by widget UI components.
  * This is used by store_collection when widget mode is enabled.
  * @param actor - Actor information from the store API
- * @param userFullName - User's full name from profile
- * @param userPictureUrl - User's picture URL from profile
  * @returns Formatted actor data for widget UI
  */
 export function formatActorForWidget(
-    actor: ExtendedActorStoreList,
-    userFullName?: string,
-    userPictureUrl?: string,
+    actor: ActorStoreList,
 ): WidgetActor {
-    // Calculate success rate from publicActorRunStats30Days if available
-    let successRate: number | null = null;
-    const actorStats = actor.stats as typeof actor.stats & {
-        publicActorRunStats30Days?: {
-            SUCCEEDED: number;
-            TOTAL: number;
-        };
-    };
-    if (actorStats?.publicActorRunStats30Days) {
-        const runStats = actorStats.publicActorRunStats30Days;
-        if (runStats.TOTAL > 0) {
-            successRate = Math.round((runStats.SUCCEEDED / runStats.TOTAL) * 100);
-        }
-    }
-
-    const pricingInfo = actor.currentPricingInfo as ExtendedPricingInfo | undefined;
-    const pricing = {
-        pricingModel: pricingInfo?.pricingModel || 'FREE',
-        pricePerResultUsd: pricingInfo?.pricePerUnitUsd || 0,
-        monthlyChargeUsd: pricingInfo?.pricingModel === 'FLAT_PRICE_PER_MONTH' ? (pricingInfo?.pricePerUnitUsd || 0) : 0,
-    };
-
-    // Handle tiered pricing
-    if (pricingInfo?.pricingModel === 'PRICE_PER_DATASET_ITEM' && pricingInfo.tieredPricing) {
-        const tieredEntries = Object.values(pricingInfo.tieredPricing);
-        if (tieredEntries.length > 0 && tieredEntries[0]) {
-            pricing.pricePerResultUsd = tieredEntries[0].tieredPricePerUnitUsd || 0;
-        }
-    }
-
     return {
         id: actor.id,
         name: actor.name,
         username: actor.username,
-        userPictureUrl,
-        userFullName,
+        url: actor.url,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
-        categories: actor.categories || [],
         pictureUrl: actor.pictureUrl || '',
         stats: {
-            totalBuilds: actor.stats?.totalBuilds || 0,
-            totalRuns: actor.stats?.totalRuns || 0,
+            actorReviewRating: actor.actorReviewRating || actor.stats?.actorReviewRating || 0,
+            actorReviewCount: actor.actorReviewCount || actor.stats?.actorReviewCount || 0,
             totalUsers: actor.stats?.totalUsers || 0,
-            totalBookmarks: actor.bookmarkCount || 0,
         },
-        currentPricingInfo: pricing,
-        userActorRuns: {
-            successRate,
-        },
-        rating: {
-            // @ts-expect-error - outdated types on actor
-            average: actor.actorReviewRating || actor.stats?.actorReviewRating,
-            // @ts-expect-error - outdated types on actor
-            count: actor.actorReviewCount || actor.stats?.actorReviewCount,
-        },
+        currentPricingInfo: pricingInfoToStructured(actor.currentPricingInfo),
     };
 }
 
@@ -372,81 +308,29 @@ export function formatActorForWidget(
  * Formats full Actor details (from actor.get()) into the structure needed by widget UI components.
  * This is used by fetch-actor-details when widget mode is enabled.
  * @param actor - Full Actor information from the actor API
- * @param userFullName - User's full name from profile
- * @param userPictureUrl - User's picture URL from profile
+ * @param actorUrl - URL of the actor
  * @returns Formatted actor data for widget UI
  */
 export function formatActorDetailsForWidget(
-    actor: Actor & {
-        stats: Actor['stats'] & {
-            actorReviewRating?: number;
-            actorReviewCount?: number;
-        };
-    },
-    userFullName?: string,
-    userPictureUrl?: string,
+    actor: Actor,
+    actorUrl: string,
 ): WidgetActor {
-    // Calculate success rate from publicActorRunStats30Days if available
-    let successRate: number | null = null;
-    const actorStats = actor.stats as typeof actor.stats & {
-        publicActorRunStats30Days?: {
-            SUCCEEDED: number;
-            TOTAL: number;
-        };
-        bookmarkCount?: number;
-        actorReviewRating?: number;
-        actorReviewCount?: number;
-    };
-    if (actorStats?.publicActorRunStats30Days) {
-        const runStats = actorStats.publicActorRunStats30Days;
-        if (runStats.TOTAL > 0) {
-            successRate = Math.round((runStats.SUCCEEDED / runStats.TOTAL) * 100);
-        }
-    }
-
-    // Get current pricing from pricingInfos array
-    const currentPricingInfo = getCurrentPricingInfo(actor.pricingInfos || [], new Date()) as unknown as ExtendedPricingInfo | null;
-    const pricing = {
-        pricingModel: currentPricingInfo?.pricingModel || 'FREE',
-        pricePerResultUsd: currentPricingInfo?.pricePerUnitUsd || 0,
-        monthlyChargeUsd: currentPricingInfo?.pricingModel === 'FLAT_PRICE_PER_MONTH' ? (currentPricingInfo?.pricePerUnitUsd || 0) : 0,
-    };
-
-    // Handle tiered pricing
-    if (currentPricingInfo?.pricingModel === 'PRICE_PER_DATASET_ITEM' && currentPricingInfo.tieredPricing) {
-        const tieredEntries = Object.values(currentPricingInfo.tieredPricing);
-        if (tieredEntries.length > 0 && tieredEntries[0]) {
-            pricing.pricePerResultUsd = tieredEntries[0].tieredPricePerUnitUsd || 0;
-        }
-    }
-
-    // @ts-expect-error - pictureUrl is present in API response but missing from type definition
-    const pictureUrl = actor.pictureUrl as string | undefined;
+    const currentPricingInfo = getCurrentPricingInfo(actor.pricingInfos || [], new Date());
 
     return {
         id: actor.id,
         name: actor.name,
         username: actor.username,
-        userPictureUrl,
-        userFullName,
+        url: actorUrl,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
-        categories: actor.categories || [],
-        pictureUrl: pictureUrl || '',
+        pictureUrl: actor.pictureUrl || '',
         stats: {
-            totalBuilds: actor.stats?.totalBuilds || 0,
-            totalRuns: actor.stats?.totalRuns || 0,
             totalUsers: actor.stats?.totalUsers || 0,
-            totalBookmarks: actorStats?.bookmarkCount || 0,
+            actorReviewRating: actor.stats?.actorReviewRating || 0,
+            actorReviewCount: actor.stats?.actorReviewCount || 0,
         },
-        currentPricingInfo: pricing,
-        userActorRuns: {
-            successRate,
-        },
-        rating: {
-            average: actor.stats?.actorReviewRating || null,
-            count: actor.stats?.actorReviewCount || 0,
-        },
+        currentPricingInfo: pricingInfoToStructured(currentPricingInfo),
     };
 }

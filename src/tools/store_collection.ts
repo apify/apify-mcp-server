@@ -4,11 +4,10 @@ import { z } from 'zod';
 import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorPricingModel, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../utils/actor-card.js';
 import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { fetchUserData } from '../utils/users.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
 
 export const searchActorsArgsSchema = z.object({
@@ -157,7 +156,7 @@ You can also try using more specific or alternative keywords related to your sea
             count: number;
             instructions?: string;
             // Widget format actors (not validated by schema, but available for widget UI)
-            widgetActors?: ReturnType<typeof formatActorForWidget>[];
+            widgetActors?: WidgetActor[];
         } = {
             actors: structuredActorCards,
             query: parsed.keywords,
@@ -168,23 +167,10 @@ You can also try using more specific or alternative keywords related to your sea
 
         // Add widget format actors when widget mode is enabled
         if (apifyMcpServer.options.uiMode === 'openai') {
-            // Fetch user data for each actor
-            const userDataPromises = actors.map(async (actor) => fetchUserData(actor.username, apifyToken).catch(() => null));
-            const usersData = await Promise.all(userDataPromises);
-
-            structuredContent.widgetActors = actors.map((actor, index) => {
-                const userData = usersData[index];
-                return formatActorForWidget(
-                    actor,
-                    userData?.profile?.name,
-                    userData?.profile?.pictureUrl,
-                );
+            structuredContent.widgetActors = actors.map((actor) => {
+                return formatActorForWidget(actor);
             });
-        }
 
-        // When widget mode is enabled, return minimal text with widget metadata
-        // When widget mode is disabled, return full text response without widget metadata
-        if (apifyMcpServer.options.uiMode === 'openai') {
             const texts = [`
  # Search results:
  - **Search query:** ${parsed.keywords}

@@ -1,5 +1,7 @@
 import { ActorDetails } from "../types";
 
+// FIXME: examples
+
 /**
  * Mock response for actor details based on the real fetch-actor-details response structure
  * This can be used to populate the detail view for any actor
@@ -866,10 +868,13 @@ export function createMockActorDetails(actor: {
         actorReviewCount: number;
         actorReviewRating: number;
     };
+    rating: {
+        average: number;
+        count: number;
+    };
     currentPricingInfo?: {
         pricingModel: string;
-        pricePerResultUsd: number;
-        monthlyChargeUsd: number;
+        pricePerUnitUsd: number;
     };
 }): ActorDetails {
     return {
@@ -881,6 +886,7 @@ export function createMockActorDetails(actor: {
             description: actor.description,
             pictureUrl: actor.pictureUrl,
             stats: actor.stats,
+            rating: actor.rating,
             currentPricingInfo: actor.currentPricingInfo
         },
         readme: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent.actorDetails.readme,

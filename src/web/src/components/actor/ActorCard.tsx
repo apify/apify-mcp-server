@@ -4,17 +4,13 @@ import styled from "styled-components";
 import { Actor } from "../../types";
 import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
-import { formatNumber, getPricingInfo, formatDecimalNumber } from "../../utils/formatting";
-import { ActorStats, PricingInfo } from "../../types";
+import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
+import { ActorStats, StructuredPricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;
     isDetail?: boolean;
 }
-
-const makeActorRedirectUrl = (username: string, actorName: string) => {
-    return `https://apify.com/${username}/${actorName}`;
-};
 
 const Container = styled(Box)<{ $withBorder: boolean }>`
     background: ${theme.color.neutral.background};
@@ -98,17 +94,13 @@ const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
 
 type StatsRowProps = {
     stats?: ActorStats
-    pricingInfo?: PricingInfo
-    rating?: {
-        average: number;
-        count: number;
-    }
+    pricingInfo?: StructuredPricingInfo
     isDetail: boolean;
 }
 
-const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetail }) => {
-    const {totalUsers} = stats || {}
-    const {value: pricingValue, additionalInfo: pricingAdditionalInfo} = getPricingInfo(pricingInfo || {pricingModel: "FREE", monthlyChargeUsd: 0, pricePerResultUsd: 0});
+const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, isDetail }) => {
+    const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
+    const pricing = pricingInfo ? formatPricing(pricingInfo) : 'N/A';
 
     return (
         <BoxRow>
@@ -119,20 +111,19 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, rating, isDetai
                     value={formatNumber(totalUsers)}
                 />
             </>}
-            {rating && <>
+            {actorReviewCount && actorReviewRating && <>
                 <StyledSeparator />
                 <Stat
                     icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
-                    value={formatDecimalNumber(rating.average)}
-                    additionalInfo={`(${formatNumber(rating.count)})`}
+                    value={formatDecimalNumber(actorReviewRating)}
+                    additionalInfo={`(${formatNumber(actorReviewCount)})`}
                 />
             </>}
             {pricingInfo && <>
                 <StyledSeparator />
                 <Stat
                     icon={<CoinIcon size="12" color={theme.color.neutral.icon} />}
-                    value={pricingValue}
-                    additionalInfo={pricingAdditionalInfo}
+                    value={pricing}
                 />
             </>}
         </BoxRow>
@@ -146,11 +137,8 @@ export const ActorCard: React.FC<ActorCardProps> = ({
     const statsProps = {
         stats: actor.stats,
         pricingInfo: actor.currentPricingInfo,
-        rating: actor.rating,
         isDetail
     };
-
-    const actorRedirectUrl = makeActorRedirectUrl(actor.username, actor.name);
 
     return (
         <Container px="space16" py="space12" $withBorder={!isDetail}>
@@ -174,7 +162,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                 </ActorHeader>
                 <AlignEnd>
                     {/* @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button */}
-                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actorRedirectUrl} hideExternalIcon />
+                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon />
                 </AlignEnd>
             </BoxRow>
 

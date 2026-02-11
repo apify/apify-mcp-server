@@ -1,12 +1,11 @@
 import React from "react";
 import styled from "styled-components";
 import { Box, Markdown, theme, useActorTitleHeadingFilter } from "@apify/ui-library";
-import { ActorDetails, PricingInfo } from "../../types";
+import { ActorDetails } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 
 type ActorSearchDetailProps = {
     details: ActorDetails;
-    pricingInfo?: PricingInfo;
 }
 
 const README_CLASSNAMES = {
@@ -106,7 +105,7 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details })
         <Container>
             <CardWrapper>
                 <ActorCard actor={actor} isDetail />
-                <ReadmeSection readme={details.readme} />
+                 <ReadmeSection readme={details.readme} />
             </CardWrapper>
         </Container>
     );
