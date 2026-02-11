@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+
+// Sentry must be imported before all other modules to ensure early initialization
+import './instrument.js';
+
 /**
  * This script initializes and starts the Apify MCP server using the Stdio transport.
  *
@@ -12,7 +16,6 @@
  * Example:
  *   node stdio.js --actors=apify/google-search-scraper,apify/instagram-scraper
  */
-
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -239,7 +242,10 @@ async function main() {
     await mcpServer.connect(transport);
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
     log.error('Server error', { error });
+    const Sentry = await import('@sentry/node');
+    Sentry.captureException(error);
+    await Sentry.flush(5000);
     process.exit(1);
 });

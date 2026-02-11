@@ -231,6 +231,13 @@ jobs:
                     npm run build
             -   name: Build module
                 run: npm run build
+            -   name: Upload source maps to Sentry
+                env:
+                    SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+                run: |
+                    VERSION="${{ needs.release_metadata.outputs.version_number }}"
+                    npx sentry-cli sourcemaps inject ./dist
+                    npx sentry-cli sourcemaps upload --release "$VERSION" ./dist
             -   name: Publish to NPM
                 run: npm publish
 
