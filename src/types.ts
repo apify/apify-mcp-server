@@ -512,3 +512,30 @@ export type ApifyRequestParams = {
     /** Allow any other request parameters */
     [key: string]: unknown;
 };
+
+/** MCP Server Card per SEP-1649. */
+export type ServerCard = {
+    $schema: string;
+    version: string;
+    protocolVersion: string;
+    serverInfo: {
+        name: string;
+        title: string;
+        version: string;
+    };
+    description: string;
+    iconUrl: string;
+    documentationUrl: string;
+    transport: {
+        type: string;
+        endpoint: string;
+    };
+    capabilities: {
+        tools: { listChanged: boolean };
+    };
+    authentication: {
+        required: boolean;
+        schemes: string[];
+    };
+    tools: string;
+};
