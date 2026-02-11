@@ -36,7 +36,7 @@ export async function getActorDefinition(
             const actorDefinitions = buildDetails?.actorDefinition as ActorDefinitionWithDesc;
             // We set actorDefinition ID to Actor ID
             actorDefinitions.id = actor.id;
-            actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
+            actorDefinitions.readme = actor.readmeSummary ?? truncateActorReadme(actorDefinitions.readme || '', limit);
             actorDefinitions.description = actor.description || '';
             actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;

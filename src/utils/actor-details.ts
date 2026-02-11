@@ -90,7 +90,7 @@ export async function fetchActorDetails(
             actorCard,
             actorCardStructured,
             inputSchema,
-            readme: buildInfo.actorDefinition.readme || 'No README provided.',
+            readme: actorInfo.readmeSummary || buildInfo.actorDefinition.readme || 'No README provided.', // TODO truncate?
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
