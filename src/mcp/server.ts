@@ -22,22 +22,17 @@ import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
 import type { ApifyClient } from '../apify-client.js';
-import type { HelperTools } from '../const.js';
 import {
     APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     SERVER_NAME,
     SERVER_VERSION,
-    SKYFIRE_ENABLED_TOOLS,
-    SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
 import type { AvailableWidget } from '../resources/widgets.js';
-import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv } from '../telemetry.js';
-import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { getActorsAsTools } from '../tools/index.js';
 import type {
     ActorMcpTool,
     ActorsMcpServerOptions,
@@ -54,7 +49,7 @@ import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
-import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { LOG_LEVEL_MAP } from './const.js';
 import {
     setupLoggingHandlers as setupLoggingHandlersHelper,
@@ -69,7 +64,16 @@ import {
 } from './telemetry_helpers.js';
 import { validateAndPrepareToolCall } from './tool_call_validation.js';
 import { executeToolForCall, executeToolForTask } from './tool_execution.js';
+import {
+    getToolsAndActorsToLoad,
+    listActorToolNames as listActorToolNamesFromRegistry,
+    listAllToolNames as listAllToolNamesFromRegistry,
+    listToolNames as listToolNamesFromRegistry,
+    removeToolsByName as removeToolsByNameFromRegistry,
+    upsertTools as upsertToolsIntoRegistry,
+} from './tool_registry.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
+import { resolveWidgets as resolveWidgetsHelper } from './widgets_resolver.js';
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -176,7 +180,7 @@ export class ActorsMcpServer {
      * @returns {string[]} - An array of tool names.
      */
     public listToolNames(): string[] {
-        return Array.from(this.tools.keys());
+        return listToolNamesFromRegistry(this.tools);
     }
 
     /**
@@ -206,35 +210,11 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Returns the list of all internal tool names
-     * @returns {string[]} - Array of loaded tool IDs (e.g., 'apify/rag-web-browser')
-     */
-    private listInternalToolNames(): string[] {
-        return Array.from(this.tools.values())
-            .filter((tool) => tool.type === 'internal')
-            .map((tool) => tool.name);
-    }
-
-    /**
      * Returns the list of all currently loaded Actor tool IDs.
      * @returns {string[]} - Array of loaded Actor tool IDs (e.g., 'apify/rag-web-browser')
      */
     public listActorToolNames(): string[] {
-        return Array.from(this.tools.values())
-            .filter((tool) => tool.type === 'actor')
-            .map((tool) => tool.actorFullName);
-    }
-
-    /**
-     * Returns a list of Actor IDs that are registered as MCP servers.
-     * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
-     */
-    private listActorMcpServerToolIds(): string[] {
-        const ids = Array.from(this.tools.values())
-            .filter((tool: ToolEntry) => tool.type === 'actor-mcp')
-            .map((tool) => tool.actorId);
-        // Ensure uniqueness
-        return Array.from(new Set(ids));
+        return listActorToolNamesFromRegistry(this.tools);
     }
 
     /**
@@ -242,7 +222,7 @@ export class ActorsMcpServer {
      * @returns {string[]} - An array of Actor MCP server Actor IDs (e.g., 'apify/actors-mcp-server').
      */
     public listAllToolNames(): string[] {
-        return [...this.listInternalToolNames(), ...this.listActorToolNames(), ...this.listActorMcpServerToolIds()];
+        return listAllToolNamesFromRegistry(this.tools);
     }
 
     /**
@@ -252,25 +232,12 @@ export class ActorsMcpServer {
     * @param apifyClient
     */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
-        const loadedTools = this.listAllToolNames();
-        const actorsToLoad: string[] = [];
-        const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([
-            ...defaultTools,
-            ...Object.values(toolCategories).flat(),
-        ].map((tool) => [tool.name, tool]));
+        const loadedToolNames = this.listAllToolNames();
+        const { toolsToLoad, actorsToLoad } = getToolsAndActorsToLoad({
+            toolNames,
+            loadedToolNames,
+        });
 
-        for (const tool of toolNames) {
-            // Skip if the tool is already loaded
-            if (loadedTools.includes(tool)) continue;
-            // Load internal tool
-            if (internalToolMap.has(tool)) {
-                toolsToLoad.push(internalToolMap.get(tool) as ToolEntry);
-            // Load Actor
-            } else {
-                actorsToLoad.push(tool);
-            }
-        }
         if (toolsToLoad.length > 0) {
             this.upsertTools(toolsToLoad);
         }
@@ -313,12 +280,10 @@ export class ActorsMcpServer {
     /** Delete tools from the server and notify the handler.
      */
     public removeToolsByName(toolNames: string[], shouldNotifyToolsChangedHandler = false): string[] {
-        const removedTools: string[] = [];
-        for (const toolName of toolNames) {
-            if (this.removeToolByName(toolName)) {
-                removedTools.push(toolName);
-            }
-        }
+        const removedTools = removeToolsByNameFromRegistry({
+            toolsRegistry: this.tools,
+            toolNames,
+        });
         if (removedTools.length > 0) {
             if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         }
@@ -332,41 +297,11 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        if (this.options.skyfireMode) {
-            for (const wrap of tools) {
-                // Clone the tool before modifying it to avoid affecting shared objects
-                const clonedWrap = cloneToolEntry(wrap);
-                let modified = false;
-
-                // Handle Skyfire mode modifications
-                if (this.options.skyfireMode && (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(wrap.name as HelperTools)))) {
-                    // Add Skyfire instructions to description if not already present
-                    if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
-                        clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-                    }
-                    // Add skyfire-pay-id property if not present
-                    if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
-                        const props = clonedWrap.inputSchema.properties as Record<string, unknown>;
-                        if (!props['skyfire-pay-id']) {
-                            props['skyfire-pay-id'] = {
-                                type: 'string',
-                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-                            };
-                        }
-                    }
-                    modified = true;
-                }
-
-                // Store the cloned and modified tool only if modifications were made
-                this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
-            }
-        } else {
-            // No skyfire mode - store tools as-is
-            for (const tool of tools) {
-                this.tools.set(tool.name, tool);
-            }
-        }
+        upsertToolsIntoRegistry({
+            toolsRegistry: this.tools,
+            tools,
+            skyfireMode: this.options.skyfireMode,
+        });
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
     }
@@ -377,15 +312,6 @@ export class ActorsMcpServer {
 
         // Get the list of tool names
         this.toolsChangedHandler(this.listAllToolNames());
-    }
-
-    private removeToolByName(toolName: string): boolean {
-        if (this.tools.has(toolName)) {
-            this.tools.delete(toolName);
-            log.debug('Deleted tool', { toolName });
-            return true;
-        }
-        return false;
     }
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
@@ -739,46 +665,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.options.uiMode !== 'openai') {
-            return;
-        }
-
-        try {
-            const { fileURLToPath } = await import('node:url');
-            const path = await import('node:path');
-
-            const filename = fileURLToPath(import.meta.url);
-            const dirName = path.dirname(filename);
-
-            const resolved = await resolveAvailableWidgets(dirName);
-            this.availableWidgets = resolved;
-
-            const readyWidgets: string[] = [];
-            const missingWidgets: string[] = [];
-
-            for (const [uri, widget] of resolved.entries()) {
-                if (widget.exists) {
-                    readyWidgets.push(widget.name);
-                } else {
-                    missingWidgets.push(widget.name);
-                    log.softFail(`Widget file not found: ${widget.jsPath} (widget: ${uri})`);
-                }
-            }
-
-            if (readyWidgets.length > 0) {
-                log.debug('Ready widgets', { widgets: readyWidgets });
-            }
-
-            if (missingWidgets.length > 0) {
-                log.softFail('Some widgets are not ready', {
-                    widgets: missingWidgets,
-                    note: 'These widgets will not be available. Ensure web/dist files are built and included in deployment.',
-                });
-            }
-        } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            log.softFail(`Failed to resolve widgets: ${errorMessage}`);
-            // Continue without widgets
+        const widgets = await resolveWidgetsHelper(this.options.uiMode);
+        if (widgets) {
+            this.availableWidgets = widgets;
         }
     }
 
