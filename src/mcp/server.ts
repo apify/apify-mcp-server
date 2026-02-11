@@ -15,14 +15,13 @@ import {
     ErrorCode,
     ListToolsRequestSchema,
     McpError,
-    SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify-client.js';
 import type { HelperTools } from '../const.js';
 import {
     APIFY_MCP_URL,
@@ -37,7 +36,7 @@ import {
 } from '../const.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
-import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { getTelemetryEnv } from '../telemetry.js';
 import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import type {
     ActorMcpTool,
@@ -56,12 +55,18 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
-import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
-import { getPackageVersion } from '../utils/version.js';
 import { LOG_LEVEL_MAP } from './const.js';
+import {
+    setupLoggingHandlers as setupLoggingHandlersHelper,
+    setupLoggingProxy as setupLoggingProxyHelper,
+} from './logging_handlers.js';
 import { registerPromptHandlers } from './prompt_handlers.js';
 import { registerResourceHandlers } from './resource_handlers.js';
 import { registerTaskHandlers } from './task_handlers.js';
+import {
+    finalizeAndTrackTelemetry as finalizeAndTrackTelemetryHelper,
+    prepareTelemetryData as prepareTelemetryDataHelper,
+} from './telemetry_helpers.js';
 import { validateAndPrepareToolCall } from './tool_call_validation.js';
 import { executeToolForCall, executeToolForTask } from './tool_execution.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
@@ -398,27 +403,20 @@ export class ActorsMcpServer {
     }
 
     private setupLoggingProxy(): void {
-        // Store original sendLoggingMessage
-        const originalSendLoggingMessage = this.server.sendLoggingMessage.bind(this.server);
-
-        // Proxy sendLoggingMessage to filter logs
-        this.server.sendLoggingMessage = async (params: { level: string; data?: unknown; [key: string]: unknown }) => {
-            const messageLevelValue = LOG_LEVEL_MAP[params.level] ?? -1; // Unknown levels get -1, discard
-            const currentLevelValue = LOG_LEVEL_MAP[this.currentLogLevel] ?? LOG_LEVEL_MAP.info; // Default to info if invalid
-            if (messageLevelValue >= currentLevelValue) {
-                await originalSendLoggingMessage(params as Parameters<typeof originalSendLoggingMessage>[0]);
-            }
-        };
+        setupLoggingProxyHelper({
+            server: this.server,
+            logLevelMap: LOG_LEVEL_MAP,
+            getCurrentLogLevel: () => this.currentLogLevel,
+        });
     }
 
     private setupLoggingHandlers(): void {
-        this.server.setRequestHandler(SetLevelRequestSchema, (request) => {
-            const { level } = request.params;
-            if (LOG_LEVEL_MAP[level] !== undefined) {
+        setupLoggingHandlersHelper({
+            server: this.server,
+            logLevelMap: LOG_LEVEL_MAP,
+            setCurrentLogLevel: (level) => {
                 this.currentLogLevel = level;
-            }
-            // Sending empty result based on MCP spec
-            return {};
+            },
         });
     }
 
@@ -584,17 +582,13 @@ Please verify the tool name and ensure the tool is properly registered.`;
         startTime: number,
         toolStatus: ToolStatus,
     ): void {
-        if (!telemetryData) {
-            return;
-        }
-
-        const execTime = Date.now() - startTime;
-        const finalizedTelemetryData: ToolCallTelemetryProperties = {
-            ...telemetryData,
-            tool_status: toolStatus,
-            tool_exec_time_ms: execTime,
-        };
-        trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
+        finalizeAndTrackTelemetryHelper({
+            telemetryData,
+            userId,
+            startTime,
+            toolStatus,
+            telemetryEnv: this.telemetryEnv,
+        });
     }
 
     // TODO: this function quite duplicates the main tool call login the CallToolRequestSchema handler, we should refactor
@@ -731,36 +725,14 @@ Please verify the tool name and ensure the tool is properly registered.`;
     private async prepareTelemetryData(
         tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
-        if (!this.telemetryEnabled) {
-            return { telemetryData: null, userId: null };
-        }
-
-        const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
-
-        // Get userId from cache or fetch from API
-        let userId: string | null = null;
-        if (apifyToken) {
-            const apifyClient = new ApifyClient({ token: apifyToken });
-            userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
-            log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
-        }
-        const capabilities = this.options.initializeRequestData?.params?.capabilities;
-        const params = this.options.initializeRequestData?.params as InitializeRequest['params'];
-        const telemetryData: ToolCallTelemetryProperties = {
-            app: 'mcp',
-            app_version: getPackageVersion() || '',
-            mcp_client_name: params?.clientInfo?.name || '',
-            mcp_client_version: params?.clientInfo?.version || '',
-            mcp_protocol_version: params?.protocolVersion || '',
-            mcp_client_capabilities: capabilities || null,
-            mcp_session_id: mcpSessionId || '',
-            transport_type: this.options.transportType || '',
-            tool_name: toolFullName,
-            tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
-            tool_exec_time_ms: 0, // Will be calculated in finally
-        };
-
-        return { telemetryData, userId };
+        return await prepareTelemetryDataHelper({
+            telemetryEnabled: this.telemetryEnabled,
+            tool,
+            mcpSessionId,
+            apifyToken,
+            initializeRequestData: this.options.initializeRequestData as InitializeRequest | undefined,
+            transportType: this.options.transportType,
+        });
     }
 
     /**
