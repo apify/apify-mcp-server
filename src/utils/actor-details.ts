@@ -289,7 +289,7 @@ export async function buildActorDetailsTextResponse(options: {
         pricing: boolean;
         rating: boolean;
         metadata: boolean;
-        readme: boolean;
+        readmeSummary: boolean;
         inputSchema: boolean;
         outputSchema: boolean;
         mcpTools: boolean;
@@ -307,7 +307,6 @@ export async function buildActorDetailsTextResponse(options: {
     const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode, mcpSessionId } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-    const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
 
     const texts: string[] = [];
 
@@ -323,9 +322,9 @@ export async function buildActorDetailsTextResponse(options: {
         texts.push(`# Actor information\n${details.actorCard}`);
     }
 
-    // Add README if requested
-    if (output.readme) {
-        texts.push(formattedReadme);
+    // Add README summary if requested
+    if (output.readmeSummary && details.readmeSummary) {
+        texts.push(details.readmeSummary);
     }
 
     // Add input schema if requested
@@ -352,7 +351,6 @@ export async function buildActorDetailsTextResponse(options: {
     // Build structured content
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
-        readme: output.readme ? formattedReadme : undefined,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
     };
