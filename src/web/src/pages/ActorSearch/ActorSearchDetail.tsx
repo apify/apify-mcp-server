@@ -29,8 +29,6 @@ const CardWrapper = styled(Box)`
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    max-width: 796px;
-    min-width: 400px;
     width: 100%;
 `;
 
