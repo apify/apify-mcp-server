@@ -63,6 +63,7 @@ export type ActorDetailsResult = {
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
     readme: string;
+    readmeSummary?: string;
 };
 
 export async function fetchActorDetails(
@@ -90,7 +91,8 @@ export async function fetchActorDetails(
             actorCard,
             actorCardStructured,
             inputSchema,
-            readme: actorInfo.readmeSummary || buildInfo.actorDefinition.readme || 'No README provided.', // TODO truncate?
+            readme: buildInfo.actorDefinition.readme || 'No README provided.',
+            readmeSummary: actorInfo.readmeSummary,
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });

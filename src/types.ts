@@ -48,6 +48,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
+    readmeSummary?: string;
     defaultRunOptions: ActorDefaultRunOptions;
     input?: ActorInputSchema;
 };
