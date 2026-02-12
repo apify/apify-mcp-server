@@ -114,6 +114,7 @@ export const actorInfoSchema = {
         rating: { type: 'number', description: 'Actor rating' },
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
+        readmeSummary: { type: 'string', description: 'Abridged Actor README documentation.' },
     },
     required: ['url', 'fullName', 'developer', 'description', 'categories', 'pricing'],
 };
@@ -126,7 +127,6 @@ export const actorDetailsOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         actorInfo: actorInfoSchema,
-        readme: { type: 'string', description: 'Actor README documentation.' },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
     },
@@ -164,6 +164,7 @@ export const actorSearchInternalOutputSchema = {
                     fullName: { type: 'string', description: 'Full Actor name (username/name)' },
                     title: { type: 'string', description: 'Actor title' },
                     description: { type: 'string', description: 'Actor description' },
+                    readmeSummary: { type: 'string', description: 'Abridged Actor README documentation' },
                 },
                 required: ['fullName'],
             },

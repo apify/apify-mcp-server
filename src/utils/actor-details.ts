@@ -313,6 +313,7 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Build actor card only if any card section is requested
     const needsCard = cardOptions.includeDescription
+        || cardOptions.includeReadmeSummary
         || cardOptions.includeStats
         || cardOptions.includePricing
         || cardOptions.includeRating

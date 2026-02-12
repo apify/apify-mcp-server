@@ -139,6 +139,7 @@ export function formatActorToStructuredCard(
     actor: Actor | ExtendedActorStoreList,
     options: ActorCardOptions = {
         includeDescription: true,
+        includeReadmeSummary: true,
         includeStats: true,
         includePricing: true,
         includeRating: true,
@@ -167,6 +168,10 @@ export function formatActorToStructuredCard(
     // Add description text only
     if (options.includeDescription) {
         structuredData.description = actor.description || 'No description provided.';
+    }
+
+    if (options.includeReadmeSummary) {
+        structuredData.readmeSummary = actor.readmeSummary;
     }
 
     // Add pricing info
