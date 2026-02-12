@@ -19,6 +19,14 @@ const Container = styled(Box)<{ $withBorder: boolean }>`
     gap: ${theme.space.space8};
     border-radius: ${theme.radius.radius8};
     border: ${props => props.$withBorder ? `1px solid ${theme.color.neutral.separatorSubtle}` : 'none'};
+
+    .clampToOneLine {
+        ${clampLines(1)}
+    }
+
+    .flexShrink0 {
+        flex-shrink: 0;
+    }
 `;
 
 const BoxRow = styled(Box)`
@@ -28,17 +36,11 @@ const BoxRow = styled(Box)`
     position: relative;
 `;
 
-const AlignBottom = styled.div`
-    align-self: flex-end;
-    margin-left: ${theme.space.space2};
-`;
-
-const AlignEnd = styled.div`
-    margin-left: auto;
-    align-self: flex-start;
-    position: absolute;
-    right: 0;
-    top: 0;
+const ActorHeaderWithActionButton = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
 `;
 
 const BoxGroup = styled(Box)`
@@ -95,17 +97,41 @@ const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
 type StatsRowProps = {
     stats?: ActorStats
     pricingInfo?: StructuredPricingInfo
-    isDetail: boolean;
+    showFirstSeparator?: boolean;
 }
 
-const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, isDetail }) => {
+const StatsContainer = styled(Box)`
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: ${theme.space.space8};
+    align-items: center;
+`;
+
+const ShowOnMobile = styled(BoxRow)`
+    display: flex;
+
+    @media ${theme.device.tablet} {
+        display: none;
+    }
+`;
+
+const ShowOnTabletAndDesktop = styled(BoxRow)`
+    display: none;
+
+    @media ${theme.device.tablet} {
+        display: flex;
+    }
+`;
+
+const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, showFirstSeparator = false }) => {
     const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
     const pricing = pricingInfo ? formatPricing(pricingInfo) : 'N/A';
 
     return (
-        <BoxRow>
+        <StatsContainer>
             {totalUsers && <>
-                {!isDetail && <StyledSeparator />}
+                {showFirstSeparator && <StyledSeparator />}
                 <Stat
                     icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
                     value={formatNumber(totalUsers)}
@@ -126,8 +152,8 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, isDetail }) => 
                     value={pricing}
                 />
             </>}
-        </BoxRow>
-    )
+        </StatsContainer>
+    );
 }
 
 export const ActorCard: React.FC<ActorCardProps> = ({
@@ -143,27 +169,28 @@ export const ActorCard: React.FC<ActorCardProps> = ({
     return (
         <Container px="space16" py="space12" $withBorder={!isDetail}>
             <BoxRow>
-                <ActorHeader>
-                    <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
-                    <ActorTitleWrapper>
-                        <Text as="h3" weight="bold" color={theme.color.neutral.text}>{actor.title}</Text>
-                        <BoxRow>
-                            <Text
-                                size="small"
-                                weight="medium"
-                                type="code"
-                                color={theme.color.neutral.textSubtle}
-                            >
-                                {actor.username}/{actor.name}
-                            </Text>
-                            {actor.stats && !isDetail && <AlignBottom><StatsRow {...statsProps} /></AlignBottom>}
-                        </BoxRow>
-                    </ActorTitleWrapper>
-                </ActorHeader>
-                <AlignEnd>
+                <ActorHeaderWithActionButton>
+                    <ActorHeader>
+                        <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
+                        <ActorTitleWrapper>
+                            <Text as="h3" weight="bold" color={theme.color.neutral.text} className="clampToOneLine" >{actor.title}</Text>
+                            <BoxRow>
+                                <Text
+                                    size="small"
+                                    weight="medium"
+                                    type="code"
+                                    color={theme.color.neutral.textSubtle}
+                                    className="clampToOneLine"
+                                >
+                                    {actor.username}/{actor.name}
+                                </Text>
+                                {actor.stats && !isDetail && <ShowOnTabletAndDesktop><StatsRow {...statsProps} showFirstSeparator /></ShowOnTabletAndDesktop>}
+                            </BoxRow>
+                        </ActorTitleWrapper>
+                    </ActorHeader>
                     {/* @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button */}
-                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon />
-                </AlignEnd>
+                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                </ActorHeaderWithActionButton>
             </BoxRow>
 
             <DescriptionText
@@ -176,6 +203,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
             </DescriptionText>
 
             {actor.stats && isDetail && <StatsRow {...statsProps} />}
+            {actor.stats && !isDetail && <ShowOnMobile><StatsRow {...statsProps} /></ShowOnMobile>}
         </Container>
     );
 };
