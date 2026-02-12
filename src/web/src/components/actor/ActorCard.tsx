@@ -131,14 +131,14 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, showFirstSepara
 
     return (
         <StatsContainer>
-            {totalUsers && <>
+            {totalUsers !== undefined && <>
                 {showFirstSeparator && <StyledSeparator />}
                 <Stat
                     icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
                     value={formatNumber(totalUsers)}
                 />
             </>}
-            {actorReviewCount && actorReviewRating && <>
+            {actorReviewCount !== undefined && actorReviewRating !== undefined && <>
                 <StyledSeparator />
                 <Stat
                     icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
