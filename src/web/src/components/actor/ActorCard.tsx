@@ -10,6 +10,7 @@ import { ActorStats, StructuredPricingInfo } from "../../types";
 interface ActorCardProps {
     actor: Actor;
     isDetail?: boolean;
+    customActionButton?: React.ReactNode;
 }
 
 const Container = styled(Box)<{ $withBorder: boolean }>`
@@ -159,6 +160,7 @@ const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, showFirstSepara
 export const ActorCard: React.FC<ActorCardProps> = ({
     actor,
     isDetail = false,
+    customActionButton,
 }) => {
     const statsProps = {
         stats: actor.stats,
@@ -188,8 +190,10 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                             </BoxRow>
                         </ActorTitleWrapper>
                     </ActorHeader>
-                    {/* @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button */}
-                    <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                    {customActionButton || (
+                        // @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button
+                        <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                    )}
                 </ActorHeaderWithActionButton>
             </BoxRow>
 

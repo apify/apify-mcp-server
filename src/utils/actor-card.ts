@@ -290,7 +290,6 @@ export function formatActorForWidget(
         id: actor.id,
         name: actor.name,
         username: actor.username,
-        url: actor.url,
         fullName: `${actor.username}/${actor.name}`,
         title: actor.title || actor.name,
         description: actor.description || 'No description available',
@@ -300,6 +299,7 @@ export function formatActorForWidget(
             actorReviewCount: actor.actorReviewCount || actor.stats?.actorReviewCount || 0,
             totalUsers: actor.stats?.totalUsers || 0,
         },
+        url: `${APIFY_STORE_URL}/${actor.username}/${actor.name}`,
         currentPricingInfo: pricingInfoToStructured(actor.currentPricingInfo),
     };
 }

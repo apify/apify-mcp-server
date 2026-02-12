@@ -76,12 +76,13 @@ export async function fetchActorDetails(
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
             // Fetch from store to get the processed pictureUrl (with resizing parameters)
-            searchActorsByKeywords(actorName, apifyClient.token || '', 1).catch(() => []),
+            searchActorsByKeywords(actorName, apifyClient.token || '', 5).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
-        const actorInfoWithPicture = { ...actorInfo, pictureUrl: storeActor?.pictureUrl || actorInfo.pictureUrl };
+        const pictureUrl = storeActor?.pictureUrl;
+        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & { pictureUrl?: string };
 
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',

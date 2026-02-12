@@ -17,11 +17,6 @@ export const MOCK_ACTOR_DETAILS_RESPONSE = {
                 "url": "https://apify.com/scraper_one"
             },
             "description": "Extract posts published by specified X (Twitter) profiles. Retrieve URLs, IDs, content, publication dates, text and engagement metrics. Ideal for social media monitoring solutions.",
-            "categories": [
-                "Automation",
-                "Social Media",
-                "Developer Tools"
-            ],
             "pricing": {
                 "model": "PAY_PER_EVENT",
                 "isFree": false,
