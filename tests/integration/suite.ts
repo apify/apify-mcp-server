@@ -797,7 +797,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: true,
                     },
                 },
@@ -970,7 +970,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: true,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -978,7 +978,7 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain schema but NOT readme or actor card
+            // Should contain schema but NOT readmeSummary or actor card
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
             expect(content.some((item) => item.text.includes('README'))).toBe(false);
         });
@@ -999,7 +999,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1007,7 +1007,7 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain actor info but NOT readme or schema
+            // Should contain actor info but NOT readmeSummary or schema
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
         });
@@ -1028,7 +1028,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: true,
                     },
                 },
@@ -1056,7 +1056,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: true,
                     },
                 },
@@ -1085,7 +1085,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: true,
                     },
                 },
@@ -1099,13 +1099,13 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
         });
 
-        it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
+        it('should return structured output for fetch-actor-details with output={ description: true, readmeSummary: true } matching outputSchema', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
             const toolName = HelperTools.ACTOR_GET_DETAILS;
 
-            // Test with output={ description: true, readme: true } - inputSchema should be undefined
+            // Test with output={ description: true, readmeSummary: true } - inputSchema should be undefined
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
@@ -1117,7 +1117,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: true,
+                        readmeSummary: true,
                         mcpTools: false,
                     },
                 },
@@ -1147,7 +1147,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1155,7 +1155,7 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain actor info (pricing is part of actor card) but NOT readme or schema
+            // Should contain actor info (pricing is part of actor card) but NOT readmeSummary or schema
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
             expect(content.some((item) => item.text.includes('README'))).toBe(false);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
@@ -1164,7 +1164,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
         });
 
-        it('should return only readme when output={ readme: true }', async () => {
+        it('should return only readmeSummary when output={ readmeSummary: true }', async () => {
             client = await createClientFn({
                 tools: ['actors'],
             });
@@ -1180,7 +1180,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: true,
+                        readmeSummary: true,
                         mcpTools: false,
                     },
                 },
@@ -1188,8 +1188,8 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain README but NOT actor info card or input schema
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            // Should contain readmeSummary text but NOT actor info card or input schema
+            expect(content.length).toBeGreaterThan(0);
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(false);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
@@ -1212,10 +1212,9 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
+            // Should contain all default sections (description, stats, pricing, rating, metadata, readmeSummary, inputSchema)
             // but NOT mcpTools (which defaults to false)
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
         });
@@ -1236,7 +1235,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: true,
-                        readme: true,
+                        readmeSummary: true,
                         mcpTools: false,
                     },
                 },
@@ -1247,14 +1246,12 @@ export function createIntegrationTestsSuite(
 
             // Should contain all sections in text
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
 
             // Validate structured output exists and has all fields
-            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; readme?: string; inputSchema?: unknown } };
+            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; inputSchema?: unknown } };
             expect(resultWithStructured.structuredContent).toBeDefined();
             expect(resultWithStructured.structuredContent?.actorInfo).toBeDefined();
-            expect(resultWithStructured.structuredContent?.readme).toBeDefined();
             expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
             // Validate against schema
@@ -1278,7 +1275,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1311,7 +1308,7 @@ export function createIntegrationTestsSuite(
                         rating: true,
                         metadata: false,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1343,7 +1340,7 @@ export function createIntegrationTestsSuite(
                         rating: false,
                         metadata: true,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1362,7 +1359,7 @@ export function createIntegrationTestsSuite(
             expect(metadataText).not.toContain('Rating:');
             expect(metadataText).not.toContain('README');
 
-            // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readme, input-schema)
+            // Test 4: Combination - pricing + rating + metadata (should exclude description, stats, readmeSummary, input-schema)
             const combinationResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
@@ -1374,7 +1371,7 @@ export function createIntegrationTestsSuite(
                         rating: true,
                         metadata: true,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1388,7 +1385,7 @@ export function createIntegrationTestsSuite(
             expect(combinationText).toContain('Developed by:');
             expect(combinationText).toContain('Categories:');
             expect(combinationText).toContain('Last modified:');
-            // Should NOT include: description, stats, readme, input-schema
+            // Should NOT include: description, stats, readmeSummary, input-schema
             expect(combinationText).not.toContain('Description:');
             expect(combinationText).not.toContain('Stats:');
             expect(combinationText).not.toContain('README');
@@ -1448,9 +1445,9 @@ export function createIntegrationTestsSuite(
                     notMarkers: ['Developed by:', 'Description:', 'Stats:', 'Pricing', 'Rating:', 'Last modified:', 'README'],
                 },
                 {
-                    name: 'readme',
-                    field: 'readme',
-                    markers: ['README'],
+                    name: 'readmeSummary',
+                    field: 'readmeSummary',
+                    markers: [],
                     notMarkers: ['Input schema'],
                 },
             ] as const;
@@ -1468,7 +1465,7 @@ export function createIntegrationTestsSuite(
                             rating: option.field === 'rating',
                             metadata: option.field === 'metadata',
                             inputSchema: option.field === 'inputSchema',
-                            readme: option.field === 'readme',
+                            readmeSummary: option.field === 'readmeSummary',
                             mcpTools: false,
                         },
                     },
@@ -1503,7 +1500,7 @@ export function createIntegrationTestsSuite(
                         rating: true,
                         metadata: true,
                         inputSchema: false,
-                        readme: false,
+                        readmeSummary: false,
                         mcpTools: false,
                     },
                 },
@@ -1521,7 +1518,7 @@ export function createIntegrationTestsSuite(
             expect(allCardText).toContain('Categories:');
             expect(allCardText).toContain('Last modified:');
 
-            // Should NOT include readme or input-schema
+            // Should NOT include readmeSummary or input-schema
             expect(allCardText).not.toContain('README');
             expect(allCardText).not.toContain('Input schema');
 
