@@ -169,12 +169,18 @@ You can also try using more specific or alternative keywords related to your sea
         if (apifyMcpServer.options.uiMode === 'openai') {
             structuredContent.widgetActors = actors.map(formatActorForWidget);
 
+            const actorCards = actors.map((actor) => formatActorToActorCard(actor));
+            const actorsText = actorCards.join('\n\n');
             const texts = [`
  # Search results:
  - **Search query:** ${parsed.keywords}
  - **Number of Actors found:** ${actors.length}
 
-An interactive widget has been rendered with the search results.
+An interactive widget has been rendered with the search results. The user can already see the list of Actors visually in the widget, so do NOT print or summarize the Actor list in your response.
+
+ # Actors:
+
+ ${actorsText}
 `];
 
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
