@@ -154,7 +154,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
     metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
-    readme: z.boolean().optional().describe('Include full README documentation.'),
+    readmeSummary: z.boolean().optional().describe('Include Abridged Actor README documentation.'),
     outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
@@ -166,7 +166,7 @@ export const actorDetailsOutputDefaults = {
     rating: true,
     metadata: true,
     inputSchema: true,
-    readme: true,
+    readmeSummary: true,
     outputSchema: false,
     mcpTools: false,
 };
@@ -192,7 +192,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         rating: output?.rating === true,
         metadata: output?.metadata === true,
         inputSchema: output?.inputSchema === true,
-        readme: output?.readme === true,
+        readmeSummary: output?.readmeSummary === true,
         outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
     };
