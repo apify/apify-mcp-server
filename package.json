@@ -51,7 +51,7 @@
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
     "apify": "^3.4.2",
-    "apify-client": "^2.22.1-beta.7",
+    "apify-client": "^2.22.1",
     "cheerio": "^1.1.2",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
