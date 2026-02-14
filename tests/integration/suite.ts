@@ -132,6 +132,28 @@ function expectReadmeInStructuredContent(
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
+/** Validates that the listed tools have OpenAI metadata (_meta) with outputTemplate and widgetAccessible. */
+function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
+    const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
+    for (const toolName of toolNames) {
+        const tool = tools.tools.find((t) => t.name === toolName);
+        expect(tool).toBeDefined();
+        expect(tool?._meta).toBeDefined();
+        expect(tool?._meta?.['openai/outputTemplate']).toBeDefined();
+        expect(tool?._meta?.['openai/widgetAccessible']).toBe(true);
+    }
+}
+
+/** Validates that the result contains Apify usage cost metadata with expected structure. */
+function expectUsageCostMeta(result: unknown): void {
+    const resultWithMeta = result as { _meta?: { usageTotalUsd?: number; usageUsd?: Record<string, number> } };
+    expect(resultWithMeta._meta).toBeDefined();
+    expect(typeof resultWithMeta._meta?.usageTotalUsd).toBe('number');
+    expect(resultWithMeta._meta!.usageTotalUsd!).toBeGreaterThanOrEqual(0);
+    expect(resultWithMeta._meta?.usageUsd).toBeDefined();
+    expect(typeof resultWithMeta._meta?.usageUsd).toBe('object');
+}
+
 export function createIntegrationTestsSuite(
     options: IntegrationTestsSuiteOptions,
 ) {
@@ -556,12 +578,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
 
             // Validate _meta contains Apify usage cost information for completed sync runs
-            const resultWithMeta = callResult as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
-            expect(resultWithMeta._meta).toBeDefined();
-            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
-            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
-            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
-            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
+            expectUsageCostMeta(callResult);
         });
 
         it('should support async mode in call-actor and return runId', async () => {
@@ -2082,12 +2099,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 7);
 
             // Validate _meta contains Apify usage cost information for direct actor tool calls
-            const resultWithMeta = result as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
-            expect(resultWithMeta._meta).toBeDefined();
-            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
-            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
-            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
-            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
+            expectUsageCostMeta(result);
 
             // Validate structured output for get-actor-output
             validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
@@ -2480,23 +2492,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled
-            const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
-            expect(searchActorsTool).toBeDefined();
-            expect(searchActorsTool?._meta).toBeDefined();
-            expect(searchActorsTool?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(searchActorsTool?._meta?.['openai/widgetAccessible']).toBe(true);
-
-            const fetchActorDetailsToolFromList = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_GET_DETAILS);
-            expect(fetchActorDetailsToolFromList).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta?.['openai/widgetAccessible']).toBe(true);
-
-            const callActorTool = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_CALL);
-            expect(callActorTool).toBeDefined();
-            expect(callActorTool?._meta).toBeDefined();
-            expect(callActorTool?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(callActorTool?._meta?.['openai/widgetAccessible']).toBe(true);
+            expectOpenAiToolMeta(tools);
 
             await client.close();
         });
@@ -2512,23 +2508,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
-            const searchActorsTool = tools.tools.find((tool) => tool.name === HelperTools.STORE_SEARCH);
-            expect(searchActorsTool).toBeDefined();
-            expect(searchActorsTool?._meta).toBeDefined();
-            expect(searchActorsTool?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(searchActorsTool?._meta?.['openai/widgetAccessible']).toBe(true);
-
-            const fetchActorDetailsToolFromList = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_GET_DETAILS);
-            expect(fetchActorDetailsToolFromList).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(fetchActorDetailsToolFromList?._meta?.['openai/widgetAccessible']).toBe(true);
-
-            const callActorTool = tools.tools.find((tool) => tool.name === HelperTools.ACTOR_CALL);
-            expect(callActorTool).toBeDefined();
-            expect(callActorTool?._meta).toBeDefined();
-            expect(callActorTool?._meta?.['openai/outputTemplate']).toBeDefined();
-            expect(callActorTool?._meta?.['openai/widgetAccessible']).toBe(true);
+            expectOpenAiToolMeta(tools);
 
             await client.close();
         });
