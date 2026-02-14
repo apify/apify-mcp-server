@@ -535,6 +535,14 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
+
+            // Validate _meta contains Apify usage cost information for completed sync runs
+            const resultWithMeta = callResult as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
+            expect(resultWithMeta._meta).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
+            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
+            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
         });
 
         it('should support async mode in call-actor and return runId', async () => {
@@ -2000,6 +2008,14 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 12);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 5);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 7);
+
+            // Validate _meta contains Apify usage cost information for direct actor tool calls
+            const resultWithMeta = result as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
+            expect(resultWithMeta._meta).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
+            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
+            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
 
             // Validate structured output for get-actor-output
             validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
