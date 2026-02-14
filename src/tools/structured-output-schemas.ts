@@ -223,7 +223,6 @@ export const callActorOutputSchema = {
             description: 'Dataset items from the Actor run (sync mode only, may be truncated due to size limits)',
         },
         instructions: { type: 'string', description: 'Instructions for the LLM on how to process or retrieve additional data' },
-        usageTotalUsd: { type: 'number', description: 'Total cost of the Actor run in USD (sync mode only)' },
     },
     required: ['runId'],
 };
@@ -244,7 +243,6 @@ export const getActorRunOutputSchema = {
             type: 'object' as const,
             description: 'Run statistics (compute units, memory, duration, etc.)',
         },
-        usageTotalUsd: { type: 'number', description: 'Total cost of the Actor run in USD' },
         dataset: {
             type: 'object' as const,
             description: 'Dataset information (only for completed runs with results)',

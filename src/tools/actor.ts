@@ -35,7 +35,7 @@ import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames, getAc
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { ajv, compileSchema } from '../utils/ajv.js';
 import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
 import type { ProgressTracker } from '../utils/progress.js';
 import type { JsonSchemaProperty } from '../utils/schema-generation.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
@@ -697,12 +697,11 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
 
             const { content, structuredContent } = buildActorResponseContent(actorName, callResult, previewOutput);
 
+            const _meta = buildUsageMeta(callResult);
             return {
                 content,
                 structuredContent,
-                ...(callResult.usageTotalUsd !== undefined && {
-                    _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
-                }),
+                ...(_meta && { _meta }),
             };
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, async: async ?? (apifyMcpServer.options.uiMode === 'openai') });
