@@ -13,6 +13,7 @@ const dirName = dirname(filename);
 const widgets = [
     { name: 'search-actors-widget', entry: 'src/widgets/search-actors-widget.tsx' },
     { name: 'actor-run-widget', entry: 'src/widgets/actor-run-widget.tsx' },
+    { name: 'actor-detail-widget', entry: 'src/widgets/actor-detail-widget.tsx' },
 ];
 
 // Check if we're in dev mode

@@ -1,79 +1,213 @@
 import React from "react";
-import { ActorImage } from "./ActorImage";
+import styled from "styled-components";
+
 import { Actor } from "../../types";
-import { Button } from "../ui/Button";
-import { Badge } from "../ui/Badge";
-import { ActorStats } from "./ActorStats";
-import { ListItemFrame } from "../ui/ListItemFrame";
-import { Heading } from "../ui/Heading";
-import { Text } from "../ui/Text";
-import { cn } from "../../utils/cn";
+import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
+import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
+import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
+import { ActorStats, StructuredPricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;
-    isFirst?: boolean;
-    isLast?: boolean;
-    variant: "list" | "detail";
-    subtitle: string;
-    description: string;
-    onViewDetails?: () => void;
-    isLoading?: boolean;
-    pricing?: string;
+    isDetail?: boolean;
+    customActionButton?: React.ReactNode;
 }
 
-export const ActorCard: React.FC<ActorCardProps> = ({ actor, isFirst, isLast, variant, subtitle, onViewDetails, isLoading, description, pricing }) => {
-    const title = actor.title || actor.name;
-    const isDetails = variant === "detail";
+const Container = styled(Box)<{ $withBorder: boolean }>`
+    background: ${theme.color.neutral.background};
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+    border-radius: ${theme.radius.radius8};
+    border: ${props => props.$withBorder ? `1px solid ${theme.color.neutral.separatorSubtle}` : 'none'};
+
+    .clampToOneLine {
+        ${clampLines(1)}
+    }
+
+    .flexShrink0 {
+        flex-shrink: 0;
+    }
+`;
+
+const BoxRow = styled(Box)`
+    display: flex;
+    gap: ${theme.space.space8};
+    align-items: center;
+    position: relative;
+`;
+
+const ActorHeaderWithActionButton = styled.div`
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+`;
+
+const BoxGroup = styled(Box)`
+    display: flex;
+    gap: ${theme.space.space4};
+    align-items: center;
+`;
+
+const StyledSeparator = styled(Box)`
+    border-left: 1px solid ${theme.color.neutral.separatorSubtle};
+    height: 8px;
+    width: 1px;
+`;
+
+const DescriptionText = styled(Text)<{ isDetail: boolean }>`
+    white-space: pre-wrap;
+    ${({ isDetail }) => !isDetail && clampLines(2)};
+`;
+
+const ActorHeader = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+`;
+
+const ActorTitleWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space2};
+`;
+
+type StatProps = {
+    icon: React.JSX.Element
+    value: string
+    additionalInfo?: string
+}
+
+const Stat: React.FC<StatProps> = ({ icon, value, additionalInfo }) => {
+    return (
+        <BoxGroup>
+            {icon}
+            <Text
+                size="small"
+                weight="medium"
+                color={theme.color.neutral.textMuted}
+            >
+                {value}
+                {additionalInfo && <Text size="small" color={theme.color.neutral.textSubtle} as="span"> {additionalInfo}</Text>}
+            </Text>
+        </BoxGroup>
+    )
+}
+
+type StatsRowProps = {
+    stats?: ActorStats
+    pricingInfo?: StructuredPricingInfo
+    showFirstSeparator?: boolean;
+}
+
+const StatsContainer = styled(Box)`
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: ${theme.space.space8};
+    align-items: center;
+`;
+
+const ShowOnMobile = styled(BoxRow)`
+    display: flex;
+
+    @media ${theme.device.tablet} {
+        display: none;
+    }
+`;
+
+const ShowOnTabletAndDesktop = styled(BoxRow)`
+    display: none;
+
+    @media ${theme.device.tablet} {
+        display: flex;
+    }
+`;
+
+const StatsRow: React.FC<StatsRowProps> = ({ stats, pricingInfo, showFirstSeparator = false }) => {
+    const {totalUsers, actorReviewCount, actorReviewRating} = stats || {}
+    const pricing = pricingInfo ? formatPricing(pricingInfo) : 'N/A';
 
     return (
-        <ListItemFrame isFirst={isFirst} isLast={isLast}>
-            <div className="flex gap-2 items-center w-full">
-                <div className="flex flex-1 gap-3 items-center min-w-0">
-                    <ActorImage pictureUrl={actor?.pictureUrl || ""} name={title} size={isDetails ? 80 : 40} />
+        <StatsContainer>
+            {totalUsers !== undefined && <>
+                {showFirstSeparator && <StyledSeparator />}
+                <Stat
+                    icon={<PeopleIcon size="12" color={theme.color.neutral.icon} />}
+                    value={formatNumber(totalUsers)}
+                />
+            </>}
+            {actorReviewCount !== undefined && actorReviewRating !== undefined && <>
+                <StyledSeparator />
+                <Stat
+                    icon={<StarEmptyIcon size="12" color={theme.color.neutral.icon} />}
+                    value={formatDecimalNumber(actorReviewRating)}
+                    additionalInfo={`(${formatNumber(actorReviewCount)})`}
+                />
+            </>}
+            {pricingInfo && <>
+                <StyledSeparator />
+                <Stat
+                    icon={<CoinIcon size="12" color={theme.color.neutral.icon} />}
+                    value={pricing}
+                />
+            </>}
+        </StatsContainer>
+    );
+}
 
-                    <div className="flex-1 flex flex-col items-start justify-center min-w-0">
-                        {isDetails ? (
-                            <Heading size="2xl" weight="bold" className="mb-1">
-                                {title}
-                            </Heading>
-                        ) : (
-                            <Text truncate className="w-full">
-                                {title}
-                            </Text>
-                        )}
+export const ActorCard: React.FC<ActorCardProps> = ({
+    actor,
+    isDetail = false,
+    customActionButton,
+}) => {
+    const statsProps = {
+        stats: actor.stats,
+        pricingInfo: actor.currentPricingInfo,
+        isDetail
+    };
 
-                        <Text size="sm" truncate tone="secondary" className="w-full">
-                            {subtitle}
-                        </Text>
-                    </div>
-                </div>
+    return (
+        <Container px="space16" py="space12" $withBorder={!isDetail}>
+            <BoxRow>
+                <ActorHeaderWithActionButton>
+                    <ActorHeader>
+                        <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
+                        <ActorTitleWrapper>
+                            <Text as="h3" weight="bold" color={theme.color.neutral.text} className="clampToOneLine" >{actor.title}</Text>
+                            <BoxRow>
+                                <Text
+                                    size="small"
+                                    weight="medium"
+                                    type="code"
+                                    color={theme.color.neutral.textSubtle}
+                                    className="clampToOneLine"
+                                >
+                                    {actor.username}/{actor.name}
+                                </Text>
+                                {actor.stats && !isDetail && <ShowOnTabletAndDesktop><StatsRow {...statsProps} showFirstSeparator /></ShowOnTabletAndDesktop>}
+                            </BoxRow>
+                        </ActorTitleWrapper>
+                    </ActorHeader>
+                    {customActionButton || (
+                        // @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button
+                        <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                    )}
+                </ActorHeaderWithActionButton>
+            </BoxRow>
 
-                {!isDetails && (
-                    <Button onClick={onViewDetails} disabled={isLoading} loading={isLoading} variant="primary" size="sm" className="shrink-0">
-                        {isLoading ? "Loading" : "View Details"}
-                    </Button>
-                )}
-            </div>
+            <DescriptionText
+                size="small"
+                weight="normal"
+                color={theme.color.neutral.text}
+                isDetail={isDetail}
+            >
+                {actor.description}
+            </DescriptionText>
 
-            {isDetails ? (
-                <Text className={cn("w-full tracking-tight")}>{description}</Text>
-            ) : (
-                <Text size="sm" className={cn("w-full tracking-tight")}>
-                    {description}
-                </Text>
-            )}
-
-            <ActorStats
-                totalUsers={actor.stats?.totalUsers || 0}
-                totalRuns={actor.stats?.totalRuns || 0}
-                successRate={actor.userActorRuns?.successRate ?? null}
-            />
-
-            {isDetails && pricing ? (
-                <Badge variant="success" className="text-sm">
-                    {pricing}
-                </Badge>
-            ) : null}
-        </ListItemFrame>
+            {actor.stats && isDetail && <StatsRow {...statsProps} />}
+            {actor.stats && !isDetail && <ShowOnMobile><StatsRow {...statsProps} /></ShowOnMobile>}
+        </Container>
     );
 };

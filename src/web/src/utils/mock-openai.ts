@@ -1,4 +1,5 @@
 import { OpenAiGlobals } from "../types";
+import { MOCK_ACTOR_DETAILS_RESPONSE } from "./mock-actor-details";
 
 interface MockOpenAiConfig {
     toolOutput?: any;
@@ -15,11 +16,23 @@ export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
         // API methods
         callTool: async (name: string, args: any) => {
             console.log(`Mock callTool: ${name}`, args);
+
             if (config.callTool) {
                 return config.callTool(name, args);
             }
-            alert(`Would call tool: ${name}\nWith args: ${JSON.stringify(args, null, 2)}`);
-            return { result: "mock result" };
+
+            switch (name) {
+                case "fetch-actor-details":
+                    console.log(`Returning mock actor details for: ${args.actor}`);
+                    return {
+                        result: "success",
+                        structuredContent: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent
+                    };
+
+                default:
+                    alert(`Would call tool: ${name}\nWith args: ${JSON.stringify(args, null, 2)}`);
+                    return { result: "mock result" };
+            }
         },
         sendFollowUpMessage: async (args: { prompt: string }) => {
             console.log("Mock sendFollowUpMessage:", args);
@@ -76,10 +89,10 @@ export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
 
 export const updateMockOpenAiState = (updates: Partial<OpenAiGlobals>) => {
     if (typeof window === "undefined" || !window.openai) return;
-    
+
     // Update local state
     Object.assign(window.openai, updates);
-    
+
     // Dispatch event to notify listeners (hooks)
     window.dispatchEvent(
         new CustomEvent("openai:set_globals", {

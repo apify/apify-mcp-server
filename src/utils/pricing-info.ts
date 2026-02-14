@@ -1,7 +1,5 @@
-import type { ActorRunPricingInfo } from 'apify-client';
-
 import { ACTOR_PRICING_MODEL } from '../const.js';
-import type { ExtendedPricingInfo } from '../types.js';
+import type { ActorChargeEvent, PricingInfo } from '../types.js';
 
 /**
  * Custom type to transform raw API pricing data into a clean, client-friendly format
@@ -36,7 +34,7 @@ export type StructuredPricingInfo = {
  * then sorts the remaining infos by `startedAt` in descending order (most recent first).
  * Returns the most recent valid pricing info, or `null` if none are valid.
  */
-export function getCurrentPricingInfo(pricingInfos: ActorRunPricingInfo[], now: Date): ActorRunPricingInfo | null {
+export function getCurrentPricingInfo(pricingInfos: PricingInfo[], now: Date): PricingInfo | null {
     // Filter out all future dates and those without a startedAt date
     const validPricingInfos = pricingInfos.filter((info) => {
         if (!info.startedAt) return false;
@@ -79,7 +77,7 @@ function convertMinutesToGreatestUnit(minutes: number): { value: number; unit: s
  * @param pricingPerEvent
  */
 
-function payPerEventPricingToString(pricingPerEvent: ExtendedPricingInfo['pricingPerEvent']): string {
+function payPerEventPricingToString(pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined): string {
     if (!pricingPerEvent || !pricingPerEvent.actorChargeEvents) return 'Pricing information for events is not available.';
     const eventStrings: string[] = [];
     for (const event of Object.values(pricingPerEvent.actorChargeEvents)) {
@@ -99,7 +97,7 @@ function payPerEventPricingToString(pricingPerEvent: ExtendedPricingInfo['pricin
     return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${eventStrings.join('\n')}`;
 }
 
-export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): string {
+export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
     // If there is no pricing infos entries the Actor is free to use
     // based on https://github.com/apify/apify-core/blob/058044945f242387dde2422b8f1bef395110a1bf/src/packages/actor/src/paid_actors/paid_actors_common.ts#L691
     if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
@@ -137,7 +135,7 @@ export function pricingInfoToString(pricingInfo: ExtendedPricingInfo | null): st
  * Transform and normalize API response to match unstructured text output format
  * instead of just dumping raw API data - ensures consistency across structured & unstructured modes.
  */
-export function pricingInfoToStructured(pricingInfo: ExtendedPricingInfo | null): StructuredPricingInfo {
+export function pricingInfoToStructured(pricingInfo: PricingInfo | null): StructuredPricingInfo {
     const structuredPricing: StructuredPricingInfo = {
         model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE,
         isFree: !pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE,
@@ -169,17 +167,22 @@ export function pricingInfoToStructured(pricingInfo: ExtendedPricingInfo | null)
         }
     } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
         if (pricingInfo.pricingPerEvent?.actorChargeEvents) {
-            structuredPricing.events = Object.values(pricingInfo.pricingPerEvent.actorChargeEvents).map((event) => ({
-                title: event.eventTitle,
-                description: event.eventDescription || '',
-                priceUsd: typeof event.eventPriceUsd === 'number' ? event.eventPriceUsd : undefined,
-                tieredPricing: event.eventTieredPricingUsd
-                    ? Object.entries(event.eventTieredPricingUsd).map(([tier, price]) => ({
-                        tier,
-                        priceUsd: price.tieredEventPriceUsd,
-                    }))
-                    : undefined,
-            }));
+            const { actorChargeEvents } = pricingInfo.pricingPerEvent;
+            structuredPricing.events = Object.entries(actorChargeEvents).map(([, event]) => {
+                const actorEvent = event as ActorChargeEvent;
+                return {
+                    title: actorEvent.eventTitle,
+                    description: actorEvent.eventDescription || '',
+                    priceUsd: typeof actorEvent.eventPriceUsd === 'number' ? actorEvent.eventPriceUsd : undefined,
+                    tieredPricing: actorEvent.eventTieredPricingUsd
+                        ? Object.entries(actorEvent.eventTieredPricingUsd)
+                            .map(([tier, price]) => ({
+                                tier,
+                                priceUsd: price.tieredEventPriceUsd,
+                            }))
+                        : undefined,
+                };
+            });
         }
     }
 

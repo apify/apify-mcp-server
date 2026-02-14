@@ -72,9 +72,6 @@ EXAMPLES:
                 actorInfo: details.actorCardStructured,
                 readme: formattedReadme,
                 inputSchema: details.inputSchema,
-            };
-            const widgetStructuredContent = {
-                ...structuredContent,
                 actorDetails: processedStructuredContent.actorDetails,
             };
 
@@ -89,7 +86,7 @@ An interactive widget has been rendered with detailed Actor information.
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
             return buildMCPResponse({
                 texts,
-                structuredContent: widgetStructuredContent,
+                structuredContent,
                 _meta: {
                     ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
