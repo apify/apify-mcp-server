@@ -144,14 +144,51 @@ function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<str
     }
 }
 
-/** Validates that the result contains Apify usage cost metadata with expected structure. */
+/** Validates that the structured content contains expected python-example Actor results. */
+function expectPythonExampleStructuredContent(result: unknown, firstNumber: number, secondNumber: number): void {
+    const resultWithStructured = result as { structuredContent?: {
+         runId?: string;
+         datasetId?: string;
+         itemCount?: number;
+         items?: { first_number?: number; second_number?: number; sum?: number }[];
+         instructions?: string;
+     } };
+    expect(resultWithStructured.structuredContent).toBeDefined();
+    expect(resultWithStructured.structuredContent?.items).toBeDefined();
+    expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
+    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', firstNumber + secondNumber);
+    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', firstNumber);
+    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', secondNumber);
+}
+
+/** Validates that a markdown text contains a JSON schema code block with metadata and crawl properties. */
+function expectEmbeddedSchemaWithMetadataAndCrawl(text: string): void {
+    const schemaMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+    expect(schemaMatch).toBeTruthy();
+    if (schemaMatch) {
+        const schema = JSON.parse(schemaMatch[1]);
+        expect(schema).toHaveProperty('type');
+        expect(schema.type).toBe('object');
+        expect(schema).toHaveProperty('properties');
+        expect(schema.properties).toHaveProperty('metadata');
+        expect(schema.properties.metadata).toHaveProperty('type', 'object');
+        expect(schema.properties).toHaveProperty('crawl');
+        expect(schema.properties.crawl).toHaveProperty('type', 'object');
+    }
+}
+
+/** Validates that the result contains Apify usage cost metadata with expected structure (MCP namespaced keys). */
 function expectUsageCostMeta(result: unknown): void {
-    const resultWithMeta = result as { _meta?: { usageTotalUsd?: number; usageUsd?: Record<string, number> } };
+    const resultWithMeta = result as {
+        _meta?: { 'com.apify/usageTotalUsd'?: number; 'com.apify/usageUsd'?: Record<string, number> };
+    };
     expect(resultWithMeta._meta).toBeDefined();
-    expect(typeof resultWithMeta._meta?.usageTotalUsd).toBe('number');
-    expect(resultWithMeta._meta!.usageTotalUsd!).toBeGreaterThanOrEqual(0);
-    expect(resultWithMeta._meta?.usageUsd).toBeDefined();
-    expect(typeof resultWithMeta._meta?.usageUsd).toBe('object');
+    const usageTotalUsd = resultWithMeta._meta?.['usageTotalUsd'];
+    expect(typeof usageTotalUsd).toBe('number');
+    expect(usageTotalUsd!).toBeGreaterThanOrEqual(0);
+    const usageUsd = resultWithMeta._meta?.['usageUsd'];
+    expect(usageUsd).toBeDefined();
+    expect(typeof usageUsd).toBe('object');
 }
 
 export function createIntegrationTestsSuite(
@@ -504,19 +541,7 @@ export function createIntegrationTestsSuite(
             );
 
             // Validate structured output has actual actor results
-            const resultWithStructured = result as { structuredContent?: {
-                 runId?: string;
-                 datasetId?: string;
-                 itemCount?: number;
-                 items?: { first_number?: number; second_number?: number; sum?: number }[];
-                 instructions?: string;
-             } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
+            expectPythonExampleStructuredContent(result, 1, 2);
         });
 
         it('should call Actor directly with required input', async () => {
@@ -563,19 +588,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
 
             // Validate structured content has actual actor results
-            const resultWithStructured = callResult as { structuredContent?: {
-                 runId?: string;
-                 datasetId?: string;
-                 itemCount?: number;
-                 items?: { first_number?: number; second_number?: number; sum?: number }[];
-                 instructions?: string;
-             } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
+            expectPythonExampleStructuredContent(callResult, 1, 2);
 
             // Validate _meta contains Apify usage cost information for completed sync runs
             expectUsageCostMeta(callResult);
@@ -710,19 +723,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
 
             // Validate structured content has actual actor results
-            const resultWithStructured = callResult as { structuredContent?: {
-                 runId?: string;
-                 datasetId?: string;
-                 itemCount?: number;
-                 items?: { first_number?: number; second_number?: number; sum?: number }[];
-                 instructions?: string;
-             } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
+            expectPythonExampleStructuredContent(callResult, 1, 2);
         });
 
         it('should find Actors in store search', async () => {
@@ -1926,20 +1927,7 @@ export function createIntegrationTestsSuite(
             expect(runIdMatch).toBeTruthy();
             const datasetId = runIdMatch![2];
 
-            // Check for JSON schema in the text (in a code block)
-            const schemaMatch = runText.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-            expect(schemaMatch).toBeTruthy();
-            if (schemaMatch) {
-                const schemaText = schemaMatch[1];
-                const schema = JSON.parse(schemaText);
-                expect(schema).toHaveProperty('type');
-                expect(schema.type).toBe('object');
-                expect(schema).toHaveProperty('properties');
-                expect(schema.properties).toHaveProperty('metadata');
-                expect(schema.properties.metadata).toHaveProperty('type', 'object');
-                expect(schema.properties).toHaveProperty('crawl');
-                expect(schema.properties.crawl).toHaveProperty('type', 'object');
-            }
+            expectEmbeddedSchemaWithMetadataAndCrawl(runText);
 
             const outputResult = await client.callTool({
                 name: HelperTools.ACTOR_OUTPUT_GET,
@@ -1982,20 +1970,7 @@ export function createIntegrationTestsSuite(
             expect(runIdMatch).toBeTruthy();
             const datasetId = runIdMatch![2];
 
-            // Check for JSON schema in the text (in a code block)
-            const schemaMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-            expect(schemaMatch).toBeTruthy();
-            if (schemaMatch) {
-                const schemaText = schemaMatch[1];
-                const schema = JSON.parse(schemaText);
-                expect(schema).toHaveProperty('type');
-                expect(schema.type).toBe('object');
-                expect(schema).toHaveProperty('properties');
-                expect(schema.properties).toHaveProperty('metadata');
-                expect(schema.properties.metadata).toHaveProperty('type', 'object');
-                expect(schema.properties).toHaveProperty('crawl');
-                expect(schema.properties.crawl).toHaveProperty('type', 'object');
-            }
+            expectEmbeddedSchemaWithMetadataAndCrawl(text);
 
             // Call get-actor-output with fields: 'metadata.title'
             const outputResult = await client.callTool({
@@ -2084,19 +2059,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, callActorOutputSchema, selectedToolName);
 
             // Validate structured content has actual actor results with sum
-            const resultWithStructured = result as { structuredContent?: {
-                 runId?: string;
-                 datasetId?: string;
-                 itemCount?: number;
-                 items?: { first_number?: number; second_number?: number; sum?: number }[];
-                 instructions?: string;
-             } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 12);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 5);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 7);
+            expectPythonExampleStructuredContent(result, 5, 7);
 
             // Validate _meta contains Apify usage cost information for direct actor tool calls
             expectUsageCostMeta(result);
