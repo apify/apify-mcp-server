@@ -1,6 +1,27 @@
 import type { ToolStatus } from '../types.js';
 
 /**
+ * Builds usage metadata for MCP response from a source object containing Apify run costs.
+ * Uses MCP-compliant key names with com.apify/ prefix as per MCP specification.
+ * @param source - Object containing usage cost information
+ * @param source.usageTotalUsd - Total cost in USD (optional)
+ * @param source.usageUsd - Breakdown of costs by resource type (optional)
+ * @returns Usage metadata object or undefined if no usage data is available
+ */
+export function buildUsageMeta(source: {
+    usageTotalUsd?: number;
+    usageUsd?: unknown;
+}): Record<string, unknown> | undefined {
+    const { usageTotalUsd, usageUsd } = source;
+    return usageTotalUsd !== undefined
+        ? {
+            'com.apify/usageTotalUsd': usageTotalUsd,
+            'com.apify/usageUsd': usageUsd,
+        }
+        : undefined;
+}
+
+/**
  * Helper to build a response for MCP from an array of text strings.
  * @param options - Object containing response configuration
  * @param options.texts - Array of text strings to include in the response

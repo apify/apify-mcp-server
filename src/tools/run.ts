@@ -8,7 +8,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorRunOutputSchema } from './structured-output-schemas.js';
 
@@ -138,15 +138,13 @@ USAGE EXAMPLES:
                     : `Actor run ${parsed.runId} status: ${run.status}. A progress widget has been rendered.`;
 
                 const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+                const usageMeta = buildUsageMeta(run);
                 return buildMCPResponse({
                     texts: [statusText],
                     structuredContent,
                     _meta: {
                         ...widgetConfig?.meta,
-                        ...(run.usageTotalUsd !== undefined && {
-                            apifyUsageTotalUsd: run.usageTotalUsd,
-                            apifyUsageUsd: run.usageUsd,
-                        }),
+                        ...usageMeta,
                     },
                 });
             }
@@ -158,10 +156,7 @@ USAGE EXAMPLES:
             return buildMCPResponse({
                 texts,
                 structuredContent,
-                _meta: run.usageTotalUsd !== undefined ? {
-                    apifyUsageTotalUsd: run.usageTotalUsd,
-                    apifyUsageUsd: run.usageUsd as Record<string, number> | undefined,
-                } : undefined,
+                _meta: buildUsageMeta(run),
             });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
