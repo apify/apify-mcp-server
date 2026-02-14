@@ -128,10 +128,10 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
-    /** Actor output schema as type object (injected by internal server) */
-    actorOutputSchema?: Record<string, unknown> | null;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
+    /** MCP session ID for logging context */
+    mcpSessionId?: string;
 };
 
 /**
@@ -346,6 +346,43 @@ export type ToolCallTelemetryProperties = {
 export type UiMode = 'openai';
 
 /**
+ * External store for Actor metadata that can be injected by the hosting environment.
+ * Provides access to Actor output schemas inferred from historical run data.
+ * When not provided, tools use generic output schemas without field-level detail.
+ */
+export type ActorStore = {
+    /**
+     * Returns the inferred JSON Schema properties for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object should be a JSON Schema `properties` object, e.g.:
+     * `{ url: { type: 'string' }, price: { type: 'number' } }`
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     * Internally calls `getActorOutputSchemaAsTypeObject` and converts the result.
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /**
+     * Returns the inferred output schema as a simplified type object for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object uses a compact type representation, e.g.:
+     * `{ url: "string", price: "number", tags: ["string"], user: { name: "string" } }`
+     *
+     * This is the core method that performs cache lookup, API resolution, and MongoDB queries.
+     * Results are cached with TTL to avoid repeated database queries.
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
+};
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -353,6 +390,12 @@ export type ActorsMcpServerOptions = {
      * Task store for long running tasks support.
      */
     taskStore?: TaskStore;
+    /**
+     * External store for Actor metadata (output schemas).
+     * When provided, Actor tools will have enriched output schemas with field-level detail.
+     * Only used by the streamable HTTP transport in hosted deployments.
+     */
+    actorStore?: ActorStore;
     setupSigintHandler?: boolean;
     /**
      * Switch to enable Skyfire agentic payment mode.
@@ -461,8 +504,6 @@ export type ApifyRequestParams = {
         apifyToken?: string;
         /** List of Actor IDs that the user has rented */
         userRentedActorIds?: string[];
-        /** Actor output schema as type object (injected by internal server) */
-        actorOutputSchema?: Record<string, unknown> | null;
         /** Progress token for out-of-band progress notifications (standard MCP) */
         progressToken?: string | number;
         /** Allow other metadata fields */
@@ -470,4 +511,31 @@ export type ApifyRequestParams = {
     };
     /** Allow any other request parameters */
     [key: string]: unknown;
+};
+
+/** MCP Server Card per SEP-1649. */
+export type ServerCard = {
+    $schema: string;
+    version: string;
+    protocolVersion: string;
+    serverInfo: {
+        name: string;
+        title: string;
+        version: string;
+    };
+    description: string;
+    iconUrl: string;
+    documentationUrl: string;
+    transport: {
+        type: string;
+        endpoint: string;
+    };
+    capabilities: {
+        tools: { listChanged: boolean };
+    };
+    authentication: {
+        required: boolean;
+        schemes: string[];
+    };
+    tools: string;
 };

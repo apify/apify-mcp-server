@@ -1,3 +1,22 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * Reads and parses a JSON file relative to the caller's module URL.
+ * Resolves the path from the directory of the calling module (via `import.meta.url`).
+ *
+ * @param importMetaUrl - The `import.meta.url` of the calling module.
+ * @param relativePath - The relative path to the JSON file from the calling module.
+ * @returns The parsed JSON content.
+ * @example
+ * const serverJson = readJsonFile(import.meta.url, '../../server.json');
+ */
+export function readJsonFile<T = unknown>(importMetaUrl: string, relativePath: string): T {
+    const jsonPath = resolve(dirname(fileURLToPath(importMetaUrl)), relativePath);
+    return JSON.parse(readFileSync(jsonPath, 'utf-8')) as T;
+}
+
 /**
  * Parses a comma-separated string into an array of trimmed strings.
  * Empty strings are filtered out after trimming.

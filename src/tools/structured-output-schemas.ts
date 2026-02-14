@@ -223,6 +223,7 @@ export const callActorOutputSchema = {
             description: 'Dataset items from the Actor run (sync mode only, may be truncated due to size limits)',
         },
         instructions: { type: 'string', description: 'Instructions for the LLM on how to process or retrieve additional data' },
+        usageTotalUsd: { type: 'number', description: 'Total cost of the Actor run in USD (sync mode only)' },
     },
     required: ['runId'],
 };
@@ -243,6 +244,7 @@ export const getActorRunOutputSchema = {
             type: 'object' as const,
             description: 'Run statistics (compute units, memory, duration, etc.)',
         },
+        usageTotalUsd: { type: 'number', description: 'Total cost of the Actor run in USD' },
         dataset: {
             type: 'object' as const,
             description: 'Dataset information (only for completed runs with results)',
@@ -280,3 +282,30 @@ export const datasetItemsOutputSchema = {
     },
     required: ['datasetId', 'items', 'itemCount'],
 };
+
+/**
+ * Creates an enriched version of callActorOutputSchema where the `items` field
+ * contains actual property definitions inferred from Actor run history.
+ *
+ * @param itemProperties - JSON Schema properties object describing dataset item fields
+ *   (e.g., `{ url: { type: 'string' }, price: { type: 'number' } }`)
+ * @returns A copy of callActorOutputSchema with enriched items schema
+ */
+export function buildEnrichedCallActorOutputSchema(
+    itemProperties: Record<string, unknown>,
+): typeof callActorOutputSchema {
+    return {
+        ...callActorOutputSchema,
+        properties: {
+            ...callActorOutputSchema.properties,
+            items: {
+                type: 'array' as const,
+                items: {
+                    type: 'object' as const,
+                    properties: itemProperties,
+                } as unknown as { type: 'object' },
+                description: callActorOutputSchema.properties.items.description,
+            },
+        },
+    };
+}
