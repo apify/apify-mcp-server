@@ -143,6 +143,10 @@ USAGE EXAMPLES:
                     structuredContent,
                     _meta: {
                         ...widgetConfig?.meta,
+                        ...(run.usageTotalUsd !== undefined && {
+                            apifyUsageTotalUsd: run.usageTotalUsd,
+                            apifyUsageUsd: run.usageUsd,
+                        }),
                     },
                 });
             }
@@ -151,7 +155,14 @@ USAGE EXAMPLES:
                 `# Actor Run Information\n\`\`\`json\n${JSON.stringify(run, null, 2)}\n\`\`\``,
             ];
 
-            return buildMCPResponse({ texts, structuredContent });
+            return buildMCPResponse({
+                texts,
+                structuredContent,
+                _meta: run.usageTotalUsd !== undefined ? {
+                    apifyUsageTotalUsd: run.usageTotalUsd,
+                    apifyUsageUsd: run.usageUsd as Record<string, number> | undefined,
+                } : undefined,
+            });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
             return buildMCPResponse({

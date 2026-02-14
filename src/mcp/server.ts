@@ -878,7 +878,13 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         }
 
                         const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                        return { content, structuredContent };
+                        return {
+                            content,
+                            structuredContent,
+                            ...(callResult.usageTotalUsd !== undefined && {
+                                _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
+                            }),
+                        };
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();
@@ -1070,7 +1076,13 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     result = {};
                 } else {
                     const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                    result = { content, structuredContent };
+                    result = {
+                        content,
+                        structuredContent,
+                        ...(callResult.usageTotalUsd !== undefined && {
+                            _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
+                        }),
+                    };
                 }
 
                 if (progressTracker) {

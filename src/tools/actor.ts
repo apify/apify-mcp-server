@@ -50,6 +50,8 @@ export type CallActorGetDatasetResult = {
     itemCount: number;
     schema: JsonSchemaProperty;
     previewItems: DatasetItem[];
+    usageTotalUsd?: number;
+    usageUsd?: Record<string, number>;
 };
 
 /**
@@ -154,6 +156,8 @@ export async function callActorGetDataset(options: {
         itemCount: datasetItems.count,
         schema,
         previewItems,
+        usageTotalUsd: completedRun.usageTotalUsd,
+        usageUsd: completedRun.usageUsd as Record<string, number> | undefined,
     };
 }
 
@@ -693,7 +697,13 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
 
             const { content, structuredContent } = buildActorResponseContent(actorName, callResult, previewOutput);
 
-            return { content, structuredContent };
+            return {
+                content,
+                structuredContent,
+                ...(callResult.usageTotalUsd !== undefined && {
+                    _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
+                }),
+            };
         } catch (error) {
             logHttpError(error, 'Failed to call Actor', { actorName, async: async ?? (apifyMcpServer.options.uiMode === 'openai') });
             // Let the server classify the error; we only mark it as an MCP error response
