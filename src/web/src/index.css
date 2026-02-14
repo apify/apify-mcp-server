@@ -11,6 +11,11 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+  /* Set base font size for rem calculations: 1rem = 1px */
+  html {
+    font-size: 10px;
+  }
+
   /* Theme-aware brand colors */
   :root {
     --color-code-orange: #FF6B00;

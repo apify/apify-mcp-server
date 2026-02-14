@@ -638,9 +638,13 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
                 log.debug('Started Actor run (async)', { actorName, runId: actorRun.id, mcpSessionId });
 
+                // Extract username from actorName (format: "username/name")
+                const [actorUsername, actorSimpleName] = actorName.split('/');
+
                 const structuredContent = {
                     runId: actorRun.id,
-                    actorName,
+                    actorName: actorSimpleName || actorName,
+                    actorUsername: actorUsername || 'unknown',
                     status: actorRun.status,
                     startedAt: actorRun.startedAt?.toISOString() || '',
                     input,

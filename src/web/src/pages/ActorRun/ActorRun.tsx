@@ -1,22 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import styled from "styled-components";
+import { Badge, Button, InlineSpinner, Text, theme, type BadgeVariant } from "@apify/ui-library";
+import { WidgetLayout } from "../../components/layout/WidgetLayout";
+import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
-import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { formatDuration, formatBytes } from "../../utils/formatting";
-import { Button } from "../../components/ui/Button";
-import { Badge } from "../../components/ui/Badge";
-import { Alert } from "../../components/ui/Alert";
-import { Heading } from "../../components/ui/Heading";
-import { ProgressBar } from "../../components/ui/ProgressBar";
-import { JsonPreview } from "../../components/ui/JsonPreview";
-import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
-import { ActorRunSkeleton } from "./ActorRun.skeleton";
-
+import { formatDuration } from "../../utils/formatting";
 interface ActorRunData {
     runId: string;
     actorName: string;
+    actorUsername: string;
     status: string;
+    cost?: number;
+    timestamp: string;
+    duration: string;
     startedAt: string;
     finishedAt?: string;
     stats?: {
@@ -27,40 +24,35 @@ interface ActorRunData {
     dataset?: {
         datasetId: string;
         itemCount: number;
-        schema: any;
-        previewItems: any[];
+        previewItems: Record<string, any>[];
     };
-    input?: any;
 }
 
 interface ToolOutput extends Record<string, unknown> {
     runId?: string;
     actorName?: string;
+    actorUsername?: string;
     status?: string;
     startedAt?: string;
     finishedAt?: string;
     stats?: any;
     dataset?: any;
-    input?: any;
 }
 
 interface WidgetState extends Record<string, unknown> {
     isRefreshing?: boolean;
     lastUpdateTime?: number;
-    // Run completion state for model context (set when run finishes)
     runStatus?: string;
     datasetId?: string;
     itemCount?: number;
     runId?: string;
 }
 
-type StatusVariant = "success" | "danger" | "warning" | "secondary";
-
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const getStatusVariant = (status: string): StatusVariant => {
-    switch ((status || "").toUpperCase()) {
+const getStatusVariant = (status: string): BadgeVariant => {
+    switch (status.toUpperCase()) {
         case "SUCCEEDED":
             return "success";
         case "FAILED":
@@ -68,11 +60,237 @@ const getStatusVariant = (status: string): StatusVariant => {
         case "TIMED-OUT":
             return "danger";
         case "RUNNING":
-            return "warning";
+        case "READY":
+            return "primary_blue";
         default:
-            return "secondary";
+            return "neutral";
     }
 };
+
+const getStatusVariantLeadingIcon = (status: string) => {
+    switch (status.toUpperCase()) {
+        case "SUCCEEDED":
+            return CheckIcon;
+        case "FAILED":
+        case "ABORTED":
+        case "TIMED-OUT":
+            return CrossIcon;
+        case "RUNNING":
+        case "READY":
+            return LoaderIcon;
+        default:
+            return undefined;
+    }
+};
+
+const getInitials = (name: string, maxWords: number = 2): string => {
+    return name
+        .split(/[-_\s]/)
+        .filter(word => word.length > 0)
+        .slice(0, maxWords)
+        .map(word => word.charAt(0).toUpperCase())
+        .join('');
+};
+
+const extractActorName = (fullActorName: string): string => {
+    // Extract actor name without username prefix (e.g., "apify/python-example" -> "python-example")
+    const actorNameParts = fullActorName.split('/');
+    return actorNameParts.length > 1 ? actorNameParts[1] : fullActorName;
+};
+
+const Container = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space8};
+    width: 100%;
+    background: ${theme.color.neutral.background};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-radius: ${theme.radius.radius12};
+    padding: ${theme.space.space16};
+`;
+
+const ActorHeader = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: ${theme.space.space12};
+    width: 100%;
+    min-height: 24px;
+`;
+
+// Temporary ActorAvatar component until it's available in ui-library
+const ActorAvatarWrapper = styled.div<{ size: number }>`
+    width: ${props => props.size}px;
+    height: ${props => props.size}px;
+    border-radius: ${theme.radius.radius4};
+    border: 1px solid ${theme.color.neutral.border};
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: ${theme.color.neutral.backgroundMuted};
+`;
+
+const ActorAvatarInitials = styled.div<{ size: number }>`
+    font-size: ${props => Math.floor(props.size * 0.4)}px;
+    font-weight: 600;
+    color: ${theme.color.neutral.text};
+    text-transform: uppercase;
+`;
+
+
+const ActorNameLink = styled.a`
+    color: ${theme.color.neutral.text};
+    text-decoration: underline;
+    text-decoration-color: ${theme.color.neutral.text};
+    cursor: pointer;
+    ${theme.typography.shared.desktop.bodyMMedium};
+
+    &:hover {
+        color: ${theme.color.primary.action};
+        text-decoration-color: ${theme.color.primary.action};
+    }
+`;
+
+const MetadataRow = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space8};
+    flex-wrap: nowrap;
+`;
+
+const Divider = styled.span`
+    color: ${theme.color.neutral.textMuted};
+    font-size: 12px;
+    transform: rotate(0deg);
+    display: flex;
+    align-items: center;
+`;
+
+const TableContainer = styled.div`
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: auto;
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-radius: ${theme.radius.radius12};
+    background: ${theme.color.neutral.background};
+    position: relative;
+    max-height: 265px;
+`;
+
+const TableGradientOverlay = styled.div`
+    position: sticky;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 86px;
+    margin-top: -86px;
+    background: linear-gradient(179.32deg, rgba(255, 255, 255, 0) 13.4%, rgb(255, 255, 255) 95.38%);
+    pointer-events: none;
+    border-radius: 0 0 ${theme.radius.radius12} ${theme.radius.radius12};
+    z-index: 2;
+`;
+
+const Table = styled.table`
+    width: 100%;
+    border-collapse: collapse;
+`;
+
+const TableHeader = styled.thead`
+    background: ${theme.color.neutral.backgroundMuted};
+    position: sticky;
+    top: 0;
+    z-index: 1;
+`;
+
+const TableHeaderCell = styled.th`
+    text-align: left;
+    padding: ${theme.space.space8};
+    ${theme.typography.shared.desktop.titleXs};
+    color: ${theme.color.neutral.textMuted};
+    white-space: nowrap;
+    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
+
+    &:last-child {
+        border-right: none;
+    }
+`;
+
+const TableBody = styled.tbody``;
+
+const TableRow = styled.tr`
+    border-bottom: 1px solid ${theme.color.neutral.separatorSubtle};
+
+    &:last-child {
+        border-bottom: none;
+    }
+`;
+
+const TableCell = styled.td`
+    padding: ${theme.space.space10} ${theme.space.space16};
+    color: ${theme.color.neutral.textMuted};
+    ${theme.typography.shared.desktop.bodyMMedium};
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-right: 1px solid ${theme.color.neutral.separatorSubtle};
+    background: ${theme.color.neutral.background};
+
+    &:last-child {
+        border-right: none;
+    }
+`;
+
+const Footer = styled.div`
+    display: flex;
+    align-items: center;
+`;
+
+const EmptyStateContainer = styled.div`
+    padding: ${theme.space.space24} ${theme.space.space16};
+    text-align: center;
+    color: ${theme.color.neutral.textMuted};
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: ${theme.space.space8};
+`;
+
+const ActorInfoRow = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space16};
+    height: 24px;
+`;
+
+const ActorNameWithIcon = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space6};
+`;
+
+const StatusMetadataContainer = styled.div`
+    display: flex;
+    align-items: center;
+    gap: ${theme.space.space16};
+    flex-wrap: nowrap;
+    overflow: hidden;
+    flex: 1;
+`;
+
+const MetadataText = styled(Text)`
+    color: ${theme.color.neutral.text};
+    font-weight: 500;
+`;
+
+const SuccessMessage = styled.p`
+    ${theme.typography.shared.desktop.bodyM};
+    color: ${theme.color.neutral.text};
+    margin: 0;
+`;
 
 export const ActorRun: React.FC = () => {
     const toolOutput = useWidgetProps<ToolOutput>();
@@ -84,7 +302,6 @@ export const ActorRun: React.FC = () => {
     const widgetStateRef = useRef(widgetState);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
-    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         widgetStateRef.current = widgetState;
@@ -93,15 +310,24 @@ export const ActorRun: React.FC = () => {
     // Initialize from toolOutput once
     useEffect(() => {
         if (toolOutput?.runId && !runData) {
+            const startedAt = toolOutput.startedAt as string;
+            const finishedAt = toolOutput.finishedAt;
+            const duration = formatDuration(startedAt, finishedAt);
+
+            const actorNameOnly = extractActorName((toolOutput.actorName as string) || "Unknown Actor");
+
             setRunData({
                 runId: toolOutput.runId,
-                actorName: toolOutput.actorName as string,
+                actorName: actorNameOnly,
+                actorUsername: (toolOutput.actorUsername as string) || "unknown",
                 status: (toolOutput.status as string) || "RUNNING",
-                startedAt: toolOutput.startedAt as string,
-                finishedAt: toolOutput.finishedAt,
+                startedAt,
+                finishedAt,
+                timestamp: new Date(startedAt).toLocaleString(),
+                duration,
+                cost: toolOutput.stats?.computeUnits,
                 stats: toolOutput.stats,
                 dataset: toolOutput.dataset,
-                input: toolOutput.input,
             });
         }
     }, [toolOutput, runData]);
@@ -115,6 +341,7 @@ export const ActorRun: React.FC = () => {
 
         let isCancelled = false;
         let pollCount = 0;
+        let consecutiveErrors = 0;
 
         // Gradual escalation: 5s, 5s, 10s, 10s, 15s, 15s... (max 60s)
         const getNextDelay = (count: number): number => {
@@ -133,8 +360,28 @@ export const ActorRun: React.FC = () => {
                     });
 
                     if (response.structuredContent) {
-                        const newData = response.structuredContent as unknown as ActorRunData;
-                        setRunData(newData);
+                        const newData = response.structuredContent as unknown as ToolOutput;
+                        const startedAt = newData.startedAt as string;
+                        const finishedAt = newData.finishedAt;
+                        const duration = formatDuration(startedAt, finishedAt);
+
+                        const actorNameOnly = extractActorName((newData.actorName as string) || runData.actorName);
+
+                        const updatedRunData: ActorRunData = {
+                            runId: newData.runId!,
+                            actorName: actorNameOnly,
+                            actorUsername: (newData.actorUsername as string) || runData.actorUsername,
+                            status: (newData.status as string) || "RUNNING",
+                            startedAt,
+                            finishedAt,
+                            timestamp: new Date(startedAt).toLocaleString(),
+                            duration,
+                            cost: newData.stats?.computeUnits,
+                            stats: newData.stats,
+                            dataset: newData.dataset,
+                        };
+
+                        setRunData(updatedRunData);
 
                         const newStatus = (newData.status || '').toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
@@ -150,10 +397,19 @@ export const ActorRun: React.FC = () => {
                             break;
                         }
                     }
-
                     pollCount++;
+                    consecutiveErrors = 0; // Reset error count on success
                 } catch (err) {
                     console.error('[Auto-poll] Error:', err);
+                    consecutiveErrors++;
+
+                    // Stop polling after 3 consecutive errors
+                    if (consecutiveErrors >= 3) break;
+
+                    // Stop polling on authentication errors
+                    if (err instanceof Error && (err.message.includes('401') || err.message.includes('Unauthorized'))) {
+                        break;
+                    }
                 }
             }
         };
@@ -163,16 +419,29 @@ export const ActorRun: React.FC = () => {
         return () => {
             isCancelled = true;
         };
-    }, [runData?.runId]);
+    }, [runData?.runId, runData?.status]);
 
-    const flags = useMemo(() => {
-        const status = (runData?.status || "").toUpperCase();
-        const isRunning = status === "RUNNING";
-        const isSucceeded = status === "SUCCEEDED";
-        const isFailed = ["FAILED", "ABORTED", "TIMED-OUT"].includes(status);
-        const isCompleted = isSucceeded || isFailed;
-        return { status, isRunning, isSucceeded, isFailed, isCompleted };
-    }, [runData?.status]);
+
+    if (!runData) {
+        return (
+            <WidgetLayout>
+                <Container>
+                    <EmptyStateContainer>
+                        <InlineSpinner />
+                        <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                            Loading actor run data...
+                        </Text>
+                    </EmptyStateContainer>
+                </Container>
+            </WidgetLayout>
+        );
+    }
+
+    // Extract table columns from first item
+    const columns = runData.dataset?.previewItems.length
+        ? Object.keys(runData.dataset.previewItems[0])
+        : [];
+
 
     const handleOpenRun = () => {
         if (runData && window.openai?.openExternal) {
@@ -182,199 +451,115 @@ export const ActorRun: React.FC = () => {
         }
     };
 
-    const handleOpenDataset = () => {
-        if (runData?.dataset && window.openai?.openExternal) {
+    const handleOpenActor = () => {
+        if (runData && window.openai?.openExternal) {
             window.openai.openExternal({
-                href: `https://console.apify.com/storage/datasets/${runData.dataset.datasetId}`,
+                href: `https://apify.com/${runData.actorUsername}/${runData.actorName}`,
             });
         }
     };
 
-    const handleRefreshStatus = async () => {
-        if (!runData || !window.openai?.callTool) return;
-
-        const snapshot: WidgetState = { ...widgetState, isRefreshing: true };
-        await setWidgetState(snapshot);
-
-        try {
-            // Single poll only - auto-polling handles continuous updates
-            const response = await window.openai.callTool("get-actor-run", {
-                runId: runData.runId,
-            });
-
-            if (response.structuredContent) {
-                setRunData(response.structuredContent as unknown as ActorRunData);
-                await setWidgetState({ ...snapshot, lastUpdateTime: Date.now(), isRefreshing: false });
-            }
-        } catch (err) {
-            console.error("Failed to fetch actor run status:", err);
-            setError("Failed to fetch status update");
-        } finally {
-            await setWidgetState({ ...widgetState, isRefreshing: false });
-        }
-    };
-
-    if (error) {
-        return (
-            <WidgetLayout>
-                <Alert variant="error" title="Error">
-                    {error}
-                </Alert>
-            </WidgetLayout>
-        );
-    }
-
-    if (!runData) {
-        return (
-            <WidgetLayout>
-                <ActorRunSkeleton />
-            </WidgetLayout>
-        );
-    }
 
     return (
         <WidgetLayout>
-            <Card variant="alt" padding="lg" className="flex flex-col gap-4 w-full">
-                <RunHeader
-                    actorName={runData.actorName}
-                    status={runData.status}
-                    isCompleted={flags.isCompleted}
-                    isRefreshing={!!widgetState?.isRefreshing}
-                    onRefresh={handleRefreshStatus}
-                    onOpenRun={handleOpenRun}
-                />
+            <Container>
+                <ActorHeader>
+                    <ActorInfoRow>
+                        <ActorNameWithIcon>
+                            <ActorAvatarWrapper size={20}>
+                                <ActorAvatarInitials size={20}>
+                                    {getInitials(runData.actorName)}
+                                </ActorAvatarInitials>
+                            </ActorAvatarWrapper>
 
-                <RunStats startedAt={runData.startedAt} finishedAt={runData.finishedAt} stats={runData.stats} />
+                            <ActorNameLink onClick={handleOpenActor}>
+                                {runData.actorName}
+                            </ActorNameLink>
+                        </ActorNameWithIcon>
 
-                {flags.isRunning && <ProgressBar variant="warning" />}
+                        <StatusMetadataContainer>
+                            <Badge variant={getStatusVariant(runData.status)} size="small" LeadingIcon={getStatusVariantLeadingIcon(runData.status)}>
+                                {runData.status.charAt(0) + runData.status.slice(1).toLowerCase()}
+                            </Badge>
+                            <MetadataRow>
+                                {typeof runData.cost === 'number' && (
+                                    <>
+                                        <MetadataText type="body" size="small" as="span">
+                                            ${runData.cost.toFixed(3)}
+                                        </MetadataText>
+                                        <Divider>|</Divider>
+                                    </>
+                                )}
+                                <MetadataText type="body" size="small" as="span">
+                                    {runData.timestamp}
+                                </MetadataText>
+                                <Divider>|</Divider>
+                                <MetadataText type="body" size="small" as="span">
+                                    {runData.duration}
+                                </MetadataText>
+                            </MetadataRow>
+                        </StatusMetadataContainer>
+                    </ActorInfoRow>
+                {/* TODO (KH): add expand view in next step */}
+                {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
+                </ActorHeader>
 
-                {flags.isSucceeded && runData.dataset ? <RunResults dataset={runData.dataset} onOpenDataset={handleOpenDataset} /> : null}
-
-                {flags.isFailed ? <RunFailure /> : null}
-
-                <RunIdFooter runId={runData.runId} />
-            </Card>
-        </WidgetLayout>
-    );
-};
-
-const RunHeader: React.FC<{
-    actorName: string;
-    status: string;
-    isCompleted: boolean;
-    isRefreshing: boolean;
-    onRefresh: () => void;
-    onOpenRun: () => void;
-}> = ({ actorName, status, isCompleted, isRefreshing, onRefresh, onOpenRun }) => {
-    const isRunning = (status || '').toUpperCase() === 'RUNNING';
-
-    return (
-        <div className="flex items-start justify-between w-full gap-4">
-            <div className="flex-1 min-w-0">
-                <Heading size="xl" className="mb-1">
-                    {actorName}
-                </Heading>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant={getStatusVariant(status)}>{status}</Badge>
-
-                    {isRunning && (
-                        <Badge variant="secondary">
-                            <span className="flex items-center gap-1.5">
-                                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse"></span>
-                                Auto-refreshing
-                            </span>
-                        </Badge>
-                    )}
-
-                    {!isCompleted && (
-                        <Button onClick={onRefresh} disabled={isRefreshing} loading={isRefreshing} variant="secondary" size="sm">
-                            {isRefreshing ? "Loading..." : "Get Status"}
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            <Button onClick={onOpenRun} variant="primary" size="md">
-                View in Console
-            </Button>
-        </div>
-    );
-};
-
-const RunStats: React.FC<{
-    startedAt: string;
-    finishedAt?: string;
-    stats?: ActorRunData["stats"];
-}> = ({ startedAt, finishedAt, stats }) => {
-    return (
-        <div className="flex flex-wrap gap-4">
-            <StatItem label="Runtime" value={formatDuration(startedAt, finishedAt)} />
-
-            {typeof stats?.computeUnits === "number" && <StatItem label="Compute Units" value={stats.computeUnits.toFixed(4)} />}
-
-            {typeof stats?.memoryMaxBytes === "number" && <StatItem label="Max Memory" value={formatBytes(stats.memoryMaxBytes)} />}
-        </div>
-    );
-};
-
-const RunResults: React.FC<{
-    dataset: NonNullable<ActorRunData["dataset"]>;
-    onOpenDataset: () => void;
-}> = ({ dataset, onOpenDataset }) => {
-    const previewCount = Array.isArray(dataset.previewItems) ? dataset.previewItems.length : 0;
-
-    return (
-        <Alert variant="success" title="✓ Results Ready">
-            <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <Text as="div" size="sm" tone="secondary" className="flex items-center gap-2">
-                        <span>{dataset.itemCount} items</span>
-                        <Text as="span" size="sm" tone="tertiary">
-                            •
-                        </Text>
-                        <span>Dataset ID: {dataset.datasetId}</span>
-                    </Text>
-
-                    <Button onClick={onOpenDataset} variant="primary" size="sm">
-                        View Dataset
+                {runData.dataset && runData.dataset.previewItems.length > 0 ? (
+                    <>
+                        <TableContainer>
+                            <Table>
+                                <TableHeader>
+                                    <tr>
+                                        {columns.map((column) => (
+                                            <TableHeaderCell key={column}>
+                                                {column.charAt(0).toUpperCase() + column.slice(1)}
+                                            </TableHeaderCell>
+                                        ))}
+                                    </tr>
+                                </TableHeader>
+                                <TableBody>
+                                    {runData.dataset.previewItems.map((item, index) => (
+                                        <TableRow key={index}>
+                                            {columns.map((column) => (
+                                                <TableCell key={column}>
+                                                    {item[column]?.toString() || "—"}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                            {runData.dataset.previewItems.length > 3 && <TableGradientOverlay />}
+                        </TableContainer>
+                    </>
+                ) : (
+                    <EmptyStateContainer>
+                        {runData.status.toUpperCase() === 'RUNNING' ? (
+                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                Actor is running... Results will appear when available.
+                            </Text>
+                        ) : runData.status.toUpperCase() === 'READY' ? (
+                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                The Actor is ready to run.
+                            </Text>
+                        ) : (
+                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                No results available.
+                            </Text>
+                        )}
+                    </EmptyStateContainer>
+                )}
+                <Footer>
+                    <Button onClick={handleOpenRun} variant="secondary" size="small">
+                        View in Console
                     </Button>
-                </div>
-
-                {previewCount > 0 && <JsonPreview value={dataset.previewItems} title={`Preview (first ${previewCount} items)`} />}
-            </div>
-        </Alert>
-    );
-};
-
-const RunFailure: React.FC = () => {
-    return (
-        <Alert variant="error" title="Run Failed">
-            The Actor run did not complete successfully. Check the console for details.
-        </Alert>
-    );
-};
-
-const RunIdFooter: React.FC<{ runId: string }> = ({ runId }) => {
-    return (
-        <Text as="div" size="xs" tone="tertiary" className="flex items-center gap-2 pt-2 border-t border-[var(--color-border)]">
-            <span>Run ID:</span>
-            <code className="px-2 py-0.5 rounded bg-[var(--color-code-bg)]">
-                {runId}
-            </code>
-        </Text>
-    );
-};
-
-const StatItem: React.FC<{ label: string; value: string | number }> = ({ label, value }) => {
-    return (
-        <div className="flex flex-col gap-1">
-            <Text as="span" size="xs" tone="secondary">
-                {label}
-            </Text>
-            <Text as="span" size="sm" weight="medium">
-                {value}
-            </Text>
-        </div>
+                </Footer>
+            </Container>
+            {runData.status.toUpperCase() === 'SUCCEEDED' && runData && runData.dataset && runData.dataset.itemCount > 0 && (
+                <SuccessMessage>
+                    The {runData.actorName} found {runData.dataset.itemCount} result{runData.dataset.itemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
+                </SuccessMessage>
+            )}
+        </WidgetLayout>
     );
 };
