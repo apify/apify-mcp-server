@@ -132,6 +132,10 @@ function expectReadmeInStructuredContent(
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
+function validateStructuredOutputForTool(result: unknown, toolName: string): void {
+    validateStructuredOutput(result, findToolByName(toolName)?.outputSchema, toolName);
+}
+
 /** Validates that the listed tools have OpenAI metadata (_meta) with outputTemplate and widgetAccessible. */
 function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
@@ -154,7 +158,6 @@ function expectPythonExampleStructuredContent(result: unknown, firstNumber: numb
          instructions?: string;
      } };
     expect(resultWithStructured.structuredContent).toBeDefined();
-    expect(resultWithStructured.structuredContent?.items).toBeDefined();
     expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
     expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', firstNumber + secondNumber);
     expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', firstNumber);
@@ -177,17 +180,16 @@ function expectEmbeddedSchemaWithMetadataAndCrawl(text: string): void {
     }
 }
 
-/** Validates that the result contains Apify usage cost metadata with expected structure (MCP namespaced keys). */
+/** Validates that the result contains Apify usage cost metadata with expected structure. */
 function expectUsageCostMeta(result: unknown): void {
     const resultWithMeta = result as {
-        _meta?: { 'com.apify/usageTotalUsd'?: number; 'com.apify/usageUsd'?: Record<string, number> };
+        _meta?: { usageTotalUsd?: number; usageUsd?: Record<string, number> };
     };
     expect(resultWithMeta._meta).toBeDefined();
-    const usageTotalUsd = resultWithMeta._meta?.['usageTotalUsd'];
+    const usageTotalUsd = resultWithMeta._meta?.usageTotalUsd;
     expect(typeof usageTotalUsd).toBe('number');
     expect(usageTotalUsd!).toBeGreaterThanOrEqual(0);
-    const usageUsd = resultWithMeta._meta?.['usageUsd'];
-    expect(usageUsd).toBeDefined();
+    const usageUsd = resultWithMeta._meta?.usageUsd;
     expect(typeof usageUsd).toBe('object');
 }
 
@@ -286,7 +288,6 @@ export function createIntegrationTestsSuite(
             expect(searchApiifyDocsTool).toBeDefined();
 
             // Verify that outputSchema is present
-            expect(searchApiifyDocsTool?.outputSchema).toBeDefined();
             expect(typeof searchApiifyDocsTool?.outputSchema).toBe('object');
             expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('type');
             expect(searchApiifyDocsTool?.outputSchema).toHaveProperty('properties');
@@ -578,14 +579,13 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
             // Sync mode should return dataset items directly
             expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
             expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
 
             // Validate structured output matches schema
-            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
 
             // Validate structured content has actual actor results
             expectPythonExampleStructuredContent(callResult, 1, 2);
@@ -606,7 +606,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
             // Async mode should return runId immediately
             expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
@@ -614,14 +613,13 @@ export function createIntegrationTestsSuite(
             // Check for structured content with runId
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
             expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.runId).toBeDefined();
             expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
 
             // Validate structured output matches schema
-            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
         });
 
-        it('should support sync mode in call-actor (default behavior)', async () => {
+        it('should support sync mode in call-actor with step call (default behavior)', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -634,14 +632,13 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
             // Sync mode should return dataset items directly
             expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
             expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
         });
 
-        it('should support async mode in call-actor and return runId', async () => {
+        it('should support async mode in call-actor with step call and return runId', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -654,7 +651,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
             // Async mode should return runId immediately
             expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
@@ -662,7 +658,6 @@ export function createIntegrationTestsSuite(
             // Check for structured content with runId
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
             expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.runId).toBeDefined();
             expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
         });
 
@@ -678,7 +673,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
 
             // Should still have completion message with metadata
@@ -693,7 +687,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(false);
 
             // Validate structured output matches schema
-            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
 
             // Validate structured content has empty items (preview disabled)
             const resultWithStructured = callResult as { structuredContent?: { items?: unknown[] } };
@@ -713,14 +707,13 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string }[];
 
             // Should have actual preview items with the sum result
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(true);
 
             // Validate structured output matches schema
-            validateStructuredOutput(callResult, findToolByName(HelperTools.ACTOR_CALL)?.outputSchema, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
 
             // Validate structured content has actual actor results
             expectPythonExampleStructuredContent(callResult, 1, 2);
@@ -848,7 +841,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(detailsResult.content).toBeDefined();
             const detailsContent = detailsResult.content as { text: string }[];
             expect(detailsContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
 
@@ -862,7 +854,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const callContent = callResult.content as { text: string }[];
             expect(callContent.some((item) => item.text.includes(`Fetched content from ${DOCS_URL}`))).toBe(true);
         });
@@ -883,7 +874,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             // At least one result should contain the standby actor docs URL
@@ -904,7 +894,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(documentUrl);
@@ -923,7 +912,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
             // Verify it's an error response
@@ -949,7 +937,6 @@ export function createIntegrationTestsSuite(
 
             // Should not have error status
             expect(result.isError).not.toBe(true);
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             // Verify the response contains the URL we fetched
@@ -972,11 +959,10 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_SEARCH)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.DOCS_SEARCH);
         });
 
         it('should return structured output for fetch-actor-details matching outputSchema', async () => {
@@ -992,11 +978,10 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return only input schema when output={ inputSchema: true }', async () => {
@@ -1021,7 +1006,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             // Should contain schema but NOT readme or actor card
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
@@ -1050,7 +1034,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             // Should contain actor info but NOT readme or schema
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
@@ -1079,7 +1062,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
             expect(content.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
@@ -1107,7 +1089,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes('This Actor is not an MCP server'))).toBe(true);
         });
@@ -1136,12 +1117,11 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
@@ -1168,12 +1148,11 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return only pricing when output={ pricing: true }', async () => {
@@ -1198,7 +1177,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             // Should contain actor info (pricing is part of actor card) but NOT readme or schema
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
@@ -1206,7 +1184,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return only readme when output={ readme: true }', async () => {
@@ -1231,7 +1209,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             // Should contain readme text but NOT actor info card or input schema
             expect(content.length).toBeGreaterThan(0);
@@ -1239,7 +1216,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return README content (summary or full) in text and structured response for fetch-actor-details', async () => {
@@ -1311,7 +1288,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
             // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
             // but NOT mcpTools (which defaults to false)
@@ -1342,7 +1318,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
 
             // Should contain all sections in text
@@ -1356,7 +1331,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
             // Validate against schema
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should support granular output controls for rating and metadata', async () => {
@@ -1493,10 +1468,10 @@ export function createIntegrationTestsSuite(
             expect(combinationText).not.toContain('Input schema');
 
             // Validate structured output for all test cases
-            validateStructuredOutput(pricingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutput(ratingOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutput(metadataOnlyResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutput(combinationResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(pricingOnlyResult, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(ratingOnlyResult, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(metadataOnlyResult, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(combinationResult, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should dynamically test all output options and verify section presence/absence', async () => {
@@ -1586,7 +1561,7 @@ export function createIntegrationTestsSuite(
                 }
 
                 // Validate structured output
-                validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
             }
 
             // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
@@ -1623,7 +1598,7 @@ export function createIntegrationTestsSuite(
             expect(allCardText).not.toContain('README');
             expect(allCardText).not.toContain('Input schema');
 
-            validateStructuredOutput(allCardSectionsResult, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(allCardSectionsResult, HelperTools.ACTOR_GET_DETAILS);
         });
 
         it('should return structured output for search-actors matching outputSchema', async () => {
@@ -1641,11 +1616,10 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, findToolByName(HelperTools.STORE_SEARCH)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.STORE_SEARCH);
         });
 
         it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
@@ -1661,11 +1635,10 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutput(result, findToolByName(HelperTools.DOCS_FETCH)?.outputSchema, toolName);
+            validateStructuredOutputForTool(result, HelperTools.DOCS_FETCH);
         });
 
         it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {
@@ -1914,7 +1887,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(callResult.content).toBeDefined();
             const content = callResult.content as { text: string; type: string }[];
 
             expect(content.length).toBe(2); // Call step returns text summary with embedded schema
@@ -1937,7 +1909,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
             const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
@@ -1960,7 +1931,6 @@ export function createIntegrationTestsSuite(
             });
 
             // Validate the response has 1 content item with text summary and embedded schema
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
             const { text } = content[1];
@@ -1982,7 +1952,6 @@ export function createIntegrationTestsSuite(
             });
 
             // Validate the output contains the expected structure with metadata.title
-            expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
             const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
@@ -2004,13 +1973,12 @@ export function createIntegrationTestsSuite(
                  instructions?: string;
              } };
             expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toBeDefined();
             expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('metadata');
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
 
             // Validate structured output for get-actor-output
-            validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
+            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET);
 
             await client.close();
         });
@@ -2025,7 +1993,6 @@ export function createIntegrationTestsSuite(
                 arguments: input,
             });
 
-            expect(result.content).toBeDefined();
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2); // Call step returns text summary with embedded schema
 
@@ -2045,7 +2012,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(outputResult.content).toBeDefined();
             const outputContent = outputResult.content as { text: string; type: string }[];
             const output = extractJsonFromMarkdown(outputContent[0].text);
             expect(Array.isArray(output)).toBe(true);
@@ -2065,7 +2031,7 @@ export function createIntegrationTestsSuite(
             expectUsageCostMeta(result);
 
             // Validate structured output for get-actor-output
-            validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
+            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET);
         });
 
         it('should return structured output for get-actor-run matching outputSchema', async () => {
@@ -2093,7 +2059,7 @@ export function createIntegrationTestsSuite(
 
             expect(runResult.content).toBeDefined();
             // Validate structured output for get-actor-run
-            validateStructuredOutput(runResult, findToolByName(HelperTools.ACTOR_RUNS_GET)?.outputSchema, HelperTools.ACTOR_RUNS_GET);
+            validateStructuredOutputForTool(runResult, HelperTools.ACTOR_RUNS_GET);
         });
 
         it('should return Actor details both for full Actor name and ID', async () => {
@@ -2110,7 +2076,6 @@ export function createIntegrationTestsSuite(
                 name: 'fetch-actor-details',
                 arguments: { actor: actorName },
             });
-            expect(resultByName.content).toBeDefined();
             const contentByName = resultByName.content as { text: string }[];
             expect(contentByName[0].text).toContain(actorName);
 
@@ -2119,7 +2084,6 @@ export function createIntegrationTestsSuite(
                 name: 'fetch-actor-details',
                 arguments: { actor: actorId },
             });
-            expect(resultById.content).toBeDefined();
             const contentById = resultById.content as { text: string }[];
             expect(contentById[0].text).toContain(actorName);
 
@@ -2151,7 +2115,7 @@ export function createIntegrationTestsSuite(
 
             expect(datasetResult.content).toBeDefined();
             // Validate structured output for get-dataset-items
-            validateStructuredOutput(datasetResult, findToolByName(HelperTools.DATASET_GET_ITEMS)?.outputSchema, HelperTools.DATASET_GET_ITEMS);
+            validateStructuredOutputForTool(datasetResult, HelperTools.DATASET_GET_ITEMS);
 
             // Validate structured content has items with actual results
             const datasetWithStructured = datasetResult as { structuredContent?: {
@@ -2163,7 +2127,6 @@ export function createIntegrationTestsSuite(
                  limit?: number;
              } };
             expect(datasetWithStructured.structuredContent).toBeDefined();
-            expect(datasetWithStructured.structuredContent?.items).toBeDefined();
             expect(datasetWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 7);
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 3);
@@ -2240,7 +2203,6 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            expect(response.content).toBeDefined();
             const content = response.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
             expect(content[0].text).toContain(CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG);
@@ -2348,7 +2310,6 @@ export function createIntegrationTestsSuite(
                     if (!taskId) throw new Error('Task ID should be set before receiving result');
                     // Task completed retrieve the result separately
                     const result = await client.experimental.tasks.getTaskResult(taskId, CallToolResultSchema);
-                    expect(result.content).toBeDefined();
                     const content = result.content as { text: string; type: string }[];
                     expect(content.length).toBe(2);
                 }
@@ -2424,7 +2385,6 @@ export function createIntegrationTestsSuite(
                         break;
                     case 'result': {
                         // Verify the result contains expected content
-                        expect(message.result.content).toBeDefined();
                         const content = message.result.content as { text: string; type: string }[];
                         expect(content.length).toBeGreaterThan(0);
                         // Should contain dataset or run information
@@ -2629,11 +2589,9 @@ export function createIntegrationTestsSuite(
             } };
 
             expect(content.structuredContent).toBeDefined();
-            expect(content.structuredContent?.actors).toBeDefined();
             expect(Array.isArray(content.structuredContent?.actors)).toBe(true);
 
             // Check widgetActors presence in OpenAI mode
-            expect(content.structuredContent?.widgetActors).toBeDefined();
             expect(Array.isArray(content.structuredContent?.widgetActors)).toBe(true);
 
             // Check first widget actor for required fields
@@ -2676,14 +2634,12 @@ export function createIntegrationTestsSuite(
             expect(content.structuredContent?.actorDetails).toBeDefined();
 
             const details = content.structuredContent!.actorDetails!;
-            expect(details.actorCard).toBeDefined();
             expect(typeof details.actorCard).toBe('string');
 
             // OpenAI widget path always returns full readme
             expect(details.readme).toBeDefined();
             expect(typeof details.readme).toBe('string');
 
-            expect(details.actorInfo).toBeDefined();
             expect(details.actorInfo).toHaveProperty('id');
             expect(details.actorInfo).toHaveProperty('name');
             expect(details.actorInfo).toHaveProperty('username');
