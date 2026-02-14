@@ -15,8 +15,8 @@ export function buildUsageMeta(source: {
     const { usageTotalUsd, usageUsd } = source;
     return usageTotalUsd !== undefined
         ? {
-            'com.apify/usageTotalUsd': usageTotalUsd,
-            'com.apify/usageUsd': usageUsd,
+            usageTotalUsd,
+            usageUsd,
         }
         : undefined;
 }
