@@ -48,6 +48,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
+    readmeSummary?: string;
     defaultRunOptions: ActorDefaultRunOptions;
     input?: ActorInputSchema;
 };
@@ -459,6 +460,7 @@ export type StructuredActorCard = {
         url: string;
     };
     description: string;
+    readmeSummary?: string;
     categories: string[];
     pricing: StructuredPricingInfo;
     stats?: {
@@ -479,6 +481,8 @@ export type StructuredActorCard = {
 export type ActorCardOptions = {
     /** Include description text only */
     includeDescription?: boolean;
+    /** Include readme summary */
+    includeReadmeSummary?: boolean;
     /** Include usage statistics (users, runs, success rate, bookmarks) */
     includeStats?: boolean;
     /** Include pricing information */
