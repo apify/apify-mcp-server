@@ -69,7 +69,7 @@ import type {
 } from '../types.js';
 import { buildActorResponseContent } from '../utils/actor-response.js';
 import { logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
@@ -864,12 +864,11 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                         }
 
                         const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
+                        const _meta = buildUsageMeta(callResult);
                         return {
                             content,
                             structuredContent,
-                            ...(callResult.usageTotalUsd !== undefined && {
-                                _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
-                            }),
+                            ...(_meta && { _meta }),
                         };
                     } finally {
                         if (progressTracker) {
@@ -1060,12 +1059,11 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     result = {};
                 } else {
                     const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
+                    const _meta = buildUsageMeta(callResult);
                     result = {
                         content,
                         structuredContent,
-                        ...(callResult.usageTotalUsd !== undefined && {
-                            _meta: { apifyUsageTotalUsd: callResult.usageTotalUsd, apifyUsageUsd: callResult.usageUsd },
-                        }),
+                        ...(_meta && { _meta }),
                     };
                 }
 
