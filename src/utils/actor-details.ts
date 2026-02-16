@@ -55,6 +55,20 @@ function typeValueToString(value: unknown): string {
     return 'unknown';
 }
 
+/**
+ * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
+ * Returns the content string and appropriate heading for text output.
+ */
+export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+    content: string;
+    heading: string;
+} {
+    if (details.readmeSummary?.trim()) {
+        return { content: details.readmeSummary, heading: '# README summary' };
+    }
+    return { content: details.readme, heading: '# README' };
+}
+
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
@@ -154,7 +168,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
     metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
-    readmeSummary: z.boolean().optional().describe('Include Abridged Actor README documentation.'),
+    readme: z.boolean().optional().describe('Include Actor README documentation (summary when available, full otherwise).'),
     outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
@@ -166,7 +180,7 @@ export const actorDetailsOutputDefaults = {
     rating: true,
     metadata: true,
     inputSchema: true,
-    readmeSummary: true,
+    readme: true,
     outputSchema: false,
     mcpTools: false,
 };
@@ -192,7 +206,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
         rating: output?.rating === true,
         metadata: output?.metadata === true,
         inputSchema: output?.inputSchema === true,
-        readmeSummary: output?.readmeSummary === true,
+        readme: output?.readme === true,
         outputSchema: output?.outputSchema === true,
         mcpTools: output?.mcpTools === true,
     };
@@ -289,7 +303,7 @@ export async function buildActorDetailsTextResponse(options: {
         pricing: boolean;
         rating: boolean;
         metadata: boolean;
-        readmeSummary: boolean;
+        readme: boolean;
         inputSchema: boolean;
         outputSchema: boolean;
         mcpTools: boolean;
@@ -312,7 +326,6 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Build actor card only if any card section is requested
     const needsCard = cardOptions.includeDescription
-        || cardOptions.includeReadmeSummary
         || cardOptions.includeStats
         || cardOptions.includePricing
         || cardOptions.includeRating
@@ -322,9 +335,10 @@ export async function buildActorDetailsTextResponse(options: {
         texts.push(`# Actor information\n${details.actorCard}`);
     }
 
-    // Add README summary if requested
-    if (output.readmeSummary && details.readmeSummary) {
-        texts.push(details.readmeSummary);
+    // Add README content if requested (prefer readmeSummary, fall back to full readme)
+    const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
+    if (resolvedReadme) {
+        texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
     }
 
     // Add input schema if requested
@@ -351,6 +365,7 @@ export async function buildActorDetailsTextResponse(options: {
     // Build structured content
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
+        readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
     };

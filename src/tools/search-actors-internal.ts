@@ -66,7 +66,6 @@ Returns only minimal fields (fullName, title, description) needed for subsequent
             fullName: `${actor.username}/${actor.name}`,
             title: actor.title || actor.name,
             description: actor.description || '',
-            ...(actor.readmeSummary ? { readmeSummary: actor.readmeSummary } : {}),
         }));
 
         return buildMCPResponse({

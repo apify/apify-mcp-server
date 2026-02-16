@@ -33,7 +33,7 @@ This tool is available because the LLM is operating in UI mode. Use it for inter
 where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
 Use 'output' parameter with boolean flags to control returned information:
-- Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - excepts McpTools
+- Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - except mcpTools
 - Selective: Set desired fields to true to save tokens (e.g., output: { inputSchema: true, readme: false })
 - Common patterns: inputSchema only for execution prep, readme + inputSchema for documentation, etc.
 

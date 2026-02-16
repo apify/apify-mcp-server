@@ -60,17 +60,15 @@ After completing ANY code change (feature, fix, refactor), you MUST:
    - Fix ALL TypeScript errors before proceeding
    - Zero tolerance for type errors
 
-2. **Build**: `npm run build`
-   - Ensures compilation succeeds
-   - Fix all compilation errors before running tests
-
-3. **Lint**: `npm run lint`
+2. **Lint**: `npm run lint`
    - Fix ALL lint errors before proceeding
    - Use `npm run lint:fix` for auto-fixable issues
 
-4. **Unit tests**: `npm run test:unit`
+3. **Unit tests**: `npm run test:unit`
    - ALL tests must pass
    - If a test fails, fix it before moving on
+
+**⚠️ IMPORTANT: Do NOT use `npm run build` for routine code verification.** Always use `npm run type-check` instead — it is faster and sufficient for validating TypeScript correctness. Only run `npm run build` when you explicitly need compiled JavaScript output (e.g., before integration tests or deployment).
 
 **When to run verification:**
 - After implementing a feature
@@ -106,7 +104,7 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 ### Important: Integration tests require APIFY_TOKEN
 
 **⚠️ DO NOT attempt to run integration tests as an agent.** Integration tests require a valid `APIFY_TOKEN` environment variable, which only humans have access to. As an agent, you should:
-- Run `npm run type-check` and `npm run build` to validate TypeScript changes
+- Run `npm run type-check` to validate TypeScript changes (do NOT use `npm run build` for this)
 - Run `npm run test:unit` for unit tests which don't require authentication
 - Skip integration tests - these must be run by humans with valid Apify credentials
 

@@ -72,6 +72,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         actorFullName: response.actorFullName || '',
         buildTag: response?.buildTag || '',
         readme: response?.readme || '',
+        readmeSummary: response.readmeSummary,
         input: response?.input && 'type' in response.input && 'properties' in response.input
             ? {
                 ...response.input,
