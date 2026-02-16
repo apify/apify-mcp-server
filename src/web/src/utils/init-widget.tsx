@@ -121,6 +121,7 @@ export const renderWidget = (Component: React.FC) => {
             InternalImage: React.forwardRef<HTMLImageElement, React.ImgHTMLAttributes<HTMLImageElement>>((props, ref) => (
                 <img ref={ref} {...props} />
             )),
+            generateProxyImageUrl: (url: string) => url,
             trackClick: (_id: string, _data?: object) => {
                 // No-op tracking in widget environment
             },

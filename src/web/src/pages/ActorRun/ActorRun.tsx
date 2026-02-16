@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
-import { Badge, Button, InlineSpinner, Text, theme, type BadgeVariant } from "@apify/ui-library";
+import { ActorAvatar, Badge, Button, Text, theme, type BadgeVariant } from "@apify/ui-library";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { formatDuration } from "../../utils/formatting";
+import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
     runId: string;
     actorName: string;
@@ -83,15 +84,6 @@ const getStatusVariantLeadingIcon = (status: string) => {
     }
 };
 
-const getInitials = (name: string, maxWords: number = 2): string => {
-    return name
-        .split(/[-_\s]/)
-        .filter(word => word.length > 0)
-        .slice(0, maxWords)
-        .map(word => word.charAt(0).toUpperCase())
-        .join('');
-};
-
 const extractActorName = (fullActorName: string): string => {
     // Extract actor name without username prefix (e.g., "apify/python-example" -> "python-example")
     const actorNameParts = fullActorName.split('/');
@@ -117,28 +109,6 @@ const ActorHeader = styled.div`
     width: 100%;
     min-height: 24px;
 `;
-
-// Temporary ActorAvatar component until it's available in ui-library
-const ActorAvatarWrapper = styled.div<{ size: number }>`
-    width: ${props => props.size}px;
-    height: ${props => props.size}px;
-    border-radius: ${theme.radius.radius4};
-    border: 1px solid ${theme.color.neutral.border};
-    overflow: hidden;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: ${theme.color.neutral.backgroundMuted};
-`;
-
-const ActorAvatarInitials = styled.div<{ size: number }>`
-    font-size: ${props => Math.floor(props.size * 0.4)}px;
-    font-weight: 600;
-    color: ${theme.color.neutral.text};
-    text-transform: uppercase;
-`;
-
 
 const ActorNameLink = styled.a`
     color: ${theme.color.neutral.text};
@@ -206,7 +176,7 @@ const TableHeader = styled.thead`
 
 const TableHeaderCell = styled.th`
     text-align: left;
-    padding: ${theme.space.space8};
+    padding: ${theme.space.space8} ${theme.space.space16};
     ${theme.typography.shared.desktop.titleXs};
     color: ${theme.color.neutral.textMuted};
     white-space: nowrap;
@@ -302,6 +272,7 @@ export const ActorRun: React.FC = () => {
     const widgetStateRef = useRef(widgetState);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
+    const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
 
     useEffect(() => {
         widgetStateRef.current = widgetState;
@@ -331,6 +302,29 @@ export const ActorRun: React.FC = () => {
             });
         }
     }, [toolOutput, runData]);
+
+    // Fetch actor details to get pictureUrl
+    useEffect(() => {
+        if (!runData?.actorUsername || !runData?.actorName || pictureUrl !== undefined) return;
+
+        const fetchActorDetails = async () => {
+            try {
+                const actorFullName = `${runData.actorUsername}/${runData.actorName}`;
+                const response = await window.openai?.callTool('fetch-actor-details', {
+                    actor: actorFullName,
+                });
+
+                if (response?.structuredContent?.actorInfo) {
+                    const actorInfo = response.structuredContent.actorInfo as { pictureUrl?: string };
+                    setPictureUrl(actorInfo.pictureUrl);
+                }
+            } catch (err) {
+                console.error('[ActorRun] Failed to fetch actor details:', err);
+            }
+        };
+
+        fetchActorDetails();
+    }, [runData?.actorUsername, runData?.actorName, pictureUrl]);
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
@@ -427,7 +421,6 @@ export const ActorRun: React.FC = () => {
             <WidgetLayout>
                 <Container>
                     <EmptyStateContainer>
-                        <InlineSpinner />
                         <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
                             Loading actor run data...
                         </Text>
@@ -466,11 +459,7 @@ export const ActorRun: React.FC = () => {
                 <ActorHeader>
                     <ActorInfoRow>
                         <ActorNameWithIcon>
-                            <ActorAvatarWrapper size={20}>
-                                <ActorAvatarInitials size={20}>
-                                    {getInitials(runData.actorName)}
-                                </ActorAvatarInitials>
-                            </ActorAvatarWrapper>
+                            <ActorAvatar size={20} name={runData.actorName} url={pictureUrl} />
 
                             <ActorNameLink onClick={handleOpenActor}>
                                 {runData.actorName}
@@ -532,13 +521,11 @@ export const ActorRun: React.FC = () => {
                             {runData.dataset.previewItems.length > 3 && <TableGradientOverlay />}
                         </TableContainer>
                     </>
+                ) : runData.status.toUpperCase() === 'RUNNING' ? (
+                    <TableSkeleton />
                 ) : (
                     <EmptyStateContainer>
-                        {runData.status.toUpperCase() === 'RUNNING' ? (
-                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                                Actor is running... Results will appear when available.
-                            </Text>
-                        ) : runData.status.toUpperCase() === 'READY' ? (
+                        {runData.status.toUpperCase() === 'READY' ? (
                             <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
                                 The Actor is ready to run.
                             </Text>
