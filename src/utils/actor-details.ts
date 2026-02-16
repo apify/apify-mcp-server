@@ -12,6 +12,8 @@ import { searchActorsByKeywords } from './actor-search.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 
+const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
+
 /**
  * Convert a type object to TypeScript-like string representation.
  * Used for human-readable text output.
@@ -76,7 +78,7 @@ export async function fetchActorDetails(
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
             // Fetch from store to get the processed pictureUrl (with resizing parameters)
-            searchActorsByKeywords(actorName, apifyClient.token || '', 5).catch(() => []),
+            searchActorsByKeywords(actorName, apifyClient.token || '', ACTOR_DETAILS_PICTURE_SEARCH_LIMIT).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 

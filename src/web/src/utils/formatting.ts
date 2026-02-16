@@ -1,6 +1,9 @@
 import pluralize from 'pluralize';
 
-import {StructuredPricingInfo} from '../types';
+import type {StructuredPricingInfo} from '../types';
+
+const PER_THOUSAND_PRICING_THRESHOLD = 0.01;
+const PRICE_DISPLAY_UNIT_SIZE = 1000;
 
 type FormatPriceUsdOptions = {
     decimals?: number;
@@ -51,89 +54,86 @@ export function formatPriceUsd(price: number, options: FormatPriceUsdOptions = {
     return formatNumberWithOptions(price, { style: 'currency', ...intlOptions }); // Intl will return the format we want: i.e. -$123,323.21;
 }
 
+function formatFlatPricePerMonth(pricePerUnit: number | undefined): string {
+    const monthlyPrice = pricePerUnit || 0;
+    return `${formatPriceUsd(monthlyPrice)}/month + usage`;
+}
+
+function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['events']>[0]): string {
+    const title = event.title.toLowerCase() || 'result';
+
+    if (event.tieredPricing && event.tieredPricing.length > 0) {
+        const tieredPrices = event.tieredPricing
+            .filter(tier => tier.tier !== 'FREE' && tier.priceUsd > 0)
+            .map(tier => tier.priceUsd);
+
+        if (tieredPrices.length > 0) {
+            const minPrice = Math.min(...tieredPrices);
+            const pricePerThousand = minPrice * PRICE_DISPLAY_UNIT_SIZE;
+            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
+        }
+    }
+
+    if (typeof event.priceUsd === 'number') {
+        const isPricedPerThousandResults = event.priceUsd < PER_THOUSAND_PRICING_THRESHOLD;
+
+        if (isPricedPerThousandResults) {
+            const pricePerThousand = event.priceUsd * PRICE_DISPLAY_UNIT_SIZE;
+            return `${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, PRICE_DISPLAY_UNIT_SIZE)}`;
+        }
+        return `${formatPriceUsd(event.priceUsd)} / ${title}`;
+    }
+
+    return 'Pay per event';
+}
+
+function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
+    const unitName = pricing.unitName || 'result';
+    const pluralUnitName = pluralize(unitName);
+
+    if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
+        const tieredPrices = pricing.tieredPricing
+            .filter(tier => tier.tier !== 'FREE')
+            .map(tier => tier.pricePerUnit)
+            .filter(price => price > 0);
+
+        if (tieredPrices.length > 0) {
+            const minPrice = Math.min(...tieredPrices);
+            const pricePerThousand = minPrice * PRICE_DISPLAY_UNIT_SIZE;
+            return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
+        }
+    }
+
+    const pricePerUnit = pricing.pricePerUnit || 0;
+    const pricePerThousand = pricePerUnit * PRICE_DISPLAY_UNIT_SIZE;
+    return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
+}
+
 export const formatPricing = (pricing: StructuredPricingInfo): string => {
-    // Handle PAY_PER_USAGE case (undefined input)
     if (!pricing) {
         return 'Pay per usage';
     }
 
-    // Handle RENTAL case - FLAT_PRICE_PER_MONTH
     if (pricing.model === 'FLAT_PRICE_PER_MONTH') {
-        const monthlyPrice = pricing.pricePerUnit || 0;
-        return `${formatPriceUsd(monthlyPrice)}/month + usage`;
+        return formatFlatPricePerMonth(pricing.pricePerUnit);
     }
 
-    // Handle PAY_PER_EVENT case - PAY_PER_EVENT
     if (pricing.model === 'PAY_PER_EVENT') {
         if (!pricing.events || pricing.events.length === 0) {
             return 'Pay per event';
         }
 
-        // PPE has only one event
         if (pricing.events.length === 1) {
-            const event = pricing.events[0];
-
-            // Check if it's a tiered pricing event
-            if (event.tieredPricing && event.tieredPricing.length > 0) {
-                // Find the lowest non-zero price (excluding FREE tier if present)
-                const tieredPrices = event.tieredPricing
-                    .filter(tier => tier.tier !== 'FREE' && tier.priceUsd > 0)
-                    .map(tier => tier.priceUsd);
-
-                if (tieredPrices.length > 0) {
-                    const minPrice = Math.min(...tieredPrices);
-                    const title = event.title.toLowerCase() || 'result';
-                    // Assume per-thousand pricing for most events (can be refined based on event type)
-                    const pricePerThousand = minPrice * 1000;
-                    return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, 1000)}`;
-                }
-            }
-
-            // Flat pricing for single event
-            if (typeof event.priceUsd === 'number') {
-                const title = event.title.toLowerCase() || 'result';
-                // Determine if it's per-thousand or per-unit based on price magnitude
-                const isPricedPerThousandResults = event.priceUsd < 0.01; // Heuristic: very small prices are likely per-unit
-
-                if (isPricedPerThousandResults) {
-                    const pricePerThousand = event.priceUsd * 1000;
-                    return `${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralize(title, 1000)}`;
-                } else {
-                    return `${formatPriceUsd(event.priceUsd)} / ${title}`;
-                }
-            }
+            return formatPayPerEventPricing(pricing.events[0]);
         }
 
         return 'Pay per event';
     }
 
-    // Handle PAY_PER_RESULT case - PRICE_PER_DATASET_ITEM
     if (pricing.model === 'PRICE_PER_DATASET_ITEM') {
-        const unitName = pricing.unitName || 'result';
-        const pluralUnitName = pluralize(unitName);
-
-        // Check if tiered pricing exists
-        if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
-            // Find the lowest price from tiered pricing (excluding FREE tier)
-            const tieredPrices = pricing.tieredPricing
-                .filter(tier => tier.tier !== 'FREE')
-                .map(tier => tier.pricePerUnit)
-                .filter(price => price > 0);
-
-            if (tieredPrices.length > 0) {
-                const minPrice = Math.min(...tieredPrices);
-                const pricePerThousand = minPrice * 1000;
-                return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
-            }
-        }
-
-        // Use regular price per unit
-        const pricePerUnit = pricing.pricePerUnit || 0;
-        const pricePerThousand = pricePerUnit * 1000;
-        return `from ${formatPriceUsd(pricePerThousand)} / 1,000 ${pluralUnitName}`;
+        return formatPricePerDatasetItem(pricing);
     }
 
-    // Default fallback
     return 'Pay per usage';
 };
 

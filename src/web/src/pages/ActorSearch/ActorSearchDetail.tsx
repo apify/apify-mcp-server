@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from "react";
 import styled from "styled-components";
 import { Box, Markdown, theme, useActorTitleHeadingFilter, Badge, IconButton, ICON_BUTTON_VARIANTS } from "@apify/ui-library";
 import { BookOpenIcon, FullscreenIcon, MinimizeIcon } from "@apify/ui-icons";
-import { ActorDetails } from "../../types";
+import type { ActorDetails } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
+
+const FULLSCREEN_WIDTH_THRESHOLD = 900;
 
 type ActorSearchDetailProps = {
     details: ActorDetails;
@@ -137,9 +139,7 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, isExpanded, setIs
             // opposed to width of the screen which changes in fullscreen/inline mode
             const viewportWidth = window.innerWidth;
 
-            // If viewport is wide (> 900px), we're in fullscreen mode
-            // If viewport is narrow (<= 900px), we're in inline mode
-            const shouldBeExpanded = viewportWidth > 900;
+            const shouldBeExpanded = viewportWidth > FULLSCREEN_WIDTH_THRESHOLD;
 
             // If user manually collapsed, don't auto-expand until width actually drops below threshold
             // Override for mobile version when detection doesn't work

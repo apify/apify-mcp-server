@@ -2,6 +2,7 @@ import { ActorSearchDetail } from "../pages/ActorSearch/ActorSearchDetail";
 import { setupMockOpenAi } from "../utils/mock-openai";
 import { MOCK_ACTOR_DETAILS_RESPONSE } from "../utils/mock-actor-details";
 import { renderWidget } from "../utils/init-widget";
+import type { ActorDetails } from "../types";
 
 const shouldEnableMocks = typeof window !== "undefined" && !window.openai;
 
@@ -15,9 +16,12 @@ if (shouldEnableMocks) {
     });
 }
 
-// Create a wrapper component that extracts details from toolOutput
+interface OpenAIToolOutput {
+    details?: ActorDetails;
+}
+
 const ActorDetailWrapper = () => {
-    const details = (window.openai?.toolOutput as any)?.details;
+    const details = (window.openai?.toolOutput as OpenAIToolOutput)?.details;
 
     if (!details) {
         return <div>No actor details available</div>;

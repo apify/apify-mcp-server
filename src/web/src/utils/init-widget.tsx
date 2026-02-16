@@ -5,6 +5,8 @@ import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-libra
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
 
+const THEME_CHECK_INTERVAL_MS = 1000;
+
 function resolveTheme(): "light" | "dark" {
     const t = window.openai?.theme;
     if (t === "dark") return "dark";
@@ -23,7 +25,7 @@ function applyTheme(theme: "light" | "dark") {
 function injectElement<K extends "link" | "style">(
     id: string,
     tagName: K,
-    attributes: Partial<HTMLLinkElement | HTMLStyleElement>
+    attributes: Partial<HTMLElementTagNameMap[K]>
 ): void {
     if (document.getElementById(id)) {
         return;
@@ -32,10 +34,9 @@ function injectElement<K extends "link" | "style">(
     const element = document.createElement(tagName);
     element.id = id;
 
-    // Apply all attributes to the element
     Object.entries(attributes).forEach(([key, value]) => {
         if (value !== undefined && value !== null) {
-            (element as any)[key] = value;
+            element[key as keyof HTMLElementTagNameMap[K]] = value;
         }
     });
 
@@ -73,7 +74,7 @@ function injectStylesheets(): void {
     injectElement("apify-css-variables", "style", {
         textContent: `:root {${cssColorsVariablesLight}}`,
     });
-    
+
     injectElement("apify-dark-css-variables", "style", {
         textContent: `:root[data-theme="dark"] { ${cssColorsVariablesDark} }`,
     });
@@ -104,7 +105,7 @@ export const renderWidget = (Component: React.FC) => {
             }
         };
 
-        window.setInterval(checkTheme, 1000);
+        window.setInterval(checkTheme, THEME_CHECK_INTERVAL_MS);
 
         injectStylesheets();
 
