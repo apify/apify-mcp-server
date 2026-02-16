@@ -92,8 +92,10 @@ export async function fetchActorDetails(
         const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] = await Promise.all([
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
-            // Fetch from store to get the processed pictureUrl (with resizing parameters)
-            searchActorsByKeywords(actorName, apifyClient.token || '', ACTOR_DETAILS_PICTURE_SEARCH_LIMIT).catch(() => []),
+            // Fetch from store to get the processed pictureUrl (with resizing parameters).
+            // Use only the actor name part (after '/') for better keyword search relevance —
+            // searching "apify/instagram-scraper" returns unrelated results, while "instagram-scraper" finds the correct actor.
+            searchActorsByKeywords(actorName.split('/').pop() || actorName, apifyClient.token || '', ACTOR_DETAILS_PICTURE_SEARCH_LIMIT).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
