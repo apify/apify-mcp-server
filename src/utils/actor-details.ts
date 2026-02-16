@@ -58,6 +58,20 @@ function typeValueToString(value: unknown): string {
     return 'unknown';
 }
 
+/**
+ * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
+ * Returns the content string and appropriate heading for text output.
+ */
+export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+    content: string;
+    heading: string;
+} {
+    if (details.readmeSummary?.trim()) {
+        return { content: details.readmeSummary, heading: '# README summary' };
+    }
+    return { content: details.readme, heading: '# README' };
+}
+
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
@@ -66,6 +80,7 @@ export type ActorDetailsResult = {
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
     readme: string;
+    readmeSummary?: string;
 };
 
 export async function fetchActorDetails(
@@ -101,6 +116,7 @@ export async function fetchActorDetails(
             actorCardStructured,
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
+            readmeSummary: actorInfo.readmeSummary,
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
@@ -162,7 +178,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
     metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
-    readme: z.boolean().optional().describe('Include full README documentation.'),
+    readme: z.boolean().optional().describe('Include Actor README documentation (summary when available, full otherwise).'),
     outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
@@ -215,6 +231,7 @@ export async function getMcpToolsMessage(
     apifyClient: ApifyClient,
     apifyToken: string,
     skyfireMode?: boolean,
+    mcpSessionId?: string,
 ): Promise<string> {
     const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
 
@@ -229,7 +246,7 @@ export async function getMcpToolsMessage(
     }
 
     // Connect and list tools
-    const client = await connectMCPClient(mcpServerUrl, apifyToken);
+    const client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }
@@ -241,6 +258,9 @@ export async function getMcpToolsMessage(
             .join('\n\n');
 
         return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+    } catch (error) {
+        logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
+        return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
     } finally {
         await client.close();
     }
@@ -303,14 +323,14 @@ export async function buildActorDetailsTextResponse(options: {
     apifyToken: string;
     actorOutputSchema?: Record<string, unknown> | null;
     skyfireMode?: boolean;
+    mcpSessionId?: string;
 }): Promise<{
     texts: string[];
     structuredContent: Record<string, unknown>;
 }> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode } = options;
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode, mcpSessionId } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-    const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
 
     const texts: string[] = [];
 
@@ -325,9 +345,10 @@ export async function buildActorDetailsTextResponse(options: {
         texts.push(`# Actor information\n${details.actorCard}`);
     }
 
-    // Add README if requested
-    if (output.readme) {
-        texts.push(formattedReadme);
+    // Add README content if requested (prefer readmeSummary, fall back to full readme)
+    const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
+    if (resolvedReadme) {
+        texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
     }
 
     // Add input schema if requested
@@ -347,14 +368,14 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Handle MCP tools
     if (output.mcpTools) {
-        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode);
+        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode, mcpSessionId);
         texts.push(message);
     }
 
     // Build structured content
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
-        readme: output.readme ? formattedReadme : undefined,
+        readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
     };

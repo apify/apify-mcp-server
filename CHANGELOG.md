@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.4) (2026-02-11)
+
+### 🚀 Features
+
+- **agents:** Add mcp config and instructions for design system ([6c0184e](https://github.com/apify/apify-mcp-server/commit/6c0184efcf8f30558e8e8600582f0ac91768dc67)) by [@jmikitova](https://github.com/jmikitova)
+- **vibe-code:** Add mcp config and docs for design system usage ([#423](https://github.com/apify/apify-mcp-server/pull/423)) ([beb2893](https://github.com/apify/apify-mcp-server/commit/beb2893c32a5ba7a399331261ee8a0942b9de446)) by [@jmikitova](https://github.com/jmikitova)
+- **stdio:** Allow unauthenticated access for public tools ([#421](https://github.com/apify/apify-mcp-server/pull/421)) ([64a4ed5](https://github.com/apify/apify-mcp-server/commit/64a4ed5cd289855cde24680d4c3abd033b39c73f)) by [@muhammetakkurtt](https://github.com/muhammetakkurtt)
+- Reorganize tool categories by typical workflow order ([#425](https://github.com/apify/apify-mcp-server/pull/425)) ([4cfcc36](https://github.com/apify/apify-mcp-server/commit/4cfcc3612bef946177d8a32161fad3c203d2fd21)) by [@jirispilka](https://github.com/jirispilka)
+- Add ActorStore interface for enriching direct Actor tool outputSchema ([#449](https://github.com/apify/apify-mcp-server/pull/449)) ([705f5da](https://github.com/apify/apify-mcp-server/commit/705f5da7a89ea5b1bac651c7fc063c5fae66c1fb)) by [@MQ37](https://github.com/MQ37)
+- **stdio:** Add Sentry error tracking for stdio transport ([#452](https://github.com/apify/apify-mcp-server/pull/452)) ([a772ba4](https://github.com/apify/apify-mcp-server/commit/a772ba4f79ac048ee814a8ef840f953a3fcd0139)) by [@MQ37](https://github.com/MQ37)
+- Add MCP server card (SEP-1649) ([#453](https://github.com/apify/apify-mcp-server/pull/453)) ([b299658](https://github.com/apify/apify-mcp-server/commit/b2996581b9b70fc813fb2401cf3adbe224fb0cc7)) by [@MQ37](https://github.com/MQ37)
+
+### 🐛 Bug Fixes
+
+- Evals, add retry to Phoenix calls ([#426](https://github.com/apify/apify-mcp-server/pull/426)) ([792adf4](https://github.com/apify/apify-mcp-server/commit/792adf4ca5190a5a5bd146f5e8379db31179d16a)) by [@jirispilka](https://github.com/jirispilka)
+
+
 ## [0.8.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.3) (2026-01-30)
 
 ### 🐛 Bug Fixes

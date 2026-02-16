@@ -8,7 +8,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
 import { generateSchemaFromItems } from '../utils/schema-generation.js';
 import { getActorRunOutputSchema } from './structured-output-schemas.js';
 
@@ -61,7 +61,7 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
@@ -77,7 +77,7 @@ USAGE EXAMPLES:
                 });
             }
 
-            log.debug('Get actor run', { runId: parsed.runId, status: run.status });
+            log.debug('Get actor run', { runId: parsed.runId, status: run.status, mcpSessionId });
 
             let actorName: string | undefined;
             if (run.actId) {
@@ -87,7 +87,7 @@ USAGE EXAMPLES:
                         actorName = `${actor.username}/${actor.name}`;
                     }
                 } catch (error) {
-                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { error });
+                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { mcpSessionId, error });
                 }
             }
 
@@ -138,11 +138,13 @@ USAGE EXAMPLES:
                     : `Actor run ${parsed.runId} status: ${run.status}. A progress widget has been rendered.`;
 
                 const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+                const usageMeta = buildUsageMeta(run);
                 return buildMCPResponse({
                     texts: [statusText],
                     structuredContent,
                     _meta: {
                         ...widgetConfig?.meta,
+                        ...usageMeta,
                     },
                 });
             }
@@ -151,7 +153,11 @@ USAGE EXAMPLES:
                 `# Actor Run Information\n\`\`\`json\n${JSON.stringify(run, null, 2)}\n\`\`\``,
             ];
 
-            return buildMCPResponse({ texts, structuredContent });
+            return buildMCPResponse({
+                texts,
+                structuredContent,
+                _meta: buildUsageMeta(run),
+            });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
             return buildMCPResponse({

@@ -14,6 +14,8 @@ storage/key_value_stores/*
 !storage/key_value_stores/default
 storage/key_value_stores/default/*
 !storage/key_value_stores/default/INPUT.json
+# ignore CLAUDE.md, it is a symlink to AGENTS.md
+CLAUDE.md
 
 # Added by Apify CLI
 .venv

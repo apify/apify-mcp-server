@@ -113,6 +113,25 @@ function validateStructuredOutput(
     }
 }
 
+/**
+ * Verify that structuredContent contains a non-empty readme and inputSchema.
+ * Optionally checks actorInfo.fullName when expectedActorFullName is provided.
+ */
+function expectReadmeInStructuredContent(
+    result: unknown,
+    expectedActorFullName?: string,
+): void {
+    const r = result as { structuredContent?: { actorInfo?: { fullName?: string }; readme?: string; inputSchema?: unknown } };
+    expect(r.structuredContent).toBeDefined();
+    if (expectedActorFullName) {
+        expect(r.structuredContent?.actorInfo?.fullName).toBe(expectedActorFullName);
+    }
+    expect(r.structuredContent?.readme).toBeDefined();
+    expect(typeof r.structuredContent?.readme).toBe('string');
+    expect(r.structuredContent!.readme!.length).toBeGreaterThan(0);
+    expect(r.structuredContent?.inputSchema).toBeDefined();
+}
+
 export function createIntegrationTestsSuite(
     options: IntegrationTestsSuiteOptions,
 ) {
@@ -535,6 +554,14 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 3);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 1);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 2);
+
+            // Validate _meta contains Apify usage cost information for completed sync runs
+            const resultWithMeta = callResult as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
+            expect(resultWithMeta._meta).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
+            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
+            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
         });
 
         it('should support async mode in call-actor and return runId', async () => {
@@ -1188,13 +1215,69 @@ export function createIntegrationTestsSuite(
 
             expect(result.content).toBeDefined();
             const content = result.content as { text: string }[];
-            // Should contain README but NOT actor info card or input schema
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
+            // Should contain readme text but NOT actor info card or input schema
+            expect(content.length).toBeGreaterThan(0);
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(false);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, HelperTools.ACTOR_GET_DETAILS);
+        });
+
+        it('should return README content (summary or full) in text and structured response for fetch-actor-details', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+            });
+
+            const result = await client.callTool({
+                name: 'fetch-actor-details',
+                arguments: {
+                    actor: RAG_WEB_BROWSER,
+                    output: {
+                        description: true,
+                        readme: true,
+                        inputSchema: true,
+                    },
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            const allText = content.map((item) => item.text).join('\n');
+
+            // Text should contain actor card, README section (summary or full fallback), and input schema
+            expect(allText).toContain('Actor information');
+            expect(allText).toMatch(/# README summary|# README/);
+            expect(allText).toContain('Input schema');
+
+            expectReadmeInStructuredContent(result, RAG_WEB_BROWSER);
+
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, 'fetch-actor-details');
+        });
+
+        it('should return README content via fetch-actor-details-internal in openai mode', async () => {
+            client = await createClientFn({
+                tools: ['actors'],
+                uiMode: 'openai',
+            });
+
+            // fetch-actor-details-internal is openaiOnly, so we need openai mode to access it
+            const result = await client.callTool({
+                name: 'fetch-actor-details-internal',
+                arguments: {
+                    actor: RAG_WEB_BROWSER,
+                },
+            });
+
+            expect(result.content).toBeDefined();
+            const content = result.content as { text: string }[];
+            const allText = content.map((item) => item.text).join('\n');
+
+            // Default output includes README content and input schema
+            expect(allText).toMatch(/# README summary|# README/);
+            expect(allText).toContain('Input schema');
+
+            expectReadmeInStructuredContent(result);
         });
 
         it('should use default values when output object is not provided', async () => {
@@ -1215,7 +1298,6 @@ export function createIntegrationTestsSuite(
             // Should contain all default sections (description, stats, pricing, rating, metadata, readme, inputSchema)
             // but NOT mcpTools (which defaults to false)
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(false);
         });
@@ -1247,14 +1329,12 @@ export function createIntegrationTestsSuite(
 
             // Should contain all sections in text
             expect(content.some((item) => item.text.includes('Actor information'))).toBe(true);
-            expect(content.some((item) => item.text.includes('README'))).toBe(true);
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(true);
 
             // Validate structured output exists and has all fields
-            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; readme?: string; inputSchema?: unknown } };
+            const resultWithStructured = result as { structuredContent?: { actorInfo?: unknown; inputSchema?: unknown } };
             expect(resultWithStructured.structuredContent).toBeDefined();
             expect(resultWithStructured.structuredContent?.actorInfo).toBeDefined();
-            expect(resultWithStructured.structuredContent?.readme).toBeDefined();
             expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
             // Validate against schema
@@ -1450,7 +1530,7 @@ export function createIntegrationTestsSuite(
                 {
                     name: 'readme',
                     field: 'readme',
-                    markers: ['README'],
+                    markers: [],
                     notMarkers: ['Input schema'],
                 },
             ] as const;
@@ -2000,6 +2080,14 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 12);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 5);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 7);
+
+            // Validate _meta contains Apify usage cost information for direct actor tool calls
+            const resultWithMeta = result as { _meta?: { apifyUsageTotalUsd?: number; apifyUsageUsd?: Record<string, number> } };
+            expect(resultWithMeta._meta).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageTotalUsd).toBe('number');
+            expect(resultWithMeta._meta!.apifyUsageTotalUsd!).toBeGreaterThanOrEqual(0);
+            expect(resultWithMeta._meta?.apifyUsageUsd).toBeDefined();
+            expect(typeof resultWithMeta._meta?.apifyUsageUsd).toBe('object');
 
             // Validate structured output for get-actor-output
             validateStructuredOutput(outputResult, findToolByName(HelperTools.ACTOR_OUTPUT_GET)?.outputSchema, HelperTools.ACTOR_OUTPUT_GET);
@@ -2648,6 +2736,7 @@ export function createIntegrationTestsSuite(
             expect(details.actorCard).toBeDefined();
             expect(typeof details.actorCard).toBe('string');
 
+            // OpenAI widget path always returns full readme
             expect(details.readme).toBeDefined();
             expect(typeof details.readme).toBe('string');
 

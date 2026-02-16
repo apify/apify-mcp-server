@@ -26,6 +26,8 @@ import {
     MODELS_TO_EVALUATE,
     PASS_THRESHOLD,
     EVALUATOR_NAMES,
+    PHOENIX_RETRY_DELAY_MS,
+    PHOENIX_MAX_RETRIES,
     type EvaluatorName,
     sanitizeHeaderValue,
     validatePhoenixEnvVars
@@ -199,14 +201,23 @@ async function main(datasetName: string): Promise<number> {
         },
     });
 
-    // Resolve dataset by name -> id
+    // Considered using a retry package, but opted for this simple loop with delay for clarity and transparency.
+    // A helper like withRetry could be used, but it would not significantly reduce code complexity here.
     let datasetId: string | undefined;
-    try {
-        const info = await getDatasetInfo({ client, dataset: { datasetName } });
-        datasetId = info?.id as string | undefined;
-    } catch (e) {
-        log.error(`Error loading dataset: ${e}`);
-        return 1;
+    for (let attempt = 1; attempt <= PHOENIX_MAX_RETRIES; attempt++) {
+        try {
+            const info = await getDatasetInfo({ client, dataset: { datasetName } });
+            datasetId = info?.id as string | undefined;
+            break;
+        } catch (e) {
+            if (attempt < PHOENIX_MAX_RETRIES) {
+                log.warning(`Error loading dataset (attempt ${attempt}/${PHOENIX_MAX_RETRIES}): ${e}`);
+                await new Promise((resolve) => setTimeout(resolve, attempt * PHOENIX_RETRY_DELAY_MS));
+            } else {
+                log.error(`Error loading dataset after ${PHOENIX_MAX_RETRIES} attempts: ${e}`);
+                return 1;
+            }
+        }
     }
 
     if (!datasetId) throw new Error(`Dataset "${datasetName}" not found`);
@@ -239,27 +250,39 @@ async function main(datasetName: string): Promise<number> {
             evaluators.push(toolSelectionLLMEvaluator);
         }
 
-        try {
-            const experiment = await runExperiment({
-                client,
-                dataset: { datasetName },
-                // Cast to satisfy ExperimentTask type
-                task: taskFn as ExperimentTask,
-                evaluators,
-                experimentName,
-                experimentDescription,
-                concurrency: 10,
-            });
-            log.info(`Experiment run completed`);
+        let experimentSucceeded = false;
+        for (let attempt = 1; attempt <= PHOENIX_MAX_RETRIES; attempt++) {
+            try {
+                const experiment = await runExperiment({
+                    client,
+                    dataset: { datasetName },
+                    // Cast to satisfy the ExperimentTask type
+                    task: taskFn as ExperimentTask,
+                    evaluators,
+                    experimentName,
+                    experimentDescription,
+                    concurrency: 10,
+                });
+                log.info(`Experiment run completed`);
 
-            // Process each evaluator separately
-            results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOLS_EXACT_MATCH));
-            results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOL_SELECTION_LLM));
-        } catch (e: unknown) {
-            const err = e instanceof Error ? e : new Error(String(e));
-            log.error(`Error evaluating ${modelName}:`, err);
-            log.error(`Full error trace: ${err.stack ?? err.message}`);
+                // Process each evaluator separately
+                results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOLS_EXACT_MATCH));
+                results.push(processEvaluatorResult(experiment, modelName, experimentName, EVALUATOR_NAMES.TOOL_SELECTION_LLM));
+                experimentSucceeded = true;
+                break;
+            } catch (e: unknown) {
+                const err = e instanceof Error ? e : new Error(String(e));
+                if (attempt < PHOENIX_MAX_RETRIES) {
+                    log.warning(`Error evaluating ${modelName} (attempt ${attempt}/${PHOENIX_MAX_RETRIES}): ${err.message}`);
+                    await new Promise((resolve) => setTimeout(resolve, attempt * PHOENIX_RETRY_DELAY_MS));
+                } else {
+                    log.error(`Error evaluating ${modelName} after ${PHOENIX_MAX_RETRIES} attempts:`, err);
+                    log.error(`Full error trace: ${err.stack ?? err.message}`);
+                }
+            }
+        }
 
+        if (!experimentSucceeded) {
             // Add error results for both evaluators
             Object.values(EVALUATOR_NAMES).forEach(evaluatorName => {
                 results.push({
@@ -271,7 +294,7 @@ async function main(datasetName: string): Promise<number> {
                     correct: 0,
                     total: 0,
                     passed: false,
-                    error: err.message
+                    error: `Failed after ${PHOENIX_MAX_RETRIES} attempts`
                 });
             });
         }

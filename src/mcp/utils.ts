@@ -5,7 +5,7 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
-import type { Input, UiMode } from '../types.js';
+import type { ActorStore, Input, UiMode } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools-loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
@@ -43,9 +43,9 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
  * @param apifyClient The Apify client instance
  * @param uiMode UI mode from server options
  */
-export async function processParamsGetTools(url: string, apifyClient: ApifyClient, uiMode?: UiMode) {
+export async function processParamsGetTools(url: string, apifyClient: ApifyClient, uiMode?: UiMode, actorStore?: ActorStore) {
     const input = parseInputParamsFromUrl(url);
-    return await loadToolsFromInput(input, apifyClient, uiMode);
+    return await loadToolsFromInput(input, apifyClient, uiMode, actorStore);
 }
 
 export function parseInputParamsFromUrl(url: string): Input {

@@ -18,6 +18,7 @@ export const TOOL_MAX_OUTPUT_CHARS = 50000;
 
 // MCP Server
 export const SERVER_NAME = 'apify-mcp-server';
+export const SERVER_TITLE = 'Apify MCP Server';
 export const SERVER_VERSION = '1.0.0';
 
 // User agent headers
@@ -171,7 +172,9 @@ export const ALLOWED_DOC_DOMAINS = [
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
 
 export const APIFY_STORE_URL = 'https://apify.com';
+export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
+export const APIFY_DOCS_MCP_URL = 'https://docs.apify.com/platform/integrations/mcp';
 
 // Telemetry
 export const TELEMETRY_ENV = {
