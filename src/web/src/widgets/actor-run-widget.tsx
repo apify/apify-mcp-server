@@ -6,7 +6,7 @@ import { renderWidget } from "../utils/init-widget";
 const mockRunData = {
     runId: "test_run_123",
     actorName: "apify/rag-web-browser",
-    actorUsername: "apify",
+    actorDeveloperUsername: "apify",
     status: "RUNNING",
     startedAt: new Date(Date.now() - 30000).toISOString(),
     stats: {

@@ -10,7 +10,7 @@ import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
     runId: string;
     actorName: string;
-    actorUsername: string;
+    actorDeveloperUsername: string;
     status: string;
     cost?: number;
     timestamp: string;
@@ -32,7 +32,7 @@ interface ActorRunData {
 interface ToolOutput extends Record<string, unknown> {
     runId?: string;
     actorName?: string;
-    actorUsername?: string;
+    actorDeveloperUsername?: string;
     status?: string;
     startedAt?: string;
     finishedAt?: string;
@@ -290,7 +290,7 @@ export const ActorRun: React.FC = () => {
             setRunData({
                 runId: toolOutput.runId,
                 actorName: actorNameOnly,
-                actorUsername: (toolOutput.actorUsername as string) || "unknown",
+                actorDeveloperUsername: (toolOutput.actorDeveloperUsername as string) || "unknown",
                 status: (toolOutput.status as string) || "RUNNING",
                 startedAt,
                 finishedAt,
@@ -305,11 +305,11 @@ export const ActorRun: React.FC = () => {
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
-        if (!runData?.actorUsername || !runData?.actorName || pictureUrl !== undefined) return;
+        if (!runData?.actorDeveloperUsername || !runData?.actorName || pictureUrl !== undefined) return;
 
         const fetchActorDetails = async () => {
             try {
-                const actorFullName = `${runData.actorUsername}/${runData.actorName}`;
+                const actorFullName = `${runData.actorDeveloperUsername}/${runData.actorName}`;
                 const response = await window.openai?.callTool('fetch-actor-details', {
                     actor: actorFullName,
                 });
@@ -324,7 +324,7 @@ export const ActorRun: React.FC = () => {
         };
 
         fetchActorDetails();
-    }, [runData?.actorUsername, runData?.actorName, pictureUrl]);
+    }, [runData?.actorDeveloperUsername, runData?.actorName, pictureUrl]);
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
@@ -364,7 +364,7 @@ export const ActorRun: React.FC = () => {
                         const updatedRunData: ActorRunData = {
                             runId: newData.runId!,
                             actorName: actorNameOnly,
-                            actorUsername: (newData.actorUsername as string) || runData.actorUsername,
+                            actorDeveloperUsername: (newData.actorDeveloperUsername as string) || runData.actorDeveloperUsername,
                             status: (newData.status as string) || "RUNNING",
                             startedAt,
                             finishedAt,
@@ -447,7 +447,7 @@ export const ActorRun: React.FC = () => {
     const handleOpenActor = () => {
         if (runData && window.openai?.openExternal) {
             window.openai.openExternal({
-                href: `https://apify.com/${runData.actorUsername}/${runData.actorName}`,
+                href: `https://apify.com/${runData.actorDeveloperUsername}/${runData.actorName}`,
             });
         }
     };
