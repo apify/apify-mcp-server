@@ -3,7 +3,15 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import type { Actor, ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
+import type {
+    Actor as ActorOutdated,
+    ActorDefaultRunOptions,
+    ActorDefinition,
+    ActorRunPricingInfo,
+    ActorStats,
+    ActorStoreList as ActorStoreListOutdated,
+    PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
+} from 'apify-client';
 import type z from 'zod';
 
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
@@ -59,9 +67,9 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
  */
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
     'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'> & {
-        webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
-        pictureUrl?: string; // Optional, URL to the Actor's icon/picture
-    };
+    webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+};
 
 /**
  * Actor definition combined with full actor metadata.
@@ -69,7 +77,7 @@ export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
  */
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
-    info: Actor;
+    info: ActorOutdated;
 };
 
 /**
@@ -198,27 +206,28 @@ export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | '
  */
 export type ActorChargeEvent = {
     eventTitle: string;
-    eventDescription: string;
+    eventDescription?: string;
     /** Flat price per event in USD (if not tiered) */
     eventPriceUsd?: number;
     /** Tiered pricing per event, by tier name (FREE, BRONZE, etc.) */
     eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
 };
 
-/**
- * Pricing per event for an Actor, supporting both flat and tiered pricing.
- */
-export type PricingPerEvent = {
-    actorChargeEvents: Record<string, ActorChargeEvent>;
-};
+export type TieredPricing = {
+    [tier: string]: {
+        tieredPricePerUnitUsd: number;
+    };
+}
 
-export type ExtendedPricingInfo = PricingInfo & {
-    pricePerUnitUsd?: number;
-    trialMinutes?: number;
-    unitName?: string; // Name of the unit for the pricing model
-    pricingPerEvent: PricingPerEvent;
-    tieredPricing?: Partial<Record<PricingTier, { tieredPricePerUnitUsd: number }>>;
-};
+type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
+    pricingPerEvent: {
+        actorChargeEvents: Record<string, ActorChargeEvent>;
+    };
+}
+
+export type PricingInfo = ActorRunPricingInfo & {
+    tieredPricing?: TieredPricing;
+} | PricePerEventActorPricingInfo;
 
 export type ToolCategory = keyof typeof toolCategories;
 /**
@@ -234,8 +243,8 @@ export type Input = {
      */
     actors?: string[] | string;
     /**
-    * @deprecated Use `enableAddingActors` instead.
-    */
+     * @deprecated Use `enableAddingActors` instead.
+     */
     enableActorAutoLoading?: boolean | string;
     enableAddingActors?: boolean | string;
     maxActorMemoryBytes?: number;
@@ -265,13 +274,48 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 export type ActorInfo = {
     webServerMcpPath: string | null; // To determined if the Actor is an MCP server
     definition: ActorDefinitionPruned;
-    actor: Actor;
+    actor: ActorOutdated;
 };
 
-export type ExtendedActorStoreList = ActorStoreList & {
-    categories?: string[];
-    bookmarkCount?: number;
+export type ActorStoreList = ActorStoreListOutdated & {
+    actorReviewCount?: number;
     actorReviewRating?: number;
+    badge?: string | null;
+    bookmarkCount?: number;
+    categories?: string[];
+    currentPricingInfo: ActorRunPricingInfo;
+    isWhiteListedForAgenticPayments?: boolean;
+    notice?: string | null;
+    userFullName?: string;
+    stats: ActorStats & {
+        actorReviewCount?: number;
+        actorReviewRating?: number;
+        bookmarkCount?: number;
+        publicActorRunStats30Days?: Partial<Record<string, number>> & {
+            SUCCEEDED?: number;
+            TOTAL?: number;
+        };
+    };
+};
+
+export type Actor = ActorOutdated & {
+    actorPermissionLevel?: string;
+    hasNoDataset?: boolean;
+    isCritical?: boolean;
+    isGeneric?: boolean;
+    isSourceCodeHidden?: boolean;
+    pictureUrl?: string;
+    standbyUrl?: string | null;
+    stats: ActorStats & {
+        publicActorRunStats30Days?: Partial<Record<string, number>> & {
+            SUCCEEDED?: number;
+            TOTAL?: number;
+        };
+        actorReviewCount?: number;
+        actorReviewRating?: number;
+        bookmarkCount?: number;
+        lastRunStartedAt?: string | Date | null;
+    };
 };
 
 export type ActorDefinitionStorage = {
@@ -454,6 +498,7 @@ export type StructuredActorCard = {
     title?: string;
     url: string;
     fullName: string;
+    pictureUrl?: string;
     developer: {
         username: string;
         isOfficialApify: boolean;
@@ -468,7 +513,10 @@ export type StructuredActorCard = {
         successRate?: number;
         bookmarks?: number;
     };
-    rating?: number;
+    rating?: {
+        average: number;
+        count: number;
+    };
     modifiedAt?: string;
     isDeprecated: boolean;
 }

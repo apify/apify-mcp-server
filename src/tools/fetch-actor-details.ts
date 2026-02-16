@@ -68,7 +68,7 @@ EXAMPLES:
 
         if (apifyMcpServer.options.uiMode === 'openai') {
             const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
-            const widgetStructuredContent = {
+            const structuredContent = {
                 actorInfo: details.actorCardStructured,
                 inputSchema: details.inputSchema,
                 actorDetails: processedStructuredContent.actorDetails,
@@ -85,7 +85,7 @@ An interactive widget has been rendered with detailed Actor information.
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
             return buildMCPResponse({
                 texts,
-                structuredContent: widgetStructuredContent,
+                structuredContent,
                 _meta: {
                     ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,

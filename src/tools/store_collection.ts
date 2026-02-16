@@ -1,30 +1,14 @@
 import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
-import type { ActorPricingModel, ExtendedActorStoreList, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../utils/actor-card.js';
+import type { ActorPricingModel, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../utils/actor-card.js';
 import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { actorSearchOutputSchema } from './structured-output-schemas.js';
-
-export async function searchActorsByKeywords(
-    search: string,
-    apifyToken: string,
-    limit: number | undefined = undefined,
-    offset: number | undefined = undefined,
-    allowsAgenticUsers: boolean | undefined = undefined,
-): Promise<ExtendedActorStoreList[]> {
-    const client = new ApifyClient({ token: apifyToken });
-    const storeClient = client.store();
-    if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
-
-    const results = await storeClient.list({ search, limit, offset });
-    return results.items;
-}
 
 export const searchActorsArgsSchema = z.object({
     limit: z.number()
@@ -172,7 +156,7 @@ You can also try using more specific or alternative keywords related to your sea
             count: number;
             instructions?: string;
             // Widget format actors (not validated by schema, but available for widget UI)
-            widgetActors?: ReturnType<typeof formatActorForWidget>[];
+            widgetActors?: WidgetActor[];
         } = {
             actors: structuredActorCards,
             query: parsed.keywords,
@@ -184,17 +168,19 @@ You can also try using more specific or alternative keywords related to your sea
         // Add widget format actors when widget mode is enabled
         if (apifyMcpServer.options.uiMode === 'openai') {
             structuredContent.widgetActors = actors.map(formatActorForWidget);
-        }
 
-        // When widget mode is enabled, return minimal text with widget metadata
-        // When widget mode is disabled, return full text response without widget metadata
-        if (apifyMcpServer.options.uiMode === 'openai') {
+            const actorCards = actors.map((actor) => formatActorToActorCard(actor));
+            const actorsText = actorCards.join('\n\n');
             const texts = [`
  # Search results:
  - **Search query:** ${parsed.keywords}
  - **Number of Actors found:** ${actors.length}
 
-An interactive widget has been rendered with the search results.
+An interactive widget has been rendered with the search results. The user can already see the list of Actors visually in the widget, so do NOT print or summarize the Actor list in your response.
+
+ # Actors:
+
+ ${actorsText}
 `];
 
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
