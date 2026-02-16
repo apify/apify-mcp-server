@@ -1,170 +1,246 @@
-import React, { useMemo } from "react";
-import { ArrowLeft } from "../../components/ui/Icons";
-import { formatPricing } from "../../utils/formatting";
-import { ActorDetails } from "../../types";
-import { Button } from "../../components/ui/Button";
+import React, { useState, useEffect, useRef } from "react";
+import styled from "styled-components";
+import { Box, Markdown, theme, useActorTitleHeadingFilter, Badge, IconButton, ICON_BUTTON_VARIANTS } from "@apify/ui-library";
+import { BookOpenIcon, FullscreenIcon, MinimizeIcon } from "@apify/ui-icons";
+import type { ActorDetails } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
-import { Heading } from "../../components/ui/Heading";
-import { Text } from "../../components/ui/Text";
-import { Card } from "../../components/ui/Card";
 
-interface ActorSearchDetailProps {
+const FULLSCREEN_WIDTH_THRESHOLD = 900;
+
+type ActorSearchDetailProps = {
     details: ActorDetails;
-    onBackToList: () => void;
-    showBackButton?: boolean;
 }
 
-type InputSchema = {
-    properties?: Record<
-        string,
-        {
-            type?: string;
-            description?: string;
-            [key: string]: any;
-        }
-    >;
+const README_CLASSNAMES = {
+    MARKDOWN_WRAPPER: 'Readme-MarkdownWrapper',
+    MARKDOWN: 'Readme-Markdown',
+    ONELINE_SCROLLABLE_WRAPPER: 'OneLineCode-ScrollableWrapper',
 };
 
-export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details, onBackToList, showBackButton = true }) => {
+const Container = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: ${theme.color.neutral.background};
+    border-radius: ${theme.radius.radius8};
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+`;
+
+const CardWrapper = styled(Box)`
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    width: 100%;
+    max-width: 796px;
+`;
+
+const SectionContent = styled(Box)<{ $isExpanded: boolean }>`
+    background: ${theme.color.neutral.background};
+    border-top: 1px solid ${theme.color.neutral.separatorSubtle};
+    color: ${theme.color.neutral.text};
+    position: relative;
+    display: flex;
+    flex-direction: column;
+
+    ${props => props.$isExpanded ? `
+        overflow-y: auto;
+        max-height: none;
+        flex: 1;
+    ` : `
+        overflow: hidden;
+        max-height: 408px;
+    `}
+`;
+
+const ReadmeWrapper = styled.div`
+    display: flex;
+    flex-direction: column;
+    gap: ${theme.space.space16};
+    position: relative;
+
+    .${README_CLASSNAMES.MARKDOWN_WRAPPER} {
+        display: flex;
+        flex-direction: column;
+        gap: ${theme.space.space8};
+    }
+    /* TODO: this is an exception from the design system, let's figure out how to not do overrides */
+    .${README_CLASSNAMES.MARKDOWN} {
+        p,
+        li,
+        strong,
+        b,
+        table,
+        code {
+            font-size: 1.2rem;
+        }
+
+        ul {
+            display: block;
+            list-style-type: disc;
+            margin-block-start: 1em;
+            margin-block-end: 1em;
+            padding-inline-start: 40px;
+            unicode-bidi: isolate;
+        }
+
+        div:not(.${README_CLASSNAMES.ONELINE_SCROLLABLE_WRAPPER}) > pre {
+            display: block;
+            padding-left: 1.6rem;
+            padding-right: 1.6rem;
+        }
+    }
+`;
+
+const GradientOverlay = styled.div`
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 155px;
+    background: linear-gradient(178.84deg, transparent 13.4%, ${theme.color.neutral.background} 81.59%);
+    pointer-events: none;
+    z-index: 1;
+`;
+
+const ReadmeHeader = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+`;
+
+const BadgeWrapper = styled.div`
+    flex-shrink: 0;
+`;
+
+type ReadmeSectionProps = {
+    readme: string | null;
+    isExpanded: boolean;
+    setIsExpanded: (expanded: boolean) => void;
+    manuallyCollapsed: React.RefObject<boolean>;
+    manuallyExpanded: React.RefObject<boolean>;
+}
+
+const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, isExpanded, setIsExpanded, manuallyCollapsed, manuallyExpanded }) => {
+    const sectionRef = useRef<HTMLDivElement>(null);
+    const allowElement = useActorTitleHeadingFilter("Readme");
+
+    // Detect container size changes especially when using third party app's fullscreen close button
+    useEffect(() => {
+        const section = sectionRef.current;
+        if (!section) return;
+
+        const resizeObserver = new ResizeObserver(() => {
+            // Check the viewport width (iframe width) instead of height as we have static content length once expanded
+            // opposed to width of the screen which changes in fullscreen/inline mode
+            const viewportWidth = window.innerWidth;
+
+            const shouldBeExpanded = viewportWidth > FULLSCREEN_WIDTH_THRESHOLD;
+
+            // If user manually collapsed, don't auto-expand until width actually drops below threshold
+            // Override for mobile version when detection doesn't work
+            // Override for non open ai mode, when there's no fullscreen handler (debugging purposes)'
+            if (manuallyCollapsed.current && shouldBeExpanded) {
+                return;
+            }
+
+            // If user manually expanded, don't auto-collapse until width actually exceeds threshold
+            // Override for non open ai mode, when there's no fullscreen handler (debugging purposes)
+            if (manuallyExpanded.current && !shouldBeExpanded) {
+                return;
+            }
+
+            if (shouldBeExpanded) {
+                manuallyExpanded.current = false;
+            }
+
+            if (!shouldBeExpanded) {
+                manuallyCollapsed.current = false;
+            }
+
+            setIsExpanded(shouldBeExpanded);
+        });
+
+        resizeObserver.observe(document.body);
+
+        return () => {
+            resizeObserver.disconnect();
+        };
+    }, [setIsExpanded, manuallyCollapsed, manuallyExpanded]);
+
+    if (!readme) return null;
+
+    return (
+        <SectionContent ref={sectionRef} p="space16" $isExpanded={isExpanded}>
+            <ReadmeWrapper>
+                <ReadmeHeader>
+                    <BadgeWrapper>
+                        <Badge
+                            size="small"
+                            LeadingIcon={BookOpenIcon}
+                        >
+                            Readme
+                        </Badge>
+                    </BadgeWrapper>
+                </ReadmeHeader>
+                <div className={README_CLASSNAMES.MARKDOWN_WRAPPER}>
+                    <Markdown
+                        markdown={readme}
+                        className={README_CLASSNAMES.MARKDOWN}
+                        allowElement={allowElement}
+                        lazyLoadImages
+                    />
+                </div>
+            </ReadmeWrapper>
+            {!isExpanded && <GradientOverlay />}
+        </SectionContent>
+    );
+};
+
+export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+    const manuallyCollapsed = useRef(false);
+    const manuallyExpanded = useRef(false);
     const actor = details.actorInfo;
 
-    const pricingText = useMemo(() => {
-        return formatPricing(
-            actor.currentPricingInfo || {
-                pricingModel: "FREE",
-                pricePerResultUsd: 0,
-                monthlyChargeUsd: 0,
-            }
-        );
-    }, [actor.currentPricingInfo]);
+    const handleToggleExpand = async () => {
+        if (!isExpanded) {
+            manuallyExpanded.current = true;
+            manuallyCollapsed.current = false;
+            setIsExpanded(true);
+            await window.openai?.requestDisplayMode({ mode: "fullscreen" });
+        } else {
+            manuallyCollapsed.current = true;
+            manuallyExpanded.current = false;
+            setIsExpanded(false);
+            await window.openai?.requestDisplayMode({ mode: "inline" });
+        }
+    };
 
-    const readmeLines = useMemo(() => {
-        if (!details.readme) return null;
-        return details.readme.split("\n");
-    }, [details.readme]);
-
-    const inputProps = useMemo(() => {
-        const schema = details.inputSchema as unknown as InputSchema | undefined;
-        const props = schema?.properties ?? {};
-        return Object.entries(props);
-    }, [details.inputSchema]);
+    const fullscreenButton = (
+        <IconButton
+            Icon={isExpanded ? MinimizeIcon : FullscreenIcon}
+            variant={ICON_BUTTON_VARIANTS.BORDERED}
+            onClick={handleToggleExpand}
+        />
+    );
 
     return (
-        <div className="flex flex-col gap-4 w-full">
-            {showBackButton && (
-                <Button onClick={onBackToList} variant="secondary" size="md" className="self-start">
-                    <ArrowLeft />
-                    <span>Back to search results</span>
-                </Button>
-            )}
-
-            <SectionCard>
-                <ActorCard
-                    actor={actor}
-                    variant="detail"
-                    subtitle={`${actor.username}/${actor.name}`}
-                    isLast={true}
-                    description={actor.description}
-                    pricing={pricingText}
+        <Container>
+            <CardWrapper>
+                <ActorCard actor={actor} isDetail customActionButton={fullscreenButton} />
+                <ReadmeSection
+                    readme={details.readme}
+                    isExpanded={isExpanded}
+                    setIsExpanded={setIsExpanded}
+                    manuallyCollapsed={manuallyCollapsed}
+                    manuallyExpanded={manuallyExpanded}
                 />
-            </SectionCard>
-
-            {readmeLines && readmeLines.length > 0 && <DocumentationSection lines={readmeLines} />}
-
-            {inputProps.length > 0 && <InputSchemaSection entries={inputProps.slice(0, 10)} />}
-
-            {details.actorCard && <TechnicalDetailsSection actorCard={details.actorCard} />}
-        </div>
-    );
-};
-
-const SectionCard: React.FC<{ title?: string; children: React.ReactNode }> = ({ title, children }) => {
-    return (
-        <Card variant="default" padding="lg" rounded="3xl" className="w-full" shadow="md">
-            {title ? (
-                <Heading as="h3" weight="bold" className="mb-4">
-                    {title}
-                </Heading>
-            ) : null}
-            {children}
-        </Card>
-    );
-};
-
-const DocumentationSection: React.FC<{ lines: string[] }> = ({ lines }) => {
-    const maxLines = 20;
-    const visible = lines.slice(0, maxLines);
-    const isTruncated = lines.length > maxLines;
-
-    return (
-        <SectionCard title="Documentation">
-            <Text as="div" size="sm" className="prose max-w-none">
-                {visible.map((line, i) => (
-                    <p key={i} className="mb-2">
-                        {line}
-                    </p>
-                ))}
-                {isTruncated && (
-                    <Text as="p" size="sm" tone="secondary" className="italic">
-                        ... (truncated for brevity)
-                    </Text>
-                )}
-            </Text>
-        </SectionCard>
-    );
-};
-
-const InputSchemaSection: React.FC<{
-    entries: Array<[string, { type?: string; description?: string; [key: string]: any }]>;
-}> = ({ entries }) => {
-    return (
-        <SectionCard title="Input Parameters">
-            <div className="space-y-3">
-                {entries.map(([key, value]) => (
-                    <SchemaFieldRow key={key} name={key} field={value} />
-                ))}
-            </div>
-        </SectionCard>
-    );
-};
-
-const SchemaFieldRow: React.FC<{
-    name: string;
-    field: { type?: string; description?: string; [key: string]: any };
-}> = ({ name, field }) => {
-    return (
-        <div className="p-3 rounded-lg bg-[var(--color-code-bg)]">
-            <div className="flex items-start gap-2">
-                <code className="text-sm font-mono font-semibold text-[var(--color-code-orange)]">
-                    {name}
-                </code>
-
-                {field.type ? (
-                    <span
-                        className="text-xs px-2 py-0.5 rounded bg-[var(--color-type-blue-bg)] text-[var(--color-type-blue)]"
-                    >
-                        {field.type}
-                    </span>
-                ) : null}
-            </div>
-
-            {field.description ? (
-                <Text size="sm" tone="secondary" className="mt-1">
-                    {field.description}
-                </Text>
-            ) : null}
-        </div>
-    );
-};
-
-const TechnicalDetailsSection: React.FC<{ actorCard: string }> = ({ actorCard }) => {
-    return (
-        <SectionCard title="Technical Details">
-            <div className="rounded-lg overflow-x-auto p-5 bg-[var(--color-code-bg)] text-[var(--color-code-text)]">
-                <pre className="text-xs whitespace-pre-wrap font-mono">
-                    <code>{actorCard}</code>
-                </pre>
-            </div>
-        </SectionCard>
+            </CardWrapper>
+        </Container>
     );
 };

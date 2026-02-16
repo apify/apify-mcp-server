@@ -54,7 +54,7 @@ EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, actorOutputSchema } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -67,14 +67,10 @@ EXAMPLES:
         }
 
         if (apifyMcpServer.options.uiMode === 'openai') {
-            const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
+            const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
             const structuredContent = {
                 actorInfo: details.actorCardStructured,
-                readme: formattedReadme,
                 inputSchema: details.inputSchema,
-            };
-            const widgetStructuredContent = {
-                ...structuredContent,
                 actorDetails: processedStructuredContent.actorDetails,
             };
 
@@ -89,13 +85,18 @@ An interactive widget has been rendered with detailed Actor information.
             const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
             return buildMCPResponse({
                 texts,
-                structuredContent: widgetStructuredContent,
+                structuredContent,
                 _meta: {
                     ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
                 },
             });
         }
+
+        // Fetch output schema from ActorStore if available and requested
+        const actorOutputSchema = resolvedOutput.outputSchema
+            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(parsed.actor).catch(() => null)
+            : undefined;
 
         // NOTE: Data duplication between texts and structuredContent is intentional and required.
         // Some MCP clients only read text content, while others only read structured content.
@@ -108,6 +109,7 @@ An interactive widget has been rendered with detailed Actor information.
             apifyToken,
             actorOutputSchema,
             skyfireMode: apifyMcpServer?.options.skyfireMode,
+            mcpSessionId,
         });
 
         return buildMCPResponse({ texts, structuredContent: responseStructuredContent });

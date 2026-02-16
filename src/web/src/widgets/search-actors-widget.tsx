@@ -12,22 +12,17 @@ const mockActors = [
         title: "Web Scraper",
         description:
             "Crawl arbitrary websites using the Chrome browser and extract data from them using jQuery. It handles dynamic pages, authentication, and provides a REST API.",
-        categories: ["ECOMMERCE", "CONTENT_SCRAPING", "TOOLS"],
         pictureUrl: "https://apify.com/storage/actor-avatars/1/web-scraper.png",
         stats: {
-            totalBuilds: 1234,
-            totalRuns: 567890,
             totalUsers: 12345,
-            totalBookmarks: 890,
+            actorReviewCount: 0,
+            actorReviewRating: 0,
         },
         currentPricingInfo: {
             pricingModel: "PRICE_PER_DATASET_ITEM",
-            pricePerResultUsd: 0.0001,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0.0001,
         },
-        userActorRuns: {
-            successRate: 95.5,
-        },
+        url: "https://apify.com/apify/web-scraper",
     },
     {
         id: "actor-2",
@@ -40,19 +35,15 @@ const mockActors = [
         categories: ["SEO", "CONTENT_SCRAPING"],
         pictureUrl: "https://apify.com/storage/actor-avatars/1/google-search-scraper.png",
         stats: {
-            totalBuilds: 456,
-            totalRuns: 234567,
             totalUsers: 8901,
-            totalBookmarks: 456,
+            actorReviewCount: 40,
+            actorReviewRating: 5.0,
         },
         currentPricingInfo: {
             pricingModel: "PAY_PER_EVENT",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0,
         },
-        userActorRuns: {
-            successRate: 98.2,
-        },
+        url: "https://apify.com/apify/google-search-scraper",
     },
     {
         id: "actor-3",
@@ -65,19 +56,15 @@ const mockActors = [
         categories: ["SOCIAL_MEDIA", "CONTENT_SCRAPING"],
         pictureUrl: "",
         stats: {
-            totalBuilds: 789,
-            totalRuns: 123456,
             totalUsers: 5678,
-            totalBookmarks: 234,
+            actorReviewCount: 124,
+            actorReviewRating: 4.2,
         },
         currentPricingInfo: {
             pricingModel: "FREE",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 0,
+            pricePerUnitUsd: 0,
         },
-        userActorRuns: {
-            successRate: null,
-        },
+        url: "https://apify.com/dtrungtin/instagram-scraper",
     },
     {
         id: "actor-4",
@@ -90,19 +77,15 @@ const mockActors = [
         categories: ["ECOMMERCE", "PRICE_MONITORING", "CONTENT_SCRAPING"],
         pictureUrl: "https://apify.com/storage/actor-avatars/1/amazon-scraper.png",
         stats: {
-            totalBuilds: 234,
-            totalRuns: 89012,
             totalUsers: 3456,
-            totalBookmarks: 567,
+            actorReviewCount: 5,
+            actorReviewRating: 3.0,
         },
         currentPricingInfo: {
             pricingModel: "FLAT_PRICE_PER_MONTH",
-            pricePerResultUsd: 0,
-            monthlyChargeUsd: 49.99,
+            pricePerUnitUsd: 49.99,
         },
-        userActorRuns: {
-            successRate: 92.8,
-        },
+        url: "https://apify.com/junglee/amazon-product-scraper",
     },
 ];
 

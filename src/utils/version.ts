@@ -1,7 +1,6 @@
-import { createRequire } from 'node:module';
+import { readJsonFile } from './generic.js';
 
-const require = createRequire(import.meta.url);
-const packageJson = require('../../package.json');
+const packageJson = readJsonFile<{ version?: string }>(import.meta.url, '../../package.json');
 
 /**
  * Gets the package version from package.json

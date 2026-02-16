@@ -37,6 +37,7 @@ export async function getActorDefinition(
             // We set actorDefinition ID to Actor ID
             actorDefinitions.id = actor.id;
             actorDefinitions.readme = truncateActorReadme(actorDefinitions.readme || '', limit);
+            actorDefinitions.readmeSummary = actor.readmeSummary;
             actorDefinitions.description = actor.description || '';
             actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
@@ -71,6 +72,7 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         actorFullName: response.actorFullName || '',
         buildTag: response?.buildTag || '',
         readme: response?.readme || '',
+        readmeSummary: response.readmeSummary,
         input: response?.input && 'type' in response.input && 'properties' in response.input
             ? {
                 ...response.input,

@@ -1,15 +1,18 @@
-import type { Actor, Build } from 'apify-client';
+import type { Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
-import type { ActorCardOptions, ActorInputSchema, StructuredActorCard } from '../types.js';
+import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
-import { formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
+import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
+import { searchActorsByKeywords } from './actor-search.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
+
+const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
 
 /**
  * Convert a type object to TypeScript-like string representation.
@@ -55,6 +58,20 @@ function typeValueToString(value: unknown): string {
     return 'unknown';
 }
 
+/**
+ * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
+ * Returns the content string and appropriate heading for text output.
+ */
+export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+    content: string;
+    heading: string;
+} {
+    if (details.readmeSummary?.trim()) {
+        return { content: details.readmeSummary, heading: '# README summary' };
+    }
+    return { content: details.readme, heading: '# README' };
+}
+
 // Keep the type here since it is a self-contained module
 export type ActorDetailsResult = {
     actorInfo: Actor;
@@ -63,6 +80,7 @@ export type ActorDetailsResult = {
     actorCardStructured: StructuredActorCard;
     inputSchema: ActorInputSchema;
     readme: string;
+    readmeSummary?: string;
 };
 
 export async function fetchActorDetails(
@@ -71,26 +89,36 @@ export async function fetchActorDetails(
     cardOptions?: ActorCardOptions,
 ): Promise<ActorDetailsResult | null> {
     try {
-        const [actorInfo, buildInfo]: [Actor | undefined, Build | undefined] = await Promise.all([
+        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] = await Promise.all([
             apifyClient.actor(actorName).get(),
             apifyClient.actor(actorName).defaultBuild().then(async (build) => build.get()),
+            // Fetch from store to get the processed pictureUrl (with resizing parameters).
+            // Use only the actor name part (after '/') for better keyword search relevance —
+            // searching "apify/instagram-scraper" returns unrelated results, while "instagram-scraper" finds the correct actor.
+            searchActorsByKeywords(actorName.split('/').pop() || actorName, apifyClient.token || '', ACTOR_DETAILS_PICTURE_SEARCH_LIMIT).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
+
+        const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
+        const pictureUrl = storeActor?.pictureUrl;
+        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & { pictureUrl?: string };
+
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',
             properties: {},
         }) as ActorInputSchema;
         inputSchema.properties = filterSchemaProperties(inputSchema.properties);
         inputSchema.properties = shortenProperties(inputSchema.properties);
-        const actorCard = formatActorToActorCard(actorInfo, cardOptions);
-        const actorCardStructured = formatActorToStructuredCard(actorInfo, cardOptions);
+        const actorCard = formatActorToActorCard(actorInfoWithPicture, cardOptions);
+        const actorCardStructured = formatActorToStructuredCard(actorInfoWithPicture, cardOptions);
         return {
-            actorInfo,
+            actorInfo: actorInfoWithPicture,
             buildInfo,
             actorCard,
             actorCardStructured,
             inputSchema,
             readme: buildInfo.actorDefinition.readme || 'No README provided.',
+            readmeSummary: actorInfo.readmeSummary,
         };
     } catch (error) {
         logHttpError(error, `Failed to fetch actor details for '${actorName}'`, { actorName });
@@ -122,7 +150,7 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
 
     const structuredContent = {
         actorDetails: {
-            actorInfo: details.actorInfo,
+            actorInfo: formatActorDetailsForWidget(details.actorInfo, actorUrl),
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,
@@ -152,7 +180,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
     metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
-    readme: z.boolean().optional().describe('Include full README documentation.'),
+    readme: z.boolean().optional().describe('Include Actor README documentation (summary when available, full otherwise).'),
     outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
@@ -205,6 +233,7 @@ export async function getMcpToolsMessage(
     apifyClient: ApifyClient,
     apifyToken: string,
     skyfireMode?: boolean,
+    mcpSessionId?: string,
 ): Promise<string> {
     const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
 
@@ -219,7 +248,7 @@ export async function getMcpToolsMessage(
     }
 
     // Connect and list tools
-    const client = await connectMCPClient(mcpServerUrl, apifyToken);
+    const client = await connectMCPClient(mcpServerUrl, apifyToken, mcpSessionId);
     if (!client) {
         return `Failed to connect to MCP server for Actor '${actorName}'.`;
     }
@@ -231,6 +260,9 @@ export async function getMcpToolsMessage(
             .join('\n\n');
 
         return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+    } catch (error) {
+        logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
+        return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
     } finally {
         await client.close();
     }
@@ -293,14 +325,14 @@ export async function buildActorDetailsTextResponse(options: {
     apifyToken: string;
     actorOutputSchema?: Record<string, unknown> | null;
     skyfireMode?: boolean;
+    mcpSessionId?: string;
 }): Promise<{
     texts: string[];
     structuredContent: Record<string, unknown>;
 }> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode } = options;
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode, mcpSessionId } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
-    const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
 
     const texts: string[] = [];
 
@@ -315,9 +347,10 @@ export async function buildActorDetailsTextResponse(options: {
         texts.push(`# Actor information\n${details.actorCard}`);
     }
 
-    // Add README if requested
-    if (output.readme) {
-        texts.push(formattedReadme);
+    // Add README content if requested (prefer readmeSummary, fall back to full readme)
+    const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
+    if (resolvedReadme) {
+        texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
     }
 
     // Add input schema if requested
@@ -337,14 +370,14 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Handle MCP tools
     if (output.mcpTools) {
-        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode);
+        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode, mcpSessionId);
         texts.push(message);
     }
 
     // Build structured content
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
-        readme: output.readme ? formattedReadme : undefined,
+        readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
     };

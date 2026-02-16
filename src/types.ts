@@ -3,7 +3,15 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { InitializeRequest, Notification, Prompt, Request, ToolSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import type { Actor, ActorDefaultRunOptions, ActorDefinition, ActorStoreList, PricingInfo } from 'apify-client';
+import type {
+    Actor as ActorOutdated,
+    ActorDefaultRunOptions,
+    ActorDefinition,
+    ActorRunPricingInfo,
+    ActorStats,
+    ActorStoreList as ActorStoreListOutdated,
+    PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
+} from 'apify-client';
 import type z from 'zod';
 
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
@@ -48,6 +56,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
+    readmeSummary?: string;
     defaultRunOptions: ActorDefaultRunOptions;
     input?: ActorInputSchema;
 };
@@ -57,10 +66,10 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
  * The `id` property is set to Actor ID.
  */
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
-    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'> & {
-        webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
-        pictureUrl?: string; // Optional, URL to the Actor's icon/picture
-    };
+    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'> & {
+    webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
+    pictureUrl?: string; // Optional, URL to the Actor's icon/picture
+};
 
 /**
  * Actor definition combined with full actor metadata.
@@ -68,7 +77,7 @@ export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
  */
 export type ActorDefinitionWithInfo = {
     definition: ActorDefinitionPruned;
-    info: Actor;
+    info: ActorOutdated;
 };
 
 /**
@@ -128,10 +137,10 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
-    /** Actor output schema as type object (injected by internal server) */
-    actorOutputSchema?: Record<string, unknown> | null;
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
+    /** MCP session ID for logging context */
+    mcpSessionId?: string;
 };
 
 /**
@@ -197,27 +206,28 @@ export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | '
  */
 export type ActorChargeEvent = {
     eventTitle: string;
-    eventDescription: string;
+    eventDescription?: string;
     /** Flat price per event in USD (if not tiered) */
     eventPriceUsd?: number;
     /** Tiered pricing per event, by tier name (FREE, BRONZE, etc.) */
     eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
 };
 
-/**
- * Pricing per event for an Actor, supporting both flat and tiered pricing.
- */
-export type PricingPerEvent = {
-    actorChargeEvents: Record<string, ActorChargeEvent>;
-};
+export type TieredPricing = {
+    [tier: string]: {
+        tieredPricePerUnitUsd: number;
+    };
+}
 
-export type ExtendedPricingInfo = PricingInfo & {
-    pricePerUnitUsd?: number;
-    trialMinutes?: number;
-    unitName?: string; // Name of the unit for the pricing model
-    pricingPerEvent: PricingPerEvent;
-    tieredPricing?: Partial<Record<PricingTier, { tieredPricePerUnitUsd: number }>>;
-};
+type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
+    pricingPerEvent: {
+        actorChargeEvents: Record<string, ActorChargeEvent>;
+    };
+}
+
+export type PricingInfo = ActorRunPricingInfo & {
+    tieredPricing?: TieredPricing;
+} | PricePerEventActorPricingInfo;
 
 export type ToolCategory = keyof typeof toolCategories;
 /**
@@ -233,8 +243,8 @@ export type Input = {
      */
     actors?: string[] | string;
     /**
-    * @deprecated Use `enableAddingActors` instead.
-    */
+     * @deprecated Use `enableAddingActors` instead.
+     */
     enableActorAutoLoading?: boolean | string;
     enableAddingActors?: boolean | string;
     maxActorMemoryBytes?: number;
@@ -264,13 +274,48 @@ export type TelemetryEnv = (typeof TELEMETRY_ENV)[keyof typeof TELEMETRY_ENV];
 export type ActorInfo = {
     webServerMcpPath: string | null; // To determined if the Actor is an MCP server
     definition: ActorDefinitionPruned;
-    actor: Actor;
+    actor: ActorOutdated;
 };
 
-export type ExtendedActorStoreList = ActorStoreList & {
-    categories?: string[];
-    bookmarkCount?: number;
+export type ActorStoreList = ActorStoreListOutdated & {
+    actorReviewCount?: number;
     actorReviewRating?: number;
+    badge?: string | null;
+    bookmarkCount?: number;
+    categories?: string[];
+    currentPricingInfo: ActorRunPricingInfo;
+    isWhiteListedForAgenticPayments?: boolean;
+    notice?: string | null;
+    userFullName?: string;
+    stats: ActorStats & {
+        actorReviewCount?: number;
+        actorReviewRating?: number;
+        bookmarkCount?: number;
+        publicActorRunStats30Days?: Partial<Record<string, number>> & {
+            SUCCEEDED?: number;
+            TOTAL?: number;
+        };
+    };
+};
+
+export type Actor = ActorOutdated & {
+    actorPermissionLevel?: string;
+    hasNoDataset?: boolean;
+    isCritical?: boolean;
+    isGeneric?: boolean;
+    isSourceCodeHidden?: boolean;
+    pictureUrl?: string;
+    standbyUrl?: string | null;
+    stats: ActorStats & {
+        publicActorRunStats30Days?: Partial<Record<string, number>> & {
+            SUCCEEDED?: number;
+            TOTAL?: number;
+        };
+        actorReviewCount?: number;
+        actorReviewRating?: number;
+        bookmarkCount?: number;
+        lastRunStartedAt?: string | Date | null;
+    };
 };
 
 export type ActorDefinitionStorage = {
@@ -346,6 +391,43 @@ export type ToolCallTelemetryProperties = {
 export type UiMode = 'openai';
 
 /**
+ * External store for Actor metadata that can be injected by the hosting environment.
+ * Provides access to Actor output schemas inferred from historical run data.
+ * When not provided, tools use generic output schemas without field-level detail.
+ */
+export type ActorStore = {
+    /**
+     * Returns the inferred JSON Schema properties for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object should be a JSON Schema `properties` object, e.g.:
+     * `{ url: { type: 'string' }, price: { type: 'number' } }`
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     * Internally calls `getActorOutputSchemaAsTypeObject` and converts the result.
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchema(actorFullName: string): Promise<Record<string, unknown> | null>;
+
+    /**
+     * Returns the inferred output schema as a simplified type object for an Actor's dataset items,
+     * based on historical successful runs.
+     *
+     * The returned object uses a compact type representation, e.g.:
+     * `{ url: "string", price: "number", tags: ["string"], user: { name: "string" } }`
+     *
+     * This is the core method that performs cache lookup, API resolution, and MongoDB queries.
+     * Results are cached with TTL to avoid repeated database queries.
+     *
+     * Returns null if no schema is available (e.g., new Actor with no runs).
+     *
+     * @param actorFullName - Full Actor name in "username/name" format (e.g., "apify/rag-web-browser")
+     */
+    getActorOutputSchemaAsTypeObject(actorFullName: string): Promise<Record<string, unknown> | null>;
+};
+
+/**
  * Options for configuring the ActorsMcpServer instance.
  */
 export type ActorsMcpServerOptions = {
@@ -353,6 +435,12 @@ export type ActorsMcpServerOptions = {
      * Task store for long running tasks support.
      */
     taskStore?: TaskStore;
+    /**
+     * External store for Actor metadata (output schemas).
+     * When provided, Actor tools will have enriched output schemas with field-level detail.
+     * Only used by the streamable HTTP transport in hosted deployments.
+     */
+    actorStore?: ActorStore;
     setupSigintHandler?: boolean;
     /**
      * Switch to enable Skyfire agentic payment mode.
@@ -410,6 +498,7 @@ export type StructuredActorCard = {
     title?: string;
     url: string;
     fullName: string;
+    pictureUrl?: string;
     developer: {
         username: string;
         isOfficialApify: boolean;
@@ -424,7 +513,10 @@ export type StructuredActorCard = {
         successRate?: number;
         bookmarks?: number;
     };
-    rating?: number;
+    rating?: {
+        average: number;
+        count: number;
+    };
     modifiedAt?: string;
     isDeprecated: boolean;
 }
@@ -461,8 +553,6 @@ export type ApifyRequestParams = {
         apifyToken?: string;
         /** List of Actor IDs that the user has rented */
         userRentedActorIds?: string[];
-        /** Actor output schema as type object (injected by internal server) */
-        actorOutputSchema?: Record<string, unknown> | null;
         /** Progress token for out-of-band progress notifications (standard MCP) */
         progressToken?: string | number;
         /** Allow other metadata fields */
@@ -470,4 +560,31 @@ export type ApifyRequestParams = {
     };
     /** Allow any other request parameters */
     [key: string]: unknown;
+};
+
+/** MCP Server Card per SEP-1649. */
+export type ServerCard = {
+    $schema: string;
+    version: string;
+    protocolVersion: string;
+    serverInfo: {
+        name: string;
+        title: string;
+        version: string;
+    };
+    description: string;
+    iconUrl: string;
+    documentationUrl: string;
+    transport: {
+        type: string;
+        endpoint: string;
+    };
+    capabilities: {
+        tools: { listChanged: boolean };
+    };
+    authentication: {
+        required: boolean;
+        schemes: string[];
+    };
+    tools: string;
 };

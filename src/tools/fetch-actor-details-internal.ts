@@ -33,7 +33,7 @@ This tool is available because the LLM is operating in UI mode. Use it for inter
 where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
 Use 'output' parameter with boolean flags to control returned information:
-- Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - excepts McpTools
+- Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - except mcpTools
 - Selective: Set desired fields to true to save tokens (e.g., output: { inputSchema: true, readme: false })
 - Common patterns: inputSchema only for execution prep, readme + inputSchema for documentation, etc.
 
@@ -49,7 +49,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, actorOutputSchema } = toolArgs;
+        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsInternalArgsSchema.parse(args);
         const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -61,6 +61,11 @@ but the user did NOT explicitly ask for Actor details presentation.`,
             return buildActorNotFoundResponse(parsed.actor);
         }
 
+        // Fetch output schema from ActorStore if available and requested
+        const actorOutputSchema = resolvedOutput.outputSchema
+            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(parsed.actor).catch(() => null)
+            : undefined;
+
         const { texts, structuredContent } = await buildActorDetailsTextResponse({
             actorName: parsed.actor,
             details,
@@ -70,6 +75,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
             apifyToken,
             actorOutputSchema,
             skyfireMode: apifyMcpServer?.options.skyfireMode,
+            mcpSessionId,
         });
 
         return buildMCPResponse({ texts, structuredContent });

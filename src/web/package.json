@@ -13,11 +13,13 @@
     "dependencies": {
         "@apify/ui-icons": "^1.27.2",
         "@apify/ui-library": "^1.124.0",
+        "pluralize": "^8.0.0",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "styled-components": "^6.3.8"
     },
     "devDependencies": {
+        "@types/pluralize": "^0.0.33",
         "@types/react": "^19.2.7",
         "@types/react-dom": "^19.2.3",
         "autoprefixer": "^10.4.20",

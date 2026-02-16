@@ -18,6 +18,7 @@ body {
 
   /* Theme-aware brand colors */
   :root {
+    font-size: 10px;
     --color-code-orange: #FF6B00;
     --color-code-bg: rgba(13, 13, 13, 0.05);
     --color-code-text: #5d5d5d;
