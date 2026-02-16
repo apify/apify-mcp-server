@@ -48,6 +48,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
     id: string;
     actorFullName: string;
     description: string;
+    readmeSummary?: string;
     defaultRunOptions: ActorDefaultRunOptions;
     input?: ActorInputSchema;
 };
@@ -57,7 +58,7 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
  * The `id` property is set to Actor ID.
  */
 export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
-    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'input' | 'description' | 'defaultRunOptions'> & {
+    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'> & {
         webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
         pictureUrl?: string; // Optional, URL to the Actor's icon/picture
     };

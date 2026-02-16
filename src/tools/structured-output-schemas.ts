@@ -121,12 +121,17 @@ export const actorInfoSchema = {
 /**
  * Schema for Actor details output (fetch-actor-details tool)
  * All fields are optional since the tool supports selective output via the 'output' parameter
+ *
+ * NOTE on `readme`: This field contains the abridged README summary when the Actor has one,
+ * falling back to the full README otherwise. The field is named `readme` (not `readmeSummary`)
+ * to stay consistent with the widget UI contract. Most Actors should have a summary defined,
+ * so the full README fallback is only expected in niche cases.
  */
 export const actorDetailsOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         actorInfo: actorInfoSchema,
-        readme: { type: 'string', description: 'Actor README documentation.' },
+        readme: { type: 'string', description: 'Actor README summary when available, otherwise the full README documentation.' },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
     },

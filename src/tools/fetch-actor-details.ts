@@ -67,14 +67,10 @@ EXAMPLES:
         }
 
         if (apifyMcpServer.options.uiMode === 'openai') {
-            const { structuredContent: processedStructuredContent, formattedReadme, actorUrl } = processActorDetailsForResponse(details);
-            const structuredContent = {
-                actorInfo: details.actorCardStructured,
-                readme: formattedReadme,
-                inputSchema: details.inputSchema,
-            };
+            const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
             const widgetStructuredContent = {
-                ...structuredContent,
+                actorInfo: details.actorCardStructured,
+                inputSchema: details.inputSchema,
                 actorDetails: processedStructuredContent.actorDetails,
             };
 
