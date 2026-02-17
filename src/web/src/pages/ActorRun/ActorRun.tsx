@@ -5,7 +5,7 @@ import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
-import { formatDuration, formatTimestamp } from "../../utils/formatting";
+import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
 import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
     runId: string;
@@ -32,8 +32,7 @@ interface ActorRunData {
 
 interface ToolOutput extends Record<string, unknown> {
     runId?: string;
-    actorName?: string;
-    actorDeveloperUsername?: string;
+    actorName?: string; // Full actor name with username (e.g., "apify/rag-web-browser")
     status?: string;
     startedAt?: string;
     finishedAt?: string;
@@ -294,11 +293,12 @@ export const ActorRun: React.FC = () => {
 
             const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
             const actorNameOnly = extractActorName(fullActorName);
+            const humanizedName = humanizeActorName(actorNameOnly);
             const developerUsername = extractDeveloperUsername(fullActorName);
 
             setRunData({
                 runId: toolOutput.runId,
-                actorName: actorNameOnly,
+                actorName: humanizedName,
                 actorFullName: fullActorName, // Store the full name for API calls
                 actorDeveloperUsername: developerUsername,
                 status: (toolOutput.status as string) || "RUNNING",
@@ -370,11 +370,12 @@ export const ActorRun: React.FC = () => {
 
                         const fullActorName = (newData.actorName as string) || runData.actorFullName;
                         const actorNameOnly = extractActorName(fullActorName);
+                        const humanizedName = humanizeActorName(actorNameOnly);
                         const developerUsername = extractDeveloperUsername(fullActorName);
 
                         const updatedRunData: ActorRunData = {
                             runId: newData.runId!,
-                            actorName: actorNameOnly,
+                            actorName: humanizedName,
                             actorFullName: fullActorName, // Keep the full name for API calls
                             actorDeveloperUsername: developerUsername,
                             status: (newData.status as string) || "RUNNING",
