@@ -102,7 +102,7 @@
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create-dataset.ts",
     "evals:run": "tsx evals/run-evaluation.ts",
-    "evals:workflow": "tsx evals/workflows/run-workflow-evals.ts"
+    "evals:workflow": "npm run build && tsx evals/workflows/run-workflow-evals.ts"
   },
   "author": "Apify",
   "license": "MIT"

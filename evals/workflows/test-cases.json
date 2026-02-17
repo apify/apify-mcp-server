@@ -53,7 +53,7 @@
     {
       "id": "call-tiktok-scraper",
       "category": "call",
-      "query": "Showe me 1 latest post from natgeo tik tok using Apify",
+      "query": "Show me 1 latest post from natgeo tik tok using Apify",
       "reference": "The agent must find tik tok scraper, call it for natgeo profile, return the latest post and present it to the user."
     },
     {
