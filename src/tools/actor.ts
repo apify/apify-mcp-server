@@ -412,7 +412,7 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
         .describe('The input JSON to pass to the Actor. Required.'),
     async: z.boolean()
         .optional()
-        .describe(`When true: starts the run and returns immediately with runId. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled (enforced), false otherwise. Note: When UI mode is enabled, async is always true regardless of this parameter and the widget automatically tracks progress.`),
+        .describe(`When true: starts the run and returns immediately with runId. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled (enforced), false otherwise. IMPORTANT: Only set async to true if the user explicitly asks to run the Actor in the background or does not need immediate results. When the user asks for data or results, always use async: false (default) so the results are returned immediately.`),
     previewOutput: z.boolean()
         .optional()
         .describe('When true (default): includes preview items. When false: metadata only (reduces context). Use when fetching fields via get-actor-output.'),
@@ -468,8 +468,8 @@ USAGE:
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
 
 - This tool supports async execution via the \`async\` parameter:
-  - **When \`async: false\` or not provided** (default when UI mode is disabled): Waits for completion and returns results immediately with dataset preview.
-  - **When \`async: true\`** (enforced when UI mode is enabled): Starts the run and returns immediately with runId and a widget that automatically tracks progress. DO NOT call ${HelperTools.ACTOR_RUNS_GET} or any other tool after this - your task is complete. Note: UI mode always enforces async execution for optimal user experience.
+  - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
+  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results. When UI mode is enabled, async is always enforced and the widget automatically tracks progress.
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;

@@ -92,8 +92,8 @@ Do NOT use this tool when user wants immediate data retrieval - use apify-slash-
 IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
 
 Usage:
-- Use the most direct query possible.
-- The search is smart enough to return all relevant actors from one query.
+- ALWAYS prefer broad, generic keywords - use just the platform name (e.g., "TikTok" instead of "TikTok posts", "Instagram" instead of "Instagram scraper").
+- You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
 For complete Actor details, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
@@ -135,8 +135,7 @@ Returns list of Actor cards with the following info:
         });
         if (actors.length === 0) {
             const instructions = `No Actors were found for the search query "${parsed.keywords}".
-Try a different query with different keywords, or adjust the limit and offset parameters.
-You can also try using more specific or alternative keywords related to your search topic.`;
+You MUST retry with broader, more generic keywords - use just the platform name (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.`;
             const structuredContent = {
                 actors: [],
                 query: parsed.keywords,
@@ -162,7 +161,7 @@ You can also try using more specific or alternative keywords related to your sea
             query: parsed.keywords,
             count: actors.length,
             instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
- If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.`,
+IMPORTANT: You MUST always do a second search with broader, more generic keywords (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure you haven't missed a better Actor.`,
         };
 
         // Add widget format actors when widget mode is enabled
@@ -206,7 +205,7 @@ An interactive widget has been rendered with the search results. The user can al
  ${actorsText}
 
 If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.
- If the search did not return relevant results, consider refining your keywords, use broader terms or removing less important words from the keywords.
+IMPORTANT: You MUST always do a second search with broader, more generic keywords (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure you haven't missed a better Actor.
  `;
 
         return buildMCPResponse({
