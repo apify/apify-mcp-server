@@ -115,6 +115,9 @@ export async function createMcpStdioClient(
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
     };
 
+    // Default telemetry to disabled for tests to avoid sending Sentry sessions and events
+    const telemetryEnabled = telemetry?.enabled ?? false;
+
     // Set environment variables instead of command line arguments when useEnv is true
     if (useEnv) {
         if (actors !== undefined) {
@@ -126,9 +129,7 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             env.TOOLS = tools.join(',');
         }
-        if (telemetry?.enabled !== undefined) {
-            env.TELEMETRY_ENABLED = telemetry.enabled.toString();
-        }
+        env.TELEMETRY_ENABLED = telemetryEnabled.toString();
         if (telemetry?.env !== undefined) {
             env.TELEMETRY_ENV = telemetry.env;
         }
@@ -149,10 +150,8 @@ export async function createMcpStdioClient(
         if (tools !== undefined) {
             args.push('--tools', tools.join(','));
         }
-        if (telemetry?.enabled === false) {
-            args.push('--telemetry-enabled', 'false');
-        }
-        if (telemetry?.env !== undefined && telemetry?.enabled !== false) {
+        args.push('--telemetry-enabled', telemetryEnabled.toString());
+        if (telemetry?.env !== undefined && telemetryEnabled) {
             args.push('--telemetry-env', telemetry.env);
         }
         if (uiMode !== undefined) {
