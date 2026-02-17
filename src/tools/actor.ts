@@ -640,7 +640,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
                 const structuredContent = {
                     runId: actorRun.id,
-                    actorName,
+                    actorName, // Full name with username (e.g., "apify/rag-web-browser")
                     status: actorRun.status,
                     startedAt: actorRun.startedAt?.toISOString() || '',
                     input,
