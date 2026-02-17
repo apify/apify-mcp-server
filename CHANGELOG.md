@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.6) (2026-02-17)
+
+### 🚀 Features
+
+- **widgets:** Redesign actor detail widget ([6d5c080](https://github.com/apify/apify-mcp-server/commit/6d5c08007dda1e61742ce8fe82aec458414316ca)) by [@jmikitova](https://github.com/jmikitova)
+- Include actor cards in widget text output for LLM context ([9d6d9a2](https://github.com/apify/apify-mcp-server/commit/9d6d9a20c952698a3ea3bc20936950240607dee5)) by [@MQ37](https://github.com/MQ37)
+- Expose Apify run costs in MCP response _meta ([#428](https://github.com/apify/apify-mcp-server/pull/428)) ([874775a](https://github.com/apify/apify-mcp-server/commit/874775a4041e87d59d23a511ab45c4135f1feff0)) by [@shreyansh073](https://github.com/shreyansh073)
+- **widgets:** Redesign actor search and actor detail ([#430](https://github.com/apify/apify-mcp-server/pull/430)) ([825ec42](https://github.com/apify/apify-mcp-server/commit/825ec42af3bd1b4f29b00925d277eb8a6632f4ba)) by [@jmikitova](https://github.com/jmikitova)
+
+### 🐛 Bug Fixes
+
+- Refactor imports from ui library ([42ac3f3](https://github.com/apify/apify-mcp-server/commit/42ac3f3cfcf6ee82ca207dc599899c1744372dc8)) by [@jmikitova](https://github.com/jmikitova)
+- Refactor usage metadata and expose run costs in MCP response ([#456](https://github.com/apify/apify-mcp-server/pull/456)) ([b25d639](https://github.com/apify/apify-mcp-server/commit/b25d639f19b8d74880ba00a2074fa7223dc187b0)) by [@jirispilka](https://github.com/jirispilka)
+- Use readmeSummary instead of full readme to avoid context bloat ([#454](https://github.com/apify/apify-mcp-server/pull/454)) ([87b7c92](https://github.com/apify/apify-mcp-server/commit/87b7c92083a4aa63eb06e7c971d0c9644c84c893)) by [@janbuchar](https://github.com/janbuchar), closes [#422](https://github.com/apify/apify-mcp-server/issues/422)
+- Improve store search for actor pictureUrl by using name-only query ([#459](https://github.com/apify/apify-mcp-server/pull/459)) ([f749b1b](https://github.com/apify/apify-mcp-server/commit/f749b1bdbe7c532ebf14dc0b2306e807c5e9b427)) by [@MQ37](https://github.com/MQ37)
+- Integration-tests ([#458](https://github.com/apify/apify-mcp-server/pull/458)) ([1bec912](https://github.com/apify/apify-mcp-server/commit/1bec91291692d47891bbe77bead759de32af3543)) by [@jirispilka](https://github.com/jirispilka)
+- Add Sentry session tracking for crash-free rate metrics ([#460](https://github.com/apify/apify-mcp-server/pull/460)) ([0a03da5](https://github.com/apify/apify-mcp-server/commit/0a03da54c1a8abd096468c4078564ef76fc9bef2)) by [@MQ37](https://github.com/MQ37)
+- Improve workflow evals and tool instructions for search and call-actor ([#462](https://github.com/apify/apify-mcp-server/pull/462)) ([bd1c06c](https://github.com/apify/apify-mcp-server/commit/bd1c06c3374f16999671f03e2173ce7aee4650ce)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.8.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.4) (2026-02-11)
 
 ### 🚀 Features
