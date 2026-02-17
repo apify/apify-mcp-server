@@ -99,6 +99,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
+    "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create-dataset.ts",
     "evals:run": "tsx evals/run-evaluation.ts",
     "evals:workflow": "tsx evals/workflows/run-workflow-evals.ts"
