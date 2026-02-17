@@ -10,6 +10,7 @@ import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
     runId: string;
     actorName: string;
+    actorFullName: string; // Full name with username (e.g., "apify/rag-web-browser")
     actorDeveloperUsername: string;
     status: string;
     cost?: number;
@@ -90,6 +91,12 @@ const extractActorName = (fullActorName: string): string => {
     return actorNameParts.length > 1 ? actorNameParts[1] : fullActorName;
 };
 
+const extractDeveloperUsername = (fullActorName: string): string => {
+    // Extract developer username from full name (e.g., "apify/python-example" -> "apify")
+    const actorNameParts = fullActorName.split('/');
+    return actorNameParts.length > 1 ? actorNameParts[0] : "unknown";
+};
+
 const Container = styled.div`
     display: flex;
     flex-direction: column;
@@ -156,7 +163,7 @@ const TableGradientOverlay = styled.div`
     width: 100%;
     height: 86px;
     margin-top: -86px;
-    background: linear-gradient(179.32deg, rgba(255, 255, 255, 0) 13.4%, rgb(255, 255, 255) 95.38%);
+    background: linear-gradient(178.84deg, transparent 13.4%, ${theme.color.neutral.background} 81.59%);
     pointer-events: none;
     border-radius: 0 0 ${theme.radius.radius12} ${theme.radius.radius12};
     z-index: 2;
@@ -285,12 +292,15 @@ export const ActorRun: React.FC = () => {
             const finishedAt = toolOutput.finishedAt;
             const duration = formatDuration(startedAt, finishedAt);
 
-            const actorNameOnly = extractActorName((toolOutput.actorName as string) || "Unknown Actor");
+            const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
+            const actorNameOnly = extractActorName(fullActorName);
+            const developerUsername = extractDeveloperUsername(fullActorName);
 
             setRunData({
                 runId: toolOutput.runId,
                 actorName: actorNameOnly,
-                actorDeveloperUsername: (toolOutput.actorDeveloperUsername as string) || "unknown",
+                actorFullName: fullActorName, // Store the full name for API calls
+                actorDeveloperUsername: developerUsername,
                 status: (toolOutput.status as string) || "RUNNING",
                 startedAt,
                 finishedAt,
@@ -305,13 +315,12 @@ export const ActorRun: React.FC = () => {
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
-        if (!runData?.actorDeveloperUsername || !runData?.actorName || pictureUrl !== undefined) return;
+        if (!runData?.actorFullName || pictureUrl !== undefined) return;
 
         const fetchActorDetails = async () => {
             try {
-                const actorFullName = `${runData.actorDeveloperUsername}/${runData.actorName}`;
                 const response = await window.openai?.callTool('fetch-actor-details', {
-                    actor: actorFullName,
+                    actor: runData.actorFullName,
                 });
 
                 if (response?.structuredContent?.actorInfo) {
@@ -324,7 +333,7 @@ export const ActorRun: React.FC = () => {
         };
 
         fetchActorDetails();
-    }, [runData?.actorDeveloperUsername, runData?.actorName, pictureUrl]);
+    }, [runData?.actorFullName, pictureUrl]);
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
@@ -359,12 +368,15 @@ export const ActorRun: React.FC = () => {
                         const finishedAt = newData.finishedAt;
                         const duration = formatDuration(startedAt, finishedAt);
 
-                        const actorNameOnly = extractActorName((newData.actorName as string) || runData.actorName);
+                        const fullActorName = (newData.actorName as string) || runData.actorFullName;
+                        const actorNameOnly = extractActorName(fullActorName);
+                        const developerUsername = extractDeveloperUsername(fullActorName);
 
                         const updatedRunData: ActorRunData = {
                             runId: newData.runId!,
                             actorName: actorNameOnly,
-                            actorDeveloperUsername: (newData.actorDeveloperUsername as string) || runData.actorDeveloperUsername,
+                            actorFullName: fullActorName, // Keep the full name for API calls
+                            actorDeveloperUsername: developerUsername,
                             status: (newData.status as string) || "RUNNING",
                             startedAt,
                             finishedAt,
@@ -447,7 +459,7 @@ export const ActorRun: React.FC = () => {
     const handleOpenActor = () => {
         if (runData && window.openai?.openExternal) {
             window.openai.openExternal({
-                href: `https://apify.com/${runData.actorDeveloperUsername}/${runData.actorName}`,
+                href: `https://apify.com/${runData.actorFullName}`,
             });
         }
     };
