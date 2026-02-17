@@ -5,7 +5,7 @@ import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
-import { formatDuration } from "../../utils/formatting";
+import { formatDuration, formatTimestamp } from "../../utils/formatting";
 import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
     runId: string;
@@ -294,7 +294,7 @@ export const ActorRun: React.FC = () => {
                 status: (toolOutput.status as string) || "RUNNING",
                 startedAt,
                 finishedAt,
-                timestamp: new Date(startedAt).toLocaleString(),
+                timestamp: formatTimestamp(startedAt),
                 duration,
                 cost: toolOutput.stats?.computeUnits,
                 stats: toolOutput.stats,
@@ -368,7 +368,7 @@ export const ActorRun: React.FC = () => {
                             status: (newData.status as string) || "RUNNING",
                             startedAt,
                             finishedAt,
-                            timestamp: new Date(startedAt).toLocaleString(),
+                            timestamp: formatTimestamp(startedAt),
                             duration,
                             cost: newData.stats?.computeUnits,
                             stats: newData.stats,
@@ -460,7 +460,6 @@ export const ActorRun: React.FC = () => {
                     <ActorInfoRow>
                         <ActorNameWithIcon>
                             <ActorAvatar size={20} name={runData.actorName} url={pictureUrl} />
-
                             <ActorNameLink onClick={handleOpenActor}>
                                 {runData.actorName}
                             </ActorNameLink>
