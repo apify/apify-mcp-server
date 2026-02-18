@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.0) (2026-02-18)
+
+### 🚀 Features
+
+- **web:** Widget and actor run status redesign ([#429](https://github.com/apify/apify-mcp-server/pull/429)) ([056dded](https://github.com/apify/apify-mcp-server/commit/056dded1a0af47c1fc81b9fc700605a337730b70)) by [@katacek](https://github.com/katacek)
+
+### 🐛 Bug Fixes
+
+- **ci:** Pass explicit token to git-cliff-release action ([#463](https://github.com/apify/apify-mcp-server/pull/463)) ([1b2d7c8](https://github.com/apify/apify-mcp-server/commit/1b2d7c86dd39dc79a83b042454ebaedeb4560279)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.8.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.8.6) (2026-02-17)
 
 ### 🚀 Features
