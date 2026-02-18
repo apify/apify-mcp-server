@@ -46,6 +46,7 @@ jobs:
                     release_type: ${{ inputs.release_type }}
                     custom_version: ${{ inputs.custom_version }}
                     existing_changelog_path: CHANGELOG.md
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
     update_changelog:
         needs: [ release_metadata ]
