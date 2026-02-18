@@ -14,6 +14,7 @@ const OPENAI_WIDGET_CSP = {
         'https://images.apifyusercontent.com',
         'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
         'https://apify-image-uploads-prod.s3.amazonaws.com',
+        'https://apify.com',
     ],
 } as const;
 
