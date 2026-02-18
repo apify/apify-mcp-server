@@ -6,8 +6,7 @@
 
 import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
-import { filterRentalActors } from '../tools/store_collection.js';
-import type { ActorStoreList } from '../types.js';
+import type { ActorPricingModel, ActorStoreList } from '../types.js';
 
 export type SearchAndFilterActorsOptions = {
     keywords: string;
@@ -54,4 +53,27 @@ export async function searchAndFilterActors(
     );
 
     return filterRentalActors(actors || [], userRentedActorIds || []).slice(0, limit) as ActorStoreList[];
+}
+
+/**
+ * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors),
+ * unless the actor's ID is present in the user's rented actor IDs list.
+ *
+ * This is necessary because the Store list API does not support filtering by multiple pricing models at once.
+ *
+ * @param actors - Array of ActorStorePruned objects to filter.
+ * @param userRentedActorIds - Array of Actor IDs that the user has rented.
+ * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
+ *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
+ */
+export function filterRentalActors(
+    actors: ActorStoreList[],
+    userRentedActorIds: string[],
+): ActorStoreList[] {
+    // Store list API does not support filtering by two pricing models at once,
+    // so we filter the results manually after fetching them.
+    return actors.filter((actor) => (
+        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH'
+        || userRentedActorIds.includes(actor.id),
+    );
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNormalActorsAsTools } from '../../src/tools/actor.js';
+import { getNormalActorsAsTools } from '../../src/tools/core/actor-tools-factory.js';
 import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 

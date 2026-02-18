@@ -54,6 +54,7 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { buildActorResponseContent } from '../tools/core/actor-response.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
@@ -68,7 +69,6 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { buildActorResponseContent } from '../utils/actor-response.js';
 import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
