@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.1) (2026-02-18)
+
+### 🐛 Bug Fixes
+
+- **web:** Prevent mock data from overwriting real widget data in production ([#464](https://github.com/apify/apify-mcp-server/pull/464)) ([57c152e](https://github.com/apify/apify-mcp-server/commit/57c152e1e98bd774cde3bde25979836c42567e40)) by [@MQ37](https://github.com/MQ37)
+
+
 ## [0.9.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.0) (2026-02-18)
 
 ### 🚀 Features
