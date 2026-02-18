@@ -1,9 +1,8 @@
-import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
 import { HelperTools } from '../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
-import type { ActorPricingModel, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../utils/actor-card.js';
 import { searchAndFilterActors } from '../utils/actor-search.js';
 import { compileSchema } from '../utils/ajv.js';
@@ -45,28 +44,6 @@ Examples:
         .describe('Filter the results by the specified category.'),
 });
 
-/**
- * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors),
- * unless the actor's ID is present in the user's rented actor IDs list.
- *
- * This is necessary because the Store list API does not support filtering by multiple pricing models at once.
- *
- * @param actors - Array of ActorStorePruned objects to filter.
- * @param userRentedActorIds - Array of Actor IDs that the user has rented.
- * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
- *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
- */
-export function filterRentalActors(
-    actors: ActorStoreList[],
-    userRentedActorIds: string[],
-): ActorStoreList[] {
-    // Store list API does not support filtering by two pricing models at once,
-    // so we filter the results manually after fetching them.
-    return actors.filter((actor) => (
-        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH'
-        || userRentedActorIds.includes(actor.id),
-    );
-}
 /**
  * https://docs.apify.com/api/v2/store-get
  */
