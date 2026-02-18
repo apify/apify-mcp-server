@@ -89,7 +89,9 @@ const mockActors = [
     },
 ];
 
-// Set up mock window.openai for local development
+// Set up mock window.openai for local development (no-ops when window.openai already exists)
+const isMockEnvironment = typeof window !== "undefined" && !window.openai;
+
 setupMockOpenAi({
     toolOutput: {
         actors: [], // Start with empty to show loading state
@@ -101,18 +103,20 @@ setupMockOpenAi({
     },
 });
 
-// Simulate async data loading
-setTimeout(() => {
-    updateMockOpenAiState({
-        toolOutput: {
-            actors: mockActors,
-            query: "web scraping",
-        },
-        widgetState: {
-            loadingDetails: null,
-            isLoading: false,
-        },
-    });
-}, 2000);
+// Simulate async data loading (only in local dev, never in production OpenAI environment)
+if (isMockEnvironment) {
+    setTimeout(() => {
+        updateMockOpenAiState({
+            toolOutput: {
+                actors: mockActors,
+                query: "web scraping",
+            },
+            widgetState: {
+                loadingDetails: null,
+                isLoading: false,
+            },
+        });
+    }, 2000);
+}
 
 renderWidget(ActorSearch);

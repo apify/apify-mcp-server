@@ -16,7 +16,9 @@ const mockRunData = {
 // Simulate 5-second loading delay to test skeleton
 const LOADING_DELAY_MS = 2000;
 
-// Set up mock window.openai for local development
+// Set up mock window.openai for local development (no-ops when window.openai already exists)
+const isMockEnvironment = typeof window !== "undefined" && !window.openai;
+
 setupMockOpenAi({
     toolOutput: mockRunData, // Start with basic data (no dataset) to show header immediately
     initialWidgetState: {
@@ -191,69 +193,71 @@ setupMockOpenAi({
     },
 });
 
-// Simulate loading delay - update toolOutput after 5 seconds to add dataset
-setTimeout(() => {
-    if (window.openai) {
-        // Update the toolOutput with dataset to show results
-        window.openai.toolOutput = {
-            ...mockRunData,
-            status: "SUCCEEDED",
-            finishedAt: new Date().toISOString(),
-            dataset: {
-                datasetId: "test_dataset_456",
-                itemCount: 15,
-                previewItems: [
-                    {
-                        title: "Example Page 1",
-                        url: "https://example.com/page-1",
-                        description: "This is a long description that should test text overflow and ellipsis in table cells",
-                        category: "Technology",
-                        price: "$29.99",
-                        rating: "4.5/5",
-                        date: "2026-02-10"
-                    },
-                    {
-                        title: "Example Page 2",
-                        url: "https://example.com/page-2",
-                        description: "Another lengthy description to ensure we can test horizontal scrolling properly",
-                        category: "Business",
-                        price: "$49.99",
-                        rating: "4.8/5",
-                        date: "2026-02-09"
-                    },
-                    {
-                        title: "Example Page 3",
-                        url: "https://example.com/page-3",
-                        description: "Third item with even more text content for testing purposes",
-                        category: "Science",
-                        price: "$39.99",
-                        rating: "4.2/5",
-                        date: "2026-02-08"
-                    },
-                    {
-                        title: "Example Page 4",
-                        url: "https://example.com/page-4",
-                        description: "Fourth item in the dataset to test vertical scrolling",
-                        category: "Health",
-                        price: "$19.99",
-                        rating: "4.7/5",
-                        date: "2026-02-07"
-                    },
-                    {
-                        title: "Example Page 5",
-                        url: "https://example.com/page-5",
-                        description: "Fifth item with more content to fill the table",
-                        category: "Education",
-                        price: "$59.99",
-                        rating: "4.9/5",
-                        date: "2026-02-06"
-                    },
-                ],
-            },
-        } as any;
-        // Trigger a re-render by dispatching an event
-        window.dispatchEvent(new Event('openai:set_globals'));
-    }
-}, LOADING_DELAY_MS);
+// Simulate loading delay - update toolOutput after delay to add dataset (only in local dev)
+if (isMockEnvironment) {
+    setTimeout(() => {
+        if (window.openai) {
+            // Update the toolOutput with dataset to show results
+            window.openai.toolOutput = {
+                ...mockRunData,
+                status: "SUCCEEDED",
+                finishedAt: new Date().toISOString(),
+                dataset: {
+                    datasetId: "test_dataset_456",
+                    itemCount: 15,
+                    previewItems: [
+                        {
+                            title: "Example Page 1",
+                            url: "https://example.com/page-1",
+                            description: "This is a long description that should test text overflow and ellipsis in table cells",
+                            category: "Technology",
+                            price: "$29.99",
+                            rating: "4.5/5",
+                            date: "2026-02-10"
+                        },
+                        {
+                            title: "Example Page 2",
+                            url: "https://example.com/page-2",
+                            description: "Another lengthy description to ensure we can test horizontal scrolling properly",
+                            category: "Business",
+                            price: "$49.99",
+                            rating: "4.8/5",
+                            date: "2026-02-09"
+                        },
+                        {
+                            title: "Example Page 3",
+                            url: "https://example.com/page-3",
+                            description: "Third item with even more text content for testing purposes",
+                            category: "Science",
+                            price: "$39.99",
+                            rating: "4.2/5",
+                            date: "2026-02-08"
+                        },
+                        {
+                            title: "Example Page 4",
+                            url: "https://example.com/page-4",
+                            description: "Fourth item in the dataset to test vertical scrolling",
+                            category: "Health",
+                            price: "$19.99",
+                            rating: "4.7/5",
+                            date: "2026-02-07"
+                        },
+                        {
+                            title: "Example Page 5",
+                            url: "https://example.com/page-5",
+                            description: "Fifth item with more content to fill the table",
+                            category: "Education",
+                            price: "$59.99",
+                            rating: "4.9/5",
+                            date: "2026-02-06"
+                        },
+                    ],
+                },
+            } as any;
+            // Trigger a re-render by dispatching an event
+            window.dispatchEvent(new Event('openai:set_globals'));
+        }
+    }, LOADING_DELAY_MS);
+}
 
 renderWidget(ActorRun);
