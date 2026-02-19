@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { searchAndFilterActors } from '../utils/actor-search.js';
-import { compileSchema } from '../utils/ajv.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { actorSearchInternalOutputSchema } from './structured-output-schemas.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { searchAndFilterActors } from '../../utils/actor-search.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { actorSearchInternalOutputSchema } from '../structured-output-schemas.js';
 
 const searchActorsInternalArgsSchema = z.object({
     limit: z.number()
@@ -27,7 +27,7 @@ const searchActorsInternalArgsSchema = z.object({
         .describe('Filter the results by the specified category.'),
 });
 
-export const searchActorsInternalTool: ToolEntry = {
+export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
     openaiOnly: true,
@@ -83,4 +83,4 @@ Returns only minimal fields (fullName, title, description) needed for subsequent
             },
         });
     },
-};
+});

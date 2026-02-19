@@ -37,7 +37,7 @@ const defaultVariant = defaultCallActor as HelperTool;
  *
  * Note: The description may be overridden by tools-loader.ts at load time for openai mode.
  */
-export const callActor: ToolEntry = {
+export const callActor: ToolEntry = Object.freeze({
     ...defaultVariant,
     call: async (toolArgs: InternalToolArgs) => {
         const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
@@ -45,4 +45,4 @@ export const callActor: ToolEntry = {
             : defaultCallActor) as HelperTool;
         return variant.call(toolArgs);
     },
-};
+});

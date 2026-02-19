@@ -1,16 +1,16 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
 
 const addToolArgsSchema = z.object({
     actor: z.string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
 });
-export const addTool: ToolEntry = {
+export const addTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_ADD,
     description: `Add an Actor or MCP server to the Apify MCP Server as an available tool.
@@ -75,4 +75,4 @@ USAGE EXAMPLES:
             }],
         };
     },
-} as const;
+} as const);

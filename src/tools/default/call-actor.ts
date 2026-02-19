@@ -54,7 +54,7 @@ EXAMPLES:
  * Supports both sync (default) and async execution.
  * Does not include widget metadata in responses.
  */
-export const defaultCallActor: ToolEntry = {
+export const defaultCallActor: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_DEFAULT_DESCRIPTION,
@@ -153,4 +153,4 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH},
             });
         }
     },
-};
+} as const);

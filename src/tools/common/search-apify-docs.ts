@@ -1,11 +1,11 @@
 import { z } from 'zod';
 
-import { DOCS_SOURCES, HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { searchDocsBySourceCached } from '../utils/apify-docs.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { searchApifyDocsToolOutputSchema } from './structured-output-schemas.js';
+import { DOCS_SOURCES, HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { searchDocsBySourceCached } from '../../utils/apify-docs.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { searchApifyDocsToolOutputSchema } from '../structured-output-schemas.js';
 
 /**
  * Build docSource parameter description dynamically from DOCS_SOURCES
@@ -65,7 +65,7 @@ You can increase this limit if you need more results, but keep in mind that the 
 Use this to paginate through the search results. For example, if you want to get the next 5 results, set the offset to 5 and limit to 5.`),
 });
 
-export const searchApifyDocsTool: ToolEntry = {
+export const searchApifyDocsTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DOCS_SEARCH,
     description: buildToolDescription(),
@@ -126,4 +126,4 @@ ${results.map((result) => {
         // We put the instructions at the end so that they are more likely to be acknowledged by the LLM
         return buildMCPResponse({ texts: [textResult, instructions], structuredContent });
     },
-} as const;
+} as const);
