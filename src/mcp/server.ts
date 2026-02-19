@@ -30,7 +30,6 @@ import {
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
-import { type ActorCallOptions } from 'apify-client';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
@@ -54,10 +53,12 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { buildActorResponseContent } from '../tools/core/actor-response.js';
-import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { defaultActorExecutor } from '../tools/default/actor-executor.js';
+import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { openaiActorExecutor } from '../tools/openai/actor-executor.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
+    ActorExecutor,
     ActorMcpTool,
     ActorsMcpServerOptions,
     ActorStore,
@@ -70,7 +71,7 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
-import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
+import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
@@ -96,6 +97,8 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
+    /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
+    private readonly actorExecutor: ActorExecutor;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -116,6 +119,9 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
+        this.actorExecutor = options.uiMode === 'openai'
+            ? openaiActorExecutor
+            : defaultActorExecutor;
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -850,40 +856,28 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 // Handle actor tool
                 if (tool.type === 'actor') {
-                    // Create progress tracker if progressToken is available
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
-
-                    const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
-
                     const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                     const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
                     try {
                         log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
-                        const callResult = await callActorGetDataset({
-                            actorName: tool.actorFullName,
+                        const executorResult = await this.actorExecutor.executeActorTool({
+                            actorFullName: tool.actorFullName,
                             input: actorArgs,
                             apifyClient,
-                            callOptions,
+                            callOptions: { memory: tool.memoryMbytes },
                             progressTracker,
                             abortSignal: extra.signal,
                             mcpSessionId,
                         });
 
-                        if (!callResult) {
+                        if (!executorResult) {
                             toolStatus = TOOL_STATUS.ABORTED;
-                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                            return { };
+                            return {};
                         }
 
-                        const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                        const _meta = buildUsageMeta(callResult);
-                        return {
-                            content,
-                            structuredContent,
-                            ...(_meta && { _meta }),
-                        };
+                        return executorResult;
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();
@@ -1055,36 +1049,31 @@ Please verify the tool name and ensure the tool is properly registered.`;
             // Handle actor tool execution in task mode
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
-                const callOptions: ActorCallOptions = { memory: tool.memoryMbytes };
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                 const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
-                log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
-                const callResult = await callActorGetDataset({
-                    actorName: tool.actorFullName,
-                    input: actorArgs,
-                    apifyClient,
-                    callOptions,
-                    progressTracker,
-                    abortSignal: extra.signal,
-                    mcpSessionId,
-                });
+                try {
+                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: redactSkyfirePayId(actorArgs) });
+                    const executorResult = await this.actorExecutor.executeActorTool({
+                        actorFullName: tool.actorFullName,
+                        input: actorArgs,
+                        apifyClient,
+                        callOptions: { memory: tool.memoryMbytes },
+                        progressTracker,
+                        abortSignal: extra.signal,
+                        mcpSessionId,
+                    });
 
-                if (!callResult) {
-                    toolStatus = TOOL_STATUS.ABORTED;
-                    result = {};
-                } else {
-                    const { content, structuredContent } = buildActorResponseContent(tool.actorFullName, callResult);
-                    const _meta = buildUsageMeta(callResult);
-                    result = {
-                        content,
-                        structuredContent,
-                        ...(_meta && { _meta }),
-                    };
-                }
-
-                if (progressTracker) {
-                    progressTracker.stop();
+                    if (!executorResult) {
+                        toolStatus = TOOL_STATUS.ABORTED;
+                        result = {};
+                    } else {
+                        result = executorResult;
+                    }
+                } finally {
+                    if (progressTracker) {
+                        progressTracker.stop();
+                    }
                 }
             }
 
