@@ -9,12 +9,12 @@ export type JsonSchemaProperty = {
     items?: JsonSchemaProperty;
 };
 
-export type JsonSchemaObject = {
+type JsonSchemaObject = {
     type: 'object';
     properties: Record<string, JsonSchemaProperty>;
 };
 
-export type JsonSchemaArray = {
+type JsonSchemaArray = {
     type: 'array';
     items: JsonSchemaObject | JsonSchemaProperty;
 };
@@ -22,7 +22,7 @@ export type JsonSchemaArray = {
 /**
  * Options for schema generation
  */
-export type SchemaGenerationOptions = {
+type SchemaGenerationOptions = {
     /** Maximum number of items to use for schema generation. Default is 5. */
     limit?: number;
     /** If true, uses only non-empty items and skips hidden fields. Default is true. */
@@ -34,7 +34,7 @@ export type SchemaGenerationOptions = {
 /**
  * Function to recursively remove empty arrays from an object
  */
-export function removeEmptyArrays(obj: unknown): unknown {
+function removeEmptyArrays(obj: unknown): unknown {
     if (Array.isArray(obj)) {
         // If the item is an array, recursively call removeEmptyArrays on each element.
         return obj.map((item) => removeEmptyArrays(item));

@@ -23,7 +23,7 @@ function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
     return updatedConfig;
 }
 
-export function getApifyAPIBaseUrl(): string {
+function getApifyAPIBaseUrl(): string {
     // Workaround for Actor server where the platform APIFY_API_BASE_URL did not work with getActorDefinition from actors.ts
     if (process.env.APIFY_IS_AT_HOME) return 'https://api.apify.com';
     return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';

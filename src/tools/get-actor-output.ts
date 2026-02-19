@@ -33,7 +33,7 @@ const getActorOutputArgs = z.object({
  * @param obj - The object to clean
  * @returns The cleaned object or undefined if the result is empty
  */
-export function cleanEmptyProperties(obj: unknown): unknown {
+function cleanEmptyProperties(obj: unknown): unknown {
     if (obj === null || obj === undefined || obj === '') {
         return undefined;
     }

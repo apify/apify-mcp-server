@@ -127,7 +127,7 @@ function processAlgoliaResponse(results: AlgoliaResult[]): ApifyDocsSearchResult
  * @param {string} query - The search query string.
  * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
-export async function searchDocsBySource(
+async function searchDocsBySource(
     docSource: string,
     query: string,
 ): Promise<ApifyDocsSearchResult[]> {

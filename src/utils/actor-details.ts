@@ -62,7 +62,7 @@ function typeValueToString(value: unknown): string {
  * Resolve README content with fallback: prefer readmeSummary, fall back to full readme.
  * Returns the content string and appropriate heading for text output.
  */
-export function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
+function resolveReadmeContent(details: { readmeSummary?: string; readme: string }): {
     content: string;
     heading: string;
 } {
@@ -73,7 +73,7 @@ export function resolveReadmeContent(details: { readmeSummary?: string; readme: 
 }
 
 // Keep the type here since it is a self-contained module
-export type ActorDetailsResult = {
+type ActorDetailsResult = {
     actorInfo: Actor;
     buildInfo: Build;
     actorCard: string;
@@ -185,7 +185,7 @@ export const actorDetailsOutputOptionsSchema = z.object({
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
 
-export const actorDetailsOutputDefaults = {
+const actorDetailsOutputDefaults = {
     description: true,
     stats: true,
     pricing: true,
@@ -228,7 +228,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
  * Gets MCP tools information for an Actor.
  * Returns a message about available tools, error, or that the Actor is not an MCP server.
  */
-export async function getMcpToolsMessage(
+async function getMcpToolsMessage(
     actorName: string,
     apifyClient: ApifyClient,
     apifyToken: string,

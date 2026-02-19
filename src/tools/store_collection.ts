@@ -13,9 +13,6 @@ import type { HelperTool, InternalToolArgs, ToolEntry } from '../types.js';
 import { defaultSearchActors } from './default/search-actors.js';
 import { openaiSearchActors } from './openai/search-actors.js';
 
-// Re-export the shared schema for use in other modules
-export { searchActorsArgsSchema } from './core/search-actors-common.js';
-
 const defaultVariant = defaultSearchActors as HelperTool;
 
 /**

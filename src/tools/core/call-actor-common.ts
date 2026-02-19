@@ -18,7 +18,7 @@ import { getActorsAsTools } from './actor-tools-factory.js';
 /**
  * Zod schema for call-actor arguments — shared between default and openai variants.
  */
-export const callActorArgs = z.object({
+const callActorArgs = z.object({
     actor: z.string()
         .describe(`The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
 
@@ -61,24 +61,13 @@ export const callActorAjvValidate = compileSchema({
 /**
  * Parsed call-actor arguments.
  */
-export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
+type CallActorParsedArgs = z.infer<typeof callActorArgs>;
 
 /**
- * Result of resolving actor and MCP URL before execution.
- * Contains everything needed for the mode-specific execution path.
- */
-export type CallActorResolvedContext = {
-    baseActorName: string;
-    mcpToolName: string | undefined;
-    isActorMcpServer: boolean;
-    mcpServerUrl: string | false;
-};
-
-/**
- * Resolves MCP URL and parses the "actor:tool" format.
+ * Parses the "actor:tool" format from the actor name string.
  * Shared pre-processing step used by both default and openai variants.
  */
-export function resolveActorContext(actorName: string): {
+function resolveActorContext(actorName: string): {
     baseActorName: string;
     mcpToolName: string | undefined;
 } {
@@ -96,7 +85,7 @@ export function resolveActorContext(actorName: string): {
  * Handles the MCP tool call flow (when actorName contains ":toolName").
  * Returns a response if handled, or null if this is not an MCP tool call.
  */
-export async function handleMcpToolCall(params: {
+async function handleMcpToolCall(params: {
     baseActorName: string;
     mcpToolName: string;
     input: Record<string, unknown>;

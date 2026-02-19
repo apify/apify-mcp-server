@@ -5,7 +5,7 @@ import type { CallActorGetDatasetResult } from './actor-execution.js';
  * Result from buildActorResponseContent function.
  * Contains both text content and structured content.
  */
-export type ActorResponseResult = {
+type ActorResponseResult = {
     content: ({ type: 'text'; text: string })[];
     structuredContent: {
         runId: string;

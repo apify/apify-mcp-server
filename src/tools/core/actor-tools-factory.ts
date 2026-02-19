@@ -31,7 +31,7 @@ import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInf
  * Enriches actor tool output schemas with field-level detail from the ActorStore.
  * Uses Promise.allSettled to ensure individual failures don't block other tools.
  */
-export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
+async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
     const enrichPromises = tools
         .filter((tool): tool is ActorTool => tool.type === 'actor')
         .map(async (tool) => {
@@ -146,7 +146,7 @@ Actor description: ${definition.description}`;
     return tools;
 }
 
-export async function getMCPServersAsTools(
+async function getMCPServersAsTools(
     actorsInfo: ActorInfo[],
     apifyToken: ApifyToken,
     mcpSessionId?: string,

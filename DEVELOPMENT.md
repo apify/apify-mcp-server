@@ -68,6 +68,28 @@ All widget code lives in the self-contained `src/web/` React project. The widget
 
 > **Important (UI mode):** Widget rendering is enabled only when the server runs in UI mode. Use the `ui=openai` query parameter (e.g., `/mcp?ui=openai`) or set `UI_MODE=openai`. Currently, `openai` is the only supported `ui` value.
 
+### Dead code detection (knip)
+
+The project uses [knip](https://knip.dev/) to detect unused exports, types, and enum members. Unlike ESLint's `no-unused-vars` (which only catches unused local variables), knip performs cross-file analysis to find exported symbols that are never imported anywhere.
+
+Run the dead code check:
+
+```bash
+npm run check:dead-code
+```
+
+This runs `knip --include exports,types,enumMembers` and reports:
+- **Unused exports** — exported functions, constants, or variables that no other file imports
+- **Unused exported types** — exported type aliases or interfaces that no other file imports
+- **Unused enum members** — enum values that are never referenced
+
+**Configuration** is in `knip.json`. Entry points are `src/index.ts`, `src/index-internals.ts`, and `src/stdio.ts`. The `src/web/` directory is excluded since it has its own build system.
+
+**Important notes:**
+- Before removing an "unused" export, verify it is not consumed by the internal repository (`apify-mcp-server-internal`). Knip only sees this repo's source tree.
+- If an export is only used within its own file, remove the `export` keyword rather than deleting the symbol.
+- The `@types/*` packages are listed in `ignoreDependencies` since knip cannot detect their implicit usage by TypeScript.
+
 ### Hot-reload development
 
 Run the orchestrator, which starts the web widgets builder in watch mode and the MCP server in standby mode:

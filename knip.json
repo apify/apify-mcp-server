@@ -1,0 +1,23 @@
+{
+    "$schema": "https://unpkg.com/knip@5/schema.json",
+    "entry": [
+        "src/index.ts",
+        "src/index-internals.ts",
+        "src/stdio.ts"
+    ],
+    "project": [
+        "src/**/*.ts"
+    ],
+    "ignore": [
+        "dist/**",
+        "src/web/**"
+    ],
+    "ignoreDependencies": [
+        "@types/cheerio",
+        "@types/turndown",
+        "@types/to-json-schema",
+        "@types/yargs",
+        "@types/yargs-parser",
+        "@types/express"
+    ]
+}

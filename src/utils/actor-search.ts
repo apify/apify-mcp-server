@@ -8,7 +8,7 @@ import { ApifyClient } from '../apify-client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
 import type { ActorPricingModel, ActorStoreList } from '../types.js';
 
-export type SearchAndFilterActorsOptions = {
+type SearchAndFilterActorsOptions = {
     keywords: string;
     apifyToken: string;
     limit: number;
@@ -66,7 +66,7 @@ export async function searchAndFilterActors(
  * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
  *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
  */
-export function filterRentalActors(
+function filterRentalActors(
     actors: ActorStoreList[],
     userRentedActorIds: string[],
 ): ActorStoreList[] {

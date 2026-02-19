@@ -65,7 +65,7 @@ const tieredPricingSchema = {
 /**
  * Schema for pricing information
  */
-export const pricingSchema = {
+const pricingSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         model: { type: 'string', description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)' },
@@ -82,7 +82,7 @@ export const pricingSchema = {
 /**
  * Schema for Actor statistics
  */
-export const statsSchema = {
+const statsSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         totalUsers: { type: 'number', description: 'Total users' },
@@ -96,7 +96,7 @@ export const statsSchema = {
  * Schema for Actor information (card)
  * Used in both search results and detailed Actor info
  */
-export const actorInfoSchema = {
+const actorInfoSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         title: { type: 'string', description: 'Actor title' },

@@ -13,6 +13,7 @@
  * - import/no-extraneous-dependencies: Adds vitest.config.ts and evals/** patterns
  * - @typescript-eslint/consistent-type-definitions: Prefers 'type' over 'interface' (use interface only for class implementations)
  * - @typescript-eslint/no-unused-vars: Detects unused variables, functions, and parameters (allows _ prefix)
+ * - no-unreachable: Detects unreachable code after return/throw/break/continue statements
  * - import/no-default-export: Allows default exports in config files
  */
 import apifyTypeScriptConfig from '@apify/eslint-config/ts.js';
@@ -89,6 +90,9 @@ export default [
                     varsIgnorePattern: '^_',
                 },
             ],
+            // Detect unreachable code after return, throw, break, or continue statements
+            // This catches dead code paths that can never execute
+            'no-unreachable': 'error',
         },
     },
     // Override rules for configuration files

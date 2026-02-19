@@ -60,7 +60,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
 /**
  * Structured content returned from fetching actor run data.
  */
-export type ActorRunStructuredContent = {
+type ActorRunStructuredContent = {
     runId: string;
     actorName?: string;
     status: string;
@@ -78,7 +78,7 @@ export type ActorRunStructuredContent = {
 /**
  * Result of fetching actor run data — shared between both variants.
  */
-export type FetchActorRunResult = {
+type FetchActorRunResult = {
     run: Record<string, unknown>;
     structuredContent: ActorRunStructuredContent;
 };

@@ -5,7 +5,7 @@ import { HelperTools } from '../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 
-export const addToolArgsSchema = z.object({
+const addToolArgsSchema = z.object({
     actor: z.string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),

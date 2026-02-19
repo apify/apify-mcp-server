@@ -43,7 +43,7 @@ let analyticsClient: Analytics | null = null;
  *
  * @returns Analytics client instance or null if initialization failed
  */
-export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics | null {
+function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics | null {
     if (!analyticsClient) {
         try {
             const writeKey = telemetryEnv === TELEMETRY_ENV.PROD ? PROD_WRITE_KEY : DEV_WRITE_KEY;

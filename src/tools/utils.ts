@@ -26,7 +26,7 @@ export function actorNameToToolName(actorName: string): string {
         .slice(0, 64);
 }
 
-export function getToolSchemaID(actorName: string): string {
+function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }
 
@@ -214,7 +214,7 @@ export function buildActorInputSchema(actorFullName: string, input: ActorInputSc
  * This is used specifically for apify/rag-web-browser where we want to expose
  * only a subset of input properties to the MCP tool without redefining the schema.
  */
-export function pruneSchemaPropertiesByWhitelist(
+function pruneSchemaPropertiesByWhitelist(
     input: ActorInputSchema,
     whitelist: Iterable<string>,
 ): ActorInputSchema {
@@ -270,7 +270,7 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
  *
  * @param properties
  */
-export function addEnumsToDescriptionsWithExamples(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
+function addEnumsToDescriptionsWithExamples(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
         if (property.enum && property.enum.length > 0) {
             property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;

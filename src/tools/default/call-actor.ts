@@ -1,3 +1,5 @@
+import log from '@apify/log';
+
 import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
@@ -98,6 +100,8 @@ export const defaultCallActor: ToolEntry = {
             if (isAsync) {
                 const actorClient = apifyClient.actor(baseActorName);
                 const actorRun = await actorClient.start(input, callOptions);
+
+                log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
 
                 const structuredContent = {
                     runId: actorRun.id,

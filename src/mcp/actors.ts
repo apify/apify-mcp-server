@@ -1,6 +1,5 @@
 import type { ActorDefinition } from 'apify-client';
 
-import { ApifyClient } from '../apify-client.js';
 import { MCP_STREAMABLE_ENDPOINT } from '../const.js';
 import type { ActorDefinitionPruned } from '../types.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
@@ -45,22 +44,8 @@ export async function getActorMCPServerURL(realActorId: string, mcpServerPath: s
 }
 
 /**
-* Gets Actor ID from the Actor object.
-*/
-export async function getRealActorID(actorIdOrName: string, apifyToken: string): Promise<string> {
-    const apifyClient = new ApifyClient({ token: apifyToken });
-
-    const actor = apifyClient.actor(actorIdOrName);
-    const info = await actor.get();
-    if (!info) {
-        throw new Error(`Actor ${actorIdOrName} not found`);
-    }
-    return info.id;
-}
-
-/**
 * Returns standby URL for given Actor ID.
 */
-export async function getActorStandbyURL(realActorId: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
+async function getActorStandbyURL(realActorId: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
     return `https://${realActorId}.${standbyBaseUrl}`;
 }

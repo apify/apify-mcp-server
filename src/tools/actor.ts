@@ -14,7 +14,7 @@ import { defaultCallActor } from './default/call-actor.js';
 import { openaiCallActor } from './openai/call-actor.js';
 
 // Re-exports to maintain backward compatibility and support other modules
-export { callActorGetDataset, type CallActorGetDatasetResult } from './core/actor-execution.js';
+export { callActorGetDataset } from './core/actor-execution.js';
 export { getActorsAsTools } from './core/actor-tools-factory.js';
 
 /**
