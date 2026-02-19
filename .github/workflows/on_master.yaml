@@ -1,0 +1,13 @@
+name: CI (master)
+
+on:
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+jobs:
+    code_checks:
+        name: Code checks
+        uses: ./.github/workflows/_check_code.yaml
