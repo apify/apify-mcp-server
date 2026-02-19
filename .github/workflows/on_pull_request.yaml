@@ -1,0 +1,24 @@
+name: CI (PR)
+
+on:
+    pull_request:
+
+    # Push to master will trigger code checks
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+jobs:
+    code_checks:
+        name: Code checks
+        uses: ./.github/workflows/_check_code.yaml
+
+    pr_title_check:
+        name: PR title check
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: amannn/action-semantic-pull-request@v6.1.1
+                env:
+                    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
