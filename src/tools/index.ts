@@ -2,7 +2,7 @@ import { HelperTools } from '../const.js';
 import type { ToolCategory } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool-categories-helpers.js';
 import { callActorGetDataset, getActorsAsTools } from './actor.js';
-import { toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
+import { buildCategories, CATEGORY_NAMES, toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
 
 // Use string constants instead of importing tool objects to avoid circular dependency
 export const unauthEnabledTools: string[] = [
@@ -13,7 +13,7 @@ export const unauthEnabledTools: string[] = [
 
 // Re-export from categories.ts
 // This is actually needed to avoid circular dependency issues
-export { toolCategories, toolCategoriesEnabledByDefault };
+export { buildCategories, CATEGORY_NAMES, toolCategories, toolCategoriesEnabledByDefault };
 
 // Computed here (not in helper file) to avoid module initialization issues
 export const defaultTools = getExpectedToolsByCategories(toolCategoriesEnabledByDefault);
