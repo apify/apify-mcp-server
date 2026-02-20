@@ -18,7 +18,7 @@ import {
  * OpenAI mode fetch-actor-details tool.
  * Returns simplified structured content with interactive widget metadata.
  */
-export const openaiFetchActorDetails: ToolEntry = {
+export const openaiFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken } = toolArgs;
@@ -58,4 +58,4 @@ An interactive widget has been rendered with detailed Actor information.
             },
         });
     },
-} as const;
+} as const);

@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
 
 const getUserDatasetsListArgs = z.object({
     offset: z.number()
@@ -24,7 +24,7 @@ const getUserDatasetsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/datasets-get
  */
-export const getUserDatasetsList: ToolEntry = {
+export const getUserDatasetsList: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_LIST_GET,
     description: `List datasets (collections of Actor run data) for the authenticated user.
@@ -59,4 +59,4 @@ USAGE EXAMPLES:
         });
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(datasets)}\n\`\`\`` }] };
     },
-} as const;
+} as const);

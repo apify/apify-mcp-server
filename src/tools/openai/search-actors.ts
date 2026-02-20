@@ -13,7 +13,7 @@ import {
  * OpenAI mode search-actors tool.
  * Returns widget-formatted actors with interactive widget metadata.
  */
-export const openaiSearchActors: ToolEntry = {
+export const openaiSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
@@ -81,4 +81,4 @@ An interactive widget has been rendered with the search results. The user can al
             },
         });
     },
-} as const;
+} as const);

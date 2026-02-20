@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import {
     actorDetailsOutputOptionsSchema,
     buildActorDetailsTextResponse,
@@ -10,10 +10,10 @@ import {
     buildCardOptions,
     fetchActorDetails,
     resolveOutputOptions,
-} from '../utils/actor-details.js';
-import { compileSchema } from '../utils/ajv.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { actorDetailsOutputSchema } from './structured-output-schemas.js';
+} from '../../utils/actor-details.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { actorDetailsOutputSchema } from '../structured-output-schemas.js';
 
 const fetchActorDetailsInternalArgsSchema = z.object({
     actor: z.string()
@@ -23,7 +23,7 @@ const fetchActorDetailsInternalArgsSchema = z.object({
         .describe('Specify which information to include in the response to save tokens.'),
 });
 
-export const fetchActorDetailsInternalTool: ToolEntry = {
+export const fetchActorDetailsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_GET_DETAILS_INTERNAL,
     openaiOnly: true,
@@ -80,4 +80,4 @@ but the user did NOT explicitly ask for Actor details presentation.`,
 
         return buildMCPResponse({ texts, structuredContent });
     },
-} as const;
+} as const);
