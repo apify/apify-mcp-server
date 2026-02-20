@@ -3,30 +3,38 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
-import type { ValidateFunction } from 'ajv';
 import type { ApifyClient } from 'apify';
 
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { callActor, getCallActorDescription } from '../tools/actor.js';
+import { buildCategories, CATEGORY_NAMES, toolCategoriesEnabledByDefault } from '../tools/categories.js';
 import { getActorOutput } from '../tools/common/get-actor-output.js';
 import { addTool } from '../tools/common/helpers.js';
-import { getActorRun } from '../tools/common/run.js';
-import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import type { ActorStore, Input, InternalToolArgs, ToolCategory, ToolEntry, UiMode } from '../types.js';
-import { getExpectedToolsByCategories } from './tool-categories-helpers.js';
+import { getActorsAsTools } from '../tools/index.js';
+import type { ActorStore, Input, ToolCategory, ToolEntry, UiMode } from '../types.js';
 
-// Lazily-computed cache of internal tools by name to avoid circular init issues.
-let INTERNAL_TOOL_BY_NAME_CACHE: Map<string, ToolEntry> | null = null;
-function getInternalToolByNameMap(): Map<string, ToolEntry> {
-    if (!INTERNAL_TOOL_BY_NAME_CACHE) {
-        const allInternal = getExpectedToolsByCategories(Object.keys(toolCategories) as ToolCategory[]);
-        INTERNAL_TOOL_BY_NAME_CACHE = new Map<string, ToolEntry>(
-            allInternal.map((entry) => [entry.name, entry]),
-        );
+/**
+ * Set of all known internal tool names across ALL modes.
+ * Used for classifying selectors: if a selector matches a known internal tool name,
+ * it's not treated as an Actor ID — even if it's absent from the current mode's categories.
+ */
+let ALL_INTERNAL_TOOL_NAMES_CACHE: Set<string> | null = null;
+function getAllInternalToolNames(): Set<string> {
+    if (!ALL_INTERNAL_TOOL_NAMES_CACHE) {
+        const allNames = new Set<string>();
+        // Collect tool names from both modes to ensure complete classification
+        for (const mode of [undefined, 'openai' as UiMode]) {
+            const categories = buildCategories(mode);
+            for (const name of CATEGORY_NAMES) {
+                for (const tool of categories[name]) {
+                    allNames.add(tool.name);
+                }
+            }
+        }
+        ALL_INTERNAL_TOOL_NAMES_CACHE = allNames;
     }
-    return INTERNAL_TOOL_BY_NAME_CACHE;
+    return ALL_INTERNAL_TOOL_NAMES_CACHE;
 }
 
 /**
@@ -44,6 +52,9 @@ export async function loadToolsFromInput(
     uiMode?: UiMode,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
+    // Build mode-resolved categories — tools are already the correct variant for this mode
+    const categories = buildCategories(uiMode);
+
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
         if (value === undefined) return undefined;
@@ -59,6 +70,14 @@ export async function loadToolsFromInput(
     const addActorEnabled = input.enableAddingActors === true;
     const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
 
+    // Build mode-specific tool-by-name map for individual tool selection
+    const modeToolByName = new Map<string, ToolEntry>();
+    for (const name of CATEGORY_NAMES) {
+        for (const tool of categories[name]) {
+            modeToolByName.set(tool.name, tool);
+        }
+    }
+
     // Partition selectors into internal picks (by category or by name) and Actor names
     const internalSelections: ToolEntry[] = [];
     const actorSelectorsFromTools: string[] = [];
@@ -67,19 +86,25 @@ export async function loadToolsFromInput(
             if (selector === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default
                 log.warning('Tool category "preview" is deprecated');
-                internalSelections.push(callActor);
+                const callActorTool = modeToolByName.get(HelperTools.ACTOR_CALL);
+                if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
 
-            const categoryTools = toolCategories[selector as ToolCategory];
+            const categoryTools = categories[selector as ToolCategory];
 
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
             }
-            const internalByName = getInternalToolByNameMap().get(String(selector));
+            const internalByName = modeToolByName.get(String(selector));
             if (internalByName) {
                 internalSelections.push(internalByName);
+                continue;
+            }
+            // If this is a known internal tool name (from another mode), skip it silently
+            // rather than treating it as an Actor ID
+            if (getAllInternalToolNames().has(String(selector))) {
                 continue;
             }
             // Treat unknown selectors as Actor IDs/full names.
@@ -123,12 +148,15 @@ export async function loadToolsFromInput(
         // No selectors: either expose only add-actor (when enabled), or default categories
         result.push(addTool);
     } else if (!actorsExplicitlyEmpty) {
-        result.push(...getExpectedToolsByCategories(toolCategoriesEnabledByDefault));
+        // Use mode-resolved default categories
+        for (const cat of toolCategoriesEnabledByDefault) {
+            result.push(...categories[cat]);
+        }
     }
 
-    // In openai mode, add UI-specific tools
+    // In openai mode, unconditionally add UI-specific tools (regardless of selectors)
     if (uiMode === 'openai') {
-        result.push(...(toolCategories.ui || []));
+        result.push(...categories.ui);
     }
 
     // Actor tools (if any)
@@ -141,6 +169,8 @@ export async function loadToolsFromInput(
      * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
      * Insert them right after call-actor to follow the logical workflow order:
      * search → details → call → run status → output → docs → actor tools
+     *
+     * Uses mode-resolved variants from buildCategories() for get-actor-run.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -150,7 +180,9 @@ export async function loadToolsFromInput(
 
     const toolsToInject: ToolEntry[] = [];
     if (!hasGetActorRun && (hasCallActor || uiMode === 'openai')) {
-        toolsToInject.push(getActorRun);
+        // Use mode-resolved get-actor-run variant
+        const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
+        if (modeGetActorRun) toolsToInject.push(modeGetActorRun);
     }
     if (!hasGetActorOutput && (hasCallActor || hasActorTools || hasAddActorTool)) {
         toolsToInject.push(getActorOutput);
@@ -178,48 +210,5 @@ export async function loadToolsFromInput(
 
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
-    const deduped = result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
-
-    // Filter out openai-only tools when not in openai mode
-    const filtered = uiMode === 'openai'
-        ? deduped
-        : deduped.filter((entry) => !entry.openaiOnly);
-
-    // TODO: rework this solition as it was quickly hacked together for hotfix
-    // Deep clone except ajvValidate and call functions
-
-    // holds the original functions of the tools
-    const toolFunctions = new Map<string, { ajvValidate?: ValidateFunction<unknown>; call?:(args: InternalToolArgs) => Promise<object> }>();
-    for (const entry of filtered) {
-        if (entry.type === 'internal') {
-            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate, call: entry.call });
-        } else {
-            toolFunctions.set(entry.name, { ajvValidate: entry.ajvValidate });
-        }
-    }
-
-    const cloned = JSON.parse(JSON.stringify(filtered, (key, value) => {
-        if (key === 'ajvValidate' || key === 'call') return undefined;
-        return value;
-    })) as ToolEntry[];
-
-    // restore the original functions
-    for (const entry of cloned) {
-        const funcs = toolFunctions.get(entry.name);
-        if (funcs) {
-            if (funcs.ajvValidate) {
-                entry.ajvValidate = funcs.ajvValidate;
-            }
-            if (entry.type === 'internal' && funcs.call) {
-                entry.call = funcs.call;
-            }
-        }
-    }
-
-    for (const entry of cloned) {
-        if (entry.name === HelperTools.ACTOR_CALL) {
-            entry.description = getCallActorDescription(uiMode);
-        }
-    }
-    return cloned;
+    return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
 }
