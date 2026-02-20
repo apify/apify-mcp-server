@@ -73,7 +73,7 @@ import type {
 import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { getServerInstructions } from '../utils/server-instructions.js';
+import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
 import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
