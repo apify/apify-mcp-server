@@ -17,7 +17,7 @@ import type z from 'zod';
 import type { ApifyClient } from './apify-client.js';
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
-import type { toolCategories } from './tools/index.js';
+import type { CATEGORY_NAMES } from './tools/categories.js';
 import type { StructuredPricingInfo } from './utils/pricing-info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
@@ -230,7 +230,7 @@ export type PricingInfo = ActorRunPricingInfo & {
     tieredPricing?: TieredPricing;
 } | PricePerEventActorPricingInfo;
 
-export type ToolCategory = keyof typeof toolCategories;
+export type ToolCategory = (typeof CATEGORY_NAMES)[number];
 /**
  * Selector for tools input - can be a category key or a specific tool name.
  */
