@@ -390,18 +390,22 @@ This is the critical gap the Actor Executor pattern fixes.
 
 Each phase becomes a PR. PRs are chained: each targets the previous feature branch, not `main`. This allows incremental review while keeping `main` stable until the full feature is ready.
 
+The tool split phase (Phase 3) is broken into one PR per tool to keep each PR small (~200-350 lines) and easy to review. Each tool split PR creates the default + openai variants and converts the original file to an adapter. The adapter preserves existing exports so `categories.ts` stays unchanged until the registry PR.
+
 ```
 main
  └── feat/tool-mode-separation-plan          ← PR #1: plan document (this file)
       └── feat/tool-mode-core-extraction     ← PR #2: Phase 1 (shared core logic)
            └── feat/tool-mode-executor       ← PR #3a: Phase 2 (Actor Executor pattern)
-                └── feat/tool-mode-tool-split ← PR #3b: Phase 3a (Split mode-divergent tools)
-                     └── feat/tool-mode-tool-move ← PR #3c: Phase 3b (Move internal/common tools + freeze)
-                          └── feat/tool-mode-registry  ← PR #4: Phase 4 (registry + loader cleanup)
-                               └── feat/tool-mode-tests ← PR #5: Phase 5 (contract tests)
+                └── feat/tool-mode-tool-split ← PR #3b: Phase 3 prep (plan update)
+                     └── feat/split-fetch-actor-details  ← PR #3c: Split fetch-actor-details
+                          └── feat/split-search-actors   ← PR #3d: Split search-actors
+                               └── feat/split-get-actor-run  ← PR #3e: Split get-actor-run
+                                    └── feat/split-call-actor ← PR #3f: Split call-actor
+                                         └── ... (future: move, freeze, registry, tests)
 ```
 
-**Merge order**: PR #1 → PR #2 → PR #3a → PR #3b → PR #3c → PR #4 → PR #5, each into its parent. Final merge of the base branch into `main`.
+**Merge order**: PR #1 → #2 → #3a → #3b → #3c → #3d → #3e → #3f → ..., each into its parent. Final merge of the base branch into `main`.
 
 **Review strategy**: Each PR is independently reviewable. Reviewer can check that tests pass at each level. The plan PR (#1) provides context for all subsequent PRs.
 
@@ -483,132 +487,97 @@ main
 
 ---
 
-### PR #3b: Phase 3a — Split Mode-Divergent Tools (1-2 days)
+### PR #3b: Phase 3 Prep — Plan Update
 
 **Branch**: `feat/tool-mode-tool-split` (from `feat/tool-mode-executor`)
 
-**Goal**: Split the 4 mode-divergent tools into separate definitions in `default/` and `openai/` directories.
+**Goal**: Update this plan document to reflect the granular per-tool split strategy.
 
-**Changes**:
-
-1. Split `call-actor`:
-   - `src/tools/default/call-actor.ts` — sync execution, references `search-actors`/`fetch-actor-details`
-   - `src/tools/openai/call-actor.ts` — forced async, widget `_meta`, references `*-internal` tools
-   - Each has its own description (no runtime mutation needed)
-
-2. Split `get-actor-run`:
-   - `src/tools/default/get-actor-run.ts` — full JSON dump
-   - `src/tools/openai/get-actor-run.ts` — abbreviated text + widget `_meta`
-
-3. Split `search-actors`:
-   - `src/tools/default/search-actors.ts` — text actor cards
-   - `src/tools/openai/search-actors.ts` — widget actors + `_meta` + interactive card text
-
-4. Split `fetch-actor-details`:
-   - `src/tools/default/fetch-actor-details.ts` — full text + output schema fetch
-   - `src/tools/openai/fetch-actor-details.ts` — simplified structured content + widget `_meta`
-
-**Verification**: `npm run type-check && npm run lint && npm run test:unit` — all pass.
-
-**Review focus**: Are the tool splits clean? Do they match the intended behavior for each mode?
+**Changes**: This plan document only.
 
 ---
 
-### PR #3c: Phase 3b — Move & Freeze Tool Definitions (1 day)
+### PR #3c: Split fetch-actor-details (~200 lines)
 
-**Branch**: `feat/tool-mode-tool-move` (from `feat/tool-mode-tool-split`)
+**Branch**: `feat/split-fetch-actor-details` (from `feat/tool-mode-tool-split`)
 
-**Goal**: Move existing internal tools to `openai/`, move common tools to `common/`, and ensure immutability.
+**Goal**: Split `fetch-actor-details` into default/openai variants with an adapter.
 
 **Changes**:
 
-1. Move `search-actors-internal.ts` and `fetch-actor-details-internal.ts` under `openai/`
+1. Create `src/tools/default/fetch-actor-details.ts` — full text + output schema fetch
+2. Create `src/tools/openai/fetch-actor-details.ts` — simplified structured content + widget `_meta`
+3. Convert `src/tools/fetch-actor-details.ts` to adapter (dispatches based on `uiMode`)
 
-2. Move mode-independent tools into `common/`:
-   - `get-actor-output.ts`
-   - `dataset.ts`, `dataset_collection.ts`
-   - `key_value_store.ts`, `key_value_store_collection.ts`
-   - `run.ts`, `run_collection.ts`
-   - `search-apify-docs.ts`, `fetch-apify-docs.ts`
-   - `get-html-skeleton.ts`
-   - `helpers.ts`
+The adapter preserves the existing `fetchActorDetailsTool` export so `categories.ts` is unchanged.
 
-3. `Object.freeze` all tool definitions after construction
-
-**Verification**: `npm run type-check && npm run lint && npm run test:unit` — all pass.
-
-**Review focus**: Is `Object.freeze` applied everywhere? Are common tools properly relocated?
+**Verification**: `npm run type-check && npm run lint && npm run test:unit`
 
 ---
 
-### PR #4: Phase 4 — Mode-Aware Category Registry + Loader Cleanup (1 day)
+### PR #3d: Split search-actors (~280 lines)
 
-**Branch**: `feat/tool-mode-registry` (from `feat/tool-mode-tool-move`)
+**Branch**: `feat/split-search-actors` (from `feat/split-fetch-actor-details`)
 
-**Goal**: Replace the tools-loader's deep-clone hack and conditional logic with clean category selection. Apply Skyfire augmentation at build time.
+**Goal**: Split `search-actors` into default/openai variants with an adapter.
 
 **Changes**:
 
-1. Implement `buildCategories(uiMode)` in `categories.ts`:
-   - Same category names (`actors`, `runs`, `docs`, etc.)
-   - Mode-resolved tool implementations behind each name
-   - `ui` category only present in openai mode
+1. Create `src/tools/default/search-actors.ts` — text actor cards, no widget
+2. Create `src/tools/openai/search-actors.ts` — widget actors + `_meta` + interactive card text
+3. Convert `src/tools/store_collection.ts` to adapter (dispatches based on `uiMode`)
 
-2. Simplify `loadToolsFromInput()`:
-   - Remove JSON.parse/stringify deep-clone hack (lines 188-224)
-   - Remove `openaiOnly` filtering logic
-   - Remove `getCallActorDescription(uiMode)` description mutation
-   - Remove conditional UI tool injection (replaced by `buildCategories`)
+The adapter preserves the existing `searchActors` and `searchActorsArgsSchema` exports.
 
-3. Move Skyfire augmentation to server init time:
-   - `buildToolForRegistration(tool, skyfireMode)` produces new frozen objects
-   - No runtime mutation of tool schemas
-   - Applied in `upsertTools()` or equivalent
-
-4. Split server instructions:
-   - `src/utils/server-instructions/common.ts`
-   - `src/utils/server-instructions/default.ts`
-   - `src/utils/server-instructions/openai.ts`
-
-5. Remove `openaiOnly` field from `ToolBase` type (no longer needed)
-
-6. **Retain** `getToolPublicFieldOnly` openai `_meta` stripping as defense-in-depth
-
-**Verification**: `npm run type-check && npm run lint && npm run test:unit` — all pass. Loader significantly simpler.
-
-**Review focus**: Is the deep-clone hack fully removed? Does Skyfire augmentation produce immutable objects? Are category names unchanged?
+**Verification**: `npm run type-check && npm run lint && npm run test:unit`
 
 ---
 
-### PR #5: Phase 5 — Contract Tests + Cross-Repo Coordination (1 day)
+### PR #3e: Split get-actor-run (~270 lines)
 
-**Branch**: `feat/tool-mode-tests` (from `feat/tool-mode-registry`)
+**Branch**: `feat/split-get-actor-run` (from `feat/split-search-actors`)
 
-**Goal**: Add mode-parameterized contract tests and verify cross-repo compatibility.
+**Goal**: Split `get-actor-run` into default/openai variants with an adapter.
 
 **Changes**:
 
-1. Add mode-parameterized contract tests:
-   - Tool list shape per mode (same names, correct count)
-   - Output schema per tool per mode
-   - `_meta` presence in openai mode, absence in default mode
-   - Same actor tool, both modes, identical input → assert sync dataset vs async runId
-   - Skyfire × mode matrix (4 combinations: skyfire on/off × default/openai)
-   - Task flow in openai mode: verify "task completed" when actor started
+1. Create `src/tools/default/get-actor-run.ts` — full JSON run dump
+2. Create `src/tools/openai/get-actor-run.ts` — abbreviated text + widget `_meta`
+3. Convert the `getActorRun` export in `src/tools/run.ts` to an adapter
 
-2. Use `pkg.pr.new` to publish preview package (add `beta` label to PR)
+Mode-independent tools in `run.ts` (`getActorRunLog`, `abortActorRun`) are untouched.
 
-3. In `apify-mcp-server-internal`:
-   ```bash
-   npm i https://pkg.pr.new/apify/apify-mcp-server/@apify/actors-mcp-server@<PR_NUMBER>
-   npm run type-check && npm run lint
-   ```
+**Verification**: `npm run type-check && npm run lint && npm run test:unit`
 
-4. Manual testing with MCP clients in both modes
+---
 
-**Verification**: All contract tests pass. Cross-repo type-check passes.
+### PR #3f: Split call-actor (~350 lines)
 
-**Review focus**: Do contract tests cover the critical behavioral differences? Does the preview package work in the internal repo?
+**Branch**: `feat/split-call-actor` (from `feat/split-get-actor-run`)
+
+**Goal**: Split `call-actor` into default/openai variants with an adapter.
+
+**Changes**:
+
+1. Create `src/tools/default/call-actor.ts` — sync execution, references `search-actors`/`fetch-actor-details`
+2. Create `src/tools/openai/call-actor.ts` — forced async, widget `_meta`, references `*-internal` tools
+3. Convert `src/tools/actor.ts` to adapter (dispatches based on `uiMode`)
+
+Each variant has its own description (no runtime mutation needed). The adapter preserves
+existing exports (`callActor`, `getCallActorDescription`, `callActorGetDataset`, `getActorsAsTools`).
+
+**Verification**: `npm run type-check && npm run lint && npm run test:unit`
+
+---
+
+### Future PRs (after tool splits)
+
+The following phases will be planned in detail once the tool splits are merged:
+
+- **Move & freeze**: Move tools to `common/`/`openai/` directories, `Object.freeze` all definitions
+- **Registry + loader cleanup**: `buildCategories(uiMode)`, remove deep-clone hack, remove `openaiOnly`
+- **Server instructions split**: Split into `common.ts`, `default.ts`, `openai.ts`
+- **Contract tests**: Mode-parameterized tests + cross-repo coordination
 
 ---
 
@@ -652,41 +621,33 @@ main
 | `src/tools/core/actor-search.ts` | Shared store search logic | #2 |
 | `src/tools/core/actor-details.ts` | Shared actor details logic | #2 |
 | `src/tools/core/actor-response.ts` | Shared response builder (moved from utils/) | #2 |
-| `src/tools/default/call-actor.ts` | Normal mode call-actor | #3b |
-| `src/tools/default/search-actors.ts` | Normal mode search-actors | #3b |
-| `src/tools/default/fetch-actor-details.ts` | Normal mode fetch-actor-details | #3b |
-| `src/tools/default/get-actor-run.ts` | Normal mode get-actor-run | #3b |
 | `src/tools/default/actor-executor.ts` | DefaultActorExecutor | #3a |
-| `src/tools/openai/call-actor.ts` | OpenAI mode call-actor | #3b |
-| `src/tools/openai/search-actors.ts` | OpenAI mode search-actors | #3b |
-| `src/tools/openai/fetch-actor-details.ts` | OpenAI mode fetch-actor-details | #3b |
-| `src/tools/openai/get-actor-run.ts` | OpenAI mode get-actor-run | #3b |
 | `src/tools/openai/actor-executor.ts` | OpenAIActorExecutor | #3a |
-| `src/utils/server-instructions/common.ts` | Shared server instructions | #4 |
-| `src/utils/server-instructions/default.ts` | Normal mode instructions | #4 |
-| `src/utils/server-instructions/openai.ts` | OpenAI mode instructions | #4 |
+| `src/tools/default/fetch-actor-details.ts` | Normal mode fetch-actor-details | #3c |
+| `src/tools/openai/fetch-actor-details.ts` | OpenAI mode fetch-actor-details | #3c |
+| `src/tools/default/search-actors.ts` | Normal mode search-actors | #3d |
+| `src/tools/openai/search-actors.ts` | OpenAI mode search-actors | #3d |
+| `src/tools/default/get-actor-run.ts` | Normal mode get-actor-run | #3e |
+| `src/tools/openai/get-actor-run.ts` | OpenAI mode get-actor-run | #3e |
+| `src/tools/default/call-actor.ts` | Normal mode call-actor | #3f |
+| `src/tools/openai/call-actor.ts` | OpenAI mode call-actor | #3f |
 
 ## Files to Modify
 
 | File | Changes | PR |
 |------|---------|-----|
-| `src/tools/actor.ts` | Extract core logic to `core/` modules | #2 |
-| `src/tools/store_collection.ts` | Extract core logic to `core/` modules | #2 |
-| `src/tools/fetch-actor-details.ts` | Extract core logic to `core/` modules | #2 |
-| `src/tools/run.ts` | Extract core logic to `core/` modules | #2 |
+| `src/tools/actor.ts` | Extract core logic to `core/` modules | #2; convert to adapter | #3f |
+| `src/tools/store_collection.ts` | Extract core logic to `core/` modules | #2; convert to adapter | #3d |
+| `src/tools/fetch-actor-details.ts` | Extract core logic to `core/` modules | #2; convert to adapter | #3c |
+| `src/tools/run.ts` | Extract core logic to `core/` modules | #2; convert getActorRun to adapter | #3e |
 | `src/mcp/server.ts` | Add `actorExecutor` field; replace 2 actor dispatch blocks | #3a |
-| `src/types.ts` | Add `ActorExecutor` type; remove `openaiOnly` from `ToolBase` | #3a, #4 |
-| `src/tools/categories.ts` | Mode-aware `buildCategories(uiMode)` | #4 |
-| `src/utils/tools-loader.ts` | Remove deep-clone hack, openaiOnly filter, description mutation | #4 |
+| `src/types.ts` | Add `ActorExecutor` type | #3a |
 
 ## Files to Move
 
 | From | To | PR |
 |------|-----|-----|
-| `src/tools/search-actors-internal.ts` | `src/tools/openai/search-actors-internal.ts` | #3c |
-| `src/tools/fetch-actor-details-internal.ts` | `src/tools/openai/fetch-actor-details-internal.ts` | #3c |
 | `src/utils/actor-response.ts` | `src/tools/core/actor-response.ts` | #2 |
-| `src/utils/server-instructions.ts` | `src/utils/server-instructions/` (split into 3 files) | #4 |
 
 ## Files Unchanged (Explicit)
 
