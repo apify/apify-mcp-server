@@ -9,7 +9,6 @@
  * which also auto-injects get-actor-run and get-actor-output right after call-actor.
  */
 import type { ToolEntry, UiMode } from '../types.js';
-import { callActor } from './actor.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './common/dataset.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
 import { fetchApifyDocsTool } from './common/fetch-apify-docs.js';
@@ -18,21 +17,19 @@ import { getHtmlSkeleton } from './common/get-html-skeleton.js';
 import { addTool } from './common/helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './common/key_value_store.js';
 import { getUserKeyValueStoresList } from './common/key_value_store_collection.js';
-import { abortActorRun, getActorRun, getActorRunLog } from './common/run.js';
+import { abortActorRun, getActorRunLog } from './common/run.js';
 import { getUserRunsList } from './common/run_collection.js';
 import { searchApifyDocsTool } from './common/search-apify-docs.js';
 import { defaultCallActor } from './default/call-actor.js';
 import { defaultFetchActorDetails } from './default/fetch-actor-details.js';
 import { defaultGetActorRun } from './default/get-actor-run.js';
 import { defaultSearchActors } from './default/search-actors.js';
-import { fetchActorDetailsTool } from './fetch-actor-details.js';
 import { openaiCallActor } from './openai/call-actor.js';
 import { openaiFetchActorDetails } from './openai/fetch-actor-details.js';
 import { fetchActorDetailsInternalTool } from './openai/fetch-actor-details-internal.js';
 import { openaiGetActorRun } from './openai/get-actor-run.js';
 import { openaiSearchActors } from './openai/search-actors.js';
 import { searchActorsInternalTool } from './openai/search-actors-internal.js';
-import { searchActors } from './store_collection.js';
 
 /**
  * Canonical list of all tool category names.
@@ -55,9 +52,9 @@ export const toolCategories: ToolCategoryMap = {
         addTool,
     ],
     actors: [
-        searchActors,
-        fetchActorDetailsTool,
-        callActor,
+        defaultSearchActors,
+        defaultFetchActorDetails,
+        defaultCallActor,
     ],
     ui: [
         searchActorsInternalTool,
@@ -68,7 +65,7 @@ export const toolCategories: ToolCategoryMap = {
         fetchApifyDocsTool,
     ],
     runs: [
-        getActorRun,
+        defaultGetActorRun,
         getUserRunsList,
         getActorRunLog,
         abortActorRun,
