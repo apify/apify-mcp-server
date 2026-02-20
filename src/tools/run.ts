@@ -1,174 +1,39 @@
+/**
+ * Actor run tools — get-actor-run (adapter), get-actor-run-log, and abort-actor-run.
+ *
+ * The get-actor-run tool has been split into mode-specific variants:
+ * - `default/get-actor-run.ts` — full JSON dump without widget metadata
+ * - `openai/get-actor-run.ts` — abbreviated text with widget metadata
+ * - `core/get-actor-run-common.ts` — shared schema, metadata, and data-fetching logic
+ *
+ * The getActorRunLog and abortActorRun tools are mode-independent and remain here.
+ * PR #4 will wire variants directly into the category registry, making the adapter unnecessary.
+ */
 import { z } from 'zod';
 
-import log from '@apify/log';
-
 import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { HelperTools, TOOL_STATUS } from '../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
+import { HelperTools } from '../const.js';
+import type { HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
-import { logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
-import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { getActorRunOutputSchema } from './structured-output-schemas.js';
+import { defaultGetActorRun } from './default/get-actor-run.js';
+import { openaiGetActorRun } from './openai/get-actor-run.js';
 
-const getActorRunArgs = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run.'),
-});
-
-const abortRunArgs = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run to abort.'),
-    gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
-});
+const defaultVariant = defaultGetActorRun as HelperTool;
 
 /**
- * https://docs.apify.com/api/v2/actor-run-get
+ * Adapter get-actor-run tool that dispatches to the correct mode-specific variant at runtime.
  */
 export const getActorRun: ToolEntry = {
-    type: 'internal',
-    name: HelperTools.ACTOR_RUNS_GET,
-    description: `Get detailed information about a specific Actor run by runId.
-The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
-
-CRITICAL WARNING: NEVER call this tool immediately after call-actor in UI mode. The call-actor response includes a widget that automatically polls for updates. Calling this tool after call-actor is FORBIDDEN and unnecessary.
-
-USAGE:
-- Use ONLY when user explicitly asks about a specific run's status or details.
-- Use ONLY for runs that were started outside the current conversation.
-- DO NOT use this tool as part of the call-actor workflow in UI mode.
-
-USAGE EXAMPLES:
-- user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
-- user_input: What is the datasetId for run y2h7sK3Wc?`,
-    inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
-    outputSchema: getActorRunOutputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getActorRunArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
-    },
-    annotations: {
-        title: 'Get Actor run',
-        readOnlyHint: true,
-        idempotentHint: true,
-        openWorldHint: false,
-    },
+    ...defaultVariant,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
-        const parsed = getActorRunArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
-
-        try {
-            const run = await client.run(parsed.runId).get();
-
-            if (!run) {
-                return buildMCPResponse({
-                    texts: [`Run with ID '${parsed.runId}' not found.`],
-                    isError: true,
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
-                });
-            }
-
-            log.debug('Get actor run', { runId: parsed.runId, status: run.status, mcpSessionId });
-
-            let actorName: string | undefined;
-            if (run.actId) {
-                try {
-                    const actor = await client.actor(run.actId).get();
-                    if (actor) {
-                        actorName = `${actor.username}/${actor.name}`;
-                    }
-                } catch (error) {
-                    log.warning(`Failed to fetch actor name for run ${parsed.runId}`, { mcpSessionId, error });
-                }
-            }
-
-            const structuredContent: {
-                runId: string;
-                actorName?: string;
-                status: string;
-                startedAt: string;
-                finishedAt?: string;
-                stats?: unknown;
-                dataset?: {
-                    datasetId: string;
-                    itemCount: number;
-                    schema: unknown;
-                    previewItems: unknown[];
-                };
-            } = {
-                runId: run.id,
-                actorName,
-                status: run.status,
-                startedAt: run.startedAt?.toISOString() || '',
-                finishedAt: run.finishedAt?.toISOString(),
-                stats: run.stats,
-            };
-
-            // If completed, fetch dataset results
-            if (run.status === 'SUCCEEDED' && run.defaultDatasetId) {
-                const dataset = client.dataset(run.defaultDatasetId);
-                const datasetItems = await dataset.listItems({ limit: 5 });
-
-                const generatedSchema = generateSchemaFromItems(datasetItems.items, {
-                    clean: true,
-                    arrayMode: 'all',
-                });
-
-                structuredContent.dataset = {
-                    datasetId: run.defaultDatasetId,
-                    itemCount: datasetItems.count,
-                    schema: generatedSchema || { type: 'object', properties: {} },
-                    previewItems: datasetItems.items,
-                };
-            }
-
-            // When UI mode is disabled, return full text response without widget metadata
-            if (apifyMcpServer.options.uiMode === 'openai') {
-                const statusText = run.status === 'SUCCEEDED' && structuredContent.dataset
-                    ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. A widget has been rendered with the details.`
-                    : `Actor run ${parsed.runId} status: ${run.status}. A progress widget has been rendered.`;
-
-                const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
-                const usageMeta = buildUsageMeta(run);
-                return buildMCPResponse({
-                    texts: [statusText],
-                    structuredContent,
-                    _meta: {
-                        ...widgetConfig?.meta,
-                        ...usageMeta,
-                    },
-                });
-            }
-
-            const texts = [
-                `# Actor Run Information\n\`\`\`json\n${JSON.stringify(run, null, 2)}\n\`\`\``,
-            ];
-
-            return buildMCPResponse({
-                texts,
-                structuredContent,
-                _meta: buildUsageMeta(run),
-            });
-        } catch (error) {
-            logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
-            return buildMCPResponse({
-                texts: [`Failed to get Actor run '${parsed.runId}': ${error instanceof Error ? error.message : String(error)}.
-Please verify the run ID and ensure that the run exists.`],
-                isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-            });
-        }
+        const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
+            ? openaiGetActorRun
+            : defaultGetActorRun) as HelperTool;
+        return variant.call(toolArgs);
     },
-} as const;
+};
+
+// --- Mode-independent tools below ---
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
@@ -218,6 +83,13 @@ USAGE EXAMPLES:
         return { content: [{ type: 'text', text }] };
     },
 } as const;
+
+const abortRunArgs = z.object({
+    runId: z.string()
+        .min(1)
+        .describe('The ID of the Actor run to abort.'),
+    gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
+});
 
 /**
  * https://docs.apify.com/api/v2/actor-run-abort-post
