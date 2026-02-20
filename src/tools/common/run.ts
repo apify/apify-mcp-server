@@ -1,39 +1,17 @@
 /**
- * Actor run tools — get-actor-run (adapter), get-actor-run-log, and abort-actor-run.
+ * Mode-independent Actor run tools: get-actor-run-log and abort-actor-run.
  *
- * The get-actor-run tool has been split into mode-specific variants:
+ * The get-actor-run tool has mode-specific variants in:
  * - `default/get-actor-run.ts` — full JSON dump without widget metadata
  * - `openai/get-actor-run.ts` — abbreviated text with widget metadata
- * - `core/get-actor-run-common.ts` — shared schema, metadata, and data-fetching logic
- *
- * The getActorRunLog and abortActorRun tools are mode-independent and remain here.
- * PR #4 will wire variants directly into the category registry, making the adapter unnecessary.
+ * These are resolved via buildCategories(uiMode) in tools-loader.ts.
  */
 import { z } from 'zod';
 
 import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
 import { HelperTools } from '../../const.js';
-import type { HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { defaultGetActorRun } from '../default/get-actor-run.js';
-import { openaiGetActorRun } from '../openai/get-actor-run.js';
-
-const defaultVariant = defaultGetActorRun as HelperTool;
-
-/**
- * Adapter get-actor-run tool that dispatches to the correct mode-specific variant at runtime.
- */
-export const getActorRun: ToolEntry = Object.freeze({
-    ...defaultVariant,
-    call: async (toolArgs: InternalToolArgs) => {
-        const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
-            ? openaiGetActorRun
-            : defaultGetActorRun) as HelperTool;
-        return variant.call(toolArgs);
-    },
-});
-
-// --- Mode-independent tools below ---
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
