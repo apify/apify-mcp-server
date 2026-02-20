@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../const.js';
-import { fetchApifyDocsCache } from '../state.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { htmlToMarkdown } from '../utils/html-to-md.js';
-import { logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { fetchApifyDocsToolOutputSchema } from './structured-output-schemas.js';
+import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../../const.js';
+import { fetchApifyDocsCache } from '../../state.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { htmlToMarkdown } from '../../utils/html-to-md.js';
+import { logHttpError } from '../../utils/logging.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { fetchApifyDocsToolOutputSchema } from '../structured-output-schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
     url: z.string()
@@ -17,7 +17,7 @@ const fetchApifyDocsToolArgsSchema = z.object({
         .describe(`URL of the Apify documentation page to fetch. This should be the full URL, including the protocol (e.g., https://docs.apify.com/).`),
 });
 
-export const fetchApifyDocsTool: ToolEntry = {
+export const fetchApifyDocsTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DOCS_FETCH,
     description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
@@ -101,4 +101,4 @@ Please verify the URL is correct and accessible. You can search for available do
 
         return buildMCPResponse({ texts: [`Fetched content from ${url}:\n\n${markdown}`], structuredContent: { url, content: markdown } });
     },
-} as const;
+} as const);

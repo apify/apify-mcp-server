@@ -17,7 +17,7 @@ import {
  * Default mode fetch-actor-details tool.
  * Returns full text response with output schema fetch.
  */
-export const defaultFetchActorDetails: ToolEntry = {
+export const defaultFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
@@ -53,4 +53,4 @@ export const defaultFetchActorDetails: ToolEntry = {
 
         return buildMCPResponse({ texts, structuredContent: responseStructuredContent });
     },
-} as const;
+} as const);

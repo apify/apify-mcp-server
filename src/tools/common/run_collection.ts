@@ -1,10 +1,10 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getUserRunsListArgs = z.object({
     offset: z.number()
@@ -25,7 +25,7 @@ const getUserRunsListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/act-runs-get
  */
-export const getUserRunsList: ToolEntry = {
+export const getUserRunsList: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUN_LIST_GET,
     description: `List Actor runs for the authenticated user with optional filtering and sorting.
@@ -55,4 +55,4 @@ USAGE EXAMPLES:
             texts: [`\`\`\`json\n${JSON.stringify(runs)}\n\`\`\``],
         });
     },
-} as const;
+} as const);

@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
-import { getHtmlSkeletonCache } from '../state.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { isValidHttpUrl } from '../utils/generic.js';
-import { stripHtml } from '../utils/html.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools, RAG_WEB_BROWSER, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../../const.js';
+import { getHtmlSkeletonCache } from '../../state.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { isValidHttpUrl } from '../../utils/generic.js';
+import { stripHtml } from '../../utils/html.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 type ScrapedPageItem = {
     crawl: {
@@ -35,7 +35,7 @@ const getHtmlSkeletonArgs = z.object({
         .describe('Chunk number to retrieve when getting the content. The content is split into chunks to prevent exceeding the maximum tool output length.'),
 });
 
-export const getHtmlSkeleton: ToolEntry = {
+export const getHtmlSkeleton: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.GET_HTML_SKELETON,
     description: `Retrieve the HTML skeleton (clean structure) of a webpage by stripping scripts, styles, and non-essential attributes.
@@ -123,4 +123,4 @@ USAGE EXAMPLES:
 
         return buildMCPResponse({ texts: [chunkContent + chunkInfo] });
     },
-} as const;
+} as const);

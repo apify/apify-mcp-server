@@ -13,7 +13,7 @@ import {
  * Default mode get-actor-run tool.
  * Returns full JSON dump of the run without widget metadata.
  */
-export const defaultGetActorRun: ToolEntry = {
+export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
@@ -53,4 +53,4 @@ Please verify the run ID and ensure that the run exists.`],
             });
         }
     },
-} as const;
+} as const);
