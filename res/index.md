@@ -42,6 +42,22 @@ Refactor plan for modularizing existing resource handling (no new resources).
 - Behavior-preserving steps and non-goals
 - **Use case**: Step-by-step guide for refactoring without behavior change
 
+### [tool-mode-separation-plan.md](./tool-mode-separation-plan.md)
+Implementation plan for separating UI-mode (OpenAI) and normal-mode tool behavior into independent modules.
+
+**Key approach:** Actor Executor pattern + separate tool definitions per mode + shared core logic layer.
+
+**Estimated effort:** 6-10 developer days
+
+- Design decisions table (actor-mcp passthrough, Skyfire freeze, task lifecycle, etc.)
+- Three-layer architecture (core → registry → mode-specific tools)
+- Actor Executor pattern for direct actor tools (`type: 'actor'`) mode awareness
+- Tool definition immutability via `Object.freeze` (Skyfire safety)
+- Mode-aware category registry eliminating deep-clone hack
+- 5-phase migration plan with chained PR strategy (7 PRs)
+- Directory structure and complete file manifest with PR assignments
+- **Use case**: Reference for implementing the UI/normal mode tool separation
+
 ### [patterns-for-simplification.md](./patterns-for-simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
 
