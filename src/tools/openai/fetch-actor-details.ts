@@ -52,6 +52,7 @@ An interactive widget has been rendered with detailed Actor information.
         return buildMCPResponse({
             texts,
             structuredContent,
+            // Response-level meta; only returned in openai mode (this handler is openai-only)
             _meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,

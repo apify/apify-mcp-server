@@ -46,6 +46,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema({ ...z.toJSONSchema(getActorRunArgs), additionalProperties: true }),
     requiresSkyfirePayId: true,
+    // openai/* keys are stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },

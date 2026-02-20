@@ -75,6 +75,7 @@ An interactive widget has been rendered with the search results. The user can al
         return buildMCPResponse({
             texts,
             structuredContent,
+            // Response-level meta; only returned in openai mode (this handler is openai-only)
             _meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,

@@ -43,9 +43,6 @@ import {
     HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
-    SKYFIRE_ENABLED_TOOLS,
-    SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
@@ -76,7 +73,7 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
 import { getToolStatusFromError } from '../utils/tool-status.js';
-import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
+import { applySkyfireAugmentation, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -349,40 +346,9 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        if (this.options.skyfireMode) {
-            for (const wrap of tools) {
-                // Clone the tool before modifying it to avoid affecting shared objects
-                const clonedWrap = cloneToolEntry(wrap);
-                let modified = false;
-
-                // Handle Skyfire mode modifications
-                if (this.options.skyfireMode && (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(wrap.name as HelperTools)))) {
-                    // Add Skyfire instructions to description if not already present
-                    if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
-                        clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-                    }
-                    // Add skyfire-pay-id property if not present
-                    if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
-                        const props = clonedWrap.inputSchema.properties as Record<string, unknown>;
-                        if (!props['skyfire-pay-id']) {
-                            props['skyfire-pay-id'] = {
-                                type: 'string',
-                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-                            };
-                        }
-                    }
-                    modified = true;
-                }
-
-                // Store the cloned and modified tool only if modifications were made
-                this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
-            }
-        } else {
-            // No skyfire mode - store tools as-is
-            for (const tool of tools) {
-                this.tools.set(tool.name, tool);
-            }
+        for (const tool of tools) {
+            const stored = this.options.skyfireMode ? applySkyfireAugmentation(tool) : tool;
+            this.tools.set(stored.name, stored);
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
