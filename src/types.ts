@@ -91,7 +91,11 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     ajvValidate: ValidateFunction;
     /** Whether this tool requires Skyfire pay ID validation (uses Apify API) */
     requiresSkyfirePayId?: boolean;
-    /** Whether this tool is only available in OpenAI UI mode */
+    /**
+     * Whether this tool is only available in OpenAI UI mode.
+     * @deprecated No longer used for filtering. Mode-specific tools are resolved at build time
+     * via buildCategories(uiMode). Will be removed in a future release.
+     */
     openaiOnly?: boolean;
 };
 

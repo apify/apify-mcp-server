@@ -30,7 +30,6 @@ const searchActorsInternalArgsSchema = z.object({
 export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
-    openaiOnly: true,
     description: `Search Actors internally (UI mode internal tool).
 
 This tool is available because the LLM is operating in UI mode. Use it for internal lookups 

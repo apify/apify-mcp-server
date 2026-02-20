@@ -26,7 +26,6 @@ const fetchActorDetailsInternalArgsSchema = z.object({
 export const fetchActorDetailsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_GET_DETAILS_INTERNAL,
-    openaiOnly: true,
     description: `Fetch Actor details with flexible output options (UI mode internal tool).
 
 This tool is available because the LLM is operating in UI mode. Use it for internal lookups
