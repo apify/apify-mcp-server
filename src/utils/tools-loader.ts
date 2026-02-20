@@ -10,10 +10,10 @@ import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
 import { callActor, getCallActorDescription } from '../tools/actor.js';
-import { getActorOutput } from '../tools/get-actor-output.js';
-import { addTool } from '../tools/helpers.js';
+import { getActorOutput } from '../tools/common/get-actor-output.js';
+import { addTool } from '../tools/common/helpers.js';
+import { getActorRun } from '../tools/common/run.js';
 import { getActorsAsTools, toolCategories, toolCategoriesEnabledByDefault } from '../tools/index.js';
-import { getActorRun } from '../tools/run.js';
 import type { ActorStore, Input, InternalToolArgs, ToolCategory, ToolEntry, UiMode } from '../types.js';
 import { getExpectedToolsByCategories } from './tool-categories-helpers.js';
 

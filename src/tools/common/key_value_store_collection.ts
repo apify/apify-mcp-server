@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
+import { ApifyClient } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z.number()
@@ -24,7 +24,7 @@ const getUserKeyValueStoresListArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-stores-get
  */
-export const getUserKeyValueStoresList: ToolEntry = {
+export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.KEY_VALUE_STORE_LIST_GET,
     description: `List key-value stores owned by the authenticated user.
@@ -59,4 +59,4 @@ USAGE EXAMPLES:
         });
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(stores)}\n\`\`\`` }] };
     },
-} as const;
+} as const);

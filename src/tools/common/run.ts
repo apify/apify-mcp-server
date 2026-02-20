@@ -11,19 +11,19 @@
  */
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { defaultGetActorRun } from './default/get-actor-run.js';
-import { openaiGetActorRun } from './openai/get-actor-run.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { HelperTool, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { defaultGetActorRun } from '../default/get-actor-run.js';
+import { openaiGetActorRun } from '../openai/get-actor-run.js';
 
 const defaultVariant = defaultGetActorRun as HelperTool;
 
 /**
  * Adapter get-actor-run tool that dispatches to the correct mode-specific variant at runtime.
  */
-export const getActorRun: ToolEntry = {
+export const getActorRun: ToolEntry = Object.freeze({
     ...defaultVariant,
     call: async (toolArgs: InternalToolArgs) => {
         const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
@@ -31,7 +31,7 @@ export const getActorRun: ToolEntry = {
             : defaultGetActorRun) as HelperTool;
         return variant.call(toolArgs);
     },
-};
+});
 
 // --- Mode-independent tools below ---
 
@@ -47,7 +47,7 @@ const GetRunLogArgs = z.object({
  * https://docs.apify.com/api/v2/actor-run-get
  *  /v2/actor-runs/{runId}/log{?token}
  */
-export const getActorRunLog: ToolEntry = {
+export const getActorRunLog: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_LOG,
     description: `Retrieve recent log lines for a specific Actor run.
@@ -82,7 +82,7 @@ USAGE EXAMPLES:
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
         return { content: [{ type: 'text', text }] };
     },
-} as const;
+} as const);
 
 const abortRunArgs = z.object({
     runId: z.string()
@@ -94,7 +94,7 @@ const abortRunArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/actor-run-abort-post
  */
-export const abortActorRun: ToolEntry = {
+export const abortActorRun: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_ABORT,
     description: `Abort an Actor run that is currently starting or running.
@@ -128,4 +128,4 @@ USAGE EXAMPLES:
         const v = await client.run(parsed.runId).abort({ gracefully: parsed.gracefully });
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
-} as const;
+} as const);

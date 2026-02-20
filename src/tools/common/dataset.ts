@@ -1,13 +1,13 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { HelperTools, TOOL_STATUS } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { parseCommaSeparatedList } from '../utils/generic.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { generateSchemaFromItems } from '../utils/schema-generation.js';
-import { datasetItemsOutputSchema } from './structured-output-schemas.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { HelperTools, TOOL_STATUS } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { parseCommaSeparatedList } from '../../utils/generic.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { generateSchemaFromItems } from '../../utils/schema-generation.js';
+import { datasetItemsOutputSchema } from '../structured-output-schemas.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -42,7 +42,7 @@ const getDatasetItemsArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/dataset-get
  */
-export const getDataset: ToolEntry = {
+export const getDataset: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_GET,
     description: `Get metadata for a dataset (collection of structured data created by an Actor run).
@@ -83,12 +83,12 @@ USAGE EXAMPLES:
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
     },
-} as const;
+} as const);
 
 /**
  * https://docs.apify.com/api/v2/dataset-items-get
  */
-export const getDatasetItems: ToolEntry = {
+export const getDatasetItems: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_GET_ITEMS,
     description: `Retrieve dataset items with pagination, sorting, and field selection.
@@ -155,7 +155,7 @@ USAGE EXAMPLES:
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };
     },
-} as const;
+} as const);
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string()
@@ -175,7 +175,7 @@ const getDatasetSchemaArgs = z.object({
 /**
  * Generates a JSON schema from dataset items
  */
-export const getDatasetSchema: ToolEntry = {
+export const getDatasetSchema: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_SCHEMA_GET,
     description: `Generate a JSON schema from a sample of dataset items.
@@ -249,4 +249,4 @@ USAGE EXAMPLES:
             }],
         };
     },
-} as const;
+} as const);

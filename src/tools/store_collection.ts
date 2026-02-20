@@ -21,7 +21,7 @@ const defaultVariant = defaultSearchActors as HelperTool;
 /**
  * Adapter search-actors tool that dispatches to the correct mode-specific variant at runtime.
  */
-export const searchActors: ToolEntry = {
+export const searchActors: ToolEntry = Object.freeze({
     ...defaultVariant,
     call: async (toolArgs: InternalToolArgs) => {
         const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
@@ -29,4 +29,4 @@ export const searchActors: ToolEntry = {
             : defaultSearchActors) as HelperTool;
         return variant.call(toolArgs);
     },
-};
+});

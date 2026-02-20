@@ -53,7 +53,7 @@ EXAMPLES:
  * Always runs asynchronously — starts the run and returns immediately with widget metadata.
  * The widget automatically tracks progress and updates the UI.
  */
-export const openaiCallActor: ToolEntry = {
+export const openaiCallActor: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_OPENAI_DESCRIPTION,
@@ -141,4 +141,4 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH},
             });
         }
     },
-};
+} as const);

@@ -1,12 +1,12 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { HelperTools, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
-import { getValuesByDotKeys, parseCommaSeparatedList } from '../utils/generic.js';
-import { buildMCPResponse } from '../utils/mcp.js';
-import { datasetItemsOutputSchema } from './structured-output-schemas.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { HelperTools, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
+import { getValuesByDotKeys, parseCommaSeparatedList } from '../../utils/generic.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
+import { datasetItemsOutputSchema } from '../structured-output-schemas.js';
 
 /**
  * Zod schema for get-actor-output tool arguments
@@ -64,7 +64,7 @@ export function cleanEmptyProperties(obj: unknown): unknown {
  * This tool is used specifically for retrieving Actor output.
  * It is a simplified version of the get-dataset-items tool.
  */
-export const getActorOutput: ToolEntry = {
+export const getActorOutput: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_OUTPUT_GET,
     description: `Retrieve the output dataset items of a specific Actor run using its datasetId.
@@ -159,4 +159,4 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
 
         return { content: [{ type: 'text', text: outputText }], structuredContent };
     },
-} as const;
+} as const);

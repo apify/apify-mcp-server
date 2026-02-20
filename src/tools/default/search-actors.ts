@@ -12,7 +12,7 @@ import {
  * Default mode search-actors tool.
  * Returns text-based actor cards without widget metadata.
  */
-export const defaultSearchActors: ToolEntry = {
+export const defaultSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
@@ -67,4 +67,4 @@ IMPORTANT: You MUST always do a second search with broader, more generic keyword
             structuredContent,
         });
     },
-} as const;
+} as const);

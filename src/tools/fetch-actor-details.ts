@@ -18,7 +18,7 @@ const defaultVariant = defaultFetchActorDetails as HelperTool;
 /**
  * Adapter fetch-actor-details tool that dispatches to the correct mode-specific variant at runtime.
  */
-export const fetchActorDetailsTool: ToolEntry = {
+export const fetchActorDetailsTool: ToolEntry = Object.freeze({
     ...defaultVariant,
     call: async (toolArgs: InternalToolArgs) => {
         const variant = (toolArgs.apifyMcpServer.options.uiMode === 'openai'
@@ -26,4 +26,4 @@ export const fetchActorDetailsTool: ToolEntry = {
             : defaultFetchActorDetails) as HelperTool;
         return variant.call(toolArgs);
     },
-};
+});

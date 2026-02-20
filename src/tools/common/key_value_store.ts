@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
-import { HelperTools } from '../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
-import { compileSchema } from '../utils/ajv.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { HelperTools } from '../../const.js';
+import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { compileSchema } from '../../utils/ajv.js';
 
 const getKeyValueStoreArgs = z.object({
     storeId: z.string()
@@ -14,7 +14,7 @@ const getKeyValueStoreArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-get
  */
-export const getKeyValueStore: ToolEntry = {
+export const getKeyValueStore: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.KEY_VALUE_STORE_GET,
     description: `Get details about a key-value store by ID or username~store-name.
@@ -46,7 +46,7 @@ USAGE EXAMPLES:
         const store = await client.keyValueStore(parsed.storeId).get();
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
     },
-} as const;
+} as const);
 
 const getKeyValueStoreKeysArgs = z.object({
     storeId: z.string()
@@ -64,7 +64,7 @@ const getKeyValueStoreKeysArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  */
-export const getKeyValueStoreKeys: ToolEntry = {
+export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
     description: `List keys in a key-value store with optional pagination.
@@ -100,7 +100,7 @@ USAGE EXAMPLES:
         });
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(keys)}\n\`\`\`` }] };
     },
-} as const;
+} as const);
 
 const getKeyValueStoreRecordArgs = z.object({
     storeId: z.string()
@@ -114,7 +114,7 @@ const getKeyValueStoreRecordArgs = z.object({
 /**
  * https://docs.apify.com/api/v2/key-value-store-record-get
  */
-export const getKeyValueStoreRecord: ToolEntry = {
+export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
     description: `Get a value stored in a key-value store under a specific key.
@@ -146,4 +146,4 @@ USAGE EXAMPLES:
         const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
     },
-} as const;
+} as const);

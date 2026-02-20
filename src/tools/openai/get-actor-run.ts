@@ -14,7 +14,7 @@ import {
  * OpenAI mode get-actor-run tool.
  * Returns abbreviated text with widget metadata for interactive progress display.
  */
-export const openaiGetActorRun: ToolEntry = {
+export const openaiGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
@@ -59,4 +59,4 @@ Please verify the run ID and ensure that the run exists.`],
             });
         }
     },
-} as const;
+} as const);
