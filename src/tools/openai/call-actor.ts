@@ -61,6 +61,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
     requiresSkyfirePayId: true,
+    // openai-only tool; openai/* keys also stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -124,6 +125,7 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                     text: responseText,
                 }],
                 structuredContent,
+                // Response-level meta; only returned in openai mode (this handler is openai-only)
                 _meta: {
                     ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor run progress for ${baseActorName}`,

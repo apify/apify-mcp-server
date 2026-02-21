@@ -44,6 +44,7 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
         return {
             content: [{ type: 'text' as const, text: responseText }],
             structuredContent,
+            // Response-level meta; only returned in openai mode (this executor is openai-only)
             _meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Actor run progress for ${params.actorFullName}`,

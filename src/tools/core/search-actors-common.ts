@@ -93,6 +93,7 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
+    // openai/* keys are stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },

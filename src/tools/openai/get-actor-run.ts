@@ -44,6 +44,7 @@ export const openaiGetActorRun: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [statusText],
                 structuredContent,
+                // Response-level meta; only returned in openai mode (this handler is openai-only)
                 _meta: {
                     ...widgetConfig?.meta,
                     ...usageMeta,
