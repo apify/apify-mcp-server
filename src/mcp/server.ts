@@ -104,11 +104,6 @@ export class ActorsMcpServer {
     // List of widgets that are ready to be served (with version hashes for cache-busting)
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
-    /** Returns the resolved available widgets map (used by tools for versioned widget metadata) */
-    getAvailableWidgets(): Map<string, AvailableWidget> {
-        return this.availableWidgets;
-    }
-
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
@@ -193,6 +188,11 @@ export class ActorsMcpServer {
      */
     public listToolNames(): string[] {
         return Array.from(this.tools.keys());
+    }
+
+    /** Returns the resolved available widgets map (used by tools for versioned widget metadata) */
+    public getAvailableWidgets(): Map<string, AvailableWidget> {
+        return this.availableWidgets;
     }
 
     /**

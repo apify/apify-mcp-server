@@ -5,7 +5,7 @@ import log from '@apify/log';
 import { SKYFIRE_README_CONTENT } from '../const.js';
 import type { UiMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
-import { stripWidgetVersion } from './widgets.js';
+import { getVersionedWidgetMeta, stripWidgetVersion } from './widgets.js';
 
 type ExtendedResourceContents = TextResourceContents & {
     html?: string;
@@ -54,9 +54,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     name: widget.name,
                     description: widget.description,
                     mimeType: 'text/html+skybridge',
-                    _meta: widget.versionedUri
-                        ? { ...widget.meta, 'openai/outputTemplate': widget.versionedUri }
-                        : widget.meta,
+                    _meta: getVersionedWidgetMeta(widget.uri, getAvailableWidgets()) ?? widget.meta,
                 });
             }
         }
