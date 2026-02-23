@@ -2,7 +2,7 @@ import type { ActorStoreList } from 'apify-client';
 import { z } from 'zod';
 
 import { HelperTools } from '../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
+import { getVersionedWidgetMeta, getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { ActorPricingModel, InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../utils/actor-card.js';
 import { searchAndFilterActors } from '../utils/actor-search.js';
@@ -182,12 +182,12 @@ An interactive widget has been rendered with the search results. The user can al
  ${actorsText}
 `];
 
-            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
+            const widgetMeta = getVersionedWidgetMeta(WIDGET_URIS.SEARCH_ACTORS, apifyMcpServer.getAvailableWidgets());
             return buildMCPResponse({
                 texts,
                 structuredContent,
                 _meta: {
-                    ...widgetConfig?.meta,
+                    ...widgetMeta,
                     'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,
                 },
             });

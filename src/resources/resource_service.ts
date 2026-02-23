@@ -5,6 +5,7 @@ import log from '@apify/log';
 import { SKYFIRE_README_CONTENT } from '../const.js';
 import type { UiMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
+import { stripWidgetVersion } from './widgets.js';
 
 type ExtendedResourceContents = TextResourceContents & {
     html?: string;
@@ -49,11 +50,13 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     continue;
                 }
                 resources.push({
-                    uri: widget.uri,
+                    uri: widget.versionedUri ?? widget.uri,
                     name: widget.name,
                     description: widget.description,
                     mimeType: 'text/html+skybridge',
-                    _meta: widget.meta,
+                    _meta: widget.versionedUri
+                        ? { ...widget.meta, 'openai/outputTemplate': widget.versionedUri }
+                        : widget.meta,
                 });
             }
         }
@@ -73,7 +76,9 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         }
 
         if (uiMode === 'openai' && uri.startsWith('ui://widget/')) {
-            const widget = getAvailableWidgets().get(uri);
+            // Strip version query param (e.g., ?v=abc123) to look up by base URI
+            const baseUri = stripWidgetVersion(uri);
+            const widget = getAvailableWidgets().get(baseUri);
 
             if (!widget || !widget.exists) {
                 return {

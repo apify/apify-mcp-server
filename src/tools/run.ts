@@ -4,7 +4,7 @@ import log from '@apify/log';
 
 import { createApifyClientWithSkyfireSupport } from '../apify-client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
+import { getVersionedWidgetMeta, getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
@@ -137,13 +137,13 @@ USAGE EXAMPLES:
                     ? `Actor run ${parsed.runId} completed successfully with ${structuredContent.dataset.itemCount} items. A widget has been rendered with the details.`
                     : `Actor run ${parsed.runId} status: ${run.status}. A progress widget has been rendered.`;
 
-                const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+                const widgetMeta = getVersionedWidgetMeta(WIDGET_URIS.ACTOR_RUN, apifyMcpServer.getAvailableWidgets());
                 const usageMeta = buildUsageMeta(run);
                 return buildMCPResponse({
                     texts: [statusText],
                     structuredContent,
                     _meta: {
-                        ...widgetConfig?.meta,
+                        ...widgetMeta,
                         ...usageMeta,
                     },
                 });

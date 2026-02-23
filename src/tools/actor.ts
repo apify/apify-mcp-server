@@ -17,7 +17,7 @@ import {
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { getMCPServerTools } from '../mcp/proxy.js';
-import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
+import { getVersionedWidgetMeta, getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import { actorDefinitionPrunedCache } from '../state.js';
 import type {
     ActorDefinitionStorage,
@@ -668,9 +668,9 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 };
 
                 if (apifyMcpServer.options.uiMode === 'openai') {
-                    const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+                    const widgetMeta = getVersionedWidgetMeta(WIDGET_URIS.ACTOR_RUN, apifyMcpServer.getAvailableWidgets());
                     response._meta = {
-                        ...widgetConfig?.meta,
+                        ...widgetMeta,
                         'openai/widgetDescription': `Actor run progress for ${actorName}`,
                     };
                 }

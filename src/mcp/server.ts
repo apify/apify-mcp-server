@@ -101,8 +101,13 @@ export class ActorsMcpServer {
     private telemetryEnabled: boolean | null = null;
     private telemetryEnv: TelemetryEnv = DEFAULT_TELEMETRY_ENV;
 
-    // List of widgets that are ready to be served
+    // List of widgets that are ready to be served (with version hashes for cache-busting)
     private availableWidgets: Map<string, AvailableWidget> = new Map();
+
+    /** Returns the resolved available widgets map (used by tools for versioned widget metadata) */
+    getAvailableWidgets(): Map<string, AvailableWidget> {
+        return this.availableWidgets;
+    }
 
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;

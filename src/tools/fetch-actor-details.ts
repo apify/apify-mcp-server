@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { ApifyClient } from '../apify-client.js';
 import { HelperTools } from '../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
+import { getVersionedWidgetMeta, getWidgetConfig, WIDGET_URIS } from '../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../types.js';
 import {
     actorDetailsOutputOptionsSchema,
@@ -82,12 +82,12 @@ EXAMPLES:
 An interactive widget has been rendered with detailed Actor information.
 `];
 
-            const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
+            const widgetMeta = getVersionedWidgetMeta(WIDGET_URIS.SEARCH_ACTORS, apifyMcpServer.getAvailableWidgets());
             return buildMCPResponse({
                 texts,
                 structuredContent,
                 _meta: {
-                    ...widgetConfig?.meta,
+                    ...widgetMeta,
                     'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
                 },
             });
