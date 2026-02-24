@@ -1,6 +1,6 @@
 import log from '@apify/log';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
@@ -11,8 +11,8 @@ import {
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
-} from '../core/call-actor-common.js';
-import { callActorOutputSchema } from '../structured-output-schemas.js';
+} from '../core/call_actor_common.js';
+import { callActorOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName } from '../utils.js';
 
 const CALL_ACTOR_OPENAI_DESCRIPTION = `Call any Actor from the Apify Store.

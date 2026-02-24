@@ -34,7 +34,7 @@ import type { ValidateFunction } from 'ajv';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify_client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
     APIFY_MCP_URL,
@@ -50,9 +50,9 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { defaultActorExecutor } from '../tools/default/actor-executor.js';
+import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
-import { openaiActorExecutor } from '../tools/openai/actor-executor.js';
+import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
     ActorExecutor,
@@ -72,9 +72,9 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
-import { getToolStatusFromError } from '../utils/tool-status.js';
+import { getToolStatusFromError } from '../utils/tool_status.js';
 import { applySkyfireAugmentation, getToolPublicFieldOnly } from '../utils/tools.js';
-import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
+import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';

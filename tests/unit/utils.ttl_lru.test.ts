@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { TTLLRUCache } from '../../src/utils/ttl-lru.js';
+import { TTLLRUCache } from '../../src/utils/ttl_lru.js';
 
 describe('TTLLRUCache', () => {
     it('should set and get values before TTL expires', () => {

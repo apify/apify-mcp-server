@@ -8,7 +8,7 @@ import {
     createToolSelectionLLMEvaluator,
     loadTestCases, filterById,
     type TestCase
-} from './evaluation-utils.js';
+} from './evaluation_utils.js';
 import { PASS_THRESHOLD, sanitizeHeaderValue } from './config.js';
 
 dotenv.config({ path: '.env' });

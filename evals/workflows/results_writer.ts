@@ -6,7 +6,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output-formatter.js';
+import type { EvaluationResult, ResultsDatabase, TestResultRecord } from './output_formatter.js';
 
 /**
  * Build composite key for storing results

@@ -14,11 +14,11 @@ import type {
 } from 'apify-client';
 import type z from 'zod';
 
-import type { ApifyClient } from './apify-client.js';
+import type { ApifyClient } from './apify_client.js';
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
-import type { StructuredPricingInfo } from './utils/pricing-info.js';
+import type { StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
 export type SchemaProperties = {

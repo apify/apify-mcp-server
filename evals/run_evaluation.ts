@@ -20,7 +20,7 @@ import {
     loadTools,
     createOpenRouterTask,
     createToolSelectionLLMEvaluator
-} from './evaluation-utils.js';
+} from './evaluation_utils.js';
 import {
     DATASET_NAME,
     MODELS_TO_EVALUATE,

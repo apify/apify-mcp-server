@@ -1,13 +1,13 @@
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../../utils/actor-card.js';
-import { searchAndFilterActors } from '../../utils/actor-search.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../../utils/actor_card.js';
+import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import {
     searchActorsArgsSchema,
     searchActorsMetadata,
-} from '../core/search-actors-common.js';
+} from '../core/search_actors_common.js';
 
 /**
  * OpenAI mode search-actors tool.

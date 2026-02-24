@@ -5,9 +5,9 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
 import {
     actorDetailsOutputOptionsSchema,
-} from '../../utils/actor-details.js';
+} from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { actorDetailsOutputSchema } from '../structured-output-schemas.js';
+import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Zod schema for fetch-actor-details arguments — shared between default and openai variants.

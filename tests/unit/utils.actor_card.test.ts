@@ -2,7 +2,7 @@ import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import type { ActorStoreList } from '../../src/types.js';
-import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor-card.js';
+import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
 // Mock Actor data for testing (based on real apify/rag-web-browser Actor)
 const mockActor: Actor = {

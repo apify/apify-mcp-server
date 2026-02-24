@@ -9,7 +9,7 @@ import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
 import { buildCategories, CATEGORY_NAMES, toolCategoriesEnabledByDefault } from '../tools/categories.js';
-import { getActorOutput } from '../tools/common/get-actor-output.js';
+import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { addTool } from '../tools/common/helpers.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry, UiMode } from '../types.js';

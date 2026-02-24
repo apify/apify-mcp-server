@@ -1,20 +1,20 @@
 import log from '@apify/log';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
-import { callActorGetDataset } from '../core/actor-execution.js';
-import { buildActorResponseContent } from '../core/actor-response.js';
+import { callActorGetDataset } from '../core/actor_execution.js';
+import { buildActorResponseContent } from '../core/actor_response.js';
 import {
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
-} from '../core/call-actor-common.js';
-import { callActorOutputSchema } from '../structured-output-schemas.js';
+} from '../core/call_actor_common.js';
+import { callActorOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName } from '../utils.js';
 
 const CALL_ACTOR_DEFAULT_DESCRIPTION = `Call any Actor from the Apify Store.

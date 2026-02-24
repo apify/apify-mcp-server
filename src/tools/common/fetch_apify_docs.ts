@@ -6,10 +6,10 @@ import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { htmlToMarkdown } from '../../utils/html-to-md.js';
+import { htmlToMarkdown } from '../../utils/html_to_md.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { fetchApifyDocsToolOutputSchema } from '../structured-output-schemas.js';
+import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
     url: z.string()

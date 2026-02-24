@@ -9,8 +9,8 @@ import { createClassifierFn } from '@arizeai/phoenix-evals';
 
 import log from '@apify/log';
 
-import { ApifyClient } from '../src/apify-client.js';
-import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index-internals.js';
+import { ApifyClient } from '../src/apify_client.js';
+import { getToolPublicFieldOnly, processParamsGetTools } from '../src/index_internals.js';
 import type { ToolBase, ToolEntry } from '../src/types.js';
 import {
     SYSTEM_PROMPT,
@@ -20,8 +20,8 @@ import {
     TEMPERATURE,
     sanitizeHeaderValue
 } from './config.js';
-import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test-case-loader.js';
-import { transformToolsToOpenAIFormat } from './shared/openai-tools.js';
+import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
+import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
 import type { ToolSelectionTestCase, TestData } from './shared/types.js';
 
 // Re-export types for backwards compatibility
@@ -29,7 +29,7 @@ export type TestCase = ToolSelectionTestCase;
 export type { TestData } from './shared/types.js';
 
 // Re-export shared functions for backwards compatibility
-export { filterByCategory, filterById } from './shared/test-case-loader.js';
+export { filterByCategory, filterById } from './shared/test_case_loader.js';
 
 type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
 

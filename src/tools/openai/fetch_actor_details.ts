@@ -1,4 +1,4 @@
-import { ApifyClient } from '../../apify-client.js';
+import { ApifyClient } from '../../apify_client.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
@@ -7,12 +7,12 @@ import {
     fetchActorDetails,
     processActorDetailsForResponse,
     resolveOutputOptions,
-} from '../../utils/actor-details.js';
+} from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
-} from '../core/fetch-actor-details-common.js';
+} from '../core/fetch_actor_details_common.js';
 
 /**
  * OpenAI mode fetch-actor-details tool.

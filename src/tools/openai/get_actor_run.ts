@@ -1,4 +1,4 @@
-import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
@@ -8,7 +8,7 @@ import {
     fetchActorRunData,
     getActorRunArgs,
     getActorRunMetadata,
-} from '../core/get-actor-run-common.js';
+} from '../core/get_actor_run_common.js';
 
 /**
  * OpenAI mode get-actor-run tool.

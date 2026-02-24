@@ -4,7 +4,7 @@
  * of the filtering step and reduce code duplication.
  */
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient } from '../apify_client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
 import type { ActorPricingModel, ActorStoreList } from '../types.js';
 

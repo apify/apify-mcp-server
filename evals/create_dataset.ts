@@ -15,7 +15,7 @@ import { hideBin } from 'yargs/helpers';
 import log from '@apify/log';
 
 import { sanitizeHeaderValue, validatePhoenixEnvVars } from './config.js';
-import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation-utils.js';
+import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation_utils.js';
 
 // Set log level to debug
 log.setLevel(log.LEVELS.INFO);

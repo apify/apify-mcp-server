@@ -18,23 +18,23 @@ import pLimit from 'p-limit';
 import yargs from 'yargs';
 import { hideBin } from 'yargs/helpers';
 
-import { filterByLineRanges } from '../shared/line-range-filter.js';
-import type { LineRange } from '../shared/line-range-parser.js';
-import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line-range-parser.js';
+import { filterByLineRanges } from '../shared/line_range_filter.js';
+import type { LineRange } from '../shared/line_range_parser.js';
+import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
 import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
-import { executeConversation } from './conversation-executor.js';
-import { LlmClient } from './llm-client.js';
-import { McpClient } from './mcp-client.js';
-import type { EvaluationResult } from './output-formatter.js';
-import { formatDetailedResult, formatResultsTable } from './output-formatter.js';
+import { executeConversation } from './conversation_executor.js';
+import { LlmClient } from './llm_client.js';
+import { McpClient } from './mcp_client.js';
+import type { EvaluationResult } from './output_formatter.js';
+import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
 import {
     loadResultsDatabase,
     saveResultsDatabase,
     updateResultsWithEvaluations,
-} from './results-writer.js';
-import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test-cases-loader.js';
-import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test-cases-loader.js';
-import { evaluateConversation } from './workflow-judge.js';
+} from './results_writer.js';
+import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
+import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
+import { evaluateConversation } from './workflow_judge.js';
 
 type CliArgs = {
     category?: string;

@@ -1,9 +1,9 @@
 import { HelperTools } from '../const.js';
 import type { ToolCategory } from '../types.js';
-import { getExpectedToolsByCategories } from '../utils/tool-categories-helpers.js';
+import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
 import { buildCategories, CATEGORY_NAMES, toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
-import { callActorGetDataset } from './core/actor-execution.js';
-import { getActorsAsTools } from './core/actor-tools-factory.js';
+import { callActorGetDataset } from './core/actor_execution.js';
+import { getActorsAsTools } from './core/actor_tools_factory.js';
 
 // Use string constants instead of importing tool objects to avoid circular dependency
 export const unauthEnabledTools: string[] = [

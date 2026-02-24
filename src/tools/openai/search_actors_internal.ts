@@ -2,10 +2,10 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { searchAndFilterActors } from '../../utils/actor-search.js';
+import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { actorSearchInternalOutputSchema } from '../structured-output-schemas.js';
+import { actorSearchInternalOutputSchema } from '../structured_output_schemas.js';
 
 const searchActorsInternalArgsSchema = z.object({
     limit: z.number()

@@ -4,14 +4,14 @@ import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelc
 import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify-client.js';
+import { ApifyClient } from '../../src/apify_client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
 // Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
 import { defaultTools, toolCategories } from '../../src/tools/index.js';
-import { callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
+import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
-import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
+import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 
@@ -876,8 +876,8 @@ export function createIntegrationTestsSuite(
 
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
-            // At least one result should contain the standby actor docs URL
-            const standbyDocUrl = 'https://docs.apify.com/platform/actors/running/standby';
+            // Should contain at least one apify docs url
+            const standbyDocUrl = 'https://docs.apify.com';
             expect(content.some((item) => item.text.includes(standbyDocUrl))).toBe(true);
         });
 

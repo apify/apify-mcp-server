@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
 import { TOOL_STATUS } from '../../src/const.js';
-import { getToolStatusFromError } from '../../src/utils/tool-status.js';
+import { getToolStatusFromError } from '../../src/utils/tool_status.js';
 
 describe('getToolStatusFromError', () => {
     it('returns aborted when isAborted is true', () => {

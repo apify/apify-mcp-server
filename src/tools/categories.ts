@@ -11,25 +11,25 @@
 import type { ToolEntry, UiMode } from '../types.js';
 import { getDataset, getDatasetItems, getDatasetSchema } from './common/dataset.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
-import { fetchApifyDocsTool } from './common/fetch-apify-docs.js';
-import { getActorOutput } from './common/get-actor-output.js';
-import { getHtmlSkeleton } from './common/get-html-skeleton.js';
+import { fetchApifyDocsTool } from './common/fetch_apify_docs.js';
+import { getActorOutput } from './common/get_actor_output.js';
+import { getHtmlSkeleton } from './common/get_html_skeleton.js';
 import { addTool } from './common/helpers.js';
 import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './common/key_value_store.js';
 import { getUserKeyValueStoresList } from './common/key_value_store_collection.js';
 import { abortActorRun, getActorRunLog } from './common/run.js';
 import { getUserRunsList } from './common/run_collection.js';
-import { searchApifyDocsTool } from './common/search-apify-docs.js';
-import { defaultCallActor } from './default/call-actor.js';
-import { defaultFetchActorDetails } from './default/fetch-actor-details.js';
-import { defaultGetActorRun } from './default/get-actor-run.js';
-import { defaultSearchActors } from './default/search-actors.js';
-import { openaiCallActor } from './openai/call-actor.js';
-import { openaiFetchActorDetails } from './openai/fetch-actor-details.js';
-import { fetchActorDetailsInternalTool } from './openai/fetch-actor-details-internal.js';
-import { openaiGetActorRun } from './openai/get-actor-run.js';
-import { openaiSearchActors } from './openai/search-actors.js';
-import { searchActorsInternalTool } from './openai/search-actors-internal.js';
+import { searchApifyDocsTool } from './common/search_apify_docs.js';
+import { defaultCallActor } from './default/call_actor.js';
+import { defaultFetchActorDetails } from './default/fetch_actor_details.js';
+import { defaultGetActorRun } from './default/get_actor_run.js';
+import { defaultSearchActors } from './default/search_actors.js';
+import { openaiCallActor } from './openai/call_actor.js';
+import { openaiFetchActorDetails } from './openai/fetch_actor_details.js';
+import { fetchActorDetailsInternalTool } from './openai/fetch_actor_details_internal.js';
+import { openaiGetActorRun } from './openai/get_actor_run.js';
+import { openaiSearchActors } from './openai/search_actors.js';
+import { searchActorsInternalTool } from './openai/search_actors_internal.js';
 
 /**
  * Static tool categories using adapter tools that dispatch at runtime based on uiMode.

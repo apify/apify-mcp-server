@@ -2,9 +2,9 @@
  * Output formatter for evaluation results
  */
 
-import type { WorkflowTestCase } from './test-cases-loader.js';
+import type { WorkflowTestCase } from './test_cases_loader.js';
 import type { ConversationHistory } from './types.js';
-import type { JudgeResult } from './workflow-judge.js';
+import type { JudgeResult } from './workflow_judge.js';
 
 /**
  * Single evaluation result

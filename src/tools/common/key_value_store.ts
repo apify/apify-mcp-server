@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';

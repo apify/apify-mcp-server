@@ -1,14 +1,14 @@
 import type { Build } from 'apify-client';
 import { z } from 'zod';
 
-import type { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify_client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
-import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor-card.js';
-import { searchActorsByKeywords } from './actor-search.js';
+import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
+import { searchActorsByKeywords } from './actor_search.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
 

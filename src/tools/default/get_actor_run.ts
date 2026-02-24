@@ -1,4 +1,4 @@
-import { createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { logHttpError } from '../../utils/logging.js';
@@ -7,7 +7,7 @@ import {
     fetchActorRunData,
     getActorRunArgs,
     getActorRunMetadata,
-} from '../core/get-actor-run-common.js';
+} from '../core/get_actor_run_common.js';
 
 /**
  * Default mode get-actor-run tool.

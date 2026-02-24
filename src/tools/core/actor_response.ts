@@ -1,5 +1,5 @@
 import type { DatasetItem } from '../../types.js';
-import type { CallActorGetDatasetResult } from './actor-execution.js';
+import type { CallActorGetDatasetResult } from './actor_execution.js';
 
 /**
  * Result from buildActorResponseContent function.

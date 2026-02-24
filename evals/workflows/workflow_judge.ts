@@ -8,7 +8,7 @@ import type { ResponseFormatJSONSchema } from 'openai/resources/shared';
 
 import type { WorkflowTestCase } from '../shared/types.js';
 import { JUDGE_PROMPT_TEMPLATE, MODELS } from './config.js';
-import type { LlmClient } from './llm-client.js';
+import type { LlmClient } from './llm_client.js';
 import type { ConversationHistory } from './types.js';
 
 /**

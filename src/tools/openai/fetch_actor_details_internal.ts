@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify-client.js';
+import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import {
@@ -10,10 +10,10 @@ import {
     buildCardOptions,
     fetchActorDetails,
     resolveOutputOptions,
-} from '../../utils/actor-details.js';
+} from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { actorDetailsOutputSchema } from '../structured-output-schemas.js';
+import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 
 const fetchActorDetailsInternalArgsSchema = z.object({
     actor: z.string()

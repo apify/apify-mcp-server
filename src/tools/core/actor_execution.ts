@@ -2,14 +2,14 @@ import type { ActorCallOptions, ActorRun } from 'apify-client';
 
 import log from '@apify/log';
 
-import type { ApifyClient } from '../../apify-client.js';
+import type { ApifyClient } from '../../apify_client.js';
 import { TOOL_MAX_OUTPUT_CHARS } from '../../const.js';
 import type { ActorDefinitionStorage, DatasetItem } from '../../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../../utils/actor.js';
 import { logHttpError, redactSkyfirePayId } from '../../utils/logging.js';
 import type { ProgressTracker } from '../../utils/progress.js';
-import type { JsonSchemaProperty } from '../../utils/schema-generation.js';
-import { generateSchemaFromItems } from '../../utils/schema-generation.js';
+import type { JsonSchemaProperty } from '../../utils/schema_generation.js';
+import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 
 // Define a named return type for callActorGetDataset
 export type CallActorGetDatasetResult = {

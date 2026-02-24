@@ -2,7 +2,7 @@
  * Filter test cases by line ranges
  */
 
-import type { LineRange } from './line-range-parser.js';
+import type { LineRange } from './line_range_parser.js';
 
 /**
  * Type for test cases with line number metadata

@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 
-import type { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify_client.js';
 import { USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS } from '../const.js';
-import { TTLLRUCache } from './ttl-lru.js';
+import { TTLLRUCache } from './ttl_lru.js';
 
 // LRU cache with TTL for user info - stores the raw User object from API
 const userIdCache = new TTLLRUCache<string>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);

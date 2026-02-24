@@ -2,14 +2,14 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import type { ApifyClient } from '../../apify-client.js';
+import type { ApifyClient } from '../../apify_client.js';
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { generateSchemaFromItems } from '../../utils/schema-generation.js';
-import { getActorRunOutputSchema } from '../structured-output-schemas.js';
+import { generateSchemaFromItems } from '../../utils/schema_generation.js';
+import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Zod schema for get-actor-run arguments — shared between default and openai variants.

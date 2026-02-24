@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { getNormalActorsAsTools } from '../../src/tools/core/actor-tools-factory.js';
-import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
+import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
+import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 
 // Helper type for testing schema structure

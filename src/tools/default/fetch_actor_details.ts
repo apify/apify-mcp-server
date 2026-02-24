@@ -1,4 +1,4 @@
-import { ApifyClient } from '../../apify-client.js';
+import { ApifyClient } from '../../apify_client.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
     buildActorDetailsTextResponse,
@@ -6,12 +6,12 @@ import {
     buildCardOptions,
     fetchActorDetails,
     resolveOutputOptions,
-} from '../../utils/actor-details.js';
+} from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
-} from '../core/fetch-actor-details-common.js';
+} from '../core/fetch_actor_details_common.js';
 
 /**
  * Default mode fetch-actor-details tool.

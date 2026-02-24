@@ -14,7 +14,7 @@ import express from 'express';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient } from '../apify_client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import type { ApifyRequestParams, UiMode } from '../types.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';

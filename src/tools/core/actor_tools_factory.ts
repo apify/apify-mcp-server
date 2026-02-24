@@ -2,7 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import log from '@apify/log';
 
-import type { ApifyClient } from '../../apify-client.js';
+import type { ApifyClient } from '../../apify_client.js';
 import {
     ACTOR_MAX_MEMORY_MBYTES,
     HelperTools,
@@ -24,7 +24,7 @@ import type {
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { getActorDefinition } from '../build.js';
-import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../structured-output-schemas.js';
+import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
 
 /**

@@ -6,10 +6,10 @@
 // eslint-disable-next-line import/extensions
 import type { ChatCompletionMessageParam, ChatCompletionTool } from 'openai/resources/chat/completions';
 
-import { mcpToolsToOpenAiTools } from '../shared/openai-tools.js';
+import { mcpToolsToOpenAiTools } from '../shared/openai_tools.js';
 import { AGENT_SYSTEM_PROMPT, MAX_CONVERSATION_TURNS, MODELS } from './config.js';
-import type { LlmClient } from './llm-client.js';
-import type { McpClient } from './mcp-client.js';
+import type { LlmClient } from './llm_client.js';
+import type { McpClient } from './mcp_client.js';
 import type { ConversationHistory, ConversationTurn } from './types.js';
 
 export type ConversationExecutorOptions = {

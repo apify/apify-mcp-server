@@ -2,7 +2,7 @@
  This file provides essential internal functions for Apify MCP servers, serving as an internal library.
 */
 
-import { ApifyClient } from './apify-client.js';
+import { ApifyClient } from './apify_client.js';
 import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { getServerCard } from './server_card.js';
@@ -13,9 +13,9 @@ import { actorNameToToolName } from './tools/utils.js';
 import type { ActorStore, ServerCard, ToolCategory, UiMode } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
-import { getExpectedToolNamesByCategories } from './utils/tool-categories-helpers.js';
+import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
 import { getToolPublicFieldOnly } from './utils/tools.js';
-import { TTLLRUCache } from './utils/ttl-lru.js';
+import { TTLLRUCache } from './utils/ttl_lru.js';
 
 export {
     APIFY_FAVICON_URL,

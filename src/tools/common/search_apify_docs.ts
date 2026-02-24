@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { DOCS_SOURCES, HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { searchDocsBySourceCached } from '../../utils/apify-docs.js';
+import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { searchApifyDocsToolOutputSchema } from '../structured-output-schemas.js';
+import { searchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Build docSource parameter description dynamically from DOCS_SOURCES

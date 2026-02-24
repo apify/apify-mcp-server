@@ -1,7 +1,7 @@
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
 import { buildUsageMeta } from '../../utils/mcp.js';
-import { callActorGetDataset } from '../core/actor-execution.js';
-import { buildActorResponseContent } from '../core/actor-response.js';
+import { callActorGetDataset } from '../core/actor_execution.js';
+import { buildActorResponseContent } from '../core/actor_response.js';
 
 /**
  * Default actor executor for normal (non-UI) mode.

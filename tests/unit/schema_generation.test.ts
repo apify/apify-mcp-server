@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateSchemaFromItems } from '../../src/utils/schema-generation.js';
+import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 
 describe('generateSchemaFromItems', () => {
     it('should generate basic schema from simple objects', () => {

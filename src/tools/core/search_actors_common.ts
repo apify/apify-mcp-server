@@ -4,7 +4,7 @@ import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { actorSearchOutputSchema } from '../structured-output-schemas.js';
+import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Zod schema for search-actors arguments — shared between default and openai variants.

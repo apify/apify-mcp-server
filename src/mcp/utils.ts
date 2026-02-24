@@ -6,7 +6,7 @@ import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
 import type { ActorStore, Input, UiMode } from '../types.js';
-import { loadToolsFromInput } from '../utils/tools-loader.js';
+import { loadToolsFromInput } from '../utils/tools_loader.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
 /**

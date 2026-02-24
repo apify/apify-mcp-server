@@ -1,7 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { z } from 'zod';
 
-import { ApifyClient, createApifyClientWithSkyfireSupport } from '../../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     HelperTools,
@@ -13,7 +13,7 @@ import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { getActorsAsTools } from './actor-tools-factory.js';
+import { getActorsAsTools } from './actor_tools_factory.js';
 
 /**
  * Zod schema for call-actor arguments — shared between default and openai variants.

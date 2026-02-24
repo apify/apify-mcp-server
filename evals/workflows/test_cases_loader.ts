@@ -6,8 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { TestCaseWithLineNumbers } from '../shared/line-range-filter.js';
-import { filterTestCases as filterTestCasesShared, loadTestCases as loadTestCasesShared } from '../shared/test-case-loader.js';
+import type { TestCaseWithLineNumbers } from '../shared/line_range_filter.js';
+import { filterTestCases as filterTestCasesShared, loadTestCases as loadTestCasesShared } from '../shared/test_case_loader.js';
 import type { WorkflowTestCase } from '../shared/types.js';
 
 // Re-export WorkflowTestCase type for backwards compatibility
