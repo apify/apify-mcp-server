@@ -9,15 +9,20 @@
  * which also auto-injects get-actor-run and get-actor-output right after call-actor.
  */
 import type { ToolEntry, UiMode } from '../types.js';
-import { getDataset, getDatasetItems, getDatasetSchema } from './common/dataset.js';
+import { abortActorRun } from './common/abort_actor_run.js';
+import { addTool } from './common/add_actor.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
 import { fetchApifyDocsTool } from './common/fetch_apify_docs.js';
 import { getActorOutput } from './common/get_actor_output.js';
+import { getActorRunLog } from './common/get_actor_run_log.js';
+import { getDataset } from './common/get_dataset.js';
+import { getDatasetItems } from './common/get_dataset_items.js';
+import { getDatasetSchema } from './common/get_dataset_schema.js';
 import { getHtmlSkeleton } from './common/get_html_skeleton.js';
-import { addTool } from './common/helpers.js';
-import { getKeyValueStore, getKeyValueStoreKeys, getKeyValueStoreRecord } from './common/key_value_store.js';
+import { getKeyValueStore } from './common/get_key_value_store.js';
+import { getKeyValueStoreKeys } from './common/get_key_value_store_keys.js';
+import { getKeyValueStoreRecord } from './common/get_key_value_store_record.js';
 import { getUserKeyValueStoresList } from './common/key_value_store_collection.js';
-import { abortActorRun, getActorRunLog } from './common/run.js';
 import { getUserRunsList } from './common/run_collection.js';
 import { searchApifyDocsTool } from './common/search_apify_docs.js';
 import { defaultCallActor } from './default/call_actor.js';

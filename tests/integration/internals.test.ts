@@ -5,7 +5,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { ActorsMcpServer } from '../../src/index.js';
-import { addTool } from '../../src/tools/common/helpers.js';
+import { addTool } from '../../src/tools/common/add_actor.js';
 import { getActorsAsTools } from '../../src/tools/index.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { Input } from '../../src/types.js';

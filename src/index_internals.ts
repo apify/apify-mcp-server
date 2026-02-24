@@ -6,7 +6,7 @@ import { ApifyClient } from './apify_client.js';
 import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { getServerCard } from './server_card.js';
-import { addTool } from './tools/common/helpers.js';
+import { addTool } from './tools/common/add_actor.js';
 import { defaultTools, getActorsAsTools, getUnauthEnabledToolCategories, toolCategories,
     toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
