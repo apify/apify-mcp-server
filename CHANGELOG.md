@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.2) (2026-02-24)
+
+### 🐛 Bug Fixes
+
+- Soft-fail MCP server connection errors instead of throwing ([#485](https://github.com/apify/apify-mcp-server/pull/485)) ([06280fb](https://github.com/apify/apify-mcp-server/commit/06280fbb80af909199162fe68fd92b3b75a1f7cb)) by [@MQ37](https://github.com/MQ37), closes [#475](https://github.com/apify/apify-mcp-server/issues/475)
+
+
 ## [0.9.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.1) (2026-02-18)
 
 ### 🐛 Bug Fixes
