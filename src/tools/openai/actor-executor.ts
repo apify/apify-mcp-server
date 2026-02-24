@@ -40,6 +40,7 @@ The widget will update the context with run status and datasetId when the run co
 
 Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
 
+        // _meta carries widget rendering config (not usage meta — the run is still in progress)
         const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
         return {
             content: [{ type: 'text' as const, text: responseText }],
