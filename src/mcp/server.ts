@@ -51,7 +51,7 @@ import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
-import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
 import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
@@ -62,6 +62,7 @@ import type {
     ActorTool,
     ApifyRequestParams,
     HelperTool,
+    ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
@@ -80,6 +81,12 @@ import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
+/** Mode → actor executor. Add new modes here. */
+const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
+    default: defaultActorExecutor,
+    openai: openaiActorExecutor,
+};
+
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
 /**
@@ -94,6 +101,8 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
+    /** Resolved server mode — normalized once at construction from options.uiMode. */
+    public readonly serverMode: ServerMode;
     /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
     private readonly actorExecutor: ActorExecutor;
 
@@ -116,9 +125,8 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        this.actorExecutor = options.uiMode === 'openai'
-            ? openaiActorExecutor
-            : defaultActorExecutor;
+        this.serverMode = options.uiMode ?? 'default';
+        this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -150,7 +158,7 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
-                instructions: getServerInstructions(options.uiMode),
+                instructions: getServerInstructions(this.serverMode),
             },
         );
         this.setupTelemetry();
@@ -270,8 +278,8 @@ export class ActorsMcpServer {
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
         const internalToolMap = new Map([
-            ...defaultTools,
-            ...Object.values(toolCategories).flat(),
+            ...getDefaultTools(this.serverMode),
+            ...Object.values(getCategoryTools(this.serverMode)).flat(),
         ].map((tool) => [tool.name, tool]));
 
         for (const tool of toolNames) {
@@ -317,7 +325,7 @@ export class ActorsMcpServer {
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient, this.options.uiMode, this.actorStore);
+        const tools = await processParamsGetTools(url, apifyClient, this.serverMode, this.actorStore);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -413,7 +421,7 @@ export class ActorsMcpServer {
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             skyfireMode: this.options.skyfireMode,
-            uiMode: this.options.uiMode,
+            mode: this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
 
@@ -572,7 +580,7 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
-                uiMode: this.options.uiMode,
+                mode: this.serverMode,
                 filterOpenAiMeta: true,
             }));
             return { tools };
@@ -1139,7 +1147,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.options.uiMode !== 'openai') {
+        if (this.serverMode !== 'openai') {
             return;
         }
 

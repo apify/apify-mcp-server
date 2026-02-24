@@ -23,7 +23,7 @@ describe('MCP server internals integration tests', () => {
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const initialTools = await loadToolsFromInput({
             enableAddingActors: true,
-        } as Input, apifyClient);
+        } as Input, apifyClient, 'default');
         actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
@@ -64,7 +64,7 @@ describe('MCP server internals integration tests', () => {
 
         const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore() });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
-        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient);
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
@@ -102,7 +102,7 @@ describe('MCP server internals integration tests', () => {
 
         const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore() });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
-        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient);
+        const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');
         actorsMCPServer.upsertTools(seeded);
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 

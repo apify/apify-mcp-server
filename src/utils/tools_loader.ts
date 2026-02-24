@@ -8,11 +8,12 @@ import type { ApifyClient } from 'apify';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { buildCategories, CATEGORY_NAMES, toolCategoriesEnabledByDefault } from '../tools/categories.js';
+import { CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from '../tools/categories.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { getActorsAsTools } from '../tools/index.js';
-import type { ActorStore, Input, ToolCategory, ToolEntry, UiMode } from '../types.js';
+import type { ActorStore, Input, ServerMode, ToolCategory, ToolEntry } from '../types.js';
+import { SERVER_MODES } from '../types.js';
 
 /**
  * Set of all known internal tool names across ALL modes.
@@ -24,8 +25,8 @@ function getAllInternalToolNames(): Set<string> {
     if (!ALL_INTERNAL_TOOL_NAMES_CACHE) {
         const allNames = new Set<string>();
         // Collect tool names from both modes to ensure complete classification
-        for (const mode of [undefined, 'openai' as UiMode]) {
-            const categories = buildCategories(mode);
+        for (const mode of SERVER_MODES) {
+            const categories = getCategoryTools(mode);
             for (const name of CATEGORY_NAMES) {
                 for (const tool of categories[name]) {
                     allNames.add(tool.name);
@@ -43,17 +44,17 @@ function getAllInternalToolNames(): Set<string> {
  *
  * @param input The processed Input object
  * @param apifyClient The Apify client instance
- * @param uiMode Optional UI mode.
+ * @param mode Server mode for tool variant resolution
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    uiMode?: UiMode,
+    mode: ServerMode,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     // Build mode-resolved categories — tools are already the correct variant for this mode
-    const categories = buildCategories(uiMode);
+    const categories = getCategoryTools(mode);
 
     // Helpers for readability
     const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
@@ -155,7 +156,7 @@ export async function loadToolsFromInput(
     }
 
     // In openai mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (uiMode === 'openai') {
+    if (mode === 'openai') {
         result.push(...categories.ui);
     }
 
@@ -170,7 +171,7 @@ export async function loadToolsFromInput(
      * Insert them right after call-actor to follow the logical workflow order:
      * search → details → call → run status → output → docs → actor tools
      *
-     * Uses mode-resolved variants from buildCategories() for get-actor-run.
+     * Uses mode-resolved variants from getCategoryTools() for get-actor-run.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -179,7 +180,7 @@ export async function loadToolsFromInput(
     const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || uiMode === 'openai')) {
+    if (!hasGetActorRun && (hasCallActor || mode === 'openai')) {
         // Use mode-resolved get-actor-run variant
         const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
         if (modeGetActorRun) toolsToInject.push(modeGetActorRun);
