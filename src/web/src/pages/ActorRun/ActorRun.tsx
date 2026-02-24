@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { ActorAvatar, Badge, Button, Text, theme, type BadgeVariant } from "@apify/ui-library";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
+import { useOpenAiGlobal } from "../../hooks/use-open-ai-global";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
@@ -270,6 +271,7 @@ const SuccessMessage = styled.p`
 
 export const ActorRun: React.FC = () => {
     const toolOutput = useWidgetProps<ToolOutput>();
+    const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as Record<string, unknown> | null;
 
     const [widgetState, setWidgetState] = useWidgetState<WidgetState>({
         isRefreshing: false,
@@ -296,6 +298,10 @@ export const ActorRun: React.FC = () => {
             const humanizedName = humanizeActorName(actorNameOnly);
             const developerUsername = extractDeveloperUsername(fullActorName);
 
+            const usageTotalUsd = typeof toolResponseMetadata?.usageTotalUsd === 'number'
+                ? toolResponseMetadata.usageTotalUsd as number
+                : undefined;
+
             setRunData({
                 runId: toolOutput.runId,
                 actorName: humanizedName,
@@ -306,7 +312,7 @@ export const ActorRun: React.FC = () => {
                 finishedAt,
                 timestamp: formatTimestamp(startedAt),
                 duration,
-                cost: toolOutput.stats?.computeUnits,
+                cost: usageTotalUsd,
                 stats: toolOutput.stats,
                 dataset: toolOutput.dataset,
             });
@@ -373,6 +379,10 @@ export const ActorRun: React.FC = () => {
                         const humanizedName = humanizeActorName(actorNameOnly);
                         const developerUsername = extractDeveloperUsername(fullActorName);
 
+                        const pollUsageTotalUsd = typeof response._meta?.usageTotalUsd === 'number'
+                            ? response._meta.usageTotalUsd as number
+                            : undefined;
+
                         const updatedRunData: ActorRunData = {
                             runId: newData.runId!,
                             actorName: humanizedName,
@@ -383,7 +393,7 @@ export const ActorRun: React.FC = () => {
                             finishedAt,
                             timestamp: formatTimestamp(startedAt),
                             duration,
-                            cost: newData.stats?.computeUnits,
+                            cost: pollUsageTotalUsd,
                             stats: newData.stats,
                             dataset: newData.dataset,
                         };
