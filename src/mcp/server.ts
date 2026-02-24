@@ -874,6 +874,8 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                         if (!executorResult) {
                             toolStatus = TOOL_STATUS.ABORTED;
+                            // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                             return {};
                         }
 
@@ -1066,6 +1068,8 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
                     if (!executorResult) {
                         toolStatus = TOOL_STATUS.ABORTED;
+                        // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
+                        // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
                         result = {};
                     } else {
                         result = executorResult;
