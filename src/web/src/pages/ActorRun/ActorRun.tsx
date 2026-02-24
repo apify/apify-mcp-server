@@ -550,7 +550,7 @@ export const ActorRun: React.FC = () => {
                 )}
                 <Footer>
                     <Button onClick={handleOpenRun} variant="secondary" size="small">
-                        View in Console
+                        View on Apify
                     </Button>
                 </Footer>
             </Container>
