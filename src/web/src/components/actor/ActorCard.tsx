@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
+import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines, Link } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
 import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
 import { ActorStats, StructuredPricingInfo } from "../../types";
@@ -191,8 +191,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                         </ActorTitleWrapper>
                     </ActorHeader>
                     {customActionButton || (
-                        // @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button
-                        <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                        <Link to={actor.url} hideExternalIcon className="flexShrink0"><IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} className="flexShrink0" /></Link>
                     )}
                 </ActorHeaderWithActionButton>
             </BoxRow>
