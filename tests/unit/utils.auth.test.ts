@@ -16,6 +16,14 @@ describe('isApiTokenRequired', () => {
         expect(isApiTokenRequired({
             toolCategoryKeys: ['search-apify-docs', 'fetch-apify-docs'],
         })).toBe(false);
+
+        expect(isApiTokenRequired({
+            toolCategoryKeys: ['fetch-actor-details'],
+        })).toBe(false);
+
+        expect(isApiTokenRequired({
+            toolCategoryKeys: ['search-actors', 'fetch-actor-details'],
+        })).toBe(false);
     });
 
     it('should require token if any private tool is included', () => {
