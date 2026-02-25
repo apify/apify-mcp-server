@@ -1,0 +1,60 @@
+name: Publish to NPM
+
+on:
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: Git ref to publish (branch, tag, or commit SHA)
+                required: true
+                type: string
+            tag:
+                description: NPM dist-tag
+                required: true
+                type: choice
+                default: latest
+                options:
+                    - latest
+                    - beta
+
+permissions:
+    id-token: write # Required for OIDC
+    contents: read
+
+jobs:
+    publish_to_npm:
+        name: Publish to NPM
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v6
+                with:
+                    ref: ${{ inputs.ref }}
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version-file: .nvmrc
+                    registry-url: 'https://registry.npmjs.org'
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Update npm
+                run: npm install -g npm@latest
+            -   name: Install dependencies
+                run: |
+                    npm ci --force
+            -   name: Check version consistency and bump pre-release version (beta only)
+                if: ${{ inputs.tag == 'beta' }}
+                run: node ./.github/scripts/before-beta-release.js
+            -   name: Build web widgets
+                working-directory: src/web
+                run: |
+                    npm run build
+            -   name: Build module
+                run: npm run build
+            -   name: Upload source maps to Sentry
+                if: ${{ inputs.tag == 'latest' }}
+                env:
+                      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+                run: |
+                      npx sentry-cli sourcemaps inject ./dist
+                      npx sentry-cli sourcemaps upload --release "$(jq -r '.version' package.json)" ./dist
+            -   name: Publish to NPM
+                run: npm publish --tag ${{ inputs.tag }}

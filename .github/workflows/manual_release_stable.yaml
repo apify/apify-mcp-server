@@ -1,0 +1,125 @@
+name: Stable release
+
+on:
+    # Trigger a stable version release via GitHub's UI, with the ability to specify the type of release.
+    workflow_dispatch:
+        inputs:
+            release_type:
+                description: Release type
+                required: true
+                type: choice
+                default: auto
+                options:
+                    - auto
+                    - custom
+                    - patch
+                    - minor
+                    - major
+            custom_version:
+                description: The custom version to bump to (only for "custom" type)
+                required: false
+                type: string
+                default: ""
+
+permissions:
+    id-token: write
+    contents: write
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    release_metadata:
+        name: Update release metadata
+        uses: ./.github/workflows/_update_release_metadata.yaml
+        secrets: inherit
+        with:
+          release_type: ${{ inputs.release_type }}
+          custom_version: ${{ inputs.custom_version }}
+
+    create_github_release:
+        name: Create github release
+        needs: [release_metadata]
+        runs-on: ubuntu-latest
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version-file: '.nvmrc'
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install dependencies
+                run: npm ci --force
+            -   name: Build web widgets
+                working-directory: src/web
+                run: |
+                    npm ci
+                    npm run build
+            -   name: Build module
+                run: npm run build
+            - name: Prepare MCPB package
+              run: |
+                    mkdir mcpb
+                    cp -r node_modules mcpb/node_modules
+                    cp -r dist mcpb/dist
+                    cp -r docs mcpb/docs
+                    cp package.json mcpb/package.json
+                    cp manifest.json mcpb/manifest.json
+                    cp docs/apify-logo.png mcpb/icon.png
+            - name: Create MCPB package
+              # fix version of anthropic-ai/mcpb to 1.1.1 so that we have a reproducible build
+              run: npx -y @anthropic-ai/mcpb@1.1.1 pack mcpb/ apify-mcp-server.mcpb
+            - name: Copy MCPB package
+              run: cp apify-mcp-server.mcpb actors-mcp-server.mcpb
+            - name: Create release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+                  name: ${{ needs.release_metadata.outputs.version_number }}
+                  target_commitish: ${{ needs.release_metadata.outputs.changelog_commitish }}
+                  body: ${{ needs.release_metadata.outputs.release_notes }}
+                  files: |
+                       apify-mcp-server.mcpb
+                       actors-mcp-server.mcpb
+
+    publish_to_npm:
+        name: Publish to NPM
+        needs: [ release_metadata ]
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Execute publish workflow
+                uses: apify/workflows/execute-workflow@main
+                with:
+                    workflow: manual_publish_to_npm.yaml
+                    inputs: >
+                        { 
+                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}", 
+                            "tag": "latest" 
+                        }
+
+    publish_to_mcp_registry:
+        name: Publish to MCP Registry
+        needs: [ release_metadata ]
+        runs-on: ubuntu-latest
+        steps:
+            -   uses: actions/checkout@v4
+                with:
+                    ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
+            -   name: Install mcp-publisher
+                run: |
+                    curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+                    sudo mv mcp-publisher /usr/local/bin/
+            -   name: Login to MCP Registry
+                env:
+                    MCP_REGISTRY_PUBLISH_SECRET: ${{ secrets.MCP_REGISTRY_PUBLISH_SECRET }}
+                run: |
+                    set +x
+                    mcp-publisher login dns --domain "apify.com" --private-key "${MCP_REGISTRY_PUBLISH_SECRET}"
+            -   name: Publish to MCP Registry
+                run: mcp-publisher publish
