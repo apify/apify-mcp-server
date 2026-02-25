@@ -9,6 +9,7 @@ export const unauthEnabledTools: string[] = [
     HelperTools.DOCS_SEARCH,
     HelperTools.DOCS_FETCH,
     HelperTools.STORE_SEARCH,
+    HelperTools.ACTOR_GET_DETAILS,
 ];
 
 // Re-export from categories.ts
