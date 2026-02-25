@@ -54,8 +54,8 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { buildActorResponseContent } from '../tools/core/actor-response.js';
 import { callActorGetDataset, defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
+import { buildActorResponseContent } from '../tools/shared/actor-response.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
     ActorMcpTool,

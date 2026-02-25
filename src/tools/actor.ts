@@ -21,15 +21,11 @@ import { getActorMcpUrlCached } from '../utils/actor.js';
 import { compileSchema } from '../utils/ajv.js';
 import { logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, buildUsageMeta } from '../utils/mcp.js';
-import { callActorGetDataset } from './core/actor-execution.js';
-import { buildActorResponseContent } from './core/actor-response.js';
-import { getActorsAsTools } from './core/actor-tools-factory.js';
+import { callActorGetDataset } from './shared/actor-execution.js';
+import { buildActorResponseContent } from './shared/actor-response.js';
+import { getActorsAsTools } from './shared/actor-tools-factory.js';
 import { callActorOutputSchema } from './structured-output-schemas.js';
 import { actorNameToToolName } from './utils.js';
-
-// Re-exports to maintain backward compatibility and support other modules
-export { callActorGetDataset, type CallActorGetDatasetResult } from './core/actor-execution.js';
-export { getActorsAsTools } from './core/actor-tools-factory.js';
 
 const callActorArgs = z.object({
     actor: z.string()
