@@ -35,6 +35,7 @@ Use 'output' parameter with boolean flags to control returned information:
 - Selective: Set desired fields to true (e.g., output: { inputSchema: true })
 - Common patterns: inputSchema only, description + readme, mcpTools for MCP Actors
 
+The 'readme' field returns the summary when available, full README otherwise.
 Use when querying Actor details, documentation, input requirements, or MCP tools.
 
 EXAMPLES:
