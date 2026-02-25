@@ -429,7 +429,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 ## Unauthenticated access
 
 When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
-Currently allowed tools: `search-actors`, `search-apify-docs`, `fetch-apify-docs`.
+Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`.
 Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases
