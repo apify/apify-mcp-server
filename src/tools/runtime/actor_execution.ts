@@ -31,11 +31,9 @@ export type CallActorGetDatasetResult = {
  * It requires the `APIFY_TOKEN` environment variable to be set.
  * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
  *
- * @param {string} actorName - The name of the Actor to call.
- * @param {unknown} input - The input to pass to the actor.
- * @param {ApifyClient} apifyClient - The Apify client to use for authentication.
  * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
+ * @param options
  */
 export async function callActorGetDataset(options: {
     actorName: string;
@@ -57,13 +55,13 @@ export async function callActorGetDataset(options: {
         previewOutput = true,
         mcpSessionId,
     } = options;
-    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
+    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just an internal symbol to identify client abort
     const actorClient = apifyClient.actor(actorName);
 
     // Start the actor run
     const actorRun: ActorRun = await actorClient.start(input, callOptions);
 
-    // Start progress tracking if tracker is provided
+    // Start progress tracking if a tracker is provided
     if (progressTracker) {
         progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
     }

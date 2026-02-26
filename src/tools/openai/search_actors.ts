@@ -7,7 +7,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import {
     searchActorsArgsSchema,
     searchActorsMetadata,
-} from '../core/search_actors_common.js';
+} from '../runtime/actor_search.js';
 
 /**
  * OpenAI mode search-actors tool.

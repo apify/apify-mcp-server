@@ -14,7 +14,7 @@ import {
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
-} from '../core/call_actor_common.js';
+} from '../runtime/actor_call.js';
 import { callActorOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_OPENAI_DESCRIPTION = [

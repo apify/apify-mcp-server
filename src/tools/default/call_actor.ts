@@ -6,8 +6,6 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
-import { callActorGetDataset } from '../core/actor_execution.js';
-import { buildActorResponseContent } from '../core/actor_response.js';
 import {
     CALL_ACTOR_EXAMPLES_SECTION,
     CALL_ACTOR_MCP_SERVER_SECTION,
@@ -16,7 +14,9 @@ import {
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
-} from '../core/call_actor_common.js';
+} from '../runtime/actor_call.js';
+import { callActorGetDataset } from '../runtime/actor_execution.js';
+import { buildActorResponseContent } from '../runtime/actor_response.js';
 import { callActorOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_DEFAULT_DESCRIPTION = [

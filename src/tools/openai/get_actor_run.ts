@@ -8,7 +8,7 @@ import {
     fetchActorRunData,
     getActorRunArgs,
     getActorRunMetadata,
-} from '../core/get_actor_run_common.js';
+} from '../runtime/actor_run.js';
 
 /**
  * OpenAI mode get-actor-run tool.

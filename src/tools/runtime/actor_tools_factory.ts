@@ -70,6 +70,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
+ * @param options
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
@@ -152,7 +153,7 @@ export async function getMCPServersAsTools(
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     /**
-     * This is case for the Skyfire request without any Apify token, we do not support
+     * For the Skyfire request without any Apify token, we do not support
      * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
     */
     if (apifyToken === null || apifyToken === undefined) {

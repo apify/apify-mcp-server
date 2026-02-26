@@ -12,7 +12,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
-} from '../core/fetch_actor_details_common.js';
+} from '../runtime/actor_details.js';
 
 /**
  * OpenAI mode fetch-actor-details tool.
