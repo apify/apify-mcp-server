@@ -18,7 +18,7 @@ const Container = styled(Box)<{ $withBorder: boolean }>`
     display: flex;
     flex-direction: column;
     gap: ${theme.space.space8};
-    border-radius: ${theme.radius.radius8};
+    border-radius: ${theme.radius.radius12};
     border: ${props => props.$withBorder ? `1px solid ${theme.color.neutral.separatorSubtle}` : 'none'};
 
     .clampToOneLine {
@@ -71,6 +71,13 @@ const ActorTitleWrapper = styled.div`
     display: flex;
     flex-direction: column;
     gap: ${theme.space.space2};
+`;
+
+const ActorAvatarWrapper = styled.div`
+    border: 1px solid ${theme.color.neutral.separatorSubtle};
+    border-radius: ${theme.radius.radius8};
+    overflow: hidden;
+    flex-shrink: 0;
 `;
 
 type StatProps = {
@@ -173,7 +180,9 @@ export const ActorCard: React.FC<ActorCardProps> = ({
             <BoxRow>
                 <ActorHeaderWithActionButton>
                     <ActorHeader>
-                        <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
+                        <ActorAvatarWrapper>
+                            <ActorAvatar size={40} name={actor.title} url={actor.pictureUrl} />
+                        </ActorAvatarWrapper>
                         <ActorTitleWrapper>
                             <Text as="h3" weight="bold" color={theme.color.neutral.text} className="clampToOneLine" >{actor.title}</Text>
                             <BoxRow>

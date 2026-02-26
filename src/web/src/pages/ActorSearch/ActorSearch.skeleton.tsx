@@ -8,7 +8,7 @@ const Container = styled(Box)`
     display: flex;
     flex-direction: column;
     gap: ${theme.space.space8};
-    border-radius: ${theme.radius.radius8};
+    border-radius: ${theme.radius.radius12};
     border: 1px solid ${theme.color.neutral.separatorSubtle};
 `;
 
@@ -81,7 +81,7 @@ const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = () => {
 const ResultsContainer = styled(Box)`
     display: flex;
     flex-direction: column;
-    gap: ${theme.space.space12};
+    gap: ${theme.space.space8};
     width: 100%;
 `;
 
@@ -105,7 +105,7 @@ const DetailContainer = styled(Box)`
 
 const CardWrapper = styled(Box)`
     background: ${theme.color.neutral.background};
-    border-radius: ${theme.radius.radius8};
+    border-radius: ${theme.radius.radius12};
     border: 1px solid ${theme.color.neutral.separatorSubtle};
     display: flex;
     flex-direction: column;

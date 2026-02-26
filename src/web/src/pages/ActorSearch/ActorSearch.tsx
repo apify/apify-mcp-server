@@ -63,7 +63,7 @@ export const ActorSearch: React.FC = () => {
                 <EmptyState title="No actors found" description="Try a different search query" />
             ) : (
                 actors.map((actor: Actor) => (
-                    <ActorContainer key={actor.id} mb="space12">
+                    <ActorContainer key={actor.id} mb="space8">
                         <ActorCard actor={actor} />
                     </ActorContainer>
                 ))
