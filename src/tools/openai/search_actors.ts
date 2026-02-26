@@ -50,7 +50,7 @@ You MUST retry with broader, more generic keywords - use just the platform name 
             actors: structuredActorCards,
             query: parsed.keywords,
             count: actors.length,
-            instructions: `If you need more detailed information about any of these Actors, including their input schemas and usage instructions, please use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
+            instructions: `Choosing the right details tool: Use ${HelperTools.ACTOR_GET_DETAILS} when the user wants to browse or explore Actors (e.g., "show me", "find me"). Use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL} when the user wants to execute a task and you need the input schema (e.g., "scrape", "extract").
 IMPORTANT: You MUST always do a second search with broader, more generic keywords (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure you haven't missed a better Actor.`,
         };
 
@@ -69,6 +69,12 @@ An interactive widget has been rendered with the search results. The user can al
  # Actors:
 
  ${actorsText}
+
+## Choosing the right details tool:
+- Use ${HelperTools.ACTOR_GET_DETAILS} when the user wants to **browse or explore** Actors (e.g., "show me Google Maps scrapers", "find me a TikTok scraper", "what Actors exist for LinkedIn"). This renders an interactive widget for the user.
+- Use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL} when the user wants to **execute a task** and you need the Actor's input schema to prepare the run (e.g., "scrape Google Maps for restaurants", "extract emails from this website"). This is a silent lookup — no widget is rendered.
+
+IMPORTANT: You MUST always do a second search with broader, more generic keywords (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure you haven't missed a better Actor.
 `];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
