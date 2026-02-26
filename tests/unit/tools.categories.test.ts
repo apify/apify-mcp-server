@@ -1,22 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { buildCategories, CATEGORY_NAMES, toolCategories } from '../../src/tools/index.js';
+import { CATEGORY_NAMES, getCategoryTools, toolCategories } from '../../src/tools/index.js';
 import type { ToolCategory, ToolEntry } from '../../src/types.js';
 
 describe('CATEGORY_NAMES', () => {
-    it('should be derived from toolCategories keys', () => {
-        // CATEGORY_NAMES is derived from toolCategories via Object.keys(),
-        // so they are guaranteed to match. This test verifies the derivation is correct.
+    it('should match the keys of toolCategories', () => {
         const staticKeys = Object.keys(toolCategories);
-        expect(CATEGORY_NAMES).toEqual(staticKeys);
+        expect([...CATEGORY_NAMES]).toEqual(staticKeys);
     });
 });
 
-describe('buildCategories', () => {
+describe('getCategoryTools', () => {
     it('should return all category keys matching CATEGORY_NAMES', () => {
-        const defaultResult = buildCategories();
-        const openaiResult = buildCategories('openai');
+        const defaultResult = getCategoryTools('default');
+        const openaiResult = getCategoryTools('openai');
 
         for (const name of CATEGORY_NAMES) {
             expect(defaultResult).toHaveProperty(name);
@@ -25,8 +23,8 @@ describe('buildCategories', () => {
     });
 
     it('should return no undefined entries in any category (circular-init safety)', () => {
-        const defaultResult = buildCategories();
-        const openaiResult = buildCategories('openai');
+        const defaultResult = getCategoryTools('default');
+        const openaiResult = getCategoryTools('openai');
 
         for (const name of CATEGORY_NAMES) {
             for (const tool of defaultResult[name]) {
@@ -41,18 +39,18 @@ describe('buildCategories', () => {
     });
 
     it('should return empty ui category in default mode', () => {
-        const result = buildCategories();
+        const result = getCategoryTools('default');
         expect(result.ui).toEqual([]);
     });
 
     it('should return non-empty ui category in openai mode', () => {
-        const result = buildCategories('openai');
+        const result = getCategoryTools('openai');
         expect(result.ui.length).toBeGreaterThan(0);
     });
 
     it('should return different tool variants for actors category based on mode', () => {
-        const defaultResult = buildCategories();
-        const openaiResult = buildCategories('openai');
+        const defaultResult = getCategoryTools('default');
+        const openaiResult = getCategoryTools('openai');
 
         // Both modes should have the same tool names in actors category
         const defaultNames = defaultResult.actors.map((t: ToolEntry) => t.name);
@@ -64,8 +62,8 @@ describe('buildCategories', () => {
     });
 
     it('should return different get-actor-run variants based on mode', () => {
-        const defaultResult = buildCategories();
-        const openaiResult = buildCategories('openai');
+        const defaultResult = getCategoryTools('default');
+        const openaiResult = getCategoryTools('openai');
 
         const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
         const openaiGetRun = openaiResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
@@ -77,8 +75,8 @@ describe('buildCategories', () => {
     });
 
     it('should share identical tools for mode-independent categories', () => {
-        const defaultResult = buildCategories();
-        const openaiResult = buildCategories('openai');
+        const defaultResult = getCategoryTools('default');
+        const openaiResult = getCategoryTools('openai');
 
         const modeIndependentCategories: ToolCategory[] = ['experimental', 'docs', 'storage', 'dev'];
         for (const cat of modeIndependentCategories) {
@@ -87,7 +85,7 @@ describe('buildCategories', () => {
     });
 
     it('should preserve tool ordering within categories', () => {
-        const result = buildCategories();
+        const result = getCategoryTools('default');
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
         // Verify workflow order: search → details → call

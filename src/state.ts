@@ -9,7 +9,7 @@ import {
     MCP_SERVER_CACHE_TTL_SECS,
 } from './const.js';
 import type { ActorDefinitionWithInfo, ApifyDocsSearchResult } from './types.js';
-import { TTLLRUCache } from './utils/ttl-lru.js';
+import { TTLLRUCache } from './utils/ttl_lru.js';
 
 export const actorDefinitionPrunedCache = new TTLLRUCache<ActorDefinitionWithInfo>(ACTOR_CACHE_MAX_SIZE, ACTOR_CACHE_TTL_SECS);
 export const searchApifyDocsCache = new TTLLRUCache<ApifyDocsSearchResult[]>(APIFY_DOCS_CACHE_MAX_SIZE, APIFY_DOCS_CACHE_TTL_SECS);

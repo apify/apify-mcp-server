@@ -3,7 +3,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, ReadResourceResu
 import log from '@apify/log';
 
 import { SKYFIRE_README_CONTENT } from '../const.js';
-import type { UiMode } from '../types.js';
+import type { ServerMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
 
 type ExtendedResourceContents = TextResourceContents & {
@@ -23,12 +23,12 @@ type ResourceService = {
 
 type ResourceServiceOptions = {
     skyfireMode?: boolean;
-    uiMode?: UiMode;
+    mode: ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { skyfireMode, uiMode, getAvailableWidgets } = options;
+    const { skyfireMode, mode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
@@ -43,7 +43,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (uiMode === 'openai') {
+        if (mode === 'openai') {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -72,7 +72,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (uiMode === 'openai' && uri.startsWith('ui://widget/')) {
+        if (mode === 'openai' && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {
