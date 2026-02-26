@@ -299,7 +299,7 @@ export const ActorRun: React.FC = () => {
             const developerUsername = extractDeveloperUsername(fullActorName);
 
             const usageTotalUsd = typeof toolResponseMetadata?.usageTotalUsd === 'number'
-                ? toolResponseMetadata.usageTotalUsd as number
+                ? toolResponseMetadata.usageTotalUsd
                 : undefined;
 
             setRunData({
@@ -317,7 +317,7 @@ export const ActorRun: React.FC = () => {
                 dataset: toolOutput.dataset,
             });
         }
-    }, [toolOutput, runData]);
+    }, [toolOutput, runData, toolResponseMetadata]);
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
@@ -380,7 +380,7 @@ export const ActorRun: React.FC = () => {
                         const developerUsername = extractDeveloperUsername(fullActorName);
 
                         const pollUsageTotalUsd = typeof response._meta?.usageTotalUsd === 'number'
-                            ? response._meta.usageTotalUsd as number
+                            ? response._meta.usageTotalUsd
                             : undefined;
 
                         const updatedRunData: ActorRunData = {
