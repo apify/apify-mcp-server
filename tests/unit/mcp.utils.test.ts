@@ -69,10 +69,12 @@ describe('MCP resources', () => {
 
     it('lists the Skyfire readme only when enabled', async () => {
         const skyfireService = createResourceService({
+            mode: 'default',
             skyfireMode: true,
             getAvailableWidgets: () => new Map(),
         });
         const defaultService = createResourceService({
+            mode: 'default',
             skyfireMode: false,
             getAvailableWidgets: () => new Map(),
         });
@@ -90,7 +92,7 @@ describe('MCP resources', () => {
             [WIDGET_URIS.ACTOR_RUN, buildAvailableWidget(WIDGET_URIS.ACTOR_RUN, false)],
         ]);
         const service = createResourceService({
-            uiMode: 'openai',
+            mode: 'openai',
             getAvailableWidgets: () => widgets,
         });
 
@@ -101,6 +103,7 @@ describe('MCP resources', () => {
 
     it('returns a plain-text message for missing resources', async () => {
         const service = createResourceService({
+            mode: 'default',
             getAvailableWidgets: () => new Map(),
         });
 
@@ -112,6 +115,7 @@ describe('MCP resources', () => {
 
     it('returns the Skyfire readme content when requested', async () => {
         const service = createResourceService({
+            mode: 'default',
             skyfireMode: true,
             getAvailableWidgets: () => new Map(),
         });
@@ -124,7 +128,7 @@ describe('MCP resources', () => {
 
     it('returns a plain-text message for unknown widgets', async () => {
         const service = createResourceService({
-            uiMode: 'openai',
+            mode: 'openai',
             getAvailableWidgets: () => new Map(),
         });
 
@@ -143,7 +147,7 @@ describe('MCP resources', () => {
             [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
         ]);
         const service = createResourceService({
-            uiMode: 'openai',
+            mode: 'openai',
             getAvailableWidgets: () => widgets,
         });
 
@@ -156,6 +160,7 @@ describe('MCP resources', () => {
 
     it('returns an empty resource templates list', async () => {
         const service = createResourceService({
+            mode: 'default',
             getAvailableWidgets: () => new Map(),
         });
 

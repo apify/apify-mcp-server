@@ -14,10 +14,11 @@ import type {
 } from 'apify-client';
 import type z from 'zod';
 
+import type { ApifyClient } from './apify_client.js';
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
-import type { toolCategories } from './tools/index.js';
-import type { StructuredPricingInfo } from './utils/pricing-info.js';
+import type { CATEGORY_NAMES } from './tools/categories.js';
+import type { StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
 export type SchemaProperties = {
@@ -90,7 +91,11 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
     ajvValidate: ValidateFunction;
     /** Whether this tool requires Skyfire pay ID validation (uses Apify API) */
     requiresSkyfirePayId?: boolean;
-    /** Whether this tool is only available in OpenAI UI mode */
+    /**
+     * Whether this tool is only available in OpenAI UI mode.
+     * @deprecated No longer used for filtering. Mode-specific tools are resolved at build time
+     * via getCategoryTools(mode). Will be removed in a future release.
+     */
     openaiOnly?: boolean;
 };
 
@@ -229,7 +234,7 @@ export type PricingInfo = ActorRunPricingInfo & {
     tieredPricing?: TieredPricing;
 } | PricePerEventActorPricingInfo;
 
-export type ToolCategory = keyof typeof toolCategories;
+export type ToolCategory = (typeof CATEGORY_NAMES)[number];
 /**
  * Selector for tools input - can be a category key or a specific tool name.
  */
@@ -386,9 +391,75 @@ export type ToolCallTelemetryProperties = {
 };
 
 /**
- * UI mode for tool responses.
+ * Server mode controls which tool variants are served.
+ *
+ * - `'default'` — standard MCP tools for generic clients
+ * - `'openai'` — OpenAI-specific tool variants (async execution, widget metadata, internal tools)
+ *
+ * Every call site that resolves tool categories must pass an explicit ServerMode value.
+ * This prevents accidentally serving wrong-mode tools.
  */
-export type UiMode = 'openai';
+export type ServerMode = 'default' | 'openai';
+
+/** All valid server modes, for iteration in tests and caches. */
+export const SERVER_MODES: readonly ServerMode[] = ['default', 'openai'] as const;
+
+/**
+ * UI mode for tool responses — the external-facing subset of ServerMode.
+ * Derived from ServerMode: excludes 'default' since the absence of a UI mode means default.
+ */
+export type UiMode = Exclude<ServerMode, 'default'>;
+
+/** Set of valid UiMode values for O(1) membership checks at runtime. */
+const UI_MODES: ReadonlySet<string> = new Set<string>(SERVER_MODES.filter((m): m is UiMode => m !== 'default'));
+
+/**
+ * Parse an untrusted string into a valid UiMode, returning `undefined` for invalid values.
+ * Use at ingestion boundaries (URL params, env vars) to prevent invalid modes from propagating.
+ */
+export function parseUiMode(value: string | null | undefined): UiMode | undefined {
+    return value && UI_MODES.has(value) ? (value as UiMode) : undefined;
+}
+
+/**
+ * Parameters for executing a direct actor tool (`type: 'actor'`).
+ * Used by ActorExecutor implementations.
+ */
+export type ActorExecutionParams = {
+    /** Full name of the Actor (e.g., "apify/rag-web-browser") */
+    actorFullName: string;
+    /** Input to pass to the Actor (skyfire-pay-id already stripped) */
+    input: Record<string, unknown>;
+    /** Apify client (may be Skyfire-aware) */
+    apifyClient: ApifyClient;
+    /** Call options (memory, timeout) */
+    callOptions: { memory?: number; timeout?: number };
+    /** Progress tracker for sending progress notifications */
+    progressTracker?: ProgressTracker | null;
+    /** Signal for aborting the execution */
+    abortSignal?: AbortSignal;
+    /** MCP session ID for logging */
+    mcpSessionId?: string;
+};
+
+/**
+ * Result from an ActorExecutor.
+ * Returns `null` when the execution was aborted.
+ */
+export type ActorExecutionResult = {
+    content: { type: 'text'; text: string }[];
+    structuredContent?: Record<string, unknown>;
+    _meta?: Record<string, unknown>;
+} | null;
+
+/**
+ * Executor for direct actor tools (`type: 'actor'`).
+ * Selected at server construction time based on serverMode.
+ * Default mode runs synchronously; OpenAI mode runs async with widget metadata.
+ */
+export type ActorExecutor = {
+    executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult>;
+};
 
 /**
  * External store for Actor metadata that can be injected by the hosting environment.
@@ -489,7 +560,8 @@ export type ActorsMcpServerOptions = {
     /**
      * UI mode for tool responses.
      * - 'openai': OpenAI specific widget rendering
-     * If not specified, there will be no widget rendering.
+     * If not specified, defaults to 'default' mode (no widget rendering).
+     * Normalized to {@link ServerMode} at server construction.
      */
     uiMode?: UiMode;
 }
