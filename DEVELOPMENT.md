@@ -84,7 +84,7 @@ What happens:
 Notes:
 - You can get your `APIFY_TOKEN` from [Apify Console](https://console.apify.com/settings/integrations)
 - Widget discovery happens when the server connects. Changing widget code is hot-reloaded; adding brand-new widget filenames typically requires reconnecting the MCP client (or restarting the server) to expose the new resource.
-- You can preview widgets quickly via the local esbuild dev server at `http://localhost:3000/index.html`.
+- You can preview widgets quickly via the local esbuild dev server at `http://localhost:3226/index.html`.
 
 The MCP server listens on port `3001`. The HTTP server implementation used here is the standby Actor server in `src/actor/server.ts` (used by `src/main.ts` in STANDBY mode). The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 

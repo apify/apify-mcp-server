@@ -118,7 +118,7 @@ async function buildAll() {
 
         const { host, port } = await ctx.serve({
             servedir: dirName,
-            port: 3000,
+            port: 3226,
         });
 
         console.log(`\n✓ Dev server running at http://${host}:${port}/`);
