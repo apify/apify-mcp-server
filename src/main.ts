@@ -9,7 +9,7 @@ import type { ActorCallOptions } from 'apify-client';
 import log from '@apify/log';
 
 import { createExpressApp } from './actor/server.js';
-import { ApifyClient } from './apify-client.js';
+import { ApifyClient } from './apify_client.js';
 import { processInput } from './input.js';
 import { callActorGetDataset } from './tools/index.js';
 import type { Input } from './types.js';

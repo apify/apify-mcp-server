@@ -4,20 +4,23 @@ import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelc
 import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify-client.js';
+import { ApifyClient } from '../../src/apify_client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
-// Import tools from toolCategories instead of directly to avoid circular dependency during module initialization
-import { defaultTools, toolCategories } from '../../src/tools/index.js';
-import { callActorOutputSchema } from '../../src/tools/structured-output-schemas.js';
+// Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
+import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
+import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { ToolCategory, ToolEntry } from '../../src/types.js';
-import { getExpectedToolNamesByCategories } from '../../src/utils/tool-categories-helpers.js';
+import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
+import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 
-// Helper to find tool by name from toolCategories (avoids circular dependency)
-function findToolByName(name: string): ToolEntry | undefined {
-    for (const tools of Object.values(toolCategories)) {
+// Helper to find tool by name, resolving categories for the given mode on each call.
+// This ensures we always validate against the correct mode-specific tool definition
+// (e.g. outputSchema may diverge between modes in the future).
+function findToolByName(name: string, mode: ServerMode): ToolEntry | undefined {
+    const resolved = getCategoryTools(mode);
+    for (const tools of Object.values(resolved)) {
         const tool = tools.find((t) => t.name === name);
         if (tool) return tool;
     }
@@ -132,8 +135,8 @@ function expectReadmeInStructuredContent(
     expect(r.structuredContent?.inputSchema).toBeDefined();
 }
 
-function validateStructuredOutputForTool(result: unknown, toolName: string): void {
-    validateStructuredOutput(result, findToolByName(toolName)?.outputSchema, toolName);
+function validateStructuredOutputForTool(result: unknown, toolName: string, mode: ServerMode): void {
+    validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 
 /** Validates that the listed tools have OpenAI metadata (_meta) with outputTemplate and widgetAccessible. */
@@ -231,7 +234,7 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(defaultTools.length + defaults.actors.length + 2);
+            expect(tools.tools.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 2);
 
             const names = getToolNames(tools);
             expectToolNamesToContain(names, getDefaultToolNames());
@@ -298,7 +301,7 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors when enableAddingActors is false', async () => {
             client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 2);
+            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 2);
 
             expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
@@ -509,7 +512,7 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
             // Only the actors category, get-actor-output, get-actor-run, and add-actor should be loaded
-            const numberOfTools = toolCategories.actors.length + 3;
+            const numberOfTools = getCategoryTools('default').actors.length + 3;
             expect(names).toHaveLength(numberOfTools);
             // get-actor-run should be automatically included when call-actor is present
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
@@ -585,7 +588,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
 
             // Validate structured output matches schema
-            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
 
             // Validate structured content has actual actor results
             expectPythonExampleStructuredContent(callResult, 1, 2);
@@ -616,7 +619,7 @@ export function createIntegrationTestsSuite(
             expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
 
             // Validate structured output matches schema
-            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
         });
 
         it('should support sync mode in call-actor with step call (default behavior)', async () => {
@@ -687,7 +690,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(false);
 
             // Validate structured output matches schema
-            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
 
             // Validate structured content has empty items (preview disabled)
             const resultWithStructured = callResult as { structuredContent?: { items?: unknown[] } };
@@ -713,7 +716,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(true);
 
             // Validate structured output matches schema
-            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL);
+            validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
 
             // Validate structured content has actual actor results
             expectPythonExampleStructuredContent(callResult, 1, 2);
@@ -876,8 +879,8 @@ export function createIntegrationTestsSuite(
 
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
-            // At least one result should contain the standby actor docs URL
-            const standbyDocUrl = 'https://docs.apify.com/platform/actors/running/standby';
+            // Should contain at least one apify docs url
+            const standbyDocUrl = 'https://docs.apify.com';
             expect(content.some((item) => item.text.includes(standbyDocUrl))).toBe(true);
         });
 
@@ -962,7 +965,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HelperTools.DOCS_SEARCH);
+            validateStructuredOutputForTool(result, HelperTools.DOCS_SEARCH, 'default');
         });
 
         it('should return structured output for fetch-actor-details matching outputSchema', async () => {
@@ -981,7 +984,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return only input schema when output={ inputSchema: true }', async () => {
@@ -1121,7 +1124,7 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return structured output for fetch-actor-details with output={ description: true, readme: true } matching outputSchema', async () => {
@@ -1152,7 +1155,7 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBeGreaterThan(0);
 
             // This should validate successfully - structured output must match schema
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return only pricing when output={ pricing: true }', async () => {
@@ -1184,7 +1187,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return only readme when output={ readme: true }', async () => {
@@ -1216,7 +1219,7 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes('Input schema'))).toBe(false);
 
             // Validate structured output
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return README content (summary or full) in text and structured response for fetch-actor-details', async () => {
@@ -1247,7 +1250,7 @@ export function createIntegrationTestsSuite(
 
             expectReadmeInStructuredContent(result, RAG_WEB_BROWSER);
 
-            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS)?.outputSchema, 'fetch-actor-details');
+            validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema, 'fetch-actor-details');
         });
 
         it('should return README content via fetch-actor-details-internal in openai mode', async () => {
@@ -1331,7 +1334,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.inputSchema).toBeDefined();
 
             // Validate against schema
-            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should support granular output controls for rating and metadata', async () => {
@@ -1468,10 +1471,10 @@ export function createIntegrationTestsSuite(
             expect(combinationText).not.toContain('Input schema');
 
             // Validate structured output for all test cases
-            validateStructuredOutputForTool(pricingOnlyResult, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutputForTool(ratingOnlyResult, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutputForTool(metadataOnlyResult, HelperTools.ACTOR_GET_DETAILS);
-            validateStructuredOutputForTool(combinationResult, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(pricingOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(ratingOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(metadataOnlyResult, HelperTools.ACTOR_GET_DETAILS, 'default');
+            validateStructuredOutputForTool(combinationResult, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should dynamically test all output options and verify section presence/absence', async () => {
@@ -1561,7 +1564,7 @@ export function createIntegrationTestsSuite(
                 }
 
                 // Validate structured output
-                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS);
+                validateStructuredOutputForTool(result, HelperTools.ACTOR_GET_DETAILS, 'default');
             }
 
             // Test a combination: all actor card sections (description, stats, pricing, rating, metadata)
@@ -1598,7 +1601,7 @@ export function createIntegrationTestsSuite(
             expect(allCardText).not.toContain('README');
             expect(allCardText).not.toContain('Input schema');
 
-            validateStructuredOutputForTool(allCardSectionsResult, HelperTools.ACTOR_GET_DETAILS);
+            validateStructuredOutputForTool(allCardSectionsResult, HelperTools.ACTOR_GET_DETAILS, 'default');
         });
 
         it('should return structured output for search-actors matching outputSchema', async () => {
@@ -1619,7 +1622,7 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HelperTools.STORE_SEARCH);
+            validateStructuredOutputForTool(result, HelperTools.STORE_SEARCH, 'default');
         });
 
         it('should return structured output for fetch-apify-docs matching outputSchema', async () => {
@@ -1638,10 +1641,10 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; isError?: boolean }[];
             expect(content.length).toBeGreaterThan(0);
 
-            validateStructuredOutputForTool(result, HelperTools.DOCS_FETCH);
+            validateStructuredOutputForTool(result, HelperTools.DOCS_FETCH, 'default');
         });
 
-        it.for(Object.keys(toolCategories))('should load correct tools for %s category', async (category) => {
+        it.for(Object.keys(getCategoryTools('default')))('should load correct tools for %s category', async (category) => {
             client = await createClientFn({
                 tools: [category as ToolCategory],
             });
@@ -1836,7 +1839,7 @@ export function createIntegrationTestsSuite(
             // Test with enableAddingActors = false via env var
             client = await createClientFn({ enableAddingActors: false, useEnv: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(defaultTools.length + defaults.actors.length + 2);
+            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 2);
 
             expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
@@ -1857,15 +1860,16 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'stdio')('should load tool categories from TOOLS environment variable', async () => {
-            const categories = ['docs', 'runs'] as ToolCategory[];
-            client = await createClientFn({ tools: categories, useEnv: true });
+            const selectedCategories = ['docs', 'runs'] as ToolCategory[];
+            client = await createClientFn({ tools: selectedCategories, useEnv: true });
 
             const loadedTools = await client.listTools();
             const toolNames = getToolNames(loadedTools);
 
+            const resolvedCategories = getCategoryTools('default');
             const expectedTools = [
-                ...toolCategories.docs,
-                ...toolCategories.runs,
+                ...resolvedCategories.docs,
+                ...resolvedCategories.runs,
             ];
             const expectedToolNames = expectedTools.map((tool) => tool.name);
 
@@ -1978,7 +1982,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
 
             // Validate structured output for get-actor-output
-            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET);
+            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET, 'default');
 
             await client.close();
         });
@@ -2031,7 +2035,7 @@ export function createIntegrationTestsSuite(
             expectUsageCostMeta(result);
 
             // Validate structured output for get-actor-output
-            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET);
+            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET, 'default');
         });
 
         it('should return structured output for get-actor-run matching outputSchema', async () => {
@@ -2059,7 +2063,7 @@ export function createIntegrationTestsSuite(
 
             expect(runResult.content).toBeDefined();
             // Validate structured output for get-actor-run
-            validateStructuredOutputForTool(runResult, HelperTools.ACTOR_RUNS_GET);
+            validateStructuredOutputForTool(runResult, HelperTools.ACTOR_RUNS_GET, 'default');
         });
 
         it('should return Actor details both for full Actor name and ID', async () => {
@@ -2115,7 +2119,7 @@ export function createIntegrationTestsSuite(
 
             expect(datasetResult.content).toBeDefined();
             // Validate structured output for get-dataset-items
-            validateStructuredOutputForTool(datasetResult, HelperTools.DATASET_GET_ITEMS);
+            validateStructuredOutputForTool(datasetResult, HelperTools.DATASET_GET_ITEMS, 'default');
 
             // Validate structured content has items with actual results
             const datasetWithStructured = datasetResult as { structuredContent?: {

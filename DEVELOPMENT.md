@@ -29,7 +29,7 @@ tests/
 Key entry points:
 
 - `src/index.ts` - Main library export (`ActorsMcpServer` class)
-- `src/index-internals.ts` - Internal exports for testing / advanced usage
+- `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
 - `src/main.ts` - Actor entry point (standby server / debugging)
 - `src/input.ts` - Input processing and validation
