@@ -44,7 +44,7 @@ USAGE:
 
 - This tool supports async execution via the \`async\` parameter:
   - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results. When UI mode is enabled, async is always enforced and the widget automatically tracks progress.
+  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;

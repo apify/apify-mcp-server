@@ -29,8 +29,9 @@ For MCP server Actors:
 - Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")
 
 IMPORTANT:
-- Typically returns a datasetId and preview of output items
-- Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
+- This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
+- After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
+- Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
 - Use dedicated Actor tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')}) for better experience
 
 There are two ways to run Actors:
@@ -40,10 +41,6 @@ There are two ways to run Actors:
 USAGE:
 - Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
 - Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
-
-- This tool supports async execution via the \`async\` parameter:
-  - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results. When UI mode is enabled, async is always enforced and the widget automatically tracks progress.
 
 EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;
