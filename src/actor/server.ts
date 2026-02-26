@@ -14,9 +14,10 @@ import express from 'express';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient } from '../apify-client.js';
+import { ApifyClient } from '../apify_client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
-import type { ApifyRequestParams, UiMode } from '../types.js';
+import type { ApifyRequestParams } from '../types.js';
+import { parseUiMode } from '../types.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
 import { getActorRunData } from './utils.js';
 
@@ -90,8 +91,7 @@ export function createExpressApp(
                 ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
-            const uiModeParam = urlParams.get('ui') as UiMode | undefined;
-            const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
+            const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
             // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
             const paymentParam = urlParams.get('payment');
@@ -223,8 +223,7 @@ export function createExpressApp(
                     ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
-                const uiModeParam = urlParams.get('ui') as UiMode | undefined;
-                const uiMode = uiModeParam ?? process.env.UI_MODE as UiMode | undefined;
+                const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
                 // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
                 const paymentParam = urlParams.get('payment');
