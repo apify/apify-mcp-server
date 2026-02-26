@@ -1,6 +1,6 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
-import type { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify_client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 
 export class ProgressTracker {
