@@ -32,10 +32,6 @@ permissions:
     id-token: write
     contents: write
 
-concurrency:
-    group: release
-    cancel-in-progress: false
-
 jobs:
     release_metadata:
         name: Prepare release metadata
