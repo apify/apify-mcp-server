@@ -186,59 +186,13 @@ Once the MCP server is configured, test the MCP tools by:
 
 ## Coding guidelines
 
-### Indentation
-
-We use **4 spaces** for indentation (configured in `.editorconfig`).
-
-### Naming conventions
-
-- **Constants**: Use uppercase `SNAKE_CASE` for global, immutable constants (e.g., `ACTOR_MAX_MEMORY_MBYTES`, `SERVER_NAME`)
-- **Functions & Variables**: Use `camelCase` format (e.g., `fetchActorDetails`, `actorClient`)
-- **Classes, Types, Interfaces**: Use `PascalCase` format (e.g., `ActorsMcpServer`, `ActorDetailsResult`)
-- **Files & Folders**: Use lowercase `snake_case` format (e.g., `actor_details.ts`, `key_value_store.ts`)
-- **Booleans**: Prefix with `is`, `has`, or `should` (e.g., `isValid`, `hasFinished`, `shouldRetry`)
-- **Units**: Suffix with the unit of measure (e.g., `intervalMillis`, `maxMemoryBytes`)
-- **Date/Time**: Suffix with `At` (e.g., `createdAt`, `updatedAt`)
-- **Zod Validators**: Suffix with `Validator` (e.g., `InputValidator`)
-
-### Types and interfaces
-
-- Prefer `type` for flexibility.
-- Use `interface` only when it's required for class implementations (`implements`).
+For general coding standards (naming, types, comments, code structure, async, error handling, etc.), see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ### Types organization
 
 - **Centralize shared/public types**: Put cross-module domain types and public API types in `src/types.ts`.
 - **Co-locate local types**: Keep module- or feature-specific types next to their usage (in the same file or a local `types.ts`).
 - **Use a folder-level `types.ts`** when multiple files in a folder share types, instead of inflating the root `src/types.ts`.
-
-### Comments
-
-- Use JSDoc style comments (`/** */`) for functions, interfaces, enums, and classes
-- Use `//` for generic inline comments
-- Avoid `/* */` multiline comments (single asterisk)
-- Use proper English (spelling, grammar, punctuation, capitalization)
-
-### Code structure
-
-- **Avoid `else`**: Return early to reduce indentation and keep logic flat
-- **Keep functions small**: Small, focused functions are easier to understand and test
-- **Minimal parameters**: Functions should only accept what they actually use
-  - Use comma-separated parameters for up to three parameters
-  - Use a single object parameter for more than three parameters
-- **Declare variables close to use**: Variables should be declared near their first use
-- **Extract reusable logic**: Extract complex or reusable logic into named helper functions
-- **Avoid intermediate variables for single-use expressions**: Don't create constants or variables if they're only used once. Inline them directly. For example:
-  - ❌ Don't: `const docSourceEnum = z.enum([...]); const schema = z.object({ docSource: docSourceEnum })`
-  - ✅ Do: `const schema = z.object({ docSource: z.enum([...]) })`
-  - Exception: Only create intermediate variables if they improve readability for complex expressions or serve a documentation purpose
-
-### Async functions
-
-- Use `async` and `await` over `Promise` and `then` calls
-- Use `await` when you care about the Promise result or exceptions
-- Use `void` when you don't need to wait for the Promise (fire-and-forget)
-- Use `return await` when returning Promises to preserve accurate stack traces
 
 ### Imports and import ordering
 
@@ -250,12 +204,15 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - Do not duplicate imports – always reuse existing imports if present
 - Do not use dynamic imports unless explicitly told to do so
 
+### Avoid intermediate variables for single-use expressions
+
+Don't create constants or variables if they're only used once. Inline them directly:
+- ❌ Don't: `const docSourceEnum = z.enum([...]); const schema = z.object({ docSource: docSourceEnum })`
+- ✅ Do: `const schema = z.object({ docSource: z.enum([...]) })`
+- Exception: Only create intermediate variables if they improve readability for complex expressions or serve a documentation purpose
+
 ### Error handling
 
-- **User errors**: Use appropriate error codes (4xx for client errors), log as `softFail`
-- **Internal errors**: Use appropriate error codes (5xx for server errors), log with `log.exception` or `log.error`
-- Always handle and propagate errors clearly
-- Use custom error classes from `src/errors.ts` when appropriate
 - **Don't log then throw**: Do NOT call `log.error()` immediately before throwing. Errors are already logged by the caller or error handler. This creates duplicate logs and violates separation of concerns.
   - ❌ Don't:
     ```typescript
@@ -271,14 +228,6 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
         throw new Error(`Unknown documentation source: ${docSource}`);
     }
     ```
-
-### Code quality
-
-- All files must follow ESLint rules (run `npm run lint` before committing)
-- Prefer readability over micro-optimizations
-- Avoid mutating function parameters (use immutability when possible)
-- If mutation is necessary, clearly document and explain it with a comment
-- Clean up temporary files, scripts, or helper files created during development
 
 ### Common patterns
 
@@ -329,6 +278,15 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - Don't optimize prematurely
 - Don't add configuration for things that won't change
 - Don't suggest "improvements" outside current task scope
+
+## Branching strategy
+
+- **Main branch**: `master` — always deployable, protected
+- **Branch off `master`** using type prefixes: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
+  - Use lowercase, DNS-friendly names (e.g., `feat/add-search-pagination`, `fix/handle-actor-timeout`)
+- **Commit messages and PR titles**: follow [Conventional Commits](https://www.conventionalcommits.org/) — see [CONTRIBUTING.md](./CONTRIBUTING.md) for format and examples
+- **Merge method**: always **Squash and merge** back to `master`
+- **Canary releases**: add the `beta` label to a PR to publish a preview package via [pkg.pr.new](https://pkg.pr.new) (see README for details)
 
 ## External dependencies
 
