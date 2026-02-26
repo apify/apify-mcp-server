@@ -103,9 +103,10 @@ export async function loadToolsFromInput(
                 internalSelections.push(internalByName);
                 continue;
             }
-            // If this is a known internal tool name (from another mode), skip it silently
+            // If this is a known internal tool name (from another mode), skip it
             // rather than treating it as an Actor ID
             if (getAllInternalToolNames().has(String(selector))) {
+                log.debug(`Skipping selector "${selector}" — it is an internal tool from another mode (current: "${mode}")`);
                 continue;
             }
             // Treat unknown selectors as Actor IDs/full names.
