@@ -1259,7 +1259,7 @@ export function createIntegrationTestsSuite(
                 uiMode: 'openai',
             });
 
-            // fetch-actor-details-internal is openaiOnly, so we need openai mode to access it
+            // fetch-actor-details-internal is only available in openai mode
             const result = await client.callTool({
                 name: 'fetch-actor-details-internal',
                 arguments: {
