@@ -13,7 +13,32 @@ import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { actorNameToToolName } from '../utils.js';
 import { getActorsAsTools } from './actor_tools_factory.js';
+
+// ---------------------------------------------------------------------------
+// Shared call-actor description building blocks
+// ---------------------------------------------------------------------------
+
+const RAG_WEB_BROWSER_TOOL = actorNameToToolName('apify/rag-web-browser');
+
+/** Shared MCP server instructions — identical in both modes. */
+export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:
+- Use fetch-actor-details with output={ mcpTools: true } to list available tools
+- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")`;
+
+/** Shared "two ways to run" + USAGE section — identical in both modes. */
+export const CALL_ACTOR_USAGE_SECTION = `There are two ways to run Actors:
+1. Dedicated Actor tools (e.g., ${RAG_WEB_BROWSER_TOOL}): These are pre-configured tools, offering a simpler and more direct experience.
+2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+
+USAGE:
+- Always use dedicated tools when available (e.g., ${RAG_WEB_BROWSER_TOOL})
+- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.`;
+
+/** Shared examples section — identical in both modes. */
+export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
+- user_input: Get instagram posts using apify/instagram-scraper`;
 
 /**
  * Zod schema for call-actor arguments — shared between default and openai variants.

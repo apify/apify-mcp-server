@@ -7,43 +7,38 @@ import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import {
+    CALL_ACTOR_EXAMPLES_SECTION,
+    CALL_ACTOR_MCP_SERVER_SECTION,
+    CALL_ACTOR_USAGE_SECTION,
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
 } from '../core/call_actor_common.js';
 import { callActorOutputSchema } from '../structured_output_schemas.js';
-import { actorNameToToolName } from '../utils.js';
 
-const CALL_ACTOR_OPENAI_DESCRIPTION = `Call any Actor from the Apify Store.
+const CALL_ACTOR_OPENAI_DESCRIPTION = [
+    `Call any Actor from the Apify Store.`,
 
-WORKFLOW:
+    `WORKFLOW:
 1. Use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL} to get the Actor's input schema
 2. Call this tool with the actor name and proper input based on the schema
 
 If the actor name is not in "username/name" format, use ${HelperTools.STORE_SEARCH_INTERNAL} to resolve the correct Actor first.
-Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.
+Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`,
 
-For MCP server Actors:
-- Use fetch-actor-details with output={ mcpTools: true } to list available tools
-- Call using format: "actorName:toolName" (e.g., "apify/actors-mcp-server:fetch-apify-docs")
+    CALL_ACTOR_MCP_SERVER_SECTION,
 
-IMPORTANT:
+    `IMPORTANT:
 - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
 - After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
 - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
-- Use dedicated Actor tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')}) for better experience
+- Use dedicated Actor tools when available for better experience`,
 
-There are two ways to run Actors:
-1. Dedicated Actor tools (e.g., ${actorNameToToolName('apify/rag-web-browser')}): These are pre-configured tools, offering a simpler and more direct experience.
-2. Generic call-actor tool (${HelperTools.ACTOR_CALL}): Use this when a dedicated tool is not available or when you want to run any Actor dynamically. This tool is especially useful if you do not want to add specific tools or your client does not support dynamic tool registration.
+    CALL_ACTOR_USAGE_SECTION,
 
-USAGE:
-- Always use dedicated tools when available (e.g., ${actorNameToToolName('apify/rag-web-browser')})
-- Use the generic call-actor tool only if a dedicated tool does not exist for your Actor.
-
-EXAMPLES:
-- user_input: Get instagram posts using apify/instagram-scraper`;
+    CALL_ACTOR_EXAMPLES_SECTION,
+].join('\n\n');
 
 /**
  * OpenAI mode call-actor tool.

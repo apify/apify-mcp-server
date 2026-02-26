@@ -87,10 +87,10 @@ Chain tip: `origin/refactor/remove-tool-categories`
 
 ---
 
-### `CONSISTENCY-03` Centralize duplicated long instruction strings
-- **Problem:** `CALL_ACTOR_DEFAULT_DESCRIPTION` and `CALL_ACTOR_OPENAI_DESCRIPTION` are ~95% identical. Same pattern in search-actors response text.
-- **Change required:** extract shared description parts into `core/` constants; keep only mode-specific deltas in variants.
-- **Files:** `src/tools/default/call_actor.ts`, `src/tools/openai/call_actor.ts`, `src/tools/core/`
+### ~~`CONSISTENCY-03` Centralize duplicated long instruction strings~~ — FIXED
+- Extracted shared description blocks (`CALL_ACTOR_MCP_SERVER_SECTION`, `CALL_ACTOR_USAGE_SECTION`, `CALL_ACTOR_EXAMPLES_SECTION`) into `src/tools/core/call_actor_common.ts`.
+- Both `default/call_actor.ts` and `openai/call_actor.ts` now compose descriptions from shared + mode-specific blocks via `[...].join('\n\n')`.
+- Search-actors left as-is — differences are behavioral (widget metadata + disambiguation), not just static text duplication.
 
 ---
 
@@ -138,7 +138,7 @@ Chain tip: `origin/refactor/remove-tool-categories`
 - [x] `ARCH-02` deprecated `toolCategories` removed — fixed by #494
 - [x] `ARCH-03` `openaiOnly` deleted from `ToolBase` (not just deprecated)
 - [x] `ARCH-06` fetch-actor-details split decision documented
-- [ ] `CONSISTENCY-03` shared description strings extracted
+- [x] `CONSISTENCY-03` shared description strings extracted
 - [ ] `CONSISTENCY-04` debug log for cross-mode selector skip
 - [ ] `NEW-01` cross-repo compatibility verified via `pkg.pr.new`
 - [ ] `NEW-02` `ServerMode` vs `UiMode` distinction documented
