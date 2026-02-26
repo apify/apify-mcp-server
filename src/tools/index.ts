@@ -20,7 +20,7 @@ export { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, to
  * Returns the tool entries for the default-enabled categories resolved for the given mode.
  * Computed here (not in helper file) to avoid module initialization issues.
  */
-export function getDefaultTools(mode: ServerMode): ToolEntry[] {
+export function getDefaultTools(mode: ServerMode = 'default'): ToolEntry[] {
     return getExpectedToolsByCategories(toolCategoriesEnabledByDefault, mode);
 }
 

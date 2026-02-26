@@ -52,7 +52,7 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
         .describe('The input JSON to pass to the Actor. Required.'),
     async: z.boolean()
         .optional()
-        .describe(`When true: starts the run and returns immediately with runId. When false or not provided: waits for completion and returns results immediately. Default: true when UI mode is enabled (enforced), false otherwise. IMPORTANT: Only set async to true if the user explicitly asks to run the Actor in the background or does not need immediate results. When the user asks for data or results, always use async: false (default) so the results are returned immediately.`),
+        .describe(`When true, starts the run and returns immediately with runId. When false or omitted, behavior depends on the active server mode/tool variant. IMPORTANT: use async=true only when the user explicitly asks to run in the background or does not need immediate results.`),
     previewOutput: z.boolean()
         .optional()
         .describe('When true (default): includes preview items. When false: metadata only (reduces context). Use when fetching fields via get-actor-output.'),

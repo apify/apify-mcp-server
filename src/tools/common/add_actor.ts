@@ -50,7 +50,7 @@ USAGE EXAMPLES:
         const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
         /**
          * If no tools were found, return a message that the Actor was not found
-         * instead of returning that non existent tool was added since the
+         * instead of returning that non-existent tool was added since the
          * loadActorsAsTools method returns an empty array and does not throw an error.
          */
         if (tools.length === 0) {

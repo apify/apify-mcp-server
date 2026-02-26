@@ -130,7 +130,7 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
             return buildMCPResponse({
                 texts: [`Failed to call Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
+You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.`],
                 isError: true,
             });
         }
