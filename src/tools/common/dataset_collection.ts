@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify-client.js';
+import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';

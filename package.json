@@ -10,8 +10,8 @@
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
-    "./internals": "./dist/index-internals.js",
-    "./internals.js": "./dist/index-internals.js",
+    "./internals": "./dist/index_internals.js",
+    "./internals.js": "./dist/index_internals.js",
     "./manifest.json": "./manifest.json"
   },
   "bin": {
@@ -83,7 +83,7 @@
   },
   "scripts": {
     "start": "npm run start:standby",
-    "dev": "node scripts/dev-standby.js",
+    "dev": "node scripts/dev_standby.js",
     "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" tsx src/main.ts",
     "build": "npm run build:core && npm run build:web",
     "build:core": "tsc -b src",
@@ -95,14 +95,14 @@
     "lint:fix": "eslint . --fix",
     "type-check": "tsc -p tsconfig.json --noEmit",
     "check": "npm run type-check && npm run lint",
-    "check:widgets": "tsx scripts/check-widgets.ts",
+    "check:widgets": "tsx scripts/check_widgets.ts",
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "npm run build && vitest run tests/integration",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
-    "evals:create-dataset": "tsx evals/create-dataset.ts",
-    "evals:run": "tsx evals/run-evaluation.ts",
-    "evals:workflow": "npm run build && tsx evals/workflows/run-workflow-evals.ts"
+    "evals:create-dataset": "tsx evals/create_dataset.ts",
+    "evals:run": "tsx evals/run_evaluation.ts",
+    "evals:workflow": "npm run build && tsx evals/workflows/run_workflow_evals.ts"
   },
   "author": "Apify",
   "license": "MIT"
