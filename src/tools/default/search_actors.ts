@@ -58,7 +58,7 @@ IMPORTANT: You MUST always do a second search with broader, more generic keyword
 
  ${actorsText}
 
-If you need detailed info for a user-facing request, use ${HelperTools.ACTOR_GET_DETAILS}. For helper/internal schema lookups without UI, use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.
+If you need more detailed information about any of these Actors, including their input schemas and usage instructions, use the ${HelperTools.ACTOR_GET_DETAILS} tool with the specific Actor name.
 IMPORTANT: You MUST always do a second search with broader, more generic keywords (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure you haven't missed a better Actor.
  `;
 
