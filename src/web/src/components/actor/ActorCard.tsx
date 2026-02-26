@@ -58,7 +58,7 @@ const StyledSeparator = styled(Box)`
 
 const DescriptionText = styled(Text)<{ isDetail: boolean }>`
     white-space: pre-wrap;
-    ${({ isDetail }) => !isDetail && clampLines(2)};
+    ${({ isDetail }) => !isDetail && clampLines(1)};
 `;
 
 const ActorHeader = styled.div`
