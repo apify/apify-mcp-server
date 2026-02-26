@@ -1,4 +1,4 @@
-import type { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify_client.js';
 import { ACTOR_README_MAX_LENGTH } from '../const.js';
 import type {
     ActorDefinitionPruned,
