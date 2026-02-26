@@ -47,20 +47,15 @@ Chain tip: `origin/refactor/remove-tool-categories`
 
 ---
 
-### `CONSISTENCY-01` Remove default-mode references to openai/internal helper tools
-- **Problem:** default `search-actors` text references `ACTOR_GET_DETAILS_INTERNAL` which does not exist in default mode.
-- **Evidence:** `src/tools/default/search_actors.ts` — `"use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}"`
-- **Change required:** remove the internal tool reference from default variant response text.
+### ~~`CONSISTENCY-01` Remove default-mode references to openai/internal helper tools~~ — FIXED
+- Default `search-actors` no longer references `ACTOR_GET_DETAILS_INTERNAL`.
+- OpenAI `search-actors` now includes disambiguation guidance with examples for when to use `ACTOR_GET_DETAILS` (browse/explore) vs `ACTOR_GET_DETAILS_INTERNAL` (execute a task).
 
 ---
 
-### `CONSISTENCY-02` Fix call-actor description semantics in both variants
-- **Problem:** both descriptions are wrong for their mode.
-  - **Openai variant** (`src/tools/openai/call_actor.ts`): documents `async: false` and `async: true` behavior, but implementation always runs async — the `async` parameter is ignored.
-  - **Default variant** (`src/tools/default/call_actor.ts`): includes "When UI mode is enabled, async is always enforced and the widget automatically tracks progress" — irrelevant for default mode.
-- **Change required:**
-  - Openai description: state that execution is always asynchronous; remove `async` toggle documentation
-  - Default description: remove the UI mode sentence
+### ~~`CONSISTENCY-02` Fix call-actor description semantics in both variants~~ — FIXED
+- OpenAI variant: removed `async` toggle documentation; states execution is always async with widget tracking; instructs agent to wait for user input after calling.
+- Default variant: removed "When UI mode is enabled" sentence.
 
 ---
 
@@ -78,10 +73,9 @@ Chain tip: `origin/refactor/remove-tool-categories`
 
 ---
 
-### `ARCH-03` Remove dead `openaiOnly` property
-- **Status:** no tool definitions set `openaiOnly` anymore; `getCategoryTools(mode)` handles mode resolution.
-- **Remaining:** the deprecated property declaration in `src/types.ts` with comment "Will be removed in a future release."
-- **Change required:** delete `openaiOnly` from `ToolBase` type entirely — no reason to keep a deprecated property in a squashed PR that introduces the replacement.
+### ~~`ARCH-03` Remove dead `openaiOnly` property~~ — FIXED
+- `openaiOnly` field deleted from `ToolBase` type in `src/types.ts`.
+- Integration test comment updated to remove `openaiOnly` reference.
 
 ---
 
@@ -139,10 +133,10 @@ Chain tip: `origin/refactor/remove-tool-categories`
 ## Pre-Merge Checklist
 
 - [x] `ARCH-01` unified category path — fixed by #494
-- [ ] `CONSISTENCY-01` default search-actors: no internal tool references
-- [ ] `CONSISTENCY-02` call-actor descriptions match actual behavior
+- [x] `CONSISTENCY-01` default search-actors: no internal tool references
+- [x] `CONSISTENCY-02` call-actor descriptions match actual behavior
 - [x] `ARCH-02` deprecated `toolCategories` removed — fixed by #494
-- [ ] `ARCH-03` `openaiOnly` deleted from `ToolBase` (not just deprecated)
+- [x] `ARCH-03` `openaiOnly` deleted from `ToolBase` (not just deprecated)
 - [x] `ARCH-06` fetch-actor-details split decision documented
 - [ ] `CONSISTENCY-03` shared description strings extracted
 - [ ] `CONSISTENCY-04` debug log for cross-mode selector skip
