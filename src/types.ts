@@ -385,13 +385,16 @@ export type ToolCallTelemetryProperties = {
 };
 
 /**
- * Server mode controls which tool variants are served.
+ * Internal server mode that controls which tool variants, descriptions, and response
+ * formats are served. Every internal call site (tool loading, category resolution,
+ * server instructions) uses this type.
  *
- * - `'default'` — standard MCP tools for generic clients
- * - `'openai'` — OpenAI-specific tool variants (async execution, widget metadata, internal tools)
+ * - `'default'` — standard MCP tools for generic clients (sync/async execution, text responses)
+ * - `'openai'` — OpenAI-specific tool variants (always-async execution, widget metadata)
  *
- * Every call site that resolves tool categories must pass an explicit ServerMode value.
- * This prevents accidentally serving wrong-mode tools.
+ * **Relationship to {@link UiMode}:** `ServerMode` is the internal representation;
+ * `UiMode` is the external API surface exposed to callers (currently only `'openai'`).
+ * The conversion happens in `ActorsMcpServer` constructor: `options.uiMode ?? 'default'`.
  */
 export type ServerMode = 'default' | 'openai';
 
@@ -399,8 +402,12 @@ export type ServerMode = 'default' | 'openai';
 export const SERVER_MODES: readonly ServerMode[] = ['default', 'openai'] as const;
 
 /**
- * UI mode for tool responses — the external-facing subset of ServerMode.
- * Derived from ServerMode: excludes 'default' since the absence of a UI mode means default.
+ * External API surface for selecting a UI mode — passed via `options.uiMode` in
+ * {@link ActorsMcpServerOptions}. Excludes `'default'` because the absence of a
+ * UI mode (`undefined`) maps to `ServerMode = 'default'` internally.
+ *
+ * **Relationship to {@link ServerMode}:** `UiMode` is a strict subset of `ServerMode`.
+ * Callers set `uiMode?: UiMode`; the server normalizes it to `ServerMode` at construction.
  */
 export type UiMode = Exclude<ServerMode, 'default'>;
 
