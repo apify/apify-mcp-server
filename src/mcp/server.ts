@@ -34,7 +34,7 @@ import type { ValidateFunction } from 'ajv';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify-client.js';
+import { ApifyClient, createApifyClientWithSkyfireSupport } from '../apify_client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
     APIFY_MCP_URL,
@@ -43,9 +43,6 @@ import {
     HelperTools,
     SERVER_NAME,
     SERVER_VERSION,
-    SKYFIRE_ENABLED_TOOLS,
-    SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-    SKYFIRE_TOOL_INSTRUCTIONS,
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
@@ -53,9 +50,9 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { defaultActorExecutor } from '../tools/default/actor-executor.js';
-import { defaultTools, getActorsAsTools, toolCategories } from '../tools/index.js';
-import { openaiActorExecutor } from '../tools/openai/actor-executor.js';
+import { defaultActorExecutor } from '../tools/default/actor_executor.js';
+import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
+import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames } from '../tools/utils.js';
 import type {
     ActorExecutor,
@@ -65,6 +62,7 @@ import type {
     ActorTool,
     ApifyRequestParams,
     HelperTool,
+    ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
@@ -73,15 +71,21 @@ import type {
 import { logHttpError, redactSkyfirePayId } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { getServerInstructions } from '../utils/server-instructions.js';
+import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { validateSkyfirePayId } from '../utils/skyfire.js';
-import { getToolStatusFromError } from '../utils/tool-status.js';
-import { cloneToolEntry, getToolPublicFieldOnly } from '../utils/tools.js';
-import { getUserIdFromTokenCached } from '../utils/userid-cache.js';
+import { getToolStatusFromError } from '../utils/tool_status.js';
+import { applySkyfireAugmentation, getToolPublicFieldOnly } from '../utils/tools.js';
+import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
+
+/** Mode → actor executor. Add new modes here. */
+const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
+    default: defaultActorExecutor,
+    openai: openaiActorExecutor,
+};
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -97,6 +101,8 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
+    /** Resolved server mode — normalized once at construction from options.uiMode. */
+    public readonly serverMode: ServerMode;
     /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
     private readonly actorExecutor: ActorExecutor;
 
@@ -119,9 +125,8 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        this.actorExecutor = options.uiMode === 'openai'
-            ? openaiActorExecutor
-            : defaultActorExecutor;
+        this.serverMode = options.uiMode ?? 'default';
+        this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -153,7 +158,7 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
-                instructions: getServerInstructions(options.uiMode),
+                instructions: getServerInstructions(this.serverMode),
             },
         );
         this.setupTelemetry();
@@ -273,8 +278,8 @@ export class ActorsMcpServer {
         const actorsToLoad: string[] = [];
         const toolsToLoad: ToolEntry[] = [];
         const internalToolMap = new Map([
-            ...defaultTools,
-            ...Object.values(toolCategories).flat(),
+            ...getDefaultTools(this.serverMode),
+            ...Object.values(getCategoryTools(this.serverMode)).flat(),
         ].map((tool) => [tool.name, tool]));
 
         for (const tool of toolNames) {
@@ -320,7 +325,7 @@ export class ActorsMcpServer {
      * Used primarily for SSE.
      */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient, this.options.uiMode, this.actorStore);
+        const tools = await processParamsGetTools(url, apifyClient, this.serverMode, this.actorStore);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
@@ -349,40 +354,9 @@ export class ActorsMcpServer {
      * @returns Array of added/updated tool wrappers
      */
     public upsertTools(tools: ToolEntry[], shouldNotifyToolsChangedHandler = false) {
-        if (this.options.skyfireMode) {
-            for (const wrap of tools) {
-                // Clone the tool before modifying it to avoid affecting shared objects
-                const clonedWrap = cloneToolEntry(wrap);
-                let modified = false;
-
-                // Handle Skyfire mode modifications
-                if (this.options.skyfireMode && (wrap.type === 'actor'
-                    || (wrap.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(wrap.name as HelperTools)))) {
-                    // Add Skyfire instructions to description if not already present
-                    if (clonedWrap.description && !clonedWrap.description.includes(SKYFIRE_TOOL_INSTRUCTIONS)) {
-                        clonedWrap.description += `\n\n${SKYFIRE_TOOL_INSTRUCTIONS}`;
-                    }
-                    // Add skyfire-pay-id property if not present
-                    if (clonedWrap.inputSchema && 'properties' in clonedWrap.inputSchema) {
-                        const props = clonedWrap.inputSchema.properties as Record<string, unknown>;
-                        if (!props['skyfire-pay-id']) {
-                            props['skyfire-pay-id'] = {
-                                type: 'string',
-                                description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
-                            };
-                        }
-                    }
-                    modified = true;
-                }
-
-                // Store the cloned and modified tool only if modifications were made
-                this.tools.set(clonedWrap.name, modified ? clonedWrap : wrap);
-            }
-        } else {
-            // No skyfire mode - store tools as-is
-            for (const tool of tools) {
-                this.tools.set(tool.name, tool);
-            }
+        for (const tool of tools) {
+            const stored = this.options.skyfireMode ? applySkyfireAugmentation(tool) : tool;
+            this.tools.set(stored.name, stored);
         }
         if (shouldNotifyToolsChangedHandler) this.notifyToolsChangedHandler();
         return tools;
@@ -447,7 +421,7 @@ export class ActorsMcpServer {
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             skyfireMode: this.options.skyfireMode,
-            uiMode: this.options.uiMode,
+            mode: this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
 
@@ -606,7 +580,7 @@ export class ActorsMcpServer {
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
-                uiMode: this.options.uiMode,
+                mode: this.serverMode,
                 filterOpenAiMeta: true,
             }));
             return { tools };
@@ -1173,7 +1147,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.options.uiMode !== 'openai') {
+        if (this.serverMode !== 'openai') {
             return;
         }
 
