@@ -103,6 +103,42 @@ jobs:
                             "tag": "latest" 
                         }
 
+    bump_dependency_in_internal_repo:
+        name: Bump dependency in apify-mcp-server-internal
+        needs: [ release_metadata, publish_to_npm ]
+        runs-on: ubuntu-latest
+        env:
+            GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+        steps:
+            -   name: Checkout internal repo
+                uses: actions/checkout@v6
+                with:
+                    repository: apify/apify-mcp-server-internal
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version-file: '.nvmrc'
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install updated dependency
+                uses: nick-fields/retry@v3 # Retry to compensate for NPM propagation lag
+                with:
+                    timeout_minutes: 10
+                    max_attempts: 3
+                    retry_wait_seconds: 30
+                    command: npm install @apify/actors-mcp-server@${{ needs.release_metadata.outputs.version_number }}
+            -   name: Create pull request
+                uses: peter-evans/create-pull-request@v8
+                with:
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    commit-message: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
+                    branch: "bump-actors-mcp-server-${{ needs.release_metadata.outputs.version_number }}"
+                    title: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
+                    body: "Automated PR to bump `@apify/actors-mcp-server` to `${{ needs.release_metadata.outputs.version_number }}`."
+                    reviewers: ${{ github.actor }}
+                    author: Apify Release Bot <noreply@apify.com>
+
     publish_to_mcp_registry:
         name: Publish to MCP Registry
         needs: [ release_metadata ]
