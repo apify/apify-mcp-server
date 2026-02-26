@@ -133,9 +133,14 @@ jobs:
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
                     commit-message: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
-                    branch: "bump-actors-mcp-server-${{ needs.release_metadata.outputs.version_number }}"
+                    branch: "release/${{ needs.release_metadata.outputs.tag_name }}"
                     title: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
-                    body: "Automated PR to bump `@apify/actors-mcp-server` to `${{ needs.release_metadata.outputs.version_number }}`."
+                    body: |
+                        Automated PR to bump `@apify/actors-mcp-server` to `${{ needs.release_metadata.outputs.version_number }}`.
+
+                        ## Release notes
+
+                        ${{ needs.release_metadata.outputs.release_notes }}
                     reviewers: ${{ github.actor }}
                     author: Apify Release Bot <noreply@apify.com>
 
