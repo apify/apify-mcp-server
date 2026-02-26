@@ -94,10 +94,8 @@ Chain tip: `origin/refactor/remove-tool-categories`
 
 ---
 
-### `CONSISTENCY-04` Add debug log for cross-mode selector skipping
-- **Problem:** tools-loader silently skips selectors that match tool names from another mode.
-- **Evidence:** `src/utils/tools_loader.ts`, `getAllInternalToolNames()` check + silent `continue`
-- **Change required:** add `log.debug` when skipping a selector due to mode mismatch to aid debugging.
+### ~~`CONSISTENCY-04` Add debug log for cross-mode selector skipping~~ — FIXED
+- Added `log.debug` in `src/utils/tools_loader.ts` when a selector is skipped because it matches an internal tool from another mode. Logs the selector name and current mode.
 
 ---
 
@@ -139,7 +137,7 @@ Chain tip: `origin/refactor/remove-tool-categories`
 - [x] `ARCH-03` `openaiOnly` deleted from `ToolBase` (not just deprecated)
 - [x] `ARCH-06` fetch-actor-details split decision documented
 - [x] `CONSISTENCY-03` shared description strings extracted
-- [ ] `CONSISTENCY-04` debug log for cross-mode selector skip
+- [x] `CONSISTENCY-04` debug log for cross-mode selector skip
 - [ ] `NEW-01` cross-repo compatibility verified via `pkg.pr.new`
 - [ ] `NEW-02` `ServerMode` vs `UiMode` distinction documented
 - [ ] relevant tests added/updated
