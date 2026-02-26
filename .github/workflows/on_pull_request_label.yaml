@@ -11,8 +11,6 @@ concurrency:
 
 jobs:
     wait_for_checks:
-        # Run ONLY when PR has the "beta" label
-        if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Wait for code checks to pass
         runs-on: ubuntu-latest
         steps:
@@ -29,7 +27,19 @@ jobs:
 
     push_pkg_pr_new:
         needs: [ wait_for_checks ]
+        # Run ONLY when PR has the "beta" label
+        if: contains(github.event.pull_request.labels.*.name, 'beta')
         name: Push to pkg.pr.new
         uses: ./.github/workflows/_publish_to_pkg_pr_new.yaml
         with:
             ref: ${{ github.event.pull_request.head.ref }}
+
+    evaluations:
+        needs: [ wait_for_checks ]
+        name: MCP tool calling evaluations
+        # Run when PR is labeled with 'validated'
+        if: github.event.action == 'labeled' && github.event.label.name == 'validated'
+        uses: ./.github/workflows/_evaluations.yaml
+        secrets: inherit
+        with:
+            pr_number: ${{ github.event.pull_request.number }}
