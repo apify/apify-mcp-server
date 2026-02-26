@@ -308,7 +308,7 @@ describe('applySkyfireAugmentation', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Matrix: mode × eligibility (using buildCategories tools)
+// Matrix: mode × eligibility (using getCategoryTools)
 // ---------------------------------------------------------------------------
 
 describe('Skyfire eligibility matrix', () => {

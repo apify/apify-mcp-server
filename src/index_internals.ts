@@ -6,11 +6,12 @@ import { ApifyClient } from './apify_client.js';
 import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
 import { getServerCard } from './server_card.js';
-import { addTool } from './tools/common/helpers.js';
-import { defaultTools, getActorsAsTools, getUnauthEnabledToolCategories, toolCategories,
+import { addTool } from './tools/common/add_actor.js';
+import { getActorsAsTools, getCategoryTools, getDefaultTools, getUnauthEnabledToolCategories,
     toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
-import type { ActorStore, ServerCard, ToolCategory, UiMode } from './types.js';
+import type { ActorStore, ServerCard, ServerMode, ToolCategory, UiMode } from './types.js';
+import { parseUiMode, SERVER_MODES } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
@@ -28,9 +29,12 @@ export {
     SERVER_NAME,
     SERVER_TITLE,
     defaults,
-    defaultTools,
+    getDefaultTools,
     addTool,
-    toolCategories,
+    getCategoryTools,
+    parseUiMode,
+    SERVER_MODES,
+    type ServerMode,
     toolCategoriesEnabledByDefault,
     type ActorStore,
     type ServerCard,

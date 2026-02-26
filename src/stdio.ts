@@ -202,7 +202,7 @@ async function main() {
 
     const apifyClient = new ApifyClient({ token: apifyToken });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui);
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? 'default');
 
     mcpServer.upsertTools(tools);
 

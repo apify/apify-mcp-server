@@ -4,10 +4,10 @@ import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
-import type { ActorsMcpServerOptions, HelperTool, ToolBase, ToolEntry } from '../types.js';
+import type { HelperTool, ServerMode, ToolBase, ToolEntry } from '../types.js';
 
 type ToolPublicFieldOptions = {
-    uiMode?: ActorsMcpServerOptions['uiMode'];
+    mode?: ServerMode;
     filterOpenAiMeta?: boolean;
 };
 
@@ -32,8 +32,8 @@ function stripOpenAiMeta(meta?: ToolBase['_meta']) {
  * Used for the tools list request.
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
-    const { uiMode, filterOpenAiMeta = false } = options;
-    const meta = filterOpenAiMeta && uiMode !== 'openai'
+    const { mode, filterOpenAiMeta = false } = options;
+    const meta = filterOpenAiMeta && mode !== 'openai'
         ? stripOpenAiMeta(tool._meta)
         : tool._meta;
 
