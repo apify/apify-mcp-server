@@ -99,9 +99,8 @@ Chain tip: `origin/refactor/remove-tool-categories`
 
 ---
 
-### `NEW-02` Document `ServerMode` vs `UiMode` distinction
-- **Problem:** PR #494 introduced `ServerMode = 'default' | 'openai'` (internal) and redefined `UiMode = Exclude<ServerMode, 'default'>` (external API surface). The conversion happens in `ActorsMcpServer` constructor (`options.uiMode ?? 'default'`), but this is undocumented.
-- **Change required:** add JSDoc on `ServerMode` and `UiMode` types in `src/types.ts` explaining the relationship and where conversion happens.
+### ~~`NEW-02` Document `ServerMode` vs `UiMode` distinction~~ — FIXED
+- Added comprehensive JSDoc on both `ServerMode` and `UiMode` in `src/types.ts` explaining: internal vs external role, the relationship between the two types, and the conversion point (`ActorsMcpServer` constructor).
 
 ---
 
@@ -139,7 +138,7 @@ Chain tip: `origin/refactor/remove-tool-categories`
 - [x] `CONSISTENCY-03` shared description strings extracted
 - [x] `CONSISTENCY-04` debug log for cross-mode selector skip
 - [ ] `NEW-01` cross-repo compatibility verified via `pkg.pr.new`
-- [ ] `NEW-02` `ServerMode` vs `UiMode` distinction documented
+- [x] `NEW-02` `ServerMode` vs `UiMode` distinction documented
 - [ ] relevant tests added/updated
 - [ ] `npm run type-check` passes
 - [ ] `npm run lint` passes
