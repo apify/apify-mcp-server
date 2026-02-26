@@ -186,107 +186,11 @@ Once the MCP server is configured, test the MCP tools by:
 
 ## Coding guidelines
 
-For general coding standards (naming, types, comments, code structure, async, error handling, etc.), see [CONTRIBUTING.md](./CONTRIBUTING.md).
-
-### Types organization
-
-- **Centralize shared/public types**: Put cross-module domain types and public API types in `src/types.ts`.
-- **Co-locate local types**: Keep module- or feature-specific types next to their usage (in the same file or a local `types.ts`).
-- **Use a folder-level `types.ts`** when multiple files in a folder share types, instead of inflating the root `src/types.ts`.
-
-### Imports and import ordering
-
-- Imports are automatically ordered and grouped by ESLint:
-  - Groups: builtin → external → parent/sibling → index → object
-  - Alphabetized within groups
-  - Newlines between groups
-- Use `import type` for type-only imports
-- Do not duplicate imports – always reuse existing imports if present
-- Do not use dynamic imports unless explicitly told to do so
-
-### Avoid intermediate variables for single-use expressions
-
-Don't create constants or variables if they're only used once. Inline them directly:
-- ❌ Don't: `const docSourceEnum = z.enum([...]); const schema = z.object({ docSource: docSourceEnum })`
-- ✅ Do: `const schema = z.object({ docSource: z.enum([...]) })`
-- Exception: Only create intermediate variables if they improve readability for complex expressions or serve a documentation purpose
-
-### Error handling
-
-- **Don't log then throw**: Do NOT call `log.error()` immediately before throwing. Errors are already logged by the caller or error handler. This creates duplicate logs and violates separation of concerns.
-  - ❌ Don't:
-    ```typescript
-    if (!indexConfig) {
-        const error = `Unknown documentation source: ${docSource}`;
-        log.error(`[Algolia] ${error}`);
-        throw new Error(error);
-    }
-    ```
-  - ✅ Do:
-    ```typescript
-    if (!indexConfig) {
-        throw new Error(`Unknown documentation source: ${docSource}`);
-    }
-    ```
-
-### Common patterns
-
-- **Tool implementation**: Tools are defined in `src/tools/` using Zod schemas for validation
-- **Actor interaction**: Use `src/utils/apify-client.ts` for Apify API calls, never call Apify API directly
-- **Error responses**: Return user-friendly error messages with suggestions
-- **Input validation**: Always validate tool inputs with Zod before processing
-- **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl-lru.ts`)
-- **Constants and Tool Names**: Always use constants and never magic or hardcoded values. When referring to tools, ALWAYS use the `HelperTools` enum.
-  - **Exception**: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, helping to prevent accidental breaking changes.
-
-### Input validation best practices
-
-- **No double validation**: When using Zod schemas with AJV validation (`ajvValidate` in tool definitions), do NOT add additional manual validation checks in the tool implementation. The Zod schema and AJV both validate inputs before the tool is executed. Any checks redundant to the schema definition should be removed.
-  - ❌ Don't: Define enum validation in Zod, then manually check the enum again in the tool function
-  - ✅ Do: Let Zod and AJV handle all validation; use the parsed data directly in the tool implementation
-
-### Anti-patterns
-
-- **Don't** call Apify API directly – always use the Apify client utilities
-- **Don't** mutate function parameters without clear documentation
-- **Don't** skip input validation – all tool inputs must be validated with Zod
-- **Don't** use `Promise.then()` - prefer `async/await`
-- **Don't** create tools without proper error handling and user-friendly messages
-
-
-### Design System Compliance (MANDATORY)
-
-**READ FIRST**: [DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md) - Complete design system rules
-
-**Quick Rules** (Zero tolerance):
-- ✅ ALWAYS use `theme.*` tokens (colors, spacing)
-- ❌ NEVER hardcode: `#hex`, `rgb()`, `Npx` values, font sizes
-- ✅ Import from `@apify/ui-library` only
-- ✅ Check `mcp__storybook__*` and `mcp__figma__*` availability before UI work
-- ✅ Call `mcp__storybook__get-ui-building-instructions` first
-- ✅ Read 1-3 similar components for patterns (max 3 files)
-- ✅ Verify zero hardcoded values before submitting
-
-**Figma Integration**: Call `mcp__figma__get_design_context` when working from designs.
-
-### What NOT to do (beyond code)
-
-- Don't add features not in the requirements
-- Don't refactor working code unless asked
-- Don't add error handling for impossible scenarios
-- Don't create abstractions for one-time operations
-- Don't optimize prematurely
-- Don't add configuration for things that won't change
-- Don't suggest "improvements" outside current task scope
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for all coding standards, common patterns, anti-patterns, and design system rules.
 
 ## Branching strategy
 
-- **Main branch**: `master` — always deployable, protected
-- **Branch off `master`** using type prefixes: `feat/`, `fix/`, `chore/`, `refactor/`, `docs/`
-  - Use lowercase, DNS-friendly names (e.g., `feat/add-search-pagination`, `fix/handle-actor-timeout`)
-- **Commit messages and PR titles**: follow [Conventional Commits](https://www.conventionalcommits.org/) — see [CONTRIBUTING.md](./CONTRIBUTING.md) for format and examples
-- **Merge method**: always **Squash and merge** back to `master`
-- **Canary releases**: add the `beta` label to a PR to publish a preview package via [pkg.pr.new](https://pkg.pr.new) (see README for details)
+Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for commit message format, PR best practices, and coding standards.
 
 ## External dependencies
 
