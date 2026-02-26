@@ -1,4 +1,4 @@
-import type { ApifyClient } from '../apify-client.js';
+import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
 import { mcpServerCache } from '../state.js';
 import { getActorDefinition } from '../tools/build.js';

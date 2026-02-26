@@ -31,7 +31,7 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { ApifyClient } from './apify-client.js';
+import { ApifyClient } from './apify_client.js';
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
@@ -39,7 +39,7 @@ import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
-import { loadToolsFromInput } from './utils/tools-loader.js';
+import { loadToolsFromInput } from './utils/tools_loader.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -202,7 +202,7 @@ async function main() {
 
     const apifyClient = new ApifyClient({ token: apifyToken });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui);
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? 'default');
 
     mcpServer.upsertTools(tools);
 
