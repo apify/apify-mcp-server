@@ -10,8 +10,9 @@
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { buildCategories, CATEGORY_NAMES } from '../../src/tools/index.js';
-import type { ToolEntry, UiMode } from '../../src/types.js';
+import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
+import type { ToolEntry } from '../../src/types.js';
+import { SERVER_MODES } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 /** Helper to extract tool names from a category. */
@@ -19,9 +20,9 @@ function toolNames(tools: ToolEntry[]): string[] {
     return tools.map((t) => t.name);
 }
 
-describe('buildCategories mode contract', () => {
-    const defaultCategories = buildCategories();
-    const openaiCategories = buildCategories('openai');
+describe('getCategoryTools mode contract (tool-mode separation)', () => {
+    const defaultCategories = getCategoryTools('default');
+    const openaiCategories = getCategoryTools('openai');
 
     describe('per-mode tool lists', () => {
         it('should have correct tools in experimental category (both modes)', () => {
@@ -85,14 +86,21 @@ describe('buildCategories mode contract', () => {
         });
     });
 
-    describe('mode-variant tool name parity', () => {
-        it('should have identical tool names in actors category across modes', () => {
-            expect(toolNames(defaultCategories.actors)).toEqual(toolNames(openaiCategories.actors));
-        });
+    describe('tool name invariance across modes', () => {
+        // Tool names MUST be identical across all modes for every category that has tools in both modes.
+        // This invariant is relied upon by getExpectedToolNamesByCategories, getUnauthEnabledToolCategories,
+        // and isApiTokenRequired — which all hardcode 'default' mode internally.
+        for (const categoryName of CATEGORY_NAMES) {
+            const defaultNames = toolNames(defaultCategories[categoryName]);
+            const openaiNames = toolNames(openaiCategories[categoryName]);
 
-        it('should have identical tool names in runs category across modes', () => {
-            expect(toolNames(defaultCategories.runs)).toEqual(toolNames(openaiCategories.runs));
-        });
+            // Only check categories that exist in both modes (ui category is openai-only)
+            if (defaultNames.length > 0 && openaiNames.length > 0) {
+                it(`should have identical tool names in ${categoryName} category across modes`, () => {
+                    expect(defaultNames).toEqual(openaiNames);
+                });
+            }
+        }
     });
 
     describe('inputSchema parity for mode-variant tools', () => {
@@ -118,13 +126,12 @@ describe('buildCategories mode contract', () => {
     });
 
     describe('tool definitions are frozen', () => {
-        for (const mode of [undefined, 'openai' as UiMode]) {
-            const label = mode ?? 'default';
-            const categories = buildCategories(mode);
+        for (const mode of SERVER_MODES) {
+            const categories = getCategoryTools(mode);
 
             for (const categoryName of CATEGORY_NAMES) {
                 for (const tool of categories[categoryName]) {
-                    it(`${tool.name} (${label} mode) should be frozen`, () => {
+                    it(`${tool.name} (${mode} mode) should be frozen`, () => {
                         expect(Object.isFrozen(tool)).toBe(true);
                     });
                 }
@@ -135,13 +142,12 @@ describe('buildCategories mode contract', () => {
     describe('all tool names match HelperTools enum values', () => {
         const allHelperToolNames = new Set(Object.values(HelperTools));
 
-        for (const mode of [undefined, 'openai' as UiMode]) {
-            const label = mode ?? 'default';
-            const categories = buildCategories(mode);
+        for (const mode of SERVER_MODES) {
+            const categories = getCategoryTools(mode);
 
             for (const categoryName of CATEGORY_NAMES) {
                 for (const tool of categories[categoryName]) {
-                    it(`${tool.name} (${label} mode) should be a known HelperTools value`, () => {
+                    it(`${tool.name} (${mode} mode) should be a known HelperTools value`, () => {
                         expect(allHelperToolNames.has(tool.name as HelperTools)).toBe(true);
                     });
                 }
@@ -166,7 +172,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
     it('should strip openai/ _meta keys when filterOpenAiMeta is true and not in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterOpenAiMeta: true,
-            uiMode: undefined,
+            mode: 'default',
         });
         expect(result._meta).toBeDefined();
         expect(result._meta).toEqual({ 'regular-key': { data: 123 } });
@@ -177,7 +183,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
     it('should preserve all _meta keys in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterOpenAiMeta: true,
-            uiMode: 'openai',
+            mode: 'openai',
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
@@ -198,7 +204,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         };
         const result = getToolPublicFieldOnly(toolWithOnlyOpenAiMeta, {
             filterOpenAiMeta: true,
-            uiMode: undefined,
+            mode: 'default',
         });
         expect(result._meta).toBeUndefined();
     });

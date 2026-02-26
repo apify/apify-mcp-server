@@ -7,8 +7,13 @@
  *
  * The final tool ordering presented to MCP clients is determined by tools-loader.ts,
  * which also auto-injects get-actor-run and get-actor-output right after call-actor.
+ *
+ * Each tool entry can be:
+ * - A plain ToolEntry — mode-independent, always included
+ * - A mode map (e.g. { default: ToolEntry, openai: ToolEntry }) — resolver picks entry[mode]
+ * - A partial mode map (e.g. { openai: ToolEntry }) — included only for listed modes
  */
-import type { ToolEntry, UiMode } from '../types.js';
+import type { ServerMode, ToolEntry } from '../types.js';
 import { abortActorRun } from './common/abort_actor_run.js';
 import { addTool } from './common/add_actor.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
@@ -37,31 +42,47 @@ import { openaiSearchActors } from './openai/search_actors.js';
 import { searchActorsInternalTool } from './openai/search_actors_internal.js';
 
 /**
- * Static tool categories using adapter tools that dispatch at runtime based on uiMode.
+ * A mode map: maps one or more ServerMode keys to their ToolEntry variant.
+ * - All modes present → each mode gets its own implementation
+ * - Subset of modes → tool is only included for those modes
+ */
+type ModeMap = Partial<Record<ServerMode, ToolEntry>>;
+
+/** A category tool entry: plain ToolEntry (mode-independent) or a mode map. */
+type CategoryToolEntry = ToolEntry | ModeMap;
+
+/** A plain ToolEntry always has a `name` property; mode maps never do. */
+function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
+    return !('name' in entry);
+}
+
+/**
+ * Unified tool category definitions — single source of truth.
  *
- * @deprecated Use {@link buildCategories} instead, which returns mode-resolved tool variants
- * directly without runtime dispatching. This static map will be removed once the tools-loader
- * is refactored to use buildCategories().
+ * Each entry is either a plain ToolEntry (mode-independent) or a mode map
+ * with ServerMode keys mapping to their ToolEntry variant.
+ *
+ * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
     experimental: [
         addTool,
     ],
     actors: [
-        defaultSearchActors,
-        defaultFetchActorDetails,
-        defaultCallActor,
+        { default: defaultSearchActors, openai: openaiSearchActors },
+        { default: defaultFetchActorDetails, openai: openaiFetchActorDetails },
+        { default: defaultCallActor, openai: openaiCallActor },
     ],
     ui: [
-        searchActorsInternalTool,
-        fetchActorDetailsInternalTool,
+        { openai: searchActorsInternalTool },
+        { openai: fetchActorDetailsInternalTool },
     ],
     docs: [
         searchApifyDocsTool,
         fetchApifyDocsTool,
     ],
     runs: [
-        defaultGetActorRun,
+        { default: defaultGetActorRun, openai: openaiGetActorRun },
         getUserRunsList,
         getActorRunLog,
         abortActorRun,
@@ -80,64 +101,55 @@ export const toolCategories = {
     dev: [
         getHtmlSkeleton,
     ],
-} satisfies Record<string, ToolEntry[]>;
+} satisfies Record<string, CategoryToolEntry[]>;
 
 /**
- * Canonical list of all tool category names, derived from the toolCategories map
- * so there is a single source of truth for category definitions.
+ * Canonical list of all tool category names, derived from toolCategories keys.
  */
 export const CATEGORY_NAMES = Object.keys(toolCategories) as (keyof typeof toolCategories)[];
 
-/** Map from category name to an array of tool entries. */
+/** Set of known category names for O(1) membership checks. */
+export const CATEGORY_NAME_SET: ReadonlySet<string> = new Set<string>(CATEGORY_NAMES);
+
+/** Map from category name to an array of resolved tool entries. */
 export type ToolCategoryMap = Record<(typeof CATEGORY_NAMES)[number], ToolEntry[]>;
 
 /**
- * Build tool categories for a given UI mode.
+ * Resolve a single category's tool entries for the given server mode.
  *
- * Returns the same category names as {@link toolCategories}, but with mode-resolved
- * tool variants: openai mode gets openai-specific implementations (async execution,
- * widget metadata), default mode gets standard implementations.
- *
- * This eliminates the need for runtime adapter dispatch — each tool is the correct
- * variant for its mode from the start.
+ * For each entry:
+ * - Plain ToolEntry (has `name`) → always included, mode-independent
+ * - ModeMap → look up `entry[mode]`; included only if the mode key exists
  */
-export function buildCategories(uiMode?: UiMode): ToolCategoryMap {
-    const isOpenai = uiMode === 'openai';
-    return {
-        experimental: [
-            addTool,
-        ],
-        actors: isOpenai
-            ? [openaiSearchActors, openaiFetchActorDetails, openaiCallActor]
-            : [defaultSearchActors, defaultFetchActorDetails, defaultCallActor],
-        ui: isOpenai
-            ? [searchActorsInternalTool, fetchActorDetailsInternalTool]
-            : [],
-        docs: [
-            searchApifyDocsTool,
-            fetchApifyDocsTool,
-        ],
-        runs: [
-            isOpenai ? openaiGetActorRun : defaultGetActorRun,
-            getUserRunsList,
-            getActorRunLog,
-            abortActorRun,
-        ],
-        storage: [
-            getDataset,
-            getDatasetItems,
-            getDatasetSchema,
-            getActorOutput,
-            getKeyValueStore,
-            getKeyValueStoreKeys,
-            getKeyValueStoreRecord,
-            getUserDatasetsList,
-            getUserKeyValueStoresList,
-        ],
-        dev: [
-            getHtmlSkeleton,
-        ],
-    };
+function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: ServerMode): ToolEntry[] {
+    const result: ToolEntry[] = [];
+    for (const entry of entries) {
+        if (isModeMap(entry)) {
+            const tool = entry[mode];
+            if (tool) {
+                result.push(tool);
+            }
+        } else {
+            result.push(entry);
+        }
+    }
+    return result;
+}
+
+/**
+ * Resolve tool categories for a given server mode.
+ *
+ * Returns mode-resolved tool variants: openai mode gets openai-specific implementations
+ * (async execution, widget metadata), default mode gets standard implementations.
+ * Openai-only tools are excluded in default mode.
+ *
+ * @param mode - Required. Use `'default'` or `'openai'`.
+ *   Made explicit (no default value) to prevent accidentally serving wrong-mode tools.
+ */
+export function getCategoryTools(mode: ServerMode): ToolCategoryMap {
+    return Object.fromEntries(
+        CATEGORY_NAMES.map((name) => [name, resolveCategoryEntries(toolCategories[name], mode)]),
+    ) as ToolCategoryMap;
 }
 
 export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = [
