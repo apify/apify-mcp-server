@@ -2649,5 +2649,174 @@ export function createIntegrationTestsSuite(
             expect(details.actorInfo).toHaveProperty('username');
             expect(details.actorInfo).toHaveProperty('description');
         });
+
+        describe('Tool input validation and edge cases', () => {
+            it('should reject fetch-actor-details with empty actor', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                await expect(
+                    client.callTool({
+                        name: 'fetch-actor-details',
+                        arguments: { actor: '' },
+                    }),
+                ).rejects.toThrow(/must NOT have fewer than 1 characters|actor/);
+                await client.close();
+            });
+
+            it('should return helpful error for fetch-actor-details with non-existent actor', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const result = await client.callTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: 'nonexistent-user-xyz/does-not-exist-actor-999' },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toMatch(/not found|verify Actor ID/i);
+                expect(content[0].text).toContain('search-actors');
+                await client.close();
+            });
+
+            it('should reject get-actor-output with empty datasetId', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                await expect(
+                    client.callTool({
+                        name: 'get-actor-output',
+                        arguments: { datasetId: '', offset: 0, limit: 10 },
+                    }),
+                ).rejects.toThrow(/must NOT have fewer than 1 characters|datasetId/);
+                await client.close();
+            });
+
+            it('should return helpful error for get-actor-output with non-existent datasetId', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const result = await client.callTool({
+                    name: 'get-actor-output',
+                    arguments: {
+                        datasetId: 'non-existent-dataset-id-xyz-12345',
+                        offset: 0,
+                        limit: 5,
+                    },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toMatch(/Dataset was not found|not found|verify/i);
+                await client.close();
+            });
+
+            it('should return helpful error for call-actor with non-existent actor', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const result = await client.callTool({
+                    name: 'call-actor',
+                    arguments: {
+                        actor: 'nonexistent-user-xyz/fake-actor-999',
+                        input: {},
+                    },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toMatch(/was not found|verify Actor ID/i);
+                expect(content[0].text).toContain('search-actors');
+                await client.close();
+            });
+
+            it('should reject call-actor with invalid memory (below minimum)', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                await expect(
+                    client.callTool({
+                        name: 'call-actor',
+                        arguments: {
+                            actor: RAG_WEB_BROWSER,
+                            input: { query: 'test' },
+                            callOptions: { memory: 100 },
+                        },
+                    }),
+                ).rejects.toThrow(/memory|128/);
+                await client.close();
+            });
+
+            it('should reject search-apify-docs with empty query', async () => {
+                client = await createClientFn({ tools: ['docs'] });
+                await expect(
+                    client.callTool({
+                        name: 'search-apify-docs',
+                        arguments: { query: '', docSource: 'apify', limit: 5, offset: 0 },
+                    }),
+                ).rejects.toThrow(/must NOT have fewer than 1 characters|query/);
+                await client.close();
+            });
+
+            it('should reject search-apify-docs with invalid docSource', async () => {
+                client = await createClientFn({ tools: ['docs'] });
+                await expect(
+                    client.callTool({
+                        name: 'search-apify-docs',
+                        arguments: { query: 'actor', docSource: 'invalid-doc-source', limit: 3, offset: 0 },
+                    }),
+                ).rejects.toThrow(/allowed values|docSource/);
+                await client.close();
+            });
+
+            it('should reject fetch-apify-docs with empty url', async () => {
+                client = await createClientFn({ tools: ['docs'] });
+                await expect(
+                    client.callTool({
+                        name: 'fetch-apify-docs',
+                        arguments: { url: '' },
+                    }),
+                ).rejects.toThrow(/must NOT have fewer than 1 characters|url/);
+                await client.close();
+            });
+
+            it('should reject get-actor-run with empty runId', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                await expect(
+                    client.callTool({
+                        name: 'get-actor-run',
+                        arguments: { runId: '' },
+                    }),
+                ).rejects.toThrow(/must NOT have fewer than 1 characters|runId/);
+                await client.close();
+            });
+
+            it('should return helpful error for get-actor-run with non-existent runId', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const result = await client.callTool({
+                    name: 'get-actor-run',
+                    arguments: { runId: 'nonexistent-run-id-xyz' },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toMatch(/not found/);
+                await client.close();
+            });
+
+            it('should accept search-actors with empty keywords (returns store results)', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const result = await client.callTool({
+                    name: 'search-actors',
+                    arguments: { keywords: '', limit: 2, offset: 0 },
+                });
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(result.isError).not.toBe(true);
+                await client.close();
+            });
+
+            it('should support search-actors pagination with limit and offset', async () => {
+                client = await createClientFn({ tools: ['actors'] });
+                const page1 = await client.callTool({
+                    name: 'search-actors',
+                    arguments: { keywords: 'scraper', limit: 2, offset: 0 },
+                });
+                const page2 = await client.callTool({
+                    name: 'search-actors',
+                    arguments: { keywords: 'scraper', limit: 2, offset: 2 },
+                });
+                const c1 = page1.content as { text: string }[];
+                const c2 = page2.content as { text: string }[];
+                expect(c1.length).toBeGreaterThan(0);
+                expect(c2.length).toBeGreaterThan(0);
+                await client.close();
+            });
+        });
     });
 }
