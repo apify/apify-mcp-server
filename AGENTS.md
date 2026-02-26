@@ -45,7 +45,7 @@ The codebase is organized into logical modules:
 
 - Entry points:
   - `src/index.ts` - Main library export (`ActorsMcpServer` class)
-  - `src/index-internals.ts` - Internal exports for testing and advanced usage
+  - `src/index_internals.ts` - Internal exports for testing and advanced usage
   - `src/stdio.ts` - Standard input/output entry point (CLI, used for Docker)
   - `src/main.ts` - Actor entry point (for Apify platform)
   - `src/input.ts` - Input processing and validation
@@ -195,7 +195,7 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 - **Constants**: Use uppercase `SNAKE_CASE` for global, immutable constants (e.g., `ACTOR_MAX_MEMORY_MBYTES`, `SERVER_NAME`)
 - **Functions & Variables**: Use `camelCase` format (e.g., `fetchActorDetails`, `actorClient`)
 - **Classes, Types, Interfaces**: Use `PascalCase` format (e.g., `ActorsMcpServer`, `ActorDetailsResult`)
-- **Files & Folders**: Use lowercase `snake_case` format (e.g., `actor_details.ts`, `key_value_store.ts`)
+- **Files & Folders**: Use lowercase `snake_case` format (e.g., `actor_details.ts`, `key_value_store.ts`). **NEVER use kebab-case** (`kebab-case.ts`) for file or folder names — always use underscores, not hyphens.
 - **Booleans**: Prefix with `is`, `has`, or `should` (e.g., `isValid`, `hasFinished`, `shouldRetry`)
 - **Units**: Suffix with the unit of measure (e.g., `intervalMillis`, `maxMemoryBytes`)
 - **Date/Time**: Suffix with `At` (e.g., `createdAt`, `updatedAt`)
@@ -283,10 +283,10 @@ We use **4 spaces** for indentation (configured in `.editorconfig`).
 ### Common patterns
 
 - **Tool implementation**: Tools are defined in `src/tools/` using Zod schemas for validation
-- **Actor interaction**: Use `src/utils/apify-client.ts` for Apify API calls, never call Apify API directly
+- **Actor interaction**: Use `src/utils/apify_client.ts` for Apify API calls, never call Apify API directly
 - **Error responses**: Return user-friendly error messages with suggestions
 - **Input validation**: Always validate tool inputs with Zod before processing
-- **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl-lru.ts`)
+- **Caching**: Use TTL-based caching for Actor schemas and details (see `src/utils/ttl_lru.ts`)
 - **Constants and Tool Names**: Always use constants and never magic or hardcoded values. When referring to tools, ALWAYS use the `HelperTools` enum.
   - **Exception**: Integration tests (`tests/integration/`) must use hardcoded strings for tool names. This ensures tests fail if a tool is renamed, helping to prevent accidental breaking changes.
 

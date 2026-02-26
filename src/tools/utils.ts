@@ -10,7 +10,7 @@ import {
     addPseudoUrlsProperties,
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
-} from '../utils/apify-properties.js';
+} from '../utils/apify_properties.js';
 
 /*
  * Checks if the given ActorInfo represents an MCP server Actor.
