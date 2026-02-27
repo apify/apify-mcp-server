@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Allow fetch-actor-details tool without authentication ([#496](https://github.com/apify/apify-mcp-server/pull/496)) ([f9292fb](https://github.com/apify/apify-mcp-server/commit/f9292fb5ef827a8f6a13327c8fd12464098ac145)) by [@Jkuzz](https://github.com/Jkuzz)
+- **web:** Change web dev server port [internal] ([#508](https://github.com/apify/apify-mcp-server/pull/508)) ([4a91711](https://github.com/apify/apify-mcp-server/commit/4a91711fda1d0b59c8281df8d37ae851d5bbf83e)) by [@baldasseva](https://github.com/baldasseva)
 
 ### 🐛 Bug Fixes
 
