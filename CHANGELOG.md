@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 - Return only 5 results instead of 10, clamLines in search-actor ([#500](https://github.com/apify/apify-mcp-server/pull/500)) ([9ffe117](https://github.com/apify/apify-mcp-server/commit/9ffe1171a85dea83d07b78e0b42f12b29fbb81da)) by [@jirispilka](https://github.com/jirispilka)
 - Update ActorCard and ActorSearch components for consistent styling ([#505](https://github.com/apify/apify-mcp-server/pull/505)) ([b6ee8a7](https://github.com/apify/apify-mcp-server/commit/b6ee8a777f06b8c271b967d74d6593c4a73771b9)) by [@jirispilka](https://github.com/jirispilka)
 - **web:** Capitalize Actor in loading text per style guide ([#503](https://github.com/apify/apify-mcp-server/pull/503)) ([d7ec2b2](https://github.com/apify/apify-mcp-server/commit/d7ec2b2417b687158fc554e98a7b6409859b6ba5)) by [@jirispilka](https://github.com/jirispilka)
+- Simplify AGENTS.md by moving coding standards to CONTRIBUTING.md  ([#504](https://github.com/apify/apify-mcp-server/pull/504)) ([0fc4d96](https://github.com/apify/apify-mcp-server/commit/0fc4d9672045cccd57583481f435bc7ae46fdbdf)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
