@@ -45,12 +45,13 @@ function getAllInternalToolNames(): Set<string> {
  * @param input The processed Input object
  * @param apifyClient The Apify client instance
  * @param mode Server mode for tool variant resolution
+ * @param actorStore
  * @returns An array of tool entries
  */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    mode: ServerMode,
+    mode: ServerMode = 'default',
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     // Build mode-resolved categories — tools are already the correct variant for this mode
@@ -70,6 +71,7 @@ export async function loadToolsFromInput(
     const selectorsExplicitEmpty = selectorsProvided && (selectors as string[]).length === 0;
     const addActorEnabled = input.enableAddingActors === true;
     const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
+    const explicitlyNoToolsRequested = selectorsExplicitEmpty || actorsExplicitlyEmpty;
 
     // Build mode-specific tool-by-name map for individual tool selection
     const modeToolByName = new Map<string, ToolEntry>();
@@ -157,7 +159,7 @@ export async function loadToolsFromInput(
     }
 
     // In openai mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (mode === 'openai') {
+    if (mode === 'openai' && !explicitlyNoToolsRequested) {
         result.push(...categories.ui);
     }
 
@@ -181,7 +183,7 @@ export async function loadToolsFromInput(
     const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || mode === 'openai')) {
+    if (!hasGetActorRun && (hasCallActor || (mode === 'openai' && !explicitlyNoToolsRequested))) {
         // Use mode-resolved get-actor-run variant
         const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
         if (modeGetActorRun) toolsToInject.push(modeGetActorRun);

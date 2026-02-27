@@ -16,6 +16,6 @@ const instructionsByMode: Record<ServerMode, () => string> = {
 /**
  * Build server instructions for the given server mode.
  */
-export function getServerInstructions(mode: ServerMode): string {
+export function getServerInstructions(mode: ServerMode = 'default'): string {
     return instructionsByMode[mode]();
 }

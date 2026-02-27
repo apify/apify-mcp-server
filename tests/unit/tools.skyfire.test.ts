@@ -157,6 +157,7 @@ describe('applySkyfireAugmentation', () => {
                 type: 'string',
                 description: SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
             });
+            expect(Object.isFrozen(result)).toBe(true);
         });
 
         // Test each SKYFIRE_ENABLED_TOOLS member
@@ -181,6 +182,7 @@ describe('applySkyfireAugmentation', () => {
 
             const props = result.inputSchema.properties as Record<string, unknown>;
             expect(props['skyfire-pay-id']).toBeDefined();
+            expect(Object.isFrozen(result)).toBe(true);
         });
     });
 

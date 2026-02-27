@@ -32,7 +32,7 @@ npm run evals:workflow -- --category search
 # Run specific test
 npm run evals:workflow -- --id search-google-maps
 
-# Filter by line range in test-cases.json
+# Filter by line range in test_cases.json
 npm run evals:workflow -- --lines 277-283
 
 # Show detailed conversation logs
@@ -242,7 +242,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 | `--id <id>` | | Run specific test by ID | All tests |
 | `--lines <range>` | `-l` | Filter by line range in test-cases.json | All tests |
 | `--verbose` | | Show detailed conversation logs | `false` |
-| `--test-cases-path <path>` | | Custom test cases file path | `test-cases.json` |
+| `--test-cases-path <path>` | | Custom test cases file path | `test_cases.json` |
 | `--agent-model <model>` | | Override agent model | `anthropic/claude-haiku-4.5` |
 | `--judge-model <model>` | | Override judge model | `x-ai/grok-4.1-fast` |
 | `--tool-timeout <seconds>` | | Tool call timeout | `60` |
@@ -252,7 +252,7 @@ export OPENROUTER_API_KEY="your_openrouter_key" # Get from https://openrouter.ai
 
 ### Line Range Filtering
 
-The `--lines` (or `-l`) option filters test cases by their line numbers in the `test-cases.json` file.
+The `--lines` (or `-l`) option filters test cases by their line numbers in the `test_cases.json` file.
 
 **Format options:**
 - **Single line:** `--lines 100` (includes tests that contain line 100)

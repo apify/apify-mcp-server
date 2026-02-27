@@ -146,7 +146,7 @@ function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: Ser
  * @param mode - Required. Use `'default'` or `'openai'`.
  *   Made explicit (no default value) to prevent accidentally serving wrong-mode tools.
  */
-export function getCategoryTools(mode: ServerMode): ToolCategoryMap {
+export function getCategoryTools(mode: ServerMode = 'default'): ToolCategoryMap {
     return Object.fromEntries(
         CATEGORY_NAMES.map((name) => [name, resolveCategoryEntries(toolCategories[name], mode)]),
     ) as ToolCategoryMap;

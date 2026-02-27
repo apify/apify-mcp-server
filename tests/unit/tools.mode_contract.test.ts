@@ -125,6 +125,16 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         }
     });
 
+    describe('mode-specific call-actor behavior guidance', () => {
+        it('should document that openai call-actor always runs asynchronously', () => {
+            const openaiCallActor = openaiCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+
+            expect(openaiCallActor).toBeDefined();
+            expect(openaiCallActor!.description).toContain('always runs asynchronously');
+            expect(openaiCallActor!.description).toContain('do NOT poll or call any other tool');
+        });
+    });
+
     describe('tool definitions are frozen', () => {
         for (const mode of SERVER_MODES) {
             const categories = getCategoryTools(mode);

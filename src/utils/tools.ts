@@ -110,5 +110,5 @@ export function applySkyfireAugmentation(tool: ToolEntry): ToolEntry {
         }
     }
 
-    return cloned;
+    return Object.freeze(cloned);
 }

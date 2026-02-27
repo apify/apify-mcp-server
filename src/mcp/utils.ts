@@ -42,8 +42,14 @@ export function getProxyMCPServerToolName(url: string, toolName: string): string
  * @param url The URL to process
  * @param apifyClient The Apify client instance
  * @param mode Server mode for tool variant resolution
+ * @param actorStore
  */
-export async function processParamsGetTools(url: string, apifyClient: ApifyClient, mode: ServerMode, actorStore?: ActorStore) {
+export async function processParamsGetTools(
+    url: string,
+    apifyClient: ApifyClient,
+    mode: ServerMode = 'default',
+    actorStore?: ActorStore,
+) {
     const input = parseInputParamsFromUrl(url);
     return await loadToolsFromInput(input, apifyClient, mode, actorStore);
 }

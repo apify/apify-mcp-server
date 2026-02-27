@@ -22,7 +22,7 @@ export type WorkflowTestCaseWithLineNumbers = WorkflowTestCase & TestCaseWithLin
  * Load workflow test cases from JSON file with validation
  */
 export function loadTestCases(filePath?: string): WorkflowTestCase[] {
-    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test-cases.json');
+    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test_cases.json');
 
     if (!fs.existsSync(testCasesPath)) {
         throw new Error(`Test cases file not found: ${testCasesPath}`);
@@ -89,7 +89,7 @@ export function loadTestCasesWithLineNumbers(filePath?: string): {
     testCases: WorkflowTestCaseWithLineNumbers[];
     totalLines: number;
 } {
-    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test-cases.json');
+    const testCasesPath = filePath || path.join(process.cwd(), 'evals/workflows/test_cases.json');
 
     if (!fs.existsSync(testCasesPath)) {
         throw new Error(`Test cases file not found: ${testCasesPath}`);

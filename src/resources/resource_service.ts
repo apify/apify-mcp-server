@@ -23,12 +23,12 @@ type ResourceService = {
 
 type ResourceServiceOptions = {
     skyfireMode?: boolean;
-    mode: ServerMode;
+    mode?: ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { skyfireMode, mode, getAvailableWidgets } = options;
+    const { skyfireMode, mode = 'default', getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
