@@ -445,7 +445,7 @@ export const ActorRun: React.FC = () => {
                 <Container>
                     <EmptyStateContainer>
                         <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                            Loading actor run data...
+                            Loading Actor run data ...
                         </Text>
                     </EmptyStateContainer>
                 </Container>
