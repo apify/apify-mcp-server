@@ -1,9 +1,10 @@
 /* eslint-disable no-console */
-const { execSync } = require('node:child_process');
-const fs = require('node:fs');
-const path = require('node:path');
+import { execSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const PKG_JSON_PATH = path.join(__dirname, '..', '..', 'package.json');
+const PKG_JSON_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
 
 // eslint-disable-next-line import/no-dynamic-require
 const pkgJson = require(PKG_JSON_PATH);
@@ -15,7 +16,7 @@ const nextVersion = addBetaSuffixToVersion(VERSION);
 console.log(`before-deploy: Setting version to ${nextVersion}`);
 pkgJson.version = nextVersion;
 
-fs.writeFileSync(PKG_JSON_PATH, `${JSON.stringify(pkgJson, null, 2)}\n`);
+writeFileSync(PKG_JSON_PATH, `${JSON.stringify(pkgJson, null, 2)}\n`);
 
 function addBetaSuffixToVersion(version) {
     const versionString = execSync(`npm show ${PACKAGE_NAME} versions --json`, { encoding: 'utf8' });
