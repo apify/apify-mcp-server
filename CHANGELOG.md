@@ -21,6 +21,7 @@ All notable changes to this project will be documented in this file.
 - Simplify AGENTS.md by moving coding standards to CONTRIBUTING.md  ([#504](https://github.com/apify/apify-mcp-server/pull/504)) ([0fc4d96](https://github.com/apify/apify-mcp-server/commit/0fc4d9672045cccd57583481f435bc7ae46fdbdf)) by [@jirispilka](https://github.com/jirispilka)
 - **ci:** Convert before-beta-release script to ESM ([#512](https://github.com/apify/apify-mcp-server/pull/512)) ([4723327](https://github.com/apify/apify-mcp-server/commit/4723327066bbb0fe1d708379edcf1c9a3a269c1e)) by [@janbuchar](https://github.com/janbuchar)
 - **ci:** Fix conversion of before-beta-release script to ESM ([#514](https://github.com/apify/apify-mcp-server/pull/514)) ([5987059](https://github.com/apify/apify-mcp-server/commit/5987059947fbfcfe9c9e1998e5b7fffff51a5780)) by [@janbuchar](https://github.com/janbuchar)
+- **ci:** Add missing npm install ([#515](https://github.com/apify/apify-mcp-server/pull/515)) ([73579a9](https://github.com/apify/apify-mcp-server/commit/73579a9a02adc7e9e553356c91f8042af15bbf3f)) by [@janbuchar](https://github.com/janbuchar)
 
 
 <!-- git-cliff-unreleased-end -->
