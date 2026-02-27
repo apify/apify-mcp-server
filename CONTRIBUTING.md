@@ -5,7 +5,7 @@ All pull requests are subject to automated and manual review against these guide
 
 ---
 
-## 1. Commit Messages and PR Titles
+## Commit Messages and PR Titles
 
 All commits and PR titles must follow the **[Conventional Commits](https://www.conventionalcommits.org/)** format.
 Both the **type** (`feat`, `fix`, `chore`, etc.) and the **scope** (the component in parentheses) are required.
@@ -26,7 +26,7 @@ chore: Update dependencies
 
 ---
 
-## 2. Pull Request Descriptions
+## Pull Request Descriptions
 
 Your PR description should extend your commit message:
 - Explain **what**, **why**, and **how**.
@@ -36,7 +36,7 @@ Your PR description should extend your commit message:
 
 ---
 
-## 3. Pull Request Comments
+## Pull Request Comments
 
 Use comments to guide reviewers:
 - Flag code that was **just moved**, so they don't re-review it.
@@ -45,14 +45,14 @@ Use comments to guide reviewers:
 
 ---
 
-## 4. Pull Request Size
+## Pull Request Size
 
 - Aim for ≤ **300 lines changed**.
 - Large PRs should be split into smaller, focused changes.
 
 ---
 
-## 5. Coding Standards & Pitfalls
+## Coding Standards & Pitfalls
 
 ### Key reminders
 *   **Keep logic flat**: avoid deep nesting and unnecessary `else`; return early instead.
@@ -220,7 +220,7 @@ Use comments to guide reviewers:
 
 ---
 
-## 6. Design System Compliance (MANDATORY)
+## Design System Compliance (MANDATORY)
 
 **READ FIRST**: [DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md) — Complete design system rules.
 
@@ -237,13 +237,13 @@ Use comments to guide reviewers:
 
 ---
 
-## 7. Development Setup
+## Development Setup
 
 For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
 ---
 
-## 8. Code Review Guidelines
+## Code Review Guidelines
 
 - Make **two passes** on substantial PRs:
   - First: understand changes at a high level.
@@ -253,7 +253,7 @@ For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](.
 
 ---
 
-## 9. Testing
+## Testing
 
 - Write tests for new features and bug fixes.
 - Ensure all tests pass before submitting a PR.
@@ -262,7 +262,7 @@ For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](.
 
 ---
 
-## 10. Documentation
+## Documentation
 
 - Update README.md if adding new features or changing behavior.
 - Add JSDoc comments for public APIs.
@@ -270,7 +270,7 @@ For local development setup, scripts, and manual testing, see [DEVELOPMENT.md](.
 
 ---
 
-## 11. Questions?
+## Questions?
 
 If you have questions or need help, please:
 - Open an issue for discussion
