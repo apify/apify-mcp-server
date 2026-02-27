@@ -11,10 +11,10 @@ import log from '@apify/log';
 // Re-export shared config
 export { OPENROUTER_CONFIG, sanitizeHeaderValue, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
 
-// Read version from test-cases.json
+// Read the version from test-cases.json
 function getTestCasesVersion(): string {
     const dir = dirname(fileURLToPath(import.meta.url));
-    const raw = readFileSync(join(dir, 'test-cases.json'), 'utf-8');
+    const raw = readFileSync(join(dir, 'test_cases.json'), 'utf-8');
     return JSON.parse(raw).version;
 }
 
@@ -28,7 +28,7 @@ export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES]
 
 // Models to evaluate
 // 'openai/gpt-4.1-mini', // DO NOT USE - it has much worse performance than gpt-4o-mini and other models
-// 'openai/gpt-4o-mini',  // Neither used in cursor nor copilot
+// 'openai/gpt-4o-mini', // Neither used in cursor nor copilot
 // 'openai/gpt-4.1',
 export const MODELS_TO_EVALUATE = [
     'anthropic/claude-haiku-4.5',

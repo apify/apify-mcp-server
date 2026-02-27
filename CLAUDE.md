@@ -45,7 +45,7 @@ The codebase is organized into logical modules:
 
 - Entry points:
   - `src/index.ts` - Main library export (`ActorsMcpServer` class)
-  - `src/index-internals.ts` - Internal exports for testing and advanced usage
+  - `src/index_internals.ts` - Internal exports for testing and advanced usage
   - `src/stdio.ts` - Standard input/output entry point (CLI, used for Docker)
   - `src/main.ts` - Actor entry point (for Apify platform)
   - `src/input.ts` - Input processing and validation

@@ -44,13 +44,13 @@ export OPENROUTER_API_KEY="your_key"
 export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
 npm ci
-npm run evals:create-dataset  # one-time: creates dataset from test-cases.json
+npm run evals:create-dataset  # one-time: creates dataset from test_cases.json
 npm run evals:run              # runs evaluation on default dataset (v1.4)
 ```
 
 ### Using a specific dataset version
 
-By default, the evaluation uses the dataset version from `test-cases.json` (`v1.4`). To use a different dataset:
+By default, the evaluation uses the dataset version from `test_cases.json` (`v1.4`). To use a different dataset:
 
 ```bash
 # Create a new dataset with custom name
@@ -285,4 +285,3 @@ NOTES:
 // System prompt - instructions mainly cursor (very similar instructions in copilot)
 // https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/Cursor%20Prompts/Agent%20Prompt%20v1.2.txt
 // https://github.com/x1xhlol/system-prompts-and-models-of-ai-tools/blob/main/VSCode%20Agent/Prompt.txt
-
