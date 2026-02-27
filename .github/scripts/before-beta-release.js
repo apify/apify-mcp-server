@@ -1,13 +1,12 @@
 /* eslint-disable no-console */
 import { execSync } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PKG_JSON_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
 
-// eslint-disable-next-line import/no-dynamic-require
-const pkgJson = require(PKG_JSON_PATH);
+const pkgJson = JSON.parse(readFileSync(PKG_JSON_PATH, 'utf8'));
 
 const PACKAGE_NAME = pkgJson.name;
 const VERSION = pkgJson.version;
