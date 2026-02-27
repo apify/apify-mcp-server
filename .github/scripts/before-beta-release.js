@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import { execSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const PKG_JSON_PATH = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'package.json');
