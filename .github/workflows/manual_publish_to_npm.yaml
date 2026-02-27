@@ -46,6 +46,7 @@ jobs:
             -   name: Build web widgets
                 working-directory: src/web
                 run: |
+                    npm ci --force
                     npm run build
             -   name: Build module
                 run: npm run build
