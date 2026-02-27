@@ -13,6 +13,11 @@ const mockRunData = {
     },
 };
 
+// Mock toolResponseMetadata (_meta) with real USD cost
+const mockToolResponseMetadata = {
+    usageTotalUsd: 0.0456,
+};
+
 // Simulate 5-second loading delay to test skeleton
 const LOADING_DELAY_MS = 2000;
 
@@ -21,6 +26,7 @@ const isMockEnvironment = typeof window !== "undefined" && !window.openai;
 
 setupMockOpenAi({
     toolOutput: mockRunData, // Start with basic data (no dataset) to show header immediately
+    toolResponseMetadata: mockToolResponseMetadata, // Real USD cost from _meta
     initialWidgetState: {
         isPolling: false,
         lastUpdateTime: Date.now(),
@@ -33,6 +39,9 @@ setupMockOpenAi({
 
             return {
                 result: "success",
+                _meta: {
+                    usageTotalUsd: isComplete ? 0.0456 : 0.0123,
+                },
                 structuredContent: {
                     runId: args.runId || "test_run_123",
                     actorName: "apify/rag-web-browser",

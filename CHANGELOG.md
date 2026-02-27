@@ -2,6 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.3 - **not yet released**
+
+### 🚀 Features
+
+- Allow fetch-actor-details tool without authentication ([#496](https://github.com/apify/apify-mcp-server/pull/496)) ([f9292fb](https://github.com/apify/apify-mcp-server/commit/f9292fb5ef827a8f6a13327c8fd12464098ac145)) by [@Jkuzz](https://github.com/Jkuzz)
+
+### 🐛 Bug Fixes
+
+- Update readme return behavior in `fetch-actor-details` tool documentation. ([#495](https://github.com/apify/apify-mcp-server/pull/495)) ([be7dd06](https://github.com/apify/apify-mcp-server/commit/be7dd06dc5409556339debe5732022c1769b8d95)) by [@jirispilka](https://github.com/jirispilka)
+- Clarify Skyfire PAY token format in documentation ([#492](https://github.com/apify/apify-mcp-server/pull/492)) ([7abb0e3](https://github.com/apify/apify-mcp-server/commit/7abb0e38edcd055e448f7d142b5e198e332411e9)) by [@MQ37](https://github.com/MQ37)
+- Use USD cost from toolResponseMetadata instead of computeUnits ([#493](https://github.com/apify/apify-mcp-server/pull/493)) ([9791792](https://github.com/apify/apify-mcp-server/commit/9791792000fbdd07de54bbb3f985d7bbd281cc7c)) by [@MQ37](https://github.com/MQ37)
+- Return only 5 results instead of 10, clamLines in search-actor ([#500](https://github.com/apify/apify-mcp-server/pull/500)) ([9ffe117](https://github.com/apify/apify-mcp-server/commit/9ffe1171a85dea83d07b78e0b42f12b29fbb81da)) by [@jirispilka](https://github.com/jirispilka)
+- Update ActorCard and ActorSearch components for consistent styling ([#505](https://github.com/apify/apify-mcp-server/pull/505)) ([b6ee8a7](https://github.com/apify/apify-mcp-server/commit/b6ee8a777f06b8c271b967d74d6593c4a73771b9)) by [@jirispilka](https://github.com/jirispilka)
+- **web:** Capitalize Actor in loading text per style guide ([#503](https://github.com/apify/apify-mcp-server/pull/503)) ([d7ec2b2](https://github.com/apify/apify-mcp-server/commit/d7ec2b2417b687158fc554e98a7b6409859b6ba5)) by [@jirispilka](https://github.com/jirispilka)
+- Simplify AGENTS.md by moving coding standards to CONTRIBUTING.md  ([#504](https://github.com/apify/apify-mcp-server/pull/504)) ([0fc4d96](https://github.com/apify/apify-mcp-server/commit/0fc4d9672045cccd57583481f435bc7ae46fdbdf)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.9.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.2) (2026-02-24)
+
+### 🐛 Bug Fixes
+
+- Soft-fail MCP server connection errors instead of throwing ([#485](https://github.com/apify/apify-mcp-server/pull/485)) ([06280fb](https://github.com/apify/apify-mcp-server/commit/06280fbb80af909199162fe68fd92b3b75a1f7cb)) by [@MQ37](https://github.com/MQ37), closes [#475](https://github.com/apify/apify-mcp-server/issues/475)
+
+
 ## [0.9.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.1) (2026-02-18)
 
 ### 🐛 Bug Fixes

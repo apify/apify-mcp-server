@@ -1,0 +1,48 @@
+name: CI (master)
+
+on:
+    push:
+        branches:
+            - master
+        tags-ignore:
+            - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
+
+concurrency:
+    group: release
+    cancel-in-progress: false
+
+jobs:
+    code_checks:
+        name: Code checks
+        uses: ./.github/workflows/_check_code.yaml
+
+    release_metadata:
+        # Skip this for "ci", "docs" and "test" commits
+        if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'test')"
+        name: Update pre-release metadata
+        uses: ./.github/workflows/_update_release_metadata.yaml
+        secrets: inherit
+        with:
+          release_type: prerelease
+
+    publish_to_pkg_pr_new:
+        needs: [ release_metadata ]
+        name: Publish to pkg.pr.new
+        uses: ./.github/workflows/_publish_to_pkg_pr_new.yaml
+        with:
+            ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
+
+    publish_to_npm:
+        name: Publish to NPM
+        needs: [ release_metadata ]
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Execute publish workflow
+                uses: apify/workflows/execute-workflow@main
+                with:
+                    workflow: manual_publish_to_npm.yaml
+                    inputs: >
+                        { 
+                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}", 
+                            "tag": "beta" 
+                        }

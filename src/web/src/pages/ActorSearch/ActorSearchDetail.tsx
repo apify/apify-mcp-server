@@ -26,7 +26,7 @@ const Container = styled(Box)`
     height: 100%;
     overflow: auto;
     background: ${theme.color.neutral.background};
-    border-radius: ${theme.radius.radius8};
+    border-radius: ${theme.radius.radius12};
     border: 1px solid ${theme.color.neutral.separatorSubtle};
 `;
 

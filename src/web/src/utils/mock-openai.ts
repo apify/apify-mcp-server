@@ -3,6 +3,7 @@ import { MOCK_ACTOR_DETAILS_RESPONSE } from "./mock-actor-details";
 
 interface MockOpenAiConfig {
     toolOutput?: any;
+    toolResponseMetadata?: any;
     callTool?: (name: string, args: any) => Promise<any>;
     initialWidgetState?: any;
 }
@@ -67,7 +68,7 @@ export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
         },
         toolInput: {},
         toolOutput: config.toolOutput || {},
-        toolResponseMetadata: null,
+        toolResponseMetadata: config.toolResponseMetadata || null,
         widgetState: config.initialWidgetState || {
             isPolling: false,
             lastUpdateTime: Date.now(),

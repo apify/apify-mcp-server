@@ -1,0 +1,16 @@
+name: CI (PR merged)
+
+on:
+    pull_request:
+        types: [closed]
+        branches:
+            - master
+
+jobs:
+    evaluations:
+        name: MCP tool calling evaluations
+        if: github.event.pull_request.merged == true
+        uses: ./.github/workflows/_evaluations.yaml
+        secrets: inherit
+        with:
+            pr_number: ${{ github.event.pull_request.number }}

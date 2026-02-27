@@ -12,8 +12,8 @@ const searchActorsInternalArgsSchema = z.object({
         .int()
         .min(1)
         .max(100)
-        .default(10)
-        .describe('The maximum number of Actors to return (default = 10)'),
+        .default(5)
+        .describe('The maximum number of Actors to return (default = 5)'),
     offset: z.number()
         .int()
         .min(0)

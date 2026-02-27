@@ -204,7 +204,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in the Apify Store. | ✅ |
-| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README, pricing, and Actor output schema. | ✅ |
+| `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
 | `call-actor`* | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ❔ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. |  |
 | `get-actor-output`* | - | Retrieve the output from an Actor call which is not included in the output preview of the Actor tool. | ✅ |
@@ -429,7 +429,7 @@ Upon launching, the Inspector will display a URL that you can open in your brows
 ## Unauthenticated access
 
 When the `tools` query parameter includes only tools explicitly enabled for unauthenticated use, the hosted server allows access without an API token.
-Currently allowed tools: `search-actors`, `search-apify-docs`, `fetch-apify-docs`.
+Currently allowed tools: `search-actors`, `fetch-actor-details`, `search-apify-docs`, `fetch-apify-docs`.
 Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases

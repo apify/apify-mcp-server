@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import log from '@apify/log';
 
 import { TimeoutError } from '../errors.js';
-import { logHttpError } from '../utils/logging.js';
+import { getHttpStatusCode } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
 import { getMCPServerID } from './utils.js';
 
@@ -16,10 +16,8 @@ import { getMCPServerID } from './utils.js';
 export async function connectMCPClient(
     url: string, token: string, mcpSessionId?: string,
 ): Promise<Client | null> {
-    let client: Client;
     try {
-        client = await createMCPStreamableClient(url, token);
-        return client;
+        return await createMCPStreamableClient(url, token);
     } catch (error) {
         // If streamable HTTP transport fails on not timeout error, continue with SSE transport
         if (error instanceof TimeoutError) {
@@ -34,15 +32,21 @@ export async function connectMCPClient(
     }
 
     try {
-        client = await createMCPSSEClient(url, token);
-        return client;
+        return await createMCPSSEClient(url, token);
     } catch (error) {
         if (error instanceof TimeoutError) {
             log.warning('Connection to MCP server using SSE transport timed out', { url, mcpSessionId });
             return null;
         }
-        logHttpError(error, 'Failed to connect to MCP server using SSE transport', { url, mcpSessionId, cause: error });
-        throw error;
+        // External MCP server unavailability is operational, not a bug in our service
+        const statusCode = getHttpStatusCode(error);
+        log.softFail('Failed to connect to MCP server using SSE transport', {
+            url,
+            mcpSessionId,
+            statusCode,
+            error: error instanceof Error ? error.message : String(error),
+        });
+        return null;
     }
 }
 
