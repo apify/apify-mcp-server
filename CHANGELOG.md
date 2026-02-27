@@ -20,6 +20,7 @@ All notable changes to this project will be documented in this file.
 - **web:** Capitalize Actor in loading text per style guide ([#503](https://github.com/apify/apify-mcp-server/pull/503)) ([d7ec2b2](https://github.com/apify/apify-mcp-server/commit/d7ec2b2417b687158fc554e98a7b6409859b6ba5)) by [@jirispilka](https://github.com/jirispilka)
 - Simplify AGENTS.md by moving coding standards to CONTRIBUTING.md  ([#504](https://github.com/apify/apify-mcp-server/pull/504)) ([0fc4d96](https://github.com/apify/apify-mcp-server/commit/0fc4d9672045cccd57583481f435bc7ae46fdbdf)) by [@jirispilka](https://github.com/jirispilka)
 - **ci:** Convert before-beta-release script to ESM ([#512](https://github.com/apify/apify-mcp-server/pull/512)) ([4723327](https://github.com/apify/apify-mcp-server/commit/4723327066bbb0fe1d708379edcf1c9a3a269c1e)) by [@janbuchar](https://github.com/janbuchar)
+- **ci:** Fix conversion of before-beta-release script to ESM ([#514](https://github.com/apify/apify-mcp-server/pull/514)) ([5987059](https://github.com/apify/apify-mcp-server/commit/5987059947fbfcfe9c9e1998e5b7fffff51a5780)) by [@janbuchar](https://github.com/janbuchar)
 
 
 <!-- git-cliff-unreleased-end -->
