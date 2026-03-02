@@ -72,7 +72,7 @@ function injectStylesheets(): void {
 
     // Inject base font size so 1rem = 10px in the iframe
     injectElement("apify-base-font-size", "style", {
-        textContent: `html, :root { font-size: 10px; }`,
+        textContent: `html, :root { font-size: 10px !important; }`,
     });
 
     // Inject CSS variables
