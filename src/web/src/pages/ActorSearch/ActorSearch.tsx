@@ -52,7 +52,6 @@ export const ActorSearch: React.FC = () => {
 
     return (
         <WidgetLayout>
-            Dummy text
             <ActorSearchResults>
             {showDetails ? (
                 <ActorSearchDetail details={actorDetails!} />
