@@ -7,6 +7,9 @@ on:
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
+permissions:
+    actions: write
+
 concurrency:
     group: release
     cancel-in-progress: false
@@ -46,4 +49,3 @@ jobs:
                             "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}",
                             "tag": "beta"
                         }
-                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
