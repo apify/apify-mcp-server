@@ -42,7 +42,8 @@ jobs:
                 with:
                     workflow: manual_publish_to_npm.yaml
                     inputs: >
-                        { 
-                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}", 
-                            "tag": "beta" 
+                        {
+                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}",
+                            "tag": "beta"
                         }
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

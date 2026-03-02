@@ -98,10 +98,11 @@ jobs:
                 with:
                     workflow: manual_publish_to_npm.yaml
                     inputs: >
-                        { 
-                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}", 
-                            "tag": "latest" 
+                        {
+                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}",
+                            "tag": "latest"
                         }
+                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
     bump_dependency_in_internal_repo:
         name: Bump dependency in apify-mcp-server-internal
