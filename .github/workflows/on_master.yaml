@@ -7,9 +7,6 @@ on:
         tags-ignore:
             - "**" # Ignore all tags to prevent duplicate builds when tags are pushed.
 
-permissions:
-    actions: write
-
 concurrency:
     group: release
     cancel-in-progress: false
