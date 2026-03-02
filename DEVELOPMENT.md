@@ -148,27 +148,9 @@ You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP ser
 
 #### Setting up the connection
 
-To expose the local server externally, use ngrok. The ngrok account credentials are stored in **1Password**.
-
-Add the following to `~/.config/ngrok/ngrok.yml`:
-
-```yaml
-tunnels:
-  app:
-    addr: 3001
-    proto: http
-    domain: mcp-apify.ngrok.dev
-```
-
-Then start the tunnel:
-
-```bash
-ngrok start app
-```
-
 1. Click **"Add new server"**
 2. Fill in a name for the server
-3. Enter the URL: `http://localhost:3001/mcp?ui=openai` or `https://mcp-apify.ngrok.dev/mcp?ui=openai` if using ngrok (Note: the `ui=openai` query parameter is required for widget rendering)
+3. Enter the URL: `http://localhost:3001/mcp?ui=openai` (Note: the `ui=openai` query parameter is required for widget rendering)
 4. Select **"No authentication"** as the auth method
 5. Click **Add**
 
@@ -189,3 +171,38 @@ For a better testing experience with widget rendering:
 1. Navigate to the **"Chat"** section in the left sidebar
 2. Add your `OPENAI_API_KEY` (or Anthropic API key, or OpenRouter API key)
 3. Chat with the MCP server directly, widgets will be rendered inline
+
+### Testing with ChatGPT (optional)
+
+You can test widget rendering on [chatgpt.com](https://chatgpt.com) by exposing the local server via ngrok. See the [Apify ChatGPT integration docs](https://docs.apify.com/platform/integrations/chatgpt) for background.
+
+#### Setting up ngrok
+
+The ngrok account credentials are stored in **1Password**. The static domain `mcp-apify.ngrok.dev` has already been created — no setup required.
+
+Add the following to `~/.config/ngrok/ngrok.yml`:
+
+```yaml
+tunnels:
+  app:
+    addr: 3001
+    proto: http
+    domain: mcp-apify.ngrok.dev
+```
+
+Then start the tunnel:
+
+```bash
+ngrok start app
+```
+
+The MCP server API will be reachable at `https://mcp-apify.ngrok.dev/mcp?ui=openai`.
+
+#### Adding the server in ChatGPT
+
+1. Go to [chatgpt.com](https://chatgpt.com) and open **Settings → Connectors**
+2. Click **"Add a custom connector"**
+3. Enter the URL: `https://mcp-apify.ngrok.dev/mcp?ui=openai`
+4. Save and start a new chat
+
+> **Important:** After restarting ngrok, use the **Refresh** button in the connector settings to reconnect — ChatGPT does not detect the tunnel restart automatically.
