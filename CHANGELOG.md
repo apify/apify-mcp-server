@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.3 - **not yet released**
+## [0.9.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.3) (2026-03-02)
 
 ### 🚀 Features
 
@@ -25,7 +24,6 @@ All notable changes to this project will be documented in this file.
 - Improve CLAUDE.md by removing redundant dev info already in DEVELOPMENT.md and adding reference to DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md ([#513](https://github.com/apify/apify-mcp-server/pull/513)) ([dca9492](https://github.com/apify/apify-mcp-server/commit/dca94929758aa689758e17406801b8e021485a6f)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.2) (2026-02-24)
 
 ### 🐛 Bug Fixes
