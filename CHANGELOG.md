@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.5 - **not yet released**
+## [0.9.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.5) (2026-03-02)
 
 ### 🐛 Bug Fixes
 
 - **web:** Link and font size adjustments ([#498](https://github.com/apify/apify-mcp-server/pull/498)) ([45da302](https://github.com/apify/apify-mcp-server/commit/45da3028bbc4c256bb8a6c4762085185ff0eccae)) by [@jmikitova](https://github.com/jmikitova), closes [#488](https://github.com/apify/apify-mcp-server/issues/488)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.4) (2026-03-02)
 
 ### 🐛 Bug Fixes
