@@ -24,6 +24,7 @@ on:
 permissions:
     id-token: write
     contents: write
+    actions: write
 
 concurrency:
     group: release
@@ -98,9 +99,9 @@ jobs:
                 with:
                     workflow: manual_publish_to_npm.yaml
                     inputs: >
-                        { 
-                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}", 
-                            "tag": "latest" 
+                        {
+                            "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}",
+                            "tag": "latest"
                         }
 
     bump_dependency_in_internal_repo:
