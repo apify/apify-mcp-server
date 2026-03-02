@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.4 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Actor run show number of fields for nested objects ([#519](https://github.com/apify/apify-mcp-server/pull/519)) ([c639d7d](https://github.com/apify/apify-mcp-server/commit/c639d7ddbd5e6a091acd5b5c03bdd0e9c7a05dde)) by [@katacek](https://github.com/katacek)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.3) (2026-03-02)
