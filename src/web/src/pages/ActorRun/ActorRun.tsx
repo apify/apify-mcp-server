@@ -533,7 +533,12 @@ export const ActorRun: React.FC = () => {
                                         <TableRow key={index}>
                                             {columns.map((column) => (
                                                 <TableCell key={column}>
-                                                    {item[column]?.toString() || "—"}
+                                                    {item[column] == null
+                                                        ? "—"
+                                                        // If the value is an object, show number of fields instead of [object Object]
+                                                        : typeof item[column] === 'object'
+                                                            ? `${Object.keys(item[column]).length} fields`
+                                                            : String(item[column]) || "—"}
                                                 </TableCell>
                                             ))}
                                         </TableRow>
