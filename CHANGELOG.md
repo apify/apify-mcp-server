@@ -4,9 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [0.9.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.3) (2026-03-02)
 
-
-## [0.9.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.3) (2026-03-02)
-
 ### 🚀 Features
 
 - Allow fetch-actor-details tool without authentication ([#496](https://github.com/apify/apify-mcp-server/pull/496)) ([f9292fb](https://github.com/apify/apify-mcp-server/commit/f9292fb5ef827a8f6a13327c8fd12464098ac145)) by [@Jkuzz](https://github.com/Jkuzz)
