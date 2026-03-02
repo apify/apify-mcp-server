@@ -110,6 +110,38 @@ To use the Storybook MCP server (or any other MCP server that requires authentic
 
 The `.mcp.json` file uses environment variable expansion (`${APIFY_TOKEN}`) to securely reference your token without hardcoding it in the configuration file. This allows you to share the configuration with your team while keeping credentials private.
 
+### Manual testing as an MCP client
+
+To test the MCP server, a human must first configure the MCP server. Once configured, the server exposes tools that become available to the coding agent.
+
+#### 1. Human setup (required before testing)
+
+1. **Configure the MCP server** in your environment (e.g., Claude Code, VS Code, Cursor)
+2. **Verify connection**: The client should connect and list available tools automatically
+3. **Tools are now available**: Once connected, all MCP tools are exposed and ready to use
+
+#### 2. Coding agent MCP server testing
+
+**Note**: Only execute the tests when explicitly requested by the user.
+
+Once the MCP server is configured, test the MCP tools by:
+
+1. **Invoke each tool** through the MCP client (e.g., ask the AI agent to "search for Actors" or "fetch Actor details for apify/rag-web-browser")
+2. **Test with valid inputs** (happy path) — verify outputs match expected formats
+3. **Test with invalid inputs** (edge cases) — verify error messages are clear and helpful
+4. **Verify key behaviors**:
+   - All tools return helpful error messages with suggestions
+   - **get-actor-output** supports field filtering using dot notation
+   - Search tools support pagination with `limit` and `offset`
+
+**Tools to test:**
+- **search-actors** — Search Apify Store (test: valid keywords, empty keywords, non-existent platforms)
+- **fetch-actor-details** — Get Actor info (test: valid Actor, non-existent Actor)
+- **call-actor** — Execute an Actor with input
+- **get-actor-output** — Retrieve Actor results (test: valid datasetId, field filtering, non-existent dataset)
+- **search-apify-docs** — Search documentation (test: relevant terms, non-existent topics)
+- **fetch-apify-docs** — Fetch a doc page (test: valid URL, non-existent page)
+
 ### Testing with MCPJam (optional)
 
 You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP server - run it using `npx @mcpjam/inspector@latest`.
