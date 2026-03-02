@@ -122,6 +122,8 @@ jobs:
                     node-version-file: '.nvmrc'
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
+            -   name: Configure GitHub Packages auth
+                run: npm config set //npm.pkg.github.com/:_authToken ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
             -   name: Install updated dependency
                 uses: nick-fields/retry@v3 # Retry to compensate for NPM propagation lag
                 with:
