@@ -2,7 +2,7 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, IconButton, ICON_BUTTON_VARIANTS, ActorAvatar, theme, clampLines } from "@apify/ui-library";
+import { Text, Box, ActorAvatar, theme, clampLines, Link } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
 import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
 import { ActorStats, StructuredPricingInfo } from "../../types";
@@ -48,6 +48,29 @@ const BoxGroup = styled(Box)`
     display: flex;
     gap: ${theme.space.space4};
     align-items: center;
+`;
+
+const ExternalLinkButton = styled(Link)`
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    width: 32px;
+    height: 32px;
+    border-radius: ${theme.radius.radius6};
+    background-color: ${theme.color.neutral.backgroundMuted};
+    border: 1px solid ${theme.color.neutral.border};
+    color: ${theme.color.neutral.text};
+    flex-shrink: 0;
+    text-decoration: none;
+
+    &:hover {
+        background-color: ${theme.color.neutral.hover};
+    }
+
+    & > * {
+        pointer-events: none;
+    }
 `;
 
 const StyledSeparator = styled(Box)`
@@ -200,8 +223,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                         </ActorTitleWrapper>
                     </ActorHeader>
                     {customActionButton || (
-                        // @ts-expect-error IconButton doesn't recognize `to` and `hideExternalIcon` props from Button
-                        <IconButton Icon={ExternalLinkIcon} variant={ICON_BUTTON_VARIANTS.BORDERED} to={actor.url} hideExternalIcon className="flexShrink0" />
+                        <ExternalLinkButton to={actor.url} hideExternalIcon className="flexShrink0"><ExternalLinkIcon size="16" /></ExternalLinkButton>
                     )}
                 </ActorHeaderWithActionButton>
             </BoxRow>
