@@ -44,7 +44,7 @@ export async function connectMCPClient(
             url,
             mcpSessionId,
             statusCode,
-            error: error instanceof Error ? error.message : String(error),
+            errMessage: error instanceof Error ? error.message : String(error),
         });
         return null;
     }
