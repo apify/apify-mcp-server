@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.6 - **not yet released**
+## [0.9.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.6) (2026-03-03)
 
 ### 🐛 Bug Fixes
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - **web:** Add widget metadata to Actor tools ([#523](https://github.com/apify/apify-mcp-server/pull/523)) ([4c65b68](https://github.com/apify/apify-mcp-server/commit/4c65b6816ddf6064582af54733d635bcc5444543)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.5) (2026-03-02)
 
 ### 🐛 Bug Fixes
