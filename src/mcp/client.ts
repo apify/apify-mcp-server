@@ -104,7 +104,7 @@ async function createMCPSSEClient(
             } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         });
 
-    return connectWithTransport(url, transport);
+    return await connectWithTransport(url, transport);
 }
 
 /**
@@ -123,5 +123,5 @@ async function createMCPStreamableClient(
             },
         });
 
-    return connectWithTransport(url, transport);
+    return await connectWithTransport(url, transport);
 }
