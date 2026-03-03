@@ -42,7 +42,7 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
 
     if (statusCode !== undefined && statusCode < 500) {
         // Client errors (< 500) - log as softFail without stack trace
-        log.softFail(message, { error: errorMessage, statusCode, ...data });
+        log.softFail(message, { errMessage: errorMessage, statusCode, ...data });
     } else if (statusCode !== undefined && statusCode >= 500) {
         // Server errors (>= 500) - log as exception with full error (includes stack trace)
         const errorObj = error instanceof Error ? error : new Error(String(error));
