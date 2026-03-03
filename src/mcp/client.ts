@@ -28,6 +28,8 @@ export async function connectMCPClient(
         log.debug('Streamable HTTP transport failed, falling back to SSE transport', {
             url,
             mcpSessionId,
+            statusCode: getHttpStatusCode(error),
+            errMessage: error instanceof Error ? error.message : String(error),
         });
     }
 
@@ -39,11 +41,10 @@ export async function connectMCPClient(
             return null;
         }
         // External MCP server unavailability is operational, not a bug in our service
-        const statusCode = getHttpStatusCode(error);
         log.softFail('Failed to connect to MCP server using SSE transport', {
             url,
             mcpSessionId,
-            statusCode,
+            statusCode: getHttpStatusCode(error),
             errMessage: error instanceof Error ? error.message : String(error),
         });
         return null;
@@ -51,7 +52,7 @@ export async function connectMCPClient(
 }
 
 async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
-    let timeoutPid: NodeJS.Timeout;
+    let timeoutPid: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
         timeoutPid = setTimeout(
             () => reject(new TimeoutError(`Timed out after ${millis} ms.`)),
@@ -62,15 +63,22 @@ async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
     return Promise.race([
         promise,
         timeout,
-    ]).finally(() => {
-        if (timeoutPid) {
-            clearTimeout(timeoutPid);
-        }
+    ]).finally(() => clearTimeout(timeoutPid));
+}
+
+async function connectWithTransport(
+    url: string, transport: SSEClientTransport | StreamableHTTPClientTransport,
+): Promise<Client> {
+    const client = new Client({
+        name: getMCPServerID(url),
+        version: '1.0.0',
     });
+    await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
+    return client;
 }
 
 /**
- * Creates and connects a ModelContextProtocol client.
+ * Creates and connects a ModelContextProtocol client using the SSE transport.
  */
 async function createMCPSSEClient(
     url: string, token: string,
@@ -96,14 +104,7 @@ async function createMCPSSEClient(
             } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
         });
 
-    const client = new Client({
-        name: getMCPServerID(url),
-        version: '1.0.0',
-    });
-
-    await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
-
-    return client;
+    return connectWithTransport(url, transport);
 }
 
 /**
@@ -122,12 +123,5 @@ async function createMCPStreamableClient(
             },
         });
 
-    const client = new Client({
-        name: getMCPServerID(url),
-        version: '1.0.0',
-    });
-
-    await withTimeout(ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC, client.connect(transport));
-
-    return client;
+    return connectWithTransport(url, transport);
 }
