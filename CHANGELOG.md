@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.6 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Rename error field to errMessage in SSE connection log ([#524](https://github.com/apify/apify-mcp-server/pull/524)) ([2dc1a5e](https://github.com/apify/apify-mcp-server/commit/2dc1a5e0a02cedc0b47cc89e8b7f70129afab315)) by [@jirispilka](https://github.com/jirispilka)
+- **web:** Add widget metadata to Actor tools ([#523](https://github.com/apify/apify-mcp-server/pull/523)) ([4c65b68](https://github.com/apify/apify-mcp-server/commit/4c65b6816ddf6064582af54733d635bcc5444543)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.5) (2026-03-02)
 
 ### 🐛 Bug Fixes
