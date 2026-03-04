@@ -48,7 +48,7 @@ export async function connectMCPClient(
             url,
             mcpSessionId,
             statusCode: getHttpStatusCode(error),
-            errMessage
+            errMessage,
         });
         return null;
     }
