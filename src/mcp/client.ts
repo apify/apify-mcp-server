@@ -40,12 +40,15 @@ export async function connectMCPClient(
             log.warning('Connection to MCP server using SSE transport timed out', { url, mcpSessionId });
             return null;
         }
-        // External MCP server unavailability is operational, not a bug in our service
-        log.softFail('Failed to connect to MCP server using SSE transport', {
+        // External MCP server unavailability is operational, not a bug.
+        // Mezmo (logDNA) promotes log entries to errors when the message contains "error"
+        // Sanitize the error message to preserve the soft-fail log level.
+        const errMessage = (error instanceof Error ? error.message : String(error)).replace(/ error:/gi, ' failure:');
+        log.softFail('MCP server unreachable', {
             url,
             mcpSessionId,
             statusCode: getHttpStatusCode(error),
-            errMessage: error instanceof Error ? error.message : String(error),
+            errMessage,
         });
         return null;
     }
