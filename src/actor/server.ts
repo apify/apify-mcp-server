@@ -18,7 +18,7 @@ import { ApifyClient } from '../apify_client.js';
 import { ActorsMcpServer } from '../mcp/server.js';
 import type { ApifyRequestParams } from '../types.js';
 import { parseUiMode } from '../types.js';
-import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
+import { getHelpMessage, Routes, TransportType } from './const.js';
 
 export function createExpressApp(
     host: string,
@@ -261,13 +261,6 @@ export function createExpressApp(
         } catch (error) {
             respondWithError(res, error, 'Error handling MCP request');
         }
-    });
-
-    // Handle GET requests for SSE streams according to spec
-    app.get(Routes.MCP, async (req: Request, res: Response) => {
-        // We don't support GET requests for this server
-        // The spec requires returning 405 Method Not Allowed in this case
-        res.status(405).set('Allow', 'POST').send('Method Not Allowed');
     });
 
     app.delete(Routes.MCP, async (req: Request, res: Response) => {
