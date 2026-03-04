@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.7 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Sanitize error logs to prevent incorrect log level in Mezmo ([#530](https://github.com/apify/apify-mcp-server/pull/530)) ([bfa41f9](https://github.com/apify/apify-mcp-server/commit/bfa41f999aa8315879dd772b2e867e6791ba07f5)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.6) (2026-03-03)
