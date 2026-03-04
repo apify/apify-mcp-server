@@ -50,10 +50,6 @@ export function createExpressApp(
         }
     }
 
-    app.head(Routes.MCP, (_req: Request, res: Response) => {
-        res.status(200).end();
-    });
-
     app.get(Routes.SSE, async (req: Request, res: Response) => {
         try {
             log.info('MCP API', {
@@ -261,6 +257,13 @@ export function createExpressApp(
         } catch (error) {
             respondWithError(res, error, 'Error handling MCP request');
         }
+    });
+
+    // Handle GET requests for SSE streams according to spec
+    app.get(Routes.MCP, async (_req: Request, res: Response) => {
+        // We don't support GET requests for this server
+        // The spec requires returning 405 Method Not Allowed in this case
+        res.status(405).set('Allow', 'POST').send('Method Not Allowed');
     });
 
     app.delete(Routes.MCP, async (req: Request, res: Response) => {
