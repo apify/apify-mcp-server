@@ -19,7 +19,6 @@ import { ActorsMcpServer } from '../mcp/server.js';
 import type { ApifyRequestParams } from '../types.js';
 import { parseUiMode } from '../types.js';
 import { getHelpMessage, HEADER_READINESS_PROBE, Routes, TransportType } from './const.js';
-import { getActorRunData } from './utils.js';
 
 export function createExpressApp(
     host: string,
@@ -51,28 +50,7 @@ export function createExpressApp(
         }
     }
 
-    app.get(Routes.ROOT, async (req: Request, res: Response) => {
-        if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
-            log.debug('Received readiness probe');
-            res.status(200).json({ message: 'Server is ready' }).end();
-            return;
-        }
-        try {
-            log.info('MCP API', {
-                mth: req.method,
-                rt: Routes.ROOT,
-                tr: TransportType.HTTP,
-            });
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
-            res.status(200).json({ message: `Actor is using Model Context Protocol. ${getHelpMessage(host)}`, data: getActorRunData() }).end();
-        } catch (error) {
-            respondWithError(res, error, `Error in GET ${Routes.ROOT}`);
-        }
-    });
-
-    app.head(Routes.ROOT, (_req: Request, res: Response) => {
+    app.head(Routes.MCP, (_req: Request, res: Response) => {
         res.status(200).end();
     });
 
@@ -192,7 +170,7 @@ export function createExpressApp(
     });
 
     // express.json() middleware to parse JSON bodies.
-    // It must be used before the POST /mcp route but after the GET /sse route :shrug:
+    // It must be used before the POST / route but after the GET /sse route :shrug:
     app.use(express.json());
     app.post(Routes.MCP, async (req: Request, res: Response) => {
         log.info('Received MCP request:', req.body);
@@ -286,7 +264,12 @@ export function createExpressApp(
     });
 
     // Handle GET requests for SSE streams according to spec
-    app.get(Routes.MCP, async (_req: Request, res: Response) => {
+    app.get(Routes.MCP, async (req: Request, res: Response) => {
+        if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
+            log.debug('Received readiness probe');
+            res.status(200).json({ message: 'Server is ready' }).end();
+            return;
+        }
         // We don't support GET requests for this server
         // The spec requires returning 405 Method Not Allowed in this case
         res.status(405).set('Allow', 'POST').send('Method Not Allowed');
