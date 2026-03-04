@@ -265,11 +265,6 @@ export function createExpressApp(
 
     // Handle GET requests for SSE streams according to spec
     app.get(Routes.MCP, async (req: Request, res: Response) => {
-        if (req.headers && req.get(HEADER_READINESS_PROBE) !== undefined) {
-            log.debug('Received readiness probe');
-            res.status(200).json({ message: 'Server is ready' }).end();
-            return;
-        }
         // We don't support GET requests for this server
         // The spec requires returning 405 Method Not Allowed in this case
         res.status(405).set('Allow', 'POST').send('Method Not Allowed');
