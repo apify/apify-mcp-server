@@ -124,7 +124,7 @@ export const ACTOR_PRICING_MODEL = {
  */
 export const ACTOR_SEARCH_ABOVE_LIMIT = 50;
 
-export const MCP_STREAMABLE_ENDPOINT = '/';
+export const MCP_STREAMABLE_ENDPOINT = '/mcp';
 
 export const DOCS_SOURCES = [
     {
