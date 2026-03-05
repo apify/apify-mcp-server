@@ -3,7 +3,7 @@ import styled from "styled-components";
 import { ActorAvatar, Badge, Button, Text, theme, type BadgeVariant } from "@apify/ui-library";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
-import { useOpenAiGlobal } from "../../hooks/use-open-ai-global";
+import { useMcpApp } from "../../context/mcp-app-context";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { useWidgetState } from "../../hooks/use-widget-state";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
@@ -270,8 +270,9 @@ const SuccessMessage = styled.p`
 `;
 
 export const ActorRun: React.FC = () => {
+    const { app, toolResult } = useMcpApp();
     const toolOutput = useWidgetProps<ToolOutput>();
-    const toolResponseMetadata = useOpenAiGlobal("toolResponseMetadata") as Record<string, unknown> | null;
+    const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
 
     const [widgetState, setWidgetState] = useWidgetState<WidgetState>({
         isRefreshing: false,
@@ -321,17 +322,21 @@ export const ActorRun: React.FC = () => {
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
-        if (!runData?.actorFullName || pictureUrl !== undefined) return;
+        if (!runData?.actorFullName || pictureUrl !== undefined || !app) return;
 
         const fetchActorDetails = async () => {
             try {
-                const response = await window.openai?.callTool('fetch-actor-details', {
-                    actor: runData.actorFullName,
+                const response = await app.callServerTool({
+                    name: 'fetch-actor-details',
+                    arguments: { actor: runData.actorFullName },
                 });
 
-                if (response?.structuredContent?.actorInfo) {
-                    const actorInfo = response.structuredContent.actorInfo as { pictureUrl?: string };
-                    setPictureUrl(actorInfo.pictureUrl);
+                if (response?.structuredContent) {
+                    const content = response.structuredContent as Record<string, any>;
+                    if (content.actorInfo) {
+                        const actorInfo = content.actorInfo as { pictureUrl?: string };
+                        setPictureUrl(actorInfo.pictureUrl);
+                    }
                 }
             } catch (err) {
                 console.error('[ActorRun] Failed to fetch actor details:', err);
@@ -339,11 +344,11 @@ export const ActorRun: React.FC = () => {
         };
 
         fetchActorDetails();
-    }, [runData?.actorFullName, pictureUrl]);
+    }, [runData?.actorFullName, pictureUrl, app]);
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
-        if (!runData?.runId || !window.openai?.callTool) return;
+        if (!runData?.runId || !app) return;
 
         const status = (runData.status || '').toUpperCase();
         if (TERMINAL_STATUSES.has(status)) return;
@@ -364,8 +369,9 @@ export const ActorRun: React.FC = () => {
                 if (isCancelled) break;
 
                 try {
-                    const response = await window.openai.callTool('get-actor-run', {
-                        runId: runData.runId,
+                    const response = await app.callServerTool({
+                        name: 'get-actor-run',
+                        arguments: { runId: runData.runId },
                     });
 
                     if (response.structuredContent) {
@@ -436,7 +442,7 @@ export const ActorRun: React.FC = () => {
         return () => {
             isCancelled = true;
         };
-    }, [runData?.runId, runData?.status]);
+    }, [runData?.runId, runData?.status, app]);
 
 
     if (!runData) {
@@ -460,17 +466,17 @@ export const ActorRun: React.FC = () => {
 
 
     const handleOpenRun = () => {
-        if (runData && window.openai?.openExternal) {
-            window.openai.openExternal({
-                href: `https://console.apify.com/actors/runs/${runData.runId}`,
+        if (runData && app) {
+            app.openLink({
+                url: `https://console.apify.com/actors/runs/${runData.runId}`,
             });
         }
     };
 
     const handleOpenActor = () => {
-        if (runData && window.openai?.openExternal) {
-            window.openai.openExternal({
-                href: `https://apify.com/${runData.actorFullName}`,
+        if (runData && app) {
+            app.openLink({
+                url: `https://apify.com/${runData.actorFullName}`,
             });
         }
     };

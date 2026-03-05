@@ -1,23 +1,50 @@
 import "../index.css";
-import React from "react";
+import React, { useEffect } from "react";
 import { UiDependencyProvider } from "@apify/ui-library";
 import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
-
-const THEME_CHECK_INTERVAL_MS = 1000;
-
-function resolveTheme(): "light" | "dark" {
-    const t = window.openai?.theme;
-    if (t === "dark") return "dark";
-    if (t === "light") return "light";
-    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
+import { McpAppProvider, useMcpApp } from "../context/mcp-app-context";
 
 function applyTheme(theme: "light" | "dark") {
     document.documentElement.setAttribute("data-theme", theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
 }
+
+function resolveSystemTheme(): "light" | "dark" {
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+/**
+ * Syncs the document theme from MCP host context, falling back to system preference.
+ */
+const ThemeSync: React.FC = () => {
+    const { hostContext } = useMcpApp();
+
+    useEffect(() => {
+        const hostTheme = hostContext?.theme;
+        if (hostTheme === "dark" || hostTheme === "light") {
+            applyTheme(hostTheme);
+        } else {
+            applyTheme(resolveSystemTheme());
+        }
+    }, [hostContext?.theme]);
+
+    // Also listen for system theme changes when host doesn't specify a theme
+    useEffect(() => {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const handler = (e: MediaQueryListEvent) => {
+            const hostTheme = hostContext?.theme;
+            if (hostTheme !== "dark" && hostTheme !== "light") {
+                applyTheme(e.matches ? "dark" : "light");
+            }
+        };
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, [hostContext?.theme]);
+
+    return null;
+};
 
 /**
  * Helper to create and inject a link or style element if it doesn't already exist.
@@ -90,27 +117,7 @@ export const renderWidget = (Component: React.FC) => {
         const rootElement = document.getElementById("root");
         if (!rootElement) return;
 
-        applyTheme(resolveTheme());
-
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const onSystemThemeChange = (e: MediaQueryListEvent) => {
-            const t = window.openai?.theme;
-            if (t !== "dark" && t !== "light") {
-                applyTheme(e.matches ? "dark" : "light");
-            }
-        };
-        mq.addEventListener("change", onSystemThemeChange);
-
-        let lastTheme = resolveTheme();
-        const checkTheme = () => {
-            const current = resolveTheme();
-            if (current !== lastTheme) {
-                lastTheme = current;
-                applyTheme(current);
-            }
-        };
-
-        window.setInterval(checkTheme, THEME_CHECK_INTERVAL_MS);
+        applyTheme(resolveSystemTheme());
 
         injectStylesheets();
 
@@ -146,7 +153,10 @@ export const renderWidget = (Component: React.FC) => {
             <React.StrictMode>
                 <ThemeProvider theme={{}}>
                     <UiDependencyProvider dependencies={dependencies as any}>
-                        <Component />
+                        <McpAppProvider>
+                            <ThemeSync />
+                            <Component />
+                        </McpAppProvider>
                     </UiDependencyProvider>
                 </ThemeProvider>
             </React.StrictMode>

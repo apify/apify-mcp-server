@@ -4,6 +4,7 @@ import { Box, Markdown, theme, useActorTitleHeadingFilter, Badge, IconButton, IC
 import { BookOpenIcon, FullscreenIcon, MinimizeIcon } from "@apify/ui-icons";
 import type { ActorDetails } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
+import { useMcpApp } from "../../context/mcp-app-context";
 
 const FULLSCREEN_WIDTH_THRESHOLD = 900;
 
@@ -202,6 +203,7 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, isExpanded, setIs
 };
 
 export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details }) => {
+    const { app } = useMcpApp();
     const [isExpanded, setIsExpanded] = useState(false);
     const manuallyCollapsed = useRef(false);
     const manuallyExpanded = useRef(false);
@@ -212,12 +214,12 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details })
             manuallyExpanded.current = true;
             manuallyCollapsed.current = false;
             setIsExpanded(true);
-            await window.openai?.requestDisplayMode({ mode: "fullscreen" });
+            await app?.requestDisplayMode({ mode: "fullscreen" });
         } else {
             manuallyCollapsed.current = true;
             manuallyExpanded.current = false;
             setIsExpanded(false);
-            await window.openai?.requestDisplayMode({ mode: "inline" });
+            await app?.requestDisplayMode({ mode: "inline" });
         }
     };
 

@@ -1,6 +1,7 @@
-import { useOpenAiGlobal } from "../hooks/use-open-ai-global";
+import { useMcpApp } from "../context/mcp-app-context";
 import type { DisplayMode } from "../types";
 
 export const useDisplayMode = (): DisplayMode | null => {
-  return useOpenAiGlobal("displayMode");
+    const { hostContext } = useMcpApp();
+    return (hostContext?.displayMode as DisplayMode) ?? null;
 };
