@@ -1,15 +1,11 @@
 import "../index.css";
 import React, { useEffect } from "react";
+import { applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
 import { UiDependencyProvider } from "@apify/ui-library";
 import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
 import { McpAppProvider, useMcpApp } from "../context/mcp-app-context";
-
-function applyTheme(theme: "light" | "dark") {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.documentElement.classList.toggle("dark", theme === "dark");
-}
 
 function resolveSystemTheme(): "light" | "dark" {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -24,9 +20,9 @@ const ThemeSync: React.FC = () => {
     useEffect(() => {
         const hostTheme = hostContext?.theme;
         if (hostTheme === "dark" || hostTheme === "light") {
-            applyTheme(hostTheme);
+            applyDocumentTheme(hostTheme);
         } else {
-            applyTheme(resolveSystemTheme());
+            applyDocumentTheme(resolveSystemTheme());
         }
     }, [hostContext?.theme]);
 
@@ -36,7 +32,7 @@ const ThemeSync: React.FC = () => {
         const handler = (e: MediaQueryListEvent) => {
             const hostTheme = hostContext?.theme;
             if (hostTheme !== "dark" && hostTheme !== "light") {
-                applyTheme(e.matches ? "dark" : "light");
+                applyDocumentTheme(e.matches ? "dark" : "light");
             }
         };
         mq.addEventListener("change", handler);
@@ -117,7 +113,7 @@ export const renderWidget = (Component: React.FC) => {
         const rootElement = document.getElementById("root");
         if (!rootElement) return;
 
-        applyTheme(resolveSystemTheme());
+        applyDocumentTheme(resolveSystemTheme());
 
         injectStylesheets();
 

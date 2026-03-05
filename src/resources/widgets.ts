@@ -23,11 +23,8 @@ const WIDGET_CSP_DOMAINS = {
     ],
 } as const;
 
-// CSP object with both snake_case (legacy, required by MCP Jam) and camelCase (MCP Apps spec) field names.
-// TODO: Remove snake_case fields once all hosts support camelCase.
-const WIDGET_CSP = {
-    connect_domains: WIDGET_CSP_DOMAINS.connect,
-    resource_domains: WIDGET_CSP_DOMAINS.resource,
+// MCP Apps CSP (camelCase only).
+const WIDGET_UI_CSP = {
     connectDomains: WIDGET_CSP_DOMAINS.connect,
     resourceDomains: WIDGET_CSP_DOMAINS.resource,
 } as const;
@@ -36,18 +33,20 @@ const WIDGET_BASE_UI = {
     visibility: ['model', 'app'] as const,
     prefersBorder: true,
     domain: 'https://apify.com',
-    csp: WIDGET_CSP,
+    csp: WIDGET_UI_CSP,
 } as const;
 
+/**
+ * Compatibility shim for legacy OpenAI widget metadata.
+ * Keep this isolated so MCP Apps metadata (`ui`) remains the source of truth.
+ */
 const OPENAI_WIDGET_BASE_META = {
     // Legacy OpenAI keys (still required by ChatGPT)
     'openai/widgetAccessible': true,
     'openai/resultCanProduceWidget': true,
     'openai/widgetPrefersBorder': true,
     'openai/widgetDomain': 'https://apify.com',
-    'openai/widgetCSP': WIDGET_CSP,
-    // MCP Apps standard metadata
-    ui: WIDGET_BASE_UI,
+    'openai/widgetCSP': WIDGET_UI_CSP,
 } as const;
 
 export const WIDGET_URIS = {
@@ -55,11 +54,7 @@ export const WIDGET_URIS = {
     ACTOR_RUN: 'ui://widget/actor-run.html',
 } as const;
 
-// Both snake_case (legacy) and camelCase (MCP Apps spec) fields.
-// TODO: Remove snake_case fields once all hosts support camelCase.
-type WidgetCsp = {
-  readonly connect_domains: readonly string[];
-  readonly resource_domains: readonly string[];
+type UiWidgetCsp = {
   readonly connectDomains: readonly string[];
   readonly resourceDomains: readonly string[];
 };
@@ -72,16 +67,32 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
   'openai/widgetAccessible': boolean;
   'openai/resultCanProduceWidget': boolean;
   'openai/widgetDomain': string;
-  'openai/widgetCSP': WidgetCsp;
+  'openai/widgetCSP': UiWidgetCsp;
   // MCP Apps standard metadata
   ui: {
     resourceUri: string;
     visibility: readonly string[];
     prefersBorder: boolean;
     domain: string;
-    csp: WidgetCsp;
+    csp: UiWidgetCsp;
   };
 };
+
+function createWidgetMeta(params: {
+    resourceUri: string;
+    invoking: string;
+    invoked: string;
+}): WidgetMeta {
+    const { resourceUri, invoking, invoked } = params;
+
+    return {
+        ...OPENAI_WIDGET_BASE_META,
+        'openai/outputTemplate': resourceUri,
+        'openai/toolInvocation/invoking': invoking,
+        'openai/toolInvocation/invoked': invoked,
+        ui: { ...WIDGET_BASE_UI, resourceUri },
+    };
+}
 
 export type WidgetConfig = {
   uri: Resource['uri'];
@@ -103,13 +114,11 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
         description: 'Interactive Actor search results widget',
         jsFilename: 'search-actors-widget.js',
         title: 'Apify Actor Search',
-        meta: {
-            ...OPENAI_WIDGET_BASE_META,
-            'openai/outputTemplate': WIDGET_URIS.SEARCH_ACTORS,
-            'openai/toolInvocation/invoking': 'Searching Apify Store...',
-            'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
-            ui: { ...WIDGET_BASE_UI, resourceUri: WIDGET_URIS.SEARCH_ACTORS },
-        },
+        meta: createWidgetMeta({
+            resourceUri: WIDGET_URIS.SEARCH_ACTORS,
+            invoking: 'Searching Apify Store...',
+            invoked: 'Found Actors matching your criteria',
+        }),
     },
     [WIDGET_URIS.ACTOR_RUN]: {
         uri: WIDGET_URIS.ACTOR_RUN,
@@ -117,13 +126,11 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
         description: 'Interactive Actor run widget',
         jsFilename: 'actor-run-widget.js',
         title: 'Apify Actor Run',
-        meta: {
-            ...OPENAI_WIDGET_BASE_META,
-            'openai/outputTemplate': WIDGET_URIS.ACTOR_RUN,
-            'openai/toolInvocation/invoking': 'Running Apify Actor...',
-            'openai/toolInvocation/invoked': 'Actor run started',
-            ui: { ...WIDGET_BASE_UI, resourceUri: WIDGET_URIS.ACTOR_RUN },
-        },
+        meta: createWidgetMeta({
+            resourceUri: WIDGET_URIS.ACTOR_RUN,
+            invoking: 'Running Apify Actor...',
+            invoked: 'Actor run started',
+        }),
     },
 };
 
