@@ -36,6 +36,8 @@ export const WIDGET_URIS = {
 } as const;
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
+  // ChatGPT compatibility alias (ChatGPT may still require this to render widgets)
+  'openai/outputTemplate': string;
   // ChatGPT extensions (optional UX enhancements)
   'openai/toolInvocation/invoking'?: string;
   'openai/toolInvocation/invoked'?: string;
@@ -57,6 +59,7 @@ function createWidgetMeta(params: {
     const { resourceUri, invoking, invoked } = params;
 
     return {
+        'openai/outputTemplate': resourceUri,
         'openai/toolInvocation/invoking': invoking,
         'openai/toolInvocation/invoked': invoked,
         ui: { ...WIDGET_BASE_UI, resourceUri },
