@@ -97,6 +97,22 @@ const extractDeveloperUsername = (fullActorName: string): string => {
     return actorNameParts.length > 1 ? actorNameParts[0] : "unknown";
 };
 
+/**
+ * Resolves runId from URL (?runId=xxx) or hostContext.
+ * Used when the host overwrites toolResult with a different tool call (e.g. search-actors),
+ * so the widget can still show the correct run when opened for a call-actor response.
+ */
+function getRunIdFromStableSource(hostContext: Record<string, unknown> | undefined): string | null {
+    if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        const fromUrl = params.get("runId");
+        if (fromUrl?.trim()) return fromUrl.trim();
+    }
+    const fromHost = hostContext?.runId;
+    if (typeof fromHost === "string" && fromHost.trim()) return fromHost.trim();
+    return null;
+}
+
 const Container = styled.div`
     display: flex;
     flex-direction: column;
@@ -269,10 +285,39 @@ const SuccessMessage = styled.p`
     margin: 0;
 `;
 
+function toolOutputToRunData(
+    toolOutput: ToolOutput,
+    meta?: { usageTotalUsd?: number } | null
+): ActorRunData {
+    const startedAt = toolOutput.startedAt as string;
+    const finishedAt = toolOutput.finishedAt;
+    const duration = formatDuration(startedAt, finishedAt);
+    const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
+    const actorNameOnly = extractActorName(fullActorName);
+    const humanizedName = humanizeActorName(actorNameOnly);
+    const developerUsername = extractDeveloperUsername(fullActorName);
+    const usageTotalUsd = typeof meta?.usageTotalUsd === "number" ? meta.usageTotalUsd : undefined;
+    return {
+        runId: toolOutput.runId!,
+        actorName: humanizedName,
+        actorFullName: fullActorName,
+        actorDeveloperUsername: developerUsername,
+        status: (toolOutput.status as string) || "RUNNING",
+        startedAt,
+        finishedAt,
+        timestamp: formatTimestamp(startedAt),
+        duration,
+        cost: usageTotalUsd,
+        stats: toolOutput.stats,
+        dataset: toolOutput.dataset,
+    };
+}
+
 export const ActorRun: React.FC = () => {
-    const { app, toolResult } = useMcpApp();
+    const { app, toolResult, hostContext } = useMcpApp();
     const toolOutput = useWidgetProps<ToolOutput>();
     const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
+    const stableRunId = getRunIdFromStableSource(hostContext);
 
     const [widgetState, setWidgetState] = useWidgetState<WidgetState>({
         isRefreshing: false,
@@ -287,49 +332,46 @@ export const ActorRun: React.FC = () => {
         widgetStateRef.current = widgetState;
     }, [widgetState]);
 
-    // Initialize from toolOutput once
+    // Initialize runData from toolOutput (call-actor result) or by fetching run when we have a stable runId.
+    // When the host overwrites toolResult with another tool (e.g. search-actors), toolOutput has no runId;
+    // use runId from URL or hostContext so this widget still shows the correct run.
     useEffect(() => {
-        if (toolOutput?.runId && !runData) {
-            const startedAt = toolOutput.startedAt as string;
-            const finishedAt = toolOutput.finishedAt;
-            const duration = formatDuration(startedAt, finishedAt);
+        if (runData) return;
 
-            const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
-            const actorNameOnly = extractActorName(fullActorName);
-            const humanizedName = humanizeActorName(actorNameOnly);
-            const developerUsername = extractDeveloperUsername(fullActorName);
-
-            const usageTotalUsd = typeof toolResponseMetadata?.usageTotalUsd === 'number'
-                ? toolResponseMetadata.usageTotalUsd
-                : undefined;
-
-            setRunData({
-                runId: toolOutput.runId,
-                actorName: humanizedName,
-                actorFullName: fullActorName, // Store the full name for API calls
-                actorDeveloperUsername: developerUsername,
-                status: (toolOutput.status as string) || "RUNNING",
-                startedAt,
-                finishedAt,
-                timestamp: formatTimestamp(startedAt),
-                duration,
-                cost: usageTotalUsd,
-                stats: toolOutput.stats,
-                dataset: toolOutput.dataset,
-            });
+        if (toolOutput?.runId) {
+            setRunData(toolOutputToRunData(toolOutput, toolResponseMetadata));
+            return;
         }
-    }, [toolOutput, runData, toolResponseMetadata]);
+
+        if (!stableRunId || !app) return;
+
+        let cancelled = false;
+        const fetchRunByRunId = async () => {
+            try {
+                const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: stableRunId } });
+                if (cancelled) return;
+                const data = response?.structuredContent as ToolOutput | undefined;
+                if (data?.runId) {
+                    const meta = response?._meta as { usageTotalUsd?: number } | undefined;
+                    setRunData(toolOutputToRunData(data, meta));
+                }
+            } catch (err) {
+                if (!cancelled) console.error("[ActorRun] Failed to fetch run by runId:", err);
+            }
+        };
+        void fetchRunByRunId();
+        return () => {
+            cancelled = true;
+        };
+    }, [toolOutput, runData, toolResponseMetadata, stableRunId, app]);
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
-        if (!runData?.actorFullName || pictureUrl !== undefined || !app) return;
+        if (!app || !runData?.actorFullName || pictureUrl !== undefined) return;
 
         const fetchActorDetails = async () => {
             try {
-                const response = await app.callServerTool({
-                    name: 'fetch-actor-details',
-                    arguments: { actor: runData.actorFullName },
-                });
+                const response = await app.callServerTool({ name: "fetch-actor-details", arguments: { actor: runData.actorFullName } });
 
                 if (response?.structuredContent) {
                     const content = response.structuredContent as Record<string, any>;
@@ -348,7 +390,7 @@ export const ActorRun: React.FC = () => {
 
     // Auto-polling: Fetch status updates automatically with gradual escalation
     useEffect(() => {
-        if (!runData?.runId || !app) return;
+        if (!app || !runData?.runId) return;
 
         const status = (runData.status || '').toUpperCase();
         if (TERMINAL_STATUSES.has(status)) return;
@@ -369,10 +411,7 @@ export const ActorRun: React.FC = () => {
                 if (isCancelled) break;
 
                 try {
-                    const response = await app.callServerTool({
-                        name: 'get-actor-run',
-                        arguments: { runId: runData.runId },
-                    });
+                    const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: runData.runId } });
 
                     if (response.structuredContent) {
                         const newData = response.structuredContent as unknown as ToolOutput;
@@ -467,17 +506,13 @@ export const ActorRun: React.FC = () => {
 
     const handleOpenRun = () => {
         if (runData && app) {
-            app.openLink({
-                url: `https://console.apify.com/actors/runs/${runData.runId}`,
-            });
+            app.openLink({ url: `https://console.apify.com/actors/runs/${runData.runId}` });
         }
     };
 
     const handleOpenActor = () => {
         if (runData && app) {
-            app.openLink({
-                url: `https://apify.com/${runData.actorFullName}`,
-            });
+            app.openLink({ url: `https://apify.com/${runData.actorFullName}` });
         }
     };
 

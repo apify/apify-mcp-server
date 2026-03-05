@@ -23,31 +23,11 @@ const WIDGET_CSP = {
     ],
 } as const;
 
-// Compatibility for hosts that still parse legacy snake_case CSP fields.
-const WIDGET_CSP_COMPAT = {
-    ...WIDGET_CSP,
-    connect_domains: WIDGET_CSP.connectDomains,
-    resource_domains: WIDGET_CSP.resourceDomains,
-} as const;
-
 const WIDGET_BASE_UI = {
     visibility: ['model', 'app'] as const,
     prefersBorder: true,
     domain: 'https://apify.com',
-    csp: WIDGET_CSP_COMPAT,
-} as const;
-
-/**
- * Compatibility shim for legacy OpenAI widget metadata.
- * Keep this isolated so MCP Apps metadata (`ui`) remains the source of truth.
- */
-const OPENAI_WIDGET_BASE_META = {
-    // Legacy OpenAI keys (still required by ChatGPT)
-    'openai/widgetAccessible': true,
-    'openai/resultCanProduceWidget': true,
-    'openai/widgetPrefersBorder': true,
-    'openai/widgetDomain': 'https://apify.com',
-    'openai/widgetCSP': WIDGET_CSP_COMPAT,
+    csp: WIDGET_CSP,
 } as const;
 
 export const WIDGET_URIS = {
@@ -55,31 +35,17 @@ export const WIDGET_URIS = {
     ACTOR_RUN: 'ui://widget/actor-run.html',
 } as const;
 
-type UiWidgetCsp = {
-  readonly connectDomains: readonly string[];
-  readonly resourceDomains: readonly string[];
-  readonly connect_domains?: readonly string[];
-  readonly resource_domains?: readonly string[];
-};
-
 type WidgetMeta = NonNullable<Resource['_meta']> & {
-  // Legacy OpenAI keys (still required by ChatGPT)
-  'openai/outputTemplate': string;
+  // ChatGPT extensions (optional UX enhancements)
   'openai/toolInvocation/invoking'?: string;
   'openai/toolInvocation/invoked'?: string;
-  'openai/widgetAccessible': boolean;
-  'openai/resultCanProduceWidget': boolean;
-  'openai/widgetDomain': string;
-  'openai/widgetCSP': UiWidgetCsp;
-  // Legacy MCP Apps flat key for older hosts.
-  'ui/resourceUri': string;
-  // MCP Apps standard metadata
+  // MCP Apps standard metadata (SEP-1865)
   ui: {
     resourceUri: string;
     visibility: readonly string[];
     prefersBorder: boolean;
     domain: string;
-    csp: UiWidgetCsp;
+    csp: typeof WIDGET_CSP;
   };
 };
 
@@ -91,11 +57,8 @@ function createWidgetMeta(params: {
     const { resourceUri, invoking, invoked } = params;
 
     return {
-        ...OPENAI_WIDGET_BASE_META,
-        'openai/outputTemplate': resourceUri,
         'openai/toolInvocation/invoking': invoking,
         'openai/toolInvocation/invoked': invoked,
-        'ui/resourceUri': resourceUri,
         ui: { ...WIDGET_BASE_UI, resourceUri },
     };
 }
