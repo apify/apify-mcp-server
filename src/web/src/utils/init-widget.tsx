@@ -1,6 +1,6 @@
 import "../index.css";
 import React, { useEffect } from "react";
-import { applyDocumentTheme } from "@modelcontextprotocol/ext-apps";
+import { applyDocumentTheme, applyHostFonts, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 import { UiDependencyProvider } from "@apify/ui-library";
 import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
@@ -11,6 +11,23 @@ function resolveSystemTheme(): "light" | "dark" {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
+function applyHostContext(hostContext: ReturnType<typeof useMcpApp>["hostContext"]) {
+    const hostTheme = hostContext?.theme;
+    if (hostTheme === "dark" || hostTheme === "light") {
+        applyDocumentTheme(hostTheme);
+    } else {
+        applyDocumentTheme(resolveSystemTheme());
+    }
+
+    if (hostContext?.styles?.variables) {
+        applyHostStyleVariables(hostContext.styles.variables);
+    }
+
+    if (hostContext?.styles?.css?.fonts) {
+        applyHostFonts(hostContext.styles.css.fonts);
+    }
+}
+
 /**
  * Syncs the document theme from MCP host context, falling back to system preference.
  */
@@ -18,13 +35,8 @@ const ThemeSync: React.FC = () => {
     const { hostContext } = useMcpApp();
 
     useEffect(() => {
-        const hostTheme = hostContext?.theme;
-        if (hostTheme === "dark" || hostTheme === "light") {
-            applyDocumentTheme(hostTheme);
-        } else {
-            applyDocumentTheme(resolveSystemTheme());
-        }
-    }, [hostContext?.theme]);
+        applyHostContext(hostContext);
+    }, [hostContext]);
 
     // Also listen for system theme changes when host doesn't specify a theme
     useEffect(() => {

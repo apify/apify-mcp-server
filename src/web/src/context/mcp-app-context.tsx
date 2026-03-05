@@ -5,8 +5,6 @@ import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 interface McpAppState {
     app: App | null;
-    isConnected: boolean;
-    error: Error | null;
     toolResult: CallToolResult | null;
     hostContext: McpUiHostContext | undefined;
 }
@@ -17,7 +15,7 @@ export function McpAppProvider({ children }: { children: React.ReactNode }) {
     const [toolResult, setToolResult] = useState<CallToolResult | null>(null);
     const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
 
-    const { app, isConnected, error } = useApp({
+    const { app } = useApp({
         appInfo: { name: "Apify MCP Widget", version: "1.0.0" },
         capabilities: {},
         onAppCreated: (createdApp) => {
@@ -33,7 +31,7 @@ export function McpAppProvider({ children }: { children: React.ReactNode }) {
 
     return (
         <McpAppContext.Provider
-            value={{ app, isConnected, error, toolResult, hostContext }}
+            value={{ app, toolResult, hostContext }}
         >
             {children}
         </McpAppContext.Provider>
