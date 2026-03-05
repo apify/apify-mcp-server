@@ -10,9 +10,9 @@ import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
 export { RESOURCE_MIME_TYPE };
 
-const WIDGET_CSP_DOMAINS = {
-    connect: ['https://api.apify.com'],
-    resource: [
+const WIDGET_CSP = {
+    connectDomains: [`https://api.apify.com`],
+    resourceDomains: [
         'https://mcp.apify.com',
         'https://images.apifyusercontent.com',
         'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
@@ -23,17 +23,18 @@ const WIDGET_CSP_DOMAINS = {
     ],
 } as const;
 
-// MCP Apps CSP (camelCase only).
-const WIDGET_UI_CSP = {
-    connectDomains: WIDGET_CSP_DOMAINS.connect,
-    resourceDomains: WIDGET_CSP_DOMAINS.resource,
+// Compatibility for hosts that still parse legacy snake_case CSP fields.
+const WIDGET_CSP_COMPAT = {
+    ...WIDGET_CSP,
+    connect_domains: WIDGET_CSP.connectDomains,
+    resource_domains: WIDGET_CSP.resourceDomains,
 } as const;
 
 const WIDGET_BASE_UI = {
     visibility: ['model', 'app'] as const,
     prefersBorder: true,
     domain: 'https://apify.com',
-    csp: WIDGET_UI_CSP,
+    csp: WIDGET_CSP_COMPAT,
 } as const;
 
 /**
@@ -46,7 +47,7 @@ const OPENAI_WIDGET_BASE_META = {
     'openai/resultCanProduceWidget': true,
     'openai/widgetPrefersBorder': true,
     'openai/widgetDomain': 'https://apify.com',
-    'openai/widgetCSP': WIDGET_UI_CSP,
+    'openai/widgetCSP': WIDGET_CSP_COMPAT,
 } as const;
 
 export const WIDGET_URIS = {
@@ -57,6 +58,8 @@ export const WIDGET_URIS = {
 type UiWidgetCsp = {
   readonly connectDomains: readonly string[];
   readonly resourceDomains: readonly string[];
+  readonly connect_domains?: readonly string[];
+  readonly resource_domains?: readonly string[];
 };
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
@@ -68,6 +71,8 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
   'openai/resultCanProduceWidget': boolean;
   'openai/widgetDomain': string;
   'openai/widgetCSP': UiWidgetCsp;
+  // Legacy MCP Apps flat key for older hosts.
+  'ui/resourceUri': string;
   // MCP Apps standard metadata
   ui: {
     resourceUri: string;
@@ -90,6 +95,7 @@ function createWidgetMeta(params: {
         'openai/outputTemplate': resourceUri,
         'openai/toolInvocation/invoking': invoking,
         'openai/toolInvocation/invoked': invoked,
+        'ui/resourceUri': resourceUri,
         ui: { ...WIDGET_BASE_UI, resourceUri },
     };
 }
