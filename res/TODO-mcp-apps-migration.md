@@ -20,9 +20,9 @@ Tracks items not covered by the initial metadata migration PR.
 - [ ] Remove snake_case CSP fields (`connect_domains`, `resource_domains`) from `WIDGET_CSP` in `src/resources/widgets.ts` once MCP Jam and all hosts support camelCase (`connectDomains`, `resourceDomains`). Currently shipping both for compatibility.
 
 ### Cleanup / renames
-- [ ] Rename `stripOpenAiMeta` → `stripWidgetMeta` in `src/utils/tools.ts`
-- [ ] Rename `filterOpenAiMeta` → `filterWidgetMeta` in `ToolPublicFieldOptions` and `src/mcp/server.ts`
-- [ ] Update `stripOpenAiMeta` comment references in 6 tool files
+- [x] Rename `stripOpenAiMeta` → `stripWidgetMeta` in `src/utils/tools.ts`
+- [x] Rename `filterOpenAiMeta` → `filterWidgetMeta` in `ToolPublicFieldOptions` and `src/mcp/server.ts`
+- [x] Update `stripOpenAiMeta` comment references in 6 tool files
 - [ ] Remove `openai/resultCanProduceWidget` (no MCP equivalent) once ChatGPT no longer needs it
 - [ ] Remove `openai/widgetAccessible` once ChatGPT fully supports `ui.visibility`
 

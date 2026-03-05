@@ -581,7 +581,7 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
                 mode: this.serverMode,
-                filterOpenAiMeta: true,
+                filterWidgetMeta: true,
             }));
             return { tools };
         });
