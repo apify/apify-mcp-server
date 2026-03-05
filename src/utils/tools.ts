@@ -12,15 +12,15 @@ type ToolPublicFieldOptions = {
 };
 
 /**
- * Strips OpenAI specific metadata from the tool metadata. U
- * @param meta - The tool metadata.
- * @returns The tool metadata with OpenAI specific metadata stripped.
+ * Strips widget-specific metadata (openai/* and ui keys) from tool metadata.
+ * Used to hide widget metadata in non-openai modes.
+ * TODO: Rename to stripWidgetMeta and update filterOpenAiMeta → filterWidgetMeta in a follow-up PR.
  */
 function stripOpenAiMeta(meta?: ToolBase['_meta']) {
     if (!meta) return meta;
 
     const filteredEntries = Object.entries(meta)
-        .filter(([key]) => !key.startsWith('openai/'));
+        .filter(([key]) => !key.startsWith('openai/') && key !== 'ui');
 
     if (filteredEntries.length === 0) return undefined;
 

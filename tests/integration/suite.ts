@@ -139,15 +139,21 @@ function validateStructuredOutputForTool(result: unknown, toolName: string, mode
     validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 
-/** Validates that the listed tools have OpenAI metadata (_meta) with outputTemplate and widgetAccessible. */
+/** Validates that the listed tools have widget metadata (_meta) with both legacy openai/* and MCP Apps ui.* keys. */
 function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
         expect(tool?._meta).toBeDefined();
+        // Legacy OpenAI keys (still required by ChatGPT)
         expect(tool?._meta?.['openai/outputTemplate']).toBeDefined();
         expect(tool?._meta?.['openai/widgetAccessible']).toBe(true);
+        // MCP Apps standard keys
+        const ui = tool?._meta?.ui as Record<string, unknown> | undefined;
+        expect(ui).toBeDefined();
+        expect(ui?.resourceUri).toBeDefined();
+        expect(ui?.visibility).toEqual(['model', 'app']);
     }
 }
 
