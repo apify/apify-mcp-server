@@ -1,5 +1,5 @@
 import { ActorRun } from "../pages/ActorRun/ActorRun";
-import { setupMockOpenAi } from "../utils/mock-openai";
+import { setupMockOpenAi, updateMockOpenAiState } from "../utils/mock-openai";
 import { renderWidget } from "../utils/init-widget";
 
 // Mock data for local development/testing
@@ -22,7 +22,7 @@ const mockToolResponseMetadata = {
 const LOADING_DELAY_MS = 2000;
 
 // Set up mock window.openai for local development (no-ops when window.openai already exists)
-const isMockEnvironment = typeof window !== "undefined" && !window.openai;
+const isMockEnvironment = typeof window !== "undefined" && !(window as any).openai;
 
 setupMockOpenAi({
     toolOutput: mockRunData, // Start with basic data (no dataset) to show header immediately
@@ -220,9 +220,8 @@ setupMockOpenAi({
 // Simulate loading delay - update toolOutput after delay to add dataset (only in local dev)
 if (isMockEnvironment) {
     setTimeout(() => {
-        if (window.openai) {
-            // Update the toolOutput with dataset to show results
-            window.openai.toolOutput = {
+        updateMockOpenAiState({
+            toolOutput: {
                 ...mockRunData,
                 status: "SUCCEEDED",
                 finishedAt: new Date().toISOString(),
@@ -282,10 +281,8 @@ if (isMockEnvironment) {
                         },
                     ],
                 },
-            } as any;
-            // Trigger a re-render by dispatching an event
-            window.dispatchEvent(new Event('openai:set_globals'));
-        }
+            },
+        });
     }, LOADING_DELAY_MS);
 }
 

@@ -1,4 +1,3 @@
-import { OpenAiGlobals } from "../types";
 import { MOCK_ACTOR_DETAILS_RESPONSE } from "./mock-actor-details";
 
 interface MockOpenAiConfig {
@@ -8,12 +7,17 @@ interface MockOpenAiConfig {
     initialWidgetState?: any;
 }
 
+/**
+ * Sets up a mock `window.openai` for local development.
+ * The MCP Apps SDK auto-detects `window.openai` and uses its OpenAI transport,
+ * so this mock makes dev mode work transparently with `useApp()`.
+ */
 export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
-    if (typeof window === "undefined" || window.openai) return;
+    if (typeof window === "undefined" || (window as any).openai) return;
 
     console.log("Setting up mock openai");
 
-    window.openai = {
+    (window as any).openai = {
         // API methods
         callTool: async (name: string, args: any) => {
             console.log(`Mock callTool: ${name}`, args);
@@ -75,30 +79,23 @@ export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
         },
         setWidgetState: async (state: any) => {
             console.log("Mock setWidgetState:", state);
-            if (window.openai) {
-                window.openai.widgetState = { ...window.openai.widgetState, ...state };
+            if ((window as any).openai) {
+                (window as any).openai.widgetState = { ...(window as any).openai.widgetState, ...state };
             }
         },
-    } as unknown as OpenAiGlobals & any; // Casting to avoid complex type mocking of every single method signature match perfectly
-
-    // Helper to simulate async data loading if needed
-    if (config.toolOutput && Object.keys(config.toolOutput).length === 0) {
-        // This part is a bit tricky to generalize, usually the caller handles delayed data updates
-        // by dispatching events. We can expose a helper for that.
-    }
+    };
 };
 
-export const updateMockOpenAiState = (updates: Partial<OpenAiGlobals>) => {
-    if (typeof window === "undefined" || !window.openai) return;
+export const updateMockOpenAiState = (updates: Record<string, unknown>) => {
+    if (typeof window === "undefined" || !(window as any).openai) return;
 
     // Update local state
-    Object.assign(window.openai, updates);
+    Object.assign((window as any).openai, updates);
 
-    // Dispatch event to notify listeners (hooks)
+    // Dispatch event to notify listeners (SDK's OpenAI transport listens for this)
     window.dispatchEvent(
         new CustomEvent("openai:set_globals", {
             detail: { globals: updates },
         })
     );
 };
-

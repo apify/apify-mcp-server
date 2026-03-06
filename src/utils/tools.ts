@@ -19,7 +19,7 @@ function stripWidgetMeta(meta?: ToolBase['_meta']) {
     if (!meta) return meta;
 
     const filteredEntries = Object.entries(meta)
-        .filter(([key]) => !key.startsWith('openai/') && key !== 'ui');
+        .filter(([key]) => !key.startsWith('openai/') && key !== 'ui' && key !== 'ui/resourceUri');
 
     if (filteredEntries.length === 0) return undefined;
 

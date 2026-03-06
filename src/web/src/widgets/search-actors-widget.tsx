@@ -90,7 +90,7 @@ const mockActors = [
 ];
 
 // Set up mock window.openai for local development (no-ops when window.openai already exists)
-const isMockEnvironment = typeof window !== "undefined" && !window.openai;
+const isMockEnvironment = typeof window !== "undefined" && !(window as any).openai;
 
 setupMockOpenAi({
     toolOutput: {

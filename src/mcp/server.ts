@@ -113,7 +113,10 @@ export class ActorsMcpServer {
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
-    /** Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension). */
+    /**
+     * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
+     * NOTE: This is currently informational only (logged for observability) and does not yet gate widget behavior.
+     */
     public clientSupportsUi = false;
 
     constructor(options: ActorsMcpServerOptions = {}) {

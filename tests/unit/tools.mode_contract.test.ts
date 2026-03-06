@@ -133,6 +133,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(openaiCallActor!.description).toContain('always runs asynchronously');
             expect(openaiCallActor!.description).toContain('do NOT poll or call any other tool');
         });
+
+        it('should not advertise long-running task support for openai call-actor', () => {
+            const openaiCallActor = openaiCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+
+            expect(openaiCallActor).toBeDefined();
+            expect(openaiCallActor!.execution?.taskSupport).toBeUndefined();
+        });
     });
 
     describe('tool definitions are frozen', () => {

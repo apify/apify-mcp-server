@@ -31,15 +31,15 @@ Tracks items not covered by the initial metadata migration PR.
 ## Client-side (`src/web/`)
 
 ### Replace `window.openai` with MCP Apps SDK `App` instance
-- [ ] Install `@modelcontextprotocol/ext-apps` in the web package
-- [ ] `window.openai.theme` → `app.getHostContext()?.theme` (`src/web/src/utils/init-widget.tsx`, `src/web/src/hooks/use-open-ai-global.ts`)
-- [ ] `window.openai.toolOutput = ...` → `app.ontoolresult` callback (`src/web/src/widgets/actor-run-widget.tsx:225`)
-- [ ] `window.openai.callTool(...)` → `app.callServerTool(...)` (`src/web/src/pages/ActorRun/ActorRun.tsx:367`)
-- [ ] `window.openai.openExternal({href})` → `app.openLink({url})` (`src/web/src/pages/ActorRun/ActorRun.tsx:464,472`)
-- [ ] `window.openai.widgetState` / `setWidgetState` → alternative state mechanism (`src/web/src/hooks/use-widget-state.ts`) — no MCP equivalent yet, use `localStorage` or server-side state
-- [ ] Replace `src/web/src/hooks/use-open-ai-global.ts` hook with MCP Apps context
-- [ ] Update `src/web/src/utils/mock-openai.ts` dev mock for new `App` API
-- [ ] Remove/update `window.openai` type declarations
+- [x] Install `@modelcontextprotocol/ext-apps` in the web package
+- [x] `window.openai.theme` → `app.getHostContext()?.theme` (`src/web/src/utils/init-widget.tsx`, `src/web/src/hooks/use-open-ai-global.ts`)
+- [x] `window.openai.toolOutput = ...` → `app.ontoolresult` callback (`src/web/src/widgets/actor-run-widget.tsx:225`)
+- [x] `window.openai.callTool(...)` → `app.callServerTool(...)` (`src/web/src/pages/ActorRun/ActorRun.tsx:367`)
+- [x] `window.openai.openExternal({href})` → `app.openLink({url})` (`src/web/src/pages/ActorRun/ActorRun.tsx:464,472`)
+- [x] `window.openai.widgetState` / `setWidgetState` → plain React state (`src/web/src/hooks/use-widget-state.ts`) — no MCP equivalent yet
+- [x] Replace `src/web/src/hooks/use-open-ai-global.ts` hook with MCP Apps context
+- [x] Update `src/web/src/utils/mock-openai.ts` dev mock for new `App` API
+- [x] Remove/update `window.openai` type declarations
 
 ### Theming
 - [ ] Adopt MCP Apps CSS variables (`--color-background-primary`, `--color-text-primary`, etc.) from host context
