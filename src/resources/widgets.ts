@@ -10,6 +10,8 @@ import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
 export { RESOURCE_MIME_TYPE };
 
+const WIDGET_DOMAIN = 'https://apify.com';
+
 const WIDGET_CSP = {
     connectDomains: [`https://api.apify.com`],
     resourceDomains: [
@@ -17,7 +19,7 @@ const WIDGET_CSP = {
         'https://images.apifyusercontent.com',
         'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
         'https://apify-image-uploads-prod.s3.amazonaws.com',
-        'https://apify.com',
+        WIDGET_DOMAIN,
         'https://fonts.googleapis.com',
         'https://fonts.gstatic.com',
     ],
@@ -26,7 +28,7 @@ const WIDGET_CSP = {
 const WIDGET_BASE_UI = {
     visibility: ['model', 'app'] as const,
     prefersBorder: true,
-    domain: 'https://apify.com',
+    domain: WIDGET_DOMAIN,
     csp: WIDGET_CSP,
 } as const;
 
