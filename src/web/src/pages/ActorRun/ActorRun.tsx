@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { ActorAvatar, Badge, Button, Text, theme, type BadgeVariant } from "@apify/ui-library";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useMcpApp } from "../../context/mcp-app-context";
 import { useWidgetProps } from "../../hooks/use-widget-props";
+import { useWidgetState } from "../../hooks/use-widget-state";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
 import { TableSkeleton } from "./ActorRun.skeleton";
 interface ActorRunData {
@@ -40,6 +41,14 @@ interface ToolOutput extends Record<string, unknown> {
     dataset?: any;
 }
 
+interface WidgetState extends Record<string, unknown> {
+    isRefreshing?: boolean;
+    lastUpdateTime?: number;
+    runStatus?: string;
+    datasetId?: string;
+    itemCount?: number;
+    runId?: string;
+}
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -310,8 +319,18 @@ export const ActorRun: React.FC = () => {
     const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
     const stableRunId = getRunIdFromStableSource(hostContext);
 
+    const [widgetState, setWidgetState] = useWidgetState<WidgetState>({
+        isRefreshing: false,
+        lastUpdateTime: Date.now(),
+    });
+    const widgetStateRef = useRef(widgetState);
+
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        widgetStateRef.current = widgetState;
+    }, [widgetState]);
 
     // Initialize runData from toolOutput (call-actor result) or by fetching run when we have a stable runId.
     // When the host overwrites toolResult with another tool (e.g. search-actors), toolOutput has no runId;
@@ -428,15 +447,15 @@ export const ActorRun: React.FC = () => {
 
                         const newStatus = (newData.status || '').toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
-                            // Notify the model that the run completed so it can follow up.
-                            if (app) {
-                                const ctx = [
-                                    `Actor run ${runData.runId} finished with status: ${newStatus}.`,
-                                    newData.dataset?.datasetId ? `Dataset ID: ${newData.dataset.datasetId}` : null,
-                                    newData.dataset?.itemCount != null ? `Items scraped: ${newData.dataset.itemCount}` : null,
-                                ].filter(Boolean).join(' ');
-                                await app.updateModelContext({ content: [{ type: 'text', text: ctx }] }).catch(() => {});
-                            }
+                            // Notify model that run is complete by updating widget state
+                            await setWidgetState({
+                                ...widgetStateRef.current,
+                                runStatus: newStatus,
+                                runId: runData.runId,
+                                datasetId: newData.dataset?.datasetId,
+                                itemCount: newData.dataset?.itemCount,
+                                lastUpdateTime: Date.now(),
+                            });
                             break;
                         }
                     }
