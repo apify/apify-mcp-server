@@ -1,8 +1,3 @@
-export type Theme = "light" | "dark";
-
-/** Display mode */
-export type DisplayMode = "pip" | "inline" | "fullscreen";
-
 // --- App Specific Types ---
 
 export type StructuredPricingInfo = {
