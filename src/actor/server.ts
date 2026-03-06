@@ -56,10 +56,6 @@ export function createExpressApp(
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
         res.setHeader('Access-Control-Allow-Headers', 'Content-Type, mcp-session-id');
         res.setHeader('Access-Control-Expose-Headers', 'Mcp-Session-Id');
-        if (req.method === 'OPTIONS') {
-            res.sendStatus(204);
-            return;
-        }
         next();
     });
 
