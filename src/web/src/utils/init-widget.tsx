@@ -158,16 +158,14 @@ export const renderWidget = (Component: React.FC) => {
         } as const;
 
         root.render(
-            <React.StrictMode>
-                <ThemeProvider theme={{}}>
-                    <UiDependencyProvider dependencies={dependencies as any}>
-                        <McpAppProvider>
-                            <ThemeSync />
-                            <Component />
-                        </McpAppProvider>
-                    </UiDependencyProvider>
-                </ThemeProvider>
-            </React.StrictMode>
+            <ThemeProvider theme={{}}>
+                <UiDependencyProvider dependencies={dependencies as any}>
+                    <McpAppProvider>
+                        <ThemeSync />
+                        <Component />
+                    </McpAppProvider>
+                </UiDependencyProvider>
+            </ThemeProvider>
         );
     };
 
