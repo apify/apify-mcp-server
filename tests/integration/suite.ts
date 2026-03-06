@@ -140,7 +140,7 @@ function validateStructuredOutputForTool(result: unknown, toolName: string, mode
 }
 
 /** Validates that the listed tools have widget metadata (_meta) with both legacy openai/* and MCP Apps ui.* keys. */
-function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
+function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
@@ -2425,7 +2425,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled
-            expectOpenAiToolMeta(tools);
+            expectWidgetToolMeta(tools);
 
             await client.close();
         });
@@ -2441,7 +2441,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
-            expectOpenAiToolMeta(tools);
+            expectWidgetToolMeta(tools);
 
             await client.close();
         });

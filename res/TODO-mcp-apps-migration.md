@@ -6,10 +6,12 @@ Tracks items not covered by the initial metadata migration PR.
 ## Server-side
 
 ### Capability negotiation (high priority)
-- [ ] Check `io.modelcontextprotocol/ui` extension in client capabilities during `initialize`
-- [ ] Use `getUiCapability()` from `@modelcontextprotocol/ext-apps/server` (requires `moduleResolution: 'node16'` or `'bundler'` in tsconfig, or import from root)
-- [ ] Conditionally register UI tools/resources only when client supports `text/html;profile=mcp-app`
-- [ ] Provide text-only fallback tools when client doesn't support MCP Apps
+- [x] Check `io.modelcontextprotocol/ui` extension in client capabilities during `initialize`
+- [x] Use `getUiCapability()` equivalent inline (`getUiCapability()` from `@modelcontextprotocol/ext-apps/server` can't be imported without `moduleResolution: 'node16'` — implemented as 3-line inline check)
+- [ ] Conditionally register UI tools/resources only when client supports `text/html;profile=mcp-app` (capability flag is informational for now; future PR)
+- [ ] Provide text-only fallback tools when client doesn't support MCP Apps (future PR)
+
+> **Note**: `registerAppTool()`/`registerAppResource()` from `@modelcontextprotocol/ext-apps/server` require `McpServer` (high-level SDK class), but our server uses the low-level `Server` class. Adoption requires a separate `McpServer` migration effort.
 
 ### Mode decoupling
 - [ ] Decouple `ui` metadata from `mode: 'openai'` — the `_meta.ui.*` keys are the MCP standard and should be available in all modes, not just `openai`
@@ -20,9 +22,9 @@ Tracks items not covered by the initial metadata migration PR.
 - [ ] Remove snake_case CSP fields (`connect_domains`, `resource_domains`) from `WIDGET_CSP` in `src/resources/widgets.ts` once MCP Jam and all hosts support camelCase (`connectDomains`, `resourceDomains`). Currently shipping both for compatibility.
 
 ### Cleanup / renames
-- [ ] Rename `stripOpenAiMeta` → `stripWidgetMeta` in `src/utils/tools.ts`
-- [ ] Rename `filterOpenAiMeta` → `filterWidgetMeta` in `ToolPublicFieldOptions` and `src/mcp/server.ts`
-- [ ] Update `stripOpenAiMeta` comment references in 6 tool files
+- [x] Rename `stripOpenAiMeta` → `stripWidgetMeta` in `src/utils/tools.ts`
+- [x] Rename `filterOpenAiMeta` → `filterWidgetMeta` in `ToolPublicFieldOptions` and `src/mcp/server.ts`
+- [x] Update `stripOpenAiMeta` comment references in 6 tool files
 - [ ] Remove `openai/resultCanProduceWidget` (no MCP equivalent) once ChatGPT no longer needs it
 - [ ] Remove `openai/widgetAccessible` once ChatGPT fully supports `ui.visibility`
 

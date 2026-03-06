@@ -180,9 +180,9 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         },
     };
 
-    it('should strip openai/ and ui _meta keys when filterOpenAiMeta is true and not in openai mode', () => {
+    it('should strip openai/ and ui _meta keys when filterWidgetMeta is true and not in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: true,
+            filterWidgetMeta: true,
             mode: 'default',
         });
         expect(result._meta).toBeDefined();
@@ -194,15 +194,15 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
 
     it('should preserve all _meta keys in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: true,
+            filterWidgetMeta: true,
             mode: 'openai',
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should preserve all _meta keys when filterOpenAiMeta is false', () => {
+    it('should preserve all _meta keys when filterWidgetMeta is false', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: false,
+            filterWidgetMeta: false,
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
@@ -216,7 +216,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
             },
         };
         const result = getToolPublicFieldOnly(toolWithOnlyWidgetMeta, {
-            filterOpenAiMeta: true,
+            filterWidgetMeta: true,
             mode: 'default',
         });
         expect(result._meta).toBeUndefined();

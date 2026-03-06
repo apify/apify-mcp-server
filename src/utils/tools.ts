@@ -8,15 +8,14 @@ import type { HelperTool, ServerMode, ToolBase, ToolEntry } from '../types.js';
 
 type ToolPublicFieldOptions = {
     mode?: ServerMode;
-    filterOpenAiMeta?: boolean;
+    filterWidgetMeta?: boolean;
 };
 
 /**
  * Strips widget-specific metadata (openai/* and ui keys) from tool metadata.
  * Used to hide widget metadata in non-openai modes.
- * TODO: Rename to stripWidgetMeta and update filterOpenAiMeta → filterWidgetMeta in a follow-up PR.
  */
-function stripOpenAiMeta(meta?: ToolBase['_meta']) {
+function stripWidgetMeta(meta?: ToolBase['_meta']) {
     if (!meta) return meta;
 
     const filteredEntries = Object.entries(meta)
@@ -32,9 +31,9 @@ function stripOpenAiMeta(meta?: ToolBase['_meta']) {
  * Used for the tools list request.
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
-    const { mode, filterOpenAiMeta = false } = options;
-    const meta = filterOpenAiMeta && mode !== 'openai'
-        ? stripOpenAiMeta(tool._meta)
+    const { mode, filterWidgetMeta = false } = options;
+    const meta = filterWidgetMeta && mode !== 'openai'
+        ? stripWidgetMeta(tool._meta)
         : tool._meta;
 
     return {
