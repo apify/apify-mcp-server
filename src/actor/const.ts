@@ -9,8 +9,7 @@ export enum TransportType {
 }
 
 export enum Routes {
-    ROOT = '/',
-    MCP = '/mcp',
+    MCP = '/',
     SSE = '/sse',
     MESSAGE = '/message',
 }
