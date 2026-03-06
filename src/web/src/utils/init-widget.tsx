@@ -157,6 +157,8 @@ export const renderWidget = (Component: React.FC) => {
             tooltipSafeHtml: (content: React.ReactNode) => content,
         } as const;
 
+        // No React.StrictMode — double-mount interferes with the ext-apps SDK's
+        // PostMessageTransport (creates duplicate JSON-RPC connections to the host).
         root.render(
             <ThemeProvider theme={{}}>
                 <UiDependencyProvider dependencies={dependencies as any}>

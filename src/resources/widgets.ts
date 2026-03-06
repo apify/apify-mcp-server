@@ -49,6 +49,18 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
   };
 };
 
+/**
+ * Creates widget metadata for tool definitions.
+ *
+ * IMPORTANT: `openai/outputTemplate` is intentionally NOT included here.
+ * MCP Jam's `detectUIType()` checks for both `openai/outputTemplate` and `ui.resourceUri`.
+ * If both are present, it returns `OPENAI_SDK_AND_MCP_APPS` and defaults to the legacy
+ * ChatGPT renderer, which doesn't speak JSON-RPC — breaking our MCP Apps widgets.
+ * By only including `ui.resourceUri`, MCP Jam detects `MCP_APPS` and uses the correct renderer.
+ *
+ * The `openai/toolInvocation/*` keys are safe — they're UX hints only and don't affect
+ * renderer detection.
+ */
 function createWidgetMeta(params: {
     resourceUri: string;
     invoking: string;

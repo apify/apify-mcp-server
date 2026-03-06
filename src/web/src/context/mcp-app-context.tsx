@@ -11,6 +11,20 @@ interface McpAppState {
 
 const McpAppContext = createContext<McpAppState | null>(null);
 
+/**
+ * Provides a single MCP Apps connection (via `useApp()`) shared across all widget components.
+ *
+ * The ext-apps SDK's `useApp()` creates a `PostMessageTransport` that speaks JSON-RPC
+ * with the host (ChatGPT, MCP Jam, etc.) over postMessage. Tool results arrive via
+ * `ui/notifications/tool-result`, and host context (theme, viewport) via
+ * `ui/notifications/host-context-changed`.
+ *
+ * ChatGPT quirk: on the first widget in a conversation, ChatGPT must HTTP-fetch the
+ * resource template. The tool often completes before the iframe loads, so the MCP Apps
+ * bridge never sends `tool-result`. As a workaround, we read `window.openai.toolOutput`
+ * (set synchronously by ChatGPT's Apps SDK compatibility layer) as initial data.
+ * See the `receivedViaBridge` ref and the `useEffect` below.
+ */
 export function McpAppProvider({ children }: { children: React.ReactNode }) {
     const [toolResult, setToolResult] = useState<CallToolResult | null>(null);
     const [hostContext, setHostContext] = useState<McpUiHostContext | undefined>();
