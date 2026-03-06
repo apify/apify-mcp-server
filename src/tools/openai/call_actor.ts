@@ -53,7 +53,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
     requiresSkyfirePayId: true,
-    // openai-only tool; openai/* keys also stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
+    // openai-only tool; openai/* and ui keys also stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },

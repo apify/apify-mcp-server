@@ -139,15 +139,21 @@ function validateStructuredOutputForTool(result: unknown, toolName: string, mode
     validateStructuredOutput(result, findToolByName(toolName, mode)?.outputSchema, toolName);
 }
 
-/** Validates that the listed tools have OpenAI metadata (_meta) with outputTemplate and widgetAccessible. */
-function expectOpenAiToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
+/** Validates that the listed tools have widget metadata (_meta) with both legacy openai/* and MCP Apps ui.* keys. */
+function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
     const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
         expect(tool?._meta).toBeDefined();
+        // Legacy OpenAI keys (still required by ChatGPT)
         expect(tool?._meta?.['openai/outputTemplate']).toBeDefined();
         expect(tool?._meta?.['openai/widgetAccessible']).toBe(true);
+        // MCP Apps standard keys
+        const ui = tool?._meta?.ui as Record<string, unknown> | undefined;
+        expect(ui).toBeDefined();
+        expect(ui?.resourceUri).toBeDefined();
+        expect(ui?.visibility).toEqual(['model', 'app']);
     }
 }
 
@@ -2419,7 +2425,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled
-            expectOpenAiToolMeta(tools);
+            expectWidgetToolMeta(tools);
 
             await client.close();
         });
@@ -2435,7 +2441,7 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
-            expectOpenAiToolMeta(tools);
+            expectWidgetToolMeta(tools);
 
             await client.close();
         });

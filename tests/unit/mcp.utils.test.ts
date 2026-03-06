@@ -153,7 +153,7 @@ describe('MCP resources', () => {
 
         const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
 
-        expect(result.contents[0].mimeType).toBe('text/html+skybridge');
+        expect(result.contents[0].mimeType).toBe('text/html;profile=mcp-app');
         expect(result.contents[0].text).toContain('console.log("widget");');
         expect(result.contents[0].html).toContain('<script type="module">console.log("widget");</script>');
     });

@@ -5,25 +5,49 @@
  * at runtime.
  */
 
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
-const OPENAI_WIDGET_CSP = {
-    connect_domains: ['https://api.apify.com'],
-    resource_domains: [
+export { RESOURCE_MIME_TYPE };
+
+const WIDGET_CSP_DOMAINS = {
+    connect: ['https://api.apify.com'],
+    resource: [
         'https://mcp.apify.com',
         'https://images.apifyusercontent.com',
         'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
         'https://apify-image-uploads-prod.s3.amazonaws.com',
         'https://apify.com',
+        'https://fonts.googleapis.com',
+        'https://fonts.gstatic.com',
     ],
 } as const;
 
+// CSP object with both snake_case (legacy, required by MCP Jam) and camelCase (MCP Apps spec) field names.
+// TODO: Remove snake_case fields once all hosts support camelCase.
+const WIDGET_CSP = {
+    connect_domains: WIDGET_CSP_DOMAINS.connect,
+    resource_domains: WIDGET_CSP_DOMAINS.resource,
+    connectDomains: WIDGET_CSP_DOMAINS.connect,
+    resourceDomains: WIDGET_CSP_DOMAINS.resource,
+} as const;
+
+const WIDGET_BASE_UI = {
+    visibility: ['model', 'app'] as const,
+    prefersBorder: true,
+    domain: 'https://apify.com',
+    csp: WIDGET_CSP,
+} as const;
+
 const OPENAI_WIDGET_BASE_META = {
+    // Legacy OpenAI keys (still required by ChatGPT)
     'openai/widgetAccessible': true,
     'openai/resultCanProduceWidget': true,
     'openai/widgetPrefersBorder': true,
     'openai/widgetDomain': 'https://apify.com',
-    'openai/widgetCSP': OPENAI_WIDGET_CSP,
+    'openai/widgetCSP': WIDGET_CSP,
+    // MCP Apps standard metadata
+    ui: WIDGET_BASE_UI,
 } as const;
 
 export const WIDGET_URIS = {
@@ -31,16 +55,31 @@ export const WIDGET_URIS = {
     ACTOR_RUN: 'ui://widget/actor-run.html',
 } as const;
 
+// Both snake_case (legacy) and camelCase (MCP Apps spec) fields.
+// TODO: Remove snake_case fields once all hosts support camelCase.
+type WidgetCsp = {
+  readonly connect_domains: readonly string[];
+  readonly resource_domains: readonly string[];
+  readonly connectDomains: readonly string[];
+  readonly resourceDomains: readonly string[];
+};
+
 type WidgetMeta = NonNullable<Resource['_meta']> & {
+  // Legacy OpenAI keys (still required by ChatGPT)
   'openai/outputTemplate': string;
   'openai/toolInvocation/invoking'?: string;
   'openai/toolInvocation/invoked'?: string;
   'openai/widgetAccessible': boolean;
   'openai/resultCanProduceWidget': boolean;
   'openai/widgetDomain': string;
-  'openai/widgetCSP': {
-    readonly connect_domains: readonly string[];
-    readonly resource_domains: readonly string[];
+  'openai/widgetCSP': WidgetCsp;
+  // MCP Apps standard metadata
+  ui: {
+    resourceUri: string;
+    visibility: readonly string[];
+    prefersBorder: boolean;
+    domain: string;
+    csp: WidgetCsp;
   };
 };
 
@@ -69,6 +108,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
             'openai/outputTemplate': WIDGET_URIS.SEARCH_ACTORS,
             'openai/toolInvocation/invoking': 'Searching Apify Store...',
             'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
+            ui: { ...WIDGET_BASE_UI, resourceUri: WIDGET_URIS.SEARCH_ACTORS },
         },
     },
     [WIDGET_URIS.ACTOR_RUN]: {
@@ -82,6 +122,7 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
             'openai/outputTemplate': WIDGET_URIS.ACTOR_RUN,
             'openai/toolInvocation/invoking': 'Running Apify Actor...',
             'openai/toolInvocation/invoked': 'Actor run started',
+            ui: { ...WIDGET_BASE_UI, resourceUri: WIDGET_URIS.ACTOR_RUN },
         },
     },
 };
