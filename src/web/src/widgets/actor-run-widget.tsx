@@ -21,8 +21,8 @@ const mockToolResponseMetadata = {
 // Simulate a 5-second loading delay to test skeleton
 const LOADING_DELAY_MS = 2000;
 
-// Set up mock window.openai only for local dev (no-ops when window.openai exists or when not on localhost)
-const isMockEnvironment = isLocalDev && typeof window !== "undefined" && !window.openai;
+// Set up mock window.openai for local development (no-ops when window.openai already exists)
+const isMockEnvironment = typeof window !== "undefined" && !window.openai;
 
 setupMockOpenAi({
     toolOutput: mockRunData, // Start with basic data (no dataset) to show header immediately
