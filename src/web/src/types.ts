@@ -1,3 +1,11 @@
+// --- Global Augmentations ---
+
+declare global {
+    interface Window {
+        openai?: Record<string, unknown>;
+    }
+}
+
 // --- App Specific Types ---
 
 export type StructuredPricingInfo = {

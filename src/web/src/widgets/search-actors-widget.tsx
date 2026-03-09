@@ -90,16 +90,16 @@ const mockActors = [
 ];
 
 // Set up mock window.openai for local development (no-ops when window.openai already exists)
-const isMockEnvironment = typeof window !== "undefined" && !(window as any).openai;
+const isMockEnvironment = typeof window !== "undefined" && !window.openai;
 
 setupMockOpenAi({
     toolOutput: {
-        actors: [], // Start with empty to show loading state
+        actors: [], // Start with empty to show the loading state
         query: "web scraping",
     },
     initialWidgetState: {
         loadingDetails: null,
-        isLoading: true, // Start in loading state
+        isLoading: true, // Start in the loading state
     },
 });
 

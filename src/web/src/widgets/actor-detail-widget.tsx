@@ -5,10 +5,10 @@ import { renderWidget } from "../utils/init-widget";
 import { useWidgetProps } from "../hooks/use-widget-props";
 import type { ActorDetails } from "../types";
 
-const shouldEnableMocks = typeof window !== "undefined" && !(window as any).openai;
+const shouldEnableMocks = typeof window !== "undefined" && !window.openai;
 
 if (shouldEnableMocks) {
-    // Set up mock window.openai for local development
+    // Set up a mock window.openai for local development
     setupMockOpenAi({
         toolOutput: {
             details: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent.actorDetails,

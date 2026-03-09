@@ -13,11 +13,11 @@ interface MockOpenAiConfig {
  * so this mock makes dev mode work transparently with `useApp()`.
  */
 export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
-    if (typeof window === "undefined" || (window as any).openai) return;
+    if (typeof window === "undefined" || window.openai) return;
 
     console.log("Setting up mock openai");
 
-    (window as any).openai = {
+    window.openai = {
         // API methods
         callTool: async (name: string, args: any) => {
             console.log(`Mock callTool: ${name}`, args);
@@ -77,20 +77,20 @@ export const setupMockOpenAi = (config: MockOpenAiConfig = {}) => {
             isPolling: false,
             lastUpdateTime: Date.now(),
         },
-        setWidgetState: async (state: any) => {
+        setWidgetState: async (state: Record<string, unknown>) => {
             console.log("Mock setWidgetState:", state);
-            if ((window as any).openai) {
-                (window as any).openai.widgetState = { ...(window as any).openai.widgetState, ...state };
+            if (window.openai) {
+                window.openai.widgetState = { ...(window.openai.widgetState as object), ...state };
             }
         },
     };
 };
 
 export const updateMockOpenAiState = (updates: Record<string, unknown>) => {
-    if (typeof window === "undefined" || !(window as any).openai) return;
+    if (typeof window === "undefined" || !window.openai) return;
 
     // Update local state
-    Object.assign((window as any).openai, updates);
+    Object.assign(window.openai, updates);
 
     // Dispatch event to notify listeners (SDK's OpenAI transport listens for this)
     window.dispatchEvent(
