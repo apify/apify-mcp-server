@@ -429,14 +429,12 @@ export const ActorRun: React.FC = () => {
                         const newStatus = (newData.status || '').toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
                             // Notify the model that the run completed so it can follow up.
-                            if (app) {
-                                const ctx = [
-                                    `Actor run ${runData.runId} finished with status: ${newStatus}.`,
-                                    newData.dataset?.datasetId ? `Dataset ID: ${newData.dataset.datasetId}` : null,
-                                    newData.dataset?.itemCount != null ? `Items scraped: ${newData.dataset.itemCount}` : null,
-                                ].filter(Boolean).join(' ');
-                                await app.updateModelContext({ content: [{ type: 'text', text: ctx }] }).catch(() => {});
-                            }
+                            const ctx = [
+                                `Actor run ${runData.runId} finished with status: ${newStatus}.`,
+                                newData.dataset?.datasetId ? `Dataset ID: ${newData.dataset.datasetId}` : null,
+                                newData.dataset?.itemCount != null ? `Items scraped: ${newData.dataset.itemCount}` : null,
+                            ].filter(Boolean).join(' ');
+                            await app.updateModelContext({ content: [{ type: 'text', text: ctx }] }).catch(() => {});
                             break;
                         }
                     }
