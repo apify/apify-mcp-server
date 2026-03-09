@@ -90,7 +90,6 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                 log.debug('Reading widget file', { uri, jsPath: widget.jsPath });
                 const fs = await import('node:fs');
                 const widgetJs = fs.readFileSync(widget.jsPath, 'utf-8');
-                const safeWidgetJs = widgetJs.replace(/<\/script/gi, '<\\/script');
 
                 const widgetHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -101,7 +100,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
   </head>
   <body>
     <div id="root"></div>
-    <script type="module">${safeWidgetJs}</script>
+    <script type="module">${widgetJs}</script>
   </body>
 </html>`;
 

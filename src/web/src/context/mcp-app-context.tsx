@@ -52,11 +52,11 @@ export function McpAppProvider({ children }: { children: React.ReactNode }) {
         // (first widget in a conversation), the MCP Apps bridge never sends
         // ui/notifications/tool-result. Read the sync value as initial data.
         if (!receivedViaBridge.current) {
-            const openai = (window as any).openai;
-            if (openai?.toolOutput) {
+            const { toolOutput } = (window as Window & { openai?: { toolOutput?: unknown } }).openai ?? {};
+            if (toolOutput) {
                 setToolResult({
                     content: [],
-                    structuredContent: openai.toolOutput,
+                    structuredContent: toolOutput,
                 });
             }
         }
