@@ -89,19 +89,15 @@ const extractDeveloperUsername = (fullActorName: string): string => {
 };
 
 /**
- * Resolves runId from URL (?runId=xxx) or hostContext.
+ * Resolves runId from URL query parameter (?runId=xxx).
  * Used when the host overwrites toolResult with a different tool call (e.g. search-actors),
  * so the widget can still show the correct run when opened for a call-actor response.
  */
-function getRunIdFromStableSource(hostContext: Record<string, unknown> | undefined): string | null {
-    if (typeof window !== "undefined") {
-        const params = new URLSearchParams(window.location.search);
-        const fromUrl = params.get("runId");
-        if (fromUrl?.trim()) return fromUrl.trim();
-    }
-    const fromHost = hostContext?.runId;
-    if (typeof fromHost === "string" && fromHost.trim()) return fromHost.trim();
-    return null;
+function getRunIdFromUrl(): string | null {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    const runId = params.get("runId");
+    return runId?.trim() || null;
 }
 
 const Container = styled.div`
@@ -305,17 +301,17 @@ function toolOutputToRunData(
 }
 
 export const ActorRun: React.FC = () => {
-    const { app, toolResult, hostContext } = useMcpApp();
+    const { app, toolResult } = useMcpApp();
     const toolOutput = useWidgetProps<ToolOutput>();
     const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
-    const stableRunId = getRunIdFromStableSource(hostContext);
+    const stableRunId = getRunIdFromUrl();
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
 
     // Initialize runData from toolOutput (call-actor result) or by fetching run when we have a stable runId.
     // When the host overwrites toolResult with another tool (e.g. search-actors), toolOutput has no runId;
-    // use runId from URL or hostContext so this widget still shows the correct run.
+    // use runId from URL so this widget still shows the correct run.
     useEffect(() => {
         if (runData) return;
 
