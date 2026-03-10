@@ -64,10 +64,6 @@ export const openaiCallActor: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
-    execution: {
-        // Support long-running tasks
-        taskSupport: 'optional',
-    },
     call: async (toolArgs: InternalToolArgs) => {
         const preResult = await callActorPreExecute(toolArgs);
         if ('earlyResponse' in preResult) {

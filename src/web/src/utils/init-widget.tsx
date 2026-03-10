@@ -1,23 +1,58 @@
 import "../index.css";
-import React from "react";
+import React, { useEffect } from "react";
+import { applyDocumentTheme, applyHostFonts, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
 import { UiDependencyProvider } from "@apify/ui-library";
 import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
+import { McpAppProvider, useMcpApp } from "../context/mcp-app-context";
 
-const THEME_CHECK_INTERVAL_MS = 1000;
-
-function resolveTheme(): "light" | "dark" {
-    const t = window.openai?.theme;
-    if (t === "dark") return "dark";
-    if (t === "light") return "light";
+function resolveSystemTheme(): "light" | "dark" {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
 }
 
-function applyTheme(theme: "light" | "dark") {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.documentElement.classList.toggle("dark", theme === "dark");
+function applyHostContext(hostContext: ReturnType<typeof useMcpApp>["hostContext"]) {
+    const hostTheme = hostContext?.theme;
+    if (hostTheme === "dark" || hostTheme === "light") {
+        applyDocumentTheme(hostTheme);
+    } else {
+        applyDocumentTheme(resolveSystemTheme());
+    }
+
+    if (hostContext?.styles?.variables) {
+        applyHostStyleVariables(hostContext.styles.variables);
+    }
+
+    if (hostContext?.styles?.css?.fonts) {
+        applyHostFonts(hostContext.styles.css.fonts);
+    }
 }
+
+/**
+ * Syncs the document theme from MCP host context, falling back to system preference.
+ */
+const ThemeSync: React.FC = () => {
+    const { hostContext } = useMcpApp();
+
+    useEffect(() => {
+        applyHostContext(hostContext);
+    }, [hostContext]);
+
+    // Also listen for system theme changes when host doesn't specify a theme
+    useEffect(() => {
+        const mq = window.matchMedia("(prefers-color-scheme: dark)");
+        const handler = (e: MediaQueryListEvent) => {
+            const hostTheme = hostContext?.theme;
+            if (hostTheme !== "dark" && hostTheme !== "light") {
+                applyDocumentTheme(e.matches ? "dark" : "light");
+            }
+        };
+        mq.addEventListener("change", handler);
+        return () => mq.removeEventListener("change", handler);
+    }, [hostContext?.theme]);
+
+    return null;
+};
 
 /**
  * Helper to create and inject a link or style element if it doesn't already exist.
@@ -90,27 +125,7 @@ export const renderWidget = (Component: React.FC) => {
         const rootElement = document.getElementById("root");
         if (!rootElement) return;
 
-        applyTheme(resolveTheme());
-
-        const mq = window.matchMedia("(prefers-color-scheme: dark)");
-        const onSystemThemeChange = (e: MediaQueryListEvent) => {
-            const t = window.openai?.theme;
-            if (t !== "dark" && t !== "light") {
-                applyTheme(e.matches ? "dark" : "light");
-            }
-        };
-        mq.addEventListener("change", onSystemThemeChange);
-
-        let lastTheme = resolveTheme();
-        const checkTheme = () => {
-            const current = resolveTheme();
-            if (current !== lastTheme) {
-                lastTheme = current;
-                applyTheme(current);
-            }
-        };
-
-        window.setInterval(checkTheme, THEME_CHECK_INTERVAL_MS);
+        applyDocumentTheme(resolveSystemTheme());
 
         injectStylesheets();
 
@@ -142,14 +157,17 @@ export const renderWidget = (Component: React.FC) => {
             tooltipSafeHtml: (content: React.ReactNode) => content,
         } as const;
 
+        // No React.StrictMode — double-mount interferes with the ext-apps SDK's
+        // PostMessageTransport (creates duplicate JSON-RPC connections to the host).
         root.render(
-            <React.StrictMode>
-                <ThemeProvider theme={{}}>
-                    <UiDependencyProvider dependencies={dependencies as any}>
+            <ThemeProvider theme={{}}>
+                <UiDependencyProvider dependencies={dependencies as any}>
+                    <McpAppProvider>
+                        <ThemeSync />
                         <Component />
-                    </UiDependencyProvider>
-                </ThemeProvider>
-            </React.StrictMode>
+                    </McpAppProvider>
+                </UiDependencyProvider>
+            </ThemeProvider>
         );
     };
 
