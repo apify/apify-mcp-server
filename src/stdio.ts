@@ -37,6 +37,7 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
+import { parseUiMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools_loader.js';
@@ -58,7 +59,9 @@ type CliArgs = {
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
     /** UI mode for tool responses.
-     * - 'openai': OpenAI specific widget rendering. If not specified, there will be no widget rendering.
+     * - 'true': Enable widget rendering (recommended)
+     * - 'openai': Alias for 'true' (deprecated)
+     * If not specified, there will be no widget rendering.
      */
     ui: UiMode;
 }
@@ -128,12 +131,14 @@ Default: true (enabled)`,
 Only used when --telemetry-enabled is true`,
     })
     .option('ui', {
-        type: 'string',
-        choices: ['openai'],
         default: undefined,
-        coerce: (arg) => arg || process.env.UI_MODE,
+        coerce: (arg: string | boolean | undefined) => {
+            // Normalize: bare --ui flag (boolean true) or empty string both mean 'true'
+            const normalized = arg === true || arg === '' ? 'true' : arg;
+            return parseUiMode((normalized as string) || process.env.UI_MODE);
+        },
         describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
-- 'openai': OpenAI specific widget rendering
+--ui or --ui true: Enable widget rendering
 Default: undefined (no widget rendering)`,
     })
     .help('help')

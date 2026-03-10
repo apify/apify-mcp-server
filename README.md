@@ -294,20 +294,20 @@ As above, this exposes only the specified Actor (`apify/my-actor`) as a tool. No
 
 ### UI mode configuration
 
-The `uiMode` parameter enables OpenAI-specific widget rendering in tool responses. When enabled, tools like `search-actors` return interactive widget responses optimized for OpenAI clients.
+The `ui` parameter enables [MCP Apps](https://mcp.apify.com/) widget rendering in tool responses. When enabled, tools like `search-actors` return interactive MCP App responses.
 
 **Configuring the hosted server:**
 
 Enable UI mode using the `ui` query parameter:
 
 ```
-https://mcp.apify.com?ui=openai
+https://mcp.apify.com?ui=true
 ```
 
 You can combine it with other parameters:
 
 ```
-https://mcp.apify.com?tools=actors,docs&ui=openai
+https://mcp.apify.com?tools=actors,docs&ui=true
 ```
 
 **Configuring the CLI:**
@@ -315,13 +315,13 @@ https://mcp.apify.com?tools=actors,docs&ui=openai
 The CLI can be configured using command-line flags. For example, to enable UI mode:
 
 ```bash
-npx @apify/actors-mcp-server --ui openai
+npx @apify/actors-mcp-server --ui true
 ```
 
 You can also set it via the `UI_MODE` environment variable:
 
 ```bash
-export UI_MODE=openai
+export UI_MODE=true
 npx @apify/actors-mcp-server
 ```
 
