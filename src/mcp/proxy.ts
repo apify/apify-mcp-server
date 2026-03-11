@@ -8,31 +8,20 @@ import { getMCPServerID, getProxyMCPServerToolName } from './utils.js';
 export async function getMCPServerTools(
     actorID: string,
     client: Client,
-    // Name of the MCP server
     serverUrl: string,
 ): Promise<ToolEntry[]> {
-    const res = await client.listTools();
-    const { tools } = res;
+    const { tools } = await client.listTools();
 
-    const compiledTools: ToolEntry[] = [];
-    for (const tool of tools) {
-        const mcpTool: ActorMcpTool = {
-            type: 'actor-mcp',
-            actorId: actorID,
-            serverId: getMCPServerID(serverUrl),
-            serverUrl,
-            originToolName: tool.name,
-
-            name: getProxyMCPServerToolName(serverUrl, tool.name),
-            description: tool.description || '',
-            inputSchema: tool.inputSchema,
-            ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
-            // Preserve annotations from the proxied tool
-            annotations: tool.annotations,
-        };
-
-        compiledTools.push(mcpTool);
-    }
-
-    return compiledTools;
+    return tools.map((tool): ActorMcpTool => ({
+        type: 'actor-mcp',
+        actorId: actorID,
+        serverId: getMCPServerID(serverUrl),
+        serverUrl,
+        originToolName: tool.name,
+        name: getProxyMCPServerToolName(serverUrl, tool.name),
+        description: tool.description || '',
+        inputSchema: tool.inputSchema,
+        ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
+        annotations: tool.annotations,
+    }));
 }
