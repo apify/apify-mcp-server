@@ -713,7 +713,7 @@ Please remove the "task" parameter from the tool call request or use a different
                     });
                 });
 
-                // Return task immediately; execution continues asynchronously
+                // Return the task immediately; execution continues asynchronously
                 return { task };
             }
 
@@ -734,7 +734,7 @@ Please remove the "task" parameter from the tool call request or use a different
 
                 // Handle internal tool
                 if (tool.type === 'internal') {
-                    // Only create progress tracker for call-actor tool
+                    // Only create a progress tracker for call-actor tool
                     const progressTracker = tool.name === 'call-actor'
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
@@ -755,7 +755,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         progressTracker.stop();
                     }
 
-                    // If tool provided internal status, use it; otherwise infer from isError flag
+                    // If tool returned internalToolStatus, use it; otherwise infer from isError flag
                     const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
                     if (internalToolStatus !== undefined) {
                         toolStatus = internalToolStatus;
@@ -765,7 +765,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         toolStatus = TOOL_STATUS.SUCCEEDED;
                     }
 
-                    // Never expose internal _toolStatus field to MCP clients
+                    // Never expose internalToolStatus to MCP clients
                     return { ...rest };
                 }
 
@@ -1009,7 +1009,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     progressTracker.stop();
                 }
 
-                // If tool provided internal status, use it; otherwise infer from isError flag
+                // If tool returned internalToolStatus, use it; otherwise infer from isError flag
                 const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
                 if (internalToolStatus !== undefined) {
                     toolStatus = internalToolStatus;
@@ -1019,6 +1019,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     toolStatus = TOOL_STATUS.SUCCEEDED;
                 }
 
+                // Never expose internalToolStatus to MCP clients
                 result = rest;
             }
 

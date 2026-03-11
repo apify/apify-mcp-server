@@ -357,12 +357,12 @@ export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.
  *
- * Can be null or undefined in case of Skyfire requests.
+ * Can be null or undefined in the case of Skyfire requests.
  */
 export type ApifyToken = string | null | undefined;
 
 /**
- * Unified status type for tool execution lifecycle.
+ * Unified status type for the tool execution lifecycle.
  * Derived from TOOL_STATUS to ensure type safety and avoid duplication.
  */
 export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];

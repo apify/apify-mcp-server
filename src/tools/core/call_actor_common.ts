@@ -197,6 +197,7 @@ export async function resolveAndValidateActor(params: {
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
                 isError: true,
+                // `toolStatus` is internal-only (telemetry/server logic); clients should rely on `isError`.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
             }),
         };
@@ -259,6 +260,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
             earlyResponse: buildMCPResponse({
                 texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a Skyfire token. To use this Actor, please provide a valid Apify token instead of a Skyfire token.`],
                 isError: true,
+                // Internal status used by server telemetry; not part of the MCP client contract.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
             }),
         };
