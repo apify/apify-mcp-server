@@ -2443,6 +2443,25 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')(
+            'should treat ui=true URL parameter the same as ui=openai', async () => {
+                // 'true' is the new standard external value for ?ui= (maps to 'openai' internally via parseUiMode)
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                client = await createClientFn({ uiMode: 'true' as any });
+                const tools = await client.listTools();
+                const toolNames = getToolNames(tools);
+                expect(tools.tools.length).toBeGreaterThan(0);
+
+                // Verify that openai-only internal tools are present when ui=true is used
+                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+                expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
+
+                // Verify that tools have widget metadata when ui=true is used
+                expectWidgetToolMeta(tools);
+
+                await client.close();
+            });
+
         it('should automatically include get-actor-run when uiMode is enabled', async () => {
             client = await createClientFn({ uiMode: 'openai' });
             const tools = await client.listTools();
