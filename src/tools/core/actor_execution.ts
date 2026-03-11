@@ -31,11 +31,9 @@ export type CallActorGetDatasetResult = {
  * It requires the `APIFY_TOKEN` environment variable to be set.
  * If the `APIFY_IS_AT_HOME` the dataset items are pushed to the Apify dataset.
  *
- * @param {string} actorName - The name of the Actor to call.
- * @param {unknown} input - The input to pass to the actor.
- * @param {ApifyClient} apifyClient - The Apify client to use for authentication.
  * @returns {Promise<CallActorGetDatasetResult | null>} - A promise that resolves to an object containing the actor run and dataset items.
  * @throws {Error} - Throws an error if the `APIFY_TOKEN` is not set
+ * @param options
  */
 export async function callActorGetDataset(options: {
     actorName: string;
