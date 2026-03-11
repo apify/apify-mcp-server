@@ -5,6 +5,7 @@ import log from '@apify/log';
 import { SKYFIRE_README_CONTENT } from '../const.js';
 import type { ServerMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
+import { RESOURCE_MIME_TYPE } from './widgets.js';
 
 type ExtendedResourceContents = TextResourceContents & {
     html?: string;
@@ -52,7 +53,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
                     uri: widget.uri,
                     name: widget.name,
                     description: widget.description,
-                    mimeType: 'text/html+skybridge',
+                    mimeType: RESOURCE_MIME_TYPE,
                     _meta: widget.meta,
                 });
             }
@@ -105,7 +106,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
 
                 const widgetContent: ExtendedResourceContents = {
                     uri,
-                    mimeType: 'text/html+skybridge',
+                    mimeType: RESOURCE_MIME_TYPE,
                     text: widgetHtml,
                     html: widgetHtml,
                     _meta: widget.meta,

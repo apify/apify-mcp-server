@@ -133,6 +133,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(openaiCallActor!.description).toContain('always runs asynchronously');
             expect(openaiCallActor!.description).toContain('do NOT poll or call any other tool');
         });
+
+        it('should not advertise long-running task support for openai call-actor', () => {
+            const openaiCallActor = openaiCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+
+            expect(openaiCallActor).toBeDefined();
+            expect(openaiCallActor!.execution?.taskSupport).toBeUndefined();
+        });
     });
 
     describe('tool definitions are frozen', () => {
@@ -175,45 +182,48 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         _meta: {
             'openai/widget': { type: 'test' },
             'openai/config': { key: 'value' },
+            ui: { resourceUri: 'ui://widget/test.html' },
             'regular-key': { data: 123 },
         },
     };
 
-    it('should strip openai/ _meta keys when filterOpenAiMeta is true and not in openai mode', () => {
+    it('should strip openai/ and ui _meta keys when filterWidgetMeta is true and not in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: true,
+            filterWidgetMeta: true,
             mode: 'default',
         });
         expect(result._meta).toBeDefined();
         expect(result._meta).toEqual({ 'regular-key': { data: 123 } });
         expect(result._meta).not.toHaveProperty('openai/widget');
         expect(result._meta).not.toHaveProperty('openai/config');
+        expect(result._meta).not.toHaveProperty('ui');
     });
 
     it('should preserve all _meta keys in openai mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: true,
+            filterWidgetMeta: true,
             mode: 'openai',
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should preserve all _meta keys when filterOpenAiMeta is false', () => {
+    it('should preserve all _meta keys when filterWidgetMeta is false', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
-            filterOpenAiMeta: false,
+            filterWidgetMeta: false,
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should return undefined _meta when all keys are openai/ and mode is not openai', () => {
-        const toolWithOnlyOpenAiMeta = {
+    it('should return undefined _meta when all keys are widget-specific and mode is not openai', () => {
+        const toolWithOnlyWidgetMeta = {
             ...toolWithOpenAiMeta,
             _meta: {
                 'openai/widget': { type: 'test' },
+                ui: { resourceUri: 'ui://widget/test.html' },
             },
         };
-        const result = getToolPublicFieldOnly(toolWithOnlyOpenAiMeta, {
-            filterOpenAiMeta: true,
+        const result = getToolPublicFieldOnly(toolWithOnlyWidgetMeta, {
+            filterWidgetMeta: true,
             mode: 'default',
         });
         expect(result._meta).toBeUndefined();

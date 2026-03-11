@@ -5,25 +5,31 @@
  * at runtime.
  */
 
+import { RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps';
 import type { Resource } from '@modelcontextprotocol/sdk/types.js';
 
-const OPENAI_WIDGET_CSP = {
-    connect_domains: ['https://api.apify.com'],
-    resource_domains: [
+export { RESOURCE_MIME_TYPE };
+
+const WIDGET_DOMAIN = 'https://apify.com';
+
+const WIDGET_CSP = {
+    connectDomains: [`https://api.apify.com`],
+    resourceDomains: [
         'https://mcp.apify.com',
         'https://images.apifyusercontent.com',
         'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
         'https://apify-image-uploads-prod.s3.amazonaws.com',
-        'https://apify.com',
+        WIDGET_DOMAIN,
+        'https://fonts.googleapis.com',
+        'https://fonts.gstatic.com',
     ],
 } as const;
 
-const OPENAI_WIDGET_BASE_META = {
-    'openai/widgetAccessible': true,
-    'openai/resultCanProduceWidget': true,
-    'openai/widgetPrefersBorder': true,
-    'openai/widgetDomain': 'https://apify.com',
-    'openai/widgetCSP': OPENAI_WIDGET_CSP,
+const WIDGET_BASE_UI = {
+    visibility: ['model', 'app'] as const,
+    prefersBorder: true,
+    domain: WIDGET_DOMAIN,
+    csp: WIDGET_CSP,
 } as const;
 
 export const WIDGET_URIS = {
@@ -32,17 +38,44 @@ export const WIDGET_URIS = {
 } as const;
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
-  'openai/outputTemplate': string;
+  // ChatGPT UX hints (does not affect MCP Jam renderer detection)
   'openai/toolInvocation/invoking'?: string;
   'openai/toolInvocation/invoked'?: string;
-  'openai/widgetAccessible': boolean;
-  'openai/resultCanProduceWidget': boolean;
-  'openai/widgetDomain': string;
-  'openai/widgetCSP': {
-    readonly connect_domains: readonly string[];
-    readonly resource_domains: readonly string[];
+  // MCP Apps standard metadata (SEP-1865)
+  ui: {
+    resourceUri: string;
+    visibility: readonly string[];
+    prefersBorder: boolean;
+    domain: string;
+    csp: typeof WIDGET_CSP;
   };
 };
+
+/**
+ * Creates widget metadata for tool definitions.
+ *
+ * IMPORTANT: `openai/outputTemplate` is intentionally NOT included here.
+ * MCP Jam's `detectUIType()` checks for both `openai/outputTemplate` and `ui.resourceUri`.
+ * If both are present, it returns `OPENAI_SDK_AND_MCP_APPS` and defaults to the legacy
+ * ChatGPT renderer, which doesn't speak JSON-RPC — breaking our MCP Apps widgets.
+ * By only including `ui.resourceUri`, MCP Jam detects `MCP_APPS` and uses the correct renderer.
+ *
+ * The `openai/toolInvocation/*` keys are safe — they're UX hints only and don't affect
+ * renderer detection.
+ */
+function createWidgetMeta(params: {
+    resourceUri: string;
+    invoking: string;
+    invoked: string;
+}): WidgetMeta {
+    const { resourceUri, invoking, invoked } = params;
+
+    return {
+        'openai/toolInvocation/invoking': invoking,
+        'openai/toolInvocation/invoked': invoked,
+        ui: { ...WIDGET_BASE_UI, resourceUri },
+    };
+}
 
 export type WidgetConfig = {
   uri: Resource['uri'];
@@ -64,12 +97,11 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
         description: 'Interactive Actor search results widget',
         jsFilename: 'search-actors-widget.js',
         title: 'Apify Actor Search',
-        meta: {
-            ...OPENAI_WIDGET_BASE_META,
-            'openai/outputTemplate': WIDGET_URIS.SEARCH_ACTORS,
-            'openai/toolInvocation/invoking': 'Searching Apify Store...',
-            'openai/toolInvocation/invoked': 'Found Actors matching your criteria',
-        },
+        meta: createWidgetMeta({
+            resourceUri: WIDGET_URIS.SEARCH_ACTORS,
+            invoking: 'Searching Apify Store...',
+            invoked: 'Found Actors matching your criteria',
+        }),
     },
     [WIDGET_URIS.ACTOR_RUN]: {
         uri: WIDGET_URIS.ACTOR_RUN,
@@ -77,12 +109,11 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
         description: 'Interactive Actor run widget',
         jsFilename: 'actor-run-widget.js',
         title: 'Apify Actor Run',
-        meta: {
-            ...OPENAI_WIDGET_BASE_META,
-            'openai/outputTemplate': WIDGET_URIS.ACTOR_RUN,
-            'openai/toolInvocation/invoking': 'Running Apify Actor...',
-            'openai/toolInvocation/invoked': 'Actor run started',
-        },
+        meta: createWidgetMeta({
+            resourceUri: WIDGET_URIS.ACTOR_RUN,
+            invoking: 'Running Apify Actor...',
+            invoked: 'Actor run started',
+        }),
     },
 };
 

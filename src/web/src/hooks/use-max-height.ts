@@ -1,5 +1,9 @@
-import { useOpenAiGlobal } from "../hooks/use-open-ai-global";
+import { useMcpApp } from "../context/mcp-app-context";
 
 export const useMaxHeight = (): number | null => {
-  return useOpenAiGlobal("maxHeight");
+    const { hostContext } = useMcpApp();
+    const dims = hostContext?.containerDimensions;
+    if (dims && "maxHeight" in dims) return dims.maxHeight ?? null;
+    if (dims && "height" in dims) return dims.height;
+    return null;
 };

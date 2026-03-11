@@ -66,6 +66,7 @@ async function buildWidget(widget, watch = false) {
         outfile: resolve(dirName, 'dist', `${widget.name}.js`),
         plugins: [inlineCssPlugin],
         define: {
+            IS_DEV_BUILD: watch ? 'true' : 'false',
             'process.env.NODE_ENV': watch ? '"development"' : '"production"',
         },
         loader: {

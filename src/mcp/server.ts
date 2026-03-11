@@ -48,7 +48,7 @@ import {
 import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
-import { resolveAvailableWidgets } from '../resources/widgets.js';
+import { resolveAvailableWidgets, RESOURCE_MIME_TYPE } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
@@ -113,6 +113,12 @@ export class ActorsMcpServer {
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
+    /**
+     * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
+     * NOTE: This is currently informational only (logged for observability) and does not yet gate widget behavior.
+     */
+    public clientSupportsUi = false;
+
     constructor(options: ActorsMcpServerOptions = {}) {
         this.options = options;
 
@@ -162,6 +168,7 @@ export class ActorsMcpServer {
             },
         );
         this.setupTelemetry();
+        this.setupCapabilityNegotiation();
         this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
@@ -191,6 +198,23 @@ export class ActorsMcpServer {
         if (this.telemetryEnabled) {
             this.telemetryEnv = getTelemetryEnv(this.options.telemetry?.env ?? process.env.TELEMETRY_ENV);
         }
+    }
+
+    /**
+     * Detects MCP Apps UI support from client capabilities after initialization.
+     * Checks for the `io.modelcontextprotocol/ui` extension with `text/html;profile=mcp-app` MIME type.
+     */
+    private setupCapabilityNegotiation() {
+        const MCP_APPS_EXTENSION_ID = 'io.modelcontextprotocol/ui';
+
+        this.server.oninitialized = () => {
+            const caps = this.server.getClientCapabilities() as
+                (Record<string, unknown> & { extensions?: Record<string, unknown> }) | undefined;
+            const uiCap = caps?.extensions?.[MCP_APPS_EXTENSION_ID] as
+                { mimeTypes?: string[] } | undefined;
+            this.clientSupportsUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
+            log.info('Client MCP Apps UI support', { clientSupportsUi: this.clientSupportsUi });
+        };
     }
 
     /**
@@ -581,7 +605,7 @@ export class ActorsMcpServer {
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
             const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
                 mode: this.serverMode,
-                filterOpenAiMeta: true,
+                filterWidgetMeta: true,
             }));
             return { tools };
         });

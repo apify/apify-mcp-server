@@ -123,7 +123,7 @@ Actor description: ${definition.description}`;
             ajvValidate,
             requiresSkyfirePayId: true,
             memoryMbytes,
-            // openai/* keys are stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
+            // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
             _meta: {
                 ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
             },

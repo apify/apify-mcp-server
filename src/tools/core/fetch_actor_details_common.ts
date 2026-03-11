@@ -46,7 +46,7 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
-    // openai/* keys are stripped in non-openai mode by stripOpenAiMeta() in src/utils/tools.ts
+    // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },
