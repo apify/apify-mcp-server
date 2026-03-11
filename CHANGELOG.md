@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.8 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Move streamable HTTP transport from &#x2F;mcp to root &#x2F; ([#529](https://github.com/apify/apify-mcp-server/pull/529)) ([6e408fd](https://github.com/apify/apify-mcp-server/commit/6e408fdb60b83ffc13aba260919084127e67eee8)) by [@Copilot](https://github.com/Copilot), closes [#528](https://github.com/apify/apify-mcp-server/issues/528)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.7) (2026-03-04)
 
 ### 🐛 Bug Fixes
