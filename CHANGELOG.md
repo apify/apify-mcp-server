@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.8 - **not yet released**
 
+### 🚀 Features
+
+- Migrate widget metadata to MCP Apps standard ([#532](https://github.com/apify/apify-mcp-server/pull/532)) ([0d8276d](https://github.com/apify/apify-mcp-server/commit/0d8276d7c34e86d8587e734ccf2bc1af2ba6aa85)) by [@jirispilka](https://github.com/jirispilka), closes [#527](https://github.com/apify/apify-mcp-server/issues/527), [#533](https://github.com/apify/apify-mcp-server/issues/533)
+
 ### 🐛 Bug Fixes
 
 - Move streamable HTTP transport from &#x2F;mcp to root &#x2F; ([#529](https://github.com/apify/apify-mcp-server/pull/529)) ([6e408fd](https://github.com/apify/apify-mcp-server/commit/6e408fdb60b83ffc13aba260919084127e67eee8)) by [@Copilot](https://github.com/Copilot), closes [#528](https://github.com/apify/apify-mcp-server/issues/528)
