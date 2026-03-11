@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { TelemetryEnv, ToolCategory, UiMode } from '../src/types.js';
+import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
 export type McpClientOptions = {
     actors?: string[];
@@ -17,7 +17,7 @@ export type McpClientOptions = {
         enabled?: boolean; // Enable or disable telemetry (default: false for tests)
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
-    uiMode?: UiMode; // UI mode for tool responses. 'openai' for OpenAI specific widget rendering.
+    uiMode?: string; // Raw UI mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'openai', 'true')
     skyfireMode?: boolean; // Enable Skyfire mode (default: false)
 }
 

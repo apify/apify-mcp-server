@@ -419,7 +419,9 @@ const UI_MODES: ReadonlySet<string> = new Set<string>(SERVER_MODES.filter((m): m
  * Use at ingestion boundaries (URL params, env vars) to prevent invalid modes from propagating.
  */
 export function parseUiMode(value: string | null | undefined): UiMode | undefined {
-    return value && UI_MODES.has(value) ? (value as UiMode) : undefined;
+    if (!value) return undefined;
+    if (value === 'true') return 'openai'; // 'true' is the new standard; 'openai' is deprecated alias
+    return UI_MODES.has(value) ? (value as UiMode) : undefined;
 }
 
 /**

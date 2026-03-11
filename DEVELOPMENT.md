@@ -66,7 +66,7 @@ This command builds the core project and the `src/web/` widgets, then copies the
 
 All widget code lives in the self-contained `src/web/` React project. The widgets (MCP Apps) are rendered based on the structured output returned by MCP tools. If you need to add specific data to a widget, modify the corresponding MCP tool's output, since widgets can only render data returned by the MCP tool call result.
 
-> **Important (UI mode):** Widget rendering is enabled only when the server runs in UI mode. Use the `ui=openai` query parameter (e.g., `/mcp?ui=openai`) or set `UI_MODE=openai`. Currently, `openai` is the only supported `ui` value.
+> **Important (UI mode):** Widget rendering is enabled only when the server runs in UI mode. Use the `ui=true` query parameter (e.g., `/mcp?ui=true`) or set `UI_MODE=true`.
 
 ### Hot-reload development
 
@@ -150,7 +150,7 @@ You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP ser
 
 1. Click **"Add new server"**
 2. Fill in a name for the server
-3. Enter the URL: `http://localhost:3001/mcp?ui=openai` (Note: the `ui=openai` query parameter is required for widget rendering)
+3. Enter the URL: `http://localhost:3001/mcp?ui=true` (Note: the `ui=openai` query parameter is required for widget rendering)
 4. Select **"No authentication"** as the auth method
 5. Click **Add**
 
@@ -196,13 +196,13 @@ Then start the tunnel:
 ngrok start app
 ```
 
-The MCP server API will be reachable at `https://mcp-apify.ngrok.dev/mcp?ui=openai`.
+The MCP server API will be reachable at `https://mcp-apify.ngrok.dev/mcp?ui=true`.
 
 #### Adding the server in ChatGPT
 
 1. Go to [chatgpt.com](https://chatgpt.com) and open **Settings → Connectors**
 2. Click **"Add a custom connector"**
-3. Enter the URL: `https://mcp-apify.ngrok.dev/mcp?ui=openai`
+3. Enter the URL: `https://mcp-apify.ngrok.dev/mcp?ui=true`
 4. Save and start a new chat
 
 > **Important:** After restarting ngrok, use the **Refresh** button in the connector settings to reconnect — ChatGPT does not detect the tunnel restart automatically.
