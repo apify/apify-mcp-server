@@ -2229,7 +2229,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // TODO: if we add more streamable task tool call tests it migth be worth it to abscract the common logic but now it's not worth it
+        // TODO: if we add more streamable task tool call tests it might be worth it to abstract the common logic but now it's not worth it
         it('should be able to call a long running task tool call', async () => {
             client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
 
@@ -2446,8 +2446,7 @@ export function createIntegrationTestsSuite(
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')(
             'should treat ui=true URL parameter the same as ui=openai', async () => {
                 // 'true' is the new standard external value for ?ui= (maps to 'openai' internally via parseUiMode)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                client = await createClientFn({ uiMode: 'true' as any });
+                client = await createClientFn({ uiMode: 'true' });
                 const tools = await client.listTools();
                 const toolNames = getToolNames(tools);
                 expect(tools.tools.length).toBeGreaterThan(0);
@@ -2513,34 +2512,22 @@ export function createIntegrationTestsSuite(
 
                     // Tool should have inputSchema with properties
                     expect(tool.inputSchema, `Tool "${toolName}" should have inputSchema`).toBeDefined();
-                    expect(
-                        tool.inputSchema && 'properties' in tool.inputSchema,
-                        `Tool "${toolName}" should have inputSchema.properties`,
-                    ).toBe(true);
+                    expect(tool.inputSchema && 'properties' in tool.inputSchema, `Tool "${toolName}" should have inputSchema.properties`).toBe(true);
 
                     if (!tool.inputSchema || !('properties' in tool.inputSchema)) continue;
 
                     const properties = tool.inputSchema.properties as Record<string, unknown>;
 
                     // skyfire-pay-id property should exist
-                    expect(
-                        properties['skyfire-pay-id'],
-                        `Tool "${toolName}" should have skyfire-pay-id property in inputSchema`,
-                    ).toBeDefined();
+                    expect(properties['skyfire-pay-id'], `Tool "${toolName}" should have skyfire-pay-id property in inputSchema`).toBeDefined();
 
-                    // Verify skyfire-pay-id has correct structure
+                    // Verify skyfire-pay-id has the correct structure
                     const skyfireProperty = properties['skyfire-pay-id'] as Record<string, unknown>;
                     expect(skyfireProperty.type, `skyfire-pay-id should have type "string"`).toBe('string');
-                    expect(
-                        skyfireProperty.description,
-                        `skyfire-pay-id should have description`,
-                    ).toBeDefined();
+                    expect(skyfireProperty.description, `skyfire-pay-id should have description`).toBeDefined();
 
                     // Tool description should contain skyfire instructions
-                    expect(
-                        tool.description?.includes('skyfire-pay-id'),
-                        `Tool "${toolName}" description should mention skyfire-pay-id`,
-                    ).toBe(true);
+                    expect(tool.description?.includes('skyfire-pay-id'), `Tool "${toolName}" description should mention skyfire-pay-id`).toBe(true);
                 }
 
                 await client.close();
