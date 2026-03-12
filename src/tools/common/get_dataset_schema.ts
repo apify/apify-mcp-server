@@ -47,6 +47,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset schema',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

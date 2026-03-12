@@ -44,6 +44,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user key-value stores list',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

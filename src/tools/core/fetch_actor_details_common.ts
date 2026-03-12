@@ -53,6 +53,7 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

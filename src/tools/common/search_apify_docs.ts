@@ -75,6 +75,7 @@ export const searchApifyDocsTool: ToolEntry = Object.freeze({
     annotations: {
         title: 'Search Apify docs',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

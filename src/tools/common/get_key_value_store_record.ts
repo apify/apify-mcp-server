@@ -38,6 +38,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get key-value store record',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

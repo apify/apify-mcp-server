@@ -53,6 +53,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

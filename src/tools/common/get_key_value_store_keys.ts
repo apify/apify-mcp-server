@@ -43,6 +43,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

@@ -54,6 +54,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get HTML skeleton',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: true,
     },
