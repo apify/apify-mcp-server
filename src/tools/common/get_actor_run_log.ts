@@ -39,6 +39,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

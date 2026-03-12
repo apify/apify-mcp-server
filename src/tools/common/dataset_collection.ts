@@ -44,6 +44,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user datasets list',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

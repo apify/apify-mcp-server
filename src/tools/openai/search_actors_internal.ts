@@ -46,6 +46,7 @@ Returns only minimal fields (fullName, title, description) needed for subsequent
     annotations: {
         title: 'Search Actors (internal)',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

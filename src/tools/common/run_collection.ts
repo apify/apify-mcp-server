@@ -43,6 +43,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get user runs list',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

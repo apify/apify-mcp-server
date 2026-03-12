@@ -94,6 +94,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
     annotations: {
         title: 'Get Actor output',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

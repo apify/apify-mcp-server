@@ -100,6 +100,7 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

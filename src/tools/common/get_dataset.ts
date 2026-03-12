@@ -38,6 +38,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

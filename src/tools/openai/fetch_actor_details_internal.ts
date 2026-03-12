@@ -44,6 +44,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
     annotations: {
         title: 'Fetch Actor details internal',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },

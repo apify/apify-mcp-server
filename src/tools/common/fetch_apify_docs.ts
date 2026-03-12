@@ -36,6 +36,7 @@ USAGE EXAMPLES:
     annotations: {
         title: 'Fetch Apify docs',
         readOnlyHint: true,
+        destructiveHint: false,
         idempotentHint: true,
         openWorldHint: false,
     },
