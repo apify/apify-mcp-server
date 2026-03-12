@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.9 - **not yet released**
+## [0.9.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.9) (2026-03-12)
 
 ### 🚀 Features
 
 - Explicitly set destructiveHint to false ([#549](https://github.com/apify/apify-mcp-server/pull/549)) ([a33956a](https://github.com/apify/apify-mcp-server/commit/a33956a62ed7c1a502746cba019eca5963687a0f)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.8) (2026-03-11)
 
 ### 🚀 Features
