@@ -7,7 +7,7 @@ import log from '@apify/log';
 import { TimeoutError } from '../errors.js';
 import { getHttpStatusCode } from '../utils/logging.js';
 import { ACTORIZED_MCP_CONNECTION_TIMEOUT_MSEC } from './const.js';
-import { getMCPServerID } from './utils.js';
+import { getMCPServerID } from './proxy.js';
 
 /**
  * Creates and connects a ModelContextProtocol client.

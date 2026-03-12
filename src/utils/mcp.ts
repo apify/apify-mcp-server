@@ -23,13 +23,19 @@ export function buildUsageMeta(source: {
 
 /**
  * Helper to build a response for MCP from an array of text strings.
+ *
+ * Status model used by this project:
+ * - `isError` is MCP-visible and returned to the client.
+ * - `toolStatus` is an internal helper input for server telemetry.
+ * - `internalToolStatus` is the transient wire field carrying `toolStatus`
+ *   from tool helpers back to the server, and is stripped before client response.
+ *
  * @param options - Object containing response configuration
  * @param options.texts - Array of text strings to include in the response
  * @param options.isError - Optional flag to mark the response as an error (default: false).
  *                          This must remain MCP compliant: true for any tool-level error.
  * @param options.toolStatus - Optional internal tool status used for telemetry. When provided,
- *                             it will be attached as `_toolStatus` so the server can read it
- *                             and strip it before sending the response to the MCP client.
+ *                             it is attached as `internalToolStatus` for server-side processing only.
  * @param options.structuredContent - Optional structured content of unknown type
  * @param options._meta - Optional metadata for widget rendering (e.g., OpenAI widget metadata)
  */
@@ -48,31 +54,11 @@ export function buildMCPResponse(options: {
         _meta,
     } = options;
 
-    const response: {
-        content: { type: 'text'; text: string }[];
-        isError: boolean;
-        internalToolStatus?: ToolStatus;
-        structuredContent?: unknown;
-        _meta?: Record<string, unknown>;
-    } = {
-        content: texts.map((text) => ({ type: 'text', text })),
+    return {
+        content: texts.map((text) => ({ type: 'text' as const, text })),
         isError,
+        ...(toolStatus && { internalToolStatus: toolStatus }),
+        ...(structuredContent !== undefined && { structuredContent }),
+        ...(_meta !== undefined && { _meta }),
     };
-
-    // Attach internal tool status for telemetry; server will read and strip it
-    if (toolStatus) {
-        response.internalToolStatus = toolStatus;
-    }
-
-    // Add structured content if provided
-    if (structuredContent !== undefined) {
-        response.structuredContent = structuredContent;
-    }
-
-    // Add metadata if provided (e.g., for widget rendering)
-    if (_meta !== undefined) {
-        response._meta = _meta;
-    }
-
-    return response;
 }
