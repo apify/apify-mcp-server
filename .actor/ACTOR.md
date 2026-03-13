@@ -166,7 +166,7 @@ You can run the Apify MCP Server on your local machine by configuring it with Cl
 
 - MacOS or Windows
 - The latest version of Claude Desktop must be installed (or another MCP client)
-- [Node.js](https://nodejs.org/en) (v18 or higher)
+- [Node.js](https://nodejs.org/en) (v22 or higher)
 - [Apify API Token](https://docs.apify.com/platform/integrations/api#api-token) (`APIFY_TOKEN`)
 
 Make sure you have the `node` and `npx` installed properly:
@@ -308,7 +308,7 @@ npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en) (v18 or higher)
+- [Node.js](https://nodejs.org/en) (v22 or higher)
 - Python 3.9 or higher
 
 Create an environment file `.env` with the following content:
