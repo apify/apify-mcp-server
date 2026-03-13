@@ -28,29 +28,37 @@ export class ProgressTracker {
 
         // Send progress notification only if progressToken and sendNotification are available
         if (this.progressToken && this.sendNotification) {
-            const notification: ProgressNotification = {
-                method: 'notifications/progress' as const,
-                params: {
-                    progressToken: this.progressToken,
-                    progress: this.currentProgress,
-                    ...(message && { message }),
-                },
-                // Per MCP spec: progress notifications during task execution should include related-task metadata
-                ...(this.taskId && {
-                    _meta: {
-                        'io.modelcontextprotocol/related-task': {
-                            taskId: this.taskId,
-                        },
+            try {
+                const notification: ProgressNotification = {
+                    method: 'notifications/progress' as const,
+                    params: {
+                        progressToken: this.progressToken,
+                        progress: this.currentProgress,
+                        ...(message && { message }),
                     },
-                }),
-            };
+                    // Per MCP spec: progress notifications during task execution should include related-task metadata
+                    ...(this.taskId && {
+                        _meta: {
+                            'io.modelcontextprotocol/related-task': {
+                                taskId: this.taskId,
+                            },
+                        },
+                    }),
+                };
 
-            await this.sendNotification(notification);
+                await this.sendNotification(notification);
+            } catch {
+                // Silent fail - don't break execution
+            }
         }
 
         // Update task statusMessage if callback is provided
         if (this.onStatusMessage && message) {
-            await this.onStatusMessage(message);
+            try {
+                await this.onStatusMessage(message);
+            } catch {
+                // Silent fail - don't break execution
+            }
         }
     }
 

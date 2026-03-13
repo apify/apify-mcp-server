@@ -2411,7 +2411,7 @@ export function createIntegrationTestsSuite(
             expect(resultReceived).toBe(true);
         });
 
-        it.only('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', async () => {
+        it('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const stream = client.experimental.tasks.callToolStream(
@@ -2464,6 +2464,52 @@ export function createIntegrationTestsSuite(
             // Stream taskStatus events (backed by tasks/get) must have included statusMessage
             expect(getTaskSawStatusMessage).toBe(true);
             // tasks/list must have also returned statusMessage
+            expect(listTasksSawStatusMessage).toBe(true);
+        });
+
+        it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', async () => {
+            client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(RAG_WEB_BROWSER),
+                    arguments: {
+                        query: 'https://apify.com',
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000,
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            let getTaskSawStatusMessage = false;
+            let listTasksSawStatusMessage = false;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+                } else if (message.type === 'taskStatus') {
+                    if (message.task.statusMessage) {
+                        getTaskSawStatusMessage = true;
+
+                        if (!listTasksSawStatusMessage && taskId) {
+                            const currentTaskId = taskId;
+                            const tasksList = await client.experimental.tasks.listTasks();
+                            const ourTask = tasksList.tasks.find((t) => t.taskId === currentTaskId);
+                            if (ourTask?.statusMessage) {
+                                listTasksSawStatusMessage = true;
+                            }
+                        }
+                    }
+                } else if (message.type === 'error') {
+                    throw message.error;
+                }
+            }
+
+            expect(getTaskSawStatusMessage).toBe(true);
             expect(listTasksSawStatusMessage).toBe(true);
         });
 

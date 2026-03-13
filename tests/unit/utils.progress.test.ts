@@ -48,12 +48,12 @@ describe('ProgressTracker', () => {
         });
     });
 
-    it('should propagate notification send errors to the caller', async () => {
+    it('should handle notification send errors gracefully', async () => {
         const mockSendNotification = vi.fn().mockRejectedValue(new Error('Network error'));
         const tracker = new ProgressTracker({ progressToken: 'test-token', sendNotification: mockSendNotification });
 
-        // Errors propagate so the caller (startActorRunUpdates interval) can catch them
-        await expect(tracker.updateProgress('Test')).rejects.toThrow('Network error');
+        // Should not throw
+        await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
         expect(mockSendNotification).toHaveBeenCalled();
     });
 });
