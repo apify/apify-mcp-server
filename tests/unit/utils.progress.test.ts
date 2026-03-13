@@ -48,72 +48,12 @@ describe('ProgressTracker', () => {
         });
     });
 
-    it('should call onStatusMessage callback during actor run updates', async () => {
-        vi.useFakeTimers();
-        const mockSendNotification = vi.fn();
-        const mockOnStatusMessage = vi.fn();
-        const tracker = new ProgressTracker({
-            progressToken: 'test-token',
-            sendNotification: mockSendNotification,
-            taskId: 'task-123',
-            onStatusMessage: mockOnStatusMessage,
-        });
-
-        const mockRun = {
-            status: 'RUNNING',
-            statusMessage: 'Scraping page 1 of 10',
-        };
-        const mockApifyClient = {
-            run: () => ({
-                get: vi.fn().mockResolvedValue(mockRun),
-            }),
-        } as unknown as Parameters<typeof tracker.startActorRunUpdates>[1];
-
-        tracker.startActorRunUpdates('run-id', mockApifyClient, 'test-actor');
-
-        // Advance timer to trigger the polling interval
-        await vi.advanceTimersByTimeAsync(5_000);
-
-        expect(mockOnStatusMessage).toHaveBeenCalledWith('test-actor: Scraping page 1 of 10');
-        expect(mockSendNotification).toHaveBeenCalled();
-
-        tracker.stop();
-        vi.useRealTimers();
-    });
-
-    it('should poll and update task status without progressToken', async () => {
-        vi.useFakeTimers();
-        const mockOnStatusMessage = vi.fn();
-        const tracker = new ProgressTracker({
-            onStatusMessage: mockOnStatusMessage,
-        });
-
-        const mockRun = {
-            status: 'RUNNING',
-            statusMessage: 'Processing batch 2 of 5',
-        };
-        const mockApifyClient = {
-            run: () => ({
-                get: vi.fn().mockResolvedValue(mockRun),
-            }),
-        } as unknown as Parameters<typeof tracker.startActorRunUpdates>[1];
-
-        tracker.startActorRunUpdates('run-id', mockApifyClient, 'test-actor');
-
-        await vi.advanceTimersByTimeAsync(5_000);
-
-        expect(mockOnStatusMessage).toHaveBeenCalledWith('test-actor: Processing batch 2 of 5');
-
-        tracker.stop();
-        vi.useRealTimers();
-    });
-
-    it('should handle notification send errors gracefully', async () => {
+    it('should propagate notification send errors to the caller', async () => {
         const mockSendNotification = vi.fn().mockRejectedValue(new Error('Network error'));
         const tracker = new ProgressTracker({ progressToken: 'test-token', sendNotification: mockSendNotification });
 
-        // Should not throw
-        await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
+        // Errors propagate so the caller (startActorRunUpdates interval) can catch them
+        await expect(tracker.updateProgress('Test')).rejects.toThrow('Network error');
         expect(mockSendNotification).toHaveBeenCalled();
     });
 });

@@ -28,7 +28,6 @@ import {
     ReadResourceRequestSchema,
     ServerNotificationSchema,
     SetLevelRequestSchema,
-    TaskStatusNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 
@@ -1014,17 +1013,11 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 }
             }
 
-            // Callback to propagate Actor run statusMessage into the task store and notify clients
+            // Callback to propagate Actor run statusMessage into the task store.
+            // Clients retrieve it via tasks/get and tasks/list polling.
+            // TODO: Also send notifications/tasks/status so clients get real-time push updates
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
-                // Send notifications/tasks/status so clients get real-time task status updates
-                const task = await this.taskStore.getTask(taskId, mcpSessionId);
-                if (task) {
-                    await this.server.notification(TaskStatusNotificationSchema.parse({
-                        method: 'notifications/tasks/status',
-                        params: task,
-                    }));
-                }
             };
 
             // Handle internal tool execution in task mode
