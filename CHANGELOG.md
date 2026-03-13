@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.11 - **not yet released**
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.10](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.10) (2026-03-13)
 
 ### 🐛 Bug Fixes
