@@ -4,49 +4,61 @@ import type { ApifyClient } from '../apify_client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 
 export class ProgressTracker {
-    private progressToken: string | number;
-    private sendNotification: (notification: ProgressNotification) => Promise<void>;
+    private progressToken?: string | number;
+    private sendNotification?: (notification: ProgressNotification) => Promise<void>;
     private currentProgress = 0;
     private intervalId?: NodeJS.Timeout;
     private taskId?: string;
     private onStatusMessage?: (message: string) => Promise<void>;
 
-    constructor(
-        progressToken: string | number,
-        sendNotification: (notification: ProgressNotification) => Promise<void>,
-        taskId?: string,
-        onStatusMessage?: (message: string) => Promise<void>,
-    ) {
-        this.progressToken = progressToken;
-        this.sendNotification = sendNotification;
-        this.taskId = taskId;
-        this.onStatusMessage = onStatusMessage;
+    constructor(options: {
+        progressToken?: string | number;
+        sendNotification?: (notification: ProgressNotification) => Promise<void>;
+        taskId?: string;
+        onStatusMessage?: (message: string) => Promise<void>;
+    }) {
+        this.progressToken = options.progressToken;
+        this.sendNotification = options.sendNotification;
+        this.taskId = options.taskId;
+        this.onStatusMessage = options.onStatusMessage;
     }
 
     async updateProgress(message?: string): Promise<void> {
         this.currentProgress += 1;
 
-        try {
-            const notification: ProgressNotification = {
-                method: 'notifications/progress' as const,
-                params: {
-                    progressToken: this.progressToken,
-                    progress: this.currentProgress,
-                    ...(message && { message }),
-                },
-                // Per MCP spec: progress notifications during task execution should include related-task metadata
-                ...(this.taskId && {
-                    _meta: {
-                        'io.modelcontextprotocol/related-task': {
-                            taskId: this.taskId,
-                        },
+        // Send progress notification only if progressToken and sendNotification are available
+        if (this.progressToken && this.sendNotification) {
+            try {
+                const notification: ProgressNotification = {
+                    method: 'notifications/progress' as const,
+                    params: {
+                        progressToken: this.progressToken,
+                        progress: this.currentProgress,
+                        ...(message && { message }),
                     },
-                }),
-            };
+                    // Per MCP spec: progress notifications during task execution should include related-task metadata
+                    ...(this.taskId && {
+                        _meta: {
+                            'io.modelcontextprotocol/related-task': {
+                                taskId: this.taskId,
+                            },
+                        },
+                    }),
+                };
 
-            await this.sendNotification(notification);
-        } catch {
-            // Silent fail - don't break execution
+                await this.sendNotification(notification);
+            } catch {
+                // Silent fail - don't break execution
+            }
+        }
+
+        // Update task statusMessage if callback is provided
+        if (this.onStatusMessage && message) {
+            try {
+                await this.onStatusMessage(message);
+            } catch {
+                // Silent fail - don't break execution
+            }
         }
     }
 
@@ -73,11 +85,6 @@ export class ProgressTracker {
 
                     await this.updateProgress(message);
 
-                    // Update task statusMessage if callback is provided
-                    if (this.onStatusMessage) {
-                        await this.onStatusMessage(message);
-                    }
-
                     // Stop polling if Actor finished
                     if (status === 'SUCCEEDED' || status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
                         this.stop();
@@ -103,9 +110,10 @@ export function createProgressTracker(
     taskId?: string,
     onStatusMessage?: (message: string) => Promise<void>,
 ): ProgressTracker | null {
-    if (!progressToken || !sendNotification) {
+    // Create tracker if we have either progress notification support or a status message callback
+    if ((!progressToken || !sendNotification) && !onStatusMessage) {
         return null;
     }
 
-    return new ProgressTracker(progressToken, sendNotification, taskId, onStatusMessage);
+    return new ProgressTracker({ progressToken, sendNotification, taskId, onStatusMessage });
 }

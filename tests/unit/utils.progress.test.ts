@@ -6,7 +6,7 @@ describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
         const mockSendNotification = vi.fn();
         const progressToken = 'test-token-123';
-        const tracker = new ProgressTracker(progressToken, mockSendNotification);
+        const tracker = new ProgressTracker({ progressToken, sendNotification: mockSendNotification });
 
         await tracker.updateProgress('Quarter done');
 
@@ -22,7 +22,7 @@ describe('ProgressTracker', () => {
 
     it('should track actor run status updates', async () => {
         const mockSendNotification = vi.fn();
-        const tracker = new ProgressTracker('test-token', mockSendNotification);
+        const tracker = new ProgressTracker({ progressToken: 'test-token', sendNotification: mockSendNotification });
 
         // Test with a simple manual update instead of mocking the full actor run flow
         await tracker.updateProgress('test-actor: READY');
@@ -52,7 +52,12 @@ describe('ProgressTracker', () => {
         vi.useFakeTimers();
         const mockSendNotification = vi.fn();
         const mockOnStatusMessage = vi.fn();
-        const tracker = new ProgressTracker('test-token', mockSendNotification, 'task-123', mockOnStatusMessage);
+        const tracker = new ProgressTracker({
+            progressToken: 'test-token',
+            sendNotification: mockSendNotification,
+            taskId: 'task-123',
+            onStatusMessage: mockOnStatusMessage,
+        });
 
         const mockRun = {
             status: 'RUNNING',
@@ -62,7 +67,7 @@ describe('ProgressTracker', () => {
             run: () => ({
                 get: vi.fn().mockResolvedValue(mockRun),
             }),
-        } as any;
+        } as unknown as Parameters<typeof tracker.startActorRunUpdates>[1];
 
         tracker.startActorRunUpdates('run-id', mockApifyClient, 'test-actor');
 
@@ -76,9 +81,36 @@ describe('ProgressTracker', () => {
         vi.useRealTimers();
     });
 
+    it('should poll and update task status without progressToken', async () => {
+        vi.useFakeTimers();
+        const mockOnStatusMessage = vi.fn();
+        const tracker = new ProgressTracker({
+            onStatusMessage: mockOnStatusMessage,
+        });
+
+        const mockRun = {
+            status: 'RUNNING',
+            statusMessage: 'Processing batch 2 of 5',
+        };
+        const mockApifyClient = {
+            run: () => ({
+                get: vi.fn().mockResolvedValue(mockRun),
+            }),
+        } as unknown as Parameters<typeof tracker.startActorRunUpdates>[1];
+
+        tracker.startActorRunUpdates('run-id', mockApifyClient, 'test-actor');
+
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(mockOnStatusMessage).toHaveBeenCalledWith('test-actor: Processing batch 2 of 5');
+
+        tracker.stop();
+        vi.useRealTimers();
+    });
+
     it('should handle notification send errors gracefully', async () => {
         const mockSendNotification = vi.fn().mockRejectedValue(new Error('Network error'));
-        const tracker = new ProgressTracker('test-token', mockSendNotification);
+        const tracker = new ProgressTracker({ progressToken: 'test-token', sendNotification: mockSendNotification });
 
         // Should not throw
         await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
