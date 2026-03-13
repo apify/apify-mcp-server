@@ -17,7 +17,7 @@
 </p>
 
 
-The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, and any other website using thousands of ready-made scrapers, crawlers, and automation tools from the [Apify Store](https://apify.com/store). It supports OAuth, allowing you to connect from clients like Claude.ai or Visual Studio Code using just the URL.
+The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp.apify.com) enables your AI agents to extract data from social media, search engines, maps, e-commerce sites, and any other website using thousands of ready-made scrapers, crawlers, and automation tools from [Apify Store](https://apify.com/store). It supports OAuth, allowing you to connect from clients like Claude.ai or Visual Studio Code using just the URL.
 
 > **🚀 Use the hosted Apify MCP Server!**
 >
@@ -31,7 +31,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 ![Apify-MCP-server](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-mcp-server.png)
 
 ## Table of Contents
-- [🌐 Introducing the Apify MCP server](#-introducing-the-apify-mcp-server)
+- [🌐 Introducing Apify MCP Server](#-introducing-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
 - [⚠️ SSE transport deprecation](#%EF%B8%8F-sse-transport-deprecation)
 - [🤖 MCP clients](#-mcp-clients)
@@ -44,7 +44,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [🤝 Contributing](#-contributing)
 - [📚 Learn more](#-learn-more)
 
-# 🌐 Introducing the Apify MCP server
+# 🌐 Introducing Apify MCP Server
 
 The Apify MCP Server allows an AI assistant to use any [Apify Actor](https://apify.com/store) as a tool to perform a specific task.
 For example, it can:
@@ -52,7 +52,7 @@ For example, it can:
 - Use [Google Maps Email Extractor](https://apify.com/lukaskrivka/google-maps-with-contact-details) to extract contact details from Google Maps.
 - Use [Google Search Results Scraper](https://apify.com/apify/google-search-scraper) to scrape Google Search Engine Results Pages (SERPs).
 - Use [Instagram Scraper](https://apify.com/apify/instagram-scraper) to scrape Instagram posts, profiles, places, photos, and comments.
-- Use [RAG Web Browser](https://apify.com/apify/web-scraper) to search the web, scrape the top N URLs, and return their content.
+- Use [RAG Web Browser](https://apify.com/apify/rag-web-browser) to search the web, scrape the top N URLs, and return their content.
 
 **Video tutorial: Integrate 8,000+ Apify Actors and Agents with Claude**
 
@@ -74,7 +74,7 @@ You can find detailed instructions for setting up the MCP server in the [Apify d
 # ⚠️ SSE transport deprecation on April 1, 2026
 
 Update your MCP client config before April 1, 2026.
-The Apify MCP server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
+Apify MCP Server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
 
 Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for your client of choice, with a valid endpoint.
 
@@ -83,7 +83,7 @@ Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for you
 Apify MCP Server is compatible with any MCP client that adheres to the [Model Context Protocol](https://modelcontextprotocol.org/), but the level of support for dynamic tool discovery and other features may vary between clients.
 <!--Therefore, the server uses [mcp-client-capabilities](https://github.com/apify/mcp-client-capabilities) to detect client capabilities and adjust its behavior accordingly.-->
 
-To interact with the Apify MCP server, you can use clients such as: [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client).
+To interact with the Apify MCP Server, you can use clients such as [Claude Desktop](https://claude.ai/download), [Visual Studio Code](https://code.visualstudio.com/), or [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client).
 
 Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your preferred client.
 
@@ -95,7 +95,7 @@ The following table outlines the tested MCP clients and their level of support f
 
 | Client                      | Dynamic Tool Discovery | Notes                                                |
 |-----------------------------|------------------------|------------------------------------------------------|
-| **Claude.ai (web)**         | 🟡 Partial             | Tools mey need to be reloaded manually in the client |
+| **Claude.ai (web)**         | 🟡 Partial             | Tools may need to be reloaded manually in the client |
 | **Claude Desktop**          | 🟡 Partial             | Tools may need to be reloaded manually in the client |
 | **VS Code (Genie)**         | ✅ Full                 |                                                      |
 | **Cursor**                  | ✅ Full                 |                                                      |
@@ -120,7 +120,7 @@ Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-cli
 This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
 Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
-Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
+Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP Server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
 
 # 💰 Skyfire agentic payments
 
@@ -132,7 +132,7 @@ The Apify MCP Server integrates with [Skyfire](https://www.skyfire.xyz/) to enab
 
 **Setup:**
 
-Configure both the Skyfire MCP server and the Apify MCP server in your MCP client. Enable payment mode by adding the `payment=skyfire` query parameter to the Apify server URL:
+Configure both the Skyfire MCP server and Apify MCP Server in your MCP client. Enable payment mode by adding the `payment=skyfire` query parameter to the Apify server URL:
 
 ```json
 {
@@ -164,7 +164,7 @@ To learn more, see the [Skyfire integration documentation](https://docs.apify.co
 # 🛠️ Tools, resources, and prompts
 
 The MCP server provides a set of tools for interacting with Apify Actors.
-Since the Apify Store is large and growing rapidly, the MCP server provides a way to dynamically discover and use new Actors.
+Since Apify Store is large and growing rapidly, the MCP server provides a way to dynamically discover and use new Actors.
 
 ### Actors
 
@@ -203,7 +203,7 @@ Here is an overview list of all the tools provided by the Apify MCP Server.
 
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
-| `search-actors` | actors | Search for Actors in the Apify Store. | ✅ |
+| `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
 | `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
 | `call-actor`* | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ❔ |
 | `get-actor-run` | runs | Get detailed information about a specific Actor run. |  |
@@ -397,7 +397,7 @@ Create an environment file, `.env`, with the following content:
 APIFY_TOKEN="your-apify-token"
 ```
 
-Build the `actor-mcp-server` package:
+Build the `actors-mcp-server` package:
 
 ```bash
 npm run build
@@ -468,7 +468,7 @@ The Actor input schema is processed to be compatible with most MCP clients while
 - **Nested properties** are built for special cases like proxy configuration and request list sources to ensure the correct input structure.
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
 - **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
-- **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from the Apify Store—including rental Actors—connect to the hosted endpoint.
+- **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from Apify Store—including rental Actors—connect to the hosted endpoint.
 
 # 🤝 Contributing
 
