@@ -28,6 +28,7 @@ import {
     ReadResourceRequestSchema,
     ServerNotificationSchema,
     SetLevelRequestSchema,
+    TaskStatusNotificationSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
 
@@ -1051,6 +1052,14 @@ Please verify the tool name and ensure the tool is properly registered.`;
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
                 const onStatusMessage = async (message: string) => {
                     await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+                    // Send notifications/tasks/status so clients get real-time task status updates
+                    const task = await this.taskStore.getTask(taskId, mcpSessionId);
+                    if (task) {
+                        await this.server.notification(TaskStatusNotificationSchema.parse({
+                            method: 'notifications/tasks/status',
+                            params: task,
+                        }));
+                    }
                 };
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
