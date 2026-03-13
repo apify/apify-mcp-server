@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.10 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Fix CSP config for ChatGPT ([#552](https://github.com/apify/apify-mcp-server/pull/552)) ([1bac26a](https://github.com/apify/apify-mcp-server/commit/1bac26a13bde66135d54ef7f0fdad64a49747703)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.9) (2026-03-12)
 
 ### 🚀 Features
