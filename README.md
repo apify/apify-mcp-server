@@ -390,7 +390,7 @@ For detailed development setup, project structure, and local testing instruction
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en) (v18 or higher)
+- [Node.js](https://nodejs.org/en) (v22 or higher)
 
 Create an environment file, `.env`, with the following content:
 ```text
