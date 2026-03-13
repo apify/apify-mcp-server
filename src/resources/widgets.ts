@@ -12,17 +12,29 @@ export { RESOURCE_MIME_TYPE };
 
 const WIDGET_DOMAIN = 'https://apify.com';
 
+const RESOURCE_DOMAINS = [
+    'https://mcp.apify.com',
+    'https://images.apifyusercontent.com',
+    'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
+    'https://apify-image-uploads-prod.s3.amazonaws.com',
+    WIDGET_DOMAIN,
+    'https://fonts.googleapis.com',
+    'https://fonts.gstatic.com',
+] as const;
+
+const CONNECT_DOMAINS = [`https://api.apify.com`] as const;
+
+// MCP Apps standard CSP (camelCase)
 const WIDGET_CSP = {
-    connectDomains: [`https://api.apify.com`],
-    resourceDomains: [
-        'https://mcp.apify.com',
-        'https://images.apifyusercontent.com',
-        'https://apify-image-uploads-prod.s3.us-east-1.amazonaws.com',
-        'https://apify-image-uploads-prod.s3.amazonaws.com',
-        WIDGET_DOMAIN,
-        'https://fonts.googleapis.com',
-        'https://fonts.gstatic.com',
-    ],
+    connectDomains: CONNECT_DOMAINS,
+    resourceDomains: RESOURCE_DOMAINS,
+} as const;
+
+// ChatGPT-specific CSP compatibility key uses snake_case field names.
+// See: https://developers.openai.com/apps-sdk/reference/#component-resource-_meta-fields
+const OPENAI_WIDGET_CSP = {
+    connect_domains: CONNECT_DOMAINS,
+    resource_domains: RESOURCE_DOMAINS,
 } as const;
 
 const WIDGET_BASE_UI = {
@@ -41,6 +53,13 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
   // ChatGPT UX hints (does not affect MCP Jam renderer detection)
   'openai/toolInvocation/invoking'?: string;
   'openai/toolInvocation/invoked'?: string;
+  // ChatGPT-specific compatibility keys (OpenAI aliases for standard _meta.ui.* fields)
+  // See: https://developers.openai.com/apps-sdk/reference/#_meta-fields-on-tool-descriptor
+  //      https://developers.openai.com/apps-sdk/reference/#component-resource-_meta-fields
+  // 'openai/widgetAccessible'?: boolean;
+  'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
+  // 'openai/widgetPrefersBorder'?: boolean;
+  // 'openai/widgetDomain'?: string;
   // MCP Apps standard metadata (SEP-1865)
   ui: {
     resourceUri: string;
@@ -73,6 +92,12 @@ function createWidgetMeta(params: {
     return {
         'openai/toolInvocation/invoking': invoking,
         'openai/toolInvocation/invoked': invoked,
+        // ChatGPT compatibility keys — required for public apps in ChatGPT.
+        // These were removed during MCP Apps migration but ChatGPT still reads them.
+        // 'openai/widgetAccessible': true,
+        'openai/widgetCSP': OPENAI_WIDGET_CSP,
+        // 'openai/widgetPrefersBorder': WIDGET_BASE_UI.prefersBorder,
+        // 'openai/widgetDomain': WIDGET_BASE_UI.domain,
         ui: { ...WIDGET_BASE_UI, resourceUri },
     };
 }
