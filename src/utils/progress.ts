@@ -9,15 +9,18 @@ export class ProgressTracker {
     private currentProgress = 0;
     private intervalId?: NodeJS.Timeout;
     private taskId?: string;
+    private onStatusMessage?: (message: string) => Promise<void>;
 
     constructor(
         progressToken: string | number,
         sendNotification: (notification: ProgressNotification) => Promise<void>,
         taskId?: string,
+        onStatusMessage?: (message: string) => Promise<void>,
     ) {
         this.progressToken = progressToken;
         this.sendNotification = sendNotification;
         this.taskId = taskId;
+        this.onStatusMessage = onStatusMessage;
     }
 
     async updateProgress(message?: string): Promise<void> {
@@ -70,6 +73,11 @@ export class ProgressTracker {
 
                     await this.updateProgress(message);
 
+                    // Update task statusMessage if callback is provided
+                    if (this.onStatusMessage) {
+                        await this.onStatusMessage(message);
+                    }
+
                     // Stop polling if Actor finished
                     if (status === 'SUCCEEDED' || status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
                         this.stop();
@@ -93,10 +101,11 @@ export function createProgressTracker(
     progressToken: string | number | undefined,
     sendNotification: ((notification: ProgressNotification) => Promise<void>) | undefined,
     taskId?: string,
+    onStatusMessage?: (message: string) => Promise<void>,
 ): ProgressTracker | null {
     if (!progressToken || !sendNotification) {
         return null;
     }
 
-    return new ProgressTracker(progressToken, sendNotification, taskId);
+    return new ProgressTracker(progressToken, sendNotification, taskId, onStatusMessage);
 }

@@ -48,6 +48,34 @@ describe('ProgressTracker', () => {
         });
     });
 
+    it('should call onStatusMessage callback during actor run updates', async () => {
+        vi.useFakeTimers();
+        const mockSendNotification = vi.fn();
+        const mockOnStatusMessage = vi.fn();
+        const tracker = new ProgressTracker('test-token', mockSendNotification, 'task-123', mockOnStatusMessage);
+
+        const mockRun = {
+            status: 'RUNNING',
+            statusMessage: 'Scraping page 1 of 10',
+        };
+        const mockApifyClient = {
+            run: () => ({
+                get: vi.fn().mockResolvedValue(mockRun),
+            }),
+        } as any;
+
+        tracker.startActorRunUpdates('run-id', mockApifyClient, 'test-actor');
+
+        // Advance timer to trigger the polling interval
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        expect(mockOnStatusMessage).toHaveBeenCalledWith('test-actor: Scraping page 1 of 10');
+        expect(mockSendNotification).toHaveBeenCalled();
+
+        tracker.stop();
+        vi.useRealTimers();
+    });
+
     it('should handle notification send errors gracefully', async () => {
         const mockSendNotification = vi.fn().mockRejectedValue(new Error('Network error'));
         const tracker = new ProgressTracker('test-token', mockSendNotification);

@@ -1049,7 +1049,10 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
             // Handle actor tool execution in task mode
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId);
+                const onStatusMessage = async (message: string) => {
+                    await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+                };
+                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
                 const { 'skyfire-pay-id': _skyfirePayId, ...actorArgs } = args as Record<string, unknown>;
                 const apifyClient = createApifyClientWithSkyfireSupport(this, args, apifyToken);
 
