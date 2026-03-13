@@ -46,7 +46,7 @@ jobs:
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         steps:
-            -   uses: actions/checkout@v4
+            -   uses: actions/checkout@v6
                 with:
                     ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
             -   name: Use Node.js
@@ -152,7 +152,7 @@ jobs:
         needs: [ release_metadata ]
         runs-on: ubuntu-latest
         steps:
-            -   uses: actions/checkout@v4
+            -   uses: actions/checkout@v6
                 with:
                     ref: ${{ needs.release_metadata.outputs.changelog_commitish }}
             -   name: Install mcp-publisher
