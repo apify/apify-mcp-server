@@ -1,0 +1,33 @@
+{
+  "name": "apify/apify-mcp-server",
+  "description": "Apify MCP Server",
+  "accepts": [
+    {
+      "network": "eip155:8453",
+      "asset": "USDC",
+      "address": "YOUR_WALLET_ADDRESS"
+    }
+  ],
+  "resources": [
+    {
+      "path": "/apify",
+      "price": "0.01",
+      "description": "Pay-per-call access to apify"
+    },
+    {
+      "path": "/server",
+      "price": "0.01",
+      "description": "Pay-per-call access to server"
+    },
+    {
+      "path": "/actors",
+      "price": "0.01",
+      "description": "Pay-per-call access to actors"
+    },
+    {
+      "path": "/model context protocol",
+      "price": "0.01",
+      "description": "Pay-per-call access to model context protocol"
+    }
+  ]
+}
