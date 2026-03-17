@@ -31,6 +31,8 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 ![Apify-MCP-server](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-mcp-server.png)
 
 ## Table of Contents
+
+[![AgentRank](https://agentrank-ai.com/api/badge/tool/apify--apify-mcp-server)](https://agentrank-ai.com/tool/apify--apify-mcp-server/)
 - [🌐 Introducing Apify MCP Server](#-introducing-apify-mcp-server)
 - [🚀 Quickstart](#-quickstart)
 - [⚠️ SSE transport deprecation](#%EF%B8%8F-sse-transport-deprecation)
