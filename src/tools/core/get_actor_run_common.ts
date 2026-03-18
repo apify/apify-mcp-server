@@ -71,7 +71,8 @@ export type ActorRunStructuredContent = {
     stats?: unknown;
     dataset?: {
         datasetId: string;
-        itemCount: number;
+        totalItemCount: number;
+        previewItemCount: number;
         schema: unknown;
         previewItems: unknown[];
     };
@@ -145,7 +146,8 @@ export async function fetchActorRunData(params: {
 
         structuredContent.dataset = {
             datasetId: run.defaultDatasetId,
-            itemCount: datasetItems.count,
+            totalItemCount: datasetItems.total,
+            previewItemCount: datasetItems.items.length,
             schema: generatedSchema || { type: 'object', properties: {} },
             previewItems: datasetItems.items,
         };

@@ -15,7 +15,8 @@ import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 export type CallActorGetDatasetResult = {
     runId: string;
     datasetId: string;
-    itemCount: number;
+    totalItemCount: number;
+    previewItemCount: number;
     schema: JsonSchemaProperty;
     previewItems: DatasetItem[];
     usageTotalUsd?: number;
@@ -119,7 +120,8 @@ export async function callActorGetDataset(options: {
     return {
         runId: actorRun.id,
         datasetId: completedRun.defaultDatasetId,
-        itemCount: datasetItems.count,
+        totalItemCount: datasetItems.total,
+        previewItemCount: previewItems.length,
         schema,
         previewItems,
         usageTotalUsd: completedRun.usageTotalUsd,

@@ -10,7 +10,7 @@ export type ActorResponseResult = {
     structuredContent: {
         runId: string;
         datasetId: string;
-        itemCount: number;
+        totalItemCount: number;
         items: DatasetItem[];
         instructions: string;
     };
@@ -37,7 +37,7 @@ export function buildActorResponseContent(
     result: CallActorGetDatasetResult,
     previewOutput = true,
 ): ActorResponseResult {
-    const { runId, datasetId, itemCount, schema } = result;
+    const { runId, datasetId, totalItemCount, schema } = result;
 
     // Extract item schema if schema is an array
     let displaySchema = schema;
@@ -46,8 +46,8 @@ export function buildActorResponseContent(
     }
 
     // Build instructions for retrieving additional data
-    const previewNote = itemCount !== result.previewItems.length
-        ? ` Note: You have access only to a limited preview (${result.previewItems.length} of ${itemCount} items). Do not present this as the full output.`
+    const previewNote = totalItemCount !== result.previewItems.length
+        ? ` Note: You have access only to a limited preview (${result.previewItems.length} of ${totalItemCount} items). Do not present this as the full output.`
         : '';
     const instructions = `If you need to retrieve additional data, use the "get-actor-output" tool with datasetId: "${datasetId}".${previewNote} Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.`;
 
@@ -57,7 +57,7 @@ export function buildActorResponseContent(
 Results summary:
 • Run ID: ${runId}
 • Dataset ID: ${datasetId}
-• Total items: ${itemCount}
+• Total items: ${totalItemCount}
 
 Actor output data schema:
 * You can use this schema to understand the structure of the output data and, for example, retrieve specific fields based on your current task.
@@ -65,7 +65,7 @@ Actor output data schema:
 ${JSON.stringify(displaySchema)}
 \`\`\`
 
-Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${itemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${itemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
+Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${totalItemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${totalItemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
 
 ${instructions}
 `;
@@ -94,7 +94,7 @@ ${instructions}
     const structuredContent = {
         runId: result.runId,
         datasetId: result.datasetId,
-        itemCount: result.itemCount,
+        totalItemCount: result.totalItemCount,
         items: result.previewItems,
         instructions,
     };

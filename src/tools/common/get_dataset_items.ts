@@ -96,7 +96,7 @@ USAGE EXAMPLES:
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
-            totalItemCount: v.count,
+            totalItemCount: v.total,
             offset: parsed.offset ?? 0,
             limit: parsed.limit,
         };

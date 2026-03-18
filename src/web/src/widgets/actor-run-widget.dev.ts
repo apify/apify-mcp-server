@@ -204,7 +204,7 @@ export function setupActorRunWidgetDev(): void {
                         dataset: isComplete
                             ? {
                                   datasetId: "test_dataset_456",
-                                  itemCount: mockPreviewItems.length,
+                                  totalItemCount: mockPreviewItems.length,
                                   previewItems: mockPreviewItems,
                               }
                             : undefined,
@@ -224,7 +224,7 @@ export function setupActorRunWidgetDev(): void {
                 finishedAt: new Date().toISOString(),
                 dataset: {
                     datasetId: "test_dataset_456",
-                    itemCount: mockPreviewItems.length,
+                    totalItemCount: mockPreviewItems.length,
                     previewItems: mockPreviewItems,
                 },
             },

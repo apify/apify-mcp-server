@@ -153,7 +153,7 @@ Note: This tool is automatically included if the Apify MCP Server is configured 
             datasetId: parsed.datasetId,
             items: cleanedItems,
             itemCount: cleanedItems.length,
-            totalItemCount: response.count,
+            totalItemCount: response.total,
             offset: parsed.offset,
             limit: parsed.limit,
         };

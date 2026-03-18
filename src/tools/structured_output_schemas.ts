@@ -227,7 +227,7 @@ export const callActorOutputSchema = {
         startedAt: { type: 'string', description: 'ISO timestamp when the run started (only in async mode)' },
         input: { type: 'object' as const, description: 'Input parameters passed to the Actor (only in async mode)' },
         datasetId: { type: 'string', description: 'Dataset ID containing the full results (sync mode only)' },
-        itemCount: { type: 'number', description: 'Total number of items in the dataset (sync mode only)' },
+        totalItemCount: { type: 'number', description: 'Total number of items in the dataset (sync mode only)' },
         items: {
             type: 'array' as const,
             items: { type: 'object' as const },
@@ -259,7 +259,8 @@ export const getActorRunOutputSchema = {
             description: 'Dataset information (only for completed runs with results)',
             properties: {
                 datasetId: { type: 'string', description: 'Default dataset ID' },
-                itemCount: { type: 'number', description: 'Total number of items in dataset' },
+                totalItemCount: { type: 'number', description: 'Total number of items in dataset' },
+                previewItemCount: { type: 'number', description: 'Number of preview items returned' },
                 schema: { type: 'object' as const, description: 'Auto-generated JSON schema from dataset items' },
                 previewItems: {
                     type: 'array' as const,
@@ -267,7 +268,7 @@ export const getActorRunOutputSchema = {
                     description: 'Preview of first 5 dataset items',
                 },
             },
-            required: ['datasetId', 'itemCount', 'schema', 'previewItems'],
+            required: ['datasetId', 'totalItemCount', 'previewItemCount', 'schema', 'previewItems'],
         },
     },
     required: ['runId', 'status', 'startedAt'],

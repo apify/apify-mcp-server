@@ -25,7 +25,7 @@ interface ActorRunData {
     };
     dataset?: {
         datasetId: string;
-        itemCount: number;
+        totalItemCount: number;
         previewItems: Record<string, any>[];
     };
 }
@@ -428,7 +428,7 @@ export const ActorRun: React.FC = () => {
                             const ctx = [
                                 `Actor run ${runData.runId} finished with status: ${newStatus}.`,
                                 newData.dataset?.datasetId ? `Dataset ID: ${newData.dataset.datasetId}` : null,
-                                newData.dataset?.itemCount != null ? `Items scraped: ${newData.dataset.itemCount}` : null,
+                                newData.dataset?.totalItemCount != null ? `Items scraped: ${newData.dataset.totalItemCount}` : null,
                             ].filter(Boolean).join(' ');
                             await app.updateModelContext({ content: [{ type: 'text', text: ctx }] }).catch(() => {});
                             break;
@@ -585,9 +585,9 @@ export const ActorRun: React.FC = () => {
                     </Button>
                 </Footer>
             </Container>
-            {runData.status.toUpperCase() === 'SUCCEEDED' && runData && runData.dataset && runData.dataset.itemCount > 0 && (
+            {runData.status.toUpperCase() === 'SUCCEEDED' && runData && runData.dataset && runData.dataset.totalItemCount > 0 && (
                 <SuccessMessage>
-                    The {runData.actorName} found {runData.dataset.itemCount} result{runData.dataset.itemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
+                    The {runData.actorName} found {runData.dataset.totalItemCount} result{runData.dataset.totalItemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
                 </SuccessMessage>
             )}
         </WidgetLayout>
