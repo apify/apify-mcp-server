@@ -235,11 +235,11 @@ All tools include metadata annotations to help MCP clients and LLMs understand t
 
 - **`title`**: Short display name for the tool (e.g., "Search Actors", "Call Actor", "apify/rag-web-browser")
 - **`readOnlyHint`**: `true` for tools that only read data without modifying state (e.g., `get-dataset`, `fetch-actor-details`)
-- **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors, `get-html-skeleton` scrapes external websites). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
+- **`openWorldHint`**: `true` for tools that access external resources outside the Apify platform (e.g., `call-actor` executes external Actors). Tools that interact only with the Apify platform (like `search-actors` or `fetch-apify-docs`) do not have this hint.
 
 ### Tools configuration
 
-The `tools` configuration parameter is used to specify loaded tools - either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=add-actor` loads just one tool.
+The `tools` configuration parameter is used to specify loaded tools – either categories or specific tools directly, and Apify Actors. For example, `tools=storage,runs` loads two categories; `tools=add-actor` loads just one tool.
 
 When no query parameters are provided, the MCP server loads the following `tools` by default:
 
@@ -247,7 +247,7 @@ When no query parameters are provided, the MCP server loads the following `tools
 - `docs`
 - `apify/rag-web-browser`
 
-If the tools parameter is specified, only the listed tools or categories will be enabled - no default tools will be included.
+If the tools parameter is specified, only the listed tools or categories will be enabled – no default tools will be included.
 
 > **Easy configuration:**
 >

@@ -25,7 +25,7 @@ createIntegrationTestsSuite({
         // Get an available port
         httpServerPort = await getAvailablePort();
         httpServerHost = `http://localhost:${httpServerPort}`;
-        mcpUrl = `${httpServerHost}/mcp`;
+        mcpUrl = httpServerHost;
 
         // Create an express app
         app = createExpressApp(httpServerHost);
