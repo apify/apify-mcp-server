@@ -6,7 +6,9 @@ import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useMcpApp } from "../../context/mcp-app-context";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
+import { extractActorRunErrorMessage } from "../../utils/actor-run";
 import { TableSkeleton } from "./ActorRun.skeleton";
+
 interface ActorRunData {
     runId: string;
     actorName: string;
@@ -305,6 +307,7 @@ export const ActorRun: React.FC = () => {
     const toolOutput = useWidgetProps<ToolOutput>();
     const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
     const stableRunId = getRunIdFromUrl();
+    const toolErrorMessage = extractActorRunErrorMessage(toolResult);
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
@@ -464,9 +467,20 @@ export const ActorRun: React.FC = () => {
             <WidgetLayout>
                 <Container>
                     <EmptyStateContainer>
-                        <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
-                            Loading Actor run data ...
-                        </Text>
+                        {toolErrorMessage ? (
+                            <>
+                                <Badge variant="danger" size="small" LeadingIcon={CrossIcon}>
+                                    Failed
+                                </Badge>
+                                <Text type="body" size="small" style={{ color: theme.color.neutral.text }}>
+                                    {toolErrorMessage}
+                                </Text>
+                            </>
+                        ) : (
+                            <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
+                                Loading Actor run data ...
+                            </Text>
+                        )}
                     </EmptyStateContainer>
                 </Container>
             </WidgetLayout>
