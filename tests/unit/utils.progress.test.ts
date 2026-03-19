@@ -56,4 +56,31 @@ describe('ProgressTracker', () => {
         await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
         expect(mockSendNotification).toHaveBeenCalled();
     });
+
+    it('should call onStatusMessage with the progress message', async () => {
+        const mockOnStatusMessage = vi.fn();
+        const tracker = new ProgressTracker({ onStatusMessage: mockOnStatusMessage });
+
+        await tracker.updateProgress('Actor running');
+
+        expect(mockOnStatusMessage).toHaveBeenCalledWith('Actor running');
+    });
+
+    it('should not call onStatusMessage when message is undefined', async () => {
+        const mockOnStatusMessage = vi.fn();
+        const tracker = new ProgressTracker({ onStatusMessage: mockOnStatusMessage });
+
+        await tracker.updateProgress();
+
+        expect(mockOnStatusMessage).not.toHaveBeenCalled();
+    });
+
+    it('should handle onStatusMessage errors gracefully', async () => {
+        const mockOnStatusMessage = vi.fn().mockRejectedValue(new Error('Store error'));
+        const tracker = new ProgressTracker({ onStatusMessage: mockOnStatusMessage });
+
+        // Should not throw
+        await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
+        expect(mockOnStatusMessage).toHaveBeenCalledWith('Test');
+    });
 });

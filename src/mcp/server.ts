@@ -1024,34 +1024,36 @@ Please verify the tool name and ensure the tool is properly registered.`;
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
 
-                log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
-                const res = await tool.call({
-                    args,
-                    extra,
-                    apifyMcpServer: this,
-                    mcpServer: this.server,
-                    apifyToken,
-                    userRentedActorIds,
-                    progressTracker,
-                    mcpSessionId,
-                }) as object;
+                try {
+                    log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: redactSkyfirePayId(args) });
+                    const res = await tool.call({
+                        args,
+                        extra,
+                        apifyMcpServer: this,
+                        mcpServer: this.server,
+                        apifyToken,
+                        userRentedActorIds,
+                        progressTracker,
+                        mcpSessionId,
+                    }) as object;
 
-                if (progressTracker) {
-                    progressTracker.stop();
+                    // If the tool returned internalToolStatus, use it; otherwise infer from isError flag
+                    const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
+                    if (internalToolStatus !== undefined) {
+                        toolStatus = internalToolStatus;
+                    } else if ('isError' in rest && rest.isError) {
+                        toolStatus = TOOL_STATUS.FAILED;
+                    } else {
+                        toolStatus = TOOL_STATUS.SUCCEEDED;
+                    }
+
+                    // Never expose internalToolStatus to MCP clients
+                    result = rest;
+                } finally {
+                    if (progressTracker) {
+                        progressTracker.stop();
+                    }
                 }
-
-                // If tool returned internalToolStatus, use it; otherwise infer from isError flag
-                const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
-                if (internalToolStatus !== undefined) {
-                    toolStatus = internalToolStatus;
-                } else if ('isError' in rest && rest.isError) {
-                    toolStatus = TOOL_STATUS.FAILED;
-                } else {
-                    toolStatus = TOOL_STATUS.SUCCEEDED;
-                }
-
-                // Never expose internalToolStatus to MCP clients
-                result = rest;
             }
 
             // Handle actor tool execution in task mode

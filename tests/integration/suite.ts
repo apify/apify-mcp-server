@@ -2411,7 +2411,45 @@ export function createIntegrationTestsSuite(
             expect(resultReceived).toBe(true);
         });
 
-        // WARNING: This test can be flaky on streamable HTTP transport due to timing —
+        // Helper to verify statusMessage propagation in task mode.
+        // Reads the callToolStream, checks that tasks/get (via taskStatus events) and
+        // tasks/list both return statusMessage for the running task.
+        async function assertStatusMessagePropagated(
+            taskClient: Client,
+            stream: AsyncIterable<{ type: string; task?: { taskId: string; statusMessage?: string }; error?: Error }>,
+        ) {
+            let taskId: string | null = null;
+            let getTaskSawStatusMessage = false;
+            let listTasksSawStatusMessage = false;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task!.taskId;
+                } else if (message.type === 'taskStatus') {
+                    if (message.task?.statusMessage) {
+                        getTaskSawStatusMessage = true;
+
+                        // Verify tasks/list also includes statusMessage (one-time check)
+                        if (!listTasksSawStatusMessage && taskId) {
+                            const currentTaskId = taskId;
+                            const tasksList = await taskClient.experimental.tasks.listTasks();
+                            const ourTask = tasksList.tasks.find((t) => t.taskId === currentTaskId);
+                            if (ourTask?.statusMessage) {
+                                listTasksSawStatusMessage = true;
+                            }
+                        }
+                    }
+                } else if (message.type === 'error') {
+                    throw message.error;
+                }
+            }
+
+            // Stream taskStatus events (backed by tasks/get) must have included statusMessage
+            expect(getTaskSawStatusMessage).toBe(true);
+            // tasks/list must have also returned statusMessage
+            expect(listTasksSawStatusMessage).toBe(true);
+        }
+
+        // WARNING: These tests can be flaky on streamable HTTP transport due to timing —
         // the Actor may complete before the 5s progress polling interval fires a statusMessage.
         // See: https://github.com/apify/apify-mcp-server/issues/558
         it('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', async () => {
@@ -2435,44 +2473,9 @@ export function createIntegrationTestsSuite(
                 },
             );
 
-            // The SDK's callToolStream internally polls tasks/get and yields taskStatus events.
-            // Each taskStatus event IS the result of a tasks/get call, so if statusMessage appears
-            // in the stream, it proves tasks/get returns it correctly.
-            // We separately verify tasks/list once we know statusMessage exists.
-            let taskId: string | null = null;
-            let getTaskSawStatusMessage = false;
-            let listTasksSawStatusMessage = false;
-            for await (const message of stream) {
-                if (message.type === 'taskCreated') {
-                    taskId = message.task.taskId;
-                } else if (message.type === 'taskStatus') {
-                    if (message.task.statusMessage) {
-                        getTaskSawStatusMessage = true;
-
-                        // Verify tasks/list also includes statusMessage (one-time check)
-                        if (!listTasksSawStatusMessage && taskId) {
-                            const currentTaskId = taskId;
-                            const tasksList = await client.experimental.tasks.listTasks();
-                            const ourTask = tasksList.tasks.find((t) => t.taskId === currentTaskId);
-                            if (ourTask?.statusMessage) {
-                                listTasksSawStatusMessage = true;
-                            }
-                        }
-                    }
-                } else if (message.type === 'error') {
-                    throw message.error;
-                }
-            }
-
-            // Stream taskStatus events (backed by tasks/get) must have included statusMessage
-            expect(getTaskSawStatusMessage).toBe(true);
-            // tasks/list must have also returned statusMessage
-            expect(listTasksSawStatusMessage).toBe(true);
+            await assertStatusMessagePropagated(client, stream);
         });
 
-        // WARNING: This test can be flaky on streamable HTTP transport due to timing —
-        // the Actor may complete before the 5s progress polling interval fires a statusMessage.
-        // See: https://github.com/apify/apify-mcp-server/issues/558
         it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', async () => {
             client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
 
@@ -2491,32 +2494,7 @@ export function createIntegrationTestsSuite(
                 },
             );
 
-            let taskId: string | null = null;
-            let getTaskSawStatusMessage = false;
-            let listTasksSawStatusMessage = false;
-            for await (const message of stream) {
-                if (message.type === 'taskCreated') {
-                    taskId = message.task.taskId;
-                } else if (message.type === 'taskStatus') {
-                    if (message.task.statusMessage) {
-                        getTaskSawStatusMessage = true;
-
-                        if (!listTasksSawStatusMessage && taskId) {
-                            const currentTaskId = taskId;
-                            const tasksList = await client.experimental.tasks.listTasks();
-                            const ourTask = tasksList.tasks.find((t) => t.taskId === currentTaskId);
-                            if (ourTask?.statusMessage) {
-                                listTasksSawStatusMessage = true;
-                            }
-                        }
-                    }
-                } else if (message.type === 'error') {
-                    throw message.error;
-                }
-            }
-
-            expect(getTaskSawStatusMessage).toBe(true);
-            expect(listTasksSawStatusMessage).toBe(true);
+            await assertStatusMessagePropagated(client, stream);
         });
 
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
