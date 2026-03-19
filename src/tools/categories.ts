@@ -23,7 +23,6 @@ import { getActorRunLog } from './common/get_actor_run_log.js';
 import { getDataset } from './common/get_dataset.js';
 import { getDatasetItems } from './common/get_dataset_items.js';
 import { getDatasetSchema } from './common/get_dataset_schema.js';
-import { getHtmlSkeleton } from './common/get_html_skeleton.js';
 import { getKeyValueStore } from './common/get_key_value_store.js';
 import { getKeyValueStoreKeys } from './common/get_key_value_store_keys.js';
 import { getKeyValueStoreRecord } from './common/get_key_value_store_record.js';
@@ -99,7 +98,6 @@ export const toolCategories = {
         getUserKeyValueStoresList,
     ],
     dev: [
-        getHtmlSkeleton,
     ],
 } satisfies Record<string, CategoryToolEntry[]>;
 

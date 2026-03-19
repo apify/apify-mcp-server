@@ -5,7 +5,7 @@
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=18.0.0"
   },
   "main": "dist/index.js",
   "exports": {
@@ -47,13 +47,11 @@
     "@modelcontextprotocol/sdk": "^1.25.2",
     "@segment/analytics-node": "^2.3.0",
     "@sentry/node": "^10.38.0",
-    "@types/cheerio": "^0.22.35",
     "@types/turndown": "^5.0.5",
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
     "apify": "^3.4.2",
     "apify-client": "^2.22.1",
-    "cheerio": "^1.1.2",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mcp-client-capabilities": "^0.0.5",

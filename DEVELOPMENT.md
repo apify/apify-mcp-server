@@ -34,6 +34,19 @@ Key entry points:
 - `src/main.ts` - Actor entry point (standby server / debugging)
 - `src/input.ts` - Input processing and validation
 
+## Node.js version policy
+
+The minimum supported Node.js version is **18** (`engines.node >= 18` in `package.json`).
+
+**Why Node.js 18 (not higher):**
+The MCP server is installed by end-users via `npx` and must work on the widest reasonable range of Node.js versions. Our key dependency, `@modelcontextprotocol/sdk`, requires Node.js >= 18, and our own source code uses no APIs beyond what Node.js 18 provides. Sentry telemetry showed ~20K crash events from users on older Node versions (`File is not defined`, `ReadableStream is not defined`), confirming that many users run older runtimes.
+
+**Rules for maintaining compatibility:**
+- Do not use Node.js APIs introduced after v18 (e.g., `import.meta.resolve`, `Array.fromAsync`, `Set.union()`).
+- Do not add dependencies that require Node.js > 18 at runtime. Check `engines` field of new dependencies before adding them.
+- CI runs unit tests against Node.js 18, 20, 22, and 24 to catch compatibility regressions.
+- The `.nvmrc` file pins the latest Node.js version for development tooling (lint, type-check, build) — this is intentionally higher than the minimum supported version.
+
 ## How to contribute
 
 Refer to the [CONTRIBUTING.md](./CONTRIBUTING.md) file.

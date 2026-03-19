@@ -49,15 +49,19 @@ jobs:
                 run: npm run build
 
     test:
-        name: Test
+        name: Test (Node.js ${{ matrix.node-version }})
+        strategy:
+            matrix:
+                node-version: [18, 20, 22, 24]
+            fail-fast: false
         runs-on: ubuntu-latest
 
         steps:
             -   uses: actions/checkout@v6
-            -   name: Use Node.js
+            -   name: Use Node.js ${{ matrix.node-version }}
                 uses: actions/setup-node@v6
                 with:
-                    node-version-file: '.nvmrc'
+                    node-version: ${{ matrix.node-version }}
                     cache: 'npm'
                     cache-dependency-path: 'package-lock.json'
             -   name: Install Dependencies

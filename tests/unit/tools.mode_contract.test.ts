@@ -81,8 +81,8 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         });
 
         it('should have correct tools in dev category (both modes)', () => {
-            expect(toolNames(defaultCategories.dev)).toEqual([HelperTools.GET_HTML_SKELETON]);
-            expect(toolNames(openaiCategories.dev)).toEqual([HelperTools.GET_HTML_SKELETON]);
+            expect(toolNames(defaultCategories.dev)).toEqual([]);
+            expect(toolNames(openaiCategories.dev)).toEqual([]);
         });
     });
 
