@@ -3,19 +3,6 @@ description: Report a bug or issue with the Apify MCP server
 title: "[Bug]: "
 labels: ["bug"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Thanks for taking the time to report a bug! Please fill out the sections below so we can reproduce and fix the issue.
-
-        **Before opening an issue, please check:**
-        - [ ] You are using **Node.js v22 or higher** (`node -v`)
-        - [ ] You have an Apify account and logged in successfully using OAuth, or your `APIFY_TOKEN` is set and valid
-        - [ ] You are using the latest version of the server — either the hosted mcp.apify.com or `@apify/actors-mcp-server@latest`
-        - [ ] You have checked the [Troubleshooting section](https://github.com/apify/apify-mcp-server#troubleshooting-local-mcp-server) in the README
-
-        > **Most issues we receive are related to Claude Desktop setup.** If you're having trouble getting the server to work in Claude Desktop, please make sure you include your `claude_desktop_config.json` contents and the MCP server logs (see below).
-
   - type: dropdown
     id: server-type
     attributes:
@@ -38,21 +25,10 @@ body:
         - Claude Code (CLI)
         - VS Code
         - Cursor
-        - OpenCode
         - ChatGPT
-        - MCPC
         - Other (specify in description)
     validations:
       required: true
-
-  - type: input
-    id: mcp-client-version
-    attributes:
-      label: MCP Client version
-      description: "Version of the MCP client (e.g., Claude Desktop 0.9.2)"
-      placeholder: "e.g., Claude Desktop 0.9.2"
-    validations:
-      required: false
 
   - type: dropdown
     id: os
@@ -63,13 +39,34 @@ body:
         - Windows
         - Linux
     validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you do, what went wrong, and what did you expect instead?
+      placeholder: "Describe the issue..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open Claude Desktop
+        2. Start a new conversation
+        3. Try to use an Apify tool
+        4. See error...
+    validations:
       required: true
 
   - type: input
     id: node-version
     attributes:
       label: Node.js version
-      description: "Run `node --version` in your terminal and paste the output. Required v22+."
+      description: "Run `node --version`. Required v22+."
       placeholder: "e.g., v22.5.0"
     validations:
       required: false
@@ -84,44 +81,12 @@ body:
       required: false
 
   - type: textarea
-    id: description
-    attributes:
-      label: What happened?
-      description: A clear description of the bug.
-      placeholder: "Describe the issue..."
-    validations:
-      required: true
-
-  - type: textarea
-    id: expected
-    attributes:
-      label: Expected behavior
-      description: What did you expect to happen?
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce
-      description: Step-by-step instructions to reproduce the issue.
-      placeholder: |
-        1. Open Claude Desktop
-        2. Start a new conversation
-        3. Try to use an Apify tool
-        4. See error...
-    validations:
-      required: true
-
-  - type: textarea
     id: config
     attributes:
       label: MCP server configuration
       description: |
-        Paste your MCP server configuration.
-
-        **For Claude Desktop**: paste your `claude_desktop_config.json` (find it via Settings > Developer).
-        **For hosted server**: paste the full URL you are using (e.g., `https://mcp.apify.com?tools=actors,docs`).
+        **For Claude Desktop**: paste your `claude_desktop_config.json` (Settings > Developer).
+        **For hosted server**: paste the full URL (e.g., `https://mcp.apify.com?tools=actors`).
 
         **Remove your APIFY_TOKEN before pasting!**
       render: json
@@ -145,24 +110,11 @@ body:
     attributes:
       label: Error logs
       description: |
-        Paste any error messages or logs you see.
+        Paste any error messages or logs.
 
-        **Claude Desktop MCP logs location:**
+        **Claude Desktop MCP logs:**
         - **macOS**: `~/Library/Logs/Claude/mcp*.log`
         - **Windows**: `%APPDATA%\Claude\logs\mcp*.log`
-
-        **Tip:** You can also debug using [MCP Inspector](https://github.com/modelcontextprotocol/inspector):
-        ```
-        npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
-        ```
       render: text
-    validations:
-      required: false
-
-  - type: textarea
-    id: additional
-    attributes:
-      label: Additional context
-      description: Screenshots, related issues, or anything else that might help.
     validations:
       required: false
