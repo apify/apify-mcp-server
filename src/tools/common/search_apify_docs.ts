@@ -7,6 +7,9 @@ import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { searchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
+const PLATFORM_DOCS_PREFERENCE = `When results contain both platform documentation (\`docs.apify.com/platform\`) \
+and Academy content (\`docs.apify.com/academy\`) on the same topic, prefer the platform documentation.`;
+
 /**
  * Build docSource parameter description dynamically from DOCS_SOURCES
  */
@@ -34,7 +37,9 @@ ${sources}
 The results will include the URL of the documentation page (which may include an anchor),
 and a limited piece of content that matches the search query.
 
-Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.`;
+Fetch the full content of the document using the ${HelperTools.DOCS_FETCH} tool by providing the URL.
+
+${PLATFORM_DOCS_PREFERENCE}`;
 }
 
 const searchApifyDocsToolArgsSchema = z.object({
@@ -65,13 +70,15 @@ You can increase this limit if you need more results, but keep in mind that the 
 Use this to paginate through the search results. For example, if you want to get the next 5 results, set the offset to 5 and limit to 5.`),
 });
 
+const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema;
+
 export const searchApifyDocsTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DOCS_SEARCH,
     description: buildToolDescription(),
-    inputSchema: z.toJSONSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema,
+    inputSchema: searchApifyDocsToolInputSchema,
     outputSchema: searchApifyDocsToolOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchApifyDocsToolArgsSchema)),
+    ajvValidate: compileSchema(searchApifyDocsToolInputSchema),
     annotations: {
         title: 'Search Apify docs',
         readOnlyHint: true,
@@ -103,7 +110,7 @@ You can also try using more specific or alternative keywords related to your sea
         }
 
         // Instructions for LLM to use the docs fetch tool when retrieving full document content
-        const instructions = 'You can use the Apify docs fetch tool to retrieve the full content of a document by its URL.';
+        const instructions = `You can use the Apify docs fetch tool to retrieve the full content of a document by its URL. ${PLATFORM_DOCS_PREFERENCE}`;
         // Actual unstructured text result
         const textResult = `Search results for "${query}" in ${parsed.docSource}:
 
