@@ -10,8 +10,9 @@ export const ajv = new Ajv({ coerceTypes: 'array', strict: false });
  * 2. Incorrectly marks fields with default values as required
  *
  * This function fixes both issues to ensure proper schema validation.
+ * Exported so MCP tool listings can apply the same fix via `fixZodInputSchemaRequired` (see `getToolPublicFieldOnly`).
  */
-function cleanJsonSchema(schema: Record<string, unknown>): Record<string, unknown> {
+export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<string, unknown> {
     const cleaned = { ...schema };
     delete cleaned.$schema;
 
@@ -36,5 +37,5 @@ function cleanJsonSchema(schema: Record<string, unknown>): Record<string, unknow
  * This wrapper ensures compatibility with z.toJSONSchema() output.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
-    return ajv.compile(cleanJsonSchema(schema));
+    return ajv.compile(fixZodSchemaRequired(schema));
 }

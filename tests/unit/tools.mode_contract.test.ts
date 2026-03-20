@@ -10,6 +10,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
+import { searchApifyDocsTool } from '../../src/tools/common/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import type { ToolEntry } from '../../src/types.js';
 import { SERVER_MODES } from '../../src/types.js';
@@ -227,5 +228,17 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
             mode: 'default',
         });
         expect(result._meta).toBeUndefined();
+    });
+});
+
+describe('getToolPublicFieldOnly inputSchema normalization', () => {
+    it('should not expose Zod-defaulted fields as JSON Schema required (search-apify-docs)', () => {
+        const { inputSchema } = getToolPublicFieldOnly(searchApifyDocsTool, { filterWidgetMeta: false });
+        const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
+
+        expect(schema.required).toEqual(['query']);
+        expect(schema.properties?.docSource).toMatchObject({ default: 'apify' });
+        expect(schema.properties?.limit).toMatchObject({ default: 5 });
+        expect(schema.properties?.offset).toMatchObject({ default: 0 });
     });
 });

@@ -4,7 +4,8 @@ import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
-import type { HelperTool, ServerMode, ToolBase, ToolEntry } from '../types.js';
+import type { HelperTool, ServerMode, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import { fixZodSchemaRequired } from './ajv.js';
 
 type ToolPublicFieldOptions = {
     mode?: ServerMode;
@@ -27,6 +28,15 @@ function stripWidgetMeta(meta?: ToolBase['_meta']) {
 }
 
 /**
+ * Zod 4's z.toJSONSchema() lists properties with `.default()` in `required`.
+ * Clients treat that as mandatory arguments; strip them before tools/list.
+ */
+function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBase['inputSchema'] {
+    if (!inputSchema || typeof inputSchema !== 'object') return inputSchema;
+    return fixZodSchemaRequired({ ...inputSchema } as Record<string, unknown>) as ToolInputSchema;
+}
+
+/**
  * Returns a public version of the tool containing only fields that should be exposed publicly.
  * Used for the tools list request.
  */
@@ -40,7 +50,7 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         name: tool.name,
         title: tool.title,
         description: tool.description,
-        inputSchema: tool.inputSchema,
+        inputSchema: fixZodInputSchemaRequired(tool.inputSchema),
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
         icons: tool.icons,
