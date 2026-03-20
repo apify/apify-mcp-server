@@ -56,13 +56,13 @@ export async function callActorGetDataset(options: {
         previewOutput = true,
         mcpSessionId,
     } = options;
-    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just internal symbol to identify client abort
+    const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just an internal symbol to identify client abort
     const actorClient = apifyClient.actor(actorName);
 
     // Start the actor run
     const actorRun: ActorRun = await actorClient.start(input, callOptions);
 
-    // Start progress tracking if tracker is provided
+    // Start progress tracking if a tracker is provided
     if (progressTracker) {
         progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
     }
@@ -120,7 +120,14 @@ export async function callActorGetDataset(options: {
     return {
         runId: actorRun.id,
         datasetId: completedRun.defaultDatasetId,
-        totalItemCount: datasetItems.total,
+        // `datasetItems.total` comes from the X-Apify-Pagination-Total header, which is backed
+        // by the dataset's cached `itemCount` counter. Per the API docs, this counter may lag
+        // up to 5 seconds after items are written (eventual consistency). When called immediately
+        // after a run finishes it can return 0 even though items are already stored.
+        // Fall back to `items.length`: safe here because listItems() has no limit, so all items
+        // are fetched and the length always reflects the true count.
+        // See: https://docs.apify.com/api/v2/dataset-get (itemCount note)
+        totalItemCount: datasetItems.total || datasetItems.items.length,
         previewItemCount: previewItems.length,
         schema,
         previewItems,
