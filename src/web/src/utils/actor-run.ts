@@ -1,7 +1,4 @@
-export type ToolResultLike = {
-    isError?: boolean;
-    content?: unknown[];
-};
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
 /**
  * Strip noise that is meant for the model, not the end-user:
@@ -12,11 +9,11 @@ function cleanErrorText(raw: string): string {
     // Take only the first meaningful line (the rest is model guidance)
     const firstLine = raw.split("\n")[0].trim();
     // Strip trailing JSON blob (e.g. `{"statusCode":404}`)
-    return firstLine.replace(/\s*\{[^}]*\}\s*\.?$/, "").trim();
+    return firstLine.replace(/\s*\{[^}]*}\s*\.?$/, "").trim();
 }
 
-export function extractActorRunErrorMessage(toolResult: ToolResultLike | null | undefined): string | null {
-    if (!toolResult?.isError || !Array.isArray(toolResult.content)) {
+export function extractActorRunErrorMessage(toolResult: CallToolResult | null | undefined): string | null {
+    if (!toolResult?.isError) {
         return null;
     }
 

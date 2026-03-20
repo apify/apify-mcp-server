@@ -46,7 +46,7 @@ describe('extractActorRunErrorMessage', () => {
     it('returns a fallback message when the error response has no text content', () => {
         const message = extractActorRunErrorMessage({
             isError: true,
-            content: [{ type: 'image', url: 'https://example.com/example.png' }],
+            content: [{ type: 'image', data: 'abc123', mimeType: 'image/png' }],
         });
 
         expect(message).toBe('Actor run failed before it could start.');
