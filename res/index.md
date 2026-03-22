@@ -58,6 +58,15 @@ Implementation plan for separating UI-mode (OpenAI) and normal-mode tool behavio
 - Directory structure and complete file manifest with PR assignments
 - **Use case**: Reference for implementing the UI/normal mode tool separation
 
+### [mcp_task_reference.md](./mcp_task_reference.md)
+MCP task lifecycle, SDK features, and protocol reference for the Apify MCP server.
+- Task states, protocol flow, key SDK types (`Task`, `TaskStore`, `ResponseMessage`)
+- How `executeToolAndUpdateTask()` implements tasks with `mcpTaskExecution` flag
+- Available but unused SDK features: resource links, dynamic resources, elicitation, completion
+- Current server capabilities declaration
+- Related issues: #582 (async call-actor), #587 (roadmap), #588 (tool naming)
+- **Use case**: Reference when working on MCP task integration, resource links, or protocol-level features
+
 ### [patterns_for_simplification.md](./patterns_for_simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
 

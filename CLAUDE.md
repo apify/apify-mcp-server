@@ -105,3 +105,4 @@ it('should do something awesome', async () => {
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — coding standards, patterns, anti-patterns, commit format, PR guidelines, design system rules
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** — project structure, setup, build system, hot-reload workflow, manual MCP testing
 - **[DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](./DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md)** — UI widget design system rules (read this when doing any UI/widget work)
+- **[res/](./res/index.md)** — architecture analyses, refactor plans, and protocol references (MCP tasks, SDK features, tool mode separation, etc.)
