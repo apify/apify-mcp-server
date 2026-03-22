@@ -4,7 +4,7 @@ This directory contains useful documents and insights about the repository archi
 
 ## Files
 
-### [algolia-analysis.md](./algolia.md)
+### [algolia.md](./algolia.md)
 Technical analysis of Algolia search API responses for each documentation source.
 - Data structure overview for each doc source (apify, crawlee-js, crawlee-py)
 - Field availability patterns (content, hierarchy, anchors)
@@ -31,32 +31,10 @@ Implementation plan for migrating from low-level `Server` to high-level `McpServ
 - **Use case**: Reference for implementing the MCP SDK migration
 
 ### [mcp_resources_analysis.md](./mcp_resources_analysis.md)
-Current MCP resources behavior and constraints (Skyfire readme and OpenAI widgets).
-- Handler locations and low-level MCP usage
+MCP resources behavior and constraints (Skyfire readme and UI widgets), low-level `Server` API usage.
+- Handler wiring and delegation to `resource_service`
 - Resource list/read behavior and error handling
-- **Use case**: Baseline reference before refactoring resources
-
-### [mcp_resources_refactor_analysis.md](./mcp_resources_refactor_analysis.md)
-Refactor plan for modularizing existing resource handling (no new resources).
-- Minimal resource service API (list/read/templates)
-- Behavior-preserving steps and non-goals
-- **Use case**: Step-by-step guide for refactoring without behavior change
-
-### [tool_mode_separation_plan.md](./tool_mode_separation_plan.md)
-Implementation plan for separating UI-mode (OpenAI) and normal-mode tool behavior into independent modules.
-
-**Key approach:** Actor Executor pattern + separate tool definitions per mode + shared core logic layer.
-
-**Estimated effort:** 6-10 developer days
-
-- Design decisions table (actor-mcp passthrough, Skyfire freeze, task lifecycle, etc.)
-- Three-layer architecture (core → registry → mode-specific tools)
-- Actor Executor pattern for direct actor tools (`type: 'actor'`) mode awareness
-- Tool definition immutability via `Object.freeze` (Skyfire safety)
-- Mode-aware category registry eliminating deep-clone hack
-- 5-phase migration plan with chained PR strategy (7 PRs)
-- Directory structure and complete file manifest with PR assignments
-- **Use case**: Reference for implementing the UI/normal mode tool separation
+- **Use case**: Baseline for how resources are exposed and why
 
 ### [patterns_for_simplification.md](./patterns_for_simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
@@ -77,6 +55,14 @@ Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** fr
 - Before/after code examples
 - Benefits for each pattern
 - **Use case**: Reference for incremental codebase improvements
+
+### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
+Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markdown stack cost).
+- **Use case**: When changing widget dependencies or markdown rendering, re-measure bundle impact
+
+### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
+Checklist and notes for ChatGPT MCP Apps store submission (verify line references against current source before relying on them).
+- **Use case**: Submission prep and audits
 
 ---
 
