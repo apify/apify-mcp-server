@@ -122,6 +122,8 @@ export type ActorTool = ToolBase & {
 export type InternalToolArgs = {
     /** Arguments passed to the tool (payment fields already stripped by the server) */
     args: Record<string, unknown>;
+    /** MCP request `_meta` field — used by payment providers that read from metadata (e.g., x402) */
+    meta?: Record<string, unknown>;
     /** Extra data given to request handlers.
      *
      * Can be used to send notifications from the server to the client.

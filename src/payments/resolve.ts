@@ -1,5 +1,6 @@
 import { SkyfirePaymentProvider } from './skyfire.js';
 import type { PaymentProvider, PaymentProviderId } from './types.js';
+import { X402PaymentProvider } from './x402.js';
 
 /**
  * Resolves a payment provider from a `?payment=` query parameter value.
@@ -11,7 +12,7 @@ export function resolvePaymentProvider(paymentParam: string | null | undefined):
 
     const providers: Record<PaymentProviderId, () => PaymentProvider> = {
         skyfire: () => new SkyfirePaymentProvider(),
-        x402: () => { throw new Error('x402 payment provider not yet implemented'); },
+        x402: () => new X402PaymentProvider(),
     };
 
     const factory = providers[paymentParam as PaymentProviderId];

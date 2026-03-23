@@ -1,0 +1,89 @@
+import type { ToolEntry } from '../types.js';
+import { cloneToolEntry } from '../utils/tools.js';
+import type { PaymentHeaders, PaymentMeta, PaymentProvider } from './types.js';
+
+/**
+ * Key used by MCP clients to pass x402 payment data in the JSON-RPC `_meta` field.
+ * The mcp-cli injects the decoded payment payload here (JSON object, not base64).
+ */
+const X402_META_KEY = 'x402/payment';
+
+/** HTTP header name for forwarding x402 payment signatures to the Apify API. */
+const PAYMENT_SIGNATURE_HEADER = 'PAYMENT-SIGNATURE';
+
+const X402_TOOL_INSTRUCTIONS = [
+    'This tool requires an x402 payment.',
+    'Include a valid x402 payment signature in the request metadata (_meta["x402/payment"]).',
+    'Your MCP client must support the x402 payment protocol.',
+].join(' ');
+
+/**
+ * x402 payment provider.
+ *
+ * Reads x402 payment signatures from MCP `_meta["x402/payment"]` and forwards
+ * them as `PAYMENT-SIGNATURE` HTTP headers to the Apify API.
+ *
+ * Protocol flow:
+ * 1. Client reads `_meta.x402` from tool definitions to know payment is required
+ * 2. Client signs an EIP-3009 TransferWithAuthorization and includes it in `_meta["x402/payment"]`
+ * 3. This provider extracts the payment, base64-encodes it, and forwards as PAYMENT-SIGNATURE header
+ * 4. The Apify API verifies and settles the payment
+ */
+export class X402PaymentProvider implements PaymentProvider {
+    readonly id = 'x402' as const;
+    readonly allowsUnauthenticated = true;
+
+    decorateToolSchema(tool: ToolEntry): ToolEntry {
+        if (!tool.paymentRequired) return tool;
+
+        const cloned = cloneToolEntry(tool);
+
+        // Add _meta.x402 to signal payment requirement to clients (idempotent)
+        if (!cloned._meta) {
+            cloned._meta = {};
+        }
+        const metaRecord = cloned._meta as Record<string, unknown>;
+        if (!metaRecord.x402) {
+            metaRecord.x402 = { paymentRequired: true };
+        }
+
+        // Append x402 instructions to description (idempotent)
+        if (cloned.description && !cloned.description.includes(X402_TOOL_INSTRUCTIONS)) {
+            cloned.description += `\n\n${X402_TOOL_INSTRUCTIONS}`;
+        }
+
+        return Object.freeze(cloned);
+    }
+
+    validatePayment(_args: Record<string, unknown>, meta?: PaymentMeta): string | null {
+        const payment = meta?.[X402_META_KEY];
+        if (!payment) {
+            return X402_TOOL_INSTRUCTIONS;
+        }
+        return null;
+    }
+
+    getPaymentHeaders(_args: Record<string, unknown>, meta?: PaymentMeta): PaymentHeaders {
+        const payment = meta?.[X402_META_KEY];
+        if (!payment) return {};
+
+        // The client sends the payment payload as a JSON object in _meta.
+        // The Apify API expects it as a base64-encoded JSON string in the PAYMENT-SIGNATURE header.
+        const paymentBase64 = Buffer.from(JSON.stringify(payment)).toString('base64');
+        return { [PAYMENT_SIGNATURE_HEADER]: paymentBase64 };
+    }
+
+    removePaymentFields(args: Record<string, unknown>): Record<string, unknown> {
+        // x402 doesn't inject anything into tool arguments — payment is in _meta
+        return args;
+    }
+
+    getUsageGuide(): string | null {
+        return null;
+    }
+
+    redactForLogging(args: unknown): unknown {
+        // x402 doesn't put sensitive data in tool arguments
+        return args;
+    }
+}

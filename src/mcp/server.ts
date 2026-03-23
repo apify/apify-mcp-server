@@ -691,6 +691,7 @@ Please provide the required arguments for this tool. Check the tool's input sche
                 tool,
                 args: args as Record<string, unknown>,
                 apifyToken,
+                meta,
             });
 
             log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: payment.logArgs });
