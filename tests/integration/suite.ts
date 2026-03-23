@@ -261,7 +261,7 @@ export function createIntegrationTestsSuite(
                 'call-actor',
             ];
             const expectedDocsTools = ['search-apify-docs', 'fetch-apify-docs'];
-            const expectedActors = ['apify-slash-rag-web-browser'];
+            const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
 
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
             expect(names).toHaveLength(expectedTotal.length + 2);
@@ -417,7 +417,7 @@ export function createIntegrationTestsSuite(
             expect(names).toContain('fetch-apify-docs');
 
             // Should include actor (if it exists/is valid)
-            expect(names).toContain('apify-slash-python-example');
+            expect(names).toContain(actorNameToToolName('apify/python-example'));
         });
 
         it('should merge actors param into tools selectors (backward compatibility)', async () => {
@@ -1931,7 +1931,7 @@ export function createIntegrationTestsSuite(
         it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
             client = await createClientFn({ actors: ['apify/rag-web-browser'] });
 
-            // Call the dedicated apify-slash-rag-web-browser tool
+            // Call the dedicated actor-rag-web-browser-by-apify tool
             const result = await client.callTool({
                 name: actorNameToToolName('apify/rag-web-browser'),
                 arguments: { query: 'https://apify.com' },

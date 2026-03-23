@@ -1,7 +1,10 @@
+import { createHash } from 'node:crypto';
+
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
+import { MAX_TOOL_NAME_LENGTH } from '../mcp/const.js';
 import type { ActorInfo, ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
@@ -19,11 +22,23 @@ export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
     return !!((actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled));
 }
 
-export function actorNameToToolName(actorName: string): string {
-    return actorName
-        .replace(/\//g, '-slash-')
-        .replace(/\./g, '-dot-')
-        .slice(0, 64);
+export function actorNameToToolName(actorFullName: string): string {
+    const slashIndex = actorFullName.indexOf('/');
+    if (slashIndex === -1) {
+        return actorFullName.slice(0, MAX_TOOL_NAME_LENGTH);
+    }
+
+    const username = actorFullName.slice(0, slashIndex);
+    const actorName = actorFullName.slice(slashIndex + 1);
+    const fullName = `actor-${actorName}-by-${username}`;
+
+    if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
+        return fullName;
+    }
+
+    // Truncate and add 4-char hash for uniqueness
+    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, 4);
+    return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - 5)}-${hash}`;
 }
 
 export function getToolSchemaID(actorName: string): string {
