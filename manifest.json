@@ -29,7 +29,7 @@
   ],
   "author": {
     "name": "Apify Technologies s.r.o.",
-    "url": "https://github.com/apify/apify-mcp-server"
+    "url": "https://apify.com/"
   },
   "license": "MIT",
   "privacy_policies": [
@@ -43,7 +43,7 @@
   },
   "homepage": "https://mcp.apify.com",
   "support": "https://github.com/apify/apify-mcp-server/issues",
-  "icon": "docs/apify-logo.png",
+  "icon": "https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-logo.png",
   "screenshots": [
     "docs/actors-mcp-server.png"
   ],
@@ -67,15 +67,15 @@
   "user_config": {
     "apify_token": {
       "type": "string",
-      "title": "Apify token",
-      "description": "Your Apify API token for authentication",
+      "title": "Apify API token",
+      "description": "Get your API key by signing up for a free account at https://console.apify.com/sign-up",
       "sensitive": true,
       "required": true
     },
     "tools": {
       "type": "string",
       "title": "Enabled tools",
-      "description": "Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: \"actors,docs,apify/rag-web-browser\". For more details visit https://mcp.apify.com.",
+      "description": "Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: \"actors,docs,apify/rag-web-browser\". To configure your custom endpoint with select tools, go to https://mcp.apify.com",
       "required": false,
       "default": "actors,docs,apify/rag-web-browser"
     }
