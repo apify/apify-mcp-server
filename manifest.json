@@ -43,7 +43,7 @@
   },
   "homepage": "https://mcp.apify.com",
   "support": "https://github.com/apify/apify-mcp-server/issues",
-  "icon": "https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/apify-logo.png",
+  "icon": "apify-logo.png",
   "screenshots": [
     "docs/actors-mcp-server.png"
   ],
