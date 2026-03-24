@@ -42,7 +42,6 @@ import {
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
     SERVER_NAME,
-    SERVER_VERSION,
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
@@ -138,7 +137,7 @@ export class ActorsMcpServer {
         this.server = new Server(
             {
                 name: SERVER_NAME,
-                version: SERVER_VERSION,
+                version: getPackageVersion()!,
                 websiteUrl: APIFY_MCP_URL,
             },
             {

@@ -1,9 +1,10 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { SERVER_NAME, SERVER_TITLE, SERVER_VERSION } from '../../src/const.js';
+import { SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard } from '../../src/server_card.js';
 import { readJsonFile } from '../../src/utils/generic.js';
+import { getPackageVersion } from '../../src/utils/version.js';
 
 const serverJson = readJsonFile<{ description: string }>(import.meta.url, '../../server.json');
 
@@ -21,7 +22,7 @@ describe('getServerCard', () => {
 
         expect(card.serverInfo.name).toBe(SERVER_NAME);
         expect(card.serverInfo.title).toBe(SERVER_TITLE);
-        expect(card.serverInfo.version).toBe(SERVER_VERSION);
+        expect(card.serverInfo.version).toBe(getPackageVersion());
     });
 
     it('should declare streamable-http transport at root endpoint', () => {
