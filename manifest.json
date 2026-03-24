@@ -4,7 +4,7 @@
   "display_name": "Apify",
   "version": "0.9.13",
   "description": "Extract data from any website with thousands of scrapers, crawlers, and automations on Apify Store.",
-  "long_description": "Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation. You can extract structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
+  "long_description": "Apify is the world's largest marketplace of tools for web scraping, crawling, data extraction, and web automation. Get structured data from social media, e-commerce, search engines, maps, travel sites, or any other website.",
   "keywords": [
     "apify",
     "actors",
@@ -28,21 +28,19 @@
     "API"
   ],
   "author": {
-    "name": "Apify Technologies s.r.o.",
+    "name": "Apify",
     "url": "https://apify.com/"
   },
   "license": "MIT",
   "privacy_policies": [
-    "https://docs.apify.com/legal/privacy-policy",
-    "https://docs.apify.com/legal/gdpr-information",
     "https://docs.apify.com/legal"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/apify/apify-mcp-server"
   },
-  "homepage": "https://mcp.apify.com",
-  "support": "https://github.com/apify/apify-mcp-server/issues",
+  "homepage": "https://apify.com/",
+  "support": "https://help.apify.com/",
   "icon": "icon.png",
   "screenshots": [
     "docs/actors-mcp-server.png"
@@ -68,14 +66,14 @@
     "apify_token": {
       "type": "string",
       "title": "Apify API token",
-      "description": "Get your free API token at console.apify.com",
+      "description": "You can create a free account and get an API token at https://console.apify.com/settings/integrations",
       "sensitive": true,
       "required": true
     },
     "tools": {
       "type": "string",
       "title": "Enabled tools",
-      "description": "Comma-separated tool categories or Actors, e.g. \"actors,docs,apify/rag-web-browser\". Configure at mcp.apify.com",
+      "description": "Comma-separated list of tool categories or Actors, e.g. \"actors,docs,apify/rag-web-browser\". For details, see https://mcp.apify.com",
       "required": false,
       "default": "actors,docs,apify/rag-web-browser"
     }
