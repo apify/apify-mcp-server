@@ -1931,7 +1931,7 @@ export function createIntegrationTestsSuite(
         it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
             client = await createClientFn({ actors: ['apify/rag-web-browser'] });
 
-            // Call the dedicated actor-rag-web-browser-by-apify tool
+            // Call the dedicated apify--rag-web-browser tool
             const result = await client.callTool({
                 name: actorNameToToolName('apify/rag-web-browser'),
                 arguments: { query: 'https://apify.com' },

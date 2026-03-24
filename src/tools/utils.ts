@@ -4,7 +4,7 @@ import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
-import { MAX_TOOL_NAME_LENGTH } from '../mcp/const.js';
+import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo, ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
@@ -30,15 +30,15 @@ export function actorNameToToolName(actorFullName: string): string {
 
     const username = actorFullName.slice(0, slashIndex);
     const actorName = actorFullName.slice(slashIndex + 1);
-    const fullName = `actor-${actorName}-by-${username}`;
+    const fullName = `${username}--${actorName}`;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;
     }
 
-    // Truncate and add 4-char hash for uniqueness
-    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, 4);
-    return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - 5)}-${hash}`;
+    // Truncate and add hash for uniqueness
+    const hash = createHash('sha256').update(actorFullName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+    return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
 export function getToolSchemaID(actorName: string): string {
