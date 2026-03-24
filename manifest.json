@@ -43,7 +43,7 @@
   },
   "homepage": "https://mcp.apify.com",
   "support": "https://github.com/apify/apify-mcp-server/issues",
-  "icon": "apify-logo.png",
+  "icon": "icon.png",
   "screenshots": [
     "docs/actors-mcp-server.png"
   ],
@@ -68,14 +68,14 @@
     "apify_token": {
       "type": "string",
       "title": "Apify API token",
-      "description": "Get your API key by signing up for a free account at https://console.apify.com/sign-up",
+      "description": "Get your free API token at console.apify.com",
       "sensitive": true,
       "required": true
     },
     "tools": {
       "type": "string",
       "title": "Enabled tools",
-      "description": "Comma-separated list of tools to enable. Can be either a tool category, a specific tool, or an Apify Actor. For example: \"actors,docs,apify/rag-web-browser\". To configure your custom endpoint with select tools, go to https://mcp.apify.com",
+      "description": "Comma-separated tool categories or Actors, e.g. \"actors,docs,apify/rag-web-browser\". Configure at mcp.apify.com",
       "required": false,
       "default": "actors,docs,apify/rag-web-browser"
     }

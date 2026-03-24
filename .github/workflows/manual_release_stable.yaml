@@ -64,19 +64,20 @@ jobs:
                 run: npm run build
             -   name: Prepare MCPB package
                 run: |
-                    npm prune --omit=dev
                     mkdir mcpb
                     cp -r node_modules mcpb/node_modules
                     cp -r dist mcpb/dist
                     cp -r docs mcpb/docs
                     cp package.json mcpb/package.json
                     cp manifest.json mcpb/manifest.json
-                    cp docs/apify-logo-claude-desktop.png mcpb/apify-logo.png
+                    cp docs/apify-logo-claude-desktop.png mcpb/icon.png
             -   name: Validate MCPB manifest
                 run: npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json
             -   name: Create MCPB package
                 # fix version of anthropic-ai/mcpb to 2.1.2 so that we have a reproducible build
                 run: npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
+            -   name: Clean MCPB package
+                run: npx -y @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
             -   name: Upload MCPB artifacts
                 uses: actions/upload-artifact@v4
                 with:
