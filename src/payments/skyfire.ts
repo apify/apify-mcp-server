@@ -46,7 +46,7 @@ export class SkyfirePaymentProvider implements PaymentProvider {
 
     validatePayment(args: Record<string, unknown>): string | null {
         if (args[SKYFIRE_PAY_ID_KEY] === undefined) {
-            return 'Missing required "skyfire-pay-id" field. Obtain a Skyfire PAY JWT token via the create-pay-token tool and pass it as "skyfire-pay-id".';
+            return `Missing required "${SKYFIRE_PAY_ID_KEY}" field. Obtain a Skyfire PAY JWT token via the create-pay-token tool and pass it as "${SKYFIRE_PAY_ID_KEY}".`;
         }
         return null;
     }
