@@ -51,6 +51,7 @@
     "algoliasearch": "^5.31.0",
     "apify": "^3.4.2",
     "apify-client": "^2.22.1",
+    "dedent": "^1.7.2",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "mcp-client-capabilities": "^0.0.5",

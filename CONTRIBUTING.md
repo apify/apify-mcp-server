@@ -78,6 +78,29 @@ Use comments to guide reviewers:
     * **Zod Validators:** Suffix with `Validator`.
     * **Text/Copy:** Use the branded term `Actor` (capitalized) instead of `actor` in user-facing texts, labels, notifications, error messages, etc.
 
+*   **String formatting (multiline descriptions):**
+    * Use `dedent` (tagged template literal) + a named `SCREAMING_SNAKE_CASE` constant for long multiline prose (e.g., tool `description` fields, `.describe(...)` texts longer than ~3 lines).
+        ```typescript
+        import dedent from 'dedent';
+
+        const TOOL_DESCRIPTION = dedent`
+            Line 1
+            Line 2
+
+            USAGE:
+            - Example
+        `;
+
+        export const toolEntry = {
+            name: 'example-tool',
+            description: TOOL_DESCRIPTION,
+        };
+        ```
+    * Use plain single-quoted strings for short one-liners.
+    * Use string concatenation (`+`) only to satisfy `max-len` where necessary.
+    * Avoid `[].join('\n')` for multiline strings — it is noisy and harder to edit.
+    * When migrating existing strings, keep wording **semantically unchanged**.
+
 *   **Comments:**
     * Use proper English (spelling, grammar, punctuation, capitalization).
     * Use JSDoc `/**` for documentation, `//` for generic comments, and avoid `/*` (single asterix multiline comments).

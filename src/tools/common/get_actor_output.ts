@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
@@ -67,23 +68,24 @@ export function cleanEmptyProperties(obj: unknown): unknown {
 export const getActorOutput: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_OUTPUT_GET,
-    description: `Retrieve the output dataset items of a specific Actor run using its datasetId.
-You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.
-This tool is a simplified version of the get-dataset-items tool, focused on Actor run outputs.
+    description: dedent`
+        Retrieve the output dataset items of a specific Actor run using its datasetId.
+        You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.
+        This tool is a simplified version of the get-dataset-items tool, focused on Actor run outputs.
 
-The results will include the dataset items from the specified dataset. If you provide fields, only those fields will be included (nested fields supported via dot notation).
+        The results will include the dataset items from the specified dataset. If you provide fields, only those fields will be included (nested fields supported via dot notation).
 
-You can obtain the datasetId from an Actor run (e.g., after calling an Actor with the call-actor tool) or from the Apify Console (Runs → Run details → Dataset ID).
+        You can obtain the datasetId from an Actor run (e.g., after calling an Actor with the call-actor tool) or from the Apify Console (Runs → Run details → Dataset ID).
 
-USAGE:
-- Use when you need to read Actor output data (full items or selected fields), especially when preview does not include all fields.
+        USAGE:
+        - Use when you need to read Actor output data (full items or selected fields), especially when preview does not include all fields.
 
-USAGE EXAMPLES:
-- user_input: Get data of my last Actor run
-- user_input: Get number_of_likes from my dataset
-- user_input: Return only crawl.statusCode and url from dataset aab123
+        USAGE EXAMPLES:
+        - user_input: Get data of my last Actor run
+        - user_input: Get number_of_likes from my dataset
+        - user_input: Return only crawl.statusCode and url from dataset aab123
 
-Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
+        Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
     inputSchema: z.toJSONSchema(getActorOutputArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
     /**
