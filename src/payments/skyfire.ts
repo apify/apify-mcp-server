@@ -8,6 +8,7 @@ import { cloneToolEntry } from '../utils/tools.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
 
 const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
+const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 const REDACTED_VALUE = '[REDACTED]';
 
 /**
@@ -54,7 +55,10 @@ export class SkyfirePaymentProvider implements PaymentProvider {
     getPaymentHeaders(args: Record<string, unknown>): PaymentHeaders {
         const payId = args[SKYFIRE_PAY_ID_KEY];
         if (typeof payId === 'string') {
-            return { [SKYFIRE_PAY_ID_KEY]: payId };
+            return {
+                [SKYFIRE_PAY_ID_KEY]: payId,
+                [PAYMENT_PROTOCOL_HEADER]: 'skyfire',
+            };
         }
         return {};
     }
