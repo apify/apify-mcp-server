@@ -91,7 +91,7 @@ You must judge whether this agent made the correct selection.
 - Use when query mentions: "Actor", "tool", "scraper", or asks about finding/discovering scraping capabilities
 - Example: "Find an Actor for Instagram" or "What tools scrape Twitter?"
 
-**apify-slash-rag-web-browser**: Browses the web to get data immediately (one-time data retrieval).
+**apify--rag-web-browser**: Browses the web to get data immediately (one-time data retrieval).
 - Use when query has time indicators ("today", "recent", "current", "latest") or asks for immediate data
 - Example: "Get flight prices for tomorrow" or "What's the current weather?"
 

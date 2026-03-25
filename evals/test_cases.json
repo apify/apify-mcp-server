@@ -166,33 +166,33 @@
     },
     {
       "id": "rag-web-browser-1",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Find recent articles about AI from tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "rag-web-browser-2",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Fetch recent articles about climate change",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "rag-web-browser-3",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get the latest weather forecast for San Francisco",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "rag-web-browser-4",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get data from example.com",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "rag-web-browser-5",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get the latest tech industry news",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-1",
@@ -210,21 +210,21 @@
     },
     {
       "id": "search-vs-rag-3",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Find recent AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-4",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get current articles about AI from Wired and The Verge",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-5",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get the latest weather forecast for New York",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-6",
@@ -234,9 +234,9 @@
     },
     {
       "id": "search-vs-rag-7a",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Get flight prices from New York to London for tomorrow",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-7b",
@@ -253,15 +253,15 @@
     },
     {
       "id": "search-vs-rag-9",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Look for news articles on AI",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-vs-rag-10",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "Fetch AI-related news from CNN and BBC",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "search-apify-docs-1",
@@ -397,9 +397,9 @@
     },
     {
       "id": "misleading-query-1",
-      "category": "apify-slash-rag-web-browser",
+      "category": "apify--rag-web-browser",
       "query": "What's the weather like today in San Francisco?",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "misleading-query-3",
@@ -430,13 +430,13 @@
       "id": "tool-selection-confusion-2",
       "category": "tool-selection",
       "query": "Find recent AI articles on tech blogs",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "tool-selection-confusion-3",
       "category": "tool-selection",
       "query": "Get the latest weather forecast for New York",
-      "expectedTools": ["apify-slash-rag-web-browser"]
+      "expectedTools": ["apify--rag-web-browser"]
     },
     {
       "id": "weather-mcp-search-then-call-1",

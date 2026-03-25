@@ -34,6 +34,14 @@ describe('actors', () => {
             expect(result.endsWith(`-${hash}`)).toBe(true);
         });
 
+        it('should replace dots with -dot- in usernames', () => {
+            expect(actorNameToToolName('my.org/my-actor')).toBe('my-dot-org--my-actor');
+        });
+
+        it('should handle empty string', () => {
+            expect(actorNameToToolName('')).toBe('');
+        });
+
         it('should produce deterministic results', () => {
             const name = 'apify/rag-web-browser';
             expect(actorNameToToolName(name)).toBe(actorNameToToolName(name));

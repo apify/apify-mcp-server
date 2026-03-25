@@ -32,7 +32,8 @@ export function actorNameToToolName(actorFullName: string): string {
 
     const username = slashIndex !== -1 ? actorFullName.slice(0, slashIndex) : '';
     const actorName = slashIndex !== -1 ? actorFullName.slice(slashIndex + 1) : actorFullName;
-    const fullName = slashIndex !== -1 ? `${username}--${actorName}` : actorName;
+    const safeUsername = username.replace(/\./g, '-dot-');
+    const fullName = slashIndex !== -1 ? `${safeUsername}--${actorName}` : actorName;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;

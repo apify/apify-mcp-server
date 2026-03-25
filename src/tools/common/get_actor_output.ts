@@ -83,7 +83,7 @@ USAGE EXAMPLES:
 - user_input: Get number_of_likes from my dataset
 - user_input: Return only crawl.statusCode and url from dataset aab123
 
-Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify-slash-rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
+Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify--rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
     inputSchema: z.toJSONSchema(getActorOutputArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
     /**

@@ -59,7 +59,7 @@ Use this tool when user wants to:
 - Browse existing solutions (e.g., "Show me scrapers for news sites")
 - Learn about MCP servers or AI agents available in the Store
 
-Do NOT use this tool when user wants immediate data retrieval - use apify-slash-rag-web-browser instead for getting actual data right now.
+Do NOT use this tool when user wants immediate data retrieval - use apify/rag-web-browser instead for getting actual data right now.
 IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
 
 Usage:

@@ -644,7 +644,7 @@ You can obtain your Apify token from https://console.apify.com/account/integrati
                 );
             }
 
-            // Claude is saving tool names with 'local__' prefix, name is local__apify-actors__compass-slash-crawler-google-places
+            // Claude is saving tool names with 'local__' prefix, e.g. local__apify-actors__compass--crawler-google-places
             // We are interested in the Actor name only, so we remove the 'local__apify-actors__' prefix
             if (name.startsWith('local__')) {
                 // we split the name by '__' and take the last part, which is the actual Actor name

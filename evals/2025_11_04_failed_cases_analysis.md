@@ -131,7 +131,7 @@ Keyword rules exist at lines 47-48 in parameter description but are buried. LLM 
    - example: "facebook data" → one call with "facebook" (not multiple calls for posts/pages/groups)
 
 4. **Add "do not use" section:**
-   - do not use for fetching actual data (news, weather, web content) → use apify-slash-rag-web-browser
+   - do not use for fetching actual data (news, weather, web content) → use apify--rag-web-browser
    - do not use for running actors → use call-actor or dedicated actor tools
    - do not use for getting actor details → use fetch-actor-details
    - do not use for overly general queries → ask user for specifics
@@ -149,12 +149,12 @@ Keyword rules exist at lines 47-48 in parameter description but are buried. LLM 
 
 **Impact:** ~20 cases (19%)
 
-#### 3a. `search-actors` vs `apify-slash-rag-web-browser`
+#### 3a. `search-actors` vs `apify--rag-web-browser`
 
 **Failed cases:**
-- "Fetch recent articles about climate change" → used `search-actors`, expected `apify-slash-rag-web-browser`
-- "Get the latest weather forecast for New York" → used `search-actors`, expected `apify-slash-rag-web-browser`
-- "Get the latest tech industry news" → used `search-actors`, expected `apify-slash-rag-web-browser`
+- "Fetch recent articles about climate change" → used `search-actors`, expected `apify--rag-web-browser`
+- "Get the latest weather forecast for New York" → used `search-actors`, expected `apify--rag-web-browser`
+- "Get the latest tech industry news" → used `search-actors`, expected `apify--rag-web-browser`
 
 **Fix:**
 Already covered in section 2 above (do not use section).
@@ -196,7 +196,7 @@ Description doesn't clearly distinguish when to use `fetch-actor-details` vs `ca
 **Failed cases:**
 - "How does apify/rag-web-browser work?" → no tool called, expected `fetch-actor-details`
 - "documentation" → no tool called, expected `search-apify-docs`
-- "Look for news articles on AI" → no tool called, expected `apify-slash-rag-web-browser`
+- "Look for news articles on AI" → no tool called, expected `apify--rag-web-browser`
 
 **Fix:**
 Add "must use" section to each tool description. This might be model/configuration issue, but clearer guidance helps.
@@ -226,7 +226,7 @@ Already covered in section 2 above (do not use for overly general queries).
 
 ### Phase 2: Medium Priority
 4. improve `fetch-actor-details` vs `call-actor` distinction
-5. add explicit guidance about `apify-slash-rag-web-browser` vs `search-actors`
+5. add explicit guidance about `apify--rag-web-browser` vs `search-actors`
 
 **Estimated impact:** ~30 cases resolved (29% of remaining)
 
