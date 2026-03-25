@@ -44,6 +44,15 @@ export function actorNameToToolName(actorFullName: string): string {
     return `${fullName.slice(0, MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`;
 }
 
+/**
+ * Converts a legacy tool name (apify-slash-rag-web-browser) to the current format (apify--rag-web-browser).
+ * Returns null if the name doesn't match the legacy pattern.
+ */
+export function legacyToolNameToNew(name: string): string | null {
+    if (!name.includes('-slash-')) return null;
+    return name.replace('-slash-', '--');
+}
+
 export function getToolSchemaID(actorName: string): string {
     return `https://apify.com/mcp/${actorNameToToolName(actorName)}/schema.json`;
 }

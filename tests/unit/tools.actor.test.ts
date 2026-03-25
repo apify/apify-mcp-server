@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
-import { actorNameToToolName } from '../../src/tools/utils.js';
+import { actorNameToToolName, legacyToolNameToNew } from '../../src/tools/utils.js';
 
 describe('actors', () => {
     describe('actorNameToToolName', () => {
@@ -45,6 +45,22 @@ describe('actors', () => {
         it('should produce deterministic results', () => {
             const name = 'apify/rag-web-browser';
             expect(actorNameToToolName(name)).toBe(actorNameToToolName(name));
+        });
+    });
+
+    describe('legacyToolNameToNew', () => {
+        it('should convert legacy -slash- format to new -- format', () => {
+            expect(legacyToolNameToNew('apify-slash-rag-web-browser')).toBe('apify--rag-web-browser');
+            expect(legacyToolNameToNew('compass-slash-crawler-google-places')).toBe('compass--crawler-google-places');
+        });
+
+        it('should preserve -dot- encoding unchanged', () => {
+            expect(legacyToolNameToNew('jiri-dot-spilka-slash-openrouter-x')).toBe('jiri-dot-spilka--openrouter-x');
+        });
+
+        it('should return null for names without -slash-', () => {
+            expect(legacyToolNameToNew('apify--rag-web-browser')).toBeNull();
+            expect(legacyToolNameToNew('search-actors')).toBeNull();
         });
     });
 });
