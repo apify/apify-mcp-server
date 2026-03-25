@@ -21,6 +21,14 @@ export type PaymentHeaders = Record<string, string>;
 export type PaymentMeta = Record<string, unknown> | undefined;
 
 /**
+ * Incoming HTTP request headers from the MCP transport.
+ * Passed to provider methods so payment schemes that use HTTP headers (e.g., x402 PAYMENT-SIGNATURE)
+ * can extract payment data from the transport layer.
+ * Undefined for non-HTTP transports (e.g., stdio).
+ */
+export type RequestHeaders = Record<string, string | string[] | undefined> | undefined;
+
+/**
  * Interface for payment providers.
  *
  * Each payment scheme implements this interface to handle:
@@ -45,24 +53,26 @@ export type PaymentProvider = {
     decorateToolSchema(tool: ToolEntry): ToolEntry;
 
     /**
-     * Validate that required payment credentials are present in tool call arguments or request metadata.
+     * Validate that required payment credentials are present in tool call arguments, request metadata, or HTTP headers.
      * Called before executing tools with `paymentRequired: true`.
      *
      * @param args - Tool call arguments
      * @param meta - MCP request `_meta` field (used by x402 for `_meta["x402/payment"]`)
+     * @param requestHeaders - Incoming HTTP request headers (used by x402 for `PAYMENT-SIGNATURE` header)
      * @returns A concise error message string if validation fails, or null if valid.
      */
-    validatePayment(args: Record<string, unknown>, meta?: PaymentMeta): string | null;
+    validatePayment(args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): string | null;
 
     /**
-     * Extract payment credentials from tool call arguments or request metadata
+     * Extract payment credentials from tool call arguments, request metadata, or HTTP headers
      * and return headers for the Apify API client.
      *
      * @param args - Tool call arguments
      * @param meta - MCP request `_meta` field
+     * @param requestHeaders - Incoming HTTP request headers
      * @returns Headers to attach to outbound Apify API requests, or empty object if none.
      */
-    getPaymentHeaders(args: Record<string, unknown>, meta?: PaymentMeta): PaymentHeaders;
+    getPaymentHeaders(args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): PaymentHeaders;
 
     /**
      * Remove payment-specific fields from tool call arguments before passing

@@ -1,6 +1,6 @@
 import { ApifyClient } from '../apify_client.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
-import type { PaymentMeta, PaymentProvider } from './types.js';
+import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 
 /**
  * Result of preparing payment context for a tool call.
@@ -35,8 +35,9 @@ export function preparePayment(input: {
     args: Record<string, unknown>;
     apifyToken: ApifyToken;
     meta?: PaymentMeta;
+    requestHeaders?: RequestHeaders;
 }): PreparePaymentResult {
-    const { provider, tool, args, apifyToken, meta } = input;
+    const { provider, tool, args, apifyToken, meta, requestHeaders } = input;
 
     if (!provider) {
         return {
@@ -47,11 +48,11 @@ export function preparePayment(input: {
         };
     }
 
-    const error = tool.paymentRequired ? provider.validatePayment(args, meta) : null;
+    const error = tool.paymentRequired ? provider.validatePayment(args, meta, requestHeaders) : null;
     const cleanArgs = provider.removePaymentFields(args);
     const logArgs = provider.redactForLogging(args);
 
-    const paymentHeaders = provider.getPaymentHeaders(args, meta);
+    const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
     const client = Object.keys(paymentHeaders).length > 0
         ? new ApifyClient({ paymentHeaders })
         : new ApifyClient({ token: apifyToken });

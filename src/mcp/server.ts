@@ -692,6 +692,7 @@ Please provide the required arguments for this tool. Check the tool's input sche
                 args: args as Record<string, unknown>,
                 apifyToken,
                 meta,
+                requestHeaders: extra.requestInfo?.headers,
             });
 
             log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: payment.logArgs });
@@ -764,7 +765,7 @@ Please remove the "task" parameter from the tool call request or use a different
                 // Check payment validation (already computed by preparePayment)
                 if (payment.error) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    return buildMCPResponse({ texts: [payment.error] });
+                    return buildMCPResponse({ texts: [payment.error], isError: true });
                 }
 
                 // Handle internal tool
@@ -1024,7 +1025,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
             // Check payment validation (already computed by preparePayment in the caller)
             if (paymentError) {
-                result = buildMCPResponse({ texts: [paymentError] });
+                result = buildMCPResponse({ texts: [paymentError], isError: true });
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             }
 
