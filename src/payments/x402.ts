@@ -1,3 +1,6 @@
+import log from '@apify/log';
+
+import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ToolEntry } from '../types.js';
 import { cloneToolEntry } from '../utils/tools.js';
 import type { PaymentHeaders, PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
@@ -12,11 +15,52 @@ const X402_META_KEY = 'x402/payment';
 const PAYMENT_SIGNATURE_HEADER = 'PAYMENT-SIGNATURE';
 const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 
+const PAYMENT_REQUIRED_HEADER = 'payment-required';
+
 const X402_TOOL_INSTRUCTIONS = [
     'This tool requires an x402 payment.',
     'Include a valid x402 payment signature in the request metadata (_meta["x402/payment"]).',
     'Your MCP client must support the x402 payment protocol.',
 ].join(' ');
+
+/**
+ * x402 payment requirements returned by the Apify API.
+ * Decoded from the base64 `payment-required` response header.
+ */
+export type X402PaymentRequirements = Record<string, unknown>;
+
+/**
+ * Fetches x402 payment requirements from the Apify API.
+ *
+ * Sends a request with `x-apify-payment-protocol: x402` header which triggers
+ * a 402 response containing the payment requirements in the `payment-required` header.
+ *
+ * @returns The decoded payment requirements, or undefined if the fetch fails.
+ */
+export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequirements | undefined> {
+    const apiBaseUrl = getApifyAPIBaseUrl();
+    const url = `${apiBaseUrl}/v2/acts/`;
+
+    try {
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { [PAYMENT_PROTOCOL_HEADER]: 'x402' },
+        });
+
+        const paymentRequiredBase64 = response.headers.get(PAYMENT_REQUIRED_HEADER);
+        if (!paymentRequiredBase64) {
+            log.warning('[x402] No payment-required header in API response', { status: response.status, url });
+            return undefined;
+        }
+
+        const decoded = JSON.parse(Buffer.from(paymentRequiredBase64, 'base64').toString('utf-8')) as X402PaymentRequirements;
+        log.info('[x402] Fetched payment requirements from Apify API', { url });
+        return decoded;
+    } catch (error) {
+        log.warning('[x402] Failed to fetch payment requirements — tools will advertise paymentRequired only', { url, error });
+        return undefined;
+    }
+}
 
 /**
  * Extracts the PAYMENT-SIGNATURE value from incoming HTTP request headers.
@@ -51,6 +95,17 @@ export class X402PaymentProvider implements PaymentProvider {
     readonly id = 'x402' as const;
     readonly allowsUnauthenticated = true;
 
+    constructor(private readonly requirements?: X402PaymentRequirements) {}
+
+    /**
+     * Creates an X402PaymentProvider, fetching payment requirements from the Apify API.
+     * Falls back to a provider without full requirements if the fetch fails.
+     */
+    static async create(): Promise<X402PaymentProvider> {
+        const requirements = await fetchX402PaymentRequirements();
+        return new X402PaymentProvider(requirements);
+    }
+
     decorateToolSchema(tool: ToolEntry): ToolEntry {
         if (!tool.paymentRequired) return tool;
 
@@ -62,7 +117,7 @@ export class X402PaymentProvider implements PaymentProvider {
         }
         const metaRecord = cloned._meta as Record<string, unknown>;
         if (!metaRecord.x402) {
-            metaRecord.x402 = { paymentRequired: true };
+            metaRecord.x402 = { paymentRequired: true, ...this.requirements };
         }
 
         // Append x402 instructions to description (idempotent)
@@ -105,6 +160,10 @@ export class X402PaymentProvider implements PaymentProvider {
     removePaymentFields(args: Record<string, unknown>): Record<string, unknown> {
         // x402 doesn't inject anything into tool arguments — payment is in _meta
         return args;
+    }
+
+    getPaymentRequiredData(): X402PaymentRequirements | undefined {
+        return this.requirements;
     }
 
     getUsageGuide(): string | null {

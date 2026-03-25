@@ -88,6 +88,15 @@ export type PaymentProvider = {
     readonly allowsUnauthenticated: boolean;
 
     /**
+     * Optional: Return structured error data for a 402 JSON-RPC error.
+     * Used by x402 to return PaymentRequired (x402Version + accepts) so that
+     * x402-compatible MCP clients can automatically handle the payment flow.
+     *
+     * @returns Structured data to include in the McpError `data` field, or undefined if not supported.
+     */
+    getPaymentRequiredData?(): unknown;
+
+    /**
      * Optional: Get a readme/usage guide resource for this payment mode.
      * @returns Resource content string, or null if no guide is available.
      */
