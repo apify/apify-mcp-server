@@ -10,6 +10,7 @@ const X402_META_KEY = 'x402/payment';
 
 /** HTTP header name for forwarding x402 payment signatures to the Apify API. */
 const PAYMENT_SIGNATURE_HEADER = 'PAYMENT-SIGNATURE';
+const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 
 const X402_TOOL_INSTRUCTIONS = [
     'This tool requires an x402 payment.',
@@ -89,13 +90,13 @@ export class X402PaymentProvider implements PaymentProvider {
             // The client sends the payment payload as a JSON object in _meta.
             // The Apify API expects it as a base64-encoded JSON string in the PAYMENT-SIGNATURE header.
             const paymentBase64 = Buffer.from(JSON.stringify(metaPayment)).toString('base64');
-            return { [PAYMENT_SIGNATURE_HEADER]: paymentBase64 };
+            return { [PAYMENT_SIGNATURE_HEADER]: paymentBase64, [PAYMENT_PROTOCOL_HEADER]: 'x402' };
         }
 
         // Fall back to HTTP PAYMENT-SIGNATURE header (already base64-encoded by the client)
         const headerPayment = getPaymentSignatureFromHeader(requestHeaders);
         if (headerPayment) {
-            return { [PAYMENT_SIGNATURE_HEADER]: headerPayment };
+            return { [PAYMENT_SIGNATURE_HEADER]: headerPayment, [PAYMENT_PROTOCOL_HEADER]: 'x402' };
         }
 
         return {};

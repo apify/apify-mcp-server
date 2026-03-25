@@ -48,14 +48,14 @@ describe('getPaymentHeaders', () => {
         const meta: PaymentMeta = { 'x402/payment': SAMPLE_PAYMENT };
         const result = provider.getPaymentHeaders({}, meta, undefined);
 
-        expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64 });
+        expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64, 'x-apify-payment-protocol': 'x402' });
     });
 
     it('should forward the HTTP PAYMENT-SIGNATURE header directly (already base64)', () => {
         const headers: RequestHeaders = { 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64 };
         const result = provider.getPaymentHeaders({}, undefined, headers);
 
-        expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64 });
+        expect(result).toEqual({ 'PAYMENT-SIGNATURE': SAMPLE_PAYMENT_BASE64, 'x-apify-payment-protocol': 'x402' });
     });
 
     it('should prefer _meta over HTTP header when both are present', () => {
@@ -67,6 +67,6 @@ describe('getPaymentHeaders', () => {
         const headers: RequestHeaders = { 'PAYMENT-SIGNATURE': headerBase64 };
         const result = provider.getPaymentHeaders({}, meta, headers);
 
-        expect(result).toEqual({ 'PAYMENT-SIGNATURE': metaBase64 });
+        expect(result).toEqual({ 'PAYMENT-SIGNATURE': metaBase64, 'x-apify-payment-protocol': 'x402' });
     });
 });
