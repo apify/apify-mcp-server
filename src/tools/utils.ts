@@ -3,6 +3,8 @@ import { createHash } from 'node:crypto';
 import type { ValidateFunction } from 'ajv';
 import type Ajv from 'ajv';
 
+import log from '@apify/log';
+
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
 import type { ActorInfo, ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
@@ -25,12 +27,12 @@ export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
 export function actorNameToToolName(actorFullName: string): string {
     const slashIndex = actorFullName.indexOf('/');
     if (slashIndex === -1) {
-        return actorFullName.slice(0, MAX_TOOL_NAME_LENGTH);
+        log.warning(`Actor name "${actorFullName}" does not contain a slash — expected format "username/actor-name"`);
     }
 
-    const username = actorFullName.slice(0, slashIndex);
-    const actorName = actorFullName.slice(slashIndex + 1);
-    const fullName = `${username}--${actorName}`;
+    const username = slashIndex !== -1 ? actorFullName.slice(0, slashIndex) : '';
+    const actorName = slashIndex !== -1 ? actorFullName.slice(slashIndex + 1) : actorFullName;
+    const fullName = slashIndex !== -1 ? `${username}--${actorName}` : actorName;
 
     if (fullName.length <= MAX_TOOL_NAME_LENGTH) {
         return fullName;

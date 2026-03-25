@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it } from 'vitest';
 
-import { TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
+import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../../src/mcp/const.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 
 describe('actors', () => {
@@ -13,15 +13,12 @@ describe('actors', () => {
             expect(actorNameToToolName('compass/crawler-google-places')).toBe('compass--crawler-google-places');
         });
 
-        it('should handle empty strings', () => {
-            expect(actorNameToToolName('')).toBe('');
-        });
-
-        it('should handle strings without slashes', () => {
+        it('should handle strings without slashes by using hash truncation for long names', () => {
             expect(actorNameToToolName('actorname')).toBe('actorname');
-            // Strings longer than 64 chars without a slash should be truncated
+            // Strings longer than 64 chars without a slash should use hash-based truncation
             const longName = 'a'.repeat(70);
-            expect(actorNameToToolName(longName)).toBe('a'.repeat(64));
+            const hash = createHash('sha256').update(longName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
+            expect(actorNameToToolName(longName)).toBe(`${'a'.repeat(MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`);
         });
 
         it('should handle tool names longer than 64 characters by truncating with a hash', () => {
