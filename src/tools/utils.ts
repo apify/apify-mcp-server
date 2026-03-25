@@ -25,7 +25,7 @@ export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
 export function actorNameToToolName(actorFullName: string): string {
     const slashIndex = actorFullName.indexOf('/');
     if (slashIndex === -1) {
-        return actorFullName.slice(0, MAX_TOOL_NAME_LENGTH);
+        throw new Error(`Invalid actor name: "${actorFullName}" — expected format "username/actor-name"`);
     }
 
     const username = actorFullName.slice(0, slashIndex);

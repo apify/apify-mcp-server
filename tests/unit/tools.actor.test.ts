@@ -13,15 +13,10 @@ describe('actors', () => {
             expect(actorNameToToolName('compass/crawler-google-places')).toBe('compass--crawler-google-places');
         });
 
-        it('should handle empty strings', () => {
-            expect(actorNameToToolName('')).toBe('');
-        });
-
-        it('should handle strings without slashes', () => {
-            expect(actorNameToToolName('actorname')).toBe('actorname');
-            // Strings longer than 64 chars without a slash should be truncated
-            const longName = 'a'.repeat(70);
-            expect(actorNameToToolName(longName)).toBe('a'.repeat(64));
+        it('should throw for actor names without a slash', () => {
+            expect(() => actorNameToToolName('')).toThrow();
+            expect(() => actorNameToToolName('actorname')).toThrow();
+            expect(() => actorNameToToolName('a'.repeat(70))).toThrow();
         });
 
         it('should handle tool names longer than 64 characters by truncating with a hash', () => {
