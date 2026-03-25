@@ -243,9 +243,9 @@ export async function getMcpToolsMessage(
         return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
     }
 
-    // Early return: Skyfire mode restriction
+    // Early return: payment provider restriction — MCP server Actors are not supported
     if (paymentProvider) {
-        return `This Actor is an MCP server and cannot be accessed in Skyfire mode.`;
+        return `This Actor is an MCP server and cannot be accessed when using a payment provider.`;
     }
 
     // Connect and list tools
