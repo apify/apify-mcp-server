@@ -17,6 +17,9 @@ const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 
+/** Timeout for fetching x402 payment requirements from the Apify API (ms). */
+const FETCH_TIMEOUT_MS = 8_000;
+
 const X402_TOOL_INSTRUCTIONS = [
     'This tool requires an x402 payment.',
     'Include a valid x402 payment signature in the request metadata (_meta["x402/payment"]).',
@@ -41,10 +44,14 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
     const apiBaseUrl = getApifyAPIBaseUrl();
     const url = `${apiBaseUrl}/v2/acts/`;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
     try {
         const response = await fetch(url, {
             method: 'GET',
             headers: { [PAYMENT_PROTOCOL_HEADER]: 'x402' },
+            signal: controller.signal,
         });
 
         const paymentRequiredBase64 = response.headers.get(PAYMENT_REQUIRED_HEADER);
@@ -59,6 +66,8 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
     } catch (error) {
         log.warning('[x402] Failed to fetch payment requirements — tools will advertise paymentRequired only', { url, error });
         return undefined;
+    } finally {
+        clearTimeout(timeoutId);
     }
 }
 
@@ -106,18 +115,32 @@ export class X402PaymentProvider implements PaymentProvider {
         return new X402PaymentProvider(requirements);
     }
 
+    /**
+     * Extracts the first "exact" scheme accept entry from the full payment requirements.
+     * This is the flattened payment info that goes into _meta.x402 for tool schemas.
+     */
+    private getFirstAcceptEntry(): Record<string, unknown> | undefined {
+        if (!this.requirements) return undefined;
+        const accepts = this.requirements.accepts as unknown[] | undefined;
+        if (!Array.isArray(accepts) || accepts.length === 0) return undefined;
+        return accepts[0] as Record<string, unknown>;
+    }
+
     decorateToolSchema(tool: ToolEntry): ToolEntry {
         if (!tool.paymentRequired) return tool;
 
         const cloned = cloneToolEntry(tool);
 
         // Add _meta.x402 to signal payment requirement to clients (idempotent)
+        // Only include the first accept entry (scheme, network, amount, asset, payTo, etc.)
+        // matching the demo server format — NOT the full API response
         if (!cloned._meta) {
             cloned._meta = {};
         }
         const metaRecord = cloned._meta as Record<string, unknown>;
         if (!metaRecord.x402) {
-            metaRecord.x402 = { paymentRequired: true, ...this.requirements };
+            const acceptEntry = this.getFirstAcceptEntry();
+            metaRecord.x402 = { paymentRequired: true, ...acceptEntry };
         }
 
         // Append x402 instructions to description (idempotent)

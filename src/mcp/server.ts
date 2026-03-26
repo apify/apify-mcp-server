@@ -767,12 +767,18 @@ Please remove the "task" parameter from the tool call request or use a different
             try {
                 // Check payment validation (already computed by preparePayment)
                 if (payment.error) {
-                    // If the provider supplies structured error data (e.g., x402 PaymentRequired),
-                    // throw a JSON-RPC error so x402-compatible clients can handle payment automatically.
-                    if (payment.errorData) {
-                        throw new McpError(402, payment.error, payment.errorData);
-                    }
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    // If the provider supplies structured error data (e.g., x402 PaymentRequired),
+                    // return it as a tool result per the x402 MCP transport spec:
+                    // content[0].text (JSON) + isError: true
+                    // NOTE: structuredContent is NOT used because the MCP SDK validates it
+                    // against the tool's outputSchema, which would reject PaymentRequired objects.
+                    if (payment.errorData) {
+                        return buildMCPResponse({
+                            texts: [JSON.stringify(payment.errorData)],
+                            isError: true,
+                        });
+                    }
                     return buildMCPResponse({ texts: [payment.error], isError: true });
                 }
 
@@ -911,18 +917,23 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 // If we reached here without returning, it means the tool type was not recognized (user error)
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
-                // Propagate 402 Payment Required as a JSON-RPC error (x402-compatible).
-                // The x402 MCP client detects this via error.code === 402 and reads
-                // payment requirements from error.data.
+                // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
+                // structuredContent + content[0].text (JSON) + isError: true
                 const httpStatus = getHttpStatusCode(error);
                 if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                     logHttpError(error, 'Payment required while calling tool', { toolName: name });
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    throw new McpError(
-                        HTTP_PAYMENT_REQUIRED,
-                        error instanceof Error ? error.message : 'Payment required',
-                        extractPaymentRequiredData(error),
-                    );
+                    const paymentData = extractPaymentRequiredData(error);
+                    if (paymentData) {
+                        return buildMCPResponse({
+                            texts: [JSON.stringify(paymentData)],
+                            isError: true,
+                        });
+                    }
+                    return buildMCPResponse({
+                        texts: [error instanceof Error ? error.message : 'Payment required'],
+                        isError: true,
+                    });
                 }
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
@@ -1051,11 +1062,15 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
             // Check payment validation (already computed by preparePayment in the caller)
             if (paymentError) {
-                if (paymentErrorData) {
-                    throw new McpError(402, paymentError, paymentErrorData);
-                }
-                result = buildMCPResponse({ texts: [paymentError], isError: true });
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
+                if (paymentErrorData) {
+                    result = buildMCPResponse({
+                        texts: [JSON.stringify(paymentErrorData)],
+                        isError: true,
+                    });
+                } else {
+                    result = buildMCPResponse({ texts: [paymentError], isError: true });
+                }
             }
 
             // Callback to propagate Actor run statusMessage into the task store.

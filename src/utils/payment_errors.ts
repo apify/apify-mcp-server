@@ -1,3 +1,7 @@
+import { ApifyApiError } from 'apify-client';
+
+import log from '@apify/log';
+
 import type { ApifyClient } from '../apify_client.js';
 import { HTTP_PAYMENT_REQUIRED } from '../const.js';
 
@@ -23,9 +27,17 @@ type ErrorWithPaymentData = Error & { [PAYMENT_REQUIRED_DATA]?: Record<string, u
  */
 export function registerPaymentRequiredInterceptor(apifyClient: ApifyClient): void {
     // Access the internal axios instance: ApifyClient -> HttpClient -> AxiosInstance
-    const axiosInstance = (apifyClient as unknown as { httpClient: { axios: { interceptors: {
-        response: { use: (onFulfilled: null, onRejected: (error: unknown) => unknown) => void };
-    } } } }).httpClient.axios;
+    // Wrapped in try-catch because this accesses private internals that may change
+    let axiosInstance;
+    try {
+        axiosInstance = (apifyClient as unknown as { httpClient: { axios: { interceptors: {
+            response: { use: (onFulfilled: null, onRejected: (error: unknown) => unknown) => void };
+        } } } }).httpClient.axios;
+        if (!axiosInstance?.interceptors?.response?.use) throw new Error('axios interceptors not found');
+    } catch {
+        log.warning('[x402] Failed to access apify-client axios internals — payment header capture disabled');
+        return;
+    }
 
     // eslint-disable-next-line @typescript-eslint/promise-function-async -- axios interceptors must return a rejected promise, not throw
     axiosInstance.interceptors.response.use(null, (error: unknown) => {
@@ -65,9 +77,9 @@ export function extractPaymentRequiredData(error: unknown): Record<string, unkno
     const captured = (error as ErrorWithPaymentData)[PAYMENT_REQUIRED_DATA];
     if (captured && typeof captured === 'object') return captured;
 
-    // Source 2: ApifyApiError.data (API response body)
-    if ('data' in error) {
-        const { data } = error as { data?: unknown };
+    // Source 2: ApifyApiError.data (API response body) — only trust genuine Apify API errors
+    if (error instanceof ApifyApiError) {
+        const { data } = error;
         if (typeof data === 'object' && data !== null) return data as Record<string, unknown>;
     }
 
