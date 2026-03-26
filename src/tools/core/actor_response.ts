@@ -1,3 +1,5 @@
+import dedent from 'dedent';
+
 import type { DatasetItem } from '../../types.js';
 import type { CallActorGetDatasetResult } from './actor_execution.js';
 
@@ -46,35 +48,56 @@ export function buildActorResponseContent(
     }
 
     // Build instructions for retrieving additional data
-    const previewNote = totalItemCount !== result.previewItems.length
-        ? ` Note: You have access only to a limited preview (${result.previewItems.length} of ${totalItemCount} items). Do not present this as the full output.`
+    const isPreviewLimited = totalItemCount !== result.previewItems.length;
+    const previewNote = isPreviewLimited
+        ? dedent`
+            Note: You have access only to a limited preview
+            (${result.previewItems.length} of ${totalItemCount} items). Do not present this as the full output.
+        `
         : '';
-    const instructions = `If you need to retrieve additional data, use the "get-actor-output" tool with datasetId: "${datasetId}".${previewNote} Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.`;
+    const previewLimitNote = isPreviewLimited
+        ? dedent`
+            You have access only to a limited preview of the Actor output.
+            Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${totalItemCount} item(s).
+            Be aware of this and inform users about the currently loaded count and the total available output items count.
+        `
+        : '';
+    const instructions = dedent`
+        If you need to retrieve additional data, use the "get-actor-output" tool with datasetId: "${datasetId}".${previewNote}
+        Be sure to limit the number of results when using the "get-actor-output" tool, since you never know how large the items may be, and they might exceed the output limits.
+    `;
 
     // Construct text content
-    const textContent = `Actor "${actorName}" completed successfully!
+    const textContent = dedent`
+        Actor "${actorName}" completed successfully!
 
-Results summary:
-• Run ID: ${runId}
-• Dataset ID: ${datasetId}
-• Total items: ${totalItemCount}
+        Results summary:
+        • Run ID: ${runId}
+        • Dataset ID: ${datasetId}
+        • Total items: ${totalItemCount}
 
-Actor output data schema:
-* You can use this schema to understand the structure of the output data and, for example, retrieve specific fields based on your current task.
-\`\`\`json
-${JSON.stringify(displaySchema)}
-\`\`\`
+        Actor output data schema:
+        * You can use this schema to understand the structure of the output data and, for example, retrieve specific fields based on your current task.
+        \`\`\`json
+        ${JSON.stringify(displaySchema)}
+        \`\`\`
 
-Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${totalItemCount !== result.previewItems.length ? ` You have access only to a limited preview of the Actor output. Do not present this as the full output, as you have only ${result.previewItems.length} item(s) available instead of the full ${totalItemCount} item(s). Be aware of this and inform users about the currently loaded count and the total available output items count.` : ''}
+        Above this text block is a preview of the Actor output containing ${result.previewItems.length} item(s).${previewLimitNote}
 
-${instructions}
-`;
+        ${instructions}
+    `;
 
     const getEmptyPreviewMessage = () => {
         if (previewOutput) {
-            return `No items available for preview—either the Actor did not return any items or they are too large for preview. Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results.`;
+            return dedent`
+                No items available for preview—either the Actor did not return any items or they are too large for preview.
+                Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results.
+            `;
         }
-        return `Preview skipped (previewOutput: false). Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results or specific fields.`;
+        return dedent`
+            Preview skipped (previewOutput: false).
+            Use the "get-actor-output" tool with datasetId: "${result.datasetId}" to retrieve results or specific fields.
+        `;
     };
 
     const itemsPreviewText = result.previewItems.length > 0
@@ -84,9 +107,7 @@ ${instructions}
     // Build content array
     const content: ({ type: 'text'; text: string })[] = [
         { type: 'text', text: itemsPreviewText },
-        /**
-         * The metadata and instructions text must be at the end otherwise the LLM does not acknowledge it.
-         */
+        // The metadata and instructions text must be at the end, otherwise the LLM does not acknowledge it.
         { type: 'text', text: textContent },
     ];
 
