@@ -191,6 +191,11 @@ Use comments to guide reviewers:
         * `warn` - suspicious but non-critical behavior
         * `info` - progress or important state changes
         * `debug` - local development
+    * **Mezmo (logDNA) promotion rule:** Mezmo automatically promotes log entries to error level when the log message or data keys contain the word `"error"`. To avoid false error alerts in `softFail` calls:
+        * Use `errMessage` as the data key (not `error`) when logging an error message string.
+        * Sanitize the error message string: `.replace(/ error:/gi, ' failure:')`.
+        * Avoid the word `"error"` in the `softFail` message string itself.
+        * Example: `log.softFail('Client disconnected', { errMessage: err.message.replace(/ error:/gi, ' failure:') })`
 
 *   **Sensitive Data:**
     * Never send sensitive information without proper permission checks.
