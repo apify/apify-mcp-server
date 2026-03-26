@@ -75,7 +75,7 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
  * Extracts the PAYMENT-SIGNATURE value from incoming HTTP request headers.
  * Header lookup is case-insensitive. Returns the first string value, or undefined.
  */
-function getPaymentSignatureFromHeader(requestHeaders: RequestHeaders): string | undefined {
+function getPaymentSignatureFromHeader(requestHeaders?: RequestHeaders): string | undefined {
     if (!requestHeaders) return undefined;
 
     // HTTP headers are case-insensitive; the SDK may normalize to lowercase
@@ -83,6 +83,18 @@ function getPaymentSignatureFromHeader(requestHeaders: RequestHeaders): string |
     if (typeof value === 'string' && value.length > 0) return value;
     if (Array.isArray(value) && typeof value[0] === 'string' && value[0].length > 0) return value[0];
     return undefined;
+}
+
+/**
+ * Gets the base64-encoded payment signature from either _meta (JSON object) or HTTP headers.
+ */
+function getEncodedPaymentSignature(meta?: PaymentMeta, requestHeaders?: RequestHeaders): string | undefined {
+    const metaPayment = meta?.[X402_META_KEY];
+    if (metaPayment) {
+        return Buffer.from(JSON.stringify(metaPayment)).toString('base64');
+    }
+
+    return getPaymentSignatureFromHeader(requestHeaders);
 }
 
 /**
@@ -152,32 +164,14 @@ export class X402PaymentProvider implements PaymentProvider {
     }
 
     validatePayment(_args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): string | null {
-        const metaPayment = meta?.[X402_META_KEY];
-        if (metaPayment) return null;
-
-        const headerPayment = getPaymentSignatureFromHeader(requestHeaders);
-        if (headerPayment) return null;
-
-        return X402_TOOL_INSTRUCTIONS;
+        return getEncodedPaymentSignature(meta, requestHeaders) ? null : X402_TOOL_INSTRUCTIONS;
     }
 
     getPaymentHeaders(_args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): PaymentHeaders {
-        // Prefer _meta over HTTP header — _meta is the canonical MCP mechanism
-        const metaPayment = meta?.[X402_META_KEY];
-        if (metaPayment) {
-            // The client sends the payment payload as a JSON object in _meta.
-            // The Apify API expects it as a base64-encoded JSON string in the PAYMENT-SIGNATURE header.
-            const paymentBase64 = Buffer.from(JSON.stringify(metaPayment)).toString('base64');
-            return { [PAYMENT_SIGNATURE_HEADER]: paymentBase64, [PAYMENT_PROTOCOL_HEADER]: 'x402' };
-        }
-
-        // Fall back to HTTP PAYMENT-SIGNATURE header (already base64-encoded by the client)
-        const headerPayment = getPaymentSignatureFromHeader(requestHeaders);
-        if (headerPayment) {
-            return { [PAYMENT_SIGNATURE_HEADER]: headerPayment, [PAYMENT_PROTOCOL_HEADER]: 'x402' };
-        }
-
-        return {};
+        const paymentSignature = getEncodedPaymentSignature(meta, requestHeaders);
+        return paymentSignature
+            ? { [PAYMENT_SIGNATURE_HEADER]: paymentSignature, [PAYMENT_PROTOCOL_HEADER]: 'x402' }
+            : {};
     }
 
     removePaymentFields(args: Record<string, unknown>): Record<string, unknown> {

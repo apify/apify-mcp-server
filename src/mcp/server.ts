@@ -72,7 +72,7 @@ import type {
 } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
-import { extractPaymentRequiredData } from '../utils/payment_errors.js';
+import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { getToolStatusFromError } from '../utils/tool_status.js';
@@ -744,8 +744,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         tool,
                         cleanArgs: payment.cleanArgs,
                         logArgs: payment.logArgs,
-                        paymentError: payment.error,
-                        paymentErrorData: payment.errorData,
+                        paymentErrorResult: payment.errorResult,
                         apifyClient: payment.client,
                         apifyToken,
                         progressToken,
@@ -766,20 +765,9 @@ Please remove the "task" parameter from the tool call request or use a different
 
             try {
                 // Check payment validation (already computed by preparePayment)
-                if (payment.error) {
+                if (payment.errorResult) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    // If the provider supplies structured error data (e.g., x402 PaymentRequired),
-                    // return it as a tool result per the x402 MCP transport spec:
-                    // content[0].text (JSON) + isError: true
-                    // NOTE: structuredContent is NOT used because the MCP SDK validates it
-                    // against the tool's outputSchema, which would reject PaymentRequired objects.
-                    if (payment.errorData) {
-                        return buildMCPResponse({
-                            texts: [JSON.stringify(payment.errorData)],
-                            isError: true,
-                        });
-                    }
-                    return buildMCPResponse({ texts: [payment.error], isError: true });
+                    return payment.errorResult;
                 }
 
                 // Handle internal tool
@@ -918,22 +906,12 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
-                // structuredContent + content[0].text (JSON) + isError: true
+                // content[0].text (JSON) + isError: true
                 const httpStatus = getHttpStatusCode(error);
                 if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                     logHttpError(error, 'Payment required while calling tool', { toolName: name });
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    const paymentData = extractPaymentRequiredData(error);
-                    if (paymentData) {
-                        return buildMCPResponse({
-                            texts: [JSON.stringify(paymentData)],
-                            isError: true,
-                        });
-                    }
-                    return buildMCPResponse({
-                        texts: [error instanceof Error ? error.message : 'Payment required'],
-                        isError: true,
-                    });
+                    return buildPaymentRequiredResponse(error);
                 }
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
@@ -1011,8 +989,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
         tool: ToolEntry;
         cleanArgs: Record<string, unknown>;
         logArgs: unknown;
-        paymentError: string | null;
-        paymentErrorData?: unknown;
+        paymentErrorResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
         progressToken: string | number | undefined;
@@ -1021,7 +998,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
         userRentedActorIds?: string[];
     }): Promise<void> {
         const {
-            taskId, tool, cleanArgs, logArgs, paymentError, paymentErrorData,
+            taskId, tool, cleanArgs, logArgs, paymentErrorResult,
             apifyClient, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
@@ -1061,16 +1038,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
             let result: Record<string, unknown> = {};
 
             // Check payment validation (already computed by preparePayment in the caller)
-            if (paymentError) {
+            if (paymentErrorResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
-                if (paymentErrorData) {
-                    result = buildMCPResponse({
-                        texts: [JSON.stringify(paymentErrorData)],
-                        isError: true,
-                    });
-                } else {
-                    result = buildMCPResponse({ texts: [paymentError], isError: true });
-                }
+                result = paymentErrorResult;
             }
 
             // Callback to propagate Actor run statusMessage into the task store.
@@ -1174,11 +1144,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
-                const paymentData = extractPaymentRequiredData(error);
-                const taskResult = paymentData
-                    ? buildMCPResponse({ texts: [JSON.stringify(paymentData)], isError: true })
-                    : buildMCPResponse({ texts: [error instanceof Error ? error.message : 'Payment required'], isError: true });
-                await this.taskStore.storeTaskResult(taskId, 'completed', taskResult, mcpSessionId);
+                await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
                 this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL);
                 return;
             }
