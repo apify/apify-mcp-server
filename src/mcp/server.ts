@@ -1169,6 +1169,20 @@ Please verify the tool name and ensure the tool is properly registered.`;
             this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
         } catch (error) {
             log.error('Error executing tool for task', { taskId, mcpSessionId, error });
+
+            // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
+            const httpStatus = getHttpStatusCode(error);
+            if (httpStatus === HTTP_PAYMENT_REQUIRED) {
+                logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                const paymentData = extractPaymentRequiredData(error);
+                const taskResult = paymentData
+                    ? buildMCPResponse({ texts: [JSON.stringify(paymentData)], isError: true })
+                    : buildMCPResponse({ texts: [error instanceof Error ? error.message : 'Payment required'], isError: true });
+                await this.taskStore.storeTaskResult(taskId, 'completed', taskResult, mcpSessionId);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL);
+                return;
+            }
+
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
 

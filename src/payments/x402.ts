@@ -116,7 +116,7 @@ export class X402PaymentProvider implements PaymentProvider {
     }
 
     /**
-     * Extracts the first "exact" scheme accept entry from the full payment requirements.
+     * Extracts the first accept entry from the full payment requirements.
      * This is the flattened payment info that goes into _meta.x402 for tool schemas.
      */
     private getFirstAcceptEntry(): Record<string, unknown> | undefined {

@@ -10,7 +10,7 @@ const PAYMENT_REQUIRED_HEADER = 'payment-required';
 /**
  * Symbol used to attach captured payment-required header data to errors.
  * The axios response interceptor stores the header value here so it can be
- * forwarded in McpError.data without modifying the apify-client SDK.
+ * forwarded as x402 payment data without modifying the apify-client SDK.
  */
 const PAYMENT_REQUIRED_DATA = Symbol.for('paymentRequiredData');
 
