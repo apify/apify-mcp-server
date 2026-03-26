@@ -22,9 +22,6 @@ const searchActorsInternalArgsSchema = z.object({
     keywords: z.string()
         .default('')
         .describe('Keywords used to search for Actors in the Apify Store.'),
-    category: z.string()
-        .default('')
-        .describe('Filter the results by the specified category.'),
 });
 
 export const searchActorsInternalTool: ToolEntry = Object.freeze({

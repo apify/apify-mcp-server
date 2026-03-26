@@ -28,9 +28,6 @@ Examples:
 ❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
 ❌ Bad: "data extraction scraping tools" (too generic)
 `),
-    category: z.string()
-        .default('')
-        .describe('Filter the results by the specified category.'),
     limit: z.number()
         .int()
         .min(1)
@@ -63,7 +60,7 @@ Do NOT use this tool when user wants immediate data retrieval - use apify-slash-
 IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
 
 Usage:
-- ALWAYS prefer broad, generic keywords - use just the platform name (e.g., "TikTok" instead of "TikTok posts", "Instagram" instead of "Instagram scraper").
+- Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
