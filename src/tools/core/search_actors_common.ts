@@ -10,17 +10,6 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
  * Zod schema for search-actors arguments — shared between default and openai variants.
  */
 export const searchActorsArgsSchema = z.object({
-    limit: z.number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(5)
-        .describe('The maximum number of Actors to return (default = 5)'),
-    offset: z.number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe('The number of elements to skip from the start (default = 0)'),
     keywords: z.string()
         .default('')
         .describe(`Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
@@ -42,6 +31,17 @@ Examples:
     category: z.string()
         .default('')
         .describe('Filter the results by the specified category.'),
+    limit: z.number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(5)
+        .describe('The maximum number of Actors to return (default = 5)'),
+    offset: z.number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe('The number of elements to skip from the start (default = 0)'),
 });
 
 const SEARCH_ACTORS_DESCRIPTION = `
