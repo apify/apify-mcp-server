@@ -14,7 +14,7 @@ export async function resolvePaymentProvider(paymentParam: string | null | undef
     if (!paymentParam) return undefined;
 
     const providers: Record<PaymentProviderId, () => Promise<PaymentProvider>> = {
-        skyfire: async () => new SkyfirePaymentProvider(),
+        skyfire: async () => SkyfirePaymentProvider.create(),
         x402: async () => X402PaymentProvider.create(),
     };
 
