@@ -20,6 +20,13 @@
             "env": {
                 "APIFY_TOKEN": "${APIFY_TOKEN}"
             }
+        },
+        "stdio-full": {
+            "command": "node",
+            "args": ["dist/stdio.js", "--tools=actors,docs,experimental,runs,storage,apify/rag-web-browser"],
+            "env": {
+                "APIFY_TOKEN": "${APIFY_TOKEN}"
+            }
         }
     }
 }
