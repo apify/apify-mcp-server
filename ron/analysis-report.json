@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-03-27T03:36:14.786Z",
+  "ronPatterns": [
+    {
+      "pattern": "ironic-credit",
+      "avgViews": 3000000,
+      "count": 1,
+      "examples": [
+        "\"thanks mcdonalds for this...\""
+      ],
+      "verdict": "SCALE"
+    },
+    {
+      "pattern": "nostalgia-bait",
+      "avgViews": 248000,
+      "count": 1,
+      "examples": [
+        "\"2016 canada larp...\""
+      ],
+      "verdict": "SCALE"
+    },
+    {
+      "pattern": "deep-motivational",
+      "avgViews": 1000,
+      "count": 2,
+      "examples": [
+        "\"when every choice you make is deciding your fate......\"",
+        "\"whole time i thought this was temporary...\""
+      ],
+      "verdict": "KILL"
+    },
+    {
+      "pattern": "trial",
+      "avgViews": 1000,
+      "count": 1,
+      "examples": [
+        "\"trial reel (motivational car)...\""
+      ],
+      "verdict": "TEST"
+    }
+  ],
+  "competitorPatterns": [],
+  "topAudiosRon": [
+    {
+      "audio": "trending",
+      "avgViews": 3000000,
+      "count": 1
+    },
+    {
+      "audio": "nostalgia audio",
+      "avgViews": 248000,
+      "count": 1
+    },
+    {
+      "audio": "ambient",
+      "avgViews": 1000,
+      "count": 2
+    }
+  ],
+  "topAudiosCompetitors": []
+}
