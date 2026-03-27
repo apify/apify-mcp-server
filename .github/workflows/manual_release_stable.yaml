@@ -39,12 +39,10 @@ jobs:
           release_type: ${{ inputs.release_type }}
           custom_version: ${{ inputs.custom_version }}
 
-    create_github_release:
-        name: Create github release
+    build_mcpb:
+        name: Build MCPB package
         needs: [release_metadata]
         runs-on: ubuntu-latest
-        env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         steps:
             -   uses: actions/checkout@v6
                 with:
@@ -64,30 +62,47 @@ jobs:
                     npm run build
             -   name: Build module
                 run: npm run build
-            - name: Prepare MCPB package
-              run: |
+            -   name: Prepare MCPB package
+                run: |
                     mkdir mcpb
                     cp -r node_modules mcpb/node_modules
                     cp -r dist mcpb/dist
                     cp -r docs mcpb/docs
                     cp package.json mcpb/package.json
                     cp manifest.json mcpb/manifest.json
-                    cp docs/apify-logo.png mcpb/icon.png
-            - name: Create MCPB package
-              # fix version of anthropic-ai/mcpb to 1.1.1 so that we have a reproducible build
-              run: npx -y @anthropic-ai/mcpb@1.1.1 pack mcpb/ apify-mcp-server.mcpb
-            - name: Copy MCPB package
-              run: cp apify-mcp-server.mcpb actors-mcp-server.mcpb
-            - name: Create release
-              uses: softprops/action-gh-release@v2
-              with:
-                  tag_name: ${{ needs.release_metadata.outputs.tag_name }}
-                  name: ${{ needs.release_metadata.outputs.version_number }}
-                  target_commitish: ${{ needs.release_metadata.outputs.changelog_commitish }}
-                  body: ${{ needs.release_metadata.outputs.release_notes }}
-                  files: |
-                       apify-mcp-server.mcpb
-                       actors-mcp-server.mcpb
+                    cp docs/apify-logo-claude-desktop.png mcpb/icon.png
+            -   name: Validate MCPB manifest
+                run: npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json
+            -   name: Create MCPB package
+                # fix version of anthropic-ai/mcpb to 2.1.2 so that we have a reproducible build
+                run: npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
+            -   name: Clean MCPB package
+                run: npx -y @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
+            -   name: Upload MCPB artifacts
+                uses: actions/upload-artifact@v4
+                with:
+                    name: mcpb-packages
+                    path: apify-mcp-server.mcpb
+
+    create_github_release:
+        name: Create github release
+        needs: [release_metadata, build_mcpb]
+        runs-on: ubuntu-latest
+        env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        steps:
+            -   name: Download MCPB artifacts
+                uses: actions/download-artifact@v4
+                with:
+                    name: mcpb-packages
+            -   name: Create release
+                uses: softprops/action-gh-release@v2
+                with:
+                    tag_name: ${{ needs.release_metadata.outputs.tag_name }}
+                    name: ${{ needs.release_metadata.outputs.version_number }}
+                    target_commitish: ${{ needs.release_metadata.outputs.changelog_commitish }}
+                    body: ${{ needs.release_metadata.outputs.release_notes }}
+                    files: apify-mcp-server.mcpb
 
     publish_to_npm:
         name: Publish to NPM

@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
@@ -38,18 +39,19 @@ const getDatasetItemsArgs = z.object({
 export const getDatasetItems: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_GET_ITEMS,
-    description: `Retrieve dataset items with pagination, sorting, and field selection.
-Use clean=true to skip empty items and hidden fields. Include or omit fields using comma-separated lists.
-For nested objects, first flatten them (e.g., flatten="metadata"), then reference nested fields via dot notation (e.g., fields="metadata.url").
+    description: dedent`
+        Retrieve dataset items with pagination, sorting, and field selection.
+        Use clean=true to skip empty items and hidden fields. Include or omit fields using comma-separated lists.
+        For nested objects, first flatten them (e.g., flatten="metadata"), then reference nested fields via dot notation (e.g., fields="metadata.url").
 
-The results will include items along with pagination info (limit, offset) and total count.
+        The results will include items along with pagination info (limit, offset) and total count.
 
-USAGE:
-- Use when you need to read data from a dataset (all items or only selected fields).
+        USAGE:
+        - Use when you need to read data from a dataset (all items or only selected fields).
 
-USAGE EXAMPLES:
-- user_input: Get first 100 items from dataset abd123
-- user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
+        USAGE EXAMPLES:
+        - user_input: Get first 100 items from dataset abd123
+        - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
     /**

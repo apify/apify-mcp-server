@@ -1,8 +1,9 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
-import { APIFY_DOCS_MCP_URL, APIFY_FAVICON_URL, SERVER_NAME, SERVER_TITLE, SERVER_VERSION } from './const.js';
+import { APIFY_DOCS_MCP_URL, APIFY_FAVICON_URL, SERVER_NAME, SERVER_TITLE } from './const.js';
 import type { ServerCard } from './types.js';
 import { readJsonFile } from './utils/generic.js';
+import { getPackageVersion } from './utils/version.js';
 
 const serverJson = readJsonFile<{ description: string }>(import.meta.url, '../server.json');
 
@@ -15,7 +16,7 @@ export function getServerCard(): ServerCard {
         serverInfo: {
             name: SERVER_NAME,
             title: SERVER_TITLE,
-            version: SERVER_VERSION,
+            version: getPackageVersion()!,
         },
         description: serverJson.description,
         iconUrl: APIFY_FAVICON_URL,

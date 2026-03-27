@@ -42,7 +42,6 @@ import {
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
     SERVER_NAME,
-    SERVER_VERSION,
     TOOL_STATUS,
 } from '../const.js';
 import { prompts } from '../prompts/index.js';
@@ -138,7 +137,7 @@ export class ActorsMcpServer {
         this.server = new Server(
             {
                 name: SERVER_NAME,
-                version: SERVER_VERSION,
+                version: getPackageVersion()!,
                 websiteUrl: APIFY_MCP_URL,
             },
             {
@@ -405,7 +404,14 @@ export class ActorsMcpServer {
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
-            console.error('[MCP Error]', error); // eslint-disable-line no-console
+            if (error.message?.includes('No connection established')) {
+                // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
+                // Use errMessage key and sanitize the string to preserve the soft-fail log level.
+                const errMessage = error.message.replace(/ error:/gi, ' failure:');
+                log.softFail('MCP client disconnected before response could be sent', { errMessage });
+            } else {
+                log.error('[MCP Error]', { error });
+            }
         };
         if (setupSIGINTHandler) {
             const handler = async () => {

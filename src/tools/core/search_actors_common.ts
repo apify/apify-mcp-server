@@ -10,17 +10,6 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
  * Zod schema for search-actors arguments — shared between default and openai variants.
  */
 export const searchActorsArgsSchema = z.object({
-    limit: z.number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(5)
-        .describe('The maximum number of Actors to return (default = 5)'),
-    offset: z.number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe('The number of elements to skip from the start (default = 0)'),
     keywords: z.string()
         .default('')
         .describe(`Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
@@ -39,9 +28,17 @@ Examples:
 ❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
 ❌ Bad: "data extraction scraping tools" (too generic)
 `),
-    category: z.string()
-        .default('')
-        .describe('Filter the results by the specified category.'),
+    limit: z.number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(5)
+        .describe('The maximum number of Actors to return (default = 5)'),
+    offset: z.number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe('The number of elements to skip from the start (default = 0)'),
 });
 
 const SEARCH_ACTORS_DESCRIPTION = `
@@ -63,7 +60,7 @@ Do NOT use this tool when user wants immediate data retrieval - use apify/rag-we
 IMPORTANT: There is a high chance that a relevant Actor already exists in the Apify Store so find it first before considering alternative solutions!
 
 Usage:
-- ALWAYS prefer broad, generic keywords - use just the platform name (e.g., "TikTok" instead of "TikTok posts", "Instagram" instead of "Instagram scraper").
+- Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.

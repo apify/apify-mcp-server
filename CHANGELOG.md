@@ -3,7 +3,34 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.9.13 - **not yet released**
+## 0.9.16 - **not yet released**
+
+### 🚀 Features
+
+- Adopt dedent for multiline tool descriptions ([#609](https://github.com/apify/apify-mcp-server/pull/609)) ([f1f6a90](https://github.com/apify/apify-mcp-server/commit/f1f6a90ec7ccae3d7ec617a9a7c23a4956907359)) by [@jirispilka](https://github.com/jirispilka), closes [#197](https://github.com/apify/apify-mcp-server/issues/197), [#574](https://github.com/apify/apify-mcp-server/issues/574)
+
+### 🐛 Bug Fixes
+
+- Read server version from package.json instead of hardcoded constant ([#600](https://github.com/apify/apify-mcp-server/pull/600)) ([0abad83](https://github.com/apify/apify-mcp-server/commit/0abad8395765328e3d8514482ec1e3de61049aa1)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.9.15](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.15) (2026-03-26)
+
+### 🐛 Bug Fixes
+
+- Reorder search-actors params by importance: keywords first ([#610](https://github.com/apify/apify-mcp-server/pull/610)) ([7b7130c](https://github.com/apify/apify-mcp-server/commit/7b7130cc71d1206dbd51504c17ee6a4104a23f5e)) by [@MQ37](https://github.com/MQ37)
+- Remove console.error ([#611](https://github.com/apify/apify-mcp-server/pull/611)) ([31c5736](https://github.com/apify/apify-mcp-server/commit/31c57367bdab88d10f77994d620109726d4f3a6c)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.9.14](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.14) (2026-03-26)
+
+### 🐛 Bug Fixes
+
+- Update MCPB build process and manifest configuration ([#597](https://github.com/apify/apify-mcp-server/pull/597)) ([25fa8a2](https://github.com/apify/apify-mcp-server/commit/25fa8a2a9499a5a7a6a627f2f29a44cd4d6565b0)) by [@jirispilka](https://github.com/jirispilka)
+
+
+## [0.9.13](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.13) (2026-03-23)
 
 ### 🚀 Features
 
@@ -14,7 +41,6 @@ All notable changes to this project will be documented in this file.
 - Strip Zod-defaulted fields from required in tools&#x2F;list response ([#576](https://github.com/apify/apify-mcp-server/pull/576)) ([7a75815](https://github.com/apify/apify-mcp-server/commit/7a758156aecf9b9420a6d4e09cb54863c9de9513)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.12) (2026-03-20)
 
 ### 🚀 Features

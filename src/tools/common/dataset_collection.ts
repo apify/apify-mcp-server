@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
@@ -27,18 +28,19 @@ const getUserDatasetsListArgs = z.object({
 export const getUserDatasetsList: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.DATASET_LIST_GET,
-    description: `List datasets (collections of Actor run data) for the authenticated user.
-Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
+    description: dedent`
+        List datasets (collections of Actor run data) for the authenticated user.
+        Actor runs automatically produce unnamed datasets (set unnamed=true to include them). Users can also create named datasets.
 
-The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
-Use limit (max 20), offset, and desc to paginate and sort.
+        The results will include datasets with itemCount, access settings, and usage stats, sorted by createdAt (ascending by default).
+        Use limit (max 20), offset, and desc to paginate and sort.
 
-USAGE:
-- Use when you need to browse available datasets (named or unnamed) to locate data.
+        USAGE:
+        - Use when you need to browse available datasets (named or unnamed) to locate data.
 
-USAGE EXAMPLES:
-- user_input: List my last 10 datasets (newest first)
-- user_input: List unnamed datasets`,
+        USAGE EXAMPLES:
+        - user_input: List my last 10 datasets (newest first)
+        - user_input: List unnamed datasets`,
     inputSchema: z.toJSONSchema(getUserDatasetsListArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserDatasetsListArgs)),
     annotations: {

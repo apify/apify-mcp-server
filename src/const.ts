@@ -19,8 +19,6 @@ export const TOOL_MAX_OUTPUT_CHARS = 50000;
 // MCP Server
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
-export const SERVER_VERSION = '1.0.0';
-
 // User agent headers
 export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 

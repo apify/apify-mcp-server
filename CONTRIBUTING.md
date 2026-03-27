@@ -78,6 +78,40 @@ Use comments to guide reviewers:
     * **Zod Validators:** Suffix with `Validator`.
     * **Text/Copy:** Use the branded term `Actor` (capitalized) instead of `actor` in user-facing texts, labels, notifications, error messages, etc.
 
+*   **String formatting:**
+    * Use plain single-quoted strings for short one-liners.
+    * Use `dedent` (tagged template literal) for any string that would otherwise exceed `max-len` or span multiple lines — including tool `description` fields, LLM instructions, and single-sentence strings that are simply long.
+        * Inline `dedent` directly as a property or variable value — do not extract it to a named constant.
+        * `dedent` introduces `\n` at each source line break. This is fine for LLM-facing strings (tool descriptions, instructions, notes), but avoid it for strings where whitespace is significant or where `\n` would break rendering (e.g. UI labels, log messages, URLs).
+        * For strings where `\n` is not acceptable, use string concatenation (`+`) to split across lines for `max-len` compliance.
+        ```typescript
+        import dedent from 'dedent';
+
+        // Multi-line prose — always use dedent
+        export const toolEntry = {
+            name: 'example-tool',
+            description: dedent`
+                Line 1.
+                Line 2.
+
+                USAGE:
+                - Example
+            `,
+        };
+
+        // Long single sentence going to LLM — dedent is fine, \n is ok
+        const note = isLimited ? dedent`
+            You only have a preview (${count} of ${total} items).
+            Do not present this as the full output.
+        ` : '';
+
+        // Long string where \n is NOT ok (e.g. log message) — use + instead
+        const msg = `Something failed for actor "${actorName}"`
+            + ` with status ${status}.`;
+        ```
+    * Avoid `[].join('\n')` for multiline strings — it is noisy and harder to edit.
+    * When migrating existing strings, keep the wording **semantically unchanged**.
+
 *   **Comments:**
     * Use proper English (spelling, grammar, punctuation, capitalization).
     * Use JSDoc `/**` for documentation, `//` for generic comments, and avoid `/*` (single asterix multiline comments).
@@ -191,6 +225,11 @@ Use comments to guide reviewers:
         * `warn` - suspicious but non-critical behavior
         * `info` - progress or important state changes
         * `debug` - local development
+    * **Mezmo (logDNA) promotion rule:** Mezmo automatically promotes log entries to error level when the log message or data keys contain the word `"error"`. To avoid false error alerts in `softFail` calls:
+        * Use `errMessage` as the data key (not `error`) when logging an error message string.
+        * Sanitize the error message string: `.replace(/ error:/gi, ' failure:')`.
+        * Avoid the word `"error"` in the `softFail` message string itself.
+        * Example: `log.softFail('Client disconnected', { errMessage: err.message.replace(/ error:/gi, ' failure:') })`
 
 *   **Sensitive Data:**
     * Never send sensitive information without proper permission checks.
