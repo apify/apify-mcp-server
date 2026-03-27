@@ -53,10 +53,10 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequirements | undefined> {
     const now = Date.now();
     // If we have a cached promise, and the TTL hasn't expired since it successfully resolved, return it.
-    // Note: During the very first fetch, lastFetchTime is 0, so this will be false and we will 
-    // fall through to create the promise, which is expected. However, if multiple requests hit this 
-    // block *while the first fetch is still in-flight*, they will also see lastFetchTime = 0 and 
-    // create duplicate promises. This is a known minor flaw in this specific caching pattern, but 
+    // Note: During the very first fetch, lastFetchTime is 0, so this will be false and we will
+    // fall through to create the promise, which is expected. However, if multiple requests hit this
+    // block *while the first fetch is still in-flight*, they will also see lastFetchTime = 0 and
+    // create duplicate promises. This is a known minor flaw in this specific caching pattern, but
     // acceptable since the overhead of a few duplicate calls during cold-start is negligible.
     if (cachedRequirementsPromise && (now - lastFetchTime < CACHE_TTL_MS)) {
         return cachedRequirementsPromise;
