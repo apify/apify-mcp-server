@@ -147,8 +147,14 @@ mcpc @stdio tools-call search-actors keywords:="web scraper" limit:=5
 mcpc @stdio tools-call fetch-actor-details actorId:="apify/rag-web-browser"
 mcpc @stdio tools-call call-actor actorId:="apify/rag-web-browser" input:='{"query":"hello"}'
 
-# Parse output with jq
+# Parse output with jq (always prefer jq over inline scripts)
 mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
+
+# Inspect tool annotations
+mcpc --json @stdio tools-list --full | jq '[.[] | {name, readOnly: .annotations.readOnlyHint, destructive: .annotations.destructiveHint}]'
+
+# Filter to read-only tools only
+mcpc --json @stdio tools-list --full | jq '[.[] | select(.annotations.readOnlyHint == true) | .name]'
 ```
 
 **Key behaviors to verify:**

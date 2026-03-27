@@ -40,3 +40,24 @@ mcpc @stdio tools-call search-apify-docs query:="pagination"
 
 mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
 ```
+
+## Parsing output with jq
+
+Always use `mcpc --json ... | jq` to inspect structured output — never inline Python.
+
+```bash
+# Extract text content from a tool call
+mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
+
+# Check tool annotations (readOnlyHint, destructiveHint, etc.)
+mcpc --json @stdio tools-list --full | jq '[.[] | {name, readOnly: .annotations.readOnlyHint, destructive: .annotations.destructiveHint}]'
+
+# Check a single tool's annotations
+mcpc --json @stdio tools-list --full | jq '.[] | select(.name == "call-actor") | .annotations'
+
+# Count tools / filter by annotation
+mcpc --json @stdio tools-list --full | jq '[.[] | select(.annotations.readOnlyHint == true)] | length'
+
+# Extract server version from initialization
+mcpc --json @stdio tools-list | jq '.meta.serverInfo.version // "n/a"'
+```
