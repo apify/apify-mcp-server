@@ -249,11 +249,11 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
 
-    // Standby Actors (MCPs) are not supported when using a payment provider
+    // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
     if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {
         return {
             earlyResponse: buildMCPResponse({
-                texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed when using a payment provider. To use this Actor, please provide a valid Apify token directly instead.`],
+                texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider. To use this Actor, please provide a valid Apify token instead.`],
                 isError: true,
                 // Internal status used by server telemetry; not part of the MCP client contract.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,

@@ -243,9 +243,9 @@ export async function getMcpToolsMessage(
         return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
     }
 
-    // Early return: payment provider restriction — MCP server Actors are not supported
+    // Early return: Payment provider restriction
     if (paymentProvider) {
-        return `This Actor is an MCP server and cannot be accessed when using a payment provider.`;
+        return `This Actor is an MCP server and cannot be accessed using a third-party payment provider.`;
     }
 
     // Connect and list tools

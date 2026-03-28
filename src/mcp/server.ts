@@ -41,6 +41,7 @@ import {
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     HelperTools,
+    HTTP_PAYMENT_REQUIRED,
     SERVER_NAME,
     SERVER_VERSION,
     TOOL_STATUS,
@@ -69,8 +70,9 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { logHttpError } from '../utils/logging.js';
+import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse } from '../utils/mcp.js';
+import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { getToolStatusFromError } from '../utils/tool_status.js';
@@ -691,6 +693,8 @@ Please provide the required arguments for this tool. Check the tool's input sche
                 tool,
                 args: args as Record<string, unknown>,
                 apifyToken,
+                meta,
+                requestHeaders: extra.requestInfo?.headers,
             });
 
             log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: payment.logArgs });
@@ -740,7 +744,7 @@ Please remove the "task" parameter from the tool call request or use a different
                         tool,
                         cleanArgs: payment.cleanArgs,
                         logArgs: payment.logArgs,
-                        paymentError: payment.error,
+                        paymentErrorResult: payment.errorResult,
                         apifyClient: payment.client,
                         apifyToken,
                         progressToken,
@@ -761,9 +765,9 @@ Please remove the "task" parameter from the tool call request or use a different
 
             try {
                 // Check payment validation (already computed by preparePayment)
-                if (payment.error) {
+                if (payment.errorResult) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    return buildMCPResponse({ texts: [payment.error] });
+                    return payment.errorResult;
                 }
 
                 // Handle internal tool
@@ -901,6 +905,15 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 // If we reached here without returning, it means the tool type was not recognized (user error)
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
+                // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
+                // content[0].text (JSON) + isError: true
+                const httpStatus = getHttpStatusCode(error);
+                if (httpStatus === HTTP_PAYMENT_REQUIRED) {
+                    logHttpError(error, 'Payment required while calling tool', { toolName: name });
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    return buildPaymentRequiredResponse(error);
+                }
+
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
@@ -976,7 +989,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
         tool: ToolEntry;
         cleanArgs: Record<string, unknown>;
         logArgs: unknown;
-        paymentError: string | null;
+        paymentErrorResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
         progressToken: string | number | undefined;
@@ -984,7 +997,10 @@ Please verify the tool name and ensure the tool is properly registered.`;
         mcpSessionId: string | undefined;
         userRentedActorIds?: string[];
     }): Promise<void> {
-        const { taskId, tool, cleanArgs, logArgs, paymentError, apifyClient, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds } = params;
+        const {
+            taskId, tool, cleanArgs, logArgs, paymentErrorResult,
+            apifyClient, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds,
+        } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         const startTime = Date.now();
 
@@ -1022,9 +1038,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
             let result: Record<string, unknown> = {};
 
             // Check payment validation (already computed by preparePayment in the caller)
-            if (paymentError) {
-                result = buildMCPResponse({ texts: [paymentError] });
+            if (paymentErrorResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
+                result = paymentErrorResult;
             }
 
             // Callback to propagate Actor run statusMessage into the task store.
@@ -1123,6 +1139,16 @@ Please verify the tool name and ensure the tool is properly registered.`;
             this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
         } catch (error) {
             log.error('Error executing tool for task', { taskId, mcpSessionId, error });
+
+            // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
+            const httpStatus = getHttpStatusCode(error);
+            if (httpStatus === HTTP_PAYMENT_REQUIRED) {
+                logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL);
+                return;
+            }
+
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
 

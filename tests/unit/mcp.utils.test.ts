@@ -71,7 +71,7 @@ describe('MCP resources', () => {
     it('lists the Skyfire readme only when enabled', async () => {
         const skyfireService = createResourceService({
             mode: 'default',
-            paymentProvider: resolvePaymentProvider('skyfire'),
+            paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
         const defaultService = createResourceService({
@@ -117,7 +117,7 @@ describe('MCP resources', () => {
     it('returns the Skyfire readme content when requested', async () => {
         const service = createResourceService({
             mode: 'default',
-            paymentProvider: resolvePaymentProvider('skyfire'),
+            paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
 

@@ -91,6 +91,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "type-check": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run type-check",
     "check": "npm run type-check && npm run lint",
     "check:widgets": "tsx scripts/check_widgets.ts",
     "test": "npm run test:unit",

@@ -4,12 +4,12 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
 import type { ToolEntry } from '../types.js';
+import { redactSkyfirePayId } from '../utils/logging.js';
 import { cloneToolEntry } from '../utils/tools.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
 
 const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';
 const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
-const REDACTED_VALUE = '[REDACTED]';
 
 /**
  * Skyfire payment provider.
@@ -20,6 +20,10 @@ const REDACTED_VALUE = '[REDACTED]';
 export class SkyfirePaymentProvider implements PaymentProvider {
     readonly id = 'skyfire' as const;
     readonly allowsUnauthenticated = true;
+
+    static async create(): Promise<SkyfirePaymentProvider> {
+        return new SkyfirePaymentProvider();
+    }
 
     decorateToolSchema(tool: ToolEntry): ToolEntry {
         if (!tool.paymentRequired) return tool;
@@ -73,16 +77,10 @@ export class SkyfirePaymentProvider implements PaymentProvider {
     }
 
     redactForLogging(args: unknown): unknown {
-        if (!isPlainRecord(args) || !(SKYFIRE_PAY_ID_KEY in args)) {
-            return args;
-        }
-        if (args[SKYFIRE_PAY_ID_KEY] === REDACTED_VALUE) {
-            return args;
-        }
-        return { ...args, [SKYFIRE_PAY_ID_KEY]: REDACTED_VALUE };
+        // TODO: redactSkyfirePayId is still exported and used directly by the internal MCP server repo.
+        // Once the internal repo migrates to using `paymentProvider.redactForLogging()`, we should
+        // remove the standalone function and centralize the redaction logic entirely inside this provider
+        // to make it more maintainable.
+        return redactSkyfirePayId(args);
     }
-}
-
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-    return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
