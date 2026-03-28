@@ -226,7 +226,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
  * Performs the pre-execution checks common to both modes:
  * - Parses args
  * - Resolves actor/MCP context
- * - Handles Skyfire restrictions
+ * - Handles payment provider restrictions
  * - Handles MCP tool calls
  *
  * Returns either an early response (error or MCP tool result) or the parsed context for mode-specific execution.
@@ -244,7 +244,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
-    // For definition resolution we always use token-based client; Skyfire is only for actual Actor runs
+    // For definition resolution we always use token-based client; payment provider is only for actual Actor runs
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
