@@ -1,5 +1,6 @@
 import { ApifyClient } from '../apify_client.js';
 import type { ApifyToken, ToolEntry } from '../types.js';
+import { buildPaymentRequiredResponse, registerPaymentRequiredInterceptor } from '../utils/payment_errors.js';
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 
 /**
@@ -7,8 +8,8 @@ import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
  * Centralizes all payment-related processing into a single step.
  */
 export type PreparePaymentResult = {
-    /** Validation error message if payment is required but credentials are missing; null otherwise. */
-    error: string | null;
+    /** Structured error result for a 402 PaymentRequired response. Undefined if no error. */
+    errorResult?: ReturnType<typeof buildPaymentRequiredResponse>;
     /** Args with payment-specific fields removed — safe for ajv validation and Actor input. */
     cleanArgs: Record<string, unknown>;
     /** Args with sensitive payment fields redacted — safe for logging. */
@@ -40,15 +41,17 @@ export function preparePayment(input: {
     const { provider, tool, args, apifyToken, meta, requestHeaders } = input;
 
     if (!provider) {
+        const client = new ApifyClient({ token: apifyToken });
+        registerPaymentRequiredInterceptor(client);
         return {
-            error: null,
             cleanArgs: args,
             logArgs: args,
-            client: new ApifyClient({ token: apifyToken }),
+            client,
         };
     }
 
     const error = tool.paymentRequired ? provider.validatePayment(args, meta, requestHeaders) : null;
+    const errorData = error && provider.getPaymentRequiredData ? provider.getPaymentRequiredData() : undefined;
     const cleanArgs = provider.removePaymentFields(args);
     const logArgs = provider.redactForLogging(args);
 
@@ -56,6 +59,12 @@ export function preparePayment(input: {
     const client = Object.keys(paymentHeaders).length > 0
         ? new ApifyClient({ paymentHeaders })
         : new ApifyClient({ token: apifyToken });
+    registerPaymentRequiredInterceptor(client);
 
-    return { error, cleanArgs, logArgs, client };
+    return {
+        errorResult: error ? buildPaymentRequiredResponse(error, errorData) : undefined,
+        cleanArgs,
+        logArgs,
+        client,
+    };
 }

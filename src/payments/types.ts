@@ -88,6 +88,15 @@ export type PaymentProvider = {
     readonly allowsUnauthenticated: boolean;
 
     /**
+     * Optional: Return structured x402 PaymentRequired data for 402 tool results.
+     * Used by x402 to return PaymentRequired (x402Version + accepts) so that
+     * x402-compatible MCP clients can automatically handle the payment flow.
+     *
+     * @returns PaymentRequired object for structuredContent/content, or undefined if not supported.
+     */
+    getPaymentRequiredData?(): unknown;
+
+    /**
      * Optional: Get a readme/usage guide resource for this payment mode.
      * @returns Resource content string, or null if no guide is available.
      */

@@ -69,7 +69,7 @@ export function createExpressApp(
             const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
             // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
-            const paymentProvider = resolvePaymentProvider(urlParams.get('payment'));
+            const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
             const mcpServer = new ActorsMcpServer({
                 taskStore,
@@ -200,7 +200,7 @@ export function createExpressApp(
                 const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
-                const paymentProvider = resolvePaymentProvider(urlParams.get('payment'));
+                const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
