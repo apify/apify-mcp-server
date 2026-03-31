@@ -71,7 +71,9 @@ The agent parses JSON stdout and decides next steps.
 
 ## Test scenarios
 
-### Category 1: Discovery (single-step)
+Eight scenarios covering discovery, execution, investigation, and real-world workflows from [apify/awesome-skills](https://github.com/apify/awesome-skills).
+
+### Discovery (single-step)
 
 #### `search_actor_by_keyword`
 - **Goal**: Find a web scraping Actor for Instagram.
@@ -85,13 +87,7 @@ The agent parses JSON stdout and decides next steps.
 - **Ground truth**: The answer must list actual required fields from the Actor's input schema.
 - **Success rubric**: Agent returns at least the `startUrls` required field.
 
-### Category 2: Execution (multi-step)
-
-#### `run_actor_minimal_input`
-- **Goal**: Run an Actor with minimal valid input and confirm it started.
-- **Prompt**: "Run the Actor `apify/web-scraper` with startUrls set to `https://example.com` and tell me the run ID and status."
-- **Ground truth**: A valid run ID is returned and status is one of READY/RUNNING/SUCCEEDED.
-- **Success rubric**: Agent returns a real Apify run ID (alphanumeric string).
+### Execution (multi-step)
 
 #### `run_actor_and_get_output`
 - **Goal**: Run an Actor, wait for it, and retrieve output.
@@ -99,19 +95,43 @@ The agent parses JSON stdout and decides next steps.
 - **Ground truth**: Agent returns at least one dataset item with a `url` field.
 - **Success rubric**: Output contains structured data from the run's default dataset.
 
-### Category 3: Investigation (multi-step)
-
 #### `compare_two_actors`
 - **Goal**: Compare two Actors and recommend one.
 - **Prompt**: "Compare `apify/web-scraper` and `apify/cheerio-scraper`. Tell me which one has more users and what the key differences are based on their descriptions."
 - **Ground truth**: Agent fetches details for both and makes a comparison.
 - **Success rubric**: Answer mentions both Actors by name and includes at least one factual difference.
 
-#### `explore_actor_output_schema`
-- **Goal**: Understand what data an Actor produces.
-- **Prompt**: "What fields does the output dataset of `apify/instagram-scraper` contain? Get the dataset schema or run it with a minimal example to find out."
-- **Ground truth**: Agent returns actual field names from the dataset schema or a sample run.
-- **Success rubric**: Answer lists at least 3 real output field names.
+### Real-world workflows
+
+_Derived from [apify/awesome-skills](https://github.com/apify/awesome-skills) community workflows._
+
+#### `local_business_lead_gen`
+- **Goal**: Find businesses on Google Maps and extract contact info.
+- **Prompt**: "Find 5 Italian restaurants in San Francisco using Apify. For each, give me the name, address, phone number, and website URL."
+- **Ground truth**: Agent discovers a Google Maps scraper (e.g. `compass/crawler-google-places`), runs it, and returns structured business data.
+- **Success rubric**: Answer contains at least 3 businesses with name, address, and at least one contact detail (phone or website) each.
+- **Covers**: lead-generation, Google Maps
+
+#### `ecommerce_price_comparison`
+- **Goal**: Extract product pricing data from an e-commerce platform.
+- **Prompt**: "Search Apify for an Amazon product scraper. Then use it to get the price, title, and rating for this product URL: `https://www.amazon.com/dp/B0CHX3QBCH`. Show me the results."
+- **Ground truth**: Agent finds an Amazon scraper Actor, runs it with the product URL, and returns product data.
+- **Success rubric**: Answer includes the product title, a numeric price, and a rating value.
+- **Covers**: e-commerce, price intelligence
+
+#### `instagram_profile_analysis`
+- **Goal**: Retrieve and analyze an Instagram profile's public metrics.
+- **Prompt**: "Use Apify to get the public profile data for the Instagram account `natgeo`. Tell me their follower count, post count, and bio."
+- **Ground truth**: Agent finds an Instagram profile scraper (e.g. `apify/instagram-profile-scraper`), runs it, and returns profile metrics.
+- **Success rubric**: Answer includes a numeric follower count, post count, and the account's bio text.
+- **Covers**: content-analytics, audience-analysis, influencer-discovery
+
+#### `google_maps_review_analysis`
+- **Goal**: Scrape and summarize reviews for a business from Google Maps.
+- **Prompt**: "Find an Apify Actor for scraping Google Maps reviews. Get the 10 most recent reviews for 'Chez Panisse Berkeley'. Summarize the overall sentiment and mention the average star rating."
+- **Ground truth**: Agent finds a Google Maps reviews scraper (e.g. `compass/Google-Maps-Reviews-Scraper`), runs it, and analyzes the output.
+- **Success rubric**: Answer includes a sentiment summary, an average rating, and references at least 2 specific review themes.
+- **Covers**: brand-reputation-monitoring, market-research, competitor-intelligence
 
 ## Run logging
 
