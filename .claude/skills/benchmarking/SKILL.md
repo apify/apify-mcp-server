@@ -34,11 +34,34 @@ Eight scenarios. Each has a prompt to send verbatim and a success rubric.
 
 ## How to run
 
+### Session isolation — MANDATORY
+
+**Each condition requires its own dedicated, fresh Claude Code session. Never mix conditions in the same session.**
+
+The entire point of this benchmark is to compare the baseline context cost of the two approaches:
+- `mcp-native` loads ~7700 tokens of MCP tool definitions into context at startup
+- `mcp-cli` starts with near-zero tool-definition overhead
+
+If you run `mcp-cli` scenarios in a session that already has `mcp-native` context (or vice versa), the `ctx_start` values are garbage and the comparison is invalid.
+
+**Before running any scenarios, verify your session is correct:**
+
+```bash
+# Check whether MCP tools are loaded — for mcp-cli this MUST return 0
+mcpc @apify-prod tools-list 2>/dev/null | wc -l   # irrelevant — check Claude's context instead
+```
+
+The correct way to check: if you can call MCP tools directly (e.g. `search-actors` appears as a tool in Claude's tool list), you are in an `mcp-native` session. If the only way to call them is via `mcpc ... | jq`, you are in an `mcp-cli` session.
+
+**STOP and tell the user to restart in the correct session type if there is a mismatch.**
+
+Do NOT read or reference `runs.jsonl` entries from a previous session's condition when running a new condition. Each set of runs for a condition is self-contained.
+
 ### 1. Run scenarios
 
 For **mcp-native**: start Claude Code normally (MCP servers loaded). **Before the first scenario**, run `/context` and record the baseline token count — this captures the cost of MCP tool definitions in context. Then run each scenario prompt. The agent calls MCP tools directly.
 
-For **mcp-cli**: start Claude Code with `--no-mcp`. Run `/context` to capture the baseline (should be near zero — no tool defs). Then run each scenario prompt. The agent must use `mcpc @apify-prod tools-call ... --json | jq .` via Bash. Requires `mcpc login https://mcp.apify.com` beforehand.
+For **mcp-cli**: start Claude Code with `--no-mcp` (no MCP servers). Run `/context` to capture the baseline (should be near zero — no tool defs in context). Then run each scenario prompt. The agent must use `mcpc @apify-prod tools-call ... --json | jq .` via Bash. Requires `mcpc login https://mcp.apify.com` beforehand.
 
 **Always resolve the session ID from the filesystem — never guess it:**
 ```bash
