@@ -74,7 +74,7 @@ but the user did NOT explicitly ask for Actor details presentation.`,
             apifyClient,
             apifyToken,
             actorOutputSchema,
-            skyfireMode: apifyMcpServer?.options.skyfireMode,
+            paymentProvider: apifyMcpServer?.options.paymentProvider,
             mcpSessionId,
         });
 

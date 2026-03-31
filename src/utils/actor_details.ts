@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ApifyClient } from '../apify_client.js';
 import { HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
+import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
@@ -232,7 +233,7 @@ export async function getMcpToolsMessage(
     actorName: string,
     apifyClient: ApifyClient,
     apifyToken: string,
-    skyfireMode?: boolean,
+    paymentProvider?: PaymentProvider,
     mcpSessionId?: string,
 ): Promise<string> {
     const mcpServerUrl = await getActorMcpUrlCached(actorName, apifyClient);
@@ -242,9 +243,9 @@ export async function getMcpToolsMessage(
         return `Note: This Actor is not an MCP server and does not expose MCP tools.`;
     }
 
-    // Early return: Skyfire mode restriction
-    if (skyfireMode) {
-        return `This Actor is an MCP server and cannot be accessed in Skyfire mode.`;
+    // Early return: Payment provider restriction
+    if (paymentProvider) {
+        return `This Actor is an MCP server and cannot be accessed using a third-party payment provider.`;
     }
 
     // Connect and list tools
@@ -324,13 +325,13 @@ export async function buildActorDetailsTextResponse(options: {
     apifyClient: ApifyClient;
     apifyToken: string;
     actorOutputSchema?: Record<string, unknown> | null;
-    skyfireMode?: boolean;
+    paymentProvider?: PaymentProvider;
     mcpSessionId?: string;
 }): Promise<{
     texts: string[];
     structuredContent: Record<string, unknown>;
 }> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, skyfireMode, mcpSessionId } = options;
+    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, paymentProvider, mcpSessionId } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
 
@@ -370,7 +371,7 @@ export async function buildActorDetailsTextResponse(options: {
 
     // Handle MCP tools
     if (output.mcpTools) {
-        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, skyfireMode, mcpSessionId);
+        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId);
         texts.push(message);
     }
 

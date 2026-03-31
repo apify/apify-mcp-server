@@ -6,6 +6,7 @@
 
 import { ApifyClient } from '../apify_client.js';
 import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import type { ActorPricingModel, ActorStoreList } from '../types.js';
 
 export type SearchAndFilterActorsOptions = {
@@ -13,7 +14,7 @@ export type SearchAndFilterActorsOptions = {
     apifyToken: string;
     limit: number;
     offset: number;
-    skyfireMode?: boolean;
+    paymentProvider?: PaymentProvider;
     userRentedActorIds?: string[];
 };
 
@@ -42,14 +43,14 @@ export async function searchActorsByKeywords(
 export async function searchAndFilterActors(
     options: SearchAndFilterActorsOptions,
 ): Promise<ActorStoreList[]> {
-    const { keywords, apifyToken, limit, offset, skyfireMode, userRentedActorIds } = options;
+    const { keywords, apifyToken, limit, offset, paymentProvider, userRentedActorIds } = options;
 
     const actors = await searchActorsByKeywords(
         keywords,
         apifyToken,
         limit + ACTOR_SEARCH_ABOVE_LIMIT,
         offset,
-        skyfireMode ? true : undefined,
+        paymentProvider ? true : undefined,
     );
 
     return filterRentalActors(actors || [], userRentedActorIds || []).slice(0, limit) as ActorStoreList[];

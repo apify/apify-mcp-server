@@ -1,6 +1,5 @@
 /*
- * Express HTTP server for local development and testing.
- * This file is the entry point for `npm start`.
+ * Express server implementation used for standby Actor mode.
  */
 
 import { randomUUID } from 'node:crypto';
@@ -18,6 +17,7 @@ import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
+import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
 import { parseUiMode } from './types.js';
 
@@ -77,9 +77,8 @@ export function createExpressApp(): express.Express {
 
             const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
-            // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
-            const paymentParam = urlParams.get('payment');
-            const skyfireMode = paymentParam === 'skyfire';
+            // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
+            const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
             const mcpServer = new ActorsMcpServer({
                 taskStore,
@@ -89,7 +88,7 @@ export function createExpressApp(): express.Express {
                     enabled: telemetryEnabled,
                 },
                 uiMode,
-                skyfireMode,
+                paymentProvider,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
@@ -209,9 +208,8 @@ export function createExpressApp(): express.Express {
 
                 const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
 
-                // Extract payment mode parameter - if payment=skyfire, enable skyfire mode
-                const paymentParam = urlParams.get('payment');
-                const skyfireMode = paymentParam === 'skyfire';
+                // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
+                const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
@@ -222,7 +220,7 @@ export function createExpressApp(): express.Express {
                         enabled: telemetryEnabled,
                     },
                     uiMode,
-                    skyfireMode,
+                    paymentProvider,
                 });
 
                 // Load MCP server tools

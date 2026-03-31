@@ -1,6 +1,5 @@
 import log from '@apify/log';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
@@ -52,7 +51,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
     inputSchema: callActorInputSchema,
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
-    requiresSkyfirePayId: true,
+    paymentRequired: true,
     // openai-only tool; openai/* and ui keys also stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
@@ -83,7 +82,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
                 return resolution.error;
             }
 
-            const apifyClient = createApifyClientWithSkyfireSupport(toolArgs.apifyMcpServer, toolArgs.args, toolArgs.apifyToken);
+            const { apifyClient } = toolArgs;
 
             // OpenAI mode always runs asynchronously
             const actorClient = apifyClient.actor(baseActorName);

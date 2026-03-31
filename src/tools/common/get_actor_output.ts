@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -88,11 +87,8 @@ export const getActorOutput: ToolEntry = Object.freeze({
         Note: This tool is automatically included if the Apify MCP Server is configured with any Actor tools (e.g., "apify--rag-web-browser") or tools that can interact with Actors (e.g., "call-actor", "add-actor").`,
     inputSchema: z.toJSONSchema(getActorOutputArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getActorOutputArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(getActorOutputArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get Actor output',
         readOnlyHint: true,
@@ -101,9 +97,7 @@ export const getActorOutput: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
-
-        const apifyClient = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
+        const { args, apifyClient } = toolArgs;
         const parsed = getActorOutputArgs.parse(args);
 
         // Parse fields into array

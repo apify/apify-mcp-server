@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -54,11 +53,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetItemsArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get dataset items',
         readOnlyHint: true,
@@ -67,10 +63,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
         // Convert comma-separated strings to arrays
         const fields = parseCommaSeparatedList(parsed.fields);

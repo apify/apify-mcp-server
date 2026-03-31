@@ -5,6 +5,8 @@
 import { ApifyClient } from './apify_client.js';
 import { APIFY_FAVICON_URL, defaults, HelperTools, SERVER_NAME, SERVER_TITLE } from './const.js';
 import { processParamsGetTools } from './mcp/utils.js';
+import { resolvePaymentProvider } from './payments/index.js';
+import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
 import { addTool } from './tools/common/add_actor.js';
 import { getActorsAsTools, getCategoryTools, getDefaultTools, getUnauthEnabledToolCategories,
@@ -48,5 +50,10 @@ export {
     readJsonFile,
     parseCommaSeparatedList,
     parseQueryParamList,
+    resolvePaymentProvider,
+    type PaymentProvider,
+    /**
+     * @deprecated Use the server's paymentProvider.redactForLogging instead. This will be removed in a future release.
+     */
     redactSkyfirePayId,
 };

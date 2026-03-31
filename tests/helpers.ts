@@ -18,7 +18,7 @@ export type McpClientOptions = {
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
     uiMode?: string; // Raw UI mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'openai', 'true')
-    skyfireMode?: boolean; // Enable Skyfire mode (default: false)
+    payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
 }
 
 function checkApifyToken(): void {
@@ -28,7 +28,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry, uiMode, skyfireMode } = options || {};
+    const { actors, enableAddingActors, tools, telemetry, uiMode, payment } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -44,8 +44,8 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     if (uiMode !== undefined) {
         url.searchParams.append('ui', uiMode);
     }
-    if (skyfireMode) {
-        url.searchParams.append('payment', 'skyfire');
+    if (payment) {
+        url.searchParams.append('payment', payment);
     }
 }
 
@@ -109,7 +109,7 @@ export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
     checkApifyToken();
-    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode, skyfireMode } = options || {};
+    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode, payment } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -136,8 +136,8 @@ export async function createMcpStdioClient(
         if (uiMode !== undefined) {
             env.UI_MODE = uiMode;
         }
-        if (skyfireMode !== undefined) {
-            env.SKYFIRE_MODE = skyfireMode.toString();
+        if (payment !== undefined) {
+            env.PAYMENT = payment;
         }
     } else {
         // Use command line arguments as before
@@ -157,8 +157,8 @@ export async function createMcpStdioClient(
         if (uiMode !== undefined) {
             args.push('--ui', uiMode);
         }
-        if (skyfireMode !== undefined) {
-            args.push('--skyfire', skyfireMode.toString());
+        if (payment !== undefined) {
+            args.push('--payment', payment);
         }
     }
 

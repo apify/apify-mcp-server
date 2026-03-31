@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -31,11 +30,8 @@ USAGE EXAMPLES:
 - user_input: Get logs for run y2h7sK3Wc`,
     inputSchema: z.toJSONSchema(GetRunLogArgs) as ToolInputSchema,
     // It does not make sense to add structured output here since the log API just returns plain text
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(GetRunLogArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(GetRunLogArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get Actor run log',
         readOnlyHint: true,
@@ -44,10 +40,8 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.run(parsed.runId).log().get() ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');

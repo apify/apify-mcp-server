@@ -23,7 +23,7 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
             apifyToken,
             limit: parsed.limit,
             offset: parsed.offset,
-            skyfireMode: apifyMcpServer.options.skyfireMode,
+            paymentProvider: apifyMcpServer.options.paymentProvider,
             userRentedActorIds,
         });
 

@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -35,11 +34,8 @@ USAGE EXAMPLES:
 - user_input: List first 100 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreKeysArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get key-value store keys',
         readOnlyHint: true,
@@ -48,10 +44,8 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const keys = await client.keyValueStore(parsed.storeId).listKeys({
             exclusiveStartKey: parsed.exclusiveStartKey,
             limit: parsed.limit,

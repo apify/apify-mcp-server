@@ -17,6 +17,7 @@ import type z from 'zod';
 import type { ApifyClient } from './apify_client.js';
 import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
+import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
 import type { StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
@@ -89,8 +90,8 @@ export type ActorDefinitionWithInfo = {
 export type ToolBase = z.infer<typeof ToolSchema> & {
     /** AJV validation function for the input schema */
     ajvValidate: ValidateFunction;
-    /** Whether this tool requires Skyfire pay ID validation (uses Apify API) */
-    requiresSkyfirePayId?: boolean;
+    /** Whether this tool requires payment validation before execution */
+    paymentRequired?: boolean;
 };
 
 /**
@@ -119,8 +120,10 @@ export type ActorTool = ToolBase & {
  * Contains both the tool arguments and server references.
  */
 export type InternalToolArgs = {
-    /** Arguments passed to the tool */
+    /** Arguments passed to the tool (payment fields already stripped by the server) */
     args: Record<string, unknown>;
+    /** MCP request `_meta` field — used by payment providers that read from metadata (e.g., x402) */
+    meta?: Record<string, unknown>;
     /** Extra data given to request handlers.
      *
      * Can be used to send notifications from the server to the client.
@@ -134,6 +137,8 @@ export type InternalToolArgs = {
     mcpServer: Server;
     /** Apify API token */
     apifyToken: string;
+    /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
+    apifyClient: ApifyClient;
     /** List of Actor IDs that the user has rented */
     userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
@@ -355,7 +360,7 @@ export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.
  *
- * Can be null or undefined in the case of Skyfire requests.
+ * Can be null or undefined when a payment provider allows unauthenticated access.
  */
 export type ApifyToken = string | null | undefined;
 
@@ -429,9 +434,9 @@ export function parseUiMode(value: string | null | undefined): UiMode | undefine
 export type ActorExecutionParams = {
     /** Full name of the Actor (e.g., "apify/rag-web-browser") */
     actorFullName: string;
-    /** Input to pass to the Actor (skyfire-pay-id already stripped) */
+    /** Input to pass to the Actor (payment fields already stripped) */
     input: Record<string, unknown>;
-    /** Apify client (may be Skyfire-aware) */
+    /** Apify client (may include payment headers) */
     apifyClient: ApifyClient;
     /** Call options (memory, timeout) */
     callOptions: { memory?: number; timeout?: number };
@@ -515,9 +520,10 @@ export type ActorsMcpServerOptions = {
     actorStore?: ActorStore;
     setupSigintHandler?: boolean;
     /**
-     * Switch to enable Skyfire agentic payment mode.
+     * Payment provider for agentic payment modes (e.g., Skyfire, x402).
+     * When set, enables payment-gated tool execution.
      */
-    skyfireMode?: boolean;
+    paymentProvider?: PaymentProvider;
     /**
      * Allow unauthenticated mode - tools can be called without an Apify API token.
      * This is primarily used for making documentation tools available without authentication.

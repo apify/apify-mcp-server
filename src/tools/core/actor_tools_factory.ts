@@ -102,6 +102,7 @@ Actor description: ${definition.description}`;
 
         let ajvValidate;
         try {
+            // Allow additional properties for dynamic Actor input fields
             ajvValidate = fixedAjvCompile(ajv, { ...inputSchema, additionalProperties: true });
         } catch (e) {
             log.error('Failed to compile schema', {
@@ -121,7 +122,7 @@ Actor description: ${definition.description}`;
             // reuse the common output schema
             outputSchema: callActorOutputSchema,
             ajvValidate,
-            requiresSkyfirePayId: true,
+            paymentRequired: true,
             memoryMbytes,
             // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
             _meta: {
@@ -157,7 +158,7 @@ export async function getMCPServersAsTools(
     mcpSessionId?: string,
 ): Promise<ToolEntry[]> {
     /**
-     * This is case for the Skyfire request without any Apify token, we do not support
+     * This is case for the payment provider request without any Apify token, we do not support
      * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
     */
     if (apifyToken === null || apifyToken === undefined) {

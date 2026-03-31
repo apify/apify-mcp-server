@@ -2580,7 +2580,7 @@ export function createIntegrationTestsSuite(
             'should inject skyfire-pay-id parameter into all SKYFIRE_ENABLED_TOOLS when skyfireMode is enabled',
             async () => {
                 client = await createClientFn({
-                    skyfireMode: true,
+                    payment: 'skyfire',
                     tools: Array.from(SKYFIRE_ENABLED_TOOLS),
                 });
 
@@ -2615,6 +2615,28 @@ export function createIntegrationTestsSuite(
                     // Tool description should contain skyfire instructions
                     expect(tool.description?.includes('skyfire-pay-id'), `Tool "${toolName}" description should mention skyfire-pay-id`).toBe(true);
                 }
+
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
+            'should return x402 payment error when calling paymentRequired tool without payment signature',
+            async () => {
+                client = await createClientFn({ tools: ['actors'], payment: 'x402' });
+
+                const result = await client.callTool({
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: ACTOR_PYTHON_EXAMPLE,
+                        input: { first_number: 1, second_number: 2 },
+                    },
+                });
+
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content[0].text).toContain('x402');
 
                 await client.close();
             },

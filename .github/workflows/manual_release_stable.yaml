@@ -145,7 +145,7 @@ jobs:
                     timeout_minutes: 10
                     max_attempts: 3
                     retry_wait_seconds: 30
-                    command: npm install @apify/actors-mcp-server@${{ needs.release_metadata.outputs.version_number }}
+                    command: npm install --save-exact @apify/actors-mcp-server@${{ needs.release_metadata.outputs.version_number }}
             -   name: Create pull request
                 uses: peter-evans/create-pull-request@v8
                 with:

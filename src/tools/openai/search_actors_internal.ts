@@ -55,7 +55,7 @@ Returns only minimal fields (fullName, title, description) needed for subsequent
             apifyToken,
             limit: parsed.limit,
             offset: parsed.offset,
-            skyfireMode: apifyMcpServer.options.skyfireMode,
+            paymentProvider: apifyMcpServer.options.paymentProvider,
             userRentedActorIds,
         });
 

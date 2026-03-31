@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -27,11 +26,8 @@ USAGE EXAMPLES:
 - user_input: Show info for key-value store username~my-store
 - user_input: Get details for store adb123`,
     inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getKeyValueStoreArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get key-value store',
         readOnlyHint: true,
@@ -40,10 +36,8 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const store = await client.keyValueStore(parsed.storeId).get();
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
     },

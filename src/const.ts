@@ -200,5 +200,8 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
+// HTTP status codes
+export const HTTP_PAYMENT_REQUIRED = 402;
+
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;

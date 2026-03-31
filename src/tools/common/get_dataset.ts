@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -30,11 +29,8 @@ USAGE EXAMPLES:
 - user_input: Show info for dataset xyz123
 - user_input: What fields does username~my-dataset have?`,
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
-    /**
-     * Allow additional properties for Skyfire mode to pass `skyfire-pay-id`.
-     */
-    ajvValidate: compileSchema({ ...z.toJSONSchema(getDatasetArgs), additionalProperties: true }),
-    requiresSkyfirePayId: true,
+    ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get dataset',
         readOnlyHint: true,
@@ -43,10 +39,8 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
         const v = await client.dataset(parsed.datasetId).get();
         if (!v) {
             return buildMCPResponse({

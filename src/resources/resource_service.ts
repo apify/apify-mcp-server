@@ -2,7 +2,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, ReadResourceResu
 
 import log from '@apify/log';
 
-import { SKYFIRE_README_CONTENT } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import type { ServerMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
@@ -23,23 +23,23 @@ type ResourceService = {
 };
 
 type ResourceServiceOptions = {
-    skyfireMode?: boolean;
+    paymentProvider?: PaymentProvider;
     mode?: ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { skyfireMode, mode = 'default', getAvailableWidgets } = options;
+    const { paymentProvider, mode = 'default', getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
 
-        if (skyfireMode) {
+        if (paymentProvider?.getUsageGuide?.()) {
             resources.push({
                 uri: 'file://readme.md',
                 name: 'readme',
-                description: 'Apify MCP Server usage guide. Read this to understand how to use the server, '
-                    + 'especially in Skyfire mode before interacting with it.',
+                description: 'Apify MCP Server usage guide. Read this to understand how to use the server '
+                    + 'before interacting with it.',
                 mimeType: 'text/markdown',
             });
         }
@@ -63,12 +63,13 @@ export function createResourceService(options: ResourceServiceOptions): Resource
     };
 
     const readResource = async (uri: string): Promise<ExtendedReadResourceResult> => {
-        if (skyfireMode && uri === 'file://readme.md') {
+        const usageGuide = paymentProvider?.getUsageGuide?.();
+        if (usageGuide && uri === 'file://readme.md') {
             return {
                 contents: [{
                     uri: 'file://readme.md',
                     mimeType: 'text/markdown',
-                    text: SKYFIRE_README_CONTENT,
+                    text: usageGuide,
                 }],
             };
         }

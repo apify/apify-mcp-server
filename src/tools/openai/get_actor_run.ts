@@ -1,4 +1,3 @@
-import { createApifyClientWithSkyfireSupport } from '../../apify_client.js';
 import { TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
@@ -17,10 +16,8 @@ import {
 export const openaiGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, mcpSessionId } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
-
-        const client = createApifyClientWithSkyfireSupport(apifyMcpServer, args, apifyToken);
 
         try {
             const fetchResult = await fetchActorRunData({

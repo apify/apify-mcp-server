@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/const.js';
 import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import { resolvePaymentProvider } from '../../src/payments/index.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
 import { WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
@@ -70,12 +71,12 @@ describe('MCP resources', () => {
     it('lists the Skyfire readme only when enabled', async () => {
         const skyfireService = createResourceService({
             mode: 'default',
-            skyfireMode: true,
+            paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
         const defaultService = createResourceService({
             mode: 'default',
-            skyfireMode: false,
+            paymentProvider: undefined,
             getAvailableWidgets: () => new Map(),
         });
 
@@ -116,7 +117,7 @@ describe('MCP resources', () => {
     it('returns the Skyfire readme content when requested', async () => {
         const service = createResourceService({
             mode: 'default',
-            skyfireMode: true,
+            paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
 

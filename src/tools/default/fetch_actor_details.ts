@@ -47,7 +47,7 @@ export const defaultFetchActorDetails: ToolEntry = Object.freeze({
             apifyClient,
             apifyToken,
             actorOutputSchema,
-            skyfireMode: apifyMcpServer?.options.skyfireMode,
+            paymentProvider: apifyMcpServer?.options.paymentProvider,
             mcpSessionId,
         });
 

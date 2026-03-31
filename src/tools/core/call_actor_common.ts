@@ -1,7 +1,7 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { z } from 'zod';
 
-import { ApifyClient, createApifyClientWithSkyfireSupport } from '../../apify_client.js';
+import { ApifyClient } from '../../apify_client.js';
 import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     HelperTools,
@@ -75,13 +75,8 @@ For MCP server Actors, use format "actorName:toolName" to call a specific tool (
  */
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
 
-/**
- * Compiled AJV validator with additional properties allowed (for Skyfire pay-id).
- */
-export const callActorAjvValidate = compileSchema({
-    ...z.toJSONSchema(callActorArgs),
-    additionalProperties: true,
-});
+// Allow additional properties for dynamic Actor input fields passed via the `input` object
+export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
 /**
  * Parsed call-actor arguments.
@@ -186,7 +181,7 @@ export async function resolveAndValidateActor(params: {
     toolArgs: InternalToolArgs;
 }): Promise<{ error: object } | { actor: Awaited<ReturnType<typeof getActorsAsTools>>[0] }> {
     const { actorName, input, toolArgs } = params;
-    const apifyClient = createApifyClientWithSkyfireSupport(toolArgs.apifyMcpServer, toolArgs.args, toolArgs.apifyToken);
+    const { apifyClient } = toolArgs;
 
     const [actor] = await getActorsAsTools([actorName], apifyClient, { mcpSessionId: toolArgs.mcpSessionId });
 
@@ -231,7 +226,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
  * Performs the pre-execution checks common to both modes:
  * - Parses args
  * - Resolves actor/MCP context
- * - Handles Skyfire restrictions
+ * - Handles payment provider restrictions
  * - Handles MCP tool calls
  *
  * Returns either an early response (error or MCP tool result) or the parsed context for mode-specific execution.
@@ -249,16 +244,16 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
-    // For definition resolution we always use token-based client; Skyfire is only for actual Actor runs
+    // For definition resolution we always use token-based client; payment provider is only for actual Actor runs
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
 
-    // Standby Actors (MCPs) are not supported in Skyfire mode
-    if (isActorMcpServer && apifyMcpServer.options.skyfireMode) {
+    // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
+    if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {
         return {
             earlyResponse: buildMCPResponse({
-                texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a Skyfire token. To use this Actor, please provide a valid Apify token instead of a Skyfire token.`],
+                texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider. To use this Actor, please provide a valid Apify token instead.`],
                 isError: true,
                 // Internal status used by server telemetry; not part of the MCP client contract.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
