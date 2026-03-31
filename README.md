@@ -37,6 +37,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
 - [💰 Agentic payments](#-agentic-payments)
+  - [How agentic payments work](#how-agentic-payments-work)
   - [💸 x402](#-x402)
   - [🔥 Skyfire](#-skyfire)
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
@@ -127,73 +128,73 @@ Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, 
 
 # 💰 Agentic payments
 
-The Apify MCP Server supports agentic payments, allowing AI agents to autonomously pay for Actor runs without requiring an Apify API token. Two payment integrations are available: **x402** (onchain payments) and **Skyfire**.
+You can pay for Actor runs without an Apify API token using either **x402** or **Skyfire**.
+
+- **x402** pays with USDC on [Base](https://base.org) and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
+
+## How agentic payments work
+
+Actor run costs vary, so both payment methods use a prepaid balance model. The payment flow happens in four steps:
+
+1. **Discovery**: The agent discovers Actors with `search-actors` or `fetch-actor-details`. Those calls are free.
+2. **Prepayment**: Before running a paid Actor tool, the agent funds a prepaid balance.
+   - **x402**: `mcpc` automatically signs a $1.00 USDC transaction.
+   - **Skyfire**: The agent creates a PAY token (minimum $5.00) using Skyfire's `create-pay-token` tool.
+3. **Execution**: The agent calls the Actor tool.
+   - **x402**: Handled automatically by `mcpc` using the prepaid balance.
+   - **Skyfire**: The agent explicitly passes the PAY token in the `skyfire-pay-id` input property.
+4. **Resolution**: The tool returns the Actor results. Unused funds stay available for later runs.
+   - **x402**: After 60 minutes of inactivity, the server refunds any unused balance to the wallet on [Base](https://base.org).
+   - **Skyfire**: Skyfire returns unused funds when the token expires.
 
 ## 💸 x402
 
-The Apify MCP Server supports the [x402 payment protocol](https://www.x402.org/) — an open standard for internet-native payments. The Apify MCP server implements an MCP extension of this protocol to support agentic payments. With x402, AI agents can autonomously pay for Actor runs using USDC on the [Base](https://base.org/) blockchain, without requiring an Apify API token.
+The [x402 protocol](https://www.x402.org/) enables direct, machine-to-machine payments. Your MCP client can use it to pay for Actor runs with USDC on the [Base blockchain](https://base.org/), completely bypassing the need for an Apify API token.
 
-**How it works:**
+### Prerequisites
 
-1. The Apify MCP server advertises payment requirements in each paid tool's metadata.
-2. When `mcpc` calls a paid tool, it automatically detects the metadata, signs a USDC payment using your local wallet, and includes it in the request.
-3. The server verifies and settles the payment onchain, executes the Actor, and returns the results.
-4. If a tool is called without a payment, the server responds that payment is required and `mcpc` signs and retries automatically.
+- A wallet with USDC on [Base](https://base.org) mainnet.
 
-The server requires a minimum transaction of $1.00 USD. The payment is tracked as a balance on the server - subsequent tool calls draw from this balance without requiring a new onchain transaction. When the balance runs out, `mcpc` automatically signs a new payment to top it up. After a period of inactivity, any remaining unused balance is refunded to the client's wallet address on the Base blockchain.
+### Setup
 
-**Prerequisites:**
-- A wallet funded with USDC on Base mainnet
-- The [`mcpc` CLI](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`)
-
-**Setup with `mcpc` CLI:**
-
-You can provide this `README.md` file to an AI agent, and once the wallet is funded, the agent will be able to autonomously pay for tools on the Apify MCP server (or any other MCP server supporting x402).
-
-The [`mcpc`](https://github.com/apify/mcp-cli) CLI has built-in x402 support. First, set up a wallet:
+Create or import a wallet:
 
 ```bash
-# Create a new wallet (generates a random private key)
+# Create a new wallet
 mcpc x402 init
 
-# Or import an existing wallet from a private key
+# Import an existing wallet
 mcpc x402 import <private-key>
 
-# Verify your wallet address
+# Show the wallet address so you can fund it with USDC on Base (https://base.org)
 mcpc x402 info
 ```
 
-Then connect to the Apify MCP Server with x402 enabled:
+Connect to the server with x402 enabled:
 
 ```bash
-# Connect with x402 payment support
 mcpc connect "mcp.apify.com?payment=x402" @apify --x402
+```
 
-# Tool calls that require payment are handled automatically
+You can now call a paid tool:
+
+```bash
 mcpc @apify tools-call call-actor actor:="apify/rag-web-browser" input:='{"query": "latest AI news"}'
 ```
 
-**Key differences from Skyfire:**
-- **x402** uses direct onchain payments (USDC) — no intermediary PAY tokens needed.
-- **x402** is an open standard — any network or token can be supported.
-- Payment verification and settlement are handled via metadata detection and inline within the HTTP request/response cycle.
-
-To learn more, see the [x402 specification](https://www.x402.org/).
-
-
-
 ## 🔥 Skyfire
 
+[Skyfire](https://www.skyfire.xyz/) provides managed payment infrastructure for AI agents. Instead of authenticating with an Apify API token, your agent passes a Skyfire payment token to cover the cost of each tool call using PAY tokens.
 
-The Apify MCP Server integrates with [Skyfire](https://www.skyfire.xyz/) to enable agentic payments - AI agents can autonomously pay for Actor runs without requiring an Apify API token. Instead of authenticating with `APIFY_TOKEN`, the agent uses Skyfire PAY tokens to cover billing for each tool call.
+### Prerequisites
 
-**Prerequisites:**
-- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet
-- An MCP client that supports multiple servers (e.g., Claude Desktop, OpenCode, VS Code)
+- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet.
+- An MCP client that supports multiple servers, such as Claude Desktop, OpenCode, or VS Code.
 
-**Setup:**
+### Setup
 
-Configure both the Skyfire MCP server and Apify MCP Server in your MCP client. Enable payment mode by adding the `payment=skyfire` query parameter to the Apify server URL:
+Configure the Skyfire MCP server and the Apify MCP Server in your client. Add `payment=skyfire` to the Apify server URL:
 
 ```json
 {
@@ -211,17 +212,7 @@ Configure both the Skyfire MCP server and Apify MCP Server in your MCP client. E
 }
 ```
 
-**How it works:**
-
-When Skyfire mode is enabled, the agent handles the full payment flow autonomously:
-
-1. The agent discovers relevant Actors via `search-actors` or `fetch-actor-details` (these remain free).
-2. Before executing an Actor, the agent creates a PAY token using the `create-pay-token` tool from the Skyfire MCP server (minimum $5.00 USD).
-3. The agent passes the PAY token in the `skyfire-pay-id` input property when calling the Actor tool.
-4. Results are returned as usual. Unused funds on the token remain available for future runs or are returned upon expiration.
-
-To learn more, see the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) and the [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) blog post.
-
+See the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) for setup details. The [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) post provides additional background.
 
 # 🛠️ Tools, resources, and prompts
 
