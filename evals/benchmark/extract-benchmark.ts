@@ -150,25 +150,95 @@ console.log(`\n${matchedRuns[0].condition} (${matchedRuns[0].model}) — ${updat
 const cols = [
     { key: 'scenario_id',           label: 'scenario',    w: 30, align: 'l' as const },
     { key: 'ctx_start_tokens',      label: 'ctx_start',   w: 10, align: 'r' as const },
-    { key: 'ctx_delta_tokens',      label: 'ctx_Δ',       w: 8,  align: 'r' as const, fmt: (v: unknown) => v != null ? `+${v}` : '-' },
+    { key: 'ctx_delta_tokens',      label: 'ctx_Δ',       w: 8,  align: 'r' as const, fmt: (v: unknown, _r: unknown) => v != null ? `+${v}` : '-' },
     { key: 'input_tokens',          label: 'input',       w: 8,  align: 'r' as const },
     { key: 'output_tokens',         label: 'output',      w: 8,  align: 'r' as const },
     { key: 'cache_creation_tokens', label: 'cache_write', w: 12, align: 'r' as const },
     { key: 'cache_read_tokens',     label: 'cache_read',  w: 12, align: 'r' as const },
     { key: 'total_tokens',          label: 'total',       w: 10, align: 'r' as const },
-    { key: 'cost_usd',              label: 'cost',        w: 9,  align: 'r' as const, fmt: (v: unknown) => v != null ? `$${v}` : '-' },
-    { key: 'duration_s',            label: 'dur',         w: 6,  align: 'r' as const, fmt: (v: unknown) => v != null ? `${v}s` : '-' },
+    { key: '_cache_pct',            label: 'cache%',      w: 7,  align: 'r' as const, fmt: (_v: unknown, run: Record<string, unknown>) => {
+        const total = run.total_tokens as number;
+        const cached = (run.cache_read_tokens as number ?? 0) + (run.cache_creation_tokens as number ?? 0);
+        return total > 0 ? `${Math.round(cached / total * 100)}%` : '-';
+    }},
+    { key: 'cost_usd',              label: 'cost',        w: 9,  align: 'r' as const, fmt: (v: unknown, _r: unknown) => v != null ? `$${v}` : '-' },
+    { key: 'duration_s',            label: 'dur',         w: 6,  align: 'r' as const, fmt: (v: unknown, _r: unknown) => v != null ? `${v}s` : '-' },
 ];
 
 const header = cols.map((c) => c.align === 'l' ? c.label.padEnd(c.w) : c.label.padStart(c.w)).join('  ');
 console.log(header);
 console.log('-'.repeat(header.length));
 
+const scenarioRuns = matchedRuns.filter((r) => r.scenario_id !== '_baseline');
+
 for (const run of matchedRuns) {
     const line = cols.map((c) => {
         const raw = run[c.key];
-        const val = c.fmt ? c.fmt(raw) : String(raw ?? '-');
+        const val = c.fmt ? c.fmt(raw, run) : String(raw ?? '-');
         return c.align === 'l' ? val.padEnd(c.w) : val.padStart(c.w);
     }).join('  ');
     console.log(line);
 }
+
+// Totals row
+const totals: Record<string, unknown> = { scenario_id: 'TOTAL' };
+for (const key of ['input_tokens', 'output_tokens', 'cache_creation_tokens', 'cache_read_tokens', 'total_tokens', 'duration_s']) {
+    totals[key] = scenarioRuns.reduce((s, r) => s + ((r[key] as number) ?? 0), 0);
+}
+totals.cost_usd = parseFloat(scenarioRuns.reduce((s, r) => s + ((r.cost_usd as number) ?? 0), 0).toFixed(6));
+const totalsLine = cols.map((c) => {
+    const raw = totals[c.key];
+    const val = c.fmt ? c.fmt(raw, totals) : String(raw ?? '-');
+    return c.align === 'l' ? val.padEnd(c.w) : val.padStart(c.w);
+}).join('  ');
+console.log('-'.repeat(header.length));
+console.log(totalsLine);
+
+// ---------------------------------------------------------------------------
+// Write markdown results file
+// ---------------------------------------------------------------------------
+
+const mdCols = [
+    { label: 'scenario',    key: 'scenario_id',           fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'ctx_start',   key: 'ctx_start_tokens',      fmt: (v: unknown, _r: unknown) => v != null ? String(v) : '-' },
+    { label: 'ctx_Δ',       key: 'ctx_delta_tokens',      fmt: (v: unknown, _r: unknown) => v != null ? `+${v}` : '-' },
+    { label: 'input',       key: 'input_tokens',          fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'output',      key: 'output_tokens',         fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'cache_write', key: 'cache_creation_tokens', fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'cache_read',  key: 'cache_read_tokens',     fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'total',       key: 'total_tokens',          fmt: (v: unknown, _r: unknown) => String(v ?? '-') },
+    { label: 'cache%',      key: '_cache_pct',            fmt: (_v: unknown, run: Record<string, unknown>) => {
+        const total = run.total_tokens as number;
+        const cached = (run.cache_read_tokens as number ?? 0) + (run.cache_creation_tokens as number ?? 0);
+        return total > 0 ? `${Math.round(cached / total * 100)}%` : '-';
+    }},
+    { label: 'cost',        key: 'cost_usd',              fmt: (v: unknown, _r: unknown) => v != null ? `$${v}` : '-' },
+    { label: 'dur',         key: 'duration_s',            fmt: (v: unknown, _r: unknown) => v != null ? `${v}s` : '-' },
+    { label: 'success',     key: 'success',               fmt: (v: unknown, _r: unknown) => v === true ? '✅' : v === false ? '❌' : '-' },
+];
+
+function mdRow(run: Record<string, unknown>): string {
+    return '| ' + mdCols.map((c) => c.fmt(run[c.key], run)).join(' | ') + ' |';
+}
+
+const condition = matchedRuns[0].condition as string;
+const model = matchedRuns[0].model as string;
+const date = new Date().toISOString().slice(0, 10);
+
+const mdLines = [
+    `# Benchmark results — ${condition} (${model})`,
+    ``,
+    `**Date:** ${date}  `,
+    `**Session:** ${sessionId}  `,
+    `**Scenarios:** ${scenarioRuns.length}  `,
+    ``,
+    '| ' + mdCols.map((c) => c.label).join(' | ') + ' |',
+    '| ' + mdCols.map(() => '---').join(' | ') + ' |',
+    ...matchedRuns.map((r) => mdRow(r)),
+    '| ' + mdCols.map((c) => c.fmt(totals[c.key], totals)).join(' | ') + ' |',
+    ``,
+];
+
+const mdPath = resolve(fileURLToPath(import.meta.url), '..', `results-${condition}-${date}.md`);
+writeFileSync(mdPath, mdLines.join('\n'));
+console.log(`\nResults written to ${mdPath}`);

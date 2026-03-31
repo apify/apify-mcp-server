@@ -5,7 +5,7 @@ description: >-
   (A) standard MCP (tools in context) vs (B) mcpc CLI to remote mcp.apify.com.
   Runs test scenarios, logs results, extracts token costs from session JSONL.
 argument-hint: "run scenarios 1-3 for mcp-native"
-allowed-tools: [Read, Glob, Grep, Bash, WebFetch, WebSearch, Agent]
+allowed-tools: [Bash, Write, Edit]
 ---
 
 # Apify MCP Benchmark
@@ -24,8 +24,8 @@ Eight scenarios. Each has a prompt to send verbatim and a success rubric.
 | # | ID | Prompt | Success rubric |
 |---|---|---|---|
 | 1 | `search_actor_by_keyword` | "Search the Apify Store for an Instagram scraper and tell me the name of the most popular one." | Returns a real `username/name` Actor slug |
-| 2 | `get_actor_details` | "Get the input schema for the Actor `apify/web-scraper` and list its required fields." | Lists at least `startUrls` |
-| 3 | `run_actor_and_get_output` | "Run `apify/web-scraper` with startUrls `https://example.com`, wait for it to finish, and show me the first item from the dataset." | Returns structured data with a `url` field |
+| 2 | `get_actor_details` | "Get the input schema for the Actor `apify/instagram-scraper` and list its required fields." | Lists at least `directUrls` or `username` |
+| 3 | `run_actor_and_get_output` | "Run `apify/instagram-scraper` for the username `apify`, scrape 1 post, and show me the first item from the dataset." | Returns structured data with a `url` or `shortCode` field |
 | 4 | `compare_two_actors` | "Compare `apify/web-scraper` and `apify/cheerio-scraper`. Tell me which one has more users and what the key differences are based on their descriptions." | Mentions both Actors and at least one factual difference |
 | 5 | `local_business_lead_gen` | "Find 5 Italian restaurants in San Francisco using Apify. For each, give me the name, address, phone number, and website URL." | At least 3 businesses with name, address, and one contact detail |
 | 6 | `ecommerce_price_comparison` | "Search Apify for an Amazon product scraper. Then use it to get the price, title, and rating for this product URL: `https://www.amazon.com/dp/B0CHX3QBCH`. Show me the results." | Includes product title, price, and rating |
@@ -39,6 +39,11 @@ Eight scenarios. Each has a prompt to send verbatim and a success rubric.
 For **mcp-native**: start Claude Code normally (MCP servers loaded). **Before the first scenario**, run `/context` and record the baseline token count — this captures the cost of MCP tool definitions in context. Then run each scenario prompt. The agent calls MCP tools directly.
 
 For **mcp-cli**: start Claude Code with `--no-mcp`. Run `/context` to capture the baseline (should be near zero — no tool defs). Then run each scenario prompt. The agent must use `mcpc @apify-prod tools-call ... --json | jq .` via Bash. Requires `mcpc login https://mcp.apify.com` beforehand.
+
+**Always resolve the session ID from the filesystem — never guess it:**
+```bash
+ls -t ~/.claude/projects/-home-jirka-apify-apify-mcp-server/*.jsonl | head -1
+```
 
 Record the baseline in `evals/benchmark/runs.jsonl` as a special entry with `scenario_id: "_baseline"`, then one line per scenario:
 
@@ -76,7 +81,13 @@ The script:
 - Computes per-run: `input_tokens`, `output_tokens`, `cache_creation_tokens`, `cache_read_tokens`, `total_tokens`, `cost_usd`
 - Computes context delta: `total_input` (`cache_read + cache_creation + input`) on last vs first unique turn
 - Updates `evals/benchmark/runs.jsonl` in place
-- Prints a summary table
+- Prints a summary table including `cache%` (fraction of total tokens served from cache)
+
+**Always run the extractor after all scenarios. It will:**
+- Print the full summary table with `cache_read`, `cache_write`, `cache%`, and a **TOTAL** row
+- Write a markdown results file to `evals/benchmark/results-<condition>-<date>.md`
+
+**Show the full printed table (including TOTAL row) in your final response.**
 
 ## What we measure
 
