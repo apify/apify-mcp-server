@@ -2,20 +2,20 @@
 name: benchmarking
 description: >-
   Benchmark comparing two ways an AI agent can use the Apify MCP server:
-  (A) standard MCP (tools in context) vs (B) MCP-CLI via mcpc shell commands.
+  (A) standard MCP (tools in context) vs (B) mcpc CLI to remote mcp.apify.com.
   Produces test scenarios, runs them, logs everything, and reports metrics.
 argument-hint: "--repeats <n> [--model <name>] [--output-dir <path>]"
 allowed-tools: [Read, Glob, Grep, Bash, WebFetch, WebSearch, Agent]
 ---
 
-# Apify MCP vs MCP-CLI Benchmark
+# Apify MCP Benchmark: Native vs Remote mcpc CLI
 
 Compare two conditions for an AI agent using the Apify MCP server:
 
 - **Condition A (`mcp-native`)**: MCP server tools loaded directly into agent context. Agent makes structured tool calls (e.g. `search-actors`, `call-actor`, `fetch-actor-details`).
-- **Condition B (`mcp-cli`)**: Agent uses `mcpc` CLI to call the same MCP server via shell commands (e.g. `mcpc @apify tools-call search-actors keywords:="web scraper"`).
+- **Condition B (`mcpc-remote`)**: Agent uses `mcpc` CLI to call the remote https://mcp.apify.com MCP server via shell commands (e.g. `mcpc @apify-prod tools-call search-actors keywords:="web scraper"`).
 
-Both conditions hit the **same Apify MCP server** — only the interface differs.
+Both conditions hit the **same Apify MCP server at mcp.apify.com** — only the interface differs.
 
 ## Source documents
 
@@ -30,44 +30,121 @@ This benchmark design is informed by:
 | Metric | Formula | Notes |
 |--------|---------|-------|
 | Success rate | `succeeded / total_runs` | Binary pass/fail per scenario |
-| Avg tokens | `sum(total_tokens) / total_runs` | Input + output combined |
+| Avg tokens | `sum(total_tokens) / total_runs` | Input + output + cache tokens per scenario, from JSONL |
 | Avg cost | `sum(cost_usd) / total_runs` | Based on model pricing |
 | Avg duration | `sum(duration_s) / total_runs` | Wall-clock seconds |
 | Avg turns | `sum(turns) / total_runs` | One turn = one agent action |
+| Session ctx growth | `ctx_end_tokens - ctx_start_tokens` | Whole-session context window delta (from `/context` at start + end) |
 
 Rules:
 - Failed and timed-out runs stay in the denominator.
 - Report both "all runs" and "success-only" averages.
+- Per-scenario token fields are populated **post-run** by filtering the session JSONL by timestamp window — never estimated.
+- `/context` is captured **once at session start and once at session end** — gives total context growth for the session, not per-scenario.
+
+## Execution model
+
+**Two sessions total** — one per condition. Each session runs all 8 scenarios sequentially. `/context` is captured **only at session start and end** — not between scenarios. Per-scenario token costs are extracted post-run from the JSONL history file using timestamp windows.
+
+```
+Session A — mcp-native  (MCP tools loaded)
+──────────────────────────────────────────────
+/context  →  ctx_start  (record tokens + window size)
+
+=== SCENARIO 1: search_actor_by_keyword ===
+<agent runs scenario — record started_at, ended_at>
+
+=== SCENARIO 2: get_actor_details ===
+<agent runs scenario — record started_at, ended_at>
+
+... (8 scenarios total)
+
+/context  →  ctx_end  (record tokens + window size)
+ctx_growth = ctx_end - ctx_start  (whole session)
+
+Session B — mcpc-remote  (no MCP tools, Bash only)
+──────────────────────────────────────────────────
+(same pattern)
+```
+
+### Phase 1: Run phase
+
+Run Session A then Session B. For each scenario: print the delimiter, run the scenario. Record `started_at`, `ended_at`, turns, tool calls, success/failure.
+
+### Phase 2: Token extraction phase (post-run)
+
+After all runs complete, ask the user for their Claude Code session history directory. Extract per-scenario token costs from the JSONL by filtering assistant turns within each scenario's `started_at`/`ended_at` window. Also extract session-level totals for cost accounting.
+
+## Session setup
+
+The two sessions require **different Claude Code configurations**:
+
+| | `mcp-native` | `mcpc-remote` |
+|---|---|---|
+| MCP servers | `apify-prod` loaded | **none** (MCP disabled) |
+| Tools available | `search-actors`, `call-actor`, etc. | `Bash` only |
+| Context baseline | ~5–6k tokens (MCP tool defs) | ~0k (no tool defs) |
+| Claude Code flags | default | `--no-mcp` or remove MCP servers from config |
+
+The **first message** of each session must be an identifying header:
+
+```
+=== BENCHMARK SESSION ===
+condition: mcp-native
+session_id: <uuid>
+scenarios: all (8)
+=========================
+```
+
+Each scenario within the session is separated by this delimiter (sent as a message before the scenario prompt):
+
+```
+=== SCENARIO 3: run_actor_and_get_output ===
+```
+
+Run `/context` **once before the first scenario** (record `ctx_start_tokens`) and **once after the last scenario** (record `ctx_end_tokens`). Do not run `/context` between scenarios.
 
 ## Setup
 
-### Condition A: `mcp-native`
+### Launching a session for Condition A: `mcp-native`
 
-The agent has Apify MCP tools registered directly in its tool context. It calls them like any other MCP tool:
+Start Claude Code normally with the Apify MCP server registered. The agent calls MCP tools directly:
 
+```bash
+claude --model claude-haiku-4-5-20251001
+# MCP config includes apify-prod server
+```
+
+The agent calls tools like:
 ```
 Tool: search-actors
 Arguments: { "keywords": "web scraper" }
 ```
 
-### Condition B: `mcp-cli`
+### Launching a session for Condition B: `mcpc-remote`
 
-The agent connects to the same server via `mcpc` and calls tools through shell:
+Start Claude Code with **MCP servers disabled** so no tool definitions are loaded into context. The agent uses only `Bash`:
 
 ```bash
-mcpc connect "npx -y @apify/actors-mcp-server" @apify
-mcpc @apify tools-call search-actors keywords:="web scraper" --json
+claude --model claude-haiku-4-5-20251001 --no-mcp
+# Or: temporarily remove apify-prod from ~/.claude/settings.json MCP config
 ```
 
-The agent parses JSON stdout and decides next steps.
+The agent calls tools via shell:
+```bash
+mcpc @apify-prod tools-call search-actors keywords:="web scraper" --json | jq .
+```
+
+**Authentication**: Requires `mcpc login https://mcp.apify.com` configured before the benchmark starts.
 
 ### Environment invariants
 
 - Same model and version for both conditions
 - Same system prompt (minus the interface-specific instructions)
 - Same Apify token and account
-- Fresh workspace per run (no shared state)
+- Fresh Claude Code session per run — **condition-appropriate config** (MCP on vs off)
 - Same timeout budget per scenario
+- `/context` baseline captured immediately after session start, before the benchmark header is sent
 
 ## Test scenarios
 
@@ -135,62 +212,149 @@ _Derived from [apify/awesome-skills](https://github.com/apify/awesome-skills) co
 
 ## Run logging
 
-### Per-run record (`results/runs.jsonl`)
+### Per-session record (`results/sessions.jsonl`)
 
-One JSON object per line:
+One record per condition × repeat session. Context fields filled in Phase 1; token fields in Phase 2:
+
+```json
+{
+  "session_id": "351e434a-5c60-45ac-b47e-69b13313b547",
+  "condition": "mcp-native",
+  "repeat": 1,
+  "model": "claude-haiku-4-5-20251001",
+  "started_at": "2026-03-31T12:00:00Z",
+  "ended_at": "2026-03-31T12:05:30Z",
+  "ctx_start_tokens": 5200,
+  "ctx_end_tokens": 68900,
+  "ctx_growth_tokens": 63700,
+  "ctx_window_size": 200000,
+  "input_tokens": null,
+  "output_tokens": null,
+  "cache_creation_tokens": null,
+  "cache_read_tokens": null,
+  "total_tokens": null,
+  "cost_usd": null
+}
+```
+
+### Per-scenario record (`results/runs.jsonl`)
+
+One JSON object per scenario. Token fields populated in Phase 2 by filtering the session JSONL by timestamp window:
 
 ```json
 {
   "run_id": "uuid",
+  "session_id": "351e434a-5c60-45ac-b47e-69b13313b547",
   "condition": "mcp-native",
   "scenario_id": "search_actor_by_keyword",
+  "scenario_index": 1,
   "repeat": 1,
-  "model": "claude-sonnet-4-20250514",
+  "model": "claude-haiku-4-5-20251001",
   "started_at": "2026-03-31T12:00:00Z",
   "ended_at": "2026-03-31T12:00:25Z",
   "duration_s": 25.0,
   "status": "succeeded",
   "success": true,
-  "input_tokens": 5200,
-  "output_tokens": 800,
-  "total_tokens": 6000,
-  "cost_usd": 0.021,
   "turns": 3,
   "tool_calls": 2,
   "failure_reason": null,
-  "transcript_path": "artifacts/uuid/transcript.jsonl"
+  "input_tokens": null,
+  "output_tokens": null,
+  "cache_creation_tokens": null,
+  "cache_read_tokens": null,
+  "total_tokens": null,
+  "cost_usd": null
 }
 ```
 
-### Per-turn event log (`artifacts/<run_id>/transcript.jsonl`)
+- `session_id`: links to the parent session record
+- `scenario_index`: 1-based order within the session
+- token fields: populated post-run by filtering session JSONL to the `[started_at, ended_at]` window
 
-One JSON object per agent turn:
+### Context snapshot capture (Phase 1, in-session)
 
-```json
-{
-  "turn": 1,
-  "ts": "2026-03-31T12:00:02Z",
-  "type": "tool_call",
-  "tool": "search-actors",
-  "latency_ms": 1200,
-  "status": "ok",
-  "input_tokens_so_far": 2400,
-  "output_tokens_so_far": 150
+Run `/context` **once at session start** (before the first scenario) and **once at session end** (after the last scenario). Parse the output line like `claude-haiku-4-5-20251001 · 68.9k/200k tokens (34%)`:
+
+```bash
+parse_context() {
+  # Input: one line like "model · 68.9k/200k tokens (34%)"
+  # Output: two numbers — used_tokens window_tokens
+  echo "$1" | grep -oP '[\d.]+k?/[\d.]+[kM]' | \
+    awk -F'/' '{
+      used=$1; total=$2
+      sub(/k$/, "000", used); sub(/k$/, "000", total); sub(/M$/, "000000", total)
+      printf "%d %d\n", used, total
+    }'
 }
 ```
 
-This is enough to reconstruct the full conversation flow and compute per-tool latencies.
+Record `ctx_start_tokens` and `ctx_end_tokens` in `sessions.jsonl`. Compute `ctx_growth_tokens = ctx_end - ctx_start`.
+
+**What `/context` measures vs JSONL tokens:**
+- `/context` = current context window usage (active input tokens in this session)
+- JSONL `usage` = cumulative API billing tokens (input + output + cache) across all turns
+- Use `/context` for session-level context growth; use JSONL for per-scenario cost accounting
+
+### Token extraction (Phase 2)
+
+After all runs complete, ask the user:
+
+> "Please provide the path to your Claude Code session history directory (e.g. `~/.claude/projects/-home-jirka-apify-apify-mcp-server/`)"
+
+**Session-level totals** (update `sessions.jsonl`):
+
+```bash
+SESSION_FILE="<history_dir>/<session_id>.jsonl"
+
+jq -s '
+  [ map(select(.type == "assistant" and .message.usage != null) | .message.usage)
+    | unique_by(.)[]
+  ] |
+  {
+    input_tokens:          map(.input_tokens                // 0) | add // 0,
+    output_tokens:         map(.output_tokens               // 0) | add // 0,
+    cache_creation_tokens: map(.cache_creation_input_tokens // 0) | add // 0,
+    cache_read_tokens:     map(.cache_read_input_tokens     // 0) | add // 0
+  } | .total_tokens = (.input_tokens + .output_tokens + .cache_creation_tokens + .cache_read_tokens)
+' "$SESSION_FILE"
+```
+
+**Per-scenario tokens** (update each run in `runs.jsonl`):
+
+```bash
+START="2026-03-31T12:00:00Z"   # run started_at
+END="2026-03-31T12:00:25Z"     # run ended_at
+
+jq -s --arg start "$START" --arg end "$END" '
+  [ map(select(
+      .type == "assistant" and
+      .message.usage != null and
+      .timestamp >= $start and
+      .timestamp <= $end
+    ) | .message.usage)
+    | unique_by(.)[]
+  ] |
+  {
+    input_tokens:          map(.input_tokens                // 0) | add // 0,
+    output_tokens:         map(.output_tokens               // 0) | add // 0,
+    cache_creation_tokens: map(.cache_creation_input_tokens // 0) | add // 0,
+    cache_read_tokens:     map(.cache_read_input_tokens     // 0) | add // 0
+  } | .total_tokens = (.input_tokens + .output_tokens + .cache_creation_tokens + .cache_read_tokens)
+' "$SESSION_FILE"
+```
+
+`unique_by(.)` deduplicates exact-duplicate usage objects that Claude Code emits for the same API response. Compute `cost_usd` from `total_tokens` using the model's pricing.
 
 ## Judging
 
 - **Judge**: LLM evaluator (same model or stronger) with a fixed prompt template.
 - **Decision**: Binary pass/fail based on the success rubric for each scenario.
-- **Stored**: Full judge input/output saved to `artifacts/<run_id>/judge.json`.
-- **Ambiguity rule**: If the judge is uncertain, mark as `failed` and flag for manual review.
+- **Stored**: `success` (bool) and `failure_reason` (string or null) inline in `runs.jsonl`.
+- **Ambiguity rule**: If the judge is uncertain, mark as `failed` and record the reason in `failure_reason`.
 
 ## Report format
 
-After all runs complete, produce `results/report.md`:
+After all runs complete (and tokens populated), produce `results/report.md`:
 
 ```markdown
 # Benchmark: Apify MCP vs MCP-CLI
@@ -200,16 +364,16 @@ After all runs complete, produce `results/report.md`:
 - Total runs: ...
 
 ## Leaderboard
-| Condition  | Success | Avg Cost | Avg Duration | Avg Tokens | Avg Turns |
-|------------|---------|----------|--------------|------------|-----------|
-| mcp-native | ...     | ...      | ...          | ...        | ...       |
-| mcp-cli    | ...     | ...      | ...          | ...        | ...       |
+| Condition   | Success | Avg Cost | Avg Duration | Avg Tokens | Avg Turns |
+|-------------|---------|----------|--------------|------------|-----------|
+| mcp-native  | ...     | ...      | ...          | ...        | ...       |
+| mcpc-remote | ...     | ...      | ...          | ...        | ...       |
 
 ## Per-scenario breakdown
-| Scenario                   | mcp-native | mcp-cli |
-|----------------------------|------------|---------|
-| search_actor_by_keyword    | 5/5        | 4/5     |
-| ...                        | ...        | ...     |
+| Scenario                   | mcp-native | mcpc-remote |
+|----------------------------|------------|-------------|
+| search_actor_by_keyword    | 5/5        | 4/5         |
+| ...                        | ...        | ...         |
 
 ## Failure analysis
 (list failure reasons grouped by condition)
@@ -220,21 +384,42 @@ After all runs complete, produce `results/report.md`:
 
 ## Execution checklist
 
-1. Set up environment (model, token, pricing config).
-2. For each scenario x condition x repeat:
-   a. Create fresh workspace.
-   b. Run the agent with the scenario prompt.
-   c. Log the run record.
-   d. Save transcript.
-   e. Run judge.
-3. Validate all logs (no missing fields, correct run count).
-4. Compute metrics.
-5. Generate report.
+### Phase 1: Run both sessions
+
+1. **Setup**: confirm model, mcpc auth (`mcpc login https://mcp.apify.com`), pricing config.
+
+2. **Session A — `mcp-native`** (MCP tools loaded, default config):
+   a. Start a fresh Claude Code session. Note the session file name from `~/.claude/projects/…/` (it appears on first message).
+   b. Run `/context` — record `ctx_start_tokens` and `ctx_window_size`. Write initial session record to `results/sessions.jsonl`.
+   c. Send the session header (see Session setup). Record `session_id`.
+   d. **For each scenario i = 1..8:**
+      - Record `started_at`. Send the scenario delimiter: `=== SCENARIO i: <scenario_id> ===`
+      - Send the scenario prompt. Let the agent complete it.
+      - Record `ended_at`, `turns`, `tool_calls`, `status`, `success`, `failure_reason`.
+      - Write scenario record to `results/runs.jsonl` (token fields = `null`).
+   e. Run `/context` — record `ctx_end_tokens`. Update session record with `ctx_end_tokens` and `ctx_growth_tokens`.
+
+3. **Session B — `mcpc-remote`** (no MCP, `--no-mcp` flag):
+   Repeat step 2 with `mcpc` CLI instead of MCP tools.
+
+4. Validate all logs (no missing records, all JSON parses, 16 scenario records total).
+
+### Phase 2: Populate token fields
+
+5. Ask user for the Claude Code session history directory (e.g. `~/.claude/projects/-home-jirka-apify-apify-mcp-server/`).
+6. For each session in `sessions.jsonl`, extract totals from `<history_dir>/<session_id>.jsonl` using the session-level jq. Update token fields and `cost_usd`.
+7. For each run in `runs.jsonl`, extract per-scenario tokens using the timestamp-window jq with the run's `started_at`/`ended_at`. Update token fields and `cost_usd`.
+
+### Phase 3: Report
+
+8. Compute aggregate metrics (per-scenario `total_tokens` for efficiency; session totals for cost).
+9. Generate `results/report.md`.
 
 ## Validation gates
 
 Before publishing results:
 - `expected_runs == actual_runs` (no missing logs)
 - All JSONL lines parse correctly
+- Token fields fully populated in both `sessions.jsonl` and `runs.jsonl` (no nulls remaining)
+- `ctx_start_tokens` and `ctx_end_tokens` populated in `sessions.jsonl`
 - Recomputed metrics match reported metrics
-- At least one transcript spot-checked per condition
