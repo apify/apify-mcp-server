@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.17 - **not yet released**
+
+### 🚀 Features
+
+- Remove Actor deployment files and simplify to HTTP server ([#613](https://github.com/apify/apify-mcp-server/pull/613)) ([4feb11f](https://github.com/apify/apify-mcp-server/commit/4feb11f0b956f800498f45a3ed28df62b9d85bdb)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.16](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.16) (2026-03-28)
 
 ### 🚀 Features
