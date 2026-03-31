@@ -25,7 +25,7 @@ Eight scenarios. Each has a prompt to send verbatim and a success rubric.
 |---|---|---|---|
 | 1 | `search_actor_by_keyword` | "Search the Apify Store for an Instagram scraper and tell me the name of the most popular one." | Returns a real `username/name` Actor slug |
 | 2 | `get_actor_details` | "Get the input schema for the Actor `apify/instagram-scraper` and list its required fields." | Lists at least `directUrls` or `username` |
-| 3 | `run_actor_and_get_output` | "Run `apify/instagram-scraper` for the username `apify`, scrape 1 post, and show me the first item from the dataset." | Returns structured data with a `url` or `shortCode` field |
+| 3 | `run_actor_and_get_output` | "Run `apify/instagram-scraper` for the username `natgeo`, scrape 1 post, and show me the first item from the dataset." | Returns structured data with a `url` or `shortCode` field |
 | 4 | `compare_two_actors` | "Compare `apify/web-scraper` and `apify/cheerio-scraper`. Tell me which one has more users and what the key differences are based on their descriptions." | Mentions both Actors and at least one factual difference |
 | 5 | `local_business_lead_gen` | "Find 5 Italian restaurants in San Francisco using Apify. For each, give me the name, address, phone number, and website URL." | At least 3 businesses with name, address, and one contact detail |
 | 6 | `ecommerce_price_comparison` | "Search Apify for an Amazon product scraper. Then use it to get the price, title, and rating for this product URL: `https://www.amazon.com/dp/B0CHX3QBCH`. Show me the results." | Includes product title, price, and rating |
@@ -94,10 +94,15 @@ The script:
 **Session:** <session_id>
 **Scenarios run:** <n>
 
-| scenario | ctx_start | ctx_Δ | input | output | cache_write | cache_read | total | cache% | cost | dur | success |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| ... one row per run including _baseline ... |
-| **TOTAL** | - | - | <sum> | <sum> | <sum> | <sum> | <sum> | <pct> | <sum> | <sum> | |
+| scenario | ctx_start | ctx_delta | input | output | cache_write | cache_read | total | cache% | cost | dur | success |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| _baseline | - | - | 0 | 0 | 0 | 0 | 0 | - | $0 | 0s | - |
+| search_actor_by_keyword | ... | ... | ... | ... | ... | ... | ... | ...% | $... | ...s | true |
+| ... |
+| **TOTAL** | - | - | <sum> | <sum> | <sum> | <sum> | <sum> | <pct>% | $<sum> | <sum>s | |
+```
+
+Use plain text in the `success` column: `true`, `false`, or `-` (for baseline). No emojis.
 ```
 
 ## What we measure
