@@ -66,7 +66,9 @@ For **mcp-cli**: start Claude Code with `--no-mcp` (no MCP servers). Run `/conte
 ls -t ~/.claude/projects/-home-jirka-apify-apify-mcp-server/*.jsonl | head -1
 ```
 
-Record the baseline in `evals/benchmark/runs.jsonl` as a special entry with `scenario_id: "_baseline"`, then one line per scenario:
+For each scenario, record a `started_at` timestamp (UTC, before sending the prompt) and an `ended_at` timestamp (after the agent finishes). Track results in memory as you go — **do NOT write to `runs.jsonl` until all scenarios are complete.**
+
+After all scenarios finish, write `evals/benchmark/runs.jsonl` in one shot. The file starts with a `_baseline` entry, then one line per scenario:
 
 ```jsonc
 {
