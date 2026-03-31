@@ -49,7 +49,6 @@
     "@sentry/node": "^10.38.0",
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
-    "apify": "^3.4.2",
     "apify-client": "^2.22.1",
     "dedent": "^1.7.2",
     "dotenv": "^16.4.7",
@@ -80,9 +79,8 @@
     "vitest": "^3.0.8"
   },
   "scripts": {
-    "start": "npm run start:standby",
+    "start": "tsx src/dev_server.ts",
     "dev": "node scripts/dev_standby.js",
-    "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" tsx src/main.ts",
     "build": "npm run build:core && npm run build:web",
     "build:core": "tsc -b src",
     "build:watch": "tsc -b src -w",

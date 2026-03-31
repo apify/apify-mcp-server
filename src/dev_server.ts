@@ -3,6 +3,7 @@
  */
 
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -14,16 +15,24 @@ import express from 'express';
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { ApifyClient } from '../apify_client.js';
-import { ActorsMcpServer } from '../mcp/server.js';
-import { resolvePaymentProvider } from '../payments/index.js';
-import type { ApifyRequestParams } from '../types.js';
-import { parseUiMode } from '../types.js';
-import { getHelpMessage, Routes, TransportType } from './const.js';
+import { ApifyClient } from './apify_client.js';
+import { ActorsMcpServer } from './mcp/server.js';
+import { resolvePaymentProvider } from './payments/index.js';
+import type { ApifyRequestParams } from './types.js';
+import { parseUiMode } from './types.js';
 
-export function createExpressApp(
-    host: string,
-): express.Express {
+enum TransportType {
+    HTTP = 'HTTP',
+    SSE = 'SSE',
+}
+
+enum Routes {
+    MCP = '/',
+    SSE = '/sse',
+    MESSAGE = '/message',
+}
+
+export function createExpressApp(): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
     const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
@@ -286,7 +295,7 @@ export function createExpressApp(
 
     // Catch-all for undefined routes
     app.use((req: Request, res: Response) => {
-        res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}. ${getHelpMessage(host)}` }).end();
+        res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}.` }).end();
     });
 
     return app;
@@ -298,4 +307,27 @@ function isInitializeRequest(body: unknown): boolean {
         return body.some((msg) => typeof msg === 'object' && msg !== null && 'method' in msg && msg.method === 'initialize');
     }
     return typeof body === 'object' && body !== null && 'method' in body && body.method === 'initialize';
+}
+
+// --- Entry point: start the server when run directly ---
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    if (!process.env.APIFY_TOKEN) {
+        log.error('APIFY_TOKEN is required but not set in the environment variables.');
+        process.exit(1);
+    }
+
+    const HOST = process.env.HOST ?? 'http://localhost';
+    const PORT = Number(process.env.PORT ?? 3001);
+
+    const app = createExpressApp();
+
+    app.listen(PORT, () => {
+        log.info('MCP server listening', { host: HOST, port: PORT });
+    });
+
+    process.on('SIGINT', () => {
+        log.info('Received SIGINT, shutting down gracefully...');
+        process.exit(0);
+    });
 }

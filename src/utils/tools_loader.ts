@@ -3,7 +3,7 @@
  * This eliminates duplication between stdio.ts and processParamsGetTools.
  */
 
-import type { ApifyClient } from 'apify';
+import type { ApifyClient } from 'apify-client';
 
 import log from '@apify/log';
 

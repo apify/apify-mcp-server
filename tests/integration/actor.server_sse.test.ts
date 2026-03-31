@@ -4,7 +4,7 @@ import type { Express } from 'express';
 
 import log from '@apify/log';
 
-import { createExpressApp } from '../../src/actor/server.js';
+import { createExpressApp } from '../../src/dev_server.js';
 import { createMcpSseClient } from '../helpers.js';
 import { createIntegrationTestsSuite } from './suite.js';
 import { getAvailablePort } from './utils/port.js';
@@ -28,7 +28,7 @@ createIntegrationTestsSuite({
         mcpUrl = `${httpServerHost}/sse`;
 
         // Create an express app
-        app = createExpressApp(httpServerHost);
+        app = createExpressApp();
 
         // Start a test server
         await new Promise<void>((resolve) => {

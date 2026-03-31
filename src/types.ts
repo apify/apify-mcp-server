@@ -252,8 +252,6 @@ export type Input = {
     enableActorAutoLoading?: boolean | string;
     enableAddingActors?: boolean | string;
     maxActorMemoryBytes?: number;
-    debugActor?: string;
-    debugActorInput?: unknown;
     /**
      * Tool selectors to include (category keys or concrete tool names).
      * When `tools` is undefined that means the default tool categories should be loaded.

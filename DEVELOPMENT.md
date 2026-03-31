@@ -5,7 +5,7 @@
 This repository (**public**) provides:
 - The core MCP server implementation (published as an NPM package)
 - The stdio entry point (CLI)
-- The Apify Actor standby HTTP server used for local development/testing
+- An Express HTTP server for local development and testing
 
 The hosted server (**[mcp.apify.com](https://mcp.apify.com)**) is implemented in an internal Apify repository that depends on this package.
 
@@ -15,7 +15,6 @@ For general information about the Apify MCP Server, features, tools, and client 
 
 ```text
 src/
-  actor/        Standby Actor HTTP server (used by src/main.ts in STANDBY mode)
   mcp/          MCP protocol implementation
   tools/        MCP tool implementations
   resources/    Resources and widgets metadata
@@ -31,7 +30,7 @@ Key entry points:
 - `src/index.ts` - Main library export (`ActorsMcpServer` class)
 - `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
-- `src/main.ts` - Actor entry point (standby server / debugging)
+- `src/dev_server.ts` - Express HTTP server for local development (`npm start`)
 - `src/input.ts` - Input processing and validation
 
 ## Node.js version policy
@@ -99,7 +98,7 @@ Notes:
 - Widget discovery happens when the server connects. Changing widget code is hot-reloaded; adding brand-new widget filenames typically requires reconnecting the MCP client (or restarting the server) to expose the new resource.
 - You can preview widgets quickly via the local esbuild dev server at `http://localhost:3226/index.html`.
 
-The MCP server listens on port `3001`. The HTTP server implementation used here is the standby Actor server in `src/actor/server.ts` (used by `src/main.ts` in STANDBY mode). The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
+The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
 ### Using MCP servers with Claude Code
 
