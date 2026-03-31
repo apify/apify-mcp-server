@@ -71,6 +71,8 @@ The agent parses JSON stdout and decides next steps.
 
 ## Test scenarios
 
+Scenarios are organized by complexity. Categories 1–3 are foundational; Categories 4–6 are derived from real-world workflows in [apify/awesome-skills](https://github.com/apify/awesome-skills).
+
 ### Category 1: Discovery (single-step)
 
 #### `search_actor_by_keyword`
@@ -112,6 +114,78 @@ The agent parses JSON stdout and decides next steps.
 - **Prompt**: "What fields does the output dataset of `apify/instagram-scraper` contain? Get the dataset schema or run it with a minimal example to find out."
 - **Ground truth**: Agent returns actual field names from the dataset schema or a sample run.
 - **Success rubric**: Answer lists at least 3 real output field names.
+
+### Category 4: Lead Generation & E-commerce (real-world, multi-step)
+
+_Inspired by [apify-lead-generation](https://github.com/apify/awesome-skills/tree/main/skills/apify-lead-generation) and [apify-ecommerce](https://github.com/apify/awesome-skills/tree/main/skills/apify-ecommerce)._
+
+#### `local_business_lead_gen`
+- **Goal**: Find businesses on Google Maps and extract contact info.
+- **Prompt**: "Find 5 Italian restaurants in San Francisco using Apify. For each, give me the name, address, phone number, and website URL."
+- **Ground truth**: Agent discovers a Google Maps scraper (e.g. `compass/crawler-google-places`), runs it, and returns structured business data.
+- **Success rubric**: Answer contains at least 3 businesses with name, address, and at least one contact detail (phone or website) each.
+
+#### `ecommerce_price_comparison`
+- **Goal**: Extract product pricing data from an e-commerce platform.
+- **Prompt**: "Search Apify for an Amazon product scraper. Then use it to get the price, title, and rating for this product URL: `https://www.amazon.com/dp/B0CHX3QBCH`. Show me the results."
+- **Ground truth**: Agent finds an Amazon scraper Actor, runs it with the product URL, and returns product data.
+- **Success rubric**: Answer includes the product title, a numeric price, and a rating value.
+
+#### `website_contact_extraction`
+- **Goal**: Scrape contact information from a website.
+- **Prompt**: "Find an Apify Actor that can extract contact information (emails, phone numbers) from a website. Use it to extract contacts from `https://apify.com`. Show me what you found."
+- **Ground truth**: Agent finds a contact scraper (e.g. `vdrmota/contact-info-scraper`), runs it, and returns extracted contact data.
+- **Success rubric**: Answer includes at least one email address or phone number extracted from the target site.
+
+### Category 5: Social Media & Content Analytics (real-world, multi-step)
+
+_Inspired by [apify-content-analytics](https://github.com/apify/awesome-skills/tree/main/skills/apify-content-analytics), [apify-audience-analysis](https://github.com/apify/awesome-skills/tree/main/skills/apify-audience-analysis), and [apify-influencer-discovery](https://github.com/apify/awesome-skills/tree/main/skills/apify-influencer-discovery)._
+
+#### `instagram_profile_analysis`
+- **Goal**: Retrieve and analyze an Instagram profile's public metrics.
+- **Prompt**: "Use Apify to get the public profile data for the Instagram account `natgeo`. Tell me their follower count, post count, and bio."
+- **Ground truth**: Agent finds an Instagram profile scraper (e.g. `apify/instagram-profile-scraper`), runs it, and returns profile metrics.
+- **Success rubric**: Answer includes a numeric follower count, post count, and the account's bio text.
+
+#### `tiktok_hashtag_trend`
+- **Goal**: Discover trending content for a hashtag on TikTok.
+- **Prompt**: "Search Apify for a TikTok hashtag scraper. Use it to get the top 5 videos for the hashtag `#traveltok`. For each, show the description and number of likes."
+- **Ground truth**: Agent finds a TikTok scraper (e.g. `clockworks/tiktok-hashtag-scraper`), runs it, and returns video data.
+- **Success rubric**: Answer lists at least 3 TikTok videos with descriptions and like counts.
+
+#### `youtube_channel_research`
+- **Goal**: Research a YouTube channel's public data.
+- **Prompt**: "Find an Apify Actor to scrape YouTube channel data. Get the channel info for `@mkbhd` — I need the subscriber count, total videos, and channel description."
+- **Ground truth**: Agent finds a YouTube channel scraper (e.g. `streamers/youtube-channel-scraper`), runs it, and returns channel data.
+- **Success rubric**: Answer includes subscriber count, video count, and a channel description snippet.
+
+### Category 6: Brand Monitoring & Market Research (real-world, multi-step)
+
+_Inspired by [apify-brand-reputation-monitoring](https://github.com/apify/awesome-skills/tree/main/skills/apify-brand-reputation-monitoring), [apify-competitor-intelligence](https://github.com/apify/awesome-skills/tree/main/skills/apify-competitor-intelligence), [apify-market-research](https://github.com/apify/awesome-skills/tree/main/skills/apify-market-research), and [apify-trend-analysis](https://github.com/apify/awesome-skills/tree/main/skills/apify-trend-analysis)._
+
+#### `google_maps_review_analysis`
+- **Goal**: Scrape and summarize reviews for a business from Google Maps.
+- **Prompt**: "Find an Apify Actor for scraping Google Maps reviews. Get the 10 most recent reviews for 'Chez Panisse Berkeley'. Summarize the overall sentiment and mention the average star rating."
+- **Ground truth**: Agent finds a Google Maps reviews scraper (e.g. `compass/Google-Maps-Reviews-Scraper`), runs it, and analyzes the output.
+- **Success rubric**: Answer includes a sentiment summary, an average rating, and references at least 2 specific review themes.
+
+#### `booking_competitor_benchmarking`
+- **Goal**: Compare hotel listings on Booking.com for competitive analysis.
+- **Prompt**: "Use Apify to scrape Booking.com listings for hotels in downtown Prague. Find at least 3 hotels and compare their prices, ratings, and number of reviews."
+- **Ground truth**: Agent finds a Booking.com scraper (e.g. `voyager/booking-scraper`), runs it, and returns comparison data.
+- **Success rubric**: Answer includes at least 3 hotels with name, price, and rating for each.
+
+#### `google_trends_exploration`
+- **Goal**: Retrieve Google Trends data for a search term.
+- **Prompt**: "Find an Apify Actor for Google Trends. Get the interest-over-time data for the search term 'artificial intelligence' in the US for the past 12 months. Tell me if interest is rising or falling."
+- **Ground truth**: Agent finds `apify/google-trends-scraper`, runs it with the keyword, and interprets the trend direction.
+- **Success rubric**: Answer includes trend direction (rising/falling/stable) and references specific data points or time periods.
+
+#### `multi_platform_brand_mention`
+- **Goal**: Check brand presence across multiple platforms in a single workflow.
+- **Prompt**: "I want to check 'Tesla' brand presence on social media using Apify. Search for a Tesla-related Instagram hashtag and also find Tesla-related TikTok videos. Summarize what you find from both platforms."
+- **Ground truth**: Agent uses at least two different Actors (one Instagram, one TikTok) and synthesizes results.
+- **Success rubric**: Answer references data from both Instagram and TikTok, with at least one concrete finding from each platform.
 
 ## Run logging
 
