@@ -83,11 +83,22 @@ The script:
 - Updates `evals/benchmark/runs.jsonl` in place
 - Prints a summary table including `cache%` (fraction of total tokens served from cache)
 
-**Always run the extractor after all scenarios. It will:**
-- Print the full summary table with `cache_read`, `cache_write`, `cache%`, and a **TOTAL** row
-- Write a markdown results file to `evals/benchmark/results-<condition>-<date>.md`
+**Always run the extractor after all scenarios, then:**
+1. Show the full printed table (including TOTAL row) in your response
+2. Write the results to `evals/benchmark/results-<condition>-<date>.md` using the Write tool, with this format:
 
-**Show the full printed table (including TOTAL row) in your final response.**
+```markdown
+# Benchmark results — <condition> (<model>)
+
+**Date:** <date>
+**Session:** <session_id>
+**Scenarios run:** <n>
+
+| scenario | ctx_start | ctx_Δ | input | output | cache_write | cache_read | total | cache% | cost | dur | success |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| ... one row per run including _baseline ... |
+| **TOTAL** | - | - | <sum> | <sum> | <sum> | <sum> | <sum> | <pct> | <sum> | <sum> | |
+```
 
 ## What we measure
 
