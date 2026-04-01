@@ -130,7 +130,7 @@ Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, 
 
 You can pay for Actor runs without an Apify API token using either **x402** or **Skyfire**.
 
-- **x402** pays with USDC on [Base](https://base.org) and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcp-cli`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **x402** pays with USDC on [Base](https://base.org) and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
 - **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
 
 ## How agentic payments work
