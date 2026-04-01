@@ -667,8 +667,8 @@ export class ActorsMcpServer {
                 throw new Error('MCP Session ID is required for tool calls');
             }
             const startTime = Date.now();
-            let telemetryData: ToolCallTelemetryProperties | null = null;
-            let userId: string | null = null;
+            let telemetryData: ToolCallTelemetryProperties | null;
+            let userId: string | null;
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
             let failureDiagnostics: FailureDiagnostics = {};
             let shouldTrackTelemetry = true;
@@ -830,6 +830,11 @@ export class ActorsMcpServer {
                 // Check payment validation (already computed by prepareToolCallContext)
                 if (paymentRequiredResult) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    failureDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        failure_http_status: 402,
+                        ...(actorName ? { actor_name: actorName } : {}),
+                    };
                     return paymentRequiredResult;
                 }
 
@@ -1023,6 +1028,13 @@ export class ActorsMcpServer {
                     return buildPaymentRequiredResponse(error);
                 }
 
+                // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
+                // returns them as JSON-RPC errors. failInvalidParams already set failureDiagnostics
+                // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
+                if (error instanceof McpError) {
+                    throw error;
+                }
+
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 const httpStatus = getHttpStatusCode(error);
                 const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
@@ -1035,12 +1047,6 @@ export class ActorsMcpServer {
                     failure_detail: failureDetail,
                     ...(actorName ? { actor_name: actorName } : {}),
                 };
-
-                // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
-                // returns them as JSON-RPC errors. failInvalidParams already logged the error.
-                if (error instanceof McpError) {
-                    throw error;
-                }
 
                 logHttpError(error, 'Error occurred while calling tool', {
                     toolName: name,
@@ -1189,6 +1195,11 @@ export class ActorsMcpServer {
             // Check payment validation (already computed by preparePayment in the caller)
             if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
+                failureDiagnostics = {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    failure_http_status: 402,
+                    ...(actorName ? { actor_name: actorName } : {}),
+                };
                 result = paymentRequiredResult;
             }
 
