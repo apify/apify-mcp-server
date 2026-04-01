@@ -70,7 +70,7 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -913,9 +913,8 @@ Please verify the server URL is correct and accessible, and ensure you have a va
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 logHttpError(error, 'Error occurred while calling tool', { toolName: name });
-                const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse({
-                    texts: [`Error calling tool "${name}": ${errorMessage}.  Please verify the tool name, input parameters, and ensure all required resources are available.`],
+                    texts: [getToolCallErrorUserText(name, error)],
                     isError: true,
                     toolStatus,
                 });
@@ -1148,6 +1147,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+            const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
             // TODO: In future, we should actually stop execution via AbortController,
@@ -1169,7 +1169,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             await this.taskStore.storeTaskResult(taskId, 'failed', {
                 content: [{
                     type: 'text' as const,
-                    text: `Error calling tool: ${errorMessage}. Please verify the tool name, input parameters, and ensure all required resources are available.`,
+                    text: userText,
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
