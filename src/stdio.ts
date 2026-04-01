@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-// Node version check must run before anything else (including Sentry)
-import './checkNodeVersion.js';
 // Sentry must be imported before all other modules to ensure early initialization
 import './instrument.js';
 
@@ -188,10 +186,10 @@ if (requiresAuthentication && !apifyToken) {
 async function main() {
     // Node.js version guard — surface a clear error instead of cryptic failures
     const [major] = process.versions.node.split('.').map(Number);
-    if (major < 18) {
+    if (major < 20) {
         // eslint-disable-next-line no-console
         console.error(
-            `Error: Apify MCP server requires Node.js 18 or later (you have ${process.version}).\n`
+            `Error: Apify MCP server requires Node.js 20 or later (you have ${process.version}).\n`
             + 'Please update Node.js: https://nodejs.org',
         );
         process.exit(1);

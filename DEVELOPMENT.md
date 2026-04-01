@@ -39,11 +39,7 @@ The minimum supported Node.js version is **20** (`engines.node >= 20` in `packag
 
 **Why Node.js 20:**
 
-`undici` (HTTP client used internally by `apify-client`) references the `File` Web API as a global at module load time:
-
-`File` was added to Node.js globals in **v20.0.0**. On Node 18, this line throws `ReferenceError: File is not defined` and the process crashes before serving a single request. Sentry recorded ~35 000 such crashes from real users before the requirement was raised.
-
-`src/checkNodeVersion.ts` is imported as the very first module in `stdio.ts` (before Sentry and before any dependency is loaded) and exits with a clear error message if the Node version is below 20, so users get an actionable message instead of a cryptic crash.
+`@segment/analytics-node` (used for telemetry) declares `engines: { node: ">=20" }`, which makes Node.js 20 the hard floor for this package.
 
 - The `.nvmrc` file pins the latest Node.js version for development tooling (lint, type-check, build) — this is intentionally higher than the minimum supported version.
 
