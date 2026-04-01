@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Node version check must run before anything else (including Sentry)
+import './checkNodeVersion.js';
+
 // Sentry must be imported before all other modules to ensure early initialization
 import './instrument.js';
 

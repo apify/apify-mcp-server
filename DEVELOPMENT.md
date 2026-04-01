@@ -35,15 +35,16 @@ Key entry points:
 
 ## Node.js version policy
 
-The minimum supported Node.js version is **18** (`engines.node >= 18` in `package.json`).
+The minimum supported Node.js version is **20** (`engines.node >= 20` in `package.json`).
 
-**Why Node.js 18 (not higher):**
-The MCP server is installed by end-users via `npx` and must work on the widest reasonable range of Node.js versions. Our key dependency, `@modelcontextprotocol/sdk`, requires Node.js >= 18, and our own source code uses no APIs beyond what Node.js 18 provides. Sentry telemetry showed ~20K crash events from users on older Node versions (`File is not defined`, `ReadableStream is not defined`), confirming that many users run older runtimes.
+**Why Node.js 20:**
 
-**Rules for maintaining compatibility:**
-- Do not use Node.js APIs introduced after v18 (e.g., `import.meta.resolve`, `Array.fromAsync`, `Set.union()`).
-- Do not add dependencies that require Node.js > 18 at runtime. Check `engines` field of new dependencies before adding them.
-- CI runs unit tests against Node.js 18, 20, 22, and 24 to catch compatibility regressions.
+`undici` (HTTP client used internally by `apify-client`) references the `File` Web API as a global at module load time:
+
+`File` was added to Node.js globals in **v20.0.0**. On Node 18, this line throws `ReferenceError: File is not defined` and the process crashes before serving a single request. Sentry recorded ~35 000 such crashes from real users before the requirement was raised.
+
+`src/checkNodeVersion.ts` is imported as the very first module in `stdio.ts` (before Sentry and before any dependency is loaded) and exits with a clear error message if the Node version is below 20, so users get an actionable message instead of a cryptic crash.
+
 - The `.nvmrc` file pins the latest Node.js version for development tooling (lint, type-check, build) — this is intentionally higher than the minimum supported version.
 
 ## How to contribute
