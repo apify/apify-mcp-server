@@ -15,7 +15,7 @@ import type {
 import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
-import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
+import type { ACTOR_PRICING_MODEL, FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
@@ -369,6 +369,7 @@ export type ApifyToken = string | null | undefined;
  * Derived from TOOL_STATUS to ensure type safety and avoid duplication.
  */
 export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];
+export type FailureCategory = (typeof FAILURE_CATEGORY)[keyof typeof FAILURE_CATEGORY];
 
 /**
  * Properties for tool call telemetry events sent to Segment.
@@ -385,6 +386,14 @@ export type ToolCallTelemetryProperties = {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
+    failure_category?: FailureCategory;
+    failure_http_status?: number;
+    failure_detail?: string;
+    actor_name?: string;
+    validation_keyword?: string;
+    validation_path?: string;
+    validation_missing_property?: string;
+    validation_additional_property?: string;
 };
 
 /**

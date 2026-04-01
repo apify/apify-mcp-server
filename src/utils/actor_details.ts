@@ -2,7 +2,7 @@ import type { Build } from 'apify-client';
 import { z } from 'zod';
 
 import type { ApifyClient } from '../apify_client.js';
-import { HelperTools, TOOL_STATUS } from '../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../const.js';
 import { connectMCPClient } from '../mcp/client.js';
 import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
@@ -299,6 +299,7 @@ Please verify Actor ID or name format and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
         isError: true,
         toolStatus: TOOL_STATUS.SOFT_FAIL,
+        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
     });
 }
 

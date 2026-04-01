@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { ApifyClient } from '../../apify_client.js';
 import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    FAILURE_CATEGORY,
     HelperTools,
     TOOL_STATUS,
 } from '../../const.js';
@@ -13,6 +14,7 @@ import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { extractValidationDiagnostics } from '../../utils/tool_status.js';
 import { actorNameToToolName } from '../utils.js';
 import { getActorsAsTools } from './actor_tools_factory.js';
 
@@ -194,6 +196,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 isError: true,
                 // `toolStatus` is internal-only (telemetry/server logic); clients should rely on `isError`.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             }),
         };
     }
@@ -204,7 +207,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
             `The input schema for this Actor was retrieved and is shown below:`,
             `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
         ];
-        return { error: buildMCPResponse({ texts: content, isError: true }) };
+        return {
+            error: buildMCPResponse({
+                texts: content, isError: true, toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            }),
+        };
     }
 
     if (!actor.ajvValidate(input)) {
@@ -216,7 +223,16 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         if (errors && errors.length > 0) {
             content.push(`Validation errors: ${errors.map((e) => (e as { message?: string; }).message).join(', ')}`);
         }
-        return { error: buildMCPResponse({ texts: content, isError: true }) };
+        const validationDiagnostics = extractValidationDiagnostics(errors ?? null);
+        return {
+            error: buildMCPResponse({
+                texts: content,
+                isError: true,
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                validationDiagnostics,
+            }),
+        };
     }
 
     return { actor };
@@ -257,6 +273,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
                 isError: true,
                 // Internal status used by server telemetry; not part of the MCP client contract.
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             }),
         };
     }

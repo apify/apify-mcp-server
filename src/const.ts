@@ -190,7 +190,7 @@ export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 // Tool status
 /**
- * Unified status constants for tool execution lifecycle.
+ * Unified status constants for the tool execution lifecycle.
  * Single source of truth for all tool status values.
  */
 export const TOOL_STATUS = {
@@ -198,6 +198,12 @@ export const TOOL_STATUS = {
     FAILED: 'FAILED',
     ABORTED: 'ABORTED',
     SOFT_FAIL: 'SOFT_FAIL',
+} as const;
+
+export const FAILURE_CATEGORY = {
+    INVALID_INPUT: 'INVALID_INPUT',
+    AUTH: 'AUTH',
+    INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
 // HTTP status codes

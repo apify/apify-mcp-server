@@ -24,6 +24,7 @@ export default [
         ignores: [
             '**/dist', // Build output directory
             '**/.venv', // Python virtual environment (if present)
+            '.claude/worktrees/**', // Local Codex/Claude worktrees are outside this repo's TS project
             'evals/*.ts', // Top-level evaluation scripts
             'evals/*.md', // Documentation files
             'evals/*.json', // Test case data files

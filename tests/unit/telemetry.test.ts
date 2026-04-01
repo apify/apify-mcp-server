@@ -81,4 +81,32 @@ describe('telemetry', () => {
         expect(callArgs.event).toBe('MCP Tool Call');
         expect(callArgs.properties).toEqual(properties);
     });
+
+    it('should preserve optional failure diagnostics in the payload', () => {
+        const properties = {
+            app: 'mcp' as const,
+            app_version: '0.5.6',
+            mcp_client_name: 'test-client',
+            mcp_client_version: '1.0.0',
+            mcp_protocol_version: '2024-11-05',
+            mcp_client_capabilities: {},
+            mcp_session_id: 'session-123',
+            transport_type: 'stdio',
+            tool_name: 'call-actor',
+            tool_status: 'SOFT_FAIL' as const,
+            tool_exec_time_ms: 100,
+            failure_category: 'INVALID_INPUT' as const,
+            actor_name: 'apify/rag-web-browser',
+            validation_keyword: 'required',
+            validation_missing_property: 'query',
+        };
+
+        trackToolCall('test-user-123', 'DEV', properties);
+
+        expect(mockTrack).toHaveBeenCalledWith({
+            userId: 'test-user-123',
+            event: 'MCP Tool Call',
+            properties,
+        });
+    });
 });

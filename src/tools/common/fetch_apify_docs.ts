@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../../const.js';
+import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -66,6 +66,7 @@ Please provide a valid documentation URL. \
 You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                 isError: true,
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
             });
         }
 
@@ -88,6 +89,8 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                         texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
                         isError: true,
                         toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
+                        failureCategory: isUserError ? FAILURE_CATEGORY.INVALID_INPUT : FAILURE_CATEGORY.INTERNAL_ERROR,
+                        failureHttpStatus: response.status,
                     });
                 }
                 markdown = await response.text();
@@ -98,6 +101,7 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                     texts: [buildFetchErrorMessage(url, `Error: ${error instanceof Error ? error.message : String(error)}.`)],
                     isError: true,
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
                 });
             }
         }
