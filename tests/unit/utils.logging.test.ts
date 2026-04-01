@@ -1,6 +1,68 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { redactSkyfirePayId } from '../../src/utils/logging.js';
+const mockSoftFail = vi.fn();
+const mockException = vi.fn();
+const mockError = vi.fn();
+
+vi.mock('@apify/log', () => ({
+    default: {
+        softFail: (...args: unknown[]) => mockSoftFail(...args),
+        exception: (...args: unknown[]) => mockException(...args),
+        error: (...args: unknown[]) => mockError(...args),
+    },
+}));
+
+// eslint-disable-next-line import/first -- @apify/log mock must run before loading the module under test
+import {
+    logHttpError,
+    redactSkyfirePayId,
+} from '../../src/utils/logging.js';
+
+describe('logHttpError', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('should softFail for 401', () => {
+        const err = Object.assign(new Error('Unauthorized'), { statusCode: 401 });
+        logHttpError(err, 'upstream failed', { toolName: 'x' });
+        expect(mockSoftFail).toHaveBeenCalledWith('upstream failed', {
+            errMessage: 'Unauthorized',
+            statusCode: 401,
+            toolName: 'x',
+        });
+    });
+
+    it('should softFail for 403', () => {
+        const err = Object.assign(new Error('Forbidden'), { statusCode: 403 });
+        logHttpError(err, 'denied');
+        expect(mockSoftFail).toHaveBeenCalledWith('denied', {
+            errMessage: 'Forbidden',
+            statusCode: 403,
+        });
+    });
+
+    it('should softFail for 404', () => {
+        const err = Object.assign(new Error('Nope'), { statusCode: 404 });
+        logHttpError(err, 'missing');
+        expect(mockSoftFail).toHaveBeenCalledWith('missing', {
+            errMessage: 'Nope',
+            statusCode: 404,
+        });
+    });
+
+    it('should log exception for 500', () => {
+        const err = Object.assign(new Error('Boom'), { statusCode: 500 });
+        logHttpError(err, 'server error');
+        expect(mockException).toHaveBeenCalledWith(err, 'server error', { statusCode: 500 });
+    });
+
+    it('should log error when no status code', () => {
+        const err = new Error('Unknown');
+        logHttpError(err, 'no status');
+        expect(mockError).toHaveBeenCalledWith('no status', { error: err });
+    });
+});
 
 describe('redactSkyfirePayId', () => {
     it('should redact skyfire-pay-id when present', () => {

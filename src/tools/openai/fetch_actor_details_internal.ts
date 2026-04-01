@@ -13,6 +13,7 @@ import {
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { normalizeAndLogActorId } from '../core/actor_tools_factory.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 
 const fetchActorDetailsInternalArgsSchema = z.object({
@@ -51,23 +52,24 @@ but the user did NOT explicitly ask for Actor details presentation.`,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsInternalArgsSchema.parse(args);
+        const actorName = normalizeAndLogActorId(parsed.actor, { mcpSessionId, route: 'fetch-actor-details-internal' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
         const resolvedOutput = resolveOutputOptions(parsed.output);
         const cardOptions = buildCardOptions(resolvedOutput);
 
-        const details = await fetchActorDetails(apifyClient, parsed.actor, cardOptions);
+        const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
-            return buildActorNotFoundResponse(parsed.actor);
+            return buildActorNotFoundResponse(actorName);
         }
 
         // Fetch output schema from ActorStore if available and requested
         const actorOutputSchema = resolvedOutput.outputSchema
-            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(parsed.actor).catch(() => null)
+            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
             : undefined;
 
         const { texts, structuredContent } = await buildActorDetailsTextResponse({
-            actorName: parsed.actor,
+            actorName,
             details,
             output: resolvedOutput,
             cardOptions,

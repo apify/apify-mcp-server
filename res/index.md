@@ -45,6 +45,10 @@ MCP task lifecycle, SDK features, and protocol reference for the Apify MCP serve
 - Related issues: #582 (async call-actor), #587 (roadmap), #588 (tool naming)
 - **Use case**: Reference when working on MCP task integration, resource links, or protocol-level features
 
+### [mezmo_soft_fail_fix_plan.md](./mezmo_soft_fail_fix_plan.md)
+Staff-level implementation plan from production Mezmo SOFT_FAIL log analysis: AJV / actor normalization / tool aliases / 4xx messaging / 402 copy / observability. Includes **log provenance** split between this package and `apify-mcp-server-internal`, Phase 0 triage, **two-repo execution order** (package release then internal bump + `streamable.ts` / `logging.ts` alignment), and a checklist synced from `.cursor/plans/`.
+- **Use case**: Prioritize error-quality and tooling work; avoid fixing gateway-only issues in the wrong repo
+
 ### [patterns_for_simplification.md](./patterns_for_simplification.md)
 Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
 

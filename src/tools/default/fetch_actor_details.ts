@@ -8,6 +8,7 @@ import {
     resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { normalizeAndLogActorId } from '../core/actor_tools_factory.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
@@ -22,25 +23,26 @@ export const defaultFetchActorDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
+        const actorName = normalizeAndLogActorId(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
         const resolvedOutput = resolveOutputOptions(parsed.output);
         const cardOptions = buildCardOptions(resolvedOutput);
 
-        const details = await fetchActorDetails(apifyClient, parsed.actor, cardOptions);
+        const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
-            return buildActorNotFoundResponse(parsed.actor);
+            return buildActorNotFoundResponse(actorName);
         }
 
         // Fetch output schema from ActorStore if available and requested
         const actorOutputSchema = resolvedOutput.outputSchema
-            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(parsed.actor).catch(() => null)
+            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
             : undefined;
 
         // NOTE: Data duplication between texts and structuredContent is intentional and required.
         // Some MCP clients only read text content, while others only read structured content.
         const { texts, structuredContent: responseStructuredContent } = await buildActorDetailsTextResponse({
-            actorName: parsed.actor,
+            actorName,
             details,
             output: resolvedOutput,
             cardOptions,

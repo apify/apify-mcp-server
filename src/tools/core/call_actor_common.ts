@@ -19,7 +19,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
-import { getActorsAsTools } from './actor_tools_factory.js';
+import { getActorsAsTools, normalizeAndLogActorId } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -269,6 +269,10 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
  * - Handles MCP tool calls
  *
  * Returns either an early response (error or MCP tool result) or the parsed context for mode-specific execution.
+ *
+ * Applies the same `actor` string normalization as `getActorsAsTools` **before** MCP URL lookup and routing so
+ * clients cannot pass a clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo:
+ * e.g. trailing `` ` `` on `apify/rag-web-browser`).
  */
 export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     | { earlyResponse: object }
@@ -279,7 +283,9 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     }
 > {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
-    const parsed = callActorArgs.parse(args);
+    const parsedRaw = callActorArgs.parse(args);
+    const normalizedActor = normalizeAndLogActorId(parsedRaw.actor, { mcpSessionId, route: 'call-actor' });
+    const parsed: CallActorParsedArgs = { ...parsedRaw, actor: normalizedActor };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 

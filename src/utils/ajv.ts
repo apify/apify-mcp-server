@@ -32,10 +32,17 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
 }
 
 /**
- * Compiles a JSON schema with AJV, automatically cleaning the $schema property
- * and fixing the required array.
- * This wrapper ensures compatibility with z.toJSONSchema() output.
+ * Compiles a JSON schema with AJV, automatically cleaning the $schema property,
+ * fixing the required array, and setting `additionalProperties: true` at the root.
+ *
+ * **Why `additionalProperties: true`:** Zod → JSON Schema emits `additionalProperties: false`
+ * at the root. MCP / LLM clients regularly send extra top-level keys (client metadata, duplicated
+ * hints, transport leftovers). AJV then rejects the whole payload even when the declared fields
+ * are valid — production Mezmo logs showed validation SOFT_FAIL noise (e.g. `search-actors`) for
+ * otherwise acceptable calls. We only relax the **root** object; nested objects keep their own
+ * `additionalProperties` rules. Payment/session fields are stripped in `preparePayment()` before
+ * validation where applicable.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
-    return ajv.compile(fixZodSchemaRequired(schema));
+    return ajv.compile(fixZodSchemaRequired({ ...schema, additionalProperties: true }));
 }

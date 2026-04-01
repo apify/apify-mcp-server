@@ -59,10 +59,13 @@ import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
+    ActorMcpTool,
     ActorsMcpServerOptions,
     ActorStore,
+    ActorTool,
     ApifyRequestParams,
     CallDiagnostics,
+    HelperTool,
     ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -70,7 +73,7 @@ import type {
     ToolStatus,
 } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse } from '../utils/mcp.js';
+import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -1003,9 +1006,8 @@ export class ActorsMcpServer {
                     validationMissingProperty: callDiagnostics.validation_missing_property,
                     validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
-                const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse({
-                    texts: [`Error calling tool "${name}": ${errorMessage}.  Please verify the tool name, input parameters, and ensure all required resources are available.`],
+                    texts: [getToolCallErrorUserText(name, error)],
                     isError: true,
                     telemetry: { toolStatus },
                 });
@@ -1268,6 +1270,7 @@ export class ActorsMcpServer {
                 error,
             });
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
+            const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
             // TODO: In future, we should actually stop execution via AbortController,
@@ -1289,7 +1292,7 @@ export class ActorsMcpServer {
             await this.taskStore.storeTaskResult(taskId, 'failed', {
                 content: [{
                     type: 'text' as const,
-                    text: `Error calling tool: ${errorMessage}. Please verify the tool name, input parameters, and ensure all required resources are available.`,
+                    text: userText,
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
@@ -1303,12 +1306,13 @@ export class ActorsMcpServer {
      * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
-        toolName: string, mcpSessionId: string | undefined, apifyToken: string,
+        toolOrName: HelperTool | ActorTool | ActorMcpTool | string, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };
         }
 
+        const toolFullName = typeof toolOrName === 'string' ? toolOrName : getToolFullName(toolOrName);
         // Get userId from cache or fetch from API
         let userId: string | null = null;
         if (apifyToken) {
@@ -1327,7 +1331,7 @@ export class ActorsMcpServer {
             mcp_client_capabilities: capabilities || null,
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
-            tool_name: toolName,
+            tool_name: toolFullName,
             tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
         };
