@@ -47,6 +47,14 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 - **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before integration tests or deployment).
 - **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN`, which only humans have access to.
 
+## Scope discipline
+
+- **Bug fix = bug fix.** When fixing a bug, fix only the bug. Don't refactor surrounding code, don't improve naming, don't add comments, don't "clean up while you're here."
+- **One thing per change.** Each change should do exactly one thing: fix a bug, add a feature, or refactor. Never combine. If you spot something unrelated that needs fixing, mention it — don't fix it.
+- **Test first.** For bug fixes, write a failing test that reproduces the bug before touching source code. Run it to confirm it fails. Then fix.
+- **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
+- **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
+
 ## Testing
 
 ### Running tests
@@ -99,6 +107,14 @@ it('should do something awesome', async () => {
 ## External dependencies
 
 **IMPORTANT**: This package (`@apify/actors-mcp-server`) is used in the private `apify-mcp-server-internal` repository for the hosted server. Changes here may affect that server. Breaking changes must be coordinated; check whether updates are needed in `apify-mcp-server-internal` before submitting a PR. See README.md for canary (`beta`) releases via `pkg.pr.new`.
+
+### Public/internal repo separation (see [internal#419](https://github.com/apify/apify-mcp-server-internal/issues/419))
+
+- **Public repo** = core MCP server logic, interfaces, types (with generic/plain data types only)
+- **Internal repo** = backend/DB/proprietary logic (Redis, MongoDB, IAM auth, multi-node)
+- **Never** import private Apify libraries or internal DB schemas into the public repo — external users can't install them
+- **Expose methods on `ActorsMcpServer`**, not raw data exports via `./internals` — minimize the coupling surface
+- When designing a new feature, ask: can this land in one repo? Prefer exposing a method or interface over exporting internals that the other repo re-implements
 
 ## Further reading
 
