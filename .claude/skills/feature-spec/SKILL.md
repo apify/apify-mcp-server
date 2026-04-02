@@ -99,38 +99,29 @@ When planning is complete, exit planning mode with `ExitPlanMode`, then create i
 
 **One issue per implementation phase.** If the feature has multiple phases, create a separate issue for each. Each issue should be independently implementable.
 
-Use the repo's `feature_request.yml` template. Create issues with `gh issue create` using this structure:
+Use the repo's `feature_spec.yml` template (not `feature_request.yml` — that one is for external users). Write **concrete, concise, no empty sections** issues. Only include sections that have real content for this specific issue.
 
 ```markdown
-## Problem or motivation
-[Why this feature/phase is needed]
+## Problem
+[Be concrete — numbers, error messages, user reports, Slack/issue links. "Users are confused" is weak; "3 users reported X in #channel" is strong.]
 
 ## Proposed solution
+[Short explanation of the approach. Reference existing code paths. If files need changing, list them here inline — don't make a separate table unless there are 5+ files.]
 
-### Scope
-- [What this issue covers — be explicit]
-
-### Out of scope
-- [What this issue does NOT cover]
-
-### Technical design
-[Implementation details, referencing existing code by file path]
-
-### Files to modify
-| File | Change |
-|------|--------|
-| `src/...` | Description |
-
-### Internal repo impact
-[Does apify-mcp-server-internal need changes? Check imports/usage.]
-
-### Testing
-- Unit tests: [key cases]
-- Integration tests: [cases for tests/integration/suite.ts]
+## Plan
+- [ ] Step 1 (with PR links or assignees if known)
+- [ ] Step 2
+- [ ] ...
 
 ## Alternatives considered
-[Other approaches and why they were rejected]
+[Only if you actually evaluated other approaches. Skip if there's one obvious solution.]
 ```
+
+**Style rules:**
+- Skip any section that would be empty or generic
+- Lead with real evidence (data, links, screenshots), not abstract motivation
+- Keep it short — the best issues are 10-30 lines, not 100
+- A checklist plan with concrete steps beats a wall of prose
 
 **Before presenting the issues**, self-review the design:
 - Is this the minimal design? Could the scope be smaller?
