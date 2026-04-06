@@ -390,7 +390,7 @@ For detailed development setup, project structure, and local testing instruction
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en) (v18 or higher)
+- [Node.js](https://nodejs.org/en) (v20 or higher)
 
 Create an environment file, `.env`, with the following content:
 ```text
@@ -446,37 +446,37 @@ The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mc
 
 # 🐛 Troubleshooting (local MCP server)
 
-- Make sure you have `node` (v18 or higher) installed by running `node -v`.
+- Make sure you have `node` (v20 or higher) installed by running `node -v`.
 - Make sure the `APIFY_TOKEN` environment variable is set.
 - Always use the latest version of the MCP server by using `@apify/actors-mcp-server@latest`.
 
 ### Common issues
 
-#### "Unable to connect to extension server" or tools not loading
+#### "Unable to connect to extension server", "Cannot find module", or tools not loading
 
-This is most commonly caused by a **corrupted npx cache**. Fix it by clearing the cache and retrying:
+This is most commonly caused by a **corrupted npx cache** — often left behind when Claude Desktop restarts the MCP server process mid-download. Fix it by clearing the cache:
 
 ```bash
-# Clear the npx cache
+# macOS / Linux
 rm -rf ~/.npm/_npx
+npx -y @apify/actors-mcp-server@latest
 
-# Retry
+# Windows (PowerShell)
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\npm-cache\_npx"
 npx -y @apify/actors-mcp-server@latest
 ```
 
+After clearing the cache, restart Claude Desktop.
+
 #### Errors like "File is not defined" or "ReadableStream is not defined"
 
-You are running an **outdated version of Node.js**. The Apify MCP server requires Node.js 18 or higher:
+You are running an **outdated version of Node.js**. The Apify MCP server requires Node.js **v20 or higher**:
 
 ```bash
 node -v  # Check your version
 ```
 
-If your version is below 18, update Node.js from [nodejs.org](https://nodejs.org).
-
-#### "Cannot find module" errors
-
-This usually indicates a corrupted `npx` cache (see above). Clear it with `rm -rf ~/.npm/_npx` and retry.
+If your version is below 20, update Node.js from [nodejs.org](https://nodejs.org).
 
 #### Server works in Claude Desktop chat but not in cowork mode
 
