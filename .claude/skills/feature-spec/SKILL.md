@@ -77,7 +77,7 @@ During planning, explore:
 5. **MCP Apps spec/SDK** if the feature involves widgets or interactive UIs — check both the spec and `node_modules/@modelcontextprotocol/ext-apps`
 6. Use `mcp__apify-dev__*` and `mcp__apify-dev-ui__*` tools to test current behavior if the dev servers are running
 
-**Public/internal repo separation** ([internal#419](https://github.com/apify/apify-mcp-server-internal/issues/419)): For every feature, ask: can this land in one repo? The public repo owns core server logic, interfaces, and types (generic/plain data types only). The internal repo owns backend/DB/proprietary logic (Redis, MongoDB, IAM auth, multi-node). Prefer exposing a method on `ActorsMcpServer` over exporting internals that the other repo re-implements. Never import private Apify libraries into the public repo.
+**Public/internal repo separation**: See `CLAUDE.md § Public/internal repo separation`.
 
 Ask clarifying questions if the feature description is ambiguous. Prefer narrowing scope over guessing intent.
 
@@ -97,7 +97,7 @@ If a matching issue exists, update it with `gh issue edit` instead of creating a
 
 When planning is complete, exit planning mode with `ExitPlanMode`, then create issues.
 
-**One issue per implementation phase.** If the feature has multiple phases, create a separate issue for each. Each issue should be independently implementable.
+**One issue per implementation phase.** A phase ≈ one PR-sized unit of work (roughly 50–200 lines changed). Example: phase 1 = add the new Zod schema + types, phase 2 = wire up the tool handler + tests. If the feature has multiple phases, create a separate issue for each. Each issue should be independently implementable.
 
 Use the repo's `feature_spec.yml` template (not `feature_request.yml` — that one is for external users). Write **concrete, concise, no empty sections** issues. Only include sections that have real content for this specific issue.
 
@@ -128,4 +128,4 @@ Use the repo's `feature_spec.yml` template (not `feature_request.yml` — that o
 - Am I reusing existing patterns or reinventing?
 - Could this be done by adjusting existing code rather than adding new code?
 
-Present the issue content to the user for review before creating. Use `gh issue create` with appropriate title and the `enhancement` label.
+Present the issue content to the user for review before creating. Use `gh issue create` with appropriate title and `t-ai` labels.

@@ -1,7 +1,7 @@
 name: Feature spec
 description: Internal feature specification with technical design and implementation plan
-title: ""
-labels: ["enhancement"]
+title: "[spec] "
+labels: ["t-ai"]
 body:
   - type: textarea
     id: problem
@@ -31,7 +31,7 @@ body:
       description: >-
         Concrete steps as checkboxes. Include assignees and PR links if known.
         Skip for trivial changes.
-      value: |
+      placeholder: |
         - [ ] Step 1
         - [ ] Step 2
     validations:

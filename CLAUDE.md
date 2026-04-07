@@ -18,6 +18,14 @@ The server can run in multiple modes:
 - **No over-engineering**: Solve the current problem, not hypothetical future ones
 - **No unsolicited features**: Don't add anything not explicitly requested by the human operator
 
+## Scope discipline
+
+- **Bug fix = bug fix.** When fixing a bug, fix only the bug. Don't refactor surrounding code, don't improve naming, don't add comments, don't "clean up while you're here."
+- **One thing per change.** Each change should do exactly one thing: fix a bug, add a feature, or refactor. Never combine. If you spot something unrelated that needs fixing, mention it — don't fix it.
+- **Test first.** For bug fixes, write a failing test that reproduces the bug before touching source code. Run it to confirm it fails. Then fix.
+- **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
+- **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
+
 ## ⚠️ MANDATORY: Verification after every implementation
 
 **THIS IS NON-NEGOTIABLE. DO NOT SKIP.**
@@ -46,14 +54,6 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 
 - **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before integration tests or deployment).
 - **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN`, which only humans have access to.
-
-## Scope discipline
-
-- **Bug fix = bug fix.** When fixing a bug, fix only the bug. Don't refactor surrounding code, don't improve naming, don't add comments, don't "clean up while you're here."
-- **One thing per change.** Each change should do exactly one thing: fix a bug, add a feature, or refactor. Never combine. If you spot something unrelated that needs fixing, mention it — don't fix it.
-- **Test first.** For bug fixes, write a failing test that reproduces the bug before touching source code. Run it to confirm it fails. Then fix.
-- **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
-- **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
 
 ## Testing
 
