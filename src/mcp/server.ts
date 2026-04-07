@@ -100,6 +100,7 @@ type ToolsChangedHandler = (toolNames: string[]) => void;
  */
 function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
     if (tool.type === 'actor') return tool.actorFullName;
+    if (tool.type === 'actor-mcp') return tool.actorId;
 
     // For call-actor, the actor name is in `args.actor`.
     // The format can be "username/name" or "username/name:toolName" (MCP server Actors).

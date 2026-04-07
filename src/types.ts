@@ -394,13 +394,15 @@ export type ToolCallTelemetryProperties = {
     validation_path?: string;
     validation_missing_property?: string;
     validation_additional_property?: string;
+    validation_error_count?: number;
 };
 
 export type ValidationDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'
-    | 'validation_additional_property'>;
+    | 'validation_additional_property'
+    | 'validation_error_count'>;
 
 export type FailureDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'failure_category'
@@ -410,7 +412,8 @@ export type FailureDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'
-    | 'validation_additional_property'>;
+    | 'validation_additional_property'
+    | 'validation_error_count'>;
 
 /**
  * Internal server mode that controls which tool variants, descriptions, and response

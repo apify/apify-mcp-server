@@ -57,17 +57,20 @@ function limitField(value: string | undefined): string | undefined {
 export function extractValidationDiagnostics(
     errors: ErrorObject[] | null | undefined,
 ): ValidationDiagnostics {
-    const firstError = errors?.[0];
-    if (!firstError) return {};
+    if (!errors?.length) return {};
+
+    const firstError = errors[0];
 
     // Extracted fields use the first AJV error as the canonical summary:
     // - validation_keyword: AJV keyword such as "required", "additionalProperties", "minimum", "type"
     // - validation_path: AJV instancePath such as "/input/query" or "/callOptions/memory"
     // - validation_missing_property: required-property name such as "query"
     // - validation_additional_property: unexpected-property name such as "docSource"
+    // - validation_error_count: total number of AJV errors (signals when there's more than one)
     const diagnostics: ValidationDiagnostics = {
         validation_keyword: limitField(firstError.keyword),
         validation_path: limitField(firstError.instancePath || undefined),
+        validation_error_count: errors.length,
     };
 
     const hasParams = typeof firstError.params === 'object' && firstError.params !== null;
