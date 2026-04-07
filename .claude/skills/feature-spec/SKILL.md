@@ -127,5 +127,6 @@ Use the repo's `feature_spec.yml` template (not `feature_request.yml` — that o
 - Is this the minimal design? Could the scope be smaller?
 - Am I reusing existing patterns or reinventing?
 - Could this be done by adjusting existing code rather than adding new code?
+- Does the feature require refactoring first? If so, split into a separate refactoring PR that must merge before the feature work begins. Never mix refactoring with feature changes — the combined diff is hard to review and easy to break.
 
 Present the issue content to the user for review before creating. Use `gh issue create` with appropriate title and `t-ai` labels.
