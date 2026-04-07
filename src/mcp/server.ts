@@ -62,7 +62,7 @@ import type {
     ActorsMcpServerOptions,
     ActorStore,
     ApifyRequestParams,
-    FailureDetails,
+    CallDiagnostics,
     ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -642,15 +642,15 @@ export class ActorsMcpServer {
             let telemetryData: ToolCallTelemetryProperties | null;
             let userId: string | null;
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
-            let failureDetails: FailureDetails = {};
+            let callDiagnostics: CallDiagnostics = {};
             let shouldTrackTelemetry = true;
             const failInvalidParams = async (
                 message: string,
-                details: FailureDetails,
+                details: CallDiagnostics,
                 logFields?: Record<string, unknown>,
             ): Promise<never> => {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
-                failureDetails = details;
+                callDiagnostics = details;
                 log.softFail(message, {
                     mcpSessionId,
                     failureCategory: details.failure_category,
@@ -710,6 +710,9 @@ export class ActorsMcpServer {
                 // Extract actor name/id for telemetry — available even when validation fails later.
                 actorName = extractActorName(tool, args as Record<string, unknown>);
                 actorId = extractActorId(tool);
+
+                // Always populate actor fields so they're tracked on both success and failure paths.
+                callDiagnostics = { ...callDiagnostics, ...buildActorFields(actorName, actorId) };
 
                 if (!args) {
                     await failInvalidParams(dedent`
@@ -804,7 +807,7 @@ export class ActorsMcpServer {
                 // Check payment validation (already computed by prepareToolCallContext)
                 if (paymentRequiredResult) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    failureDetails = {
+                    callDiagnostics = {
                         failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
@@ -836,7 +839,7 @@ export class ActorsMcpServer {
                         // Extract diagnostics and strip internal fields from res before returning to client.
                         const diag = extractToolTelemetry(res, actorName, actorId);
                         toolStatus = diag.toolStatus;
-                        failureDetails = diag.failureDetails;
+                        callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
                         return res;
                     } finally {
                         progressTracker?.stop();
@@ -855,7 +858,7 @@ export class ActorsMcpServer {
                             log.softFail(msg, { mcpSessionId, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR });
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            failureDetails = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
+                            callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
                             return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
@@ -896,14 +899,14 @@ export class ActorsMcpServer {
                         // actor-mcp gets deeper telemetry treatment.
                         if ('isError' in res && res.isError) {
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            failureDetails = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
+                            callDiagnostics = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
                         }
 
                         return { ...res };
                     } catch (error) {
                         toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                         const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-                        failureDetails = {
+                        callDiagnostics = {
                             failure_category: classifyFailureCategory(error),
                             failure_detail: failureDetail,
                             ...buildActorFields(actorName, actorId),
@@ -911,7 +914,7 @@ export class ActorsMcpServer {
                         logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
-                            failureCategory: failureDetails.failure_category,
+                            failureCategory: callDiagnostics.failure_category,
                         });
                         return buildMCPResponse({
                             texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
@@ -961,7 +964,7 @@ export class ActorsMcpServer {
                 // content[0].text (JSON) + isError: true
                 if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    failureDetails = {
+                    callDiagnostics = {
                         failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
@@ -970,7 +973,7 @@ export class ActorsMcpServer {
                 }
 
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
-                // returns them as JSON-RPC errors. failInvalidParams already set failureDetails
+                // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
                 // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
                 if (error instanceof McpError) {
                     throw error;
@@ -978,10 +981,10 @@ export class ActorsMcpServer {
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                 const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-                failureDetails = {
+                callDiagnostics = {
                     // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
                     // then overwrite with freshly computed fields so they take precedence.
-                    ...failureDetails,
+                    ...callDiagnostics,
                     failure_category: classifyFailureCategory(error),
                     ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
                     failure_detail: failureDetail,
@@ -992,13 +995,13 @@ export class ActorsMcpServer {
                     toolName: name,
                     toolStatus,
                     mcpSessionId,
-                    failureCategory: failureDetails.failure_category,
-                    failureHttpStatus: failureDetails.failure_http_status,
-                    actorName: failureDetails.actor_name,
-                    validationKeyword: failureDetails.validation_keyword,
-                    validationPath: failureDetails.validation_path,
-                    validationMissingProperty: failureDetails.validation_missing_property,
-                    validationAdditionalProperty: failureDetails.validation_additional_property,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                    actorName: callDiagnostics.actor_name,
+                    validationKeyword: callDiagnostics.validation_keyword,
+                    validationPath: callDiagnostics.validation_path,
+                    validationMissingProperty: callDiagnostics.validation_missing_property,
+                    validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse({
@@ -1008,7 +1011,7 @@ export class ActorsMcpServer {
                 });
             } finally {
                 if (shouldTrackTelemetry) {
-                    this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, failureDetails);
+                    this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
                 }
             }
 
@@ -1038,14 +1041,14 @@ export class ActorsMcpServer {
      * @param userId - Apify user ID (string or null if not available)
      * @param startTime - Timestamp when the tool call started
      * @param toolStatus - Final status of the tool call
-     * @param failureDetails - Failure details to include when toolStatus is not SUCCEEDED
+     * @param callDiagnostics - Telemetry fields: always includes actor_name/actor_id when available; failure-specific fields only on non-success
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
         userId: string | null,
         startTime: number,
         toolStatus: ToolStatus,
-        failureDetails?: FailureDetails,
+        callDiagnostics?: CallDiagnostics,
     ): void {
         if (!telemetryData) {
             return;
@@ -1056,7 +1059,8 @@ export class ActorsMcpServer {
             ...telemetryData,
             tool_status: toolStatus,
             tool_exec_time_ms: execTime,
-            ...(toolStatus !== TOOL_STATUS.SUCCEEDED ? failureDetails : {}),
+            // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
+            ...callDiagnostics,
         };
         trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
     }
@@ -1095,7 +1099,8 @@ export class ActorsMcpServer {
             apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
-        let failureDetails: FailureDetails = {};
+        // Always populate actor fields so they're tracked on both success and failure paths.
+        let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
         const startTime = Date.now();
 
         log.debug('[executeToolAndUpdateTask] Starting task execution', {
@@ -1136,7 +1141,7 @@ export class ActorsMcpServer {
             // Check payment validation (already computed by prepareToolCallContext in the caller)
             if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
-                failureDetails = {
+                callDiagnostics = {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
                     ...buildActorFields(actorName, actorId),
@@ -1171,7 +1176,7 @@ export class ActorsMcpServer {
 
                     const diag = extractToolTelemetry(res, actorName, actorId);
                     toolStatus = diag.toolStatus;
-                    failureDetails = diag.failureDetails;
+                    callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
                     result = res;
                 } finally {
                     if (progressTracker) {
@@ -1229,7 +1234,7 @@ export class ActorsMcpServer {
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, failureDetails);
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
@@ -1246,7 +1251,7 @@ export class ActorsMcpServer {
 
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
             const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
-            failureDetails = {
+            callDiagnostics = {
                 failure_category: classifyFailureCategory(error),
                 ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
                 failure_detail: failureDetail,
@@ -1257,9 +1262,9 @@ export class ActorsMcpServer {
                 toolName: tool.name,
                 toolStatus,
                 mcpSessionId,
-                failureCategory: failureDetails.failure_category,
-                failureHttpStatus: failureDetails.failure_http_status,
-                actorName: failureDetails.actor_name,
+                failureCategory: callDiagnostics.failure_category,
+                failureHttpStatus: callDiagnostics.failure_http_status,
+                actorName: callDiagnostics.actor_name,
                 error,
             });
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
@@ -1272,7 +1277,7 @@ export class ActorsMcpServer {
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, failureDetails);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
                 return;
             }
 
@@ -1290,7 +1295,7 @@ export class ActorsMcpServer {
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, failureDetails);
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
         }
     }
 

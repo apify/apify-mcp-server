@@ -15,6 +15,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractAjvErrorDetails } from '../../utils/tool_status.js';
+import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
 import { getActorsAsTools } from './actor_tools_factory.js';
 
@@ -199,6 +200,8 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         };
     }
 
+    const actorId = extractActorId(actor);
+
     if (!input) {
         return {
             error: buildMCPResponse({
@@ -208,7 +211,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                     `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
                 ],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT, actorId },
             }),
         };
     }
@@ -229,6 +232,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                 telemetry: {
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    actorId,
                     ajvErrorDetails: extractAjvErrorDetails(errors ?? null),
                 },
             }),

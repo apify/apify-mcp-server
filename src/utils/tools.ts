@@ -4,7 +4,7 @@ import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
-import type { FailureDetails, HelperTool, ServerMode, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import type { CallDiagnostics, HelperTool, ServerMode, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -33,7 +33,7 @@ export function extractActorId(tool: ToolEntry): string | undefined {
 /**
  * Build actor identification fields for failure telemetry.
  */
-export function buildActorFields(actorName?: string, actorId?: string): Pick<FailureDetails, 'actor_name' | 'actor_id'> {
+export function buildActorFields(actorName?: string, actorId?: string): Pick<CallDiagnostics, 'actor_name' | 'actor_id'> {
     return {
         ...(actorName ? { actor_name: actorName } : {}),
         ...(actorId ? { actor_id: actorId } : {}),

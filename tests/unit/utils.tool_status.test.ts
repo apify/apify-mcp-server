@@ -134,7 +134,7 @@ describe('extractAjvErrorDetails', () => {
 });
 
 describe('extractToolTelemetry', () => {
-    it('reads toolTelemetry, strips it, and maps to failureDetails', () => {
+    it('reads toolTelemetry, strips it, and maps to callDiagnostics', () => {
         const res: Record<string, unknown> = {
             content: 'ok',
             toolTelemetry: {
@@ -144,10 +144,10 @@ describe('extractToolTelemetry', () => {
             },
         };
 
-        const { toolStatus, failureDetails } = extractToolTelemetry(res, 'apify/web-scraper', 'abc123');
+        const { toolStatus, callDiagnostics } = extractToolTelemetry(res, 'apify/web-scraper', 'abc123');
 
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(failureDetails).toMatchObject(
+        expect(callDiagnostics).toMatchObject(
             { failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper', actor_id: 'abc123' },
         );
         expect(res.toolTelemetry).toBeUndefined();
@@ -155,14 +155,14 @@ describe('extractToolTelemetry', () => {
     });
 
     it('defaults to SOFT_FAIL when isError without toolTelemetry', () => {
-        const { toolStatus, failureDetails } = extractToolTelemetry({ isError: true }, undefined, undefined);
+        const { toolStatus, callDiagnostics } = extractToolTelemetry({ isError: true }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(failureDetails.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
+        expect(callDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
     });
 
     it('returns SUCCEEDED when no error signals', () => {
-        const { toolStatus, failureDetails } = extractToolTelemetry({ content: 'ok' }, undefined, undefined);
+        const { toolStatus, callDiagnostics } = extractToolTelemetry({ content: 'ok' }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
-        expect(failureDetails).toEqual({});
+        expect(callDiagnostics).toEqual({});
     });
 });

@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
-import type { AjvErrorDetails, FailureCategory, FailureDetails, ToolStatus, ToolTelemetryContext } from '../types.js';
+import type { AjvErrorDetails, CallDiagnostics, FailureCategory, ToolStatus, ToolTelemetryContext } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 import { buildActorFields } from './tools.js';
 
@@ -92,7 +92,7 @@ export function extractAjvErrorDetails(
 }
 
 /**
- * Reads `toolTelemetry` from a tool response, strips it, and returns toolStatus + failureDetails.
+ * Reads `toolTelemetry` from a tool response, strips it, and returns toolStatus + callDiagnostics.
  *
  * toolStatus resolution:
  * 1. `toolTelemetry.toolStatus` present → use it directly.
@@ -106,7 +106,7 @@ export function extractToolTelemetry(
     res: Record<string, unknown>,
     actorName: string | undefined,
     actorId: string | undefined,
-): { toolStatus: ToolStatus; failureDetails: FailureDetails } {
+): { toolStatus: ToolStatus; callDiagnostics: CallDiagnostics } {
     const telemetry = res.toolTelemetry as ToolTelemetryContext | undefined;
     delete res.toolTelemetry;
 
@@ -117,21 +117,21 @@ export function extractToolTelemetry(
         if (res.isError) {
             return {
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureDetails: { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...actorFields },
+                callDiagnostics: { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...actorFields },
             };
         }
-        return { toolStatus: TOOL_STATUS.SUCCEEDED, failureDetails: {} };
+        return { toolStatus: TOOL_STATUS.SUCCEEDED, callDiagnostics: {} };
     }
 
     const toolStatus = telemetry.toolStatus
         ?? (res.isError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.SUCCEEDED);
 
-    const failureDetails: FailureDetails = {
+    const callDiagnostics: CallDiagnostics = {
         ...(telemetry.failureCategory && { failure_category: telemetry.failureCategory }),
         ...(telemetry.failureHttpStatus !== undefined && { failure_http_status: telemetry.failureHttpStatus }),
         ...actorFields,
         ...telemetry.ajvErrorDetails,
     };
 
-    return { toolStatus, failureDetails };
+    return { toolStatus, callDiagnostics };
 }

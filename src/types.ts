@@ -409,7 +409,7 @@ export type AjvErrorDetails = Pick<ToolCallTelemetryProperties,
 
 /**
  * Telemetry reported by tool handlers on the response object.
- * The server reads `toolTelemetry` from the response, strips it, and maps it to FailureDetails.
+ * The server reads `toolTelemetry` from the response, strips it, and maps it to CallDiagnostics.
  */
 export type ToolTelemetryContext = {
     toolStatus?: ToolStatus;
@@ -419,7 +419,7 @@ export type ToolTelemetryContext = {
     ajvErrorDetails?: AjvErrorDetails;
 };
 
-export type FailureDetails = Pick<ToolCallTelemetryProperties,
+export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
