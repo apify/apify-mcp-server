@@ -46,8 +46,7 @@ USAGE EXAMPLES:
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };

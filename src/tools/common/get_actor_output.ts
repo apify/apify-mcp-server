@@ -120,8 +120,7 @@ export const getActorOutput: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 

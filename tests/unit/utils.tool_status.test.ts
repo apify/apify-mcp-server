@@ -4,8 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import {
     classifyFailureCategory,
-    extractToolResponseDiagnostics,
-    extractValidationDiagnostics,
+    extractAjvErrorDetails,
+    extractToolTelemetry,
     getToolStatusFromError,
 } from '../../src/utils/tool_status.js';
 
@@ -76,9 +76,9 @@ describe('classifyFailureCategory', () => {
     });
 });
 
-describe('extractValidationDiagnostics', () => {
+describe('extractAjvErrorDetails', () => {
     it('extracts required-property diagnostics', () => {
-        const diagnostics = extractValidationDiagnostics([
+        const diagnostics = extractAjvErrorDetails([
             {
                 keyword: 'required',
                 instancePath: '',
@@ -97,7 +97,7 @@ describe('extractValidationDiagnostics', () => {
     });
 
     it('extracts additional-property diagnostics', () => {
-        const diagnostics = extractValidationDiagnostics([
+        const diagnostics = extractAjvErrorDetails([
             {
                 keyword: 'additionalProperties',
                 instancePath: '/output',
@@ -113,7 +113,7 @@ describe('extractValidationDiagnostics', () => {
     });
 
     it('reports error count for multiple validation errors', () => {
-        const diagnostics = extractValidationDiagnostics([
+        const diagnostics = extractAjvErrorDetails([
             { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'query' }, message: '' },
             { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'url' }, message: '' },
             { keyword: 'type', instancePath: '/limit', schemaPath: '#/type', params: { type: 'number' }, message: '' },
@@ -127,40 +127,42 @@ describe('extractValidationDiagnostics', () => {
     });
 
     it('returns empty for null/undefined errors', () => {
-        expect(extractValidationDiagnostics(null)).toEqual({});
-        expect(extractValidationDiagnostics(undefined)).toEqual({});
-        expect(extractValidationDiagnostics([])).toEqual({});
+        expect(extractAjvErrorDetails(null)).toEqual({});
+        expect(extractAjvErrorDetails(undefined)).toEqual({});
+        expect(extractAjvErrorDetails([])).toEqual({});
     });
 });
 
-describe('extractToolResponseDiagnostics', () => {
-    it('uses internalToolStatus when present and strips internal fields', () => {
+describe('extractToolTelemetry', () => {
+    it('reads toolTelemetry, strips it, and maps to failureDetails', () => {
         const res: Record<string, unknown> = {
             content: 'ok',
-            internalToolStatus: TOOL_STATUS.SOFT_FAIL,
-            internalFailureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-            internalFailureHttpStatus: 404,
+            toolTelemetry: {
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                failureHttpStatus: 404,
+            },
         };
 
-        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics(res, 'apify/web-scraper');
+        const { toolStatus, failureDetails } = extractToolTelemetry(res, 'apify/web-scraper', 'abc123');
 
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(failureDiagnostics).toMatchObject(
-            { failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper' },
+        expect(failureDetails).toMatchObject(
+            { failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper', actor_id: 'abc123' },
         );
-        expect(res.internalToolStatus).toBeUndefined();
+        expect(res.toolTelemetry).toBeUndefined();
         expect(res.content).toBe('ok');
     });
 
-    it('defaults to SOFT_FAIL when isError without internalToolStatus', () => {
-        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics({ isError: true }, undefined);
+    it('defaults to SOFT_FAIL when isError without toolTelemetry', () => {
+        const { toolStatus, failureDetails } = extractToolTelemetry({ isError: true }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(failureDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
+        expect(failureDetails.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
     });
 
     it('returns SUCCEEDED when no error signals', () => {
-        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics({ content: 'ok' }, undefined);
+        const { toolStatus, failureDetails } = extractToolTelemetry({ content: 'ok' }, undefined, undefined);
         expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
-        expect(failureDiagnostics).toEqual({});
+        expect(failureDetails).toEqual({});
     });
 });

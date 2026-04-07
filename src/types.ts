@@ -109,6 +109,8 @@ export type ToolInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 export type ActorTool = ToolBase & {
     /** Type discriminator for actor tools */
     type: 'actor';
+    /** Stable Apify Actor ID (e.g. "JxcaGGqy7TwBdHxMz") — does not change on rename */
+    actorId: string;
     /** Full name of the Apify Actor (username/name) */
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
@@ -390,6 +392,7 @@ export type ToolCallTelemetryProperties = {
     failure_http_status?: number;
     failure_detail?: string;
     actor_name?: string;
+    actor_id?: string;
     validation_keyword?: string;
     validation_path?: string;
     validation_missing_property?: string;
@@ -397,18 +400,31 @@ export type ToolCallTelemetryProperties = {
     validation_error_count?: number;
 };
 
-export type ValidationDiagnostics = Pick<ToolCallTelemetryProperties,
+export type AjvErrorDetails = Pick<ToolCallTelemetryProperties,
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'
     | 'validation_additional_property'
     | 'validation_error_count'>;
 
-export type FailureDiagnostics = Pick<ToolCallTelemetryProperties,
+/**
+ * Telemetry reported by tool handlers on the response object.
+ * The server reads `toolTelemetry` from the response, strips it, and maps it to FailureDetails.
+ */
+export type ToolTelemetryContext = {
+    toolStatus?: ToolStatus;
+    failureCategory?: FailureCategory;
+    failureHttpStatus?: number;
+    actorId?: string;
+    ajvErrorDetails?: AjvErrorDetails;
+};
+
+export type FailureDetails = Pick<ToolCallTelemetryProperties,
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
     | 'actor_name'
+    | 'actor_id'
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'

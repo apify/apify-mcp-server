@@ -61,7 +61,7 @@ USAGE EXAMPLES:
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
             });
         }
 
@@ -83,7 +83,7 @@ USAGE EXAMPLES:
             return buildMCPResponse({
                 texts: [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.FAILED,
+                telemetry: { toolStatus: TOOL_STATUS.FAILED },
             });
         }
 

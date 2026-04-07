@@ -66,8 +66,7 @@ Only documentation URLs from Apify and Crawlee are allowed \
 Please provide a valid documentation URL. \
 You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 
@@ -89,9 +88,11 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                     return buildMCPResponse({
                         texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
                         isError: true,
-                        toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
-                        failureCategory: classifyFailureCategory(error),
-                        failureHttpStatus: response.status,
+                        telemetry: {
+                            toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
+                            failureCategory: classifyFailureCategory(error),
+                            failureHttpStatus: response.status,
+                        },
                     });
                 }
                 markdown = await response.text();
@@ -101,8 +102,7 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                 return buildMCPResponse({
                     texts: [buildFetchErrorMessage(url, `Error: ${error instanceof Error ? error.message : String(error)}.`)],
                     isError: true,
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
-                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR },
                 });
             }
         }

@@ -298,8 +298,7 @@ export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof
 Please verify Actor ID or name format and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
         isError: true,
-        toolStatus: TOOL_STATUS.SOFT_FAIL,
-        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
     });
 }
 

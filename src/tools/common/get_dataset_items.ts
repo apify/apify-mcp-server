@@ -84,7 +84,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
             });
         }
 

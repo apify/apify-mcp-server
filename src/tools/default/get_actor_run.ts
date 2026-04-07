@@ -46,7 +46,7 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 texts: [`Failed to get Actor run '${parsed.runId}': ${error instanceof Error ? error.message : String(error)}.
 Please verify the run ID and ensure that the run exists.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
             });
         }
     },

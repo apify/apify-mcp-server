@@ -106,8 +106,7 @@ export async function fetchActorRunData(params: {
             error: buildMCPResponse({
                 texts: [`Run with ID '${runId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
         };
     }

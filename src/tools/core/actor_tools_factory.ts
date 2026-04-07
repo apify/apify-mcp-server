@@ -116,6 +116,7 @@ Actor description: ${definition.description}`;
         tools.push({
             type: 'actor',
             name: actorNameToToolName(definition.actorFullName),
+            actorId: definition.id,
             actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,

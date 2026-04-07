@@ -14,7 +14,7 @@ import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { extractValidationDiagnostics } from '../../utils/tool_status.js';
+import { extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { actorNameToToolName } from '../utils.js';
 import { getActorsAsTools } from './actor_tools_factory.js';
 
@@ -194,22 +194,21 @@ export async function resolveAndValidateActor(params: {
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
                 isError: true,
-                // `toolStatus` is internal-only (telemetry/server logic); clients should rely on `isError`.
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT, failureHttpStatus: 404 },
             }),
         };
     }
 
     if (!input) {
-        const content = [
-            `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
-            `The input schema for this Actor was retrieved and is shown below:`,
-            `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
-        ];
         return {
             error: buildMCPResponse({
-                texts: content, isError: true, toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                texts: [
+                    `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
+                    `The input schema for this Actor was retrieved and is shown below:`,
+                    `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
+                ],
+                isError: true,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
         };
     }
@@ -223,14 +222,15 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
         if (errors && errors.length > 0) {
             content.push(`Validation errors: ${errors.map((e) => (e as { message?: string; }).message).join(', ')}`);
         }
-        const validationDiagnostics = extractValidationDiagnostics(errors ?? null);
         return {
             error: buildMCPResponse({
                 texts: content,
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-                validationDiagnostics,
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    ajvErrorDetails: extractAjvErrorDetails(errors ?? null),
+                },
             }),
         };
     }
@@ -271,9 +271,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
             earlyResponse: buildMCPResponse({
                 texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider. To use this Actor, please provide a valid Apify token instead.`],
                 isError: true,
-                // Internal status used by server telemetry; not part of the MCP client contract.
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
         };
     }

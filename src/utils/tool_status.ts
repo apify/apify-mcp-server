@@ -2,8 +2,9 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
-import type { FailureCategory, FailureDiagnostics, ToolStatus, ValidationDiagnostics } from '../types.js';
+import type { AjvErrorDetails, FailureCategory, FailureDetails, ToolStatus, ToolTelemetryContext } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
+import { buildActorFields } from './tools.js';
 
 /**
  * Central helper to classify an error into a ToolStatus value.
@@ -54,9 +55,9 @@ function limitField(value: string | undefined): string | undefined {
     return value.length > MAX_VALIDATION_FIELD_LENGTH ? value.slice(0, MAX_VALIDATION_FIELD_LENGTH) : value;
 }
 
-export function extractValidationDiagnostics(
+export function extractAjvErrorDetails(
     errors: ErrorObject[] | null | undefined,
-): ValidationDiagnostics {
+): AjvErrorDetails {
     if (!errors?.length) return {};
 
     const firstError = errors[0];
@@ -67,7 +68,7 @@ export function extractValidationDiagnostics(
     // - validation_missing_property: required-property name such as "query"
     // - validation_additional_property: unexpected-property name such as "docSource"
     // - validation_error_count: total number of AJV errors (signals when there's more than one)
-    const diagnostics: ValidationDiagnostics = {
+    const diagnostics: AjvErrorDetails = {
         validation_keyword: limitField(firstError.keyword),
         validation_path: limitField(firstError.instancePath || undefined),
         validation_error_count: errors.length,
@@ -91,56 +92,46 @@ export function extractValidationDiagnostics(
 }
 
 /**
- * Strips internal diagnostic fields from a tool response in-place and derives toolStatus + failureDiagnostics.
+ * Reads `toolTelemetry` from a tool response, strips it, and returns toolStatus + failureDetails.
  *
- * Three cases:
- * 1. internalToolStatus present → use it directly.
- * 2. isError set without internalToolStatus → SOFT_FAIL (user/input problem).
+ * toolStatus resolution:
+ * 1. `toolTelemetry.toolStatus` present → use it directly.
+ * 2. `isError` set without toolStatus → SOFT_FAIL.
  * 3. Neither → SUCCEEDED.
  *
- * Internal fields (`internalToolStatus`, `internalFailureCategory`, etc.) are deleted
- * from `res` so they are never exposed to MCP clients.
+ * actorName/actorId are server-side context (from tool resolution).
+ * Tool-reported actorId (e.g. from call-actor after resolution) takes precedence.
  */
-export function extractToolResponseDiagnostics(
+export function extractToolTelemetry(
     res: Record<string, unknown>,
     actorName: string | undefined,
-): { toolStatus: ToolStatus; failureDiagnostics: FailureDiagnostics } {
-    const internalToolStatus = res.internalToolStatus as ToolStatus | undefined;
-    const internalFailureCategory = res.internalFailureCategory as FailureCategory | undefined;
-    const internalFailureHttpStatus = res.internalFailureHttpStatus as number | undefined;
-    const internalValidationDiagnostics = res.internalValidationDiagnostics as FailureDiagnostics | undefined;
+    actorId: string | undefined,
+): { toolStatus: ToolStatus; failureDetails: FailureDetails } {
+    const telemetry = res.toolTelemetry as ToolTelemetryContext | undefined;
+    delete res.toolTelemetry;
 
-    delete res.internalToolStatus;
-    delete res.internalFailureCategory;
-    delete res.internalFailureHttpStatus;
-    delete res.internalValidationDiagnostics;
+    // Tool-reported actorId (e.g. from call-actor) takes precedence over server-side actorId
+    const actorFields = buildActorFields(actorName, telemetry?.actorId ?? actorId);
 
-    const actorField = actorName ? { actor_name: actorName } : {};
-    const httpField = internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {};
-
-    if (internalToolStatus !== undefined) {
-        return {
-            toolStatus: internalToolStatus,
-            failureDiagnostics: {
-                ...(internalFailureCategory ? { failure_category: internalFailureCategory } : {}),
-                ...httpField,
-                ...actorField,
-                ...internalValidationDiagnostics,
-            },
-        };
+    if (!telemetry) {
+        if (res.isError) {
+            return {
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureDetails: { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...actorFields },
+            };
+        }
+        return { toolStatus: TOOL_STATUS.SUCCEEDED, failureDetails: {} };
     }
 
-    if (res.isError) {
-        return {
-            toolStatus: TOOL_STATUS.SOFT_FAIL,
-            failureDiagnostics: {
-                failure_category: internalFailureCategory ?? FAILURE_CATEGORY.INTERNAL_ERROR,
-                ...httpField,
-                ...actorField,
-                ...internalValidationDiagnostics,
-            },
-        };
-    }
+    const toolStatus = telemetry.toolStatus
+        ?? (res.isError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.SUCCEEDED);
 
-    return { toolStatus: TOOL_STATUS.SUCCEEDED, failureDiagnostics: {} };
+    const failureDetails: FailureDetails = {
+        ...(telemetry.failureCategory && { failure_category: telemetry.failureCategory }),
+        ...(telemetry.failureHttpStatus !== undefined && { failure_http_status: telemetry.failureHttpStatus }),
+        ...actorFields,
+        ...telemetry.ajvErrorDetails,
+    };
+
+    return { toolStatus, failureDetails };
 }
