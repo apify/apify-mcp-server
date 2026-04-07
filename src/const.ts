@@ -207,7 +207,10 @@ export const FAILURE_CATEGORY = {
 } as const;
 
 // HTTP status codes
+export const HTTP_UNAUTHORIZED = 401;
 export const HTTP_PAYMENT_REQUIRED = 402;
+export const HTTP_FORBIDDEN = 403;
+export const HTTP_NOT_FOUND = 404;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;

@@ -1,7 +1,7 @@
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
+import { FAILURE_CATEGORY, HTTP_FORBIDDEN, HTTP_NOT_FOUND, HTTP_UNAUTHORIZED, TOOL_STATUS } from '../const.js';
 import type { FailureCategory, FailureDiagnostics, ToolStatus, ValidationDiagnostics } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
@@ -39,8 +39,8 @@ export function classifyFailureCategory(error: unknown): FailureCategory {
     }
 
     const statusCode = getHttpStatusCode(error);
-    if (statusCode === 401 || statusCode === 403) return FAILURE_CATEGORY.AUTH;
-    if (statusCode === 404) return FAILURE_CATEGORY.INVALID_INPUT;
+    if (statusCode === HTTP_UNAUTHORIZED || statusCode === HTTP_FORBIDDEN) return FAILURE_CATEGORY.AUTH;
+    if (statusCode === HTTP_NOT_FOUND) return FAILURE_CATEGORY.INVALID_INPUT;
     if (statusCode !== undefined && statusCode >= 400 && statusCode < 500) return FAILURE_CATEGORY.INVALID_INPUT;
     if (statusCode !== undefined && statusCode >= 500) return FAILURE_CATEGORY.INTERNAL_ERROR;
 
