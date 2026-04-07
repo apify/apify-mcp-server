@@ -59,13 +59,10 @@ import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
-    ActorMcpTool,
     ActorsMcpServerOptions,
     ActorStore,
-    ActorTool,
     ApifyRequestParams,
     FailureDiagnostics,
-    HelperTool,
     ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -78,7 +75,7 @@ import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractToolResponseDiagnostics, extractValidationDiagnostics, getToolStatusFromError } from '../utils/tool_status.js';
-import { getToolPublicFieldOnly } from '../utils/tools.js';
+import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -92,23 +89,6 @@ const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
-
-/**
- * Extract actor name for telemetry from the tool entry or call-actor args.
- * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
- * Returns undefined for other internal tools or when the arg is missing/invalid.
- */
-function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === 'actor') return tool.actorFullName;
-    if (tool.type === 'actor-mcp') return tool.actorId;
-
-    // For call-actor, the actor name is in `args.actor`.
-    // The format can be "username/name" or "username/name:toolName" (MCP server Actors).
-    // Strip the optional `:toolName` suffix to get the base actor name.
-    const actorArg = args?.actor;
-    if (typeof actorArg !== 'string') return undefined;
-    return actorArg.split(':')[0]?.trim() || undefined;
-}
 
 /**
  * Create Apify MCP server
@@ -709,7 +689,7 @@ export class ActorsMcpServer {
                 // Find tool by name, actor full name, or legacy tool name (e.g. apify-slash-rag-web-browser → apify--rag-web-browser)
                 const newName = legacyToolNameToNew(name) ?? name;
                 const toolEntry = Array.from(this.tools.values())
-                    .find((t) => t.name === newName || (t.type === 'actor' && t.actorFullName === newName));
+                    .find((t) => t.name === newName || getToolFullName(t) === newName);
 
                 if (!toolEntry) {
                     const availableTools = this.listToolNames();
@@ -724,7 +704,7 @@ export class ActorsMcpServer {
 
                 const tool = toolEntry!;
                 // Re-initialize telemetry with the resolved tool (uses actorFullName for actor tools).
-                ({ telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken));
+                ({ telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken));
 
                 // Extract actor name for telemetry — available even when validation fails later.
                 // For call-actor, the actor name is in `args.actor` (before validation / decoding).
@@ -1124,7 +1104,7 @@ export class ActorsMcpServer {
 
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
-        const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+        const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
 
         try {
             // Check if task was already cancelled before we start execution.
@@ -1316,19 +1296,10 @@ export class ActorsMcpServer {
      * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
-        tool: HelperTool | ActorTool | ActorMcpTool | string, mcpSessionId: string | undefined, apifyToken: string,
+        toolName: string, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };
-        }
-
-        let toolFullName: string;
-        if (typeof tool === 'string') {
-            toolFullName = tool;
-        } else if (tool.type === 'actor') {
-            toolFullName = tool.actorFullName;
-        } else {
-            toolFullName = tool.name;
         }
 
         // Get userId from cache or fetch from API
@@ -1349,7 +1320,7 @@ export class ActorsMcpServer {
             mcp_client_capabilities: capabilities || null,
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
-            tool_name: toolFullName,
+            tool_name: toolName,
             tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
         };

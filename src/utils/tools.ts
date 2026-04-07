@@ -7,6 +7,37 @@ import {
 import type { HelperTool, ServerMode, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
+/**
+ * Returns the canonical full name for a tool.
+ * For actor tools this is actorFullName (e.g. "apify/rag-web-browser"),
+ * for all others it's the tool name.
+ */
+export function getToolFullName(tool: ToolEntry): string {
+    switch (tool.type) {
+        case 'actor': return tool.actorFullName;
+        case 'internal':
+        case 'actor-mcp': return tool.name;
+        default: return (tool satisfies never as ToolEntry).name;
+    }
+}
+
+/**
+ * Extract actor name for telemetry from the tool entry or call-actor args.
+ * For actor tools, read from the tool entry. For call-actor, parse from the `actor` arg.
+ * Returns undefined for other internal tools or when the arg is missing/invalid.
+ */
+export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
+    if (tool.type === 'actor') return tool.actorFullName;
+    if (tool.type === 'actor-mcp') return tool.actorId;
+
+    // For call-actor, the actor name is in `args.actor`.
+    // The format can be "username/name" or "username/name:toolName" (MCP server Actors).
+    // Strip the optional `:toolName` suffix to get the base actor name.
+    const actorArg = args?.actor;
+    if (typeof actorArg !== 'string') return undefined;
+    return actorArg.split(':')[0]?.trim() || undefined;
+}
+
 type ToolPublicFieldOptions = {
     mode?: ServerMode;
     filterWidgetMeta?: boolean;
