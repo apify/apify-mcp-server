@@ -2,7 +2,12 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
-import { classifyFailureCategory, extractValidationDiagnostics, getToolStatusFromError } from '../../src/utils/tool_status.js';
+import {
+    classifyFailureCategory,
+    extractToolResponseDiagnostics,
+    extractValidationDiagnostics,
+    getToolStatusFromError,
+} from '../../src/utils/tool_status.js';
 
 describe('getToolStatusFromError', () => {
     it('returns aborted when isAborted is true', () => {
@@ -40,6 +45,16 @@ describe('classifyFailureCategory', () => {
         expect(category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 
+    it('classifies 401 as AUTH', () => {
+        const category = classifyFailureCategory(Object.assign(new Error('Unauthorized'), { statusCode: 401 }));
+        expect(category).toBe(FAILURE_CATEGORY.AUTH);
+    });
+
+    it('classifies 403 as AUTH', () => {
+        const category = classifyFailureCategory(Object.assign(new Error('Forbidden'), { statusCode: 403 }));
+        expect(category).toBe(FAILURE_CATEGORY.AUTH);
+    });
+
     it('classifies 404 as INVALID_INPUT', () => {
         const category = classifyFailureCategory(Object.assign(new Error('Not found'), { statusCode: 404 }));
         expect(category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
@@ -48,6 +63,11 @@ describe('classifyFailureCategory', () => {
     it('classifies generic 4xx as INVALID_INPUT', () => {
         const category = classifyFailureCategory(Object.assign(new Error('Bad request'), { statusCode: 402 }));
         expect(category).toBe(FAILURE_CATEGORY.INVALID_INPUT);
+    });
+
+    it('classifies 5xx as INTERNAL_ERROR', () => {
+        const category = classifyFailureCategory(Object.assign(new Error('Internal'), { statusCode: 500 }));
+        expect(category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
     });
 
     it('classifies unexpected errors as INTERNAL_ERROR', () => {
@@ -72,6 +92,7 @@ describe('extractValidationDiagnostics', () => {
             validation_keyword: 'required',
             validation_path: undefined,
             validation_missing_property: 'query',
+            validation_error_count: 1,
         });
     });
 
@@ -88,5 +109,56 @@ describe('extractValidationDiagnostics', () => {
 
         expect(diagnostics.validation_additional_property).toBe('docSource');
         expect(diagnostics.validation_path).toBe('/output');
+        expect(diagnostics.validation_error_count).toBe(1);
+    });
+
+    it('reports error count for multiple validation errors', () => {
+        const diagnostics = extractValidationDiagnostics([
+            { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'query' }, message: '' },
+            { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'url' }, message: '' },
+            { keyword: 'type', instancePath: '/limit', schemaPath: '#/type', params: { type: 'number' }, message: '' },
+        ]);
+
+        // First error is the canonical summary
+        expect(diagnostics.validation_keyword).toBe('required');
+        expect(diagnostics.validation_missing_property).toBe('query');
+        // Count reflects all errors
+        expect(diagnostics.validation_error_count).toBe(3);
+    });
+
+    it('returns empty for null/undefined errors', () => {
+        expect(extractValidationDiagnostics(null)).toEqual({});
+        expect(extractValidationDiagnostics(undefined)).toEqual({});
+        expect(extractValidationDiagnostics([])).toEqual({});
+    });
+});
+
+describe('extractToolResponseDiagnostics', () => {
+    it('uses internalToolStatus when present and strips internal fields', () => {
+        const res: Record<string, unknown> = {
+            content: 'ok',
+            internalToolStatus: TOOL_STATUS.SOFT_FAIL,
+            internalFailureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            internalFailureHttpStatus: 404,
+        };
+
+        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics(res, 'apify/web-scraper');
+
+        expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(failureDiagnostics).toMatchObject({ failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper' });
+        expect(res.internalToolStatus).toBeUndefined();
+        expect(res.content).toBe('ok');
+    });
+
+    it('defaults to SOFT_FAIL when isError without internalToolStatus', () => {
+        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics({ isError: true }, undefined);
+        expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
+        expect(failureDiagnostics.failure_category).toBe(FAILURE_CATEGORY.INTERNAL_ERROR);
+    });
+
+    it('returns SUCCEEDED when no error signals', () => {
+        const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics({ content: 'ok' }, undefined);
+        expect(toolStatus).toBe(TOOL_STATUS.SUCCEEDED);
+        expect(failureDiagnostics).toEqual({});
     });
 });
