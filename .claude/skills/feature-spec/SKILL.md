@@ -58,6 +58,8 @@ You might have access to these resources during planning (paths marked "if avail
 Follow these when designing:
 
 - **Simple > complex, ruthlessly minimal** — only what's explicitly in scope
+- **Reuse before creating.** Search for existing helpers, patterns, and utilities that already handle similar cases. Extend what exists rather than adding new abstractions.
+- **Smallest possible feature.** Design the minimal version that solves the problem. If you're adding new parameters, methods, or abstractions, ask: is there a simpler way using what's already there?
 - **Zod** for input validation, **HelperTools enum** for tool names
 - Integration tests go in `tests/integration/suite.ts`
 - Changes may affect `apify-mcp-server-internal` — always assess impact
@@ -75,65 +77,56 @@ During planning, explore:
 5. **MCP Apps spec/SDK** if the feature involves widgets or interactive UIs — check both the spec and `node_modules/@modelcontextprotocol/ext-apps`
 6. Use `mcp__apify-dev__*` and `mcp__apify-dev-ui__*` tools to test current behavior if the dev servers are running
 
+**Public/internal repo separation**: See `CLAUDE.md § Public/internal repo separation`.
+
 Ask clarifying questions if the feature description is ambiguous. Prefer narrowing scope over guessing intent.
 
-## Step 5: Produce the GitHub issue
+## Step 5: Check existing issues
 
-When planning is complete, exit planning mode with `ExitPlanMode`, then create a GitHub issue using `gh issue create` with this structure:
+Before creating anything, search for duplicates and related issues across all three repos:
 
-```markdown
-## Context and motivation
-[Why this feature is needed]
-
-## Scope
-
-### In scope
-- [bullet list]
-
-### Out of scope
-- [bullet list]
-
-## Technical design
-
-### Overview
-[High-level approach]
-
-### Detailed design
-[Implementation details, referencing existing code by file path]
-
-### Files to modify
-| File | Change |
-|------|--------|
-| `src/...` | Description |
-
-### New files (if any)
-| File | Purpose |
-|------|---------|
-| `src/...` | Description |
-
-## Internal repo impact
-[Does apify-mcp-server-internal need changes? Check imports/usage.]
-
-## Testing strategy
-
-### Unit tests
-- [Key test cases, target files]
-
-### Integration tests
-- [Cases to add to tests/integration/suite.ts]
-
-### Manual testing
-- [Steps using local dev servers, MCPJam, or ChatGPT]
-
-## Verification checklist
-- [ ] `npm run type-check` passes
-- [ ] `npm run lint` passes
-- [ ] `npm run test:unit` passes
-- [ ] Internal repo impact assessed
-- [ ] No breaking changes (or coordinated)
-
-## Open questions
-- [Anything needing human decision]
+```
+gh issue list -R apify/apify-mcp-server --search "<feature keywords>" --json number,title,state
+gh issue list -R apify/ai-team --search "<feature keywords>" --json number,title,state
+gh issue list -R apify/apify-mcp-server-internal --search "<feature keywords>" --json number,title,state
 ```
 
-Present the issue content to the user for review before creating it. Use `gh issue create` with appropriate title and labels.
+If a matching issue exists, update it with `gh issue edit` instead of creating a new one. Reference related issues from other repos in the description.
+
+## Step 6: Produce GitHub issues
+
+When planning is complete, exit planning mode with `ExitPlanMode`, then create issues.
+
+**One issue per implementation phase.** A phase ≈ one PR-sized unit of work (roughly 50–200 lines changed). Example: phase 1 = add the new Zod schema + types, phase 2 = wire up the tool handler + tests. If the feature has multiple phases, create a separate issue for each. Each issue should be independently implementable.
+
+Use the repo's `feature_spec.yml` template (not `feature_request.yml` — that one is for external users). Write **concrete, concise, no empty sections** issues. Only include sections that have real content for this specific issue.
+
+```markdown
+## Problem
+[Be concrete — numbers, error messages, user reports, Slack/issue links. "Users are confused" is weak; "3 users reported X in #channel" is strong.]
+
+## Proposed solution
+[Short explanation of the approach. Reference existing code paths. If files need changing, list them here inline — don't make a separate table unless there are 5+ files.]
+
+## Plan
+- [ ] Step 1 (with PR links or assignees if known)
+- [ ] Step 2
+- [ ] ...
+
+## Alternatives considered
+[Only if you actually evaluated other approaches. Skip if there's one obvious solution.]
+```
+
+**Style rules:**
+- Skip any section that would be empty or generic
+- Lead with real evidence (data, links, screenshots), not abstract motivation
+- Keep it short — the best issues are 10-30 lines, not 100
+- A checklist plan with concrete steps beats a wall of prose
+
+**Before presenting the issues**, self-review the design:
+- Is this the minimal design? Could the scope be smaller?
+- Am I reusing existing patterns or reinventing?
+- Could this be done by adjusting existing code rather than adding new code?
+- Does the feature require refactoring first? If so, split into a separate refactoring PR that must merge before the feature work begins. Never mix refactoring with feature changes — the combined diff is hard to review and easy to break.
+
+Present the issue content to the user for review before creating. Use `gh issue create` with appropriate title and `t-ai` labels.

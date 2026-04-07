@@ -1,0 +1,46 @@
+name: Feature spec
+description: Internal feature specification with technical design and implementation plan
+title: "[spec] "
+labels: ["t-ai"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: >-
+        Be concrete — include numbers, error messages, user reports, or
+        Slack/issue links. "Users are confused" is weak; "3 users reported X in
+        #channel" is strong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: >-
+        Short explanation of the approach. Reference existing code paths and
+        patterns. If files need changing, list them inline.
+    validations:
+      required: true
+
+  - type: textarea
+    id: plan
+    attributes:
+      label: Plan
+      description: >-
+        Concrete steps as checkboxes. Include assignees and PR links if known.
+        Skip for trivial changes.
+      placeholder: |
+        - [ ] Step 1
+        - [ ] Step 2
+    validations:
+      required: false
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches evaluated and why they were rejected. Skip if there's one obvious solution.
+    validations:
+      required: false
