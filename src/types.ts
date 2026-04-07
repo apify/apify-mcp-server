@@ -402,6 +402,16 @@ export type ValidationDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_missing_property'
     | 'validation_additional_property'>;
 
+export type FailureDiagnostics = Pick<ToolCallTelemetryProperties,
+    | 'failure_category'
+    | 'failure_http_status'
+    | 'failure_detail'
+    | 'actor_name'
+    | 'validation_keyword'
+    | 'validation_path'
+    | 'validation_missing_property'
+    | 'validation_additional_property'>;
+
 /**
  * Internal server mode that controls which tool variants, descriptions, and response
  * formats are served. Every internal call site (tool loading, category resolution,

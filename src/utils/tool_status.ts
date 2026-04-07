@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { FailureCategory, ToolStatus, ValidationDiagnostics } from '../types.js';
+import type { FailureCategory, FailureDiagnostics, ToolStatus, ValidationDiagnostics } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
 /**
@@ -85,4 +85,59 @@ export function extractValidationDiagnostics(
     }
 
     return diagnostics;
+}
+
+/**
+ * Strips internal diagnostic fields from a tool response in-place and derives toolStatus + failureDiagnostics.
+ *
+ * Three cases:
+ * 1. internalToolStatus present → use it directly.
+ * 2. isError set without internalToolStatus → SOFT_FAIL (user/input problem).
+ * 3. Neither → SUCCEEDED.
+ *
+ * Internal fields (`internalToolStatus`, `internalFailureCategory`, etc.) are deleted
+ * from `res` so they are never exposed to MCP clients.
+ */
+export function extractToolResponseDiagnostics(
+    res: Record<string, unknown>,
+    actorName: string | undefined,
+): { toolStatus: ToolStatus; failureDiagnostics: FailureDiagnostics } {
+    const internalToolStatus = res.internalToolStatus as ToolStatus | undefined;
+    const internalFailureCategory = res.internalFailureCategory as FailureCategory | undefined;
+    const internalFailureHttpStatus = res.internalFailureHttpStatus as number | undefined;
+    const internalValidationDiagnostics = res.internalValidationDiagnostics as FailureDiagnostics | undefined;
+
+    delete res.internalToolStatus;
+    delete res.internalFailureCategory;
+    delete res.internalFailureHttpStatus;
+    delete res.internalValidationDiagnostics;
+
+    const actorField = actorName ? { actor_name: actorName } : {};
+    const httpField = internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {};
+
+    if (internalToolStatus !== undefined) {
+        return {
+            toolStatus: internalToolStatus,
+            failureDiagnostics: {
+                ...(internalFailureCategory ? { failure_category: internalFailureCategory } : {}),
+                ...httpField,
+                ...actorField,
+                ...internalValidationDiagnostics,
+            },
+        };
+    }
+
+    if (res.isError) {
+        return {
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureDiagnostics: {
+                failure_category: internalFailureCategory ?? FAILURE_CATEGORY.INTERNAL_ERROR,
+                ...httpField,
+                ...actorField,
+                ...internalValidationDiagnostics,
+            },
+        };
+    }
+
+    return { toolStatus: TOOL_STATUS.SUCCEEDED, failureDiagnostics: {} };
 }

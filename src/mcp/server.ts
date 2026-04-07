@@ -64,7 +64,7 @@ import type {
     ActorStore,
     ActorTool,
     ApifyRequestParams,
-    FailureCategory,
+    FailureDiagnostics,
     HelperTool,
     ServerMode,
     TelemetryEnv,
@@ -77,7 +77,7 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
-import { classifyFailureCategory, extractValidationDiagnostics, getToolStatusFromError } from '../utils/tool_status.js';
+import { classifyFailureCategory, extractToolResponseDiagnostics, extractValidationDiagnostics, getToolStatusFromError } from '../utils/tool_status.js';
 import { getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
@@ -92,15 +92,6 @@ const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
-type FailureDiagnostics = Pick<ToolCallTelemetryProperties,
-    | 'failure_category'
-    | 'failure_http_status'
-    | 'failure_detail'
-    | 'actor_name'
-    | 'validation_keyword'
-    | 'validation_path'
-    | 'validation_missing_property'
-    | 'validation_additional_property'>;
 
 /**
  * Extract actor name for telemetry from the tool entry or call-actor args.
@@ -857,47 +848,13 @@ export class ActorsMcpServer {
                             userRentedActorIds,
                             progressTracker,
                             mcpSessionId,
-                        }) as object;
+                        }) as Record<string, unknown>;
 
-                        // Extract internal diagnostic fields from the tool response.
-                        // These transient fields are set by buildMCPResponse() in tool helpers
-                        // and stripped before the response reaches the MCP client (see `...rest` below).
-                        //
-                        // Three cases:
-                        // 1. internalToolStatus is set → the tool explicitly classified itself (e.g. SOFT_FAIL).
-                        //    Trust it and use any accompanying diagnostics as-is.
-                        // 2. isError is true but no internalToolStatus → the tool returned an error
-                        //    without classifying it. Default to SOFT_FAIL because tools that return
-                        //    isError as a normal response do so for user/input problems (not-found,
-                        //    validation). Real server failures throw exceptions (caught by outer catch).
-                        // 3. Neither → success.
-                        const { internalToolStatus, internalFailureCategory, internalFailureHttpStatus, internalValidationDiagnostics, ...rest } = res as {
-                            internalToolStatus?: ToolStatus;
-                            internalFailureCategory?: FailureCategory;
-                            internalFailureHttpStatus?: number;
-                            internalValidationDiagnostics?: FailureDiagnostics;
-                            isError?: boolean;
-                        };
-                        if (internalToolStatus !== undefined) {
-                            toolStatus = internalToolStatus;
-                            failureDiagnostics = {
-                                ...(internalFailureCategory ? { failure_category: internalFailureCategory } : {}),
-                                ...(internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {}),
-                                ...(actorName ? { actor_name: actorName } : {}),
-                                ...internalValidationDiagnostics,
-                            };
-                        } else if ('isError' in rest && rest.isError) {
-                            toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            failureDiagnostics = {
-                                failure_category: internalFailureCategory ?? FAILURE_CATEGORY.INTERNAL_ERROR,
-                                ...(internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {}),
-                                ...(actorName ? { actor_name: actorName } : {}),
-                                ...internalValidationDiagnostics,
-                            };
-                        }
-
-                        // Never expose internal diagnostic fields to MCP clients
-                        return { ...rest };
+                        // Extract diagnostics and strip internal fields from res before returning to client.
+                        const diag = extractToolResponseDiagnostics(res, actorName);
+                        toolStatus = diag.toolStatus;
+                        failureDiagnostics = diag.failureDiagnostics;
+                        return res;
                     } finally {
                         progressTracker?.stop();
                     }
@@ -1227,39 +1184,12 @@ export class ActorsMcpServer {
                         userRentedActorIds,
                         progressTracker,
                         mcpSessionId,
-                    }) as object;
+                    }) as Record<string, unknown>;
 
-                    // Extract internal diagnostic fields — same three-case logic as
-                    // the main callTool handler (see comment there for rationale).
-                    const { internalToolStatus, internalFailureCategory, internalFailureHttpStatus, internalValidationDiagnostics, ...rest } = res as {
-                        internalToolStatus?: ToolStatus;
-                        internalFailureCategory?: FailureCategory;
-                        internalFailureHttpStatus?: number;
-                        internalValidationDiagnostics?: FailureDiagnostics;
-                        isError?: boolean;
-                    };
-                    if (internalToolStatus !== undefined) {
-                        toolStatus = internalToolStatus;
-                        failureDiagnostics = {
-                            ...(internalFailureCategory ? { failure_category: internalFailureCategory } : {}),
-                            ...(internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {}),
-                            ...(actorName ? { actor_name: actorName } : {}),
-                            ...internalValidationDiagnostics,
-                        };
-                    } else if ('isError' in rest && rest.isError) {
-                        toolStatus = TOOL_STATUS.SOFT_FAIL;
-                        failureDiagnostics = {
-                            failure_category: internalFailureCategory ?? FAILURE_CATEGORY.INTERNAL_ERROR,
-                            ...(internalFailureHttpStatus !== undefined ? { failure_http_status: internalFailureHttpStatus } : {}),
-                            ...(actorName ? { actor_name: actorName } : {}),
-                            ...internalValidationDiagnostics,
-                        };
-                    } else {
-                        toolStatus = TOOL_STATUS.SUCCEEDED;
-                    }
-
-                    // Never expose internal diagnostic fields to MCP clients
-                    result = rest;
+                    const diag = extractToolResponseDiagnostics(res, actorName);
+                    toolStatus = diag.toolStatus;
+                    failureDiagnostics = diag.failureDiagnostics;
+                    result = res;
                 } finally {
                     if (progressTracker) {
                         progressTracker.stop();
