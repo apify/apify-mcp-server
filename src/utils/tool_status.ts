@@ -2,7 +2,7 @@ import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { ErrorObject } from 'ajv';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
-import type { FailureCategory, ToolCallTelemetryProperties, ToolStatus } from '../types.js';
+import type { FailureCategory, ToolStatus, ValidationDiagnostics } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
 /**
@@ -56,11 +56,7 @@ function limitField(value: string | undefined): string | undefined {
 
 export function extractValidationDiagnostics(
     errors: ErrorObject[] | null | undefined,
-): Pick<ToolCallTelemetryProperties,
-    | 'validation_keyword'
-    | 'validation_path'
-    | 'validation_missing_property'
-    | 'validation_additional_property'> {
+): ValidationDiagnostics {
     const firstError = errors?.[0];
     if (!firstError) return {};
 
@@ -69,14 +65,10 @@ export function extractValidationDiagnostics(
     // - validation_path: AJV instancePath such as "/input/query" or "/callOptions/memory"
     // - validation_missing_property: required-property name such as "query"
     // - validation_additional_property: unexpected-property name such as "docSource"
-    const diagnostics: Pick<ToolCallTelemetryProperties,
-        | 'validation_keyword'
-        | 'validation_path'
-        | 'validation_missing_property'
-        | 'validation_additional_property'> = {
-            validation_keyword: limitField(firstError.keyword),
-            validation_path: limitField(firstError.instancePath || undefined),
-        };
+    const diagnostics: ValidationDiagnostics = {
+        validation_keyword: limitField(firstError.keyword),
+        validation_path: limitField(firstError.instancePath || undefined),
+    };
 
     const hasParams = typeof firstError.params === 'object' && firstError.params !== null;
 

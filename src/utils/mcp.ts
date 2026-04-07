@@ -1,4 +1,4 @@
-import type { FailureCategory, ToolCallTelemetryProperties, ToolStatus } from '../types.js';
+import type { FailureCategory, ToolStatus, ValidationDiagnostics } from '../types.js';
 
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
@@ -55,11 +55,7 @@ export function buildMCPResponse(options: {
     toolStatus?: ToolStatus;
     failureCategory?: FailureCategory;
     failureHttpStatus?: number;
-    validationDiagnostics?: Pick<ToolCallTelemetryProperties,
-        | 'validation_keyword'
-        | 'validation_path'
-        | 'validation_missing_property'
-        | 'validation_additional_property'>;
+    validationDiagnostics?: ValidationDiagnostics;
     structuredContent?: unknown;
     _meta?: Record<string, unknown>;
 }) {
