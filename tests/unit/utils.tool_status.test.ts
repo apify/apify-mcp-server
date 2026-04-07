@@ -145,7 +145,9 @@ describe('extractToolResponseDiagnostics', () => {
         const { toolStatus, failureDiagnostics } = extractToolResponseDiagnostics(res, 'apify/web-scraper');
 
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(failureDiagnostics).toMatchObject({ failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper' });
+        expect(failureDiagnostics).toMatchObject(
+            { failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper' },
+        );
         expect(res.internalToolStatus).toBeUndefined();
         expect(res.content).toBe('ok');
     });
