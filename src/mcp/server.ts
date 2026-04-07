@@ -896,7 +896,7 @@ export class ActorsMcpServer {
                         // actor-mcp gets deeper telemetry treatment.
                         if ('isError' in res && res.isError) {
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            failureDetails = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
+                            failureDetails = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
                         }
 
                         return { ...res };
@@ -906,6 +906,7 @@ export class ActorsMcpServer {
                         failureDetails = {
                             failure_category: classifyFailureCategory(error),
                             failure_detail: failureDetail,
+                            ...buildActorFields(actorName, actorId),
                         };
                         logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
                             actorId: tool.actorId,
