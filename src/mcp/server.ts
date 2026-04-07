@@ -1016,9 +1016,11 @@ export class ActorsMcpServer {
                 // If we reached here without returning, it means the tool type was not recognized (user error)
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
+                const httpStatus = getHttpStatusCode(error);
+
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
                 // content[0].text (JSON) + isError: true
-                if (getHttpStatusCode(error) === HTTP_PAYMENT_REQUIRED) {
+                if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
                     failureDiagnostics = {
                         failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1036,7 +1038,6 @@ export class ActorsMcpServer {
                 }
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                const httpStatus = getHttpStatusCode(error);
                 const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
                 failureDiagnostics = {
                     // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
@@ -1192,7 +1193,7 @@ export class ActorsMcpServer {
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Check payment validation (already computed by preparePayment in the caller)
+            // Check payment validation (already computed by prepareToolCallContext in the caller)
             if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
                 failureDiagnostics = {

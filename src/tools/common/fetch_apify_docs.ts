@@ -8,6 +8,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { classifyFailureCategory } from '../../utils/tool_status.js';
 import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
@@ -89,7 +90,7 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                         texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
                         isError: true,
                         toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
-                        failureCategory: isUserError ? FAILURE_CATEGORY.INVALID_INPUT : FAILURE_CATEGORY.INTERNAL_ERROR,
+                        failureCategory: classifyFailureCategory(error),
                         failureHttpStatus: response.status,
                     });
                 }
