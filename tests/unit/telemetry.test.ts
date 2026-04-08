@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { trackToolCall } from '../../src/telemetry.js';
 
 // Mock the Segment Analytics client
-const mockTrack = vi.fn();
+const { mockTrack } = vi.hoisted(() => ({ mockTrack: vi.fn() }));
 vi.mock('@segment/analytics-node', () => ({
-    Analytics: vi.fn().mockImplementation(() => ({
-        track: mockTrack,
-    })),
+    Analytics: class {
+        track = mockTrack;
+    },
 }));
 
 describe('telemetry', () => {
