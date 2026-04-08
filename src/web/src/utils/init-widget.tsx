@@ -1,11 +1,33 @@
 import "../index.css";
 import React, { useEffect } from "react";
-import { applyDocumentTheme, applyHostFonts, applyHostStyleVariables } from "@modelcontextprotocol/ext-apps";
+import type { McpUiStyles, McpUiTheme } from "@modelcontextprotocol/ext-apps";
 import { UiDependencyProvider } from "@apify/ui-library";
 import { cssColorsVariablesLight, cssColorsVariablesDark } from "@apify/ui-library";
 import { ThemeProvider } from "styled-components";
 import { createRoot } from "react-dom/client";
 import { McpAppProvider, useMcpApp } from "../context/mcp-app-context";
+
+function applyDocumentTheme(theme: McpUiTheme): void {
+    document.documentElement.setAttribute("data-theme", theme);
+    document.documentElement.style.colorScheme = theme;
+}
+
+function applyHostStyleVariables(styles: McpUiStyles, root: HTMLElement = document.documentElement): void {
+    for (const [key, value] of Object.entries(styles)) {
+        if (value !== undefined) {
+            root.style.setProperty(key, value);
+        }
+    }
+}
+
+let _fontsInjected = false;
+function applyHostFonts(fontCss: string): void {
+    if (_fontsInjected) return;
+    const style = document.createElement("style");
+    style.textContent = fontCss;
+    document.head.appendChild(style);
+    _fontsInjected = true;
+}
 
 function resolveSystemTheme(): "light" | "dark" {
     return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
