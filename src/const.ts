@@ -190,7 +190,7 @@ export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 // Tool status
 /**
- * Unified status constants for tool execution lifecycle.
+ * Unified status constants for the tool execution lifecycle.
  * Single source of truth for all tool status values.
  */
 export const TOOL_STATUS = {
@@ -200,8 +200,17 @@ export const TOOL_STATUS = {
     SOFT_FAIL: 'SOFT_FAIL',
 } as const;
 
+export const FAILURE_CATEGORY = {
+    INVALID_INPUT: 'INVALID_INPUT',
+    AUTH: 'AUTH',
+    INTERNAL_ERROR: 'INTERNAL_ERROR',
+} as const;
+
 // HTTP status codes
+export const HTTP_UNAUTHORIZED = 401;
 export const HTTP_PAYMENT_REQUIRED = 402;
+export const HTTP_FORBIDDEN = 403;
+export const HTTP_NOT_FOUND = 404;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;

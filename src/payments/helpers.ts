@@ -4,22 +4,22 @@ import { buildPaymentRequiredResponse, registerPaymentRequiredInterceptor } from
 import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 
 /**
- * Result of preparing payment context for a tool call.
- * Centralizes all payment-related processing into a single step.
+ * Result of preparing tool-call context.
+ * Centralizes payment-aware argument sanitization, logging data, and client creation.
  */
-export type PreparePaymentResult = {
+export type PrepareToolCallContextResult = {
     /** Structured error result for a 402 PaymentRequired response. Undefined if no error. */
-    errorResult?: ReturnType<typeof buildPaymentRequiredResponse>;
-    /** Args with payment-specific fields removed — safe for ajv validation and Actor input. */
-    cleanArgs: Record<string, unknown>;
-    /** Args with sensitive payment fields redacted — safe for logging. */
-    logArgs: unknown;
+    paymentRequiredResult?: ReturnType<typeof buildPaymentRequiredResponse>;
+    /** Tool args with payment-specific fields removed — safe for ajv validation and Actor input. */
+    toolArgs: Record<string, unknown>;
+    /** Tool args with sensitive payment fields redacted — safe for logging. */
+    logSafeArgs: unknown;
     /** ApifyClient configured with payment headers (if applicable) or standard token. */
-    client: ApifyClient;
+    apifyClient: ApifyClient;
 };
 
 /**
- * Prepares payment context for a tool call.
+ * Prepares tool-call context before validation and execution.
  *
  * This helper centralizes all payment processing:
  * 1. Validates payment credentials (for tools with `paymentRequired: true`)
@@ -27,44 +27,49 @@ export type PreparePaymentResult = {
  * 3. Redacts sensitive fields for logging
  * 4. Creates an ApifyClient with payment headers or standard token
  *
- * Call this BEFORE ajv validation so `cleanArgs` can be validated without
+ * Call this BEFORE ajv validation so `toolArgs` can be validated without
  * the `additionalProperties: true` hack.
+ *
+ * TODO: This function has mixed responsibilities. It should be split into separate concerns:
+ * - validatePaymentCredentials (returns error or void)
+ * - sanitizeToolArgs (returns toolArgs and logSafeArgs)
+ * - createApifyClient (returns apifyClient)
  */
-export function preparePayment(input: {
+export function prepareToolCallContext(input: {
     provider: PaymentProvider | undefined;
     tool: ToolEntry;
     args: Record<string, unknown>;
     apifyToken: ApifyToken;
     meta?: PaymentMeta;
     requestHeaders?: RequestHeaders;
-}): PreparePaymentResult {
+}): PrepareToolCallContextResult {
     const { provider, tool, args, apifyToken, meta, requestHeaders } = input;
 
     if (!provider) {
-        const client = new ApifyClient({ token: apifyToken });
-        registerPaymentRequiredInterceptor(client);
+        const apifyClient = new ApifyClient({ token: apifyToken });
+        registerPaymentRequiredInterceptor(apifyClient);
         return {
-            cleanArgs: args,
-            logArgs: args,
-            client,
+            toolArgs: args,
+            logSafeArgs: args,
+            apifyClient,
         };
     }
 
     const error = tool.paymentRequired ? provider.validatePayment(args, meta, requestHeaders) : null;
     const errorData = error && provider.getPaymentRequiredData ? provider.getPaymentRequiredData() : undefined;
-    const cleanArgs = provider.removePaymentFields(args);
-    const logArgs = provider.redactForLogging(args);
+    const toolArgs = provider.removePaymentFields(args);
+    const logSafeArgs = provider.redactForLogging(args);
 
     const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
-    const client = Object.keys(paymentHeaders).length > 0
+    const apifyClient = Object.keys(paymentHeaders).length > 0
         ? new ApifyClient({ paymentHeaders })
         : new ApifyClient({ token: apifyToken });
-    registerPaymentRequiredInterceptor(client);
+    registerPaymentRequiredInterceptor(apifyClient);
 
     return {
-        errorResult: error ? buildPaymentRequiredResponse(error, errorData) : undefined,
-        cleanArgs,
-        logArgs,
-        client,
+        paymentRequiredResult: error ? buildPaymentRequiredResponse(error, errorData) : undefined,
+        toolArgs,
+        logSafeArgs,
+        apifyClient,
     };
 }

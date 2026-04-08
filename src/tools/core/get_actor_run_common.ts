@@ -3,7 +3,7 @@ import { z } from 'zod';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -106,7 +106,7 @@ export async function fetchActorRunData(params: {
             error: buildMCPResponse({
                 texts: [`Run with ID '${runId}' not found.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
         };
     }

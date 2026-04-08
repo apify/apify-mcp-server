@@ -2,12 +2,13 @@ import { z } from 'zod';
 
 import log from '@apify/log';
 
-import { ALLOWED_DOC_DOMAINS, HelperTools, TOOL_STATUS } from '../../const.js';
+import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { classifyFailureCategory } from '../../utils/tool_status.js';
 import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
@@ -65,7 +66,7 @@ Only documentation URLs from Apify and Crawlee are allowed \
 Please provide a valid documentation URL. \
 You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                 isError: true,
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 
@@ -87,7 +88,11 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                     return buildMCPResponse({
                         texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
                         isError: true,
-                        toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
+                        telemetry: {
+                            toolStatus: isUserError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.FAILED,
+                            failureCategory: classifyFailureCategory(error),
+                            failureHttpStatus: response.status,
+                        },
                     });
                 }
                 markdown = await response.text();
@@ -97,7 +102,7 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                 return buildMCPResponse({
                     texts: [buildFetchErrorMessage(url, `Error: ${error instanceof Error ? error.message : String(error)}.`)],
                     isError: true,
-                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR },
                 });
             }
         }

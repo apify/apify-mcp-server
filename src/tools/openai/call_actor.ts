@@ -3,8 +3,10 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { logHttpError } from '../../utils/logging.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { classifyFailureCategory, getToolStatusFromError } from '../../utils/tool_status.js';
+import { extractActorId } from '../../utils/tools.js';
 import {
     CALL_ACTOR_EXAMPLES_SECTION,
     CALL_ACTOR_MCP_SERVER_SECTION,
@@ -72,6 +74,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
         const { parsed, baseActorName } = preResult;
         const { input, callOptions } = parsed;
 
+        let resolvedActorId: string | undefined;
         try {
             const resolution = await resolveAndValidateActor({
                 actorName: baseActorName,
@@ -82,6 +85,7 @@ export const openaiCallActor: ToolEntry = Object.freeze({
                 return resolution.error;
             }
 
+            resolvedActorId = extractActorId(resolution.actor);
             const { apifyClient } = toolArgs;
 
             // OpenAI mode always runs asynchronously
@@ -118,15 +122,28 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                     ...widgetConfig?.meta,
                     'openai/widgetDescription': `Actor run progress for ${baseActorName}`,
                 },
+                toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
-            logHttpError(error, 'Failed to call Actor', { actorName: baseActorName, async: true });
-            // Let the server classify the error; we only mark it as an MCP error response
+            const errMsg = error instanceof Error ? error.message : String(error);
+            logHttpError(error, 'Failed to call Actor', {
+                actorName: baseActorName,
+                async: true,
+                mcpSessionId: toolArgs.mcpSessionId,
+                failureCategory: classifyFailureCategory(error),
+            });
             return buildMCPResponse({
-                texts: [`Failed to call Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}.
+                texts: [`Failed to call Actor '${baseActorName}': ${errMsg}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.`],
                 isError: true,
+                telemetry: {
+                    toolStatus: getToolStatusFromError(error, false),
+                    failureCategory: classifyFailureCategory(error),
+                    failureHttpStatus: getHttpStatusCode(error),
+                    failureDetail: errMsg.slice(0, 200),
+                    actorId: resolvedActorId,
+                },
             });
         }
     },

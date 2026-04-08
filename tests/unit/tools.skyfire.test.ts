@@ -45,6 +45,7 @@ function makeActorTool(overrides: Partial<ActorTool> = {}): ActorTool {
         name: 'apify--web-scraper',
         description: 'Web scraper tool',
         type: 'actor',
+        actorId: 'abc123',
         actorFullName: 'apify/web-scraper',
         inputSchema: {
             type: 'object' as const,

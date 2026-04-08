@@ -1,9 +1,12 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { z } from 'zod';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../../apify_client.js';
 import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    FAILURE_CATEGORY,
     HelperTools,
     TOOL_STATUS,
 } from '../../const.js';
@@ -13,6 +16,8 @@ import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { extractAjvErrorDetails } from '../../utils/tool_status.js';
+import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
 import { getActorsAsTools } from './actor_tools_factory.js';
 
@@ -84,19 +89,8 @@ export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorA
 export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
 
 /**
- * Result of resolving actor and MCP URL before execution.
- * Contains everything needed for the mode-specific execution path.
- */
-export type CallActorResolvedContext = {
-    baseActorName: string;
-    mcpToolName: string | undefined;
-    isActorMcpServer: boolean;
-    mcpServerUrl: string | false;
-};
-
-/**
  * Resolves MCP URL and parses the "actor:tool" format.
- * Shared pre-processing step used by both default and openai variants.
+ * Shared pre-processing step used by both default and OpenAI variants.
  */
 export function resolveActorContext(actorName: string): {
     baseActorName: string;
@@ -192,31 +186,76 @@ export async function resolveAndValidateActor(params: {
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
                 isError: true,
-                // `toolStatus` is internal-only (telemetry/server logic); clients should rely on `isError`.
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureHttpStatus: 404,
+                    failureDetail: `Actor '${actorName}' was not found`,
+                },
             }),
         };
     }
 
+    const actorId = extractActorId(actor);
+
     if (!input) {
-        const content = [
-            `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
-            `The input schema for this Actor was retrieved and is shown below:`,
-            `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
-        ];
-        return { error: buildMCPResponse({ texts: content, isError: true }) };
+        log.softFail('Input is required for Actor', {
+            actorName,
+            mcpSessionId: toolArgs.mcpSessionId,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
+        return {
+            error: buildMCPResponse({
+                texts: [
+                    `Input is required for Actor '${actorName}'. Please provide the input parameter based on the Actor's input schema.`,
+                    `The input schema for this Actor was retrieved and is shown below:`,
+                    `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
+                ],
+                isError: true,
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    actorId,
+                    failureDetail: 'input is required',
+                },
+            }),
+        };
     }
 
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
+        const ajvDetails = extractAjvErrorDetails(errors ?? null);
+        const validationSummary = errors?.map((e) => (e as { message?: string; }).message).join(', ') ?? '';
+
+        log.softFail('Input validation failed for Actor', {
+            actorName,
+            mcpSessionId: toolArgs.mcpSessionId,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            validationKeyword: ajvDetails.validation_keyword,
+            validationPath: ajvDetails.validation_path,
+            validationMissingProperty: ajvDetails.validation_missing_property,
+        });
+
         const content = [
             `Input validation failed for Actor '${actorName}'. Please ensure your input matches the Actor's input schema.`,
             `Input schema:\n\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
         ];
-        if (errors && errors.length > 0) {
-            content.push(`Validation errors: ${errors.map((e) => (e as { message?: string; }).message).join(', ')}`);
+        if (validationSummary) {
+            content.push(`Validation errors: ${validationSummary}`);
         }
-        return { error: buildMCPResponse({ texts: content, isError: true }) };
+        return {
+            error: buildMCPResponse({
+                texts: content,
+                isError: true,
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    actorId,
+                    failureDetail: validationSummary.slice(0, 200) || 'input validation failed',
+                    ajvErrorDetails: ajvDetails,
+                },
+            }),
+        };
     }
 
     return { actor };
@@ -244,10 +283,10 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
-    // For definition resolution we always use token-based client; payment provider is only for actual Actor runs
+    // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
-    const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
+    const isActorMcpServer = !!mcpServerUrlOrFalse;
 
     // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
     if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {
@@ -255,8 +294,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
             earlyResponse: buildMCPResponse({
                 texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider. To use this Actor, please provide a valid Apify token instead.`],
                 isError: true,
-                // Internal status used by server telemetry; not part of the MCP client contract.
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
         };
     }
@@ -279,7 +317,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
             baseActorName,
             mcpToolName,
             input: parsed.input as Record<string, unknown>,
-            isActorMcpServer: !!isActorMcpServer,
+            isActorMcpServer,
             mcpServerUrl: mcpServerUrlOrFalse,
             apifyToken,
             mcpSessionId,

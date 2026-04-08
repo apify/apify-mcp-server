@@ -15,7 +15,7 @@ import type {
 import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
-import type { ACTOR_PRICING_MODEL, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
+import type { ACTOR_PRICING_MODEL, FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
@@ -109,6 +109,8 @@ export type ToolInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 export type ActorTool = ToolBase & {
     /** Type discriminator for actor tools */
     type: 'actor';
+    /** Stable Apify Actor ID (e.g. "JxcaGGqy7TwBdHxMz") — does not change on rename */
+    actorId: string;
     /** Full name of the Apify Actor (username/name) */
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
@@ -369,6 +371,7 @@ export type ApifyToken = string | null | undefined;
  * Derived from TOOL_STATUS to ensure type safety and avoid duplication.
  */
 export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];
+export type FailureCategory = (typeof FAILURE_CATEGORY)[keyof typeof FAILURE_CATEGORY];
 
 /**
  * Properties for tool call telemetry events sent to Segment.
@@ -385,7 +388,49 @@ export type ToolCallTelemetryProperties = {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
+    failure_category?: FailureCategory;
+    failure_http_status?: number;
+    failure_detail?: string;
+    actor_name?: string;
+    actor_id?: string;
+    validation_keyword?: string;
+    validation_path?: string;
+    validation_missing_property?: string;
+    validation_additional_property?: string;
+    validation_error_count?: number;
 };
+
+export type AjvErrorDetails = Pick<ToolCallTelemetryProperties,
+    | 'validation_keyword'
+    | 'validation_path'
+    | 'validation_missing_property'
+    | 'validation_additional_property'
+    | 'validation_error_count'>;
+
+/**
+ * Telemetry reported by tool handlers on the response object.
+ * The server reads `toolTelemetry` from the response, strips it, and maps it to CallDiagnostics.
+ */
+export type ToolTelemetryContext = {
+    toolStatus?: ToolStatus;
+    failureCategory?: FailureCategory;
+    failureHttpStatus?: number;
+    failureDetail?: string;
+    actorId?: string;
+    ajvErrorDetails?: AjvErrorDetails;
+};
+
+export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
+    | 'failure_category'
+    | 'failure_http_status'
+    | 'failure_detail'
+    | 'actor_name'
+    | 'actor_id'
+    | 'validation_keyword'
+    | 'validation_path'
+    | 'validation_missing_property'
+    | 'validation_additional_property'
+    | 'validation_error_count'>;
 
 /**
  * Internal server mode that controls which tool variants, descriptions, and response

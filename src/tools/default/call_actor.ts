@@ -3,8 +3,10 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { logHttpError } from '../../utils/logging.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
+import { classifyFailureCategory, getToolStatusFromError } from '../../utils/tool_status.js';
+import { extractActorId } from '../../utils/tools.js';
 import { callActorGetDataset } from '../core/actor_execution.js';
 import { buildActorResponseContent } from '../core/actor_response.js';
 import {
@@ -80,6 +82,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
         const { parsed, baseActorName } = preResult;
         const { input, async: isAsync = false, previewOutput = true, callOptions } = parsed;
 
+        let resolvedActorId: string | undefined;
         try {
             const resolution = await resolveAndValidateActor({
                 actorName: baseActorName,
@@ -90,6 +93,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 return resolution.error;
             }
 
+            resolvedActorId = extractActorId(resolution.actor);
             const { apifyClient } = toolArgs;
 
             // Async mode: start run and return immediately with runId
@@ -113,6 +117,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                         text: `Started Actor "${baseActorName}" (Run ID: ${actorRun.id}).`,
                     }],
                     structuredContent,
+                    toolTelemetry: { actorId: resolvedActorId },
                 };
             }
 
@@ -140,15 +145,28 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 content,
                 structuredContent,
                 ...(_meta && { _meta }),
+                toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
-            logHttpError(error, 'Failed to call Actor', { actorName: baseActorName, async: isAsync });
-            // Let the server classify the error; we only mark it as an MCP error response
+            const errMsg = error instanceof Error ? error.message : String(error);
+            logHttpError(error, 'Failed to call Actor', {
+                actorName: baseActorName,
+                async: isAsync,
+                mcpSessionId: toolArgs.mcpSessionId,
+                failureCategory: classifyFailureCategory(error),
+            });
             return buildMCPResponse({
-                texts: [`Failed to call Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}.
+                texts: [`Failed to call Actor '${baseActorName}': ${errMsg}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
                 isError: true,
+                telemetry: {
+                    toolStatus: getToolStatusFromError(error, false),
+                    failureCategory: classifyFailureCategory(error),
+                    failureHttpStatus: getHttpStatusCode(error),
+                    failureDetail: errMsg.slice(0, 200),
+                    actorId: resolvedActorId,
+                },
             });
         }
     },

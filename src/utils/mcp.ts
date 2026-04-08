@@ -1,4 +1,4 @@
-import type { ToolStatus } from '../types.js';
+import type { ToolTelemetryContext } from '../types.js';
 
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
@@ -22,42 +22,27 @@ export function buildUsageMeta(source: {
 }
 
 /**
- * Helper to build a response for MCP from an array of text strings.
+ * Helper to build a content response for MCP from an array of text strings.
  *
- * Status model used by this project:
- * - `isError` is MCP-visible and returned to the client.
- * - `toolStatus` is an internal helper input for server telemetry.
- * - `internalToolStatus` is the transient wire field carrying `toolStatus`
- *   from tool helpers back to the server, and is stripped before client response.
- *
- * @param options - Object containing response configuration
- * @param options.texts - Array of text strings to include in the response
- * @param options.isError - Optional flag to mark the response as an error (default: false).
- *                          This must remain MCP compliant: true for any tool-level error.
- * @param options.toolStatus - Optional internal tool status used for telemetry. When provided,
- *                             it is attached as `internalToolStatus` for server-side processing only.
- * @param options.structuredContent - Optional structured content of unknown type
- * @param options._meta - Optional metadata for widget rendering (e.g., OpenAI widget metadata)
+ * Status model:
+ * - `isError` is MCP-visible — returned to the client.
+ * - `telemetry` is server-internal — attached as `toolTelemetry` on the response,
+ *   then stripped by `extractToolTelemetry()` before the response reaches the client.
+ *   Contains tool outcome (toolStatus, failureCategory, etc.) used for Segment telemetry.
  */
 export function buildMCPResponse(options: {
     texts: string[];
     isError?: boolean;
-    toolStatus?: ToolStatus;
+    telemetry?: ToolTelemetryContext;
     structuredContent?: unknown;
     _meta?: Record<string, unknown>;
 }) {
-    const {
-        texts,
-        isError = false,
-        toolStatus,
-        structuredContent,
-        _meta,
-    } = options;
+    const { texts, isError = false, telemetry, structuredContent, _meta } = options;
 
     return {
         content: texts.map((text) => ({ type: 'text' as const, text })),
         isError,
-        ...(toolStatus && { internalToolStatus: toolStatus }),
+        ...(telemetry && { toolTelemetry: telemetry }),
         ...(structuredContent !== undefined && { structuredContent }),
         ...(_meta !== undefined && { _meta }),
     };

@@ -30,6 +30,7 @@ import {
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { ValidateFunction } from 'ajv';
+import dedent from 'dedent';
 
 import log from '@apify/log';
 import { parseBooleanOrNull } from '@apify/utilities';
@@ -40,12 +41,13 @@ import {
     APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
+    FAILURE_CATEGORY,
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
     SERVER_NAME,
     TOOL_STATUS,
 } from '../const.js';
-import { preparePayment } from '../payments/helpers.js';
+import { prepareToolCallContext } from '../payments/helpers.js';
 import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
@@ -57,12 +59,10 @@ import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
-    ActorMcpTool,
     ActorsMcpServerOptions,
     ActorStore,
-    ActorTool,
     ApifyRequestParams,
-    HelperTool,
+    CallDiagnostics,
     ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -74,8 +74,8 @@ import { buildMCPResponse } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
-import { getToolStatusFromError } from '../utils/tool_status.js';
-import { getToolPublicFieldOnly } from '../utils/tools.js';
+import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
+import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -638,133 +638,181 @@ export class ActorsMcpServer {
                 log.error('MCP Session ID is missing in tool call request. This should never happen.');
                 throw new Error('MCP Session ID is required for tool calls');
             }
-
-            // Validate token
-            if (!apifyToken && !this.options.paymentProvider?.allowsUnauthenticated && !this.options.allowUnauthMode) {
-                const msg = `Apify API token is required but was not provided.
-Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
-You can obtain your Apify token from https://console.apify.com/account/integrations.`;
-                log.softFail(msg, { mcpSessionId, statusCode: 400 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    msg,
-                );
-            }
-
-            // TODO - if connection is /mcp client will not receive notification on tool change
-            // Find tool by name, actor full name, or legacy tool name (e.g. apify-slash-rag-web-browser → apify--rag-web-browser)
-            const newName = legacyToolNameToNew(name) ?? name;
-            const tool = Array.from(this.tools.values())
-                .find((t) => t.name === newName || (t.type === 'actor' && t.actorFullName === newName));
-            if (!tool) {
-                const availableTools = this.listToolNames();
-                const msg = `Tool "${name}" was not found.
-Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
-Please verify the tool name is correct. You can list all available tools using the tools/list request.`;
-                log.softFail(msg, { mcpSessionId, statusCode: 404 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    msg,
-                );
-            }
-            if (!args) {
-                const msg = `Missing arguments for tool "${name}".
-Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.`;
-                log.softFail(msg, { mcpSessionId, statusCode: 400 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    msg,
-                );
-            }
-            // Decode dot property names in arguments before validation,
-            // since validation expects the original, non-encoded property names.
-            args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
-
-            // Centralize all payment processing: validate, strip payment fields, create client.
-            // Must run before ajv validation so cleanArgs doesn't contain provider-specific fields.
-            const payment = preparePayment({
-                provider: this.options.paymentProvider,
-                tool,
-                args: args as Record<string, unknown>,
-                apifyToken,
-                meta,
-                requestHeaders: extra.requestInfo?.headers,
-            });
-
-            log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: payment.logArgs });
-            if (!tool.ajvValidate(payment.cleanArgs)) {
-                const errors = tool?.ajvValidate.errors || [];
-                const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
-                const msg = `Invalid arguments for tool "${tool.name}".
-Validation errors: ${errorMessages}.
-Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.`;
-                log.softFail(msg, { mcpSessionId, statusCode: 400 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    msg,
-                );
-            }
-            // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
-            // Check if tool call is a long running task and the tool supports that
-            // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
-            const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
-            if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
-                const msg = `Tool "${tool.name}" does not support long running task calls.
-Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.`;
-                log.softFail(msg, { mcpSessionId, statusCode: 400 });
-                await this.server.sendLoggingMessage({ level: 'error', data: msg });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    msg,
-                );
-            }
-
-            // Handle long-running task request
-            if (request.params.task) {
-                const task = await this.taskStore.createTask(
-                    {
-                        ttl: request.params.task.ttl,
-                    },
-                    `call-tool-${name}-${randomUUID()}`,
-                    request,
-                );
-                log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
-
-                // Execute the tool asynchronously and update task status
-                setImmediate(async () => {
-                    await this.executeToolAndUpdateTask({
-                        taskId: task.taskId,
-                        tool,
-                        cleanArgs: payment.cleanArgs,
-                        logArgs: payment.logArgs,
-                        paymentErrorResult: payment.errorResult,
-                        apifyClient: payment.client,
-                        apifyToken,
-                        progressToken,
-                        extra,
-                        mcpSessionId,
-                        userRentedActorIds,
-                    });
-                });
-
-                // Return the task immediately; execution continues asynchronously
-                return { task };
-            }
-
-            const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
-
             const startTime = Date.now();
+            let telemetryData: ToolCallTelemetryProperties | null;
+            let userId: string | null;
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
+            let callDiagnostics: CallDiagnostics = {};
+            let shouldTrackTelemetry = true;
+            const failInvalidParams = async (
+                message: string,
+                details: CallDiagnostics,
+                logFields?: Record<string, unknown>,
+            ): Promise<never> => {
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
+                callDiagnostics = details;
+                log.softFail(message, {
+                    mcpSessionId,
+                    failureCategory: details.failure_category,
+                    actorName: details.actor_name,
+                    validationKeyword: details.validation_keyword,
+                    validationPath: details.validation_path,
+                    validationMissingProperty: details.validation_missing_property,
+                    validationAdditionalProperty: details.validation_additional_property,
+                    ...logFields,
+                });
+                await this.server.sendLoggingMessage({ level: 'error', data: message });
+                throw new McpError(ErrorCode.InvalidParams, message);
+            };
+
+            // Initialize telemetry with raw tool name — may be overwritten below once the tool is resolved.
+            // This ensures telemetry is available even for early failures (missing token, tool not found).
+            ({ telemetryData, userId } = await this.prepareTelemetryData(name, mcpSessionId, apifyToken));
+
+            // actorName/actorId are declared here so they're available in the catch block for telemetry.
+            // Set after tool resolution (inside the try block).
+            let actorName: string | undefined;
+            let actorId: string | undefined;
 
             try {
-                // Check payment validation (already computed by preparePayment)
-                if (payment.errorResult) {
+                // Validate token
+                if (!apifyToken && !this.options.paymentProvider?.allowsUnauthenticated && !this.options.allowUnauthMode) {
+                    await failInvalidParams(dedent`
+                    Apify API token is required but was not provided.
+                    Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
+                    You can get your Apify token from https://console.apify.com/account/integrations.
+                `, {
+                        failure_category: FAILURE_CATEGORY.AUTH,
+                    });
+                }
+
+                // TODO - if connection is /mcp client will not receive notification on tool change
+                // Find tool by name, actor full name, or legacy tool name (e.g. apify-slash-rag-web-browser → apify--rag-web-browser)
+                const newName = legacyToolNameToNew(name) ?? name;
+                const toolEntry = Array.from(this.tools.values())
+                    .find((t) => t.name === newName || getToolFullName(t) === newName);
+
+                if (!toolEntry) {
+                    const availableTools = this.listToolNames();
+                    await failInvalidParams(dedent`
+                    Tool "${name}" was not found.
+                    Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
+                    Please verify the tool name is correct. You can list all available tools using the tools/list request.
+                `, {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    });
+                }
+
+                const tool = toolEntry!;
+                // Re-initialize telemetry with the resolved tool (uses actorFullName for actor tools).
+                ({ telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken));
+
+                // Extract actor name/id for telemetry — available even when validation fails later.
+                actorName = extractActorName(tool, args as Record<string, unknown>);
+                actorId = extractActorId(tool);
+
+                // Always populate actor fields so they're tracked on both success and failure paths.
+                callDiagnostics = { ...callDiagnostics, ...buildActorFields(actorName, actorId) };
+
+                if (!args) {
+                    await failInvalidParams(dedent`
+                    Missing arguments for tool "${name}".
+                    Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.
+                `, {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...buildActorFields(actorName, actorId),
+                    });
+                }
+
+                // Decode dot property names in arguments before validation,
+                // since validation expects the original, non-encoded property names.
+                args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
+
+                // Centralize all payment processing: validate, strip payment fields, create client.
+                // Must run before ajv validation so toolArgs doesn't contain provider-specific fields.
+                const { toolArgs, logSafeArgs, apifyClient, paymentRequiredResult } = prepareToolCallContext({
+                    provider: this.options.paymentProvider,
+                    tool,
+                    args: args as Record<string, unknown>,
+                    apifyToken,
+                    meta,
+                    requestHeaders: extra.requestInfo?.headers,
+                });
+
+                log.debug('Validate arguments for tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
+                if (!tool.ajvValidate(toolArgs)) {
+                    const errors = tool.ajvValidate.errors || [];
+                    const ajvErrorDetails = extractAjvErrorDetails(errors);
+                    const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
+                    await failInvalidParams(dedent`
+                    Invalid arguments for tool "${tool.name}".
+                    Validation errors: ${errorMessages}.
+                    Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
+                `, {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...ajvErrorDetails,
+                        ...buildActorFields(actorName, actorId),
+                    });
+                }
+
+                // Check if tool call is a long running task and the tool supports that
+                // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
+                const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
+                if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
+                    await failInvalidParams(dedent`
+                    Tool "${tool.name}" does not support long running task calls.
+                    Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.
+                `, {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...buildActorFields(actorName, actorId),
+                    });
+                }
+
+                // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
+                // Handle long-running task request
+                if (request.params.task) {
+                    const task = await this.taskStore.createTask(
+                        {
+                            ttl: request.params.task.ttl,
+                        },
+                        `call-tool-${name}-${randomUUID()}`,
+                        request,
+                    );
+                    log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
+
+                    // Execute the tool asynchronously and update task status
+                    setImmediate(async () => {
+                        await this.executeToolAndUpdateTask({
+                            taskId: task.taskId,
+                            tool,
+                            toolArgs: toolArgs!,
+                            logSafeArgs,
+                            paymentRequiredResult,
+                            apifyClient: apifyClient!,
+                            apifyToken,
+                            progressToken,
+                            extra,
+                            mcpSessionId,
+                            actorName,
+                            actorId,
+                            userRentedActorIds,
+                        });
+                    });
+
+                    // Return the task immediately; execution continues asynchronously
+                    shouldTrackTelemetry = false;
+                    return { task };
+                }
+
+                // Check payment validation (already computed by prepareToolCallContext)
+                if (paymentRequiredResult) {
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    return payment.errorResult;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        failure_http_status: 402,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    return paymentRequiredResult;
                 }
 
                 // Handle internal tool
@@ -774,35 +822,28 @@ Please remove the "task" parameter from the tool call request or use a different
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
-                    log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: payment.logArgs });
-                    const res = await tool.call({
-                        args: payment.cleanArgs,
-                        extra,
-                        apifyMcpServer: this,
-                        mcpServer: this.server,
-                        apifyToken,
-                        apifyClient: payment.client,
-                        userRentedActorIds,
-                        progressTracker,
-                        mcpSessionId,
-                    }) as object;
+                    try {
+                        log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: logSafeArgs });
+                        const res = await tool.call({
+                            args: toolArgs!,
+                            extra,
+                            apifyMcpServer: this,
+                            mcpServer: this.server,
+                            apifyToken,
+                            apifyClient: apifyClient!,
+                            userRentedActorIds,
+                            progressTracker,
+                            mcpSessionId,
+                        }) as Record<string, unknown>;
 
-                    if (progressTracker) {
-                        progressTracker.stop();
+                        // Extract diagnostics and strip internal fields from res before returning to client.
+                        const diag = extractToolTelemetry(res, actorName, actorId);
+                        toolStatus = diag.toolStatus;
+                        callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
+                        return res;
+                    } finally {
+                        progressTracker?.stop();
                     }
-
-                    // If tool returned internalToolStatus, use it; otherwise infer from isError flag
-                    const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
-                    if (internalToolStatus !== undefined) {
-                        toolStatus = internalToolStatus;
-                    } else if ('isError' in rest && rest.isError) {
-                        toolStatus = TOOL_STATUS.FAILED;
-                    } else {
-                        toolStatus = TOOL_STATUS.SUCCEEDED;
-                    }
-
-                    // Never expose internalToolStatus to MCP clients
-                    return { ...rest };
                 }
 
                 if (tool.type === 'actor-mcp') {
@@ -810,11 +851,14 @@ Please remove the "task" parameter from the tool call request or use a different
                     try {
                         client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
                         if (!client) {
-                            const msg = `Failed to connect to MCP server at "${tool.serverUrl}".
-Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.`;
-                            log.softFail(msg, { mcpSessionId, statusCode: 408 }); // 408 Request Timeout
+                            const msg = dedent`
+                                Failed to connect to MCP server at "${tool.serverUrl}".
+                                Please verify the server URL is correct and accessible, and ensure you have a valid Apify token with appropriate permissions.
+                            `;
+                            log.softFail(msg, { mcpSessionId, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR });
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
+                            callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
                             return buildMCPResponse({ texts: [msg], isError: true });
                         }
 
@@ -839,27 +883,39 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
                             mcpSessionId,
-                            input: payment.logArgs,
+                            input: logSafeArgs,
                         });
                         const res = await client.callTool({
                             name: tool.originToolName,
-                            arguments: payment.cleanArgs,
-                            _meta: {
-                                progressToken,
-                            },
+                            arguments: toolArgs!,
+                            _meta: { progressToken },
                         }, CallToolResultSchema, {
                             timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
                         });
 
-                        // For external MCP servers we do not try to infer soft_fail vs failed from isError.
-                        // We treat the call as succeeded at the telemetry layer unless an actual error is thrown.
+                        // TODO: actor-mcp responses are opaque — isError could be a user input problem
+                        // (e.g. invalid query) or a genuine server failure. We can't distinguish without
+                        // parsing the error text. Defaulting to INTERNAL_ERROR for now; revisit when
+                        // actor-mcp gets deeper telemetry treatment.
+                        if ('isError' in res && res.isError) {
+                            toolStatus = TOOL_STATUS.SOFT_FAIL;
+                            callDiagnostics = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
+                        }
+
                         return { ...res };
                     } catch (error) {
+                        toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+                        const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                        callDiagnostics = {
+                            failure_category: classifyFailureCategory(error),
+                            failure_detail: failureDetail,
+                            ...buildActorFields(actorName, actorId),
+                        };
                         logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
                             actorId: tool.actorId,
                             toolName: tool.originToolName,
+                            failureCategory: callDiagnostics.failure_category,
                         });
-                        toolStatus = TOOL_STATUS.FAILED;
                         return buildMCPResponse({
                             texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
                             isError: true,
@@ -874,11 +930,11 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
                     try {
-                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: payment.logArgs });
+                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
                         const executorResult = await this.actorExecutor.executeActorTool({
                             actorFullName: tool.actorFullName,
-                            input: payment.cleanArgs,
-                            apifyClient: payment.client,
+                            input: toolArgs!,
+                            apifyClient: apifyClient!,
                             callOptions: { memory: tool.memoryMbytes },
                             progressTracker,
                             abortSignal: extra.signal,
@@ -902,31 +958,69 @@ Please verify the server URL is correct and accessible, and ensure you have a va
                 // If we reached here without returning, it means the tool type was not recognized (user error)
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
             } catch (error) {
+                const httpStatus = getHttpStatusCode(error);
+
                 // Propagate 402 Payment Required as a tool result per x402 MCP transport spec:
                 // content[0].text (JSON) + isError: true
-                const httpStatus = getHttpStatusCode(error);
                 if (httpStatus === HTTP_PAYMENT_REQUIRED) {
-                    logHttpError(error, 'Payment required while calling tool', { toolName: name });
                     toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        failure_http_status: 402,
+                        ...buildActorFields(actorName, actorId),
+                    };
                     return buildPaymentRequiredResponse(error);
                 }
 
+                // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
+                // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
+                // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
+                if (error instanceof McpError) {
+                    throw error;
+                }
+
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                logHttpError(error, 'Error occurred while calling tool', { toolName: name });
+                const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                callDiagnostics = {
+                    // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
+                    // then overwrite with freshly computed fields so they take precedence.
+                    ...callDiagnostics,
+                    failure_category: classifyFailureCategory(error),
+                    ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
+                    failure_detail: failureDetail,
+                    ...buildActorFields(actorName, actorId),
+                };
+
+                logHttpError(error, 'Error occurred while calling tool', {
+                    toolName: name,
+                    toolStatus,
+                    mcpSessionId,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                    actorName: callDiagnostics.actor_name,
+                    validationKeyword: callDiagnostics.validation_keyword,
+                    validationPath: callDiagnostics.validation_path,
+                    validationMissingProperty: callDiagnostics.validation_missing_property,
+                    validationAdditionalProperty: callDiagnostics.validation_additional_property,
+                });
                 const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
                 return buildMCPResponse({
                     texts: [`Error calling tool "${name}": ${errorMessage}.  Please verify the tool name, input parameters, and ensure all required resources are available.`],
                     isError: true,
-                    toolStatus,
+                    telemetry: { toolStatus },
                 });
             } finally {
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                if (shouldTrackTelemetry) {
+                    this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
+                }
             }
 
             const availableTools = this.listToolNames();
-            const msg = `Unknown tool type for "${name}".
-Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
-Please verify the tool name and ensure the tool is properly registered.`;
+            const msg = dedent`
+                Unknown tool type for "${name}".
+                Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
+                Please verify the tool name and ensure the tool is properly registered.
+            `;
             log.softFail(msg, { mcpSessionId, statusCode: 404 });
             await this.server.sendLoggingMessage({
                 level: 'error',
@@ -947,12 +1041,14 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * @param userId - Apify user ID (string or null if not available)
      * @param startTime - Timestamp when the tool call started
      * @param toolStatus - Final status of the tool call
+     * @param callDiagnostics - Telemetry fields: always includes actor_name/actor_id when available; failure-specific fields only on non-success
      */
     private finalizeAndTrackTelemetry(
         telemetryData: ToolCallTelemetryProperties | null,
         userId: string | null,
         startTime: number,
         toolStatus: ToolStatus,
+        callDiagnostics?: CallDiagnostics,
     ): void {
         if (!telemetryData) {
             return;
@@ -963,6 +1059,8 @@ Please verify the tool name and ensure the tool is properly registered.`;
             ...telemetryData,
             tool_status: toolStatus,
             tool_exec_time_ms: execTime,
+            // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
+            ...callDiagnostics,
         };
         trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
     }
@@ -984,21 +1082,25 @@ Please verify the tool name and ensure the tool is properly registered.`;
     private async executeToolAndUpdateTask(params: {
         taskId: string;
         tool: ToolEntry;
-        cleanArgs: Record<string, unknown>;
-        logArgs: unknown;
-        paymentErrorResult?: Record<string, unknown>;
+        toolArgs: Record<string, unknown>;
+        logSafeArgs: unknown;
+        paymentRequiredResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
         progressToken: string | number | undefined;
         extra: RequestHandlerExtra<Request, Notification>;
         mcpSessionId: string | undefined;
+        actorName?: string;
+        actorId?: string;
         userRentedActorIds?: string[];
     }): Promise<void> {
         const {
-            taskId, tool, cleanArgs, logArgs, paymentErrorResult,
-            apifyClient, apifyToken, progressToken, extra, mcpSessionId, userRentedActorIds,
+            taskId, tool, toolArgs, logSafeArgs, paymentRequiredResult,
+            apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
+        // Always populate actor fields so they're tracked on both success and failure paths.
+        let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
         const startTime = Date.now();
 
         log.debug('[executeToolAndUpdateTask] Starting task execution', {
@@ -1009,7 +1111,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
 
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
-        const { telemetryData, userId } = await this.prepareTelemetryData(tool, mcpSessionId, apifyToken);
+        const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
 
         try {
             // Check if task was already cancelled before we start execution.
@@ -1021,7 +1123,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.ABORTED);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.ABORTED, {
+                    ...buildActorFields(actorName, actorId),
+                });
                 return;
             }
 
@@ -1034,10 +1138,15 @@ Please verify the tool name and ensure the tool is properly registered.`;
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Check payment validation (already computed by preparePayment in the caller)
-            if (paymentErrorResult) {
+            // Check payment validation (already computed by prepareToolCallContext in the caller)
+            if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
-                result = paymentErrorResult;
+                callDiagnostics = {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    failure_http_status: 402,
+                    ...buildActorFields(actorName, actorId),
+                };
+                result = paymentRequiredResult;
             }
 
             // Callback to propagate Actor run statusMessage into the task store.
@@ -1052,9 +1161,9 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
 
                 try {
-                    log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: logArgs });
+                    log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: logSafeArgs });
                     const res = await tool.call({
-                        args: cleanArgs,
+                        args: toolArgs,
                         extra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
@@ -1063,20 +1172,12 @@ Please verify the tool name and ensure the tool is properly registered.`;
                         userRentedActorIds,
                         progressTracker,
                         mcpSessionId,
-                    }) as object;
+                    }) as Record<string, unknown>;
 
-                    // If the tool returned internalToolStatus, use it; otherwise infer from isError flag
-                    const { internalToolStatus, ...rest } = res as { internalToolStatus?: ToolStatus; isError?: boolean };
-                    if (internalToolStatus !== undefined) {
-                        toolStatus = internalToolStatus;
-                    } else if ('isError' in rest && rest.isError) {
-                        toolStatus = TOOL_STATUS.FAILED;
-                    } else {
-                        toolStatus = TOOL_STATUS.SUCCEEDED;
-                    }
-
-                    // Never expose internalToolStatus to MCP clients
-                    result = rest;
+                    const diag = extractToolTelemetry(res, actorName, actorId);
+                    toolStatus = diag.toolStatus;
+                    callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
+                    result = res;
                 } finally {
                     if (progressTracker) {
                         progressTracker.stop();
@@ -1089,10 +1190,10 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
 
                 try {
-                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: logArgs });
+                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
                     const executorResult = await this.actorExecutor.executeActorTool({
                         actorFullName: tool.actorFullName,
-                        input: cleanArgs,
+                        input: toolArgs,
                         apifyClient,
                         callOptions: { memory: tool.memoryMbytes },
                         progressTracker,
@@ -1133,20 +1234,39 @@ Please verify the tool name and ensure the tool is properly registered.`;
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
         } catch (error) {
-            log.error('Error executing tool for task', { taskId, mcpSessionId, error });
-
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL, {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    failure_http_status: 402,
+                    ...buildActorFields(actorName, actorId),
+                });
                 return;
             }
 
             toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+            const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+            callDiagnostics = {
+                failure_category: classifyFailureCategory(error),
+                ...(httpStatus !== undefined ? { failure_http_status: httpStatus } : {}),
+                failure_detail: failureDetail,
+                ...buildActorFields(actorName, actorId),
+            };
+            log.error('Error executing tool for task', {
+                taskId,
+                toolName: tool.name,
+                toolStatus,
+                mcpSessionId,
+                failureCategory: callDiagnostics.failure_category,
+                failureHttpStatus: callDiagnostics.failure_http_status,
+                actorName: callDiagnostics.actor_name,
+                error,
+            });
             const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
 
             // Check if task was cancelled before storing result
@@ -1157,7 +1277,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
                 return;
             }
 
@@ -1175,7 +1295,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
         }
     }
 
@@ -1183,13 +1303,11 @@ Please verify the tool name and ensure the tool is properly registered.`;
      * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
-        tool: HelperTool | ActorTool | ActorMcpTool, mcpSessionId: string | undefined, apifyToken: string,
+        toolName: string, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };
         }
-
-        const toolFullName = tool.type === 'actor' ? tool.actorFullName : tool.name;
 
         // Get userId from cache or fetch from API
         let userId: string | null = null;
@@ -1209,7 +1327,7 @@ Please verify the tool name and ensure the tool is properly registered.`;
             mcp_client_capabilities: capabilities || null,
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
-            tool_name: toolFullName,
+            tool_name: toolName,
             tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
         };
