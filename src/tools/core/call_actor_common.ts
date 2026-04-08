@@ -89,19 +89,8 @@ export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorA
 export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
 
 /**
- * Result of resolving actor and MCP URL before execution.
- * Contains everything needed for the mode-specific execution path.
- */
-export type CallActorResolvedContext = {
-    baseActorName: string;
-    mcpToolName: string | undefined;
-    isActorMcpServer: boolean;
-    mcpServerUrl: string | false;
-};
-
-/**
  * Resolves MCP URL and parses the "actor:tool" format.
- * Shared pre-processing step used by both default and openai variants.
+ * Shared pre-processing step used by both default and OpenAI variants.
  */
 export function resolveActorContext(actorName: string): {
     baseActorName: string;
@@ -294,7 +283,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
-    // For definition resolution we always use token-based client; payment provider is only for actual Actor runs
+    // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = !!mcpServerUrlOrFalse;
