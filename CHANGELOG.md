@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Remove Actor deployment files and simplify to HTTP server ([#613](https://github.com/apify/apify-mcp-server/pull/613)) ([4feb11f](https://github.com/apify/apify-mcp-server/commit/4feb11f0b956f800498f45a3ed28df62b9d85bdb)) by [@jirispilka](https://github.com/jirispilka)
+- Add failure diagnostics to tool-call telemetry ([#631](https://github.com/apify/apify-mcp-server/pull/631)) ([4699b28](https://github.com/apify/apify-mcp-server/commit/4699b28b6ab97e888d71d74c96dbc6512648c02e)) by [@jirispilka](https://github.com/jirispilka), closes [#630](https://github.com/apify/apify-mcp-server/issues/630)
 
 ### 🐛 Bug Fixes
 
