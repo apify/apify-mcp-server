@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.17 - **not yet released**
+## [0.9.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.17) (2026-04-08)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Inline Node.js version guard and drop checkNodeVersion script ([#632](https://github.com/apify/apify-mcp-server/pull/632)) ([d0fb682](https://github.com/apify/apify-mcp-server/commit/d0fb6821613ae061911d3f3156f39bac4a591db1)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.16](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.16) (2026-03-28)
 
 ### 🚀 Features
