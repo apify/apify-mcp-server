@@ -1,6 +1,8 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { z } from 'zod';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../../apify_client.js';
 import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
@@ -195,7 +197,12 @@ export async function resolveAndValidateActor(params: {
 Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT, failureHttpStatus: 404 },
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureHttpStatus: 404,
+                    failureDetail: `Actor '${actorName}' was not found`,
+                },
             }),
         };
     }
@@ -203,6 +210,11 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
     const actorId = extractActorId(actor);
 
     if (!input) {
+        log.softFail('Input is required for Actor', {
+            actorName,
+            mcpSessionId: toolArgs.mcpSessionId,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        });
         return {
             error: buildMCPResponse({
                 texts: [
@@ -211,19 +223,36 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                     `\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
                 ],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT, actorId },
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    actorId,
+                    failureDetail: 'input is required',
+                },
             }),
         };
     }
 
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
+        const ajvDetails = extractAjvErrorDetails(errors ?? null);
+        const validationSummary = errors?.map((e) => (e as { message?: string; }).message).join(', ') ?? '';
+
+        log.softFail('Input validation failed for Actor', {
+            actorName,
+            mcpSessionId: toolArgs.mcpSessionId,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+            validationKeyword: ajvDetails.validation_keyword,
+            validationPath: ajvDetails.validation_path,
+            validationMissingProperty: ajvDetails.validation_missing_property,
+        });
+
         const content = [
             `Input validation failed for Actor '${actorName}'. Please ensure your input matches the Actor's input schema.`,
             `Input schema:\n\`\`\`json\n${JSON.stringify(actor.inputSchema)}\n\`\`\``,
         ];
-        if (errors && errors.length > 0) {
-            content.push(`Validation errors: ${errors.map((e) => (e as { message?: string; }).message).join(', ')}`);
+        if (validationSummary) {
+            content.push(`Validation errors: ${validationSummary}`);
         }
         return {
             error: buildMCPResponse({
@@ -233,7 +262,8 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                     actorId,
-                    ajvErrorDetails: extractAjvErrorDetails(errors ?? null),
+                    failureDetail: validationSummary.slice(0, 200) || 'input validation failed',
+                    ajvErrorDetails: ajvDetails,
                 },
             }),
         };
@@ -267,7 +297,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     // For definition resolution we always use token-based client; payment provider is only for actual Actor runs
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
-    const isActorMcpServer = mcpServerUrlOrFalse && typeof mcpServerUrlOrFalse === 'string';
+    const isActorMcpServer = !!mcpServerUrlOrFalse;
 
     // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
     if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {

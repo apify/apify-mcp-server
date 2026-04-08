@@ -148,9 +148,15 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
-            logHttpError(error, 'Failed to call Actor', { actorName: baseActorName, async: isAsync });
+            const errMsg = error instanceof Error ? error.message : String(error);
+            logHttpError(error, 'Failed to call Actor', {
+                actorName: baseActorName,
+                async: isAsync,
+                mcpSessionId: toolArgs.mcpSessionId,
+                failureCategory: classifyFailureCategory(error),
+            });
             return buildMCPResponse({
-                texts: [`Failed to call Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}.
+                texts: [`Failed to call Actor '${baseActorName}': ${errMsg}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
                 isError: true,
@@ -158,6 +164,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH},
                     toolStatus: getToolStatusFromError(error, false),
                     failureCategory: classifyFailureCategory(error),
                     failureHttpStatus: getHttpStatusCode(error),
+                    failureDetail: errMsg.slice(0, 200),
                     actorId: resolvedActorId,
                 },
             });

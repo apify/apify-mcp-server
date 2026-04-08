@@ -125,9 +125,15 @@ Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
-            logHttpError(error, 'Failed to call Actor', { actorName: baseActorName, async: true });
+            const errMsg = error instanceof Error ? error.message : String(error);
+            logHttpError(error, 'Failed to call Actor', {
+                actorName: baseActorName,
+                async: true,
+                mcpSessionId: toolArgs.mcpSessionId,
+                failureCategory: classifyFailureCategory(error),
+            });
             return buildMCPResponse({
-                texts: [`Failed to call Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}.
+                texts: [`Failed to call Actor '${baseActorName}': ${errMsg}.
 Please verify the Actor name, input parameters, and ensure the Actor exists.
 You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}.`],
                 isError: true,
@@ -135,6 +141,7 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH_I
                     toolStatus: getToolStatusFromError(error, false),
                     failureCategory: classifyFailureCategory(error),
                     failureHttpStatus: getHttpStatusCode(error),
+                    failureDetail: errMsg.slice(0, 200),
                     actorId: resolvedActorId,
                 },
             });

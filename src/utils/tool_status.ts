@@ -129,6 +129,7 @@ export function extractToolTelemetry(
     const callDiagnostics: CallDiagnostics = {
         ...(telemetry.failureCategory && { failure_category: telemetry.failureCategory }),
         ...(telemetry.failureHttpStatus !== undefined && { failure_http_status: telemetry.failureHttpStatus }),
+        ...(telemetry.failureDetail && { failure_detail: telemetry.failureDetail }),
         ...actorFields,
         ...telemetry.ajvErrorDetails,
     };

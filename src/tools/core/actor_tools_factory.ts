@@ -71,6 +71,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
+ * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for caching.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
@@ -237,7 +238,9 @@ export async function getActorsAsTools(
             try {
                 const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
                 if (!actorDefinitionWithInfo) {
-                    log.softFail('Actor not found or definition is not available', { actorName: actorIdOrName, mcpSessionId, statusCode: 404 });
+                    log.softFail('Actor not found or definition is not available', {
+                        actorName: actorIdOrName, mcpSessionId, statusCode: 404, failureCategory: 'INVALID_INPUT',
+                    });
                     return null;
                 }
                 // Cache the Actor definition with info

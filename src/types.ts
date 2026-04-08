@@ -415,6 +415,7 @@ export type ToolTelemetryContext = {
     toolStatus?: ToolStatus;
     failureCategory?: FailureCategory;
     failureHttpStatus?: number;
+    failureDetail?: string;
     actorId?: string;
     ajvErrorDetails?: AjvErrorDetails;
 };
