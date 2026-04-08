@@ -317,7 +317,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
             baseActorName,
             mcpToolName,
             input: parsed.input as Record<string, unknown>,
-            isActorMcpServer: !!isActorMcpServer,
+            isActorMcpServer,
             mcpServerUrl: mcpServerUrlOrFalse,
             apifyToken,
             mcpSessionId,
