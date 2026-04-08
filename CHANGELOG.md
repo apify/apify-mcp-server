@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.18 - **not yet released**
+
+### 🚀 Features
+
+- **ui:** Improve ui widgets bundle size [internal] ([#642](https://github.com/apify/apify-mcp-server/pull/642)) ([4bd6652](https://github.com/apify/apify-mcp-server/commit/4bd66524efc2795297bafd291aaccd810174bf44)) by [@baldasseva](https://github.com/baldasseva), closes [#26553](https://github.com/apify/apify-mcp-server/issues/26553)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.17) (2026-04-08)
 
 ### 🚀 Features
