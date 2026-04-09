@@ -19,7 +19,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractAjvErrorDetails } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
-import { cleanActorIdOrName, getActorsAsTools } from './actor_tools_factory.js';
+import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -284,8 +284,8 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 > {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
-    const normalizedActorIdOrName = cleanActorIdOrName(parsedArgs.actor, { mcpSessionId, route: 'call-actor' });
-    const parsed: CallActorParsedArgs = { ...parsedArgs, actor: normalizedActorIdOrName };
+    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: 'call-actor' });
+    const parsed: CallActorParsedArgs = { ...parsedArgs, actor: actorName };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 

@@ -9,7 +9,7 @@ import {
     resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { cleanActorIdOrName } from '../core/actor_tools_factory.js';
+import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
@@ -24,7 +24,7 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-        const actorName = cleanActorIdOrName(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
+        const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
         const resolvedOutput = resolveOutputOptions(parsed.output);
