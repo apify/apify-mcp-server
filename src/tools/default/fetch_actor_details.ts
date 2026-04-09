@@ -8,7 +8,7 @@ import {
     resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { normalizeAndLogActorId } from '../core/actor_tools_factory.js';
+import { cleanActorIdOrName } from '../core/actor_tools_factory.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
@@ -23,7 +23,7 @@ export const defaultFetchActorDetails: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
         const parsedArgs = fetchActorDetailsToolArgsSchema.parse(args);
-        const actorName = normalizeAndLogActorId(parsedArgs.actor, { mcpSessionId, route: 'fetch-actor-details' });
+        const actorName = cleanActorIdOrName(parsedArgs.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
         const resolvedOutput = resolveOutputOptions(parsedArgs.output);

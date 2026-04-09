@@ -238,8 +238,8 @@ export function logActorIdNormalized(
  * Cleans an Actor id or name and logs at INFO when client input differed.
  * Single entry point for clean+log — avoids duplicating the pattern at every call site.
  */
-export function normalizeAndLogActorId(actorIdOrName: string, extra?: Record<string, unknown>): string {
-    const normalizedActorIdOrName = cleanActorIdOrName(actorIdOrName);
+export function cleanActorIdOrName(actorIdOrName: string, extra?: Record<string, unknown>): string {
+    const normalizedActorIdOrName = stripActorIdOrName(actorIdOrName);
     if (normalizedActorIdOrName !== actorIdOrName) {
         logActorIdNormalized(actorIdOrName, normalizedActorIdOrName, extra);
     }
@@ -247,13 +247,14 @@ export function normalizeAndLogActorId(actorIdOrName: string, extra?: Record<str
 }
 
 /**
- * Cleans Actor id / `username/name` strings before cache + Apify API lookup.
+ * Strips quote wrappers and normalizes spacing in Actor id / `username/name` strings before
+ * cache + Apify API lookup.
  *
  * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
  * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
  * and strips common wrappers / spacing noise; valid ids pass through unchanged.
  */
-export function cleanActorIdOrName(actorIdOrName: string): string {
+export function stripActorIdOrName(actorIdOrName: string): string {
     let s = actorIdOrName.trim();
     for (const [open, close] of ACTOR_ID_WRAPPERS) {
         if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
@@ -277,7 +278,7 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const normalizedActorIdOrName = normalizeAndLogActorId(actorIdOrName, { mcpSessionId });
+            const normalizedActorIdOrName = cleanActorIdOrName(actorIdOrName, { mcpSessionId });
             const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(normalizedActorIdOrName);
             if (actorDefinitionWithInfoCached) {
                 return {
