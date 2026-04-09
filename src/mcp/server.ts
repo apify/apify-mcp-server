@@ -647,6 +647,7 @@ export class ActorsMcpServer {
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
             let callDiagnostics: CallDiagnostics = {};
             let shouldTrackTelemetry = true;
+            let resolvedToolName = name;
             const failInvalidParams = async (
                 message: string,
                 details: CallDiagnostics,
@@ -707,8 +708,9 @@ export class ActorsMcpServer {
                 }
 
                 const tool = toolEntry!;
+                resolvedToolName = getToolFullName(tool);
                 // Re-initialize telemetry with the resolved tool (uses actorFullName for actor tools).
-                ({ telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken));
+                ({ telemetryData, userId } = await this.prepareTelemetryData(resolvedToolName, mcpSessionId, apifyToken));
 
                 // Extract actor name/id for telemetry — available even when validation fails later.
                 actorName = extractActorName(tool, args as Record<string, unknown>);
@@ -1015,7 +1017,7 @@ export class ActorsMcpServer {
             } finally {
                 if (shouldTrackTelemetry) {
                     this.logToolCallAndTelemetry({
-                        toolName: name,
+                        toolName: resolvedToolName,
                         mcpSessionId,
                         toolStatus,
                         startTime,

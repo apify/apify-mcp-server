@@ -284,6 +284,7 @@ export async function getActorsAsTools(
                         ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                         mcpSessionId,
                         statusCode: 404,
+                        failureCategory: 'INVALID_INPUT',
                     });
                     return null;
                 }
