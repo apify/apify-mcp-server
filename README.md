@@ -23,7 +23,7 @@ The Apify Model Context Protocol (MCP) server at [**mcp.apify.com**](https://mcp
 >
 > For the best experience, connect your AI assistant to our hosted server at **[`https://mcp.apify.com`](https://mcp.apify.com)**. The hosted server supports the latest features - including output schema inference for structured Actor results - that are not available when running locally via stdio.
 
-💰 The server also supports [Skyfire agentic payments](#-skyfire-agentic-payments), allowing AI agents to pay for Actor runs without an API token.
+💰 The server also supports [agentic payments](#-agentic-payments) via [x402](#-x402) and [Skyfire](#-skyfire), allowing AI agents to pay for Actor runs without an API token.
 
 Apify MCP Server is compatible with `Claude Code, Claude.ai, Cursor, VS Code` and any client that adheres to the Model Context Protocol.
 Check out the [MCP clients section](#-mcp-clients) for more details or visit the [MCP configuration page](https://mcp.apify.com).
@@ -36,7 +36,10 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [⚠️ SSE transport deprecation](#%EF%B8%8F-sse-transport-deprecation)
 - [🤖 MCP clients](#-mcp-clients)
 - [🪄 Try Apify MCP instantly](#-try-apify-mcp-instantly)
-- [💰 Skyfire agentic payments](#-skyfire-agentic-payments)
+- [💰 Agentic payments](#-agentic-payments)
+  - [How agentic payments work](#how-agentic-payments-work)
+  - [💸 x402](#-x402)
+  - [🔥 Skyfire](#-skyfire)
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [📊 Telemetry](#-telemetry)
 - [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
@@ -118,21 +121,80 @@ Want to try Apify MCP without any setup?
 Check out [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 
 This interactive, chat-like interface provides an easy way to explore the capabilities of Apify MCP without any local setup.
-Just sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
+Sign in with your Apify account and start experimenting with web scraping, data extraction, and automation tools!
 
 Or use the MCP bundle file (formerly known as Anthropic Desktop extension file, or DXT) for one-click installation: [Apify MCP Server MCPB file](https://github.com/apify/apify-mcp-server/releases/latest/download/apify-mcp-server.mcpb)
 
-# 💰 Skyfire agentic payments
 
-The Apify MCP Server integrates with [Skyfire](https://www.skyfire.xyz/) to enable agentic payments - AI agents can autonomously pay for Actor runs without requiring an Apify API token. Instead of authenticating with `APIFY_TOKEN`, the agent uses Skyfire PAY tokens to cover billing for each tool call.
+# 💰 Agentic payments
 
-**Prerequisites:**
-- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet
-- An MCP client that supports multiple servers (e.g., Claude Desktop, OpenCode, VS Code)
+You can pay for Actor runs without an Apify API token using either **x402** or **Skyfire**.
 
-**Setup:**
+- **x402** pays with USDC on [Base](https://base.org) and does not require a separate platform account. It is fully supported by [`mcpc`](https://github.com/apify/mcp-cli) (`npm install -g @apify/mcpc`). We use `mcpc` because it is one of the few MCP clients that supports the latest features and the x402 protocol natively.
+- **Skyfire** pays with PAY tokens and requires a Skyfire account with a funded wallet. It does not require a special MCP client; the entire payment flow is handled directly through the MCP tool call parameters.
 
-Configure both the Skyfire MCP server and Apify MCP Server in your MCP client. Enable payment mode by adding the `payment=skyfire` query parameter to the Apify server URL:
+## How agentic payments work
+
+Actor run costs vary, so both payment methods use a prepaid balance model. The payment flow happens in four steps:
+
+1. **Discovery**: The agent discovers Actors with `search-actors` or `fetch-actor-details`. Those calls are free.
+2. **Prepayment**: Before running a paid Actor tool, the agent funds a prepaid balance.
+   - **x402**: `mcpc` automatically signs a $1.00 USDC transaction.
+   - **Skyfire**: The agent creates a PAY token (minimum $5.00) using Skyfire's `create-pay-token` tool.
+3. **Execution**: The agent calls the Actor tool.
+   - **x402**: Handled automatically by `mcpc` using the prepaid balance.
+   - **Skyfire**: The agent explicitly passes the PAY token in the `skyfire-pay-id` input property.
+4. **Resolution**: The tool returns the Actor results. Unused funds stay available for later runs.
+   - **x402**: After 60 minutes of inactivity, the server refunds any unused balance to the wallet on [Base](https://base.org).
+   - **Skyfire**: Skyfire returns unused funds when the token expires.
+
+## 💸 x402
+
+The [x402 protocol](https://www.x402.org/) enables direct, machine-to-machine payments. Your MCP client can use it to pay for Actor runs with USDC on the [Base blockchain](https://base.org/), completely bypassing the need for an Apify API token.
+
+### Prerequisites
+
+- A wallet with USDC on [Base](https://base.org) mainnet.
+
+### Setup
+
+Create or import a wallet:
+
+```bash
+# Create a new wallet
+mcpc x402 init
+
+# Import an existing wallet
+mcpc x402 import <private-key>
+
+# Show the wallet address so you can fund it with USDC on Base (https://base.org)
+mcpc x402 info
+```
+
+Connect to the server with x402 enabled:
+
+```bash
+mcpc connect "mcp.apify.com?payment=x402" @apify --x402
+```
+
+You can now call a paid tool:
+
+```bash
+mcpc @apify tools-call call-actor actor:="apify/rag-web-browser" input:='{"query": "latest AI news"}'
+```
+
+## 🔥 Skyfire
+
+[Skyfire](https://www.skyfire.xyz/) provides managed payment infrastructure for AI agents. Instead of authenticating with an Apify API token, your agent passes a Skyfire payment token to cover the cost of each tool call using PAY tokens.
+
+### Prerequisites
+
+- A [Skyfire account](https://www.skyfire.xyz/) with a funded wallet.
+- An MCP client that supports multiple servers, such as Claude Desktop, OpenCode, or VS Code.
+
+### Setup
+
+Configure the Skyfire MCP server and the Apify MCP Server in your client. Add `payment=skyfire` to the Apify server URL:
 
 ```json
 {
@@ -150,16 +212,7 @@ Configure both the Skyfire MCP server and Apify MCP Server in your MCP client. E
 }
 ```
 
-**How it works:**
-
-When Skyfire mode is enabled, the agent handles the full payment flow autonomously:
-
-1. The agent discovers relevant Actors via `search-actors` or `fetch-actor-details` (these remain free).
-2. Before executing an Actor, the agent creates a PAY token using the `create-pay-token` tool from the Skyfire MCP server (minimum $5.00 USD).
-3. The agent passes the PAY token in the `skyfire-pay-id` input property when calling the Actor tool.
-4. Results are returned as usual. Unused funds on the token remain available for future runs or are returned upon expiration.
-
-To learn more, see the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) and the [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) blog post.
+See the [Skyfire integration documentation](https://docs.apify.com/platform/integrations/skyfire) for setup details. The [Agentic Payments with Skyfire](https://blog.apify.com/agentic-payments-skyfire/) post provides additional background.
 
 # 🛠️ Tools, resources, and prompts
 
@@ -434,7 +487,7 @@ Example: `https://mcp.apify.com?tools=search-actors`.
 
 ## 🐦 Canary PR releases
 
-Apify MCP is split across two repositories: this one for core MCP logic and the private `apify-mcp-server-internal` for the hosted server.
+Apify MCP is split across two repositories: this repository for core MCP logic and the private `apify-mcp-server-internal` for the hosted server.
 Changes must be synchronized between both.
 
 To create a canary release, add the `beta` tag to your PR branch.
@@ -442,7 +495,7 @@ This publishes the package to [pkg.pr.new](https://pkg.pr.new/) for staging and 
 See [the workflow file](.github/workflows/pre_release.yaml) for details.
 
 ## 🐋 Docker Hub integration
-The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, be sure to test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
+The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
 
 # 🐛 Troubleshooting (local MCP server)
 

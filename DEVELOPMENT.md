@@ -159,7 +159,7 @@ You can use [MCPJam](https://www.mcpjam.com/) to connect to and test the MCP ser
 
 1. Click **"Add new server"**
 2. Fill in a name for the server
-3. Enter the URL: `http://localhost:3001/?ui=true` (Note: the `ui=openai` query parameter is required for widget rendering)
+3. Enter the URL: `http://localhost:3001/mcp?ui=true` (Note: the `ui=true` query parameter is required for widget rendering)
 4. Select **"No authentication"** as the auth method
 5. Click **Add**
 
@@ -215,4 +215,3 @@ The MCP server API will be reachable at `https://mcp-apify.ngrok.dev/?ui=true`.
 4. Save and start a new chat
 
 > **Important:** After restarting ngrok, use the **Refresh** button in the connector settings to reconnect — ChatGPT does not detect the tunnel restart automatically.
-4. Client receives only MCP-compliant fields such as `content`, `isError`, `structuredContent`, and `_meta`.
