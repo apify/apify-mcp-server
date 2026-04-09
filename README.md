@@ -42,8 +42,10 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
   - [🔥 Skyfire](#-skyfire)
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [📊 Telemetry](#-telemetry)
+- [💬 Usage examples](#-usage-examples)
 - [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
 - [⚙️ Development](#%EF%B8%8F-development)
+- [🔒 Privacy policy](#-privacy-policy)
 - [🤝 Contributing](#-contributing)
 - [📚 Learn more](#-learn-more)
 
