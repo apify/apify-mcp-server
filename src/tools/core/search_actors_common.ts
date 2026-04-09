@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
@@ -12,22 +13,23 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 export const searchActorsArgsSchema = z.object({
     keywords: z.string()
         .default('')
-        .describe(`Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
-The search engine searches across Actor's name, description, username, and readme content.
+        .describe(dedent`
+            Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
+            The search engine searches across Actor's name, description, username, and readme content.
 
-Follow these rules for search keywords:
-- Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")
-- Actors are named using platform or service name together with the type of data or task they perform
-- The most effective keywords are specific platform names (Instagram, Twitter, TikTok) and specific data types (posts, products, profiles, weather, news, reviews, comments)
-- Avoid generic terms like "crawler", "data extraction" as these are less effective
-- If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords
-- The goal is to find Actors that specifically handle the platform and data type the user mentioned
+            Follow these rules for search keywords:
+            - Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")
+            - Actors are named using platform or service name together with the type of data or task they perform
+            - The most effective keywords are specific platform names (Instagram, Twitter, TikTok) and specific data types (posts, products, profiles, weather, news, reviews, comments)
+            - Avoid generic terms like "crawler", "data extraction" as these are less effective
+            - If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords
+            - The goal is to find Actors that specifically handle the platform and data type the user mentioned
 
-Examples:
-✅ Good: "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
-❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
-❌ Bad: "data extraction scraping tools" (too generic)
-`),
+            Examples:
+            ✅ Good: "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
+            ❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
+            ❌ Bad: "data extraction scraping tools" (too generic)
+        `),
     limit: z.number()
         .int()
         .min(1)
@@ -81,7 +83,7 @@ Returns list of Actor cards with the following info:
 
 /**
  * Shared tool metadata for search-actors — everything except the `call` handler.
- * Used by both default and openai variants.
+ * Used by both default and OpenAI variants.
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -91,9 +93,7 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
     // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
-    },
+    _meta: { ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta },
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,

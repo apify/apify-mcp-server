@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
@@ -27,16 +28,18 @@ const searchActorsInternalArgsSchema = z.object({
 export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
-    description: `Search Actors internally (UI mode internal tool).
+    description: dedent`
+        Search Actors internally (UI mode internal tool).
 
-This tool is available because the LLM is operating in UI mode. Use it for internal lookups 
-where data presentation to the user is NOT needed - this tool does NOT render a widget.
+        This tool is available because the LLM is operating in UI mode. Use it for internal lookups
+        where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
-Use this instead of ${HelperTools.STORE_SEARCH} when you need to find an Actor but the user 
-did NOT explicitly ask to search Actors. For example, when user says "scrape me google maps" 
-and you need to find the right Actor for the task, then fetch its schema and call it.
+        Use this instead of ${HelperTools.STORE_SEARCH} when you need to find an Actor but the user
+        did NOT explicitly ask to search Actors. For example, when user says "scrape me google maps"
+        and you need to find the right Actor for the task, then fetch its schema and call it.
 
-Returns only minimal fields (fullName, title, description) needed for subsequent calls.`,
+        Returns only minimal fields (fullName, title, description) needed for subsequent calls.
+    `,
     inputSchema: z.toJSONSchema(searchActorsInternalArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchInternalOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsInternalArgsSchema)),
@@ -66,13 +69,14 @@ Returns only minimal fields (fullName, title, description) needed for subsequent
         }));
 
         return buildMCPResponse({
-            texts: [
-                `Found ${minimalActors.length} Actors for "${parsed.keywords}".`,
-                '',
-                `Query: ${parsed.keywords}`,
-                '',
-                `Actors:\n\`\`\`json\n${JSON.stringify(minimalActors, null, 2)}\n\`\`\``,
-            ],
+            texts: [dedent`
+                Found ${minimalActors.length} Actors for "${parsed.keywords}".
+                Query: ${parsed.keywords}
+                Actors:
+                \`\`\`json
+                ${JSON.stringify(minimalActors, null, 2)}
+                \`\`\`
+            `],
             structuredContent: {
                 actors: minimalActors,
                 query: parsed.keywords,
