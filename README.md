@@ -42,8 +42,10 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
   - [🔥 Skyfire](#-skyfire)
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [📊 Telemetry](#-telemetry)
+- [💬 Usage examples](#-usage-examples)
 - [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
 - [⚙️ Development](#%EF%B8%8F-development)
+- [🔒 Privacy policy](#-privacy-policy)
 - [🤝 Contributing](#-contributing)
 - [📚 Learn more](#-learn-more)
 
@@ -404,6 +406,34 @@ The server provides a set of predefined example prompts to help you get started 
 
 The server does not yet provide any resources.
 
+## 💬 Usage examples
+
+Below are realistic examples showing how an AI assistant uses the Apify MCP Server tools.
+
+### Example 1: Search the web using RAG Web Browser
+
+**User prompt:**
+> Find the latest news about autonomous AI agents and summarize the key developments.
+
+The AI assistant calls the pre-configured `apify--rag-web-browser` Actor tool to search the web and return content from top results.
+The tool returns markdown content from the top 3 search results, which the AI assistant then summarizes for the user.
+
+### Example 2: Discover and run an Actor from the Apify Store
+
+**User prompt:**
+> Scrape the top 10 restaurants in Prague from Google Maps with their contact details.
+
+The AI assistant first searches for a suitable Actor, inspects its input schema, and then executes it.
+The tool returns a preview of the scraped data including restaurant names, addresses, ratings, phone numbers, and websites.
+
+### Example 3: Retrieve and paginate through Actor run results
+
+**User prompt:**
+> Show me the next 10 results from that scraping run.
+
+The AI assistant uses the dataset ID from the previous Actor run to fetch additional items.
+Expected output: The tool returns the next page of structured data items from the Actor's output dataset.
+
 ## 📡 Telemetry
 
 The Apify MCP Server collects telemetry data about tool calls to help Apify understand usage patterns and improve the service.
@@ -562,6 +592,12 @@ The Actor input schema is processed to be compatible with most MCP clients while
 - **Array item types** are inferred when not explicitly defined in the schema, using a priority order: explicit type in items > prefill type > default value type > editor type.
 - **Enum values and examples** are added to property descriptions to ensure visibility, even if the client doesn't fully support the JSON schema.
 - **Rental Actors** are only available for use with the hosted MCP server at https://mcp.apify.com. When running the server locally via stdio, you can only access Actors that are already added to your local toolset. To dynamically search for and use any Actor from Apify Store—including rental Actors—connect to the hosted endpoint.
+
+# 🔒 Privacy policy
+
+When you use this server, your requests and Actor inputs are sent to the Apify API for execution.
+Data is not shared with third parties beyond what is necessary to run the requested Actors.
+For full details on data collection, usage, sharing, and retention, see [Apify Legal](https://docs.apify.com/legal).
 
 # 🤝 Contributing
 
