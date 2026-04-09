@@ -360,7 +360,7 @@ describe('formatActorToStructuredCard', () => {
 
             // Should include rating
             expect(result.rating).toBeDefined();
-            expect(result.rating?.average).toBe(4.94598340350167);
+            expect(result.rating?.average).toBe(4.95);
             expect(result.rating?.count).toBe(14);
 
             // Should include metadata (developer, categories, dates, deprecation)

@@ -128,7 +128,7 @@ function extractActorData(
             || ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
         if (actorReviewRating && actorReviewCount) {
             data.rating = {
-                average: Number(actorReviewRating),
+                average: Number(Number(actorReviewRating).toFixed(2)),
                 count: Number(actorReviewCount),
             };
         }
