@@ -258,6 +258,7 @@ export function normalizeActorIdForLookup(raw: string): string {
     for (const [open, close] of ACTOR_ID_WRAPPERS) {
         if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
             s = s.slice(open.length, -close.length).trim();
+            break;
         }
     }
     // Unpaired markdown / JSON leakage (Mezmo: `apify/rag-web-browser` or `...pr-226"`)
