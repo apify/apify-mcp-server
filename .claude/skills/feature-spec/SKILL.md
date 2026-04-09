@@ -50,8 +50,8 @@ You might have access to these resources during planning (paths marked "if avail
 | **MCP Apps SDK (types)** | `node_modules/@modelcontextprotocol/ext-apps`                     | MCP Apps types, React hooks, server helpers (compiled only) |
 | **MCP Apps SDK (source)** | `../ext-apps` (if available — search for it)                     | Examples, tests, spec, full source — faster than GitHub     |
 | **MCP Apps spec**      | `https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx` | MCP Apps extension specification                            |
-| **Dev server (no UI)** | `http://localhost:3001/mcp` / tools: `mcp__apify-dev__*`            | Test tools without widgets                                  |
-| **Dev server (UI)**    | `http://localhost:3001/mcp?ui=true` / tools: `mcp__apify-dev-ui__*` | Test tools with widget rendering                            |
+| **Dev server (no UI)** | `http://localhost:3001/` / tools: `mcp__apify-dev__*`               | Test tools without widgets                                  |
+| **Dev server (UI)**    | `http://localhost:3001/?ui=true` / tools: `mcp__apify-dev-ui__*`    | Test tools with widget rendering                            |
 
 ## Step 3: Key conventions
 
