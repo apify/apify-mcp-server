@@ -235,13 +235,6 @@ export function logActorIdNormalized(
 }
 
 /**
- * Normalizes Actor id / `username/name` strings before cache + Apify API lookup.
- *
- * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
- * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
- * and strips common wrappers / spacing noise; valid ids pass through unchanged.
- */
-/**
  * Normalizes an Actor id and logs at INFO when client input differed.
  * Single entry point for normalize+log — avoids duplicating the pattern at every call site.
  */
@@ -253,6 +246,13 @@ export function normalizeAndLogActorId(raw: string, extra?: Record<string, unkno
     return normalized;
 }
 
+/**
+ * Normalizes Actor id / `username/name` strings before cache + Apify API lookup.
+ *
+ * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
+ * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
+ * and strips common wrappers / spacing noise; valid ids pass through unchanged.
+ */
 export function normalizeActorIdForLookup(raw: string): string {
     let s = raw.trim();
     for (const [open, close] of ACTOR_ID_WRAPPERS) {

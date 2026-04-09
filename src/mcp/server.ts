@@ -826,7 +826,7 @@ export class ActorsMcpServer {
                         : null;
 
                     try {
-                        log.info('Calling internal tool', { name: tool.name, mcpSessionId, input: logSafeArgs });
+                        log.info('Calling internal tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
                         const res = await tool.call({
                             args: toolArgs!,
                             extra,
@@ -883,8 +883,9 @@ export class ActorsMcpServer {
                         }
 
                         log.info('Calling Actor-MCP', {
+                            toolName: tool.name,
+                            actorMcpToolName: tool.originToolName,
                             actorId: tool.actorId,
-                            toolName: tool.originToolName,
                             mcpSessionId,
                             input: logSafeArgs,
                         });
@@ -933,7 +934,7 @@ export class ActorsMcpServer {
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
                     try {
-                        log.info('Calling Actor', { actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
+                        log.info('Calling Actor', { toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
                         const executorResult = await this.actorExecutor.executeActorTool({
                             actorFullName: tool.actorFullName,
                             input: toolArgs!,
@@ -1013,7 +1014,15 @@ export class ActorsMcpServer {
                 });
             } finally {
                 if (shouldTrackTelemetry) {
-                    this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
+                    this.logToolCallAndTelemetry({
+                        toolName: name,
+                        mcpSessionId,
+                        toolStatus,
+                        startTime,
+                        telemetryData,
+                        userId,
+                        callDiagnostics,
+                    });
                 }
             }
 
@@ -1036,35 +1045,39 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Finalizes and tracks telemetry for a tool call.
-     * Calculates execution time, sets final status, and sends the telemetry event.
-     *
-     * @param telemetryData - Telemetry data to finalize and track (null if telemetry is disabled)
-     * @param userId - Apify user ID (string or null if not available)
-     * @param startTime - Timestamp when the tool call started
-     * @param toolStatus - Final status of the tool call
-     * @param callDiagnostics - Telemetry fields: always includes actor_name/actor_id when available; failure-specific fields only on non-success
+     * Logs tool call completion at INFO level and tracks telemetry.
+     * Computes duration once so both the log line and telemetry event use the same value.
      */
-    private finalizeAndTrackTelemetry(
-        telemetryData: ToolCallTelemetryProperties | null,
-        userId: string | null,
-        startTime: number,
-        toolStatus: ToolStatus,
-        callDiagnostics?: CallDiagnostics,
-    ): void {
-        if (!telemetryData) {
-            return;
-        }
+    private logToolCallAndTelemetry(params: {
+        toolName: string;
+        mcpSessionId: string | undefined;
+        toolStatus: ToolStatus;
+        startTime: number;
+        taskId?: string;
+        telemetryData: ToolCallTelemetryProperties | null;
+        userId: string | null;
+        callDiagnostics?: CallDiagnostics;
+    }): void {
+        const durationMs = Date.now() - params.startTime;
 
-        const execTime = Date.now() - startTime;
-        const finalizedTelemetryData: ToolCallTelemetryProperties = {
-            ...telemetryData,
-            tool_status: toolStatus,
-            tool_exec_time_ms: execTime,
-            // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
-            ...callDiagnostics,
-        };
-        trackToolCall(userId, this.telemetryEnv, finalizedTelemetryData);
+        log.info('Tool call completed', {
+            toolName: params.toolName,
+            mcpSessionId: params.mcpSessionId,
+            toolStatus: params.toolStatus,
+            durationMs,
+            ...(params.taskId !== undefined && { taskId: params.taskId }),
+        });
+
+        if (params.telemetryData) {
+            const finalizedTelemetryData: ToolCallTelemetryProperties = {
+                ...params.telemetryData,
+                tool_status: params.toolStatus,
+                tool_exec_time_ms: durationMs,
+                // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
+                ...params.callDiagnostics,
+            };
+            trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
+        }
     }
 
     // TODO: this function quite duplicates the main tool call login the CallToolRequestSchema handler, we should refactor
@@ -1115,6 +1128,19 @@ export class ActorsMcpServer {
         // This avoids re-fetching user data in the error handler.
         const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
 
+        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics) => {
+            this.logToolCallAndTelemetry({
+                toolName: tool.name,
+                mcpSessionId,
+                toolStatus: status,
+                startTime,
+                taskId,
+                telemetryData,
+                userId,
+                callDiagnostics: diagnostics,
+            });
+        };
+
         try {
             // Check if task was already cancelled before we start execution.
             // Critical: if a client cancels the task immediately after creation (race condition),
@@ -1125,7 +1151,7 @@ export class ActorsMcpServer {
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.ABORTED, {
+                finishTaskTracking(TOOL_STATUS.ABORTED, {
                     ...buildActorFields(actorName, actorId),
                 });
                 return;
@@ -1163,7 +1189,7 @@ export class ActorsMcpServer {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
 
                 try {
-                    log.info('Calling internal tool for task', { taskId, name: tool.name, mcpSessionId, input: logSafeArgs });
+                    log.info('Calling internal tool for task', { taskId, toolName: tool.name, mcpSessionId, input: logSafeArgs });
                     const res = await tool.call({
                         args: toolArgs,
                         extra,
@@ -1192,7 +1218,7 @@ export class ActorsMcpServer {
                 const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
 
                 try {
-                    log.info('Calling Actor for task', { taskId, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
+                    log.info('Calling Actor for task', { taskId, toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
                     const executorResult = await this.actorExecutor.executeActorTool({
                         actorFullName: tool.actorFullName,
                         input: toolArgs,
@@ -1224,7 +1250,7 @@ export class ActorsMcpServer {
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus);
+                finishTaskTracking(toolStatus);
                 return;
             }
 
@@ -1236,14 +1262,14 @@ export class ActorsMcpServer {
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
+            finishTaskTracking(toolStatus, callDiagnostics);
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, TOOL_STATUS.SOFT_FAIL, {
+                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
                     ...buildActorFields(actorName, actorId),
@@ -1280,7 +1306,7 @@ export class ActorsMcpServer {
                     taskId,
                     mcpSessionId,
                 });
-                this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
+                finishTaskTracking(toolStatus, callDiagnostics);
                 return;
             }
 
@@ -1298,7 +1324,7 @@ export class ActorsMcpServer {
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
 
-            this.finalizeAndTrackTelemetry(telemetryData, userId, startTime, toolStatus, callDiagnostics);
+            finishTaskTracking(toolStatus, callDiagnostics);
         }
     }
 
