@@ -93,43 +93,46 @@ function extractActorData(
         isDeprecated: false,
     };
 
-    // Extract stats
+    // Extract stats — each field checked independently to match original markdown behavior
     if (options.includeStats && 'stats' in actor) {
         const { stats } = actor;
+
         if ('totalUsers' in stats && 'totalUsers30Days' in stats) {
             data.stats = {
                 totalUsers: stats.totalUsers,
                 monthlyUsers: stats.totalUsers30Days,
             };
+        }
 
-            if ('publicActorRunStats30Days' in stats && stats.publicActorRunStats30Days) {
-                const runStats = stats.publicActorRunStats30Days as {
-                    SUCCEEDED: number;
-                    TOTAL: number;
-                };
-                if (runStats.TOTAL > 0) {
-                    data.stats.successRate = Number(((runStats.SUCCEEDED / runStats.TOTAL) * 100).toFixed(1));
-                }
+        if ('publicActorRunStats30Days' in stats && stats.publicActorRunStats30Days) {
+            const runStats = stats.publicActorRunStats30Days as {
+                SUCCEEDED: number;
+                TOTAL: number;
+            };
+            if (runStats.TOTAL > 0) {
+                data.stats ??= { totalUsers: 0, monthlyUsers: 0 };
+                data.stats.successRate = Number(((runStats.SUCCEEDED / runStats.TOTAL) * 100).toFixed(1));
             }
+        }
 
-            const bookmarkCount = ('bookmarkCount' in actor && actor.bookmarkCount)
-                || ('bookmarkCount' in stats && stats.bookmarkCount);
-            if (bookmarkCount) {
-                data.stats.bookmarks = Number(bookmarkCount);
-            }
+        const bookmarkCount = ('bookmarkCount' in actor && actor.bookmarkCount)
+            || ('bookmarkCount' in stats && stats.bookmarkCount);
+        if (bookmarkCount) {
+            data.stats ??= { totalUsers: 0, monthlyUsers: 0 };
+            data.stats.bookmarks = Number(bookmarkCount);
         }
     }
 
-    // Extract rating
+    // Extract rating — only actorReviewRating is required (count is optional)
     if (options.includeRating) {
         const actorReviewRating = ('actorReviewRating' in actor && actor.actorReviewRating)
             || ('stats' in actor && actor.stats && 'actorReviewRating' in actor.stats && actor.stats.actorReviewRating);
-        const actorReviewCount = ('actorReviewCount' in actor && actor.actorReviewCount)
-            || ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
-        if (actorReviewRating && actorReviewCount) {
+        if (actorReviewRating) {
+            const actorReviewCount = ('actorReviewCount' in actor && actor.actorReviewCount)
+                || ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
             data.rating = {
                 average: Number(Number(actorReviewRating).toFixed(2)),
-                count: Number(actorReviewCount),
+                count: actorReviewCount ? Number(actorReviewCount) : 0,
             };
         }
     }
