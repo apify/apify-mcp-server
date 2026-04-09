@@ -32,7 +32,7 @@ createIntegrationTestsSuite({
 
         // Start a test server
         await new Promise<void>((resolve) => {
-            httpServer = app.listen(httpServerPort, () => resolve());
+            httpServer = app.listen(httpServerPort, '127.0.0.1', () => resolve());
         });
     },
     afterAllFn: async () => {
