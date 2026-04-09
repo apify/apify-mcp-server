@@ -84,6 +84,7 @@ Use comments to guide reviewers:
         * Inline `dedent` directly as a property or variable value — do not extract it to a named constant.
         * For top-level string constants that are already flush-left, use a plain template literal — `dedent` only helps when indentation from surrounding code would otherwise be embedded in the string.
         * `dedent` introduces `\n` at each source line break. This is fine for LLM-facing strings (tool descriptions, instructions, notes), but avoid it for strings where whitespace is significant or where `\n` would break rendering (e.g. UI labels, log messages, URLs).
+        * Do not interpolate values that start at column 0 (e.g. `JSON.stringify` output) inside `dedent` — `dedent` computes minimum indentation across all lines including interpolated ones, so a flush-left value sets `mindent = 0` and leaves all template lines with stray leading spaces. Use a `texts[]` array or plain template literal instead.
         * For strings where `\n` is not acceptable, use string concatenation (`+`) to split across lines for `max-len` compliance.
         ```typescript
         import dedent from 'dedent';

@@ -69,14 +69,11 @@ export const searchActorsInternalTool: ToolEntry = Object.freeze({
         }));
 
         return buildMCPResponse({
-            texts: [dedent`
-                Found ${minimalActors.length} Actors for "${parsed.keywords}".
-                Query: ${parsed.keywords}
-                Actors:
-                \`\`\`json
-                ${JSON.stringify(minimalActors, null, 2)}
-                \`\`\`
-            `],
+            texts: [
+                `Found ${minimalActors.length} Actors for "${parsed.keywords}".`,
+                `Query: ${parsed.keywords}`,
+                `Actors:\n\`\`\`json\n${JSON.stringify(minimalActors)}\n\`\`\``,
+            ],
             structuredContent: {
                 actors: minimalActors,
                 query: parsed.keywords,
