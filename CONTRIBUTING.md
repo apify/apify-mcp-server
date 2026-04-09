@@ -114,7 +114,7 @@ Use comments to guide reviewers:
 
 *   **Comments:**
     * Use proper English (spelling, grammar, punctuation, capitalization).
-    * Use JSDoc `/**` for documentation, `//` for generic comments, and avoid `/*` (single asterix multiline comments).
+    * Use JSDoc `/**` for documentation, `//` for generic comments, and avoid `/*` (single asterisk multiline comments).
 
 *   **Parameters**
     * **Minimal Parameters:** Pass only the parameters that the function actually uses.
