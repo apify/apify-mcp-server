@@ -22,11 +22,11 @@ export const defaultFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
-        const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-        const actorName = normalizeAndLogActorId(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
+        const parsedArgs = fetchActorDetailsToolArgsSchema.parse(args);
+        const actorName = normalizeAndLogActorId(parsedArgs.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
-        const resolvedOutput = resolveOutputOptions(parsed.output);
+        const resolvedOutput = resolveOutputOptions(parsedArgs.output);
         const cardOptions = buildCardOptions(resolvedOutput);
 
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);

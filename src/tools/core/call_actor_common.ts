@@ -283,9 +283,9 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     }
 > {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
-    const parsedRaw = callActorArgs.parse(args);
-    const normalizedActor = normalizeAndLogActorId(parsedRaw.actor, { mcpSessionId, route: 'call-actor' });
-    const parsed: CallActorParsedArgs = { ...parsedRaw, actor: normalizedActor };
+    const parsedArgs = callActorArgs.parse(args);
+    const normalizedActorIdOrName = normalizeAndLogActorId(parsedArgs.actor, { mcpSessionId, route: 'call-actor' });
+    const parsed: CallActorParsedArgs = { ...parsedArgs, actor: normalizedActorIdOrName };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 

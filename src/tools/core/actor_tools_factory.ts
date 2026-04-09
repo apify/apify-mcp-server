@@ -235,26 +235,26 @@ export function logActorIdNormalized(
 }
 
 /**
- * Normalizes an Actor id and logs at INFO when client input differed.
- * Single entry point for normalize+log — avoids duplicating the pattern at every call site.
+ * Cleans an Actor id or name and logs at INFO when client input differed.
+ * Single entry point for clean+log — avoids duplicating the pattern at every call site.
  */
-export function normalizeAndLogActorId(raw: string, extra?: Record<string, unknown>): string {
-    const normalized = normalizeActorIdForLookup(raw);
-    if (normalized !== raw) {
-        logActorIdNormalized(raw, normalized, extra);
+export function normalizeAndLogActorId(actorIdOrName: string, extra?: Record<string, unknown>): string {
+    const normalizedActorIdOrName = cleanActorIdOrName(actorIdOrName);
+    if (normalizedActorIdOrName !== actorIdOrName) {
+        logActorIdNormalized(actorIdOrName, normalizedActorIdOrName, extra);
     }
-    return normalized;
+    return normalizedActorIdOrName;
 }
 
 /**
- * Normalizes Actor id / `username/name` strings before cache + Apify API lookup.
+ * Cleans Actor id / `username/name` strings before cache + Apify API lookup.
  *
  * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
  * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
  * and strips common wrappers / spacing noise; valid ids pass through unchanged.
  */
-export function normalizeActorIdForLookup(raw: string): string {
-    let s = raw.trim();
+export function cleanActorIdOrName(actorIdOrName: string): string {
+    let s = actorIdOrName.trim();
     for (const [open, close] of ACTOR_ID_WRAPPERS) {
         if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
             s = s.slice(open.length, -close.length).trim();
@@ -277,8 +277,8 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const normalized = normalizeAndLogActorId(actorIdOrName, { mcpSessionId });
-            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(normalized);
+            const normalizedActorIdOrName = normalizeAndLogActorId(actorIdOrName, { mcpSessionId });
+            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(normalizedActorIdOrName);
             if (actorDefinitionWithInfoCached) {
                 return {
                     definition: actorDefinitionWithInfoCached.definition,
@@ -289,18 +289,18 @@ export async function getActorsAsTools(
             }
 
             try {
-                const actorDefinitionWithInfo = await getActorDefinition(normalized, apifyClient);
+                const actorDefinitionWithInfo = await getActorDefinition(normalizedActorIdOrName, apifyClient);
                 if (!actorDefinitionWithInfo) {
                     log.softFail('Actor not found or definition is not available', {
-                        actorName: normalized,
-                        ...(normalized !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                        actorName: normalizedActorIdOrName,
+                        ...(normalizedActorIdOrName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                         mcpSessionId,
                         statusCode: 404,
                     });
                     return null;
                 }
                 // Cache the Actor definition with info
-                actorDefinitionPrunedCache.set(normalized, actorDefinitionWithInfo);
+                actorDefinitionPrunedCache.set(normalizedActorIdOrName, actorDefinitionWithInfo);
                 return {
                     definition: actorDefinitionWithInfo.definition,
                     actor: actorDefinitionWithInfo.info,
@@ -308,8 +308,8 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
-                    actorName: normalized,
-                    ...(normalized !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                    actorName: normalizedActorIdOrName,
+                    ...(normalizedActorIdOrName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
                 return null;
