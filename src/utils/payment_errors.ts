@@ -102,13 +102,12 @@ export function buildPaymentRequiredResponse(errorOrMessage: unknown, precompute
     const paymentData = precomputedPaymentData ?? extractPaymentRequiredData(errorOrMessage);
     const message = errorOrMessage instanceof Error ? errorOrMessage.message : String(errorOrMessage);
 
-    // When paymentData exists, return two text entries: a human-readable explanation first,
-    // then the raw JSON payload. Keeping JSON in its own entry preserves parseability for
-    // x402 clients that extract payment data from content[].text via JSON.parse().
+    // When paymentData exists, return two text entries: JSON payload first (backward-compatible
+    // position for x402 clients that parse content[0].text), then a human-readable explanation.
     const texts = paymentData
         ? [
-            'Payment required to run this Actor or access this resource.',
             JSON.stringify(paymentData),
+            'Payment required to run this Actor or access this resource.',
         ]
         : [message];
 
