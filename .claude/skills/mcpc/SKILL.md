@@ -10,8 +10,10 @@ allowed-tools: Bash(mcpc:*), Bash(npm run build:*)
 
 | Session | Transport | When to use |
 |---|---|---|
-| `@stdio` | `node dist/stdio.js` | Core tool behavior — requires `npm run build` |
-| `@dev` | `http://localhost:3001` | Widget / UI mode — requires `npm run dev` running |
+| `@stdio` | `node dist/stdio.js` | Core tool behavior — requires `npm run build`, no running server needed |
+| `@dev` | `http://localhost:3001` | Widget / UI mode, or when you need **server logs** — requires `npm run dev` running |
+
+> **Tip:** `@dev` shows server logs in the `npm run dev` terminal as requests come in — useful for observing server-side behavior, request flow, and debugging issues that aren't visible from the tool output alone.
 
 ## Workflow
 
