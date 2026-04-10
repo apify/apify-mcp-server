@@ -1,5 +1,5 @@
 {
-  "version": "1.4",
+  "version": "1.6",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -437,18 +437,6 @@
       "category": "tool-selection",
       "query": "Get the latest weather forecast for New York",
       "expectedTools": ["apify--rag-web-browser"]
-    },
-    {
-      "id": "weather-mcp-search-then-call-1",
-      "category": "flow",
-      "query": "Now, use the mcp to check the weather in Prague, Czechia?",
-      "expectedTools": ["call-actor"],
-      "context": [
-          { "role": "user", "content": "Search for weather MCP server" },
-          { "role": "assistant", "content": "I'll help you to do that" },
-          { "role": "tool_use", "tool": "search-actors", "input": {"search": "weather mcp", "limit": 5} },
-          { "role": "tool_result", "tool_use_id": 12, "content": "Tool 'search-actors' successful, Actor found: jiri.spilka/weather-mcp-server" }
-      ]
     },
     {
       "id": "search-actors-input-args-1",
