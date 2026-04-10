@@ -30,10 +30,7 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
             }
 
             const { run, structuredContent } = fetchResult.result;
-
-            const texts = [
-                `# Actor Run Information\n\`\`\`json\n${JSON.stringify(run, null, 2)}\n\`\`\``,
-            ];
+            const texts = [`# Actor Run Information\n\`\`\`json\n${JSON.stringify(run)}\n\`\`\``];
 
             return buildMCPResponse({
                 texts,
