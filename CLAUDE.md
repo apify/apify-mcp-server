@@ -18,6 +18,12 @@ The server can run in multiple modes:
 - **No over-engineering**: Solve the current problem, not hypothetical future ones
 - **No unsolicited features**: Don't add anything not explicitly requested by the human operator
 
+### Communication style — MANDATORY
+
+**This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
+
+- **Plain language, no fluff.** Say what you mean in the fewest words. No filler phrases, no motivational preambles, no "this will improve the developer experience."
+
 ## Scope discipline
 
 - **Bug fix = bug fix.** When fixing a bug, fix only the bug. Don't refactor surrounding code, don't improve naming, don't add comments, don't "clean up while you're here."
