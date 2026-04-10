@@ -102,8 +102,14 @@ export function buildPaymentRequiredResponse(errorOrMessage: unknown, precompute
     const paymentData = precomputedPaymentData ?? extractPaymentRequiredData(errorOrMessage);
     const message = errorOrMessage instanceof Error ? errorOrMessage.message : String(errorOrMessage);
 
-    return buildMCPResponse({
-        texts: [paymentData ? JSON.stringify(paymentData) : message],
-        isError: true,
-    });
+    // When paymentData exists, return two text entries: JSON payload first (backward-compatible
+    // position for x402 clients that parse content[0].text), then a human-readable explanation.
+    const texts = paymentData
+        ? [
+            JSON.stringify(paymentData),
+            'Payment required to run this Actor or access this resource.',
+        ]
+        : [message];
+
+    return buildMCPResponse({ texts, isError: true });
 }

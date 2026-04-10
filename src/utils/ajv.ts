@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
-export const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
 /**
  * Removes the $schema property and fixes the required array from a JSON schema.
@@ -34,7 +34,16 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
 /**
  * Compiles a JSON schema with AJV, automatically cleaning the $schema property
  * and fixing the required array.
- * This wrapper ensures compatibility with z.toJSONSchema() output.
+ *
+ * **Unknown properties are silently stripped** by the AJV `removeAdditional: true` option
+ * (set on the shared `ajv` instance). MCP / LLM clients regularly send extra top-level keys
+ * (client metadata, duplicated hints, transport leftovers) that would otherwise cause validation
+ * failures. Stripping them is safer than allowing them through with `additionalProperties: true`,
+ * because no downstream code should rely on undeclared properties.
+ *
+ * **Payment fields** (e.g. Skyfire's `skyfire-pay-id`) are removed by the payment provider's
+ * `removePaymentFields()` *before* AJV validation runs (see `prepareToolCallContext()`),
+ * so they are never subject to this stripping.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
     return ajv.compile(fixZodSchemaRequired(schema));

@@ -9,6 +9,7 @@ import {
     resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
@@ -21,16 +22,17 @@ import {
 export const openaiFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyToken, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsToolArgsSchema.parse(args);
+        const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
         const resolvedOutput = resolveOutputOptions(parsed.output);
         const cardOptions = buildCardOptions(resolvedOutput);
 
-        const details = await fetchActorDetails(apifyClient, parsed.actor, cardOptions);
+        const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
-            return buildActorNotFoundResponse(parsed.actor);
+            return buildActorNotFoundResponse(actorName);
         }
 
         const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
@@ -42,7 +44,7 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
 
         const texts = [`
 # Actor information:
-- **Actor:** ${parsed.actor}
+- **Actor:** ${actorName}
 - **URL:** ${actorUrl}
 
 An interactive widget has been rendered with detailed Actor information.
@@ -55,7 +57,7 @@ An interactive widget has been rendered with detailed Actor information.
             // Response-level meta; only returned in openai mode (this handler is openai-only)
             _meta: {
                 ...widgetConfig?.meta,
-                'openai/widgetDescription': `Actor details for ${parsed.actor} from Apify Store`,
+                'openai/widgetDescription': `Actor details for ${actorName} from Apify Store`,
             },
         });
     },

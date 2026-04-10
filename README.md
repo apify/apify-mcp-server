@@ -43,7 +43,7 @@ Check out the [MCP clients section](#-mcp-clients) for more details or visit the
 - [🛠️ Tools, resources, and prompts](#%EF%B8%8F-tools-resources-and-prompts)
 - [📊 Telemetry](#-telemetry)
 - [💬 Usage examples](#-usage-examples)
-- [🐛 Troubleshooting (local MCP server)](#-troubleshooting-local-mcp-server)
+- [🐛 Troubleshooting](#-troubleshooting)
 - [⚙️ Development](#%EF%B8%8F-development)
 - [🔒 Privacy policy](#-privacy-policy)
 - [🤝 Contributing](#-contributing)
@@ -94,18 +94,15 @@ Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your pr
 
 ![Apify-MCP-configuration-clients](https://raw.githubusercontent.com/apify/apify-mcp-server/refs/heads/master/docs/mcp-clients.png)
 
-### Supported clients matrix
+### Tested clients
 
-The following table outlines the tested MCP clients and their level of support for key features.
-
-| Client                      | Dynamic Tool Discovery | Notes                                                |
-|-----------------------------|------------------------|------------------------------------------------------|
-| **Claude.ai (web)**         | 🟡 Partial             | Tools may need to be reloaded manually in the client |
-| **Claude Desktop**          | 🟡 Partial             | Tools may need to be reloaded manually in the client |
-| **VS Code (Genie)**         | ✅ Full                 |                                                      |
-| **Cursor**                  | ✅ Full                 |                                                      |
-| **Apify Tester MCP Client** | ✅ Full                 | Designed for testing Apify MCP servers               |
-| **OpenCode**                | ✅ Full                 |                                                      |
+- [Claude Desktop](https://docs.apify.com/platform/integrations/claude-desktop)
+- Claude.ai (web)
+- [ChatGPT](https://docs.apify.com/platform/integrations/chatgpt)
+- VS Code (Genie)
+- Cursor
+- OpenCode
+- [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) — designed for testing Apify MCP servers
 
 
 **Smart tool selection based on client capabilities:**
@@ -527,60 +524,9 @@ See [the workflow file](.github/workflows/pre_release.yaml) for details.
 ## 🐋 Docker Hub integration
 The Apify MCP Server is also available on [Docker Hub](https://hub.docker.com/mcp/server/apify-mcp-server/overview), registered via the [mcp-registry](https://github.com/docker/mcp-registry) repository. The entry in `servers/apify-mcp-server/server.yaml` should be deployed automatically by the Docker Hub MCP registry (deployment frequency is unknown). **Before making major changes to the `stdio` server version, test it locally to ensure the Docker build passes.** To test, change the `source.branch` to your PR branch and run `task build -- apify-mcp-server`. For more details, see [CONTRIBUTING.md](https://github.com/docker/mcp-registry/blob/main/CONTRIBUTING.md).
 
-# 🐛 Troubleshooting (local MCP server)
+# 🐛 Troubleshooting
 
-- Make sure you have `node` (v20 or higher) installed by running `node -v`.
-- Make sure the `APIFY_TOKEN` environment variable is set.
-- Always use the latest version of the MCP server by using `@apify/actors-mcp-server@latest`.
-
-### Common issues
-
-#### "Unable to connect to extension server", "Cannot find module", or tools not loading
-
-This is most commonly caused by a **corrupted npx cache** — often left behind when Claude Desktop restarts the MCP server process mid-download. Fix it by clearing the cache:
-
-```bash
-# macOS / Linux
-rm -rf ~/.npm/_npx
-npx -y @apify/actors-mcp-server@latest
-
-# Windows (PowerShell)
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\npm-cache\_npx"
-npx -y @apify/actors-mcp-server@latest
-```
-
-After clearing the cache, restart Claude Desktop.
-
-#### Errors like "File is not defined" or "ReadableStream is not defined"
-
-You are running an **outdated version of Node.js**. The Apify MCP server requires Node.js **v20 or higher**:
-
-```bash
-node -v  # Check your version
-```
-
-If your version is below 20, update Node.js from [nodejs.org](https://nodejs.org).
-
-#### Server works in Claude Desktop chat but not in cowork mode
-
-This is a known issue we are investigating. As a workaround, try using the hosted server at [mcp.apify.com](https://mcp.apify.com) instead of the local stdio server.
-
-### Checking logs
-
-If you encounter issues, check the Claude Desktop logs for error details:
-
-- **macOS**: `~/Library/Logs/Claude/`
-- **Windows**: `%APPDATA%\Claude\logs\`
-- **Linux**: `~/.config/Claude/logs/`
-
-### Debugging the NPM package
-
-To debug the server, use the [MCP Inspector](https://github.com/modelcontextprotocol/inspector) tool:
-
-```shell
-export APIFY_TOKEN="your-apify-token"
-npx @modelcontextprotocol/inspector npx -y @apify/actors-mcp-server
-```
+For step-by-step troubleshooting, see the [Claude Desktop integration guide](https://docs.apify.com/platform/integrations/claude-desktop) in the Apify documentation.
 
 ## 💡 Limitations
 
@@ -619,3 +565,5 @@ For major changes, please open an issue first to discuss your proposal and ensur
 - [Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client)
 - [Webinar: Building and Monetizing MCP Servers on Apify](https://www.youtube.com/watch?v=w3AH3jIrXXo)
 - [How to build and monetize an AI agent on Apify](https://blog.apify.com/how-to-build-an-ai-agent/)
+- [Connect Apify MCP with Claude Desktop](https://docs.apify.com/platform/integrations/claude-desktop)
+- [Connect Apify MCP with ChatGPT](https://docs.apify.com/platform/integrations/chatgpt)
