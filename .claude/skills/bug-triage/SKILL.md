@@ -31,14 +31,22 @@ Triage open bug issues on `apify/apify-mcp-server`. Analyze, draft responses, ge
 
 ## Step 1: Fetch issues
 
-Bug reports come in two forms — find both:
+Use the arguments parsed in Step 0 to determine what to fetch.
 
-1. **By label**: issues with the `bug` label
+**If specific issue numbers were provided**, skip the list queries and fetch each issue directly:
+
+```bash
+gh issue view <number> --repo apify/apify-mcp-server --comments
+```
+
+**Otherwise** (label mode, `--all`, or empty), fetch open bug reports. Use the label from Step 0 (default: `bug`). Bug reports come in two forms — find both:
+
+1. **By label**: issues with the parsed label
 2. **By title prefix**: issues with `[Bug]` in the title (the bug report template adds this, but the label isn't always applied)
 
 ```bash
-# By label
-gh issue list --repo apify/apify-mcp-server --label bug --state open --json number,title,labels,createdAt,body --limit 30
+# By label (use the label from Step 0, default: bug)
+gh issue list --repo apify/apify-mcp-server --label <label> --state open --json number,title,labels,createdAt,body --limit 30
 
 # By title prefix (catches unlabeled bug reports)
 gh issue list --repo apify/apify-mcp-server --state open --search "[Bug] in:title" --json number,title,labels,createdAt,body --limit 30
