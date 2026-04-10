@@ -15,25 +15,25 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
-        const parsedArgs = searchActorsArgsSchema.parse(args);
+        const parsed = searchActorsArgsSchema.parse(args);
         const actors = await searchAndFilterActors({
-            keywords: parsedArgs.keywords,
+            keywords: parsed.keywords,
             apifyToken,
-            limit: parsedArgs.limit,
-            offset: parsedArgs.offset,
+            limit: parsed.limit,
+            offset: parsed.offset,
             paymentProvider: apifyMcpServer.options.paymentProvider,
             userRentedActorIds,
         });
 
         if (actors.length === 0) {
             const instructions = dedent`
-                No Actors were found for the search query "${parsedArgs.keywords}".
+                No Actors were found for the search query "${parsed.keywords}".
                 You MUST retry with broader, more generic keywords - use just the platform name
                 (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
             `;
             const structuredContent = {
                 actors: [],
-                query: parsedArgs.keywords,
+                query: parsed.keywords,
                 count: 0,
                 instructions,
             };
@@ -43,7 +43,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
         const structuredActorCards = actors.map((actor) => formatActorToStructuredCard(actor));
         const structuredContent = {
             actors: structuredActorCards,
-            query: parsedArgs.keywords,
+            query: parsed.keywords,
             count: actors.length,
             instructions: dedent`
                 If you need more detailed information about any of these Actors, including their
@@ -59,7 +59,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
         const actorsText = actorCards.join('\n\n');
         const instructions = dedent`
             # Search results:
-            - **Search query:** ${parsedArgs.keywords}
+            - **Search query:** ${parsed.keywords}
             - **Number of Actors found:** ${actors.length}
 
             # Actors:
