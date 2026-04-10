@@ -103,8 +103,10 @@ Actor description: ${definition.description}`;
 
         let ajvValidate;
         try {
-            // Allow additional properties for dynamic Actor input fields
-            ajvValidate = fixedAjvCompile(ajv, { ...inputSchema, additionalProperties: true });
+            // Unknown properties are silently stripped by AJV's removeAdditional option.
+            // Dynamic Actor input fields are part of the Actor's own inputSchema, so they
+            // are declared properties and won't be stripped.
+            ajvValidate = fixedAjvCompile(ajv, inputSchema);
         } catch (e) {
             log.error('Failed to compile schema', {
                 actorName: definition.actorFullName,
@@ -215,6 +217,46 @@ export async function getMCPServersAsTools(
     return actorToolsArrays.flat();
 }
 
+// Quote/backtick pairs that LLMs wrap actor names in (allocated once, not per call).
+const ACTOR_NAME_WRAPPERS: [string, string][] = [['`', '`'], ['"', '"'], ['\u201c', '\u201d'], ['\u2018', '\u2019']];
+
+/**
+ * Fixes an Actor name input from LLM and logs at INFO when the input differed from the fixed version.
+ * Single entry point for fix+log — avoids duplicating the pattern at every call site.
+ */
+export function fixActorNameInputAndLog(actorName: string, extra?: Record<string, unknown>): string {
+    const fixed = fixActorNameInput(actorName);
+    if (fixed !== actorName) {
+        log.info('Actor name input required normalization before lookup (quotes, spacing, or slash padding)', {
+            actorNameInput: actorName,
+            actorNameFixed: fixed,
+            ...extra,
+        });
+    }
+    return fixed;
+}
+
+/**
+ * Fixes Actor name strings (`username/name`) before cache + Apify API lookup.
+ *
+ * LLMs often wrap values in markdown quotes or smart quotes and insert spaces around `/`.
+ * The Apify API treats those as distinct strings → avoidable 404 SOFT_FAIL. This only trims
+ * and strips common wrappers / spacing noise; valid names pass through unchanged.
+ */
+export function fixActorNameInput(actorName: string): string {
+    let s = actorName.trim();
+    for (const [open, close] of ACTOR_NAME_WRAPPERS) {
+        if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
+            s = s.slice(open.length, -close.length).trim();
+            break;
+        }
+    }
+    // Unpaired markdown / JSON leakage (Mezmo: `apify/rag-web-browser` or `...pr-226"`)
+    s = s.replace(/^[`'"\u201c\u201d\u2018\u2019]+|[`'"\u201c\u201d\u2018\u2019]+$/g, '').trim();
+    s = s.replace(/\s*\/\s*/g, '/');
+    return s.replace(/\s+/g, ' ').trim();
+}
+
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
@@ -225,7 +267,8 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(actorIdOrName);
+            const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
+            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(actorName);
             if (actorDefinitionWithInfoCached) {
                 return {
                     definition: actorDefinitionWithInfoCached.definition,
@@ -236,15 +279,19 @@ export async function getActorsAsTools(
             }
 
             try {
-                const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
+                const actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
                 if (!actorDefinitionWithInfo) {
                     log.softFail('Actor not found or definition is not available', {
-                        actorName: actorIdOrName, mcpSessionId, statusCode: 404, failureCategory: 'INVALID_INPUT',
+                        actorName,
+                        ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                        mcpSessionId,
+                        statusCode: 404,
+                        failureCategory: 'INVALID_INPUT',
                     });
                     return null;
                 }
                 // Cache the Actor definition with info
-                actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionWithInfo);
+                actorDefinitionPrunedCache.set(actorName, actorDefinitionWithInfo);
                 return {
                     definition: actorDefinitionWithInfo.definition,
                     actor: actorDefinitionWithInfo.info,
@@ -252,7 +299,8 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
-                    actorName: actorIdOrName,
+                    actorName,
+                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
                 return null;

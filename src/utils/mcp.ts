@@ -1,4 +1,5 @@
 import type { ToolTelemetryContext } from '../types.js';
+import { getHttpStatusCode } from './logging.js';
 
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
@@ -46,4 +47,17 @@ export function buildMCPResponse(options: {
         ...(structuredContent !== undefined && { structuredContent }),
         ...(_meta !== undefined && { _meta }),
     };
+}
+
+/** User-facing error text for tool execution failures with HTTP-aware hints. */
+export function getToolCallErrorUserText(toolName: string, error: unknown): string {
+    const msg = error instanceof Error ? error.message : String(error);
+    const status = getHttpStatusCode(error);
+    if (status === 403) {
+        return `Error calling tool "${toolName}": ${msg}. The resource may be private or your token may lack access.`;
+    }
+    if (status === 401) {
+        return `Error calling tool "${toolName}": ${msg}. Authentication failed — check APIFY_TOKEN is set and valid.`;
+    }
+    return `Error calling tool "${toolName}": ${msg}. Verify the tool name and input parameters.`;
 }
