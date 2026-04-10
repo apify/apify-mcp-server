@@ -9,6 +9,7 @@
             "url": "https://mcp.figma.com/mcp"
         },
         "dev": {
+            "type": "http",
             "url": "http://localhost:3001",
             "headers": {
                 "Authorization": "Bearer ${APIFY_TOKEN}"

@@ -80,6 +80,7 @@ Starts the web widgets builder in watch mode and the MCP server in standby mode 
 
 - Get your `APIFY_TOKEN` from [Apify Console](https://console.apify.com/settings/integrations)
 - Preview widgets via the local esbuild dev server at `http://localhost:3226/index.html`
+
 The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
 
 ### Configuring APIFY_TOKEN for Claude Code

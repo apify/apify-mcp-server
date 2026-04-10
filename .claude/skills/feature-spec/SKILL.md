@@ -65,7 +65,7 @@ Follow these when designing:
 - Integration tests go in `tests/integration/suite.ts`
 - Changes may affect `apify-mcp-server-internal` — always assess impact
 - Verification: `npm run type-check`, `npm run lint`, `npm run test:unit`
-- Live verification: `mcpc`** — after implementing, probe the real server to confirm behavior matches the spec. Use `@stdio` (requires `npm run build`, no running server needed). Use `@dev` only for widget/UI work (requires `npm run dev`).
+- **Live verification:** `mcpc` — after implementing, probe the real server to confirm behavior matches the spec. Use `@stdio` (requires `npm run build`, no running server needed). Use `@dev` only for widget/UI work (requires `npm run dev`).
 - See `CLAUDE.md`, `CONTRIBUTING.md`, and `DEVELOPMENT.md` for full conventions
 
 ## Step 4: Planning guidance
