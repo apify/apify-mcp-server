@@ -5,6 +5,20 @@ All pull requests are subject to automated and manual review against these guide
 
 ---
 
+## Branch naming
+
+The default branch is `master`. Feature branches must follow the `type/short-description` format, where `type` matches the conventional commit type:
+
+```text
+feat/add-dataset-tool
+fix/connection-timeout
+chore/update-dependencies
+refactor/tool-registry
+docs/update-readme
+```
+
+---
+
 ## Commit Messages and PR Titles
 
 All commits and PR titles must follow the **[Conventional Commits](https://www.conventionalcommits.org/)** format.
