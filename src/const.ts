@@ -113,12 +113,6 @@ export const ACTOR_PRICING_MODEL = {
     PAY_PER_EVENT: 'PAY_PER_EVENT',
 } as const;
 
-/**
- * Used in search Actors tool to search above the input supplied limit,
- * so we can safely filter out rental Actors from the search and ensure we return some results.
- */
-export const ACTOR_SEARCH_ABOVE_LIMIT = 50;
-
 export const MCP_STREAMABLE_ENDPOINT = '/mcp';
 
 export const DOCS_SOURCES = [

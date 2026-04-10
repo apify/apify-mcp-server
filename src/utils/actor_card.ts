@@ -1,6 +1,12 @@
 import { APIFY_STORE_URL } from '../const.js';
-import type { Actor, ActorCardOptions, ActorStoreList, PricingInfo, StructuredActorCard } from '../types.js';
-import { getCurrentPricingInfo, pricingInfoToString, pricingInfoToStructured, type StructuredPricingInfo } from './pricing_info.js';
+import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } from '../types.js';
+import {
+    getCurrentPricingInfo,
+    type PricingInfo,
+    pricingInfoToString,
+    pricingInfoToStructured,
+    type StructuredPricingInfo,
+} from './pricing_info.js';
 
 // Helper function to format categories from uppercase with underscores to a proper case
 function formatCategories(categories?: string[]): string[] {

@@ -10,12 +10,11 @@ import type {
     ActorRunPricingInfo,
     ActorStats,
     ActorStoreList as ActorStoreListOutdated,
-    PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
 } from 'apify-client';
 import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
-import type { ACTOR_PRICING_MODEL, FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
+import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
@@ -194,47 +193,6 @@ export type ActorMcpTool = ToolBase & {
  */
 export type ToolEntry = HelperTool | ActorTool | ActorMcpTool;
 
-/**
- * Price for a single event in a specific tier.
- */
-export type TieredEventPrice = {
-    tieredEventPriceUsd: number;
-};
-
-/**
- * Allowed pricing tiers for tiered event pricing.
- */
-export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
-
-/**
- * Describes a single chargeable event for an Actor.
- * Supports either flat pricing (eventPriceUsd) or tiered pricing (eventTieredPricingUsd).
- */
-export type ActorChargeEvent = {
-    eventTitle: string;
-    eventDescription?: string;
-    /** Flat price per event in USD (if not tiered) */
-    eventPriceUsd?: number;
-    /** Tiered pricing per event, by tier name (FREE, BRONZE, etc.) */
-    eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
-};
-
-export type TieredPricing = {
-    [tier: string]: {
-        tieredPricePerUnitUsd: number;
-    };
-}
-
-type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
-    pricingPerEvent: {
-        actorChargeEvents: Record<string, ActorChargeEvent>;
-    };
-}
-
-export type PricingInfo = ActorRunPricingInfo & {
-    tieredPricing?: TieredPricing;
-} | PricePerEventActorPricingInfo;
-
 export type ToolCategory = (typeof CATEGORY_NAMES)[number];
 /**
  * Selector for tools input - can be a category key or a specific tool name.
@@ -262,9 +220,6 @@ export type Input = {
      */
     tools?: ToolSelector[] | string;
 };
-
-// Utility type to get a union of values from an object type
-export type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
 
 /**
  * Telemetry environment type.

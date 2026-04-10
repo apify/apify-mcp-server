@@ -5,9 +5,16 @@
  */
 
 import { ApifyClient } from '../apify_client.js';
-import { ACTOR_SEARCH_ABOVE_LIMIT } from '../const.js';
+import { ACTOR_PRICING_MODEL } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
-import type { ActorPricingModel, ActorStoreList } from '../types.js';
+import type { ActorStoreList } from '../types.js';
+
+/**
+ * Used in search Actors tool to search above the input supplied limit,
+ * so we can safely filter out rental Actors from the search and ensure we return some results.
+ */
+const ACTOR_SEARCH_ABOVE_LIMIT = 50;
+type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
 
 export type SearchAndFilterActorsOptions = {
     keywords: string;
@@ -74,7 +81,7 @@ export function filterRentalActors(
     // Store list API does not support filtering by two pricing models at once,
     // so we filter the results manually after fetching them.
     return actors.filter((actor) => (
-        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== 'FLAT_PRICE_PER_MONTH'
+        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH
         || userRentedActorIds.includes(actor.id),
     );
 }
