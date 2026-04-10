@@ -119,6 +119,82 @@ To use the Storybook MCP server (or any other MCP server that requires authentic
 
 The `.mcp.json` file uses environment variable expansion (`${APIFY_TOKEN}`) to securely reference your token without hardcoding it in the configuration file. This allows you to share the configuration with your team while keeping credentials private.
 
+## Testing
+
+This repo has three complementary layers of testing:
+
+| Layer | Command | What it covers |
+|---|---|---|
+| **Unit tests** | `npm run test:unit` | Individual modules in isolation — input parsing, tool schemas, utilities |
+| **Integration tests** | `npm run test:integration` | Full server lifecycle over all three transports (stdio, SSE, streamable HTTP) against the real Apify API |
+| **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development — call real tools, inspect real output, iterate fast |
+
+**Unit tests** run without any credentials or network access. They are fast and safe to run at any time.
+
+**Integration tests** require `APIFY_TOKEN` and a production build (`npm run build`). They spin up the real server process, connect a real MCP client, and call actual tools. They cover all three transports via a shared `tests/integration/suite.ts` — any test added there runs across stdio, SSE, and streamable HTTP automatically. These are the closest thing to smoke tests in this repo and make a dedicated smoke test suite unnecessary.
+
+**mcpc probing** is not a test suite — it is a development tool. Use it to explore tool behavior, verify a fix works end-to-end, or check what the server actually returns before writing a formal test. See the section below for setup and examples.
+
+### Live probing with mcpc
+
+`mcpc` (`@apify/mcpc`) gives both humans and AI agents a fast command-line feedback loop against the local server. Install it once, then connect after each build to probe real tool behavior.
+
+**Why mcpc instead of connecting Claude directly to the server:**
+Claude Code can connect to an MCP server via `.mcp.json` when running locally, but remote Claude sessions (claude.ai, CI) cannot reach a locally running server. mcpc is a CLI tool that works identically in all environments — it controls the server via shell commands and has no dependency on the Claude host being able to reach the server directly.
+
+#### One-time setup
+
+1. Install mcpc globally:
+   ```bash
+   npm install -g @apify/mcpc
+   ```
+2. Ensure `APIFY_TOKEN` is set in your environment (see `.claude/settings.local.json` setup below).
+3. Build the server:
+   ```bash
+   npm run build
+   ```
+4. Connect mcpc to the local server (uses the `.mcp.json` config already in this repo):
+   ```bash
+   mcpc --config .mcp.json stdio connect @stdio
+   ```
+5. Verify the connection:
+   ```bash
+   mcpc @stdio tools-list
+   ```
+
+#### After each code change
+
+```bash
+npm run build
+mcpc @stdio restart
+mcpc @stdio tools-call search-actors keywords:="web scraper"
+```
+
+#### Exploring and calling tools
+
+Arguments use `key:=value` syntax — values auto-parse as JSON (numbers, booleans, objects):
+
+```bash
+mcpc @stdio tools-list
+mcpc @stdio tools-get search-actors
+
+mcpc @stdio tools-call search-actors keywords:="web scraper" limit:=5
+mcpc @stdio tools-call fetch-actor-details actorId:="apify/rag-web-browser"
+mcpc @stdio tools-call call-actor actorId:="apify/rag-web-browser" input:='{"query":"hello"}'
+
+# Parse output with jq
+mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
+```
+
+#### Session management
+
+```bash
+mcpc               # list sessions
+mcpc @stdio restart  # reconnect after build
+mcpc @stdio close
+```
+---
+
 ### Manual testing as an MCP client
 
 To test the MCP server, a human must first configure the MCP server. Once configured, the server exposes tools that become available to the coding agent.

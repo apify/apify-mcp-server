@@ -7,6 +7,19 @@
         "figma": {
             "type": "http",
             "url": "https://mcp.figma.com/mcp"
+        },
+        "dev": {
+            "url": "http://localhost:3001",
+            "headers": {
+                "Authorization": "Bearer ${APIFY_TOKEN}"
+            }
+        },
+        "stdio": {
+            "command": "node",
+            "args": ["dist/stdio.js"],
+            "env": {
+                "APIFY_TOKEN": "${APIFY_TOKEN}"
+            }
         }
     }
 }

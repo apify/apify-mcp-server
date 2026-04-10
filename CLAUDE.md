@@ -54,7 +54,44 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 ## Agent constraints
 
 - **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before integration tests or deployment).
-- **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN`, which only humans have access to.
+- **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN` and are slow; use mcpc probing instead (see below).
+
+## Live MCP probing with mcpc
+
+Use `mcpc` (`@apify/mcpc`) to verify real end-to-end MCP tool behavior. This is the primary way to confirm that an implementation is correct and matches its spec — not just that the code compiles and unit tests pass.
+
+**When to use mcpc probing:**
+- After implementing a feature: verify actual tool output matches the spec
+- After a bug fix: confirm the fix works end-to-end, not just in unit tests
+- When implementing a new tool: explore what it returns, spot schema issues, check error messages
+- Any time the spec says "the tool should return X" — prove it does
+
+**Prerequisite**: `APIFY_TOKEN` must be set in the environment, and `@apify/mcpc` must be installed (`npm install -g @apify/mcpc`). See [DEVELOPMENT.md](./DEVELOPMENT.md) for one-time setup.
+
+**Workflow:**
+
+```bash
+# 1. Compile the server (required — mcpc runs the compiled dist/stdio.js)
+npm run build
+
+# 2. Check if the local session exists
+mcpc
+
+# 3a. If @stdio is NOT listed — connect for the first time:
+mcpc --config .mcp.json stdio connect @stdio
+
+# 3b. If @stdio IS listed — restart to pick up the new build:
+mcpc @stdio restart
+
+# 4. Probe and verify
+mcpc @stdio tools-list
+mcpc @stdio tools-call search-actors keywords:="web scraper"
+
+# 5. Use --json for machine-readable output
+mcpc --json @stdio tools-call search-actors keywords:="web scraper"
+```
+
+**Argument syntax**: `key:=value` — values auto-parse as JSON (numbers, booleans, objects). Use `key:="string with spaces"` for string values.
 
 ## Testing
 
