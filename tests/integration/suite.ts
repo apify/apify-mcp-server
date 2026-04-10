@@ -2,7 +2,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { CallToolResultSchema, ToolListChangedNotificationSchema } from '@modelcontextprotocol/sdk/types.js';
 import Ajv from 'ajv';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
@@ -14,6 +14,7 @@ import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
+import { assertStatusMessagePropagated, waitForActorRunAbortStatus } from './utils/task_waits.js';
 
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
@@ -1774,15 +1775,8 @@ export function createIntegrationTestsSuite(
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
-            // Poll up to 30s for the latest run for this actor to reach ABORTED/ABORTING
-            await vi.waitUntil(async () => {
-                const runsList = await api.runs().list({ limit: 5, desc: true });
-                const run = runsList.items.find((r) => r.actId === actId);
-                if (run) {
-                    return run.status === 'ABORTED' || run.status === 'ABORTING';
-                }
-                return false;
-            }, { timeout: 10000, interval: 500 });
+            // Poll for the latest run for this actor to reach ABORTED/ABORTING
+            await waitForActorRunAbortStatus(api, actId);
         });
 
         // Cancellation test using call-actor tool: start a long-running actor via call-actor and cancel immediately, then verify it was aborted
@@ -1819,15 +1813,8 @@ export function createIntegrationTestsSuite(
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
-            // Poll up to 30s for the latest run for this actor to reach ABORTED/ABORTING
-            await vi.waitUntil(async () => {
-                const runsList = await api.runs().list({ limit: 5, desc: true });
-                const run = runsList.items.find((r) => r.actId === actId);
-                if (run) {
-                    return run.status === 'ABORTED' || run.status === 'ABORTING';
-                }
-                return false;
-            }, { timeout: 10000, interval: 500 });
+            // Poll for the latest run for this actor to reach ABORTED/ABORTING
+            await waitForActorRunAbortStatus(api, actId);
         });
 
         // Environment variable tests - only applicable to stdio transport
@@ -2411,48 +2398,10 @@ export function createIntegrationTestsSuite(
             expect(resultReceived).toBe(true);
         });
 
-        // Helper to verify statusMessage propagation in task mode.
-        // Reads the callToolStream, checks that tasks/get (via taskStatus events) and
-        // tasks/list both return statusMessage for the running task.
-        async function assertStatusMessagePropagated(
-            taskClient: Client,
-            stream: AsyncIterable<{ type: string; task?: { taskId: string; statusMessage?: string }; error?: Error }>,
-        ) {
-            let taskId: string | null = null;
-            let getTaskSawStatusMessage = false;
-            let listTasksSawStatusMessage = false;
-            for await (const message of stream) {
-                if (message.type === 'taskCreated') {
-                    taskId = message.task!.taskId;
-                } else if (message.type === 'taskStatus') {
-                    if (message.task?.statusMessage) {
-                        getTaskSawStatusMessage = true;
-
-                        // Verify tasks/list also includes statusMessage (one-time check)
-                        if (!listTasksSawStatusMessage && taskId) {
-                            const currentTaskId = taskId;
-                            const tasksList = await taskClient.experimental.tasks.listTasks();
-                            const ourTask = tasksList.tasks.find((t) => t.taskId === currentTaskId);
-                            if (ourTask?.statusMessage) {
-                                listTasksSawStatusMessage = true;
-                            }
-                        }
-                    }
-                } else if (message.type === 'error') {
-                    throw message.error;
-                }
-            }
-
-            // Stream taskStatus events (backed by tasks/get) must have included statusMessage
-            expect(getTaskSawStatusMessage).toBe(true);
-            // tasks/list must have also returned statusMessage
-            expect(listTasksSawStatusMessage).toBe(true);
-        }
-
         // WARNING: These tests can be flaky on streamable HTTP transport due to timing —
         // the Actor may complete before the 5s progress polling interval fires a statusMessage.
         // See: https://github.com/apify/apify-mcp-server/issues/558
-        it('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', async () => {
+        it('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', { retry: 1 }, async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const stream = client.experimental.tasks.callToolStream(
@@ -2476,7 +2425,7 @@ export function createIntegrationTestsSuite(
             await assertStatusMessagePropagated(client, stream);
         });
 
-        it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', async () => {
+        it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', { retry: 1 }, async () => {
             client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
 
             const stream = client.experimental.tasks.callToolStream(
