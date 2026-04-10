@@ -19,7 +19,7 @@ To trigger evaluations on a PR, add the `validated` label to your pull request.
 
 ## Why OpenRouter?
 
-unified API for Gemini, Claude, GPT. no separate integrations needed.
+Unified API for Gemini, Claude, GPT. No separate integrations needed.
 
 ## Judge model
 
