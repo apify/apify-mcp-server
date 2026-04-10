@@ -22,7 +22,7 @@ const RUN_LLM_JUDGE = true;
 const EXAMPLES: TestCase[] = [
 ];
 
-EXAMPLES.push(...filterById(loadTestCases('test-cases.json').testCases, 'weather-mcp-search-then-call-1'));
+EXAMPLES.push(...filterById(loadTestCases('test_cases.json').testCases, 'fetch-actor-details-1'));
 
 async function main() {
     process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
