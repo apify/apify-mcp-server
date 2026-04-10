@@ -41,8 +41,8 @@ const argv = yargs(hideBin(process.argv))
     .option('test-cases', {
         type: 'string',
         describe: 'Path to test cases JSON file',
-        default: 'test-cases.json',
-        example: 'custom-test-cases.json',
+        default: 'test_cases.json',
+        example: 'custom_test_cases.json',
     })
     .option('category', {
         type: 'string',
@@ -136,7 +136,7 @@ async function main(): Promise<void> {
     try {
         // Load test cases from specified file
 
-        const testData = loadTestCases(argv.testCases || 'test-cases.json');
+        const testData = loadTestCases(argv.testCases || 'test_cases.json');
         let { testCases } = testData;
 
         // Apply category filter if specified

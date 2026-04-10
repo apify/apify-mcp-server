@@ -10,6 +10,10 @@ All notable changes to this project will be documented in this file.
 - **ui:** Improve ui widgets bundle size [internal] ([#642](https://github.com/apify/apify-mcp-server/pull/642)) ([4bd6652](https://github.com/apify/apify-mcp-server/commit/4bd66524efc2795297bafd291aaccd810174bf44)) by [@baldasseva](https://github.com/baldasseva), closes [#26553](https://github.com/apify/apify-mcp-server/issues/26553)
 - Normalize actor IDs before API lookup, unify tool call telemetry ([#633](https://github.com/apify/apify-mcp-server/pull/633)) ([a03c1f4](https://github.com/apify/apify-mcp-server/commit/a03c1f470cbd3d35d7ad0614d409304b19762e45)) by [@jirispilka](https://github.com/jirispilka)
 
+### 🐛 Bug Fixes
+
+- Update model to gpt-5.4, fix filename, remove flaky test case ([#664](https://github.com/apify/apify-mcp-server/pull/664)) ([1e6b7f4](https://github.com/apify/apify-mcp-server/commit/1e6b7f41e2c45a7801e64475d1b8a5e93057163f)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.17) (2026-04-08)
