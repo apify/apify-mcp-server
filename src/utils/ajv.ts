@@ -1,7 +1,7 @@
 import type { ValidateFunction } from 'ajv';
 import Ajv from 'ajv';
 
-export const ajv = new Ajv({ coerceTypes: 'array', strict: false });
+export const ajv = new Ajv({ coerceTypes: 'array', strict: false, removeAdditional: true });
 
 /**
  * Removes the $schema property and fixes the required array from a JSON schema.
@@ -32,17 +32,19 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
 }
 
 /**
- * Compiles a JSON schema with AJV, automatically cleaning the $schema property,
- * fixing the required array, and setting `additionalProperties: true` at the root.
+ * Compiles a JSON schema with AJV, automatically cleaning the $schema property
+ * and fixing the required array.
  *
- * **Why `additionalProperties: true`:** Zod → JSON Schema emits `additionalProperties: false`
- * at the root. MCP / LLM clients regularly send extra top-level keys (client metadata, duplicated
- * hints, transport leftovers). AJV then rejects the whole payload even when the declared fields
- * are valid — production Mezmo logs showed validation SOFT_FAIL noise (e.g. `search-actors`) for
- * otherwise acceptable calls. We only relax the **root** object; nested objects keep their own
- * `additionalProperties` rules. Payment/session fields are stripped in `preparePayment()` before
- * validation where applicable.
+ * **Unknown properties are silently stripped** by the AJV `removeAdditional: true` option
+ * (set on the shared `ajv` instance). MCP / LLM clients regularly send extra top-level keys
+ * (client metadata, duplicated hints, transport leftovers) that would otherwise cause validation
+ * failures. Stripping them is safer than allowing them through with `additionalProperties: true`,
+ * because no downstream code should rely on undeclared properties.
+ *
+ * **Payment fields** (e.g. Skyfire's `skyfire-pay-id`) are removed by the payment provider's
+ * `removePaymentFields()` *before* AJV validation runs (see `prepareToolCallContext()`),
+ * so they are never subject to this stripping.
  */
 export function compileSchema(schema: Record<string, unknown>): ValidateFunction {
-    return ajv.compile(fixZodSchemaRequired({ ...schema, additionalProperties: true }));
+    return ajv.compile(fixZodSchemaRequired(schema));
 }

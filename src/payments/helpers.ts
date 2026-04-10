@@ -10,10 +10,10 @@ import type { PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 export type PrepareToolCallContextResult = {
     /** Structured error result for a 402 PaymentRequired response. Undefined if no error. */
     paymentRequiredResult?: ReturnType<typeof buildPaymentRequiredResponse>;
-    /** Tool args with payment-specific fields removed — safe for ajv validation and Actor input. */
-    toolArgs: Record<string, unknown>;
-    /** Tool args with sensitive payment fields redacted — safe for logging. */
-    logSafeArgs: unknown;
+    /** Tool args with payment-specific fields removed — safe for AJV validation and Actor input. */
+    toolArgsWithoutPayment: Record<string, unknown>;
+    /** Tool args with sensitive payment fields redacted (e.g. `[REDACTED]`) — safe for logging. */
+    toolArgsRedacted: unknown;
     /** ApifyClient configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
 };
@@ -27,12 +27,12 @@ export type PrepareToolCallContextResult = {
  * 3. Redacts sensitive fields for logging
  * 4. Creates an ApifyClient with payment headers or standard token
  *
- * Call this BEFORE ajv validation so `toolArgs` can be validated without
- * the `additionalProperties: true` hack.
+ * Call this BEFORE AJV validation so `toolArgsWithoutPayment` can be validated
+ * without provider-specific fields.
  *
  * TODO: This function has mixed responsibilities. It should be split into separate concerns:
  * - validatePaymentCredentials (returns error or void)
- * - sanitizeToolArgs (returns toolArgs and logSafeArgs)
+ * - sanitizeToolArgs (returns toolArgsWithoutPayment and toolArgsRedacted)
  * - createApifyClient (returns apifyClient)
  */
 export function prepareToolCallContext(input: {
@@ -49,16 +49,16 @@ export function prepareToolCallContext(input: {
         const apifyClient = new ApifyClient({ token: apifyToken });
         registerPaymentRequiredInterceptor(apifyClient);
         return {
-            toolArgs: args,
-            logSafeArgs: args,
+            toolArgsWithoutPayment: { ...args },
+            toolArgsRedacted: args,
             apifyClient,
         };
     }
 
     const error = tool.paymentRequired ? provider.validatePayment(args, meta, requestHeaders) : null;
     const errorData = error && provider.getPaymentRequiredData ? provider.getPaymentRequiredData() : undefined;
-    const toolArgs = provider.removePaymentFields(args);
-    const logSafeArgs = provider.redactForLogging(args);
+    const toolArgsWithoutPayment = provider.removePaymentFields(args);
+    const toolArgsRedacted = provider.redactForLogging(args);
 
     const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
     const apifyClient = Object.keys(paymentHeaders).length > 0
@@ -68,8 +68,8 @@ export function prepareToolCallContext(input: {
 
     return {
         paymentRequiredResult: error ? buildPaymentRequiredResponse(error, errorData) : undefined,
-        toolArgs,
-        logSafeArgs,
+        toolArgsWithoutPayment,
+        toolArgsRedacted,
         apifyClient,
     };
 }

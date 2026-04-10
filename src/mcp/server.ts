@@ -731,8 +731,8 @@ export class ActorsMcpServer {
                 args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
 
                 // Centralize all payment processing: validate, strip payment fields, create client.
-                // Must run before ajv validation so toolArgs doesn't contain provider-specific fields.
-                const { toolArgs, logSafeArgs, apifyClient, paymentRequiredResult } = prepareToolCallContext({
+                // Must run before AJV validation so toolArgsWithoutPayment doesn't contain provider-specific fields.
+                const { toolArgsWithoutPayment: toolArgs, toolArgsRedacted: logSafeArgs, apifyClient, paymentRequiredResult } = prepareToolCallContext({
                     provider: this.options.paymentProvider,
                     tool,
                     args: args as Record<string, unknown>,
@@ -757,7 +757,7 @@ export class ActorsMcpServer {
                     });
                 }
 
-                // Check if tool call is a long running task and the tool supports that
+                // Check if tool call is a long-running task and the tool supports that
                 // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
                 const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
                 if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
