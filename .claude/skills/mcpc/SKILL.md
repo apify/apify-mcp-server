@@ -4,43 +4,37 @@ description: Probe the local Apify MCP server with mcpc after a code change. Use
 allowed-tools: Bash(mcpc:*), Bash(npm run build:*)
 ---
 
-# Probing the local MCP server with mcpc
+# Probing the local Apify MCP server with mcpc
 
-## Workflow after a code change
+## Sessions (defined in `.mcp.json`)
+
+| Session | Transport | When to use |
+|---|---|---|
+| `@stdio` | `node dist/stdio.js` | Core tool behavior — requires `npm run build` |
+| `@dev` | `http://localhost:3001` | Widget / UI mode — requires `npm run dev` running |
+
+## Workflow
 
 ```bash
-# 1. Compile the server
 npm run build
-
-# 2. Check if the local session exists
-mcpc
-
-# 3a. First time — connect using the repo config:
-mcpc --config .mcp.json stdio connect @stdio
-
-# 3b. Session already exists — restart to pick up the new build:
-mcpc @stdio restart
-
-# 4. Probe
-mcpc @stdio tools-list
-mcpc @stdio tools-call <tool-name> key:=value key2:="string value"
-
-# 5. Machine-readable output
-mcpc --json @stdio tools-call <tool-name> key:=value
+mcpc                                            # check sessions
+mcpc --config .mcp.json stdio connect @stdio   # first time only
+mcpc @stdio restart                             # after each build
 ```
 
-## Argument syntax
+## Calling tools
 
-Values are auto-parsed as JSON:
+Arguments auto-parse as JSON (`key:=value`):
 
 ```bash
+mcpc @stdio tools-list
+mcpc @stdio tools-get <tool-name>
+
 mcpc @stdio tools-call search-actors keywords:="web scraper" limit:=5
 mcpc @stdio tools-call fetch-actor-details actorId:="apify/rag-web-browser"
-mcpc @stdio tools-call some-tool config:='{"nested":"value"}'
-```
+mcpc @stdio tools-call call-actor actorId:="apify/rag-web-browser" input:='{"query":"hello"}'
+mcpc @stdio tools-call get-actor-output datasetId:="<id>" fields:="url,title"
+mcpc @stdio tools-call search-apify-docs query:="pagination"
 
-## Inspect a specific tool
-
-```bash
-mcpc @stdio tools-get <tool-name>
+mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
 ```
