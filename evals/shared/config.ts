@@ -8,8 +8,8 @@
  * OPENROUTER_BASE_URL is optional and defaults to the standard OpenRouter API URL
  */
 export const OPENROUTER_CONFIG = {
-    baseURL: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1',
-    apiKey: process.env.OPENROUTER_API_KEY || '',
+    baseURL: sanitizeEnvValue(process.env.OPENROUTER_BASE_URL) || 'https://openrouter.ai/api/v1',
+    apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY) || '',
 };
 
 /**
@@ -23,10 +23,10 @@ export function getRequiredEnvVars(): Record<string, string | undefined> {
 }
 
 /**
- * Removes newlines and trims whitespace. Useful for Authorization header values
- * because CI secrets sometimes include trailing newlines or quotes.
+ * Removes newlines, trims whitespace, and strips surrounding quotes from env values.
+ * CI secrets often include trailing newlines or quotes that break HTTP headers and URLs.
  */
-export function sanitizeHeaderValue(value?: string): string | undefined {
+export function sanitizeEnvValue(value?: string): string | undefined {
     if (value == null) return value;
     return value.replace(/[\r\n]/g, '').trim().replace(/^"|"$/g, '');
 }

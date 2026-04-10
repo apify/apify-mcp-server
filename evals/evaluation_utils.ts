@@ -18,7 +18,7 @@ import {
     TOOL_SELECTION_EVAL_MODEL,
     EVALUATOR_NAMES,
     TEMPERATURE,
-    sanitizeHeaderValue
+    sanitizeEnvValue
 } from './config.js';
 import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
 import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
@@ -57,8 +57,8 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
         reference: string;
     }> => {
         const client = new OpenAI({
-            baseURL: process.env.OPENROUTER_BASE_URL,
-            apiKey: sanitizeHeaderValue(process.env.OPENROUTER_API_KEY),
+            baseURL: sanitizeEnvValue(process.env.OPENROUTER_BASE_URL),
+            apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY),
         });
 
         log.info(`Input: ${JSON.stringify(example)}`);
@@ -105,8 +105,8 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
 
 export function createClassifierEvaluator() {
     const openai = createOpenAI({
-        baseURL: process.env.OPENROUTER_BASE_URL,
-        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: sanitizeEnvValue(process.env.OPENROUTER_BASE_URL),
+        apiKey: sanitizeEnvValue(process.env.OPENROUTER_API_KEY),
     });
 
     return createClassifierFn({
