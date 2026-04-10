@@ -27,3 +27,10 @@ To run the integration tests, you can use the following command:
 ```bash
 APIFY_TOKEN=your_token npm run test:integration
 ```
+
+## Integration test conventions
+
+- Keep test names sentence-style and behavior-focused (for example: `should return ...`).
+- Avoid ad-hoc fixed sleeps in assertions. Prefer polling and assertion-based checks.
+- Reuse integration helpers from `tests/integration/utils` for repeated wait/poll patterns.
+- Apply retries only to known unstable cases and keep them scoped per test (`retry: 1`).
