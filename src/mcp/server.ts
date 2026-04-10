@@ -59,13 +59,10 @@ import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
-    ActorMcpTool,
     ActorsMcpServerOptions,
     ActorStore,
-    ActorTool,
     ApifyRequestParams,
     CallDiagnostics,
-    HelperTool,
     ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -642,8 +639,6 @@ export class ActorsMcpServer {
                 throw new Error('MCP Session ID is required for tool calls');
             }
             const startTime = Date.now();
-            let telemetryData: ToolCallTelemetryProperties | null;
-            let userId: string | null;
             let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
             let callDiagnostics: CallDiagnostics = {};
             let shouldTrackTelemetry = true;
@@ -669,9 +664,9 @@ export class ActorsMcpServer {
                 throw new McpError(ErrorCode.InvalidParams, message);
             };
 
-            // Initialize telemetry with raw tool name — may be overwritten below once the tool is resolved.
+            // Initialize telemetry with raw tool name — updated below once the tool is resolved.
             // This ensures telemetry is available even for early failures (missing token, tool not found).
-            ({ telemetryData, userId } = await this.prepareTelemetryData(name, mcpSessionId, apifyToken));
+            const { telemetryData, userId } = await this.prepareTelemetryData(name, mcpSessionId, apifyToken);
 
             // actorName/actorId are declared here so they're available in the catch block for telemetry.
             // Set after tool resolution (inside the try block).
@@ -709,8 +704,10 @@ export class ActorsMcpServer {
 
                 const tool = toolEntry!;
                 resolvedToolName = getToolFullName(tool);
-                // Re-initialize telemetry with the resolved tool (uses actorFullName for actor tools).
-                ({ telemetryData, userId } = await this.prepareTelemetryData(resolvedToolName, mcpSessionId, apifyToken));
+                // Update telemetry tool name now that we resolved the tool (uses actorFullName for actor tools).
+                if (telemetryData) {
+                    telemetryData.tool_name = resolvedToolName;
+                }
 
                 // Extract actor name/id for telemetry — available even when validation fails later.
                 actorName = extractActorName(tool, args as Record<string, unknown>);
@@ -1297,7 +1294,6 @@ export class ActorsMcpServer {
                 actorName: callDiagnostics.actor_name,
                 error,
             });
-            const errorMessage = (error instanceof Error) ? error.message : 'Unknown error';
             const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
@@ -1315,7 +1311,6 @@ export class ActorsMcpServer {
             log.debug('[executeToolAndUpdateTask] Storing failed result', {
                 taskId,
                 mcpSessionId,
-                error: errorMessage,
             });
             await this.taskStore.storeTaskResult(taskId, 'failed', {
                 content: [{
@@ -1334,13 +1329,12 @@ export class ActorsMcpServer {
      * Creates telemetry data for a tool call.
     */
     private async prepareTelemetryData(
-        toolOrName: HelperTool | ActorTool | ActorMcpTool | string, mcpSessionId: string | undefined, apifyToken: string,
+        toolName: string, mcpSessionId: string | undefined, apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };
         }
 
-        const toolFullName = typeof toolOrName === 'string' ? toolOrName : getToolFullName(toolOrName);
         // Get userId from cache or fetch from API
         let userId: string | null = null;
         if (apifyToken) {
@@ -1359,7 +1353,7 @@ export class ActorsMcpServer {
             mcp_client_capabilities: capabilities || null,
             mcp_session_id: mcpSessionId || '',
             transport_type: this.options.transportType || '',
-            tool_name: toolFullName,
+            tool_name: toolName,
             tool_status: TOOL_STATUS.SUCCEEDED, // Will be updated in finally
             tool_exec_time_ms: 0, // Will be calculated in finally
         };
