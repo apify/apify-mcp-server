@@ -1,4 +1,4 @@
-# TEMPORARY: Remove before merging. Tests the smoke test workflow on push to this branch.
+# TODO: DELETE THIS ENTIRE FILE before merging to master.
 name: "DEBUG: Test smoke test workflow"
 
 on:
