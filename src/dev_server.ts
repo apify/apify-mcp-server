@@ -6,7 +6,6 @@ import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
-import { localhostHostValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
@@ -39,9 +38,6 @@ export function createExpressApp(): express.Express {
     const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
     const taskStore = new InMemoryTaskStore();
-
-    // DNS rebinding protection: reject requests with non-localhost Host headers
-    app.use(localhostHostValidation());
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
         if (statusCode >= 500) {
