@@ -29,7 +29,7 @@ import {
     PHOENIX_RETRY_DELAY_MS,
     PHOENIX_MAX_RETRIES,
     type EvaluatorName,
-    sanitizeHeaderValue,
+    sanitizeEnvValue,
     validatePhoenixEnvVars
 } from './config.js';
 
@@ -77,9 +77,6 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('  $0 --dataset-name tmp-1               # Evaluate custom dataset')
     .epilogue('  npm run evals:run -- --dataset-name custom_v1  # Via npm script')
     .parseSync() as CliArgs;
-
-// Sanitize secrets early to avoid invalid header characters in CI
-process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
 const toolsExactMatch = asEvaluator({
@@ -197,7 +194,7 @@ async function main(datasetName: string): Promise<number> {
     const client = createClient({
         options: {
             baseUrl: process.env.PHOENIX_BASE_URL!,
-            headers: { Authorization: `Bearer ${sanitizeHeaderValue(process.env.PHOENIX_API_KEY)}` },
+            headers: { Authorization: `Bearer ${sanitizeEnvValue(process.env.PHOENIX_API_KEY)}` },
         },
     });
 

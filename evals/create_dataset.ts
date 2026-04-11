@@ -14,7 +14,7 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { sanitizeHeaderValue, validatePhoenixEnvVars } from './config.js';
+import { sanitizeEnvValue, validatePhoenixEnvVars } from './config.js';
 import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation_utils.js';
 
 // Set log level to debug
@@ -98,7 +98,7 @@ async function createDatasetFromTestCases(
     const client = createClient({
         options: {
             baseUrl: process.env.PHOENIX_BASE_URL!,
-            headers: { Authorization: `Bearer ${sanitizeHeaderValue(process.env.PHOENIX_API_KEY)}` },
+            headers: { Authorization: `Bearer ${sanitizeEnvValue(process.env.PHOENIX_API_KEY)}` },
         },
     });
 

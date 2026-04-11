@@ -9,7 +9,7 @@ import {
     loadTestCases, filterById,
     type TestCase
 } from './evaluation_utils.js';
-import { PASS_THRESHOLD, sanitizeHeaderValue } from './config.js';
+import { PASS_THRESHOLD } from './config.js';
 
 dotenv.config({ path: '.env' });
 log.setLevel(log.LEVELS.INFO);
@@ -25,8 +25,6 @@ const EXAMPLES: TestCase[] = [
 EXAMPLES.push(...filterById(loadTestCases('test_cases.json').testCases, 'fetch-actor-details-1'));
 
 async function main() {
-    process.env.OPENROUTER_API_KEY = sanitizeHeaderValue(process.env.OPENROUTER_API_KEY);
-
     console.log(`\nEvaluating ${EXAMPLES.length} examples\n`);
 
     // 1. Load tools
