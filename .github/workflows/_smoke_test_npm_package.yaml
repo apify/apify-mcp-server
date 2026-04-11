@@ -25,7 +25,7 @@ jobs:
                     node-version: 22
 
             -   name: Install published package
-                uses: nick-fields/retry@v3
+                uses: nick-fields/retry@v4
                 with:
                     timeout_minutes: 10
                     max_attempts: 5
