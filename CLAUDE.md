@@ -59,45 +59,34 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 
 ## Agent constraints
 
-- **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before integration tests or deployment).
-- **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN` and are slow; use mcpc probing instead (see below).
+- **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before mcpc probing).
+- **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN` and are slow.
 
-## Live MCP probing with mcpc
+## Testing the MCP server end-to-end
 
-Use `mcpc` (`@apify/mcpc`) to verify real end-to-end MCP tool behavior. This is the primary way to confirm that an implementation is correct and matches its spec — not just that the code compiles and unit tests pass.
+After code changes, verify the server works — not just that it compiles. There are two ways:
 
-**When to use mcpc probing:**
-- After implementing a feature: verify actual tool output matches the spec
-- After a bug fix: confirm the fix works end-to-end, not just in unit tests
-- When implementing a new tool: explore what it returns, spot schema issues, check error messages
-- Any time the spec says "the tool should return X" — prove it does
-
-**Prerequisite**: `APIFY_TOKEN` must be set in the environment, and `@apify/mcpc` must be installed (`npm install -g @apify/mcpc`). See [DEVELOPMENT.md](./DEVELOPMENT.md) for one-time setup.
-
-**Workflow:**
+**1. mcpc** — CLI client, best for scripted/automated verification.
+- Requires `APIFY_TOKEN` in the environment (see [DEVELOPMENT.md](./DEVELOPMENT.md) § *Configuring APIFY_TOKEN*).
+- Requires `npm run build` before each session (mcpc runs `dist/stdio.js`).
+- Discover tools with `mcpc @stdio tools-list`.
+- Test all default tools: `search-actors`, `fetch-actor-details`, `call-actor`, `get-actor-run`, `get-actor-output`, `search-apify-docs`, `fetch-apify-docs`.
 
 ```bash
-# 1. Compile the server (required — mcpc runs the compiled dist/stdio.js)
 npm run build
-
-# 2. Check if the local session exists
-mcpc
-
-# 3a. If @stdio is NOT listed — connect for the first time:
-mcpc --config .mcp.json stdio connect @stdio
-
-# 3b. If @stdio IS listed — restart to pick up the new build:
-mcpc @stdio restart
-
-# 4. Probe and verify
-mcpc @stdio tools-list
+mcpc connect .mcp.json:stdio @stdio   # first time
+mcpc @stdio restart                    # after code changes
 mcpc @stdio tools-call search-actors keywords:="web scraper"
-
-# 5. Use --json for machine-readable output
-mcpc --json @stdio tools-call search-actors keywords:="web scraper"
 ```
 
-**Argument syntax**: `key:=value` — values auto-parse as JSON (numbers, booleans, objects). Use `key:="string with spaces"` for string values.
+**2. Native MCP client** (e.g. Claude Code, Cursor) — the server is already connected and tools are in context.
+- Auth is handled by the user's MCP config (token or OAuth).
+- Tools are already discoverable — just call them directly.
+- Use this when verifying behavior as a real client sees it.
+
+If unsure which approach to use or how to authenticate, ask the user.
+
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for mcpc setup details and examples.
 
 ## Testing
 
