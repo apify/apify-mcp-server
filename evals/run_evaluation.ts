@@ -78,9 +78,6 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('  npm run evals:run -- --dataset-name custom_v1  # Via npm script')
     .parseSync() as CliArgs;
 
-// Sanitize secrets early to avoid invalid header characters in CI
-process.env.OPENROUTER_API_KEY = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
-
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
 const toolsExactMatch = asEvaluator({
     name: EVALUATOR_NAMES.TOOLS_EXACT_MATCH,
