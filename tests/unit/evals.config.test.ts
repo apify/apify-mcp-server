@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
@@ -69,11 +69,14 @@ describe('sanitizeEnvValue', () => {
 
 describe('sanitizeProcessEnv', () => {
     const KEYS_TO_TEST = ['PHOENIX_API_KEY', 'OPENROUTER_API_KEY'] as const;
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     afterEach(() => {
         for (const key of KEYS_TO_TEST) {
             delete process.env[key];
         }
+        consoleSpy.mockClear();
     });
 
     it('sanitizes env vars in-place on process.env', () => {
@@ -89,5 +92,36 @@ describe('sanitizeProcessEnv', () => {
     it('leaves unset env vars as undefined', () => {
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBeUndefined();
+    });
+
+    it('logs redacted values for CI debugging', () => {
+        process.env.PHOENIX_API_KEY = 'phx-1234567890abcdef';
+
+        sanitizeProcessEnv();
+
+        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
+        expect(phoenixLog).toBeDefined();
+        // Should show first 4 and last 4 chars, not the full key
+        expect(phoenixLog![0]).toContain('phx-');
+        expect(phoenixLog![0]).toContain('cdef');
+        expect(phoenixLog![0]).not.toContain('1234567890ab');
+    });
+
+    it('logs (unset) for missing env vars', () => {
+        sanitizeProcessEnv();
+
+        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
+        expect(phoenixLog).toBeDefined();
+        expect(phoenixLog![0]).toContain('(unset)');
+    });
+
+    it('logs (empty) for empty env vars', () => {
+        process.env.PHOENIX_API_KEY = '';
+
+        sanitizeProcessEnv();
+
+        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
+        expect(phoenixLog).toBeDefined();
+        expect(phoenixLog![0]).toContain('(empty)');
     });
 });
