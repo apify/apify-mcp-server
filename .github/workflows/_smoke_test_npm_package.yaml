@@ -1,0 +1,101 @@
+name: Smoke test npm package
+
+on:
+    workflow_call:
+        inputs:
+            version:
+                description: Exact version to install (e.g. "1.2.3"). If empty, resolves from npm_tag.
+                required: false
+                type: string
+                default: ""
+            npm_tag:
+                description: NPM dist-tag to install (e.g. "beta", "latest"). Used when version is empty.
+                required: false
+                type: string
+                default: latest
+
+jobs:
+    smoke_test:
+        name: Smoke test published package
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: smoke-test
+        steps:
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version: 22
+
+            -   name: Create isolated test directory
+                working-directory: .
+                run: |
+                    mkdir smoke-test
+                    cd smoke-test
+                    npm init -y
+
+            -   name: Install published package
+                uses: nick-fields/retry@v3
+                with:
+                    timeout_minutes: 10
+                    max_attempts: 5
+                    retry_wait_seconds: 30
+                    command: |
+                        cd smoke-test
+                        if [ -n "${{ inputs.version }}" ]; then
+                            npm install @apify/actors-mcp-server@${{ inputs.version }} @apify/mcpc
+                        else
+                            npm install @apify/actors-mcp-server@${{ inputs.npm_tag }} @apify/mcpc
+                        fi
+
+            -   name: Report installed version
+                run: node -e "import fs from 'fs'; const p = JSON.parse(fs.readFileSync('node_modules/@apify/actors-mcp-server/package.json', 'utf8')); console.log('Installed version:', p.version);" --input-type=module
+
+            -   name: Verify library import
+                run: node --input-type=module -e "import { ActorsMcpServer } from '@apify/actors-mcp-server'; console.log('Library import OK');"
+
+            -   name: Verify internals import
+                run: node --input-type=module -e "import { HelperTools } from '@apify/actors-mcp-server/internals'; console.log('Internals import OK');"
+
+            -   name: Create MCP config for docs-only mode (no token needed)
+                run: |
+                    cat > .mcp.json << 'EOF'
+                    {
+                        "mcpServers": {
+                            "smoke": {
+                                "command": "node",
+                                "args": ["node_modules/@apify/actors-mcp-server/dist/stdio.js", "--tools", "docs", "--telemetry-enabled", "false"]
+                            }
+                        }
+                    }
+                    EOF
+
+            -   name: Connect mcpc session
+                run: npx mcpc --config .mcp.json stdio connect @smoke
+
+            -   name: Ping server
+                run: npx mcpc @smoke ping
+
+            -   name: List tools
+                run: |
+                    TOOL_COUNT=$(npx mcpc --json @smoke tools-list | jq 'length')
+                    echo "Found $TOOL_COUNT tools"
+                    if [ "$TOOL_COUNT" -lt 1 ]; then
+                        echo "ERROR: No tools returned"
+                        exit 1
+                    fi
+                    npx mcpc --json @smoke tools-list | jq '.[].name'
+
+            -   name: Call search-apify-docs
+                run: |
+                    npx mcpc --json @smoke tools-call search-apify-docs query:="web scraping" docSource:="apify" | jq '.content[0].text' > /dev/null
+                    echo "search-apify-docs OK"
+
+            -   name: Call fetch-apify-docs
+                run: |
+                    npx mcpc --json @smoke tools-call fetch-apify-docs url:="https://docs.apify.com/platform" | jq '.content[0].text' > /dev/null
+                    echo "fetch-apify-docs OK"
+
+            -   name: Disconnect mcpc session
+                if: always()
+                run: npx mcpc @smoke disconnect || true
