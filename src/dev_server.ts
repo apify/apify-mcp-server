@@ -322,7 +322,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
     const app = createExpressApp();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '127.0.0.1', () => {
         log.info('MCP server listening', { host: HOST, port: PORT });
     });
 
