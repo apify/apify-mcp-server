@@ -59,33 +59,62 @@ export async function callActorGetDataset(options: {
     const CLIENT_ABORT = Symbol('CLIENT_ABORT'); // Just an internal symbol to identify client abort
     const actorClient = apifyClient.actor(actorName);
 
+    const abortActorRun = async (runId: string) => {
+        try {
+            await apifyClient.run(runId).abort({ gracefully: false });
+        } catch (e) {
+            logHttpError(e, 'Error aborting Actor run', { runId });
+        }
+    };
+
+    // The Actor start request itself is not tied to our AbortSignal, so a client can cancel
+    // before we even create the run. In that case we should exit without starting follow-up work.
+    if (abortSignal?.aborted) {
+        log.info('Actor run aborted by client before start', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
+        return null;
+    }
+
     // Start the actor run
     const actorRun: ActorRun = await actorClient.start(input, callOptions);
+
+    // Cancellation can also arrive while actorClient.start() is still in flight. Once start()
+    // returns we finally have a run ID, so we must immediately check again and abort that run
+    // ourselves; otherwise the abort event is missed and the run continues in the background.
+    if (abortSignal?.aborted) {
+        await abortActorRun(actorRun.id);
+
+        log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
+        return null;
+    }
 
     // Start progress tracking if a tracker is provided
     if (progressTracker) {
         progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
     }
 
-    // Create abort promise that handles both API abort and race rejection
-    const abortPromise = async () => new Promise<typeof CLIENT_ABORT>((resolve) => {
-        abortSignal?.addEventListener('abort', async () => {
-            // Abort the actor run via API
-            try {
-                await apifyClient.run(actorRun.id).abort({ gracefully: false });
-            } catch (e) {
-                logHttpError(e, 'Error aborting Actor run', { runId: actorRun.id });
-            }
-            // Reject to stop waiting
+    // Resolve the race immediately on cancellation and abort the Actor run in the background.
+    // If we waited for the abort API call to finish first, waitForFinish() could win the race
+    // and the run might complete before we treat the request as cancelled.
+    let abortListener: (() => void) | undefined;
+    const abortPromise = new Promise<typeof CLIENT_ABORT>((resolve) => {
+        abortListener = () => {
             resolve(CLIENT_ABORT);
-        }, { once: true });
+            void abortActorRun(actorRun.id);
+        };
+        abortSignal?.addEventListener('abort', abortListener, { once: true });
     });
 
     // Wait for completion or cancellation
     const potentialAbortedRun = await Promise.race([
         apifyClient.run(actorRun.id).waitForFinish(),
-        ...(abortSignal ? [abortPromise()] : []),
+        ...(abortSignal ? [abortPromise] : []),
     ]);
+
+    // Clean up the abort listener if waitForFinish() won the race, so a later signal
+    // doesn't try to abort an already-completed run.
+    if (abortListener) {
+        abortSignal?.removeEventListener('abort', abortListener);
+    }
 
     if (potentialAbortedRun === CLIENT_ABORT) {
         log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
