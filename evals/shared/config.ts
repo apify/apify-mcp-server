@@ -23,12 +23,13 @@ export function getRequiredEnvVars(): Record<string, string | undefined> {
 }
 
 /**
- * Removes newlines, trims whitespace, and strips surrounding quotes from env values.
- * CI secrets often include trailing newlines or quotes that break HTTP headers and URLs.
+ * Removes characters invalid in HTTP headers, trims whitespace, and strips surrounding quotes.
+ * Node.js allows only [\t\x20-\x7e\x80-\xff] in header values (ERR_INVALID_CHAR otherwise).
+ * CI secrets can contain control characters beyond \r\n that break HTTP requests.
  */
 export function sanitizeEnvValue(value?: string): string | undefined {
     if (value == null) return value;
-    return value.replace(/[\r\n]/g, '').trim().replace(/^"|"$/g, '');
+    return value.replace(/[^\t\x20-\x7e\x80-\xff]/g, '').trim().replace(/^"|"$/g, '');
 }
 
 /**

@@ -47,6 +47,20 @@ describe('sanitizeEnvValue', () => {
         expect(sanitizeEnvValue('')).toBe('');
     });
 
+    it('strips all ASCII control characters invalid in HTTP headers', () => {
+        // Node.js rejects header values containing chars outside [\t\x20-\x7e\x80-\xff]
+        expect(sanitizeEnvValue('sk-abc\x00123')).toBe('sk-abc123'); // null byte
+        expect(sanitizeEnvValue('sk-abc\x01123')).toBe('sk-abc123'); // SOH
+        expect(sanitizeEnvValue('sk-abc\x0b123')).toBe('sk-abc123'); // vertical tab
+        expect(sanitizeEnvValue('sk-abc\x0c123')).toBe('sk-abc123'); // form feed
+        expect(sanitizeEnvValue('sk-abc\x1f123')).toBe('sk-abc123'); // unit separator
+        expect(sanitizeEnvValue('sk-abc\x7f123')).toBe('sk-abc123'); // DEL
+    });
+
+    it('preserves horizontal tab (valid in HTTP headers)', () => {
+        expect(sanitizeEnvValue('sk-abc\t123')).toBe('sk-abc\t123');
+    });
+
     it('is idempotent', () => {
         const value = '  "sk-abc123"\r\n';
         expect(sanitizeEnvValue(sanitizeEnvValue(value))).toBe(sanitizeEnvValue(value));
