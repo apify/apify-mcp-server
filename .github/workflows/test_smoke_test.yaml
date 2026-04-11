@@ -18,3 +18,9 @@ jobs:
         uses: ./.github/workflows/_smoke_test_npm_package.yaml
         with:
             npm_tag: beta
+
+    smoke_test_version:
+        name: Smoke test (exact version)
+        uses: ./.github/workflows/_smoke_test_npm_package.yaml
+        with:
+            version: 0.9.18
