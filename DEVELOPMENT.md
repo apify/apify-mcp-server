@@ -99,28 +99,17 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 ## Testing
 
-This repo has three complementary layers of testing:
-
-| Layer | Command | What it covers                                                                                                        |
-|---|---|-----------------------------------------------------------------------------------------------------------------------|
-| **Unit tests** | `npm run test:unit` | Individual modules in isolation — input parsing, tool schemas, utilities                                              |
-| **Integration tests** | `npm run test:integration` | Full server lifecycle over all three transports (stdio, SSE, streamable HTTP) against the real Apify API (human only) |
-| **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development                                                                |
-
-**Unit tests** run without credentials or network access — fast and safe at any time.
-
-**Integration tests** require `APIFY_TOKEN` and `npm run build`. They spin up the real server, connect a real MCP client, and call actual tools. All tests in `tests/integration/suite.ts` run across all three transports automatically.
-
-**mcpc probing** is a development tool, not a test suite — use it to explore behavior, verify a fix end-to-end, or check what the server returns before writing a formal test.
+| Layer | Command | What it covers |
+|---|---|---|
+| **Unit tests** | `npm run test:unit` | Individual modules in isolation — no credentials needed |
+| **Integration tests** | `npm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `npm run build`) |
+| **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
 
 ### Live probing with mcpc
 
-`mcpc` (`@apify/mcpc`) gives both humans and AI agents a fast command-line feedback loop against the local server.
+`mcpc` (`@apify/mcpc`) provides a CLI feedback loop against the local server.
 
-**Why mcpc instead of connecting Claude directly to the server:**
-Claude Code can connect to an MCP server via `.mcp.json` when running locally, but remote Claude sessions (claude.ai, CI) cannot reach a locally running server. mcpc is a CLI tool that works identically in all environments.
-
-#### One-time setup
+#### Setup
 
 ```bash
 npm install -g @apify/mcpc
@@ -129,37 +118,18 @@ mcpc --config .mcp.json stdio connect @stdio
 mcpc @stdio tools-list   # verify
 ```
 
-#### After each code change
+#### Usage
 
-```bash
-npm run build
-mcpc @stdio restart
-```
-
-#### Exploring and calling tools
-
-Arguments use `key:=value` syntax — values auto-parse as JSON (numbers, booleans, objects):
+Arguments use `key:=value` syntax (auto-parses as JSON):
 
 ```bash
 mcpc @stdio tools-list
-mcpc @stdio tools-get search-actors
-
 mcpc @stdio tools-call search-actors keywords:="web scraper" limit:=5
-mcpc @stdio tools-call fetch-actor-details actorId:="apify/rag-web-browser"
-mcpc @stdio tools-call call-actor actorId:="apify/rag-web-browser" input:='{"query":"hello"}'
-
-# Parse output with jq (always prefer jq over inline scripts)
-mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq '.content[0].text | fromjson'
-
-# Inspect tool annotations
-mcpc --json @stdio tools-list --full | jq '[.[] | {name, readOnly: .annotations.readOnlyHint, destructive: .annotations.destructiveHint}]'
-
-# Filter to read-only tools only
-mcpc --json @stdio tools-list --full | jq '[.[] | select(.annotations.readOnlyHint == true) | .name]'
+mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content[0].text’
 ```
 
 **Key behaviors to verify:**
-- `search-actors` — test valid keywords, empty keywords, pagination (`limit`, `offset`)
+- `search-actors` — test valid keywords, empty keywords
 - `fetch-actor-details` — test valid Actor, non-existent Actor
 - `call-actor` — test with valid input; check async mode
 - `get-actor-output` — test field filtering with dot notation, non-existent dataset

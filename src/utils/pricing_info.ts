@@ -1,5 +1,38 @@
+import type {
+    ActorRunPricingInfo,
+    PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
+} from 'apify-client';
+
 import { ACTOR_PRICING_MODEL } from '../const.js';
-import type { ActorChargeEvent, PricingInfo } from '../types.js';
+
+export type TieredEventPrice = {
+    tieredEventPriceUsd: number;
+};
+
+export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
+
+export type ActorChargeEvent = {
+    eventTitle: string;
+    eventDescription?: string;
+    eventPriceUsd?: number;
+    eventTieredPricingUsd?: Partial<Record<PricingTier, TieredEventPrice>>;
+};
+
+export type TieredPricing = {
+    [tier: string]: {
+        tieredPricePerUnitUsd: number;
+    };
+};
+
+type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
+    pricingPerEvent: {
+        actorChargeEvents: Record<string, ActorChargeEvent>;
+    };
+};
+
+export type PricingInfo = ActorRunPricingInfo & {
+    tieredPricing?: TieredPricing;
+} | PricePerEventActorPricingInfo;
 
 /**
  * Custom type to transform raw API pricing data into a clean, client-friendly format
@@ -24,7 +57,7 @@ export type StructuredPricingInfo = {
             priceUsd: number;
         }[];
     }[];
-}
+};
 
 /**
  * Returns the most recent valid pricing information from a list of pricing infos,
