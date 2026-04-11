@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Update model to gpt-5.4, fix filename, remove flaky test case ([#664](https://github.com/apify/apify-mcp-server/pull/664)) ([1e6b7f4](https://github.com/apify/apify-mcp-server/commit/1e6b7f41e2c45a7801e64475d1b8a5e93057163f)) by [@jirispilka](https://github.com/jirispilka)
+- Sanitize all env values in evals to prevent ERR_INVALID_CHAR ([#665](https://github.com/apify/apify-mcp-server/pull/665)) ([9f0b9d9](https://github.com/apify/apify-mcp-server/commit/9f0b9d9d07a68999a26f3ed2e439fac47a872863)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->

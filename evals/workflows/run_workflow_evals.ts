@@ -21,7 +21,7 @@ import { hideBin } from 'yargs/helpers';
 import { filterByLineRanges } from '../shared/line_range_filter.js';
 import type { LineRange } from '../shared/line_range_parser.js';
 import { checkRangesOutOfBounds, parseLineRanges, validateLineRanges } from '../shared/line_range_parser.js';
-import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS } from './config.js';
+import { DEFAULT_TOOL_TIMEOUT_SECONDS, MODELS, sanitizeEnvValue } from './config.js';
 import { executeConversation } from './conversation_executor.js';
 import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
@@ -211,8 +211,8 @@ async function main() {
     console.log();
 
     // Check environment variables
-    const apifyToken = process.env.APIFY_TOKEN;
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const apifyToken = sanitizeEnvValue(process.env.APIFY_TOKEN);
+    const openrouterKey = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
 
     if (!apifyToken) {
         console.error('❌ Error: APIFY_TOKEN environment variable is required');
