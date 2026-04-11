@@ -3,10 +3,12 @@ import dedent from 'dedent';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard, type WidgetActor } from '../../utils/actor_card.js';
+import { formatActorForWidget, type WidgetActor } from '../../utils/actor_card.js';
 import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import {
+    buildSearchActorsEmptyResponse,
+    buildSearchActorsResult,
     searchActorsArgsSchema,
     searchActorsMetadata,
 } from '../core/search_actors_common.js';
@@ -30,29 +32,18 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
         });
 
         if (actors.length === 0) {
-            const instructions = dedent`
-                No Actors were found for the search query "${parsed.keywords}".
-                You MUST retry with broader, more generic keywords - use just the platform name
-                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
-            `;
-            const structuredContent = {
-                actors: [],
-                query: parsed.keywords,
-                count: 0,
-                instructions,
-            };
-            return buildMCPResponse({ texts: [instructions], structuredContent });
+            return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const structuredActorCards = actors.map((actor) => formatActorToStructuredCard(actor));
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors);
         const structuredContent: {
-            actors: typeof structuredActorCards;
+            actors: typeof actorCardStructured;
             query: string;
             count: number;
             instructions?: string;
             widgetActors?: WidgetActor[];
         } = {
-            actors: structuredActorCards,
+            actors: actorCardStructured,
             query: parsed.keywords,
             count: actors.length,
             instructions: dedent`
@@ -69,8 +60,6 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
         // Add widget-formatted actors for the interactive UI
         structuredContent.widgetActors = actors.map(formatActorForWidget);
 
-        const actorCards = actors.map((actor) => formatActorToActorCard(actor));
-        const actorsText = actorCards.join('\n\n');
         const texts = [dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
@@ -82,7 +71,7 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
 
             # Actors:
 
-            ${actorsText}
+            ${actorCardText}
 
             ## Choosing the right details tool:
             - Use ${HelperTools.ACTOR_GET_DETAILS} when the user wants to **browse or explore**
