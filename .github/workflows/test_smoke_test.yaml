@@ -23,4 +23,4 @@ jobs:
         name: Smoke test (exact version)
         uses: ./.github/workflows/_smoke_test_npm_package.yaml
         with:
-            version: 0.9.18
+            version: 0.9.17
