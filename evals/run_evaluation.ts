@@ -30,6 +30,7 @@ import {
     PHOENIX_MAX_RETRIES,
     type EvaluatorName,
     sanitizeEnvValue,
+    sanitizeProcessEnv,
     validatePhoenixEnvVars
 } from './config.js';
 
@@ -58,6 +59,7 @@ const RUN_LLM_EVALUATOR = true;
 const RUN_TOOLS_EXACT_MATCH_EVALUATOR = true;
 
 dotenv.config({ path: '.env' });
+sanitizeProcessEnv();
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))

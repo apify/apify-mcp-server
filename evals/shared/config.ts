@@ -33,6 +33,34 @@ export function sanitizeEnvValue(value?: string): string | undefined {
 }
 
 /**
+ * Env var keys that may end up in HTTP headers (API keys, tokens, URLs).
+ * Third-party libraries (e.g. phoenix-otel) read these directly from
+ * process.env, bypassing our sanitizeEnvValue() wrapper.
+ * sanitizeProcessEnv() rewrites them in-place so every reader gets clean values.
+ */
+const ENV_KEYS_TO_SANITIZE = [
+    'OPENROUTER_API_KEY',
+    'OPENROUTER_BASE_URL',
+    'PHOENIX_API_KEY',
+    'PHOENIX_BASE_URL',
+    'APIFY_TOKEN',
+    'APIFY_API_TOKEN',
+];
+
+/**
+ * Sanitize sensitive env vars in-place on process.env.
+ * Must be called before any library reads these values.
+ */
+export function sanitizeProcessEnv(): void {
+    for (const key of ENV_KEYS_TO_SANITIZE) {
+        const raw = process.env[key];
+        if (raw != null) {
+            process.env[key] = sanitizeEnvValue(raw);
+        }
+    }
+}
+
+/**
  * Validate that all required environment variables are present
  */
 export function validateEnvVars(): boolean {

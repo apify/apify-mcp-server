@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { sanitizeEnvValue } from '../../evals/shared/config.js';
+import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
 describe('sanitizeEnvValue', () => {
     it('returns undefined for undefined', () => {
@@ -64,5 +64,30 @@ describe('sanitizeEnvValue', () => {
     it('is idempotent', () => {
         const value = '  "sk-abc123"\r\n';
         expect(sanitizeEnvValue(sanitizeEnvValue(value))).toBe(sanitizeEnvValue(value));
+    });
+});
+
+describe('sanitizeProcessEnv', () => {
+    const KEYS_TO_TEST = ['PHOENIX_API_KEY', 'OPENROUTER_API_KEY'] as const;
+
+    afterEach(() => {
+        for (const key of KEYS_TO_TEST) {
+            delete process.env[key];
+        }
+    });
+
+    it('sanitizes env vars in-place on process.env', () => {
+        process.env.PHOENIX_API_KEY = 'key-with-newline\n';
+        process.env.OPENROUTER_API_KEY = '  "quoted-key"\r\n';
+
+        sanitizeProcessEnv();
+
+        expect(process.env.PHOENIX_API_KEY).toBe('key-with-newline');
+        expect(process.env.OPENROUTER_API_KEY).toBe('quoted-key');
+    });
+
+    it('leaves unset env vars as undefined', () => {
+        sanitizeProcessEnv();
+        expect(process.env.PHOENIX_API_KEY).toBeUndefined();
     });
 });
