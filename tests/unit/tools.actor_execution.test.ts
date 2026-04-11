@@ -3,6 +3,27 @@ import { describe, expect, it, vi } from 'vitest';
 import { callActorGetDataset } from '../../src/tools/core/actor_execution.js';
 
 describe('callActorGetDataset', () => {
+    it('should return null without starting a run when the signal is already aborted', async () => {
+        const controller = new AbortController();
+        controller.abort();
+
+        const start = vi.fn();
+
+        const apifyClient = {
+            actor: vi.fn().mockReturnValue({ start }),
+        };
+
+        const result = await callActorGetDataset({
+            actorName: 'apify/rag-web-browser',
+            input: { query: 'https://apify.com' },
+            apifyClient: apifyClient as never,
+            abortSignal: controller.signal,
+        });
+
+        expect(result).toBeNull();
+        expect(start).not.toHaveBeenCalled();
+    });
+
     it('should abort and return null when the signal is aborted during actor start', async () => {
         const controller = new AbortController();
         const actorRun = {
@@ -60,20 +81,14 @@ describe('callActorGetDataset', () => {
         }));
         const start = vi.fn().mockResolvedValue(actorRun);
         const listItems = vi.fn().mockResolvedValue({ items: [], total: 0 });
-        const get = vi.fn().mockResolvedValue({ actorDefinition: { storages: {} } });
 
         const apifyClient = {
-            actor: vi.fn().mockReturnValue({
-                start,
-                defaultBuild: vi.fn().mockResolvedValue({ get }),
-            }),
+            actor: vi.fn().mockReturnValue({ start }),
             run: vi.fn().mockReturnValue({
                 abort,
                 waitForFinish,
             }),
-            dataset: vi.fn().mockReturnValue({
-                listItems,
-            }),
+            dataset: vi.fn().mockReturnValue({ listItems }),
         };
 
         const resultPromise = callActorGetDataset({
