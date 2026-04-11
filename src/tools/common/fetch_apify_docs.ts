@@ -19,6 +19,19 @@ const fetchApifyDocsToolArgsSchema = z.object({
 
 const fetchApifyDocsToolInputSchema = z.toJSONSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema;
 
+/**
+ * Apify/Crawlee docs serve Markdown at `{path}.md`. We append `.md` to the pathname,
+ * not the full URL string — otherwise bare-host URLs like `https://docs.apify.com`
+ * would become `docs.apify.com.md` (a DNS lookup, not a path).
+ */
+export function buildMarkdownUrl(url: string): string {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    const path = parsed.pathname.replace(/\/+$/, '');
+    parsed.pathname = path ? `${path}.md` : '/index.md';
+    return parsed.toString();
+}
+
 function buildFetchErrorMessage(url: string, detail: string): string {
     return `Failed to fetch the documentation page at "${url}". ${detail} \
 Please verify the URL is correct and accessible. \
@@ -75,8 +88,7 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
         let markdown = fetchApifyDocsCache.get(urlWithoutFragment);
 
         if (!markdown) {
-            // Use the .md variant of the URL to get Markdown directly
-            const mdUrl = `${urlWithoutFragment}.md`;
+            const mdUrl = buildMarkdownUrl(urlWithoutFragment);
             try {
                 const response = await fetch(mdUrl);
                 if (!response.ok) {

@@ -8,7 +8,7 @@ import type { PaymentProvider } from '../payments/types.js';
 import { filterSchemaProperties, shortenProperties } from '../tools/utils.js';
 import type { Actor, ActorCardOptions, ActorInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import { getActorMcpUrlCached } from './actor.js';
-import { formatActorDetailsForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
 import { logHttpError } from './logging.js';
 import { buildMCPResponse } from './mcp.js';
@@ -151,7 +151,7 @@ export function processActorDetailsForResponse(details: ActorDetailsResult) {
 
     const structuredContent = {
         actorDetails: {
-            actorInfo: formatActorDetailsForWidget(details.actorInfo, actorUrl),
+            actorInfo: formatActorForWidget(details.actorInfo),
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,

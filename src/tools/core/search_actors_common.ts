@@ -3,8 +3,10 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { HelperTool, ToolInputSchema } from '../../types.js';
+import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
+import { formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -102,3 +104,27 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
         openWorldHint: false,
     },
 };
+
+export type SearchActorsResult = {
+    actorCardText: string;
+    actorCardStructured: StructuredActorCard[];
+};
+
+export function buildSearchActorsResult(
+    actors: ActorStoreList[],
+): SearchActorsResult {
+    return {
+        actorCardText: actors.map((actor) => formatActorToActorCard(actor)).join('\n\n'),
+        actorCardStructured: actors.map((actor) => formatActorToStructuredCard(actor)),
+    };
+}
+
+export function buildSearchActorsEmptyResponse(query: string): ReturnType<typeof buildMCPResponse> {
+    const instructions = dedent`
+        No Actors were found for the search query "${query}".
+        You MUST retry with broader, more generic keywords - use just the platform name
+        (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+    `;
+
+    return buildMCPResponse({ texts: [instructions], structuredContent: { actors: [], query, count: 0, instructions } });
+}
