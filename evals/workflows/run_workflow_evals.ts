@@ -212,7 +212,7 @@ async function main() {
 
     // Check environment variables
     const apifyToken = sanitizeEnvValue(process.env.APIFY_TOKEN);
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
+    const openrouterKey = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
 
     if (!apifyToken) {
         console.error('❌ Error: APIFY_TOKEN environment variable is required');

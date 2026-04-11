@@ -79,7 +79,9 @@ const argv = yargs(hideBin(process.argv))
     .parseSync() as CliArgs;
 
 // Sanitize secrets early to avoid invalid header characters in CI
-process.env.OPENROUTER_API_KEY = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
+if (process.env.OPENROUTER_API_KEY != null) {
+    process.env.OPENROUTER_API_KEY = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
+}
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise
 const toolsExactMatch = asEvaluator({

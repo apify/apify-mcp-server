@@ -25,7 +25,9 @@ const EXAMPLES: TestCase[] = [
 EXAMPLES.push(...filterById(loadTestCases('test_cases.json').testCases, 'fetch-actor-details-1'));
 
 async function main() {
-    process.env.OPENROUTER_API_KEY = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
+    if (process.env.OPENROUTER_API_KEY != null) {
+        process.env.OPENROUTER_API_KEY = sanitizeEnvValue(process.env.OPENROUTER_API_KEY);
+    }
 
     console.log(`\nEvaluating ${EXAMPLES.length} examples\n`);
 
