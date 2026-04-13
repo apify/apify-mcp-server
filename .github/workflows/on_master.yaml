@@ -46,3 +46,10 @@ jobs:
                             "ref": "${{ needs.release_metadata.outputs.changelog_commitish }}",
                             "tag": "beta"
                         }
+
+    smoke_test:
+        name: Smoke test published package
+        needs: [ publish_to_npm ]
+        uses: ./.github/workflows/_smoke_test_npm_package.yaml
+        with:
+            npm_tag: beta

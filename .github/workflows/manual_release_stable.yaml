@@ -119,6 +119,13 @@ jobs:
                             "tag": "latest"
                         }
 
+    smoke_test:
+        name: Smoke test published package
+        needs: [ release_metadata, publish_to_npm ]
+        uses: ./.github/workflows/_smoke_test_npm_package.yaml
+        with:
+            version: ${{ needs.release_metadata.outputs.version_number }}
+
     bump_dependency_in_internal_repo:
         name: Bump dependency in apify-mcp-server-internal
         needs: [ release_metadata, publish_to_npm ]
