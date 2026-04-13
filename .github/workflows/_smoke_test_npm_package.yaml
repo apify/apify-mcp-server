@@ -27,8 +27,8 @@ jobs:
             -   name: Install published package
                 uses: nick-fields/retry@v4
                 with:
-                    timeout_minutes: 10
-                    max_attempts: 5
+                    timeout_minutes: 5
+                    max_attempts: 3
                     retry_wait_seconds: 30
                     command: |
                         mkdir -p smoke-test && cd smoke-test
@@ -44,5 +44,7 @@ jobs:
                     npx mcpc @dev ping
                     npx mcpc --json @dev tools-list | jq -e 'length > 0'
                     npx mcpc --json @dev tools-call search-actors keywords:="web scraper" | jq -e '.content[0].text'
+                    npx mcpc --json @dev tools-call fetch-actor-details actor:="apify/web-scraper" | jq -e '.content[0].text'
                     npx mcpc --json @dev tools-call search-apify-docs query:="web scraping" docSource:="apify" | jq -e '.content[0].text'
+                    npx mcpc --json @dev tools-call fetch-apify-docs url:="https://docs.apify.com/platform/actors" | jq -e '.content[0].text'
                     npx mcpc @dev close
