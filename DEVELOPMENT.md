@@ -104,6 +104,11 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 | **Unit tests** | `npm run test:unit` | Individual modules in isolation — no credentials needed |
 | **Integration tests** | `npm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `npm run build`) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
+| **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
+
+To trigger the eval workflow on a PR, apply the **`validated`** label.
+The workflow then runs automatically and posts results to Phoenix.
+It also runs automatically on every merge to the `master` branch.
 
 ### Live probing with mcpc
 
