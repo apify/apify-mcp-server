@@ -1,0 +1,50 @@
+name: Smoke test npm package
+
+on:
+    workflow_call:
+        inputs:
+            npm_tag:
+                description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version is set.
+                required: false
+                type: string
+                default: latest
+            version:
+                description: Exact version to install (e.g. "1.2.3"). Takes precedence over npm_tag.
+                required: false
+                type: string
+                default: ""
+
+jobs:
+    smoke_test:
+        name: Smoke test published package
+        runs-on: ubuntu-latest
+        steps:
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version: 22
+
+            -   name: Install published package
+                uses: nick-fields/retry@v4
+                with:
+                    timeout_minutes: 5
+                    max_attempts: 3
+                    retry_wait_seconds: 30
+                    command: |
+                        mkdir -p smoke-test && cd smoke-test
+                        npm init -y
+                        VERSION="${{ inputs.version || inputs.npm_tag }}"
+                        npm install "@apify/actors-mcp-server@${VERSION}" @apify/mcpc
+
+            -   name: Smoke test MCP server via mcpc
+                working-directory: smoke-test
+                run: |
+                    echo '{"mcpServers":{"dev":{"command":"node","args":["node_modules/@apify/actors-mcp-server/dist/stdio.js","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}' > .mcp.json
+                    npx mcpc connect .mcp.json:dev @dev
+                    npx mcpc @dev ping
+                    npx mcpc --json @dev tools-list | jq -e 'length > 0'
+                    npx mcpc --json @dev tools-call search-actors keywords:="web scraper" | jq -e '.content[0].text'
+                    npx mcpc --json @dev tools-call fetch-actor-details actor:="apify/web-scraper" | jq -e '.content[0].text'
+                    npx mcpc --json @dev tools-call search-apify-docs query:="web scraping" docSource:="apify" | jq -e '.content[0].text'
+                    npx mcpc --json @dev tools-call fetch-apify-docs url:="https://docs.apify.com/platform/actors" | jq -e '.content[0].text'
+                    npx mcpc @dev close
