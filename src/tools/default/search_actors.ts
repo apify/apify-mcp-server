@@ -4,6 +4,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
     buildSearchActorsEmptyResponse,
     buildSearchActorsResult,
@@ -18,7 +19,7 @@ import {
 export const defaultSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyClient, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);
         const actors = await searchAndFilterActors({
             keywords: parsed.keywords,
@@ -33,7 +34,8 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors);
+        const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,

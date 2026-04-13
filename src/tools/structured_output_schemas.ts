@@ -75,6 +75,7 @@ export const pricingSchema = {
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
         tieredPricing: tieredPricingSchema,
         events: pricingEventsSchema,
+        pricingNote: { type: 'string', description: 'Note about additional pricing tiers available via fetch-actor-details' },
     },
     required: ['model', 'isFree'],
 };

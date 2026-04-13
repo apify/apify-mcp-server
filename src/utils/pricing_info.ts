@@ -57,7 +57,29 @@ export type StructuredPricingInfo = {
             priceUsd: number;
         }[];
     }[];
+    /** Hint added when pricing is simplified to a single tier. */
+    pricingNote?: string;
 };
+
+const SIMPLIFIED_PRICING_NOTE = 'Higher subscription tiers may offer lower prices. Use fetch-actor-details for complete pricing.';
+
+/**
+ * Picks the user's tier from a tiered pricing map, falling back to FREE, then the first available tier.
+ * Returns null if the map is empty.
+ */
+function pickTierEntry<T>(
+    tieredMap: Record<string, T> | undefined,
+    userTier: PricingTier,
+): { tier: string; value: T } | null {
+    if (!tieredMap) return null;
+    const entries = Object.entries(tieredMap);
+    if (entries.length === 0) return null;
+    const userMatch = entries.find(([t]) => t === userTier);
+    if (userMatch) return { tier: userMatch[0], value: userMatch[1] };
+    const freeMatch = entries.find(([t]) => t === 'FREE');
+    if (freeMatch) return { tier: freeMatch[0], value: freeMatch[1] };
+    return { tier: entries[0][0], value: entries[0][1] };
+}
 
 /**
  * Returns the most recent valid pricing information from a list of pricing infos,
@@ -220,4 +242,100 @@ export function pricingInfoToStructured(pricingInfo: PricingInfo | null): Struct
     }
 
     return structuredPricing;
+}
+
+/**
+ * Simplified text pricing for search-actors: shows only the user's tier price
+ * (with FREE fallback) and appends a hint about other tiers.
+ *
+ * Defaults to FREE when `userTier` is undefined.
+ */
+export function pricingInfoToSimplifiedString(
+    pricingInfo: PricingInfo | null,
+    userTier: PricingTier = 'FREE',
+): string {
+    if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
+        return 'This Actor is free to use. You are only charged for Apify platform usage.';
+    }
+    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
+        const customUnitName = pricingInfo.unitName !== 'result' ? pricingInfo.unitName : '';
+        const unitLabel = customUnitName || 'results';
+        const picked = pickTierEntry(pricingInfo.tieredPricing, userTier);
+        if (picked) {
+            return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; price per 1000 ${unitLabel} for ${picked.tier} tier: $${picked.value.tieredPricePerUnitUsd * 1000}. ${SIMPLIFIED_PRICING_NOTE}`;
+        }
+        return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; the price per 1000 ${unitLabel} is ${(pricingInfo.pricePerUnitUsd as number) * 1000} USD.`;
+    }
+    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
+        const { value, unit } = convertMinutesToGreatestUnit(pricingInfo.trialMinutes || 0);
+        const picked = pickTierEntry(pricingInfo.tieredPricing, userTier);
+        if (picked) {
+            return `This Actor is rental; price for ${picked.tier} tier: $${picked.value.tieredPricePerUnitUsd} per month, with a trial period of ${value} ${unit}. ${SIMPLIFIED_PRICING_NOTE}`;
+        }
+        return `This Actor is rental and has a flat price of ${pricingInfo.pricePerUnitUsd} USD per month, with a trial period of ${value} ${unit}.`;
+    }
+    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
+        const events = pricingInfo.pricingPerEvent?.actorChargeEvents;
+        if (!events) return 'Pricing information for events is not available.';
+        const lines: string[] = [];
+        let hasTieredEvent = false;
+        for (const rawEvent of Object.values(events)) {
+            const event = rawEvent as ActorChargeEvent;
+            let line = `\t- **${event.eventTitle}**: ${event.eventDescription} `;
+            if (typeof event.eventPriceUsd === 'number') {
+                line += `(Flat price: $${event.eventPriceUsd} per event)`;
+            } else if (event.eventTieredPricingUsd) {
+                hasTieredEvent = true;
+                const picked = pickTierEntry(event.eventTieredPricingUsd, userTier);
+                line += picked
+                    ? `(${picked.tier} tier: $${picked.value.tieredEventPriceUsd} per event)`
+                    : '(No price info)';
+            } else {
+                line += '(No price info)';
+            }
+            lines.push(line);
+        }
+        const suffix = hasTieredEvent ? `\n${SIMPLIFIED_PRICING_NOTE}` : '';
+        return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${lines.join('\n')}${suffix}`;
+    }
+    return 'Pricing information is not available.';
+}
+
+/**
+ * Simplified structured pricing for search-actors: collapses tiered pricing arrays
+ * to a single entry for the user's tier (with FREE fallback) and sets `pricingNote`.
+ *
+ * Defaults to FREE when `userTier` is undefined.
+ */
+export function pricingInfoToSimplifiedStructured(
+    pricingInfo: PricingInfo | null,
+    userTier: PricingTier = 'FREE',
+): StructuredPricingInfo {
+    const result = pricingInfoToStructured(pricingInfo);
+    let simplified = false;
+
+    if (result.tieredPricing && result.tieredPricing.length > 0) {
+        const map = Object.fromEntries(result.tieredPricing.map((t) => [t.tier, t]));
+        const picked = pickTierEntry(map, userTier);
+        if (picked) {
+            result.tieredPricing = [picked.value];
+            simplified = true;
+        }
+    }
+
+    if (result.events) {
+        result.events = result.events.map((event) => {
+            if (!event.tieredPricing || event.tieredPricing.length === 0) return event;
+            const map = Object.fromEntries(event.tieredPricing.map((t) => [t.tier, t]));
+            const picked = pickTierEntry(map, userTier);
+            if (!picked) return event;
+            simplified = true;
+            return { ...event, tieredPricing: [picked.value] };
+        });
+    }
+
+    if (simplified) {
+        result.pricingNote = SIMPLIFIED_PRICING_NOTE;
+    }
+    return result;
 }

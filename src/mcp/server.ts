@@ -76,7 +76,7 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
-import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
+import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
@@ -1364,7 +1364,7 @@ export class ActorsMcpServer {
         let userId: string | null = null;
         if (apifyToken) {
             const apifyClient = new ApifyClient({ token: apifyToken });
-            userId = await getUserIdFromTokenCached(apifyToken, apifyClient);
+            ({ userId } = await getUserInfoCached(apifyToken, apifyClient));
             log.debug('Telemetry: fetched userId', { userId, mcpSessionId });
         }
         const capabilities = this.options.initializeRequestData?.params?.capabilities;

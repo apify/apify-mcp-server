@@ -3,6 +3,8 @@ import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } fro
 import {
     getCurrentPricingInfo,
     type PricingInfo,
+    pricingInfoToSimplifiedString,
+    pricingInfoToSimplifiedStructured,
     pricingInfoToString,
     pricingInfoToStructured,
     type StructuredPricingInfo,
@@ -34,7 +36,7 @@ function getActorPricingInfo(actor: Actor | ActorStoreList): PricingInfo | null 
     return getCurrentPricingInfo(actor.pricingInfos || [], new Date());
 }
 
-const DEFAULT_CARD_OPTIONS: ActorCardOptions = {
+export const DEFAULT_CARD_OPTIONS: ActorCardOptions = {
     includeDescription: true,
     includeStats: true,
     includePricing: true,
@@ -180,7 +182,9 @@ export function formatActorToActorCard(
     }
 
     if (options.includePricing) {
-        const pricingString = pricingInfoToString(data.pricingInfo);
+        const pricingString = options.userTier
+            ? pricingInfoToSimplifiedString(data.pricingInfo, options.userTier)
+            : pricingInfoToString(data.pricingInfo);
         markdownLines.push(`- **[Pricing](${data.actorUrl}/pricing):** ${pricingString}`);
     }
 
@@ -224,6 +228,13 @@ export function formatActorToStructuredCard(
 ): StructuredActorCard {
     const data = extractActorData(actor, options);
 
+    let pricing: StructuredPricingInfo = { model: 'FREE', isFree: true };
+    if (options.includePricing) {
+        pricing = options.userTier
+            ? pricingInfoToSimplifiedStructured(data.pricingInfo, options.userTier)
+            : pricingInfoToStructured(data.pricingInfo);
+    }
+
     return {
         title: data.title,
         url: data.actorUrl,
@@ -233,9 +244,7 @@ export function formatActorToStructuredCard(
         developer: data.developer,
         description: data.description,
         categories: data.categories,
-        pricing: options.includePricing
-            ? pricingInfoToStructured(data.pricingInfo)
-            : { model: 'FREE', isFree: true },
+        pricing,
         stats: data.stats,
         rating: data.rating,
         modifiedAt: data.modifiedAt,
