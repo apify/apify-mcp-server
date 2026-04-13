@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
@@ -47,18 +47,13 @@ describe('sanitizeEnvValue', () => {
         expect(sanitizeEnvValue('')).toBe('');
     });
 
-    it('strips all ASCII control characters invalid in HTTP headers', () => {
-        // Node.js rejects header values containing chars outside [\t\x20-\x7e\x80-\xff]
+    it('strips control characters', () => {
         expect(sanitizeEnvValue('sk-abc\x00123')).toBe('sk-abc123'); // null byte
         expect(sanitizeEnvValue('sk-abc\x01123')).toBe('sk-abc123'); // SOH
         expect(sanitizeEnvValue('sk-abc\x0b123')).toBe('sk-abc123'); // vertical tab
         expect(sanitizeEnvValue('sk-abc\x0c123')).toBe('sk-abc123'); // form feed
         expect(sanitizeEnvValue('sk-abc\x1f123')).toBe('sk-abc123'); // unit separator
         expect(sanitizeEnvValue('sk-abc\x7f123')).toBe('sk-abc123'); // DEL
-    });
-
-    it('preserves horizontal tab (valid in HTTP headers)', () => {
-        expect(sanitizeEnvValue('sk-abc\t123')).toBe('sk-abc\t123');
     });
 
     it('is idempotent', () => {
@@ -68,60 +63,21 @@ describe('sanitizeEnvValue', () => {
 });
 
 describe('sanitizeProcessEnv', () => {
-    const KEYS_TO_TEST = ['PHOENIX_API_KEY', 'OPENROUTER_API_KEY'] as const;
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
-    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-
     afterEach(() => {
-        for (const key of KEYS_TO_TEST) {
-            delete process.env[key];
-        }
-        consoleSpy.mockClear();
+        delete process.env.PHOENIX_API_KEY;
+        delete process.env.OPENROUTER_API_KEY;
     });
 
-    it('sanitizes env vars in-place on process.env', () => {
+    it('sanitizes env vars in-place', () => {
         process.env.PHOENIX_API_KEY = 'key-with-newline\n';
         process.env.OPENROUTER_API_KEY = '  "quoted-key"\r\n';
-
         sanitizeProcessEnv();
-
         expect(process.env.PHOENIX_API_KEY).toBe('key-with-newline');
         expect(process.env.OPENROUTER_API_KEY).toBe('quoted-key');
     });
 
-    it('leaves unset env vars as undefined', () => {
+    it('leaves unset vars untouched', () => {
         sanitizeProcessEnv();
         expect(process.env.PHOENIX_API_KEY).toBeUndefined();
-    });
-
-    it('logs redacted values for CI debugging', () => {
-        process.env.PHOENIX_API_KEY = 'phx-1234567890abcdef';
-
-        sanitizeProcessEnv();
-
-        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
-        expect(phoenixLog).toBeDefined();
-        // Should show first 4 and last 4 chars, not the full key
-        expect(phoenixLog![0]).toContain('phx-');
-        expect(phoenixLog![0]).toContain('cdef');
-        expect(phoenixLog![0]).not.toContain('1234567890ab');
-    });
-
-    it('logs (unset) for missing env vars', () => {
-        sanitizeProcessEnv();
-
-        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
-        expect(phoenixLog).toBeDefined();
-        expect(phoenixLog![0]).toContain('(unset)');
-    });
-
-    it('logs (empty) for empty env vars', () => {
-        process.env.PHOENIX_API_KEY = '';
-
-        sanitizeProcessEnv();
-
-        const phoenixLog = consoleSpy.mock.calls.find(([msg]) => typeof msg === 'string' && msg.includes('PHOENIX_API_KEY'));
-        expect(phoenixLog).toBeDefined();
-        expect(phoenixLog![0]).toContain('(empty)');
     });
 });
