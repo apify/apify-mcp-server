@@ -45,19 +45,18 @@ const ENV_KEYS_TO_SANITIZE = [
     'OPENROUTER_BASE_URL',
     'PHOENIX_API_KEY',
     'PHOENIX_BASE_URL',
-    'APIFY_TOKEN',
-    'APIFY_API_TOKEN',
 ];
 
 /**
  * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.
+ * Fully masks short values (≤ 8 chars) to prevent reconstruction from the log line.
  * Returns '(empty)' for empty strings, '(unset)' for undefined/null.
  */
 function redact(value?: string | null): string {
     if (value == null) return '(unset)';
     if (value.length === 0) return '(empty)';
-    if (value.length <= 10) return `${value.slice(0, 2)}***${value.slice(-2)} (${value.length} chars)`;
-    return `${value.slice(0, 4)}***${value.slice(-4)} (${value.length} chars)`;
+    if (value.length <= 6) return `*** (${value.length} chars)`;
+    return `${value.slice(0, 3)}***${value.slice(-3)} (${value.length} chars)`;
 }
 
 /**
