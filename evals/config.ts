@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import log from '@apify/log';
 
 // Re-export shared config
-export { OPENROUTER_CONFIG, sanitizeEnvValue, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
+export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
 
 // Read the version from test-cases.json
 function getTestCasesVersion(): string {

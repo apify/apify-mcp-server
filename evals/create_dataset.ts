@@ -14,7 +14,7 @@ import { hideBin } from 'yargs/helpers';
 
 import log from '@apify/log';
 
-import { sanitizeEnvValue, validatePhoenixEnvVars } from './config.js';
+import { sanitizeEnvValue, sanitizeProcessEnv, validatePhoenixEnvVars } from './config.js';
 import { loadTestCases, filterByCategory, filterById, type TestCase } from './evaluation_utils.js';
 
 // Set log level to debug
@@ -32,6 +32,7 @@ type CliArgs = {
 
 // Load environment variables from .env file if present
 dotenv.config({ path: '.env' });
+sanitizeProcessEnv();
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
