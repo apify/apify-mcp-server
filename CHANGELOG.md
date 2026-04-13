@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 - Sanitize all env values in evals to prevent ERR_INVALID_CHAR ([#665](https://github.com/apify/apify-mcp-server/pull/665)) ([9f0b9d9](https://github.com/apify/apify-mcp-server/commit/9f0b9d9d07a68999a26f3ed2e439fac47a872863)) by [@jirispilka](https://github.com/jirispilka)
 - Actor run cancellation handling and add tests for abort scenarios ([#662](https://github.com/apify/apify-mcp-server/pull/662)) ([acedbf5](https://github.com/apify/apify-mcp-server/commit/acedbf59b374a1243bb31d2930ebac8403b7c47e)) by [@jirispilka](https://github.com/jirispilka)
 - DNS rebinding protection for dev server ([#653](https://github.com/apify/apify-mcp-server/pull/653)) ([9781b45](https://github.com/apify/apify-mcp-server/commit/9781b450a53c96e0df49f463881253507502f195)) by [@jirispilka](https://github.com/jirispilka)
+- Fix error in the validation pipeline ([#669](https://github.com/apify/apify-mcp-server/pull/669)) ([b844f31](https://github.com/apify/apify-mcp-server/commit/b844f31f4ccbae1c53c98d2441a95c1e65799230)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
