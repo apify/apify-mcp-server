@@ -1,7 +1,7 @@
-name: Smoke test npm package
+name: "[TEST] Smoke test npm package via bin entry point"
 
 on:
-    workflow_call:
+    workflow_dispatch:
         inputs:
             npm_tag:
                 description: NPM dist-tag to install (e.g. "beta", "latest"). Ignored when version is set.
