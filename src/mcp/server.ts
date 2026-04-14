@@ -1264,6 +1264,9 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
+            // Set final statusMessage before transitioning to terminal state,
+            // because storeTaskResult does not accept a statusMessage parameter.
+            await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: completed`, mcpSessionId);
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
 
@@ -1273,6 +1276,7 @@ export class ActorsMcpServer {
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: payment required`, mcpSessionId);
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1337,6 +1341,7 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
+            await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: failed`, mcpSessionId);
             await this.taskStore.storeTaskResult(taskId, 'failed', {
                 content: [{
                     type: 'text' as const,
