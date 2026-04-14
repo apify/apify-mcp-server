@@ -1,13 +1,21 @@
 import { z } from 'zod';
 
+import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { HelperTool, ToolInputSchema } from '../../types.js';
+import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
 import {
     actorDetailsOutputOptionsSchema,
+    buildActorDetailsTextResponse,
+    buildActorNotFoundResponse,
+    buildCardOptions,
+    fetchActorDetails,
+    resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
+import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
 /**
  * Zod schema for fetch-actor-details arguments — shared between default and openai variants.
@@ -58,3 +66,45 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
         openWorldHint: false,
     },
 };
+
+/**
+ * Shared handler for default and internal fetch-actor-details variants.
+ * Both return the same text + structured response; only the telemetry route differs.
+ */
+export async function buildFetchActorDetailsResult(
+    toolArgs: InternalToolArgs,
+    route: string,
+): Promise<ReturnType<typeof buildMCPResponse>> {
+    const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+    const parsed = fetchActorDetailsToolArgsSchema.parse(args);
+    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
+    const apifyClient = new ApifyClient({ token: apifyToken });
+
+    const resolvedOutput = resolveOutputOptions(parsed.output);
+    const cardOptions = buildCardOptions(resolvedOutput);
+
+    const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
+    if (!details) {
+        return buildActorNotFoundResponse(actorName);
+    }
+
+    const actorOutputSchema = resolvedOutput.outputSchema
+        ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
+        : undefined;
+
+    // NOTE: Data duplication between texts and structuredContent is intentional and required.
+    // Some MCP clients only read text content, while others only read structured content.
+    const { texts, structuredContent } = await buildActorDetailsTextResponse({
+        actorName,
+        details,
+        output: resolvedOutput,
+        cardOptions,
+        apifyClient,
+        apifyToken,
+        actorOutputSchema,
+        paymentProvider: apifyMcpServer?.options.paymentProvider,
+        mcpSessionId,
+    });
+
+    return buildMCPResponse({ texts, structuredContent });
+}

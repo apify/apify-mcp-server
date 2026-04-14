@@ -1,3 +1,5 @@
+import dedent from 'dedent';
+
 import { ApifyClient } from '../../apify_client.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
@@ -42,13 +44,13 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
             actorDetails: processedStructuredContent.actorDetails,
         };
 
-        const texts = [`
-# Actor information:
-- **Actor:** ${actorName}
-- **URL:** ${actorUrl}
+        const texts = [dedent`
+            # Actor information:
+            - **Actor:** ${actorName}
+            - **URL:** ${actorUrl}
 
-An interactive widget has been rendered with detailed Actor information.
-`];
+            An interactive widget has been rendered with detailed Actor information.
+        `];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
         return buildMCPResponse({
