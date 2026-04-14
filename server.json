@@ -6,7 +6,7 @@
     "url": "https://github.com/apify/apify-mcp-server",
     "source": "github"
   },
-  "version": "0.9.18",
+  "version": "0.9.19",
   "remotes": [
     {
       "type": "streamable-http",
