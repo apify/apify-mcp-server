@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.18 - **not yet released**
+## [0.9.18](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.18) (2026-04-14)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - Fix error in the validation pipeline ([#669](https://github.com/apify/apify-mcp-server/pull/669)) ([b844f31](https://github.com/apify/apify-mcp-server/commit/b844f31f4ccbae1c53c98d2441a95c1e65799230)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.17](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.17) (2026-04-08)
 
 ### 🚀 Features
