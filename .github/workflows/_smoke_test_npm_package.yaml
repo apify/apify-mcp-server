@@ -26,6 +26,8 @@ jobs:
 
             -   name: Install published package
                 uses: nick-fields/retry@v4
+                env:
+                    PKG_VERSION: ${{ inputs.version || inputs.npm_tag }}
                 with:
                     timeout_minutes: 5
                     max_attempts: 3
@@ -33,13 +35,12 @@ jobs:
                     command: |
                         mkdir -p smoke-test && cd smoke-test
                         npm init -y
-                        VERSION="${{ inputs.version || inputs.npm_tag }}"
-                        npm install "@apify/actors-mcp-server@${VERSION}" @apify/mcpc
+                        npm install "@apify/actors-mcp-server@${PKG_VERSION}" @apify/mcpc
 
             -   name: Smoke test MCP server via mcpc
                 working-directory: smoke-test
                 run: |
-                    echo '{"mcpServers":{"dev":{"command":"node","args":["node_modules/@apify/actors-mcp-server/dist/stdio.js","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}' > .mcp.json
+                    echo '{"mcpServers":{"dev":{"command":"npx","args":["actors-mcp-server","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}' > .mcp.json
                     npx mcpc connect .mcp.json:dev @dev
                     npx mcpc @dev ping
                     npx mcpc --json @dev tools-list | jq -e 'length > 0'
