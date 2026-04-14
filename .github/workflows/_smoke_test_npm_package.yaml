@@ -26,6 +26,8 @@ jobs:
 
             -   name: Install published package
                 uses: nick-fields/retry@v4
+                env:
+                    PKG_VERSION: ${{ inputs.version || inputs.npm_tag }}
                 with:
                     timeout_minutes: 5
                     max_attempts: 3
@@ -33,8 +35,7 @@ jobs:
                     command: |
                         mkdir -p smoke-test && cd smoke-test
                         npm init -y
-                        VERSION="${{ inputs.version || inputs.npm_tag }}"
-                        npm install "@apify/actors-mcp-server@${VERSION}" @apify/mcpc
+                        npm install "@apify/actors-mcp-server@${PKG_VERSION}" @apify/mcpc
 
             -   name: Smoke test MCP server via mcpc
                 working-directory: smoke-test
