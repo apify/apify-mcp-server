@@ -1,6 +1,7 @@
 name: "[TEST] Smoke test npm package via bin entry point"
 
 on:
+    push:
     workflow_dispatch:
         inputs:
             npm_tag:
