@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **#637:** Required fields dropped from tools&#x2F;list for all Actors ([#676](https://github.com/apify/apify-mcp-server/pull/676)) ([02c4600](https://github.com/apify/apify-mcp-server/commit/02c46002a2084783ba5688f1384c8422c1848cc4)) by [@jirispilka](https://github.com/jirispilka), closes [#637](https://github.com/apify/apify-mcp-server/issues/637)
+- Log task-not-found as softFail instead of error ([#678](https://github.com/apify/apify-mcp-server/pull/678)) ([47a92dc](https://github.com/apify/apify-mcp-server/commit/47a92dc17616e33dd0913c4723e2eaf7967a2ba4)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
