@@ -12,7 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { searchApifyDocsTool } from '../../src/tools/common/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
-import type { ToolEntry } from '../../src/types.js';
+import type { ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
@@ -240,5 +240,47 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         expect(schema.properties?.docSource).toMatchObject({ default: 'apify' });
         expect(schema.properties?.limit).toMatchObject({ default: 5 });
         expect(schema.properties?.offset).toMatchObject({ default: 0 });
+    });
+
+    // Regression: #637 — Actor required fields were dropped from tools/list output.
+    it('should preserve required fields from Apify Actor-shape inputSchemas', () => {
+        const actorShapeTool = {
+            name: 'apify--some-actor',
+            description: 'Test Actor tool',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Search query' },
+                    maxResults: { type: 'integer', description: 'Limit', default: 3 },
+                },
+                required: ['query'],
+            },
+        } as unknown as ToolBase;
+
+        const { inputSchema } = getToolPublicFieldOnly(actorShapeTool, { filterWidgetMeta: false });
+        const schema = inputSchema as { required?: string[] };
+
+        expect(schema.required).toEqual(['query']);
+    });
+
+    // Regression: #637 — phantom `default: undefined` from filterSchemaProperties must not clear required.
+    it('should preserve required fields even when upstream writes `default: undefined`', () => {
+        const toolWithPhantomDefaults = {
+            name: 'apify--some-actor',
+            description: 'Test Actor tool',
+            inputSchema: {
+                type: 'object',
+                properties: {
+                    query: { type: 'string', description: 'Search query', default: undefined },
+                    maxResults: { type: 'integer', description: 'Limit', default: 3 },
+                },
+                required: ['query'],
+            },
+        } as unknown as ToolBase;
+
+        const { inputSchema } = getToolPublicFieldOnly(toolWithPhantomDefaults, { filterWidgetMeta: false });
+        const schema = inputSchema as { required?: string[] };
+
+        expect(schema.required).toEqual(['query']);
     });
 });

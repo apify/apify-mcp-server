@@ -65,6 +65,13 @@ Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** fr
 - Benefits for each pattern
 - **Use case**: Reference for incremental codebase improvements
 
+### [actor_input_schema_required_fields.md](./actor_input_schema_required_fields.md)
+Apify input-schema spec semantics (required vs default vs prefill), the root cause of #637
+(phantom `default: undefined` keys from `filterSchemaProperties`), before/after examples for
+`apify/rag-web-browser`, a table of 6 real Actor fields, and the follow-up cleanup plan (#675).
+- **Use case**: Reference when touching `fixZodSchemaRequired`, `filterSchemaProperties`, or any
+  Actor input-schema normalisation logic.
+
 ### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
 Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markdown stack cost).
 - **Use case**: When changing widget dependencies or markdown rendering, re-measure bundle impact

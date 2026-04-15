@@ -115,6 +115,13 @@ export function buildApifySpecificProperties(properties: Record<string, SchemaPr
 /**
  * Filters schema properties to include only the necessary fields.
  * This is done to reduce the size of the input schema and to make it more readable.
+ *
+ * TODO(#675): This object literal unconditionally assigns every whitelisted key,
+ * including `default: undefined`, on properties that didn't declare them upstream.
+ * This creates phantom keys that broke `fixZodSchemaRequired()` via key-presence
+ * checks (#637). The symptom is patched in `src/utils/ajv.ts` (value-check), but
+ * this function should only emit keys whose upstream value is not `undefined`.
+ *
  * @param properties
  */
 export function filterSchemaProperties(properties: { [key: string]: SchemaProperties }): {
