@@ -1,3 +1,5 @@
+import { ErrorCode } from '@modelcontextprotocol/sdk/types.js';
+
 import log from '@apify/log';
 
 /**
@@ -29,8 +31,34 @@ export function getHttpStatusCode(error: unknown): number | undefined {
 }
 
 /**
- * Logs HTTP errors based on status code, following apify-core pattern.
- * Uses `softFail` for status < 500 (API client errors) and `exception` for status >= 500 (API server errors).
+ * Client/caller faults and transient transport conditions that shouldn't trigger error alerts.
+ * Anything else in the JSON-RPC reserved range (-32768..-32000) is treated as a server fault.
+ */
+const SOFT_MCP_ERROR_CODES: ReadonlySet<number> = new Set([
+    ErrorCode.ParseError,
+    ErrorCode.InvalidRequest,
+    ErrorCode.MethodNotFound,
+    ErrorCode.InvalidParams,
+    ErrorCode.ConnectionClosed,
+    ErrorCode.RequestTimeout,
+]);
+
+/**
+ * Extract a JSON-RPC error code from an `McpError`-shaped object.
+ * Returns `undefined` if the `code` field is absent or outside the JSON-RPC reserved range.
+ */
+function getMcpErrorCode(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null || !('code' in error)) return undefined;
+    const { code } = error as { code?: unknown };
+    if (typeof code === 'number' && code >= -32768 && code <= -32000) return code;
+    return undefined;
+}
+
+/**
+ * Logs HTTP or MCP errors at the appropriate level:
+ * - Client errors (HTTP < 500, or JSON-RPC client/transient codes) → softFail (no stack).
+ * - Server errors (HTTP >= 500, or JSON-RPC server codes) → exception (with stack).
+ * - Anything unclassifiable → error.
  *
  * @param error - The error object
  * @param message - The log message
@@ -41,16 +69,30 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     const errorMessage = error instanceof Error ? error.message : String(error);
 
     if (statusCode !== undefined && statusCode < 500) {
-        // Client errors (< 500) - log as softFail without stack trace
+        // HTTP client errors (< 500) - softFail without stack trace
         log.softFail(message, { errMessage: errorMessage, statusCode, ...data });
-    } else if (statusCode !== undefined && statusCode >= 500) {
-        // Server errors (>= 500) - log as exception with full error (includes stack trace)
+        return;
+    }
+    if (statusCode !== undefined && statusCode >= 500) {
+        // HTTP server errors (>= 500) - exception with full error (includes stack trace)
         const errorObj = error instanceof Error ? error : new Error(String(error));
         log.exception(errorObj, message, { statusCode, ...data });
-    } else {
-        // No status code available - log as error
-        log.error(message, { error, ...data });
+        return;
     }
+
+    const mcpErrorCode = getMcpErrorCode(error);
+    if (mcpErrorCode !== undefined) {
+        if (SOFT_MCP_ERROR_CODES.has(mcpErrorCode)) {
+            log.softFail(message, { errMessage: errorMessage, mcpErrorCode, ...data });
+        } else {
+            const errorObj = error instanceof Error ? error : new Error(String(error));
+            log.exception(errorObj, message, { mcpErrorCode, ...data });
+        }
+        return;
+    }
+
+    // No status code available - log as error
+    log.error(message, { error, ...data });
 }
 
 const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';

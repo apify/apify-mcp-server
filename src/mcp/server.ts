@@ -406,10 +406,14 @@ export class ActorsMcpServer {
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
-            if (error.message?.includes('No connection established')) {
+            // Client-disconnect noise from the MCP SDK (protocol.js). Two messages we see in prod:
+            //   - "No connection established" (sendRequest before transport attached)
+            //   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
+            // Both are expected; log as softFail so they don't flood Mezmo error alerts.
+            if (/Not connected|No connection established/i.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
-                const errMessage = error.message.replace(/ error:/gi, ' failure:');
+                const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
                 log.softFail('MCP client disconnected before response could be sent', { errMessage });
             } else {
                 log.error('[MCP Error]', { error });
@@ -1284,16 +1288,35 @@ export class ActorsMcpServer {
                 failure_detail: failureDetail,
                 ...buildActorFields(actorName, actorId),
             };
-            log.error('Error executing tool for task', {
-                taskId,
-                toolName: tool.name,
-                toolStatus,
-                mcpSessionId,
-                failureCategory: callDiagnostics.failure_category,
-                failureHttpStatus: callDiagnostics.failure_http_status,
-                actorName: callDiagnostics.actor_name,
-                error,
-            });
+            // Log level follows the already-classified toolStatus:
+            //   SOFT_FAIL (e.g. 402/403 user quota, client-side issues) → softFail
+            //   FAILED/ABORTED/other                                    → error
+            if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
+                // Mezmo promotes on "error" in message/keys — use errMessage key, sanitized.
+                const errMessage = (error instanceof Error ? error.message : String(error))
+                    .replace(/ error:/gi, ' failure:');
+                log.softFail('Tool execution soft-failed for task', {
+                    taskId,
+                    toolName: tool.name,
+                    toolStatus,
+                    mcpSessionId,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                    actorName: callDiagnostics.actor_name,
+                    errMessage,
+                });
+            } else {
+                log.error('Error executing tool for task', {
+                    taskId,
+                    toolName: tool.name,
+                    toolStatus,
+                    mcpSessionId,
+                    failureCategory: callDiagnostics.failure_category,
+                    failureHttpStatus: callDiagnostics.failure_http_status,
+                    actorName: callDiagnostics.actor_name,
+                    error,
+                });
+            }
             const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
