@@ -2,15 +2,9 @@
 
 This directory contains useful documents and insights about the repository architecture, design decisions, and implementation details that don't belong in code comments or JSDoc.
 
-## Files
+Basic MCP references (spec URLs, SDK paths, transport mode → file pointers) live in [CLAUDE.md § MCP development — references](../CLAUDE.md#mcp-development--references). The MCP docs below are the deep-dives.
 
-### [algolia.md](./algolia.md)
-Technical analysis of Algolia search API responses for each documentation source.
-- Data structure overview for each doc source (apify, crawlee-js, crawlee-py)
-- Field availability patterns (content, hierarchy, anchors)
-- Example response payloads
-- Recommendations for response processing logic
-- **Use case**: Understand what data is actually returned by Algolia to inform simplification decisions
+## MCP protocol & SDK
 
 ### [mcp_server_refactor_analysis.md](./mcp_server_refactor_analysis.md)
 Implementation plan for migrating from low-level `Server` to high-level `McpServer` API.
@@ -65,6 +59,8 @@ Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** fr
 - Benefits for each pattern
 - **Use case**: Reference for incremental codebase improvements
 
+## MCP Apps / widgets
+
 ### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
 Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markdown stack cost).
 - **Use case**: When changing widget dependencies or markdown rendering, re-measure bundle impact
@@ -72,6 +68,16 @@ Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markd
 ### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
 Checklist and notes for ChatGPT MCP Apps store submission (verify line references against current source before relying on them).
 - **Use case**: Submission prep and audits
+
+## Other
+
+### [algolia.md](./algolia.md)
+Technical analysis of Algolia search API responses for each documentation source.
+- Data structure overview for each doc source (apify, crawlee-js, crawlee-py)
+- Field availability patterns (content, hierarchy, anchors)
+- Example response payloads
+- Recommendations for response processing logic
+- **Use case**: Understand what data is actually returned by Algolia to inform simplification decisions
 
 ---
 

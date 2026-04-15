@@ -133,16 +133,12 @@ Present issue content to the user for review before creating. Use `gh issue crea
 
 ## Available resources
 
+For MCP spec URLs, SDK paths, and internal repo location, see [CLAUDE.md § MCP development — references](../../../CLAUDE.md#mcp-development--references).
+
+Dig-specific workflow resources:
+
 | Resource               | Path / URL                                                          | Use for                                                     |
 |------------------------|---------------------------------------------------------------------|-------------------------------------------------------------|
-| **Public repo**        | `.` (this repo root)                                                | Main codebase — tools, widgets, tests                       |
-| **Internal repo**      | `../apify-mcp-server-internal` (if available)                       | Hosted server — assess impact of changes                    |
-| **MCP SDK (types)**    | `node_modules/@modelcontextprotocol/sdk`                            | Protocol types, server/client APIs (compiled only)          |
-| **MCP SDK (source)**   | `../typescript-sdk` (if available)                                  | Examples, tests, full source — faster than GitHub           |
-| **MCP spec**           | `https://modelcontextprotocol.io/specification/2025-11-25`          | Protocol-level features                                     |
-| **MCP Apps SDK (types)** | `node_modules/@modelcontextprotocol/ext-apps`                     | MCP Apps types, React hooks, server helpers (compiled only) |
-| **MCP Apps SDK (source)** | `../ext-apps` (if available)                                     | Examples, tests, spec, full source — faster than GitHub     |
-| **MCP Apps spec**      | `https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx` | MCP Apps extension specification                            |
 | **Dev server (no UI)** | `http://localhost:3001/` / tools: `mcp__apify-dev__*`               | Test tools without widgets                                  |
 | **Dev server (UI)**    | `http://localhost:3001/?ui=true` / tools: `mcp__apify-dev-ui__*`    | Test tools with widget rendering                            |
 | **mcpc stdio**         | `mcpc @stdio tools-call ...` (requires `npm run build`)             | Test tools — no running server needed                       |

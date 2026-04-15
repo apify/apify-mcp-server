@@ -62,80 +62,32 @@ After completing ANY code change (feature, fix, refactor), you MUST:
 - **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before mcpc probing).
 - **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN` and are slow.
 
-## Testing the MCP server end-to-end
+## MCP development — references
 
-After code changes, verify the server works — not just that it compiles. There are two ways:
+Basic references for work on MCP protocol, SDK, and MCP Apps (widgets). Deeper docs live in [res/index.md](./res/index.md).
 
-**1. mcpc** — CLI client, best for scripted/automated verification.
-- Requires `APIFY_TOKEN` in the environment (see [DEVELOPMENT.md](./DEVELOPMENT.md) § *Configuring APIFY_TOKEN*).
-- Requires `npm run build` before each session (mcpc runs `dist/stdio.js`).
-- Discover tools with `mcpc @stdio tools-list`.
-- Test all default tools: `search-actors`, `fetch-actor-details`, `call-actor`, `get-actor-run`, `get-actor-output`, `search-apify-docs`, `fetch-apify-docs`.
+| Resource | Location |
+|---|---|
+| MCP spec | https://modelcontextprotocol.io/specification/2025-11-25 |
+| MCP Apps spec | https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx |
+| MCP SDK (types) | `node_modules/@modelcontextprotocol/sdk` |
+| MCP SDK (source, if cloned) | `../typescript-sdk` |
+| MCP Apps SDK (types) | `node_modules/@modelcontextprotocol/ext-apps` |
+| MCP Apps SDK (source, if cloned) | `../ext-apps` |
+| Internal (hosted) server repo | `../apify-mcp-server-internal` |
 
-```bash
-npm run build
-mcpc connect .mcp.json:stdio @stdio   # first time
-mcpc @stdio restart                    # after code changes
-mcpc @stdio tools-call search-actors keywords:="web scraper"
-```
+**Transport modes and key files:**
+- stdio → `src/stdio.ts`
+- Streamable HTTP and legacy SSE → `src/dev_server.ts`, `src/mcp/server.ts`
 
-**2. Native MCP client** (e.g. Claude Code, Cursor) — the server is already connected and tools are in context.
-- Auth is handled by the user's MCP config (token or OAuth).
-- Tools are already discoverable — just call them directly.
-- Use this when verifying behavior as a real client sees it.
-
-If unsure which approach to use or how to authenticate, ask the user.
-
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for mcpc setup details and examples.
+**Deep-dives in [res/](./res/index.md):** task lifecycle, Server→McpServer refactor, resources analysis, SDK/FastMCP patterns for simplification.
 
 ## Testing
 
-### Running tests
-
-- **Unit tests**: `npm run test:unit` (runs `vitest run tests/unit`)
-- **Integration tests**: `npm run test:integration` (requires build first, requires `APIFY_TOKEN` — humans only)
-
-### Test structure
-
-- `tests/unit/` — unit tests for individual modules
-- `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport modes (stdio, SSE, streamable-http) that all use `suite.ts`
-- `tests/helpers.ts` — shared test utilities
-- `tests/const.ts` — test constants
-
-### Test guidelines
-
-- Write tests for new features and bug fixes
-- Use descriptive test names that explain what is being tested
-- Follow existing test patterns in the codebase
-- Ensure all tests pass before submitting a PR
-
-### Adding integration tests
-
-**IMPORTANT**: Add integration test cases to `tests/integration/suite.ts`, NOT as separate test files.
-
-`suite.ts` exports `createIntegrationTestsSuite()`, used by all transport modes (stdio, SSE, streamable-http). Adding tests here ensures they run across all transport types.
-
-**How to add a test case:**
-1. Open `tests/integration/suite.ts`
-2. Add your test case inside the `describe` block
-3. Use `it()` or `it.runIf()` for conditional tests
-4. Use `client = await createClientFn(options)` to create the test client
-5. Always call `await client.close()` when done
-
-**Example:**
-```typescript
-it('should do something awesome', async () => {
-    client = await createClientFn({ tools: ['actors'] });
-    const result = await client.callTool({
-        name: HelperTools.SOME_TOOL,
-        arguments: { /* ... */ },
-    });
-    expect(result.content).toBeDefined();
-    await client.close();
-});
-```
+- Unit tests: `npm run test:unit`
+- Integration tests: requires `APIFY_TOKEN` and `npm run build` — humans only. See [DEVELOPMENT.md § Testing](./DEVELOPMENT.md#testing).
+- Add integration test cases to `tests/integration/suite.ts` — shared across all transport modes.
+- End-to-end probing with mcpc: see [DEVELOPMENT.md § Live probing with mcpc](./DEVELOPMENT.md#live-probing-with-mcpc).
 
 ## External dependencies
 
