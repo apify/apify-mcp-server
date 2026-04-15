@@ -1,11 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH } from '../../src/const.js';
-import { buildApifySpecificProperties, decodeDotPropertyNames, encodeDotPropertyNames,
-    filterAndShortenEnum, inferArrayItemsTypeIfMissing, inferArrayItemType, markInputPropertiesAsRequired, shortenProperties,
-    transformActorInputSchemaProperties } from '../../src/tools/utils.js';
-import type { ActorInputSchema, SchemaProperties, ToolEntry } from '../../src/types.js';
-import { extractActorName, getToolFullName } from '../../src/utils/tools.js';
+import {
+    buildActorInputSchema,
+    buildApifySpecificProperties,
+    decodeDotPropertyNames,
+    encodeDotPropertyNames,
+    filterAndShortenEnum,
+    inferArrayItemsTypeIfMissing,
+    inferArrayItemType,
+    markInputPropertiesAsRequired,
+    shortenProperties,
+    transformActorInputSchemaProperties,
+} from '../../src/tools/utils.js';
+import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
+import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 describe('buildApifySpecificProperties', () => {
     it('should add resource picker structure to array items with editor resourcePicker', () => {
@@ -722,6 +731,7 @@ describe('transformActorInputSchemaProperties', () => {
         expect(result.sources.items).toBeDefined();
         expect(result.sources.items?.properties?.url).toBeDefined();
         // 3. filterSchemaProperties: only allowed fields present
+        // NOTE: includes phantom `default: undefined` etc. from filterSchemaProperties (#675).
         expect(Object.keys(result['foo-dot-bar'])).toEqual(
             expect.arrayContaining(['title', 'description', 'type', 'default', 'prefill', 'properties', 'items', 'required', 'enum']),
         );
@@ -946,5 +956,44 @@ describe('extractActorName', () => {
     it('returns undefined for internal tools without actor arg', () => {
         const tool = { type: 'internal', name: 'store-search' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBeUndefined();
+    });
+});
+
+describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
+    // Regression: #637 — end-to-end check that required fields survive the full pipeline.
+    it('keeps `query` in required across the full tools/list pipeline for a rag-web-browser-shaped schema', () => {
+        const upstream: ActorInputSchema = {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    title: 'Search term or URL',
+                    description: 'Enter Google Search keywords or a URL.',
+                    prefill: 'web browser for RAG pipelines',
+                },
+                maxResults: {
+                    type: 'integer',
+                    title: 'Maximum results',
+                    description: 'Max organic results to return.',
+                    default: 3,
+                },
+            },
+            required: ['query'],
+        };
+
+        const { inputSchema } = buildActorInputSchema('apify/rag-web-browser', upstream, false);
+
+        const tool = {
+            name: 'apify--rag-web-browser',
+            description: 'RAG web browser',
+            inputSchema,
+        } as ToolBase;
+
+        const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
+        const schema = pub.inputSchema as { required?: string[]; properties?: Record<string, { description?: string }> };
+
+        expect(schema.required).toEqual(['query']);
+        expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
+        expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
     });
 });

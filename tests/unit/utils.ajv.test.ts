@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { ajv, compileSchema } from '../../src/utils/ajv.js';
+import { ajv, compileSchema, fixZodSchemaRequired } from '../../src/utils/ajv.js';
 
 describe('compileSchema', () => {
     it('should validate declared properties normally', () => {
@@ -48,7 +48,7 @@ describe('compileSchema', () => {
         expect(validate({ name: [1, 2] })).toBe(false); // wrong type (array, not coercible to string)
     });
 
-    it('should strip fields with defaults from the required array', () => {
+    it('should allow omitting a field that has a default even when it is listed as required', () => {
         const validate = compileSchema({
             type: 'object',
             properties: {
@@ -61,6 +61,51 @@ describe('compileSchema', () => {
 
         // 'format' has a default so it shouldn't be required
         expect(validate({ name: 'test' })).toBe(true);
+    });
+});
+
+describe('fixZodSchemaRequired', () => {
+    // Regression: #637 — phantom `default: undefined` must not clear required fields.
+    it('keeps required fields whose `default` is explicitly undefined', () => {
+        const result = fixZodSchemaRequired({
+            type: 'object',
+            properties: {
+                query: { type: 'string', default: undefined },
+                maxResults: { type: 'integer', default: 3 },
+            },
+            required: ['query', 'maxResults'],
+        });
+
+        expect(result.required).toEqual(['query']);
+    });
+
+    it('removes fields with a real default from the `required` array (properties are left intact)', () => {
+        const schema = {
+            type: 'object',
+            properties: {
+                name: { type: 'string' },
+                format: { type: 'string', default: 'json' },
+            },
+            required: ['name', 'format'],
+        };
+
+        const result = fixZodSchemaRequired(schema);
+
+        expect(result.required).toEqual(['name']);
+        // `format` must still be in `properties` — we only edited `required`, not the fields.
+        expect(result.properties).toEqual(schema.properties);
+    });
+
+    it('keeps required fields when properties have no `default` key at all', () => {
+        const result = fixZodSchemaRequired({
+            type: 'object',
+            properties: {
+                url: { type: 'string' },
+            },
+            required: ['url'],
+        });
+
+        expect(result.required).toEqual(['url']);
     });
 });
 

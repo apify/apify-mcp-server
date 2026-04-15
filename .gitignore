@@ -34,3 +34,4 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+dev.log
