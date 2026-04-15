@@ -66,11 +66,14 @@ function getMcpErrorCode(error: unknown): number | undefined {
  */
 export function logHttpError<T extends object>(error: unknown, message: string, data?: T): void {
     const statusCode = getHttpStatusCode(error);
-    const errorMessage = error instanceof Error ? error.message : String(error);
+    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    // Mezmo (logDNA) promotes log entries to error level when message/keys contain "error".
+    // Sanitize for softFail paths (see CONTRIBUTING.md § Logging → Mezmo promotion rule).
+    const softErrMessage = rawErrorMessage.replace(/ error:/gi, ' failure:');
 
     if (statusCode !== undefined && statusCode < 500) {
         // HTTP client errors (< 500) - softFail without stack trace
-        log.softFail(message, { errMessage: errorMessage, statusCode, ...data });
+        log.softFail(message, { errMessage: softErrMessage, statusCode, ...data });
         return;
     }
     if (statusCode !== undefined && statusCode >= 500) {
@@ -83,7 +86,7 @@ export function logHttpError<T extends object>(error: unknown, message: string, 
     const mcpErrorCode = getMcpErrorCode(error);
     if (mcpErrorCode !== undefined) {
         if (SOFT_MCP_ERROR_CODES.has(mcpErrorCode)) {
-            log.softFail(message, { errMessage: errorMessage, mcpErrorCode, ...data });
+            log.softFail(message, { errMessage: softErrMessage, mcpErrorCode, ...data });
         } else {
             const errorObj = error instanceof Error ? error : new Error(String(error));
             log.exception(errorObj, message, { mcpErrorCode, ...data });
