@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.19 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- **#637:** Required fields dropped from tools&#x2F;list for all Actors ([#676](https://github.com/apify/apify-mcp-server/pull/676)) ([02c4600](https://github.com/apify/apify-mcp-server/commit/02c46002a2084783ba5688f1384c8422c1848cc4)) by [@jirispilka](https://github.com/jirispilka), closes [#637](https://github.com/apify/apify-mcp-server/issues/637)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.18](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.18) (2026-04-14)
