@@ -52,21 +52,4 @@ describe('Task statusMessage after terminal transition', () => {
         expect(task!.status).toBe('failed');
         expect(task!.statusMessage).toBe('my-tool: failed');
     });
-
-    it('should show stale statusMessage when final updateTaskStatus is skipped (documents the bug)', async () => {
-        const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
-
-        await store.updateTaskStatus(taskId, 'working', 'Starting the crawler.');
-
-        // No final updateTaskStatus — this is the buggy path
-        await store.storeTaskResult(taskId, 'completed', {
-            content: [{ type: 'text', text: 'result data' }],
-        });
-
-        const task = await store.getTask(taskId);
-        expect(task!.status).toBe('completed');
-        // statusMessage is stale — still the intermediate progress message
-        expect(task!.statusMessage).toBe('Starting the crawler.');
-    });
 });
