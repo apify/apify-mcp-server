@@ -604,7 +604,9 @@ export class ActorsMcpServer {
                 );
             }
             // Extract tool/actor prefix from the last statusMessage (e.g. "apify/rag-web-browser: Starting...")
-            const toolPrefix = task.statusMessage?.split(':')?.[0];
+            // Strip leading "[error] " so cancellation doesn't inherit the error marker.
+            const normalizedMessage = task.statusMessage?.replace(/^\[error\]\s*/i, '').trim();
+            const toolPrefix = normalizedMessage?.split(':')?.[0];
             const cancelMessage = toolPrefix ? `${toolPrefix}: cancelled by client` : 'Cancelled by client';
             await this.taskStore.updateTaskStatus(taskId, 'cancelled', cancelMessage, mcpSessionId);
             const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
@@ -1290,7 +1292,23 @@ export class ActorsMcpServer {
                 } else {
                     statusMessage = `${getToolFullName(tool)}: completed`;
                 }
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
+                try {
+                    await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
+                } catch (storeError) {
+                    if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                        log.debug('[executeToolAndUpdateTask] Task was cancelled during result storage, treating as aborted', {
+                            taskId,
+                            mcpSessionId,
+                        });
+                        finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
+                        return;
+                    }
+                    log.error('[executeToolAndUpdateTask] Failed to store task result', {
+                        taskId,
+                        mcpSessionId,
+                        error: storeError,
+                    });
+                }
             }
             log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
@@ -1376,14 +1394,30 @@ export class ActorsMcpServer {
             });
             // Store as 'completed' so the SDK's requestStream() delivers the result to the client.
             // See res/task_status_workaround.md for full context.
-            await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', {
-                content: [{
-                    type: 'text' as const,
-                    text: userText,
-                }],
-                isError: true,
-                internalToolStatus: toolStatus,
-            }, `[error] ${getToolFullName(tool)}: ${userText.length > 200 ? `${userText.slice(0, 200)}… (truncated)` : userText || 'failed'}`, mcpSessionId);
+            try {
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', {
+                    content: [{
+                        type: 'text' as const,
+                        text: userText,
+                    }],
+                    isError: true,
+                    internalToolStatus: toolStatus,
+                }, `[error] ${getToolFullName(tool)}: ${userText.length > 200 ? `${userText.slice(0, 200)}… (truncated)` : userText || 'failed'}`, mcpSessionId);
+            } catch (storeError) {
+                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    log.debug('[executeToolAndUpdateTask] Task was cancelled during error result storage, treating as aborted', {
+                        taskId,
+                        mcpSessionId,
+                    });
+                    finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
+                    return;
+                }
+                log.error('[executeToolAndUpdateTask] Failed to store error result', {
+                    taskId,
+                    mcpSessionId,
+                    error: storeError,
+                });
+            }
 
             finishTaskTracking(toolStatus, callDiagnostics);
         }

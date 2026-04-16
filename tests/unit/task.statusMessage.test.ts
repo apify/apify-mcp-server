@@ -23,7 +23,7 @@ describe('Task statusMessage after terminal transition', () => {
         return task.taskId;
     }
 
-    it('should set statusMessage and status atomically via storeTaskResultWithMessage', async () => {
+    it('should set statusMessage and status via storeTaskResultWithMessage', async () => {
         const store = new InMemoryTaskStore();
         const taskId = await createWorkingTask(store);
 
