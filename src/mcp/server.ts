@@ -1173,10 +1173,7 @@ export class ActorsMcpServer {
                     finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
                     return false;
                 }
-                log.error('[executeToolAndUpdateTask] Failed to store task result', {
-                    taskId, mcpSessionId, error: storeError,
-                });
-                return true;
+                throw storeError;
             }
         };
 

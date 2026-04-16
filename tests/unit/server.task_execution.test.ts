@@ -17,7 +17,7 @@ describe('ActorsMcpServer task execution', () => {
         const task = await taskStore.createTask(
             { ttl: 60_000 },
             'req-1',
-            { method: 'tools/call', params: { name: 'soft-fail-tool' } },
+            { method: 'tools/call', params: { name: 'call-actor' } },
         );
 
         const tool = {

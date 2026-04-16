@@ -18,14 +18,14 @@ describe('Task statusMessage after terminal transition', () => {
     const REQUEST_ID = 'req-1';
     const REQUEST = { method: 'tools/call', params: { name: 'test-tool' } };
 
-    async function createWorkingTask(store: InMemoryTaskStore) {
+    async function createTaskId(store: InMemoryTaskStore) {
         const task = await store.createTask({ ttl: 60_000 }, REQUEST_ID, REQUEST);
         return task.taskId;
     }
 
     it('should set statusMessage and status via storeTaskResultWithMessage', async () => {
         const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
+        const taskId = await createTaskId(store);
 
         await storeTaskResultWithMessage(store, taskId, 'completed', {
             content: [{ type: 'text', text: 'result data' }],
@@ -39,7 +39,7 @@ describe('Task statusMessage after terminal transition', () => {
 
     it('should set statusMessage for error tasks via storeTaskResultWithMessage', async () => {
         const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
+        const taskId = await createTaskId(store);
 
         // Error results are stored as 'completed' because the SDK's requestStream() only
         // delivers getTaskResult() for 'completed' tasks. The [error] prefix signals the
@@ -56,7 +56,7 @@ describe('Task statusMessage after terminal transition', () => {
 
     it('should set "payment required" statusMessage for pre-flight 402 path', async () => {
         const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
+        const taskId = await createTaskId(store);
 
         // Simulates the pre-flight payment failure path in executeToolAndUpdateTask.
         // Stored as 'completed' so the SDK's requestStream() delivers the x402 payload
@@ -74,7 +74,7 @@ describe('Task statusMessage after terminal transition', () => {
 
     it('should set status "cancelled" when task was aborted via signal, not "completed"', async () => {
         const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
+        const taskId = await createTaskId(store);
 
         // Simulates the signal-based abort path: executeActorTool returns null,
         // toolStatus = ABORTED. The fix transitions to 'cancelled' instead of
@@ -89,7 +89,7 @@ describe('Task statusMessage after terminal transition', () => {
 
     it('should not call updateTaskStatus on cancelled task (402 catch path)', async () => {
         const store = new InMemoryTaskStore();
-        const taskId = await createWorkingTask(store);
+        const taskId = await createTaskId(store);
 
         // Simulate: task is cancelled while actor is running
         await store.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client');

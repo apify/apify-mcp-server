@@ -61,7 +61,7 @@ export async function isTaskCancelled(
 export async function storeTaskResultWithMessage(
     taskStore: TaskStore,
     taskId: string,
-    status: 'completed' | 'failed',
+    status: 'completed',
     result: Result,
     statusMessage: string,
     sessionId?: string,
