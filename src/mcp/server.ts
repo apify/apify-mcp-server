@@ -10,7 +10,7 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, Notification, Request, Result } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -1134,9 +1134,11 @@ export class ActorsMcpServer {
             mcpSessionId,
         });
 
+        const toolFullName = getToolFullName(tool);
+
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
-        const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
+        const { telemetryData, userId } = await this.prepareTelemetryData(toolFullName, mcpSessionId, apifyToken);
 
         const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics) => {
             this.logToolCallAndTelemetry({
@@ -1149,6 +1151,33 @@ export class ActorsMcpServer {
                 userId,
                 callDiagnostics: diagnostics,
             });
+        };
+        const errorMsg = (detail: string) => `[error] ${toolFullName}: ${detail}`;
+        const truncate = (text: string, fallback = 'failed') => {
+            if (!text) return fallback;
+            return text.length > 200 ? `${text.slice(0, 200)}… (truncated)` : text;
+        };
+
+        // Stores a task result with cancellation-race guard. If the task was concurrently
+        // cancelled, storeTaskResultWithMessage throws (terminal state can't transition to 'working').
+        // Returns false if cancelled (tracking already done), true otherwise.
+        const safeStoreResult = async (result: Result, statusMessage: string): Promise<boolean> => {
+            try {
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
+                return true;
+            } catch (storeError) {
+                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    log.debug('[executeToolAndUpdateTask] Task was cancelled during result storage, treating as aborted', {
+                        taskId, mcpSessionId,
+                    });
+                    finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
+                    return false;
+                }
+                log.error('[executeToolAndUpdateTask] Failed to store task result', {
+                    taskId, mcpSessionId, error: storeError,
+                });
+                return true;
+            }
         };
 
         try {
@@ -1272,7 +1301,7 @@ export class ActorsMcpServer {
                 // Guard: a concurrent tasks/cancel request may have already transitioned the task
                 // to 'cancelled' between the isTaskCancelled check above and here. Skip if already terminal.
                 if (!await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                    await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
+                    await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${toolFullName}: aborted by client`, mcpSessionId);
                 }
             } else {
                 // Always store as 'completed' — even for SOFT_FAIL and paymentRequired.
@@ -1282,33 +1311,14 @@ export class ActorsMcpServer {
                 // See res/task_status_workaround.md for full context.
                 let statusMessage: string;
                 if (paymentRequiredResult) {
-                    statusMessage = `[error] ${getToolFullName(tool)}: payment required`;
+                    statusMessage = errorMsg('payment required');
                 } else if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
                     const fullText = (result as { content?: { text?: string }[] })?.content?.[0]?.text || '';
-                    const errorText = fullText.length > 200 ? `${fullText.slice(0, 200)}… (truncated)` : fullText;
-                    statusMessage = errorText
-                        ? `[error] ${getToolFullName(tool)}: ${errorText}`
-                        : `[error] ${getToolFullName(tool)}: failed`;
+                    statusMessage = errorMsg(truncate(fullText));
                 } else {
-                    statusMessage = `${getToolFullName(tool)}: completed`;
+                    statusMessage = `${toolFullName}: completed`;
                 }
-                try {
-                    await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
-                } catch (storeError) {
-                    if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                        log.debug('[executeToolAndUpdateTask] Task was cancelled during result storage, treating as aborted', {
-                            taskId,
-                            mcpSessionId,
-                        });
-                        finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
-                        return;
-                    }
-                    log.error('[executeToolAndUpdateTask] Failed to store task result', {
-                        taskId,
-                        mcpSessionId,
-                        error: storeError,
-                    });
-                }
+                if (!await safeStoreResult(result, statusMessage)) return;
             }
             log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
@@ -1318,17 +1328,14 @@ export class ActorsMcpServer {
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
-                // Guard: task may have been cancelled while the actor was running. The SDK throws
-                // if we try to transition from terminal 'cancelled' to 'working' (inside storeTaskResultWithMessage).
-                // Track as ABORTED — the cancellation is what matters, not the 402.
+                // Guard: task may have been cancelled while the actor was running.
                 if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
                     finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
                     return;
                 }
-                // Store as 'completed' — see comment above and res/task_status_workaround.md.
-                // The x402 payload must reach the client for auto-pay retry.
+                // Store as 'completed' — see comment in the try block and res/task_status_workaround.md.
                 const paymentResult = buildPaymentRequiredResponse(error);
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', paymentResult, `[error] ${getToolFullName(tool)}: payment required`, mcpSessionId);
+                if (!await safeStoreResult(paymentResult, errorMsg('payment required'))) return;
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1388,36 +1395,13 @@ export class ActorsMcpServer {
                 return;
             }
 
-            log.debug('[executeToolAndUpdateTask] Storing failed result', {
-                taskId,
-                mcpSessionId,
-            });
             // Store as 'completed' so the SDK's requestStream() delivers the result to the client.
             // See res/task_status_workaround.md for full context.
-            try {
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', {
-                    content: [{
-                        type: 'text' as const,
-                        text: userText,
-                    }],
-                    isError: true,
-                    internalToolStatus: toolStatus,
-                }, `[error] ${getToolFullName(tool)}: ${userText.length > 200 ? `${userText.slice(0, 200)}… (truncated)` : userText || 'failed'}`, mcpSessionId);
-            } catch (storeError) {
-                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                    log.debug('[executeToolAndUpdateTask] Task was cancelled during error result storage, treating as aborted', {
-                        taskId,
-                        mcpSessionId,
-                    });
-                    finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
-                    return;
-                }
-                log.error('[executeToolAndUpdateTask] Failed to store error result', {
-                    taskId,
-                    mcpSessionId,
-                    error: storeError,
-                });
-            }
+            if (!await safeStoreResult({
+                content: [{ type: 'text' as const, text: userText }],
+                isError: true,
+                internalToolStatus: toolStatus,
+            }, errorMsg(truncate(userText)))) return;
 
             finishTaskTracking(toolStatus, callDiagnostics);
         }
