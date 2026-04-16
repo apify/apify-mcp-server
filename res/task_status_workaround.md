@@ -72,10 +72,15 @@ Currently we use `storeTaskResultWithMessage()` which calls `updateTaskStatus('w
 
 ### mcpc: `pollTask()` should fetch result for 'completed' tasks
 
+**Scope:** `pollTask()` is the detached task polling fallback, used when a task was started via
+`callToolDetached()` and polled manually later. The normal `callTool()` path is **not affected** —
+it uses `callToolStream()` → SDK `requestStream()` → correctly calls `getTaskResult()` for
+`'completed'` tasks.
+
 Location: `mcp-cli/src/core/mcp-client.ts`, lines ~715-720
 
 ```javascript
-// Current behavior (incomplete):
+// Current behavior (incomplete — detached polling only):
 if (task.status === 'completed') {
     return { content: [{ type: 'text', text: task.statusMessage || 'Task completed' }] };
 }
@@ -87,7 +92,14 @@ if (task.status === 'completed') {
 }
 ```
 
-The polling fallback returns the `statusMessage` as fake content instead of fetching the actual stored result.
+The detached polling fallback returns `statusMessage` as fake content instead of fetching the actual
+stored result via `tasks/result`. The actual tool output (dataset items, actor run info, etc.) is lost.
+
+**Normal mcpc path is correct:**
+```
+mcpc callTool → callToolStream → requestStream → completed → getTaskResult ✅
+mcpc pollTask → tasks/get loop → completed → statusMessage as content ❌ (detached only)
+```
 
 ## When to remove this workaround
 

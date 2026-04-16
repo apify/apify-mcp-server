@@ -2627,6 +2627,60 @@ export function createIntegrationTestsSuite(
             },
         );
 
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        // This test verifies PR #680: payment-required errors are stored as 'completed' (not 'failed')
+        // so the SDK's requestStream() delivers the x402 payload to the client for auto-pay retry.
+        it.runIf(options.transport === 'streamable-http')(
+            'should return x402 payment error via task mode when calling paymentRequired tool without payment signature',
+            async () => {
+                client = await createClientFn({ tools: ['actors'], payment: 'x402' });
+
+                const stream = client.experimental.tasks.callToolStream(
+                    {
+                        name: HelperTools.ACTOR_CALL,
+                        arguments: {
+                            actor: ACTOR_PYTHON_EXAMPLE,
+                            input: { first_number: 1, second_number: 2 },
+                        },
+                    },
+                    CallToolResultSchema,
+                    { task: { ttl: 60000 } },
+                );
+
+                let taskCreated = false;
+                let resultReceived = false;
+                for await (const message of stream) {
+                    switch (message.type) {
+                        case 'taskCreated':
+                            taskCreated = true;
+                            expect(message.task.taskId).toBeDefined();
+                            break;
+                        case 'taskStatus':
+                            expect(['working', 'completed']).toContain(message.task.status);
+                            break;
+                        case 'result': {
+                            // x402 payment payload must reach the client — not a generic "Task X failed"
+                            expect(message.result.isError).toBe(true);
+                            const content = message.result.content as { text: string }[];
+                            expect(content[0].text).toContain('x402');
+                            resultReceived = true;
+                            break;
+                        }
+                        case 'error':
+                            // Must NOT throw — the PR guarantees task result is delivered, not discarded
+                            throw new Error(`Expected structured result delivery but got error: ${message.error.message}`);
+                        default:
+                            throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                    }
+                }
+
+                expect(taskCreated).toBe(true);
+                expect(resultReceived).toBe(true);
+
+                await client.close();
+            },
+        );
+
         it('should return required structuredContent fields for ActorRun widget (get-actor-run)', async () => {
             client = await createClientFn({ tools: ['actors', 'runs'] });
 
