@@ -4,17 +4,17 @@ import { ApifyClient } from '../../apify_client.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
-    buildActorNotFoundResponse,
     buildCardOptions,
     fetchActorDetails,
     processActorDetailsForResponse,
-    resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
+    buildActorNotFoundResponse,
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
+    resolveOutputOptions,
 } from '../core/fetch_actor_details_common.js';
 
 /**
