@@ -73,7 +73,7 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
  */
 export async function buildFetchActorDetailsResult(
     toolArgs: InternalToolArgs,
-    route: string,
+    route: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL,
 ): Promise<ReturnType<typeof buildMCPResponse>> {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
