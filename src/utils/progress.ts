@@ -1,7 +1,7 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
-import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../const.js';
 
 export class ProgressTracker {
     private progressToken?: string | number;
@@ -39,7 +39,7 @@ export class ProgressTracker {
                     // Per MCP spec: progress notifications during task execution should include related-task metadata
                     ...(this.taskId && {
                         _meta: {
-                            'io.modelcontextprotocol/related-task': {
+                            [RELATED_TASK_META_KEY]: {
                                 taskId: this.taskId,
                             },
                         },

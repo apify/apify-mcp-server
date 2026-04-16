@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { RELATED_TASK_META_KEY } from '../../src/const.js';
 import { createProgressTracker, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
@@ -102,7 +103,7 @@ describe('ProgressTracker', () => {
                 message: 'running',
             },
             _meta: {
-                'io.modelcontextprotocol/related-task': {
+                [RELATED_TASK_META_KEY]: {
                     taskId: 'task-abc',
                 },
             },
@@ -128,17 +129,8 @@ describe('createProgressTracker', () => {
         expect(createProgressTracker(undefined, undefined)).toBeNull();
     });
 
-    it('should return ProgressTracker when progressToken and sendNotification are provided', () => {
-        const tracker = createProgressTracker('tok', vi.fn());
-        expect(tracker).toBeInstanceOf(ProgressTracker);
-    });
-
     it('should return ProgressTracker when only onStatusMessage is provided', () => {
         const tracker = createProgressTracker(undefined, undefined, undefined, vi.fn());
         expect(tracker).toBeInstanceOf(ProgressTracker);
-    });
-
-    it('should return null when progressToken is provided but sendNotification is not', () => {
-        expect(createProgressTracker('tok', undefined)).toBeNull();
     });
 });

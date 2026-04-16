@@ -69,7 +69,6 @@ describe('isTaskCancelled', () => {
 
     it('should return true when task status is cancelled', async () => {
         const taskStore = makeTaskStore({ status: 'cancelled' });
-
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(true);
@@ -77,7 +76,6 @@ describe('isTaskCancelled', () => {
 
     it('should return false when task status is not cancelled', async () => {
         const taskStore = makeTaskStore({ status: 'working' });
-
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(false);
@@ -85,7 +83,6 @@ describe('isTaskCancelled', () => {
 
     it('should return false when task is not found (getTask returns undefined)', async () => {
         const taskStore = makeTaskStore(undefined);
-
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(false);
@@ -93,7 +90,6 @@ describe('isTaskCancelled', () => {
 
     it('should pass taskId and mcpSessionId through to taskStore.getTask', async () => {
         const taskStore = makeTaskStore({ status: 'working' });
-
         await isTaskCancelled('task-42', 'session-xyz', taskStore);
 
         expect(taskStore.getTask).toHaveBeenCalledWith('task-42', 'session-xyz');
