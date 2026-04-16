@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.19 - **not yet released**
+## [0.9.19](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.19) (2026-04-16)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Log MCP client errors and disconnects as softFail ([#679](https://github.com/apify/apify-mcp-server/pull/679)) ([6ee1759](https://github.com/apify/apify-mcp-server/commit/6ee1759731637da5d9d2ae5ce02759f408d716db)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.18](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.18) (2026-04-14)
 
 ### 🚀 Features
