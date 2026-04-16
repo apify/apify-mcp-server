@@ -61,6 +61,8 @@ export async function isTaskCancelled(
 export async function storeTaskResultWithMessage(
     taskStore: TaskStore,
     taskId: string,
+    // Always 'completed' — the SDK's requestStream() only delivers results for 'completed' tasks;
+    // 'failed' tasks yield a generic error and discard the stored result. See res/task_status_workaround.md.
     status: 'completed',
     result: Result,
     statusMessage: string,

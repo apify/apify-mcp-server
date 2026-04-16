@@ -1173,7 +1173,13 @@ export class ActorsMcpServer {
                     finishTaskTracking(TOOL_STATUS.ABORTED, callDiagnostics);
                     return false;
                 }
-                throw storeError;
+                // Non-cancellation storage failure (e.g. broken task store). Log and continue —
+                // this runs inside a fire-and-forget setImmediate, so throwing would be an
+                // unhandled rejection. The task is stuck at 'working' and TTL cleanup will remove it.
+                log.error('[executeToolAndUpdateTask] Failed to store task result', {
+                    taskId, mcpSessionId, error: storeError,
+                });
+                return true;
             }
         };
 
