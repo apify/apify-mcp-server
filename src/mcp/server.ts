@@ -1264,7 +1264,11 @@ export class ActorsMcpServer {
             // way non-task mode returns it.
             log.debug('Storing task result', { taskId, toolStatus, mcpSessionId });
             if (toolStatus === TOOL_STATUS.ABORTED) {
-                await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
+                // Guard: a concurrent tasks/cancel request may have already transitioned the task
+                // to 'cancelled' between the isTaskCancelled check above and here. Skip if already terminal.
+                if (!await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
+                }
             } else {
                 const statusMessage = paymentRequiredResult
                     ? `${getToolFullName(tool)}: payment required`
