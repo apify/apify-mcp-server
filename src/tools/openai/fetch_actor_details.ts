@@ -4,9 +4,9 @@ import { ApifyClient } from '../../apify_client.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
+    buildActorDetailsForWidget,
     buildCardOptions,
     fetchActorDetails,
-    processActorDetailsForResponse,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
@@ -35,11 +35,11 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
             return buildActorNotFoundResponse(actorName);
         }
 
-        const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
+        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details);
         const structuredContent = {
             actorInfo: details.actorCardStructured,
             inputSchema: details.inputSchema,
-            actorDetails: processedStructuredContent.actorDetails,
+            actorDetails,
         };
 
         const texts = [dedent`
