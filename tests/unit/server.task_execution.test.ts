@@ -59,7 +59,7 @@ describe('ActorsMcpServer task execution', () => {
         });
 
         const storedTask = await taskStore.getTask(task.taskId);
-        expect(storedTask?.status).toBe('completed');
+        expect(storedTask?.status).toBe('failed');
 
         const storedResult = await taskStore.getTaskResult(task.taskId);
         expect(storedResult).toMatchObject({

@@ -1273,10 +1273,20 @@ export class ActorsMcpServer {
                     await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
                 }
             } else {
-                const statusMessage = paymentRequiredResult
-                    ? `${getToolFullName(tool)}: payment required`
-                    : `${getToolFullName(tool)}: completed`;
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
+                const isError = toolStatus === TOOL_STATUS.SOFT_FAIL || paymentRequiredResult;
+                const taskStatus = isError ? 'failed' : 'completed';
+                let statusMessage: string;
+                if (paymentRequiredResult) {
+                    statusMessage = `${getToolFullName(tool)}: payment required`;
+                } else if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
+                    const errorText = (result as { content?: { text?: string }[] })?.content?.[0]?.text?.slice(0, 200) || '';
+                    statusMessage = errorText
+                        ? `${getToolFullName(tool)}: ${errorText}`
+                        : `${getToolFullName(tool)}: failed`;
+                } else {
+                    statusMessage = `${getToolFullName(tool)}: completed`;
+                }
+                await storeTaskResultWithMessage(this.taskStore, taskId, taskStatus, result, statusMessage, mcpSessionId);
             }
             log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
@@ -1293,9 +1303,8 @@ export class ActorsMcpServer {
                     finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
                     return;
                 }
-                // Store as 'completed' — x402 payment payload is a valid result, not an error (see try-block comment)
                 const paymentResult = buildPaymentRequiredResponse(error);
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', paymentResult, `${getToolFullName(tool)}: payment required`, mcpSessionId);
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'failed', paymentResult, `${getToolFullName(tool)}: payment required`, mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1366,7 +1375,7 @@ export class ActorsMcpServer {
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
-            }, `${getToolFullName(tool)}: failed`, mcpSessionId);
+            }, `${getToolFullName(tool)}: ${userText.slice(0, 200) || 'failed'}`, mcpSessionId);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         }

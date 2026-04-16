@@ -60,12 +60,12 @@ describe('Task statusMessage after terminal transition', () => {
         // The fix guards the updateTaskStatus call so it stamps ": payment required" instead of ": completed".
         await store.updateTaskStatus(taskId, 'working', 'apify/rag-web-browser: payment required');
 
-        await store.storeTaskResult(taskId, 'completed', {
+        await store.storeTaskResult(taskId, 'failed', {
             content: [{ type: 'text', text: 'Payment required' }],
         });
 
         const task = await store.getTask(taskId);
-        expect(task!.status).toBe('completed');
+        expect(task!.status).toBe('failed');
         expect(task!.statusMessage).toBe('apify/rag-web-browser: payment required');
         expect(task!.statusMessage).not.toContain('completed');
     });
