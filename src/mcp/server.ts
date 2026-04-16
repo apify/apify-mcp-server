@@ -1273,20 +1273,24 @@ export class ActorsMcpServer {
                     await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
                 }
             } else {
-                const isError = toolStatus === TOOL_STATUS.SOFT_FAIL || paymentRequiredResult;
-                const taskStatus = isError ? 'failed' : 'completed';
+                // Always store as 'completed' — even for SOFT_FAIL and paymentRequired.
+                // The MCP SDK's requestStream() only calls getTaskResult() for 'completed' tasks;
+                // 'failed' tasks yield a generic "Task X failed" error and discard the stored result.
+                // Error details are preserved in the result payload (isError: true, content text).
+                // See res/task_status_workaround.md for full context.
                 let statusMessage: string;
                 if (paymentRequiredResult) {
-                    statusMessage = `${getToolFullName(tool)}: payment required`;
+                    statusMessage = `[error] ${getToolFullName(tool)}: payment required`;
                 } else if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
-                    const errorText = (result as { content?: { text?: string }[] })?.content?.[0]?.text?.slice(0, 200) || '';
+                    const fullText = (result as { content?: { text?: string }[] })?.content?.[0]?.text || '';
+                    const errorText = fullText.length > 200 ? `${fullText.slice(0, 200)}… (truncated)` : fullText;
                     statusMessage = errorText
-                        ? `${getToolFullName(tool)}: ${errorText}`
-                        : `${getToolFullName(tool)}: failed`;
+                        ? `[error] ${getToolFullName(tool)}: ${errorText}`
+                        : `[error] ${getToolFullName(tool)}: failed`;
                 } else {
                     statusMessage = `${getToolFullName(tool)}: completed`;
                 }
-                await storeTaskResultWithMessage(this.taskStore, taskId, taskStatus, result, statusMessage, mcpSessionId);
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
             }
             log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
@@ -1303,8 +1307,10 @@ export class ActorsMcpServer {
                     finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
                     return;
                 }
+                // Store as 'completed' — see comment above and res/task_status_workaround.md.
+                // The x402 payload must reach the client for auto-pay retry.
                 const paymentResult = buildPaymentRequiredResponse(error);
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'failed', paymentResult, `${getToolFullName(tool)}: payment required`, mcpSessionId);
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', paymentResult, `[error] ${getToolFullName(tool)}: payment required`, mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1368,14 +1374,16 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await storeTaskResultWithMessage(this.taskStore, taskId, 'failed', {
+            // Store as 'completed' so the SDK's requestStream() delivers the result to the client.
+            // See res/task_status_workaround.md for full context.
+            await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', {
                 content: [{
                     type: 'text' as const,
                     text: userText,
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
-            }, `${getToolFullName(tool)}: ${userText.slice(0, 200) || 'failed'}`, mcpSessionId);
+            }, `[error] ${getToolFullName(tool)}: ${userText.length > 200 ? `${userText.slice(0, 200)}… (truncated)` : userText || 'failed'}`, mcpSessionId);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         }

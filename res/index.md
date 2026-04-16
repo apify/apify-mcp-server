@@ -76,6 +76,13 @@ Apify input-schema spec semantics (required vs default vs prefill), the root cau
 Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markdown stack cost).
 - **Use case**: When changing widget dependencies or markdown rendering, re-measure bundle impact
 
+### [task_status_workaround.md](./task_status_workaround.md)
+Why all task results (including errors) are stored as `'completed'` instead of `'failed'`.
+- SDK `requestStream()` discards stored results for `'failed'` tasks
+- `[error]` prefix convention in `statusMessage` to signal the real outcome
+- Upstream fixes needed in the MCP SDK and mcpc
+- **Use case**: Reference when touching task status logic or updating the MCP SDK
+
 ### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
 Checklist and notes for ChatGPT MCP Apps store submission (verify line references against current source before relying on them).
 - **Use case**: Submission prep and audits

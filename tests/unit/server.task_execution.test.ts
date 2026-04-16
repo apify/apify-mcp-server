@@ -58,8 +58,10 @@ describe('ActorsMcpServer task execution', () => {
             mcpSessionId: undefined,
         });
 
+        // Stored as 'completed' because the SDK's requestStream() only delivers getTaskResult()
+        // for 'completed' tasks. Error details are in the result payload (isError: true).
         const storedTask = await taskStore.getTask(task.taskId);
-        expect(storedTask?.status).toBe('failed');
+        expect(storedTask?.status).toBe('completed');
 
         const storedResult = await taskStore.getTaskResult(task.taskId);
         expect(storedResult).toMatchObject({

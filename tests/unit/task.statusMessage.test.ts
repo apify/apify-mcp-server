@@ -37,37 +37,39 @@ describe('Task statusMessage after terminal transition', () => {
         expect(task!.statusMessage).toBe('apify/rag-web-browser: completed');
     });
 
-    it('should set statusMessage for failed tasks via storeTaskResultWithMessage', async () => {
+    it('should set statusMessage for error tasks via storeTaskResultWithMessage', async () => {
         const store = new InMemoryTaskStore();
         const taskId = await createWorkingTask(store);
 
-        await storeTaskResultWithMessage(store, taskId, 'failed', {
+        // Error results are stored as 'completed' because the SDK's requestStream() only
+        // delivers getTaskResult() for 'completed' tasks. The [error] prefix signals the
+        // real outcome to clients polling tasks/list.
+        await storeTaskResultWithMessage(store, taskId, 'completed', {
             content: [{ type: 'text', text: 'error' }],
             isError: true,
-        }, 'my-tool: failed');
+        }, '[error] my-tool: failed');
 
         const task = await store.getTask(taskId);
-        expect(task!.status).toBe('failed');
-        expect(task!.statusMessage).toBe('my-tool: failed');
+        expect(task!.status).toBe('completed');
+        expect(task!.statusMessage).toBe('[error] my-tool: failed');
     });
 
-    it('should set "payment required" statusMessage for pre-flight 402 path, not "completed"', async () => {
+    it('should set "payment required" statusMessage for pre-flight 402 path', async () => {
         const store = new InMemoryTaskStore();
         const taskId = await createWorkingTask(store);
 
-        // Simulates the pre-flight payment failure path in executeToolAndUpdateTask:
-        // paymentRequiredResult is set, toolStatus = SOFT_FAIL, no actor execution happens.
-        // The fix guards the updateTaskStatus call so it stamps ": payment required" instead of ": completed".
-        await store.updateTaskStatus(taskId, 'working', 'apify/rag-web-browser: payment required');
+        // Simulates the pre-flight payment failure path in executeToolAndUpdateTask.
+        // Stored as 'completed' so the SDK's requestStream() delivers the x402 payload
+        // to the client for auto-pay retry. The [error] prefix signals the real outcome.
+        await store.updateTaskStatus(taskId, 'working', '[error] apify/rag-web-browser: payment required');
 
-        await store.storeTaskResult(taskId, 'failed', {
+        await store.storeTaskResult(taskId, 'completed', {
             content: [{ type: 'text', text: 'Payment required' }],
         });
 
         const task = await store.getTask(taskId);
-        expect(task!.status).toBe('failed');
-        expect(task!.statusMessage).toBe('apify/rag-web-browser: payment required');
-        expect(task!.statusMessage).not.toContain('completed');
+        expect(task!.status).toBe('completed');
+        expect(task!.statusMessage).toBe('[error] apify/rag-web-browser: payment required');
     });
 
     it('should set status "cancelled" when task was aborted via signal, not "completed"', async () => {
