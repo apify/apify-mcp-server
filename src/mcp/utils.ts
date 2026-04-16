@@ -54,9 +54,9 @@ export async function isTaskCancelled(
  *
  * WARNING: This is NOT atomic. The SDK's storeTaskResult() does not accept a statusMessage,
  * so we first call updateTaskStatus('working', message) then storeTaskResult(status, result).
- * If the process crashes between the two calls, the task stays 'working' with the final message
- * but never transitions to terminal state. This is acceptable because the same crash would leave
- * the task stuck regardless — the TTL cleanup will eventually remove it.
+ * That creates a race: after the tool has already finished, tasks/cancel can still win before
+ * storeTaskResult() runs, and the computed result is lost. We keep this workaround so tasks/list
+ * shows the final statusMessage until the SDK supports atomic result + statusMessage storage.
  */
 export async function storeTaskResultWithMessage(
     taskStore: TaskStore,

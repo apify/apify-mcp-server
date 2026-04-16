@@ -72,4 +72,62 @@ describe('ActorsMcpServer task execution', () => {
             }],
         });
     });
+
+    it('marks the task as failed when storing the result fails', async () => {
+        class FailingTaskStore extends InMemoryTaskStore {
+            override async storeTaskResult(..._args: Parameters<InMemoryTaskStore['storeTaskResult']>) {
+                throw new Error('task store unavailable');
+            }
+        }
+
+        const taskStore = new FailingTaskStore();
+        const server = new ActorsMcpServer({
+            taskStore,
+            telemetry: { enabled: false },
+            transportType: 'stdio',
+        });
+
+        const task = await taskStore.createTask(
+            { ttl: 60_000 },
+            'req-1',
+            { method: 'tools/call', params: { name: 'call-actor' } },
+        );
+
+        const tool = {
+            type: 'internal',
+            name: 'call-actor',
+            description: 'Call Actor',
+            inputSchema: { type: 'object', properties: {} },
+            ajvValidate: vi.fn(),
+            execution: {
+                taskSupport: 'optional',
+            },
+            call: vi.fn().mockResolvedValue({
+                content: [{
+                    type: 'text',
+                    text: 'ok',
+                }],
+            }),
+        } as unknown as ToolEntry;
+
+        await (server as unknown as {
+            executeToolAndUpdateTask: (params: Record<string, unknown>) => Promise<void>;
+        }).executeToolAndUpdateTask({
+            taskId: task.taskId,
+            tool,
+            toolArgs: {},
+            logSafeArgs: {},
+            apifyClient: {} as never,
+            apifyToken: '',
+            progressToken: undefined,
+            extra: {
+                signal: new AbortController().signal,
+            },
+            mcpSessionId: undefined,
+        });
+
+        const storedTask = await taskStore.getTask(task.taskId);
+        expect(storedTask?.status).toBe('failed');
+        expect(storedTask?.statusMessage).toBe('[error] call-actor: failed to store task result');
+    });
 });

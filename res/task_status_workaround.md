@@ -70,6 +70,8 @@ yield {
 
 Currently we use `storeTaskResultWithMessage()` which calls `updateTaskStatus('working', message)` then `storeTaskResult(status, result)` — two non-atomic calls. The SDK's `storeTaskResult()` should accept an optional `statusMessage` parameter to make this atomic.
 
+This also leaves a small race with `tasks/cancel`: after the tool has already produced its payload, the task is briefly back in `'working'`, so a concurrent cancel can still win and the computed result is lost.
+
 ### mcpc: `pollTask()` should fetch result for 'completed' tasks
 
 **Scope:** `pollTask()` is the detached task polling fallback, used when a task was started via
