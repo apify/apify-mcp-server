@@ -10,6 +10,7 @@ import {
     buildActorNotFoundResponse,
     buildCardOptions,
     fetchActorDetails,
+    getMcpToolsMessage,
     resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -81,9 +82,7 @@ export async function buildFetchActorDetailsResult(
     const apifyClient = new ApifyClient({ token: apifyToken });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
-    const cardOptions = buildCardOptions(resolvedOutput);
-
-    const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
+    const details = await fetchActorDetails(apifyClient, actorName, buildCardOptions(resolvedOutput));
     if (!details) {
         return buildActorNotFoundResponse(actorName);
     }
@@ -91,19 +90,17 @@ export async function buildFetchActorDetailsResult(
     const actorOutputSchema = resolvedOutput.outputSchema
         ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
         : undefined;
+    const mcpToolsMessage = resolvedOutput.mcpTools
+        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, apifyMcpServer?.options.paymentProvider, mcpSessionId)
+        : undefined;
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
     // Some MCP clients only read text content, while others only read structured content.
-    const { texts, structuredContent } = await buildActorDetailsTextResponse({
-        actorName,
+    const { texts, structuredContent } = buildActorDetailsTextResponse({
         details,
         output: resolvedOutput,
-        cardOptions,
-        apifyClient,
-        apifyToken,
         actorOutputSchema,
-        paymentProvider: apifyMcpServer?.options.paymentProvider,
-        mcpSessionId,
+        mcpToolsMessage,
     });
 
     return buildMCPResponse({ texts, structuredContent });

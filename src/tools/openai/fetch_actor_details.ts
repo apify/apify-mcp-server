@@ -29,9 +29,7 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
-        const resolvedOutput = resolveOutputOptions(parsed.output);
-        const cardOptions = buildCardOptions(resolvedOutput);
-
+        const cardOptions = buildCardOptions(resolveOutputOptions(parsed.output));
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
             return buildActorNotFoundResponse(actorName);

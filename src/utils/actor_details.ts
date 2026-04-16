@@ -198,13 +198,15 @@ export const actorDetailsOutputDefaults = {
     mcpTools: false,
 };
 
+export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
+
 /**
  * Resolve output options with smart defaults.
  * If output is undefined/empty, returns defaults.
  * If any property is explicitly set, undefined properties are treated as false.
  */
-export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputOptionsSchema>) {
-    // Check if output has any explicit true/false values
+export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputOptionsSchema>): ResolvedOutputOptions {
+    // Check if the output has any explicit true/false values
     const hasExplicitOptions = output && Object.values(output).some((v) => v !== undefined);
 
     if (!hasExplicitOptions) {
@@ -304,45 +306,29 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
 
 /**
  * Build text and structured response for actor details.
- * Handles all resolved output options: description, stats, readme, inputSchema, outputSchema, mcpTools.
- * All output properties should be boolean (resolved via resolveOutputOptions).
+ * Pure/sync: the caller pre-resolves `mcpToolsMessage` when `output.mcpTools` is true.
  */
-export async function buildActorDetailsTextResponse(options: {
-    actorName: string;
+export function buildActorDetailsTextResponse(options: {
     details: ActorDetailsResult;
-    output: {
-        description: boolean;
-        stats: boolean;
-        pricing: boolean;
-        rating: boolean;
-        metadata: boolean;
-        readme: boolean;
-        inputSchema: boolean;
-        outputSchema: boolean;
-        mcpTools: boolean;
-    };
-    cardOptions: ActorCardOptions;
-    apifyClient: ApifyClient;
-    apifyToken: string;
+    output: ResolvedOutputOptions;
     actorOutputSchema?: Record<string, unknown> | null;
-    paymentProvider?: PaymentProvider;
-    mcpSessionId?: string;
-}): Promise<{
+    mcpToolsMessage?: string;
+}): {
     texts: string[];
     structuredContent: Record<string, unknown>;
-}> {
-    const { actorName, details, output, cardOptions, apifyClient, apifyToken, actorOutputSchema, paymentProvider, mcpSessionId } = options;
+} {
+    const { details, output, actorOutputSchema, mcpToolsMessage } = options;
 
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
 
     const texts: string[] = [];
 
     // Build actor card only if any card section is requested
-    const needsCard = cardOptions.includeDescription
-        || cardOptions.includeStats
-        || cardOptions.includePricing
-        || cardOptions.includeRating
-        || cardOptions.includeMetadata;
+    const needsCard = output.description
+        || output.stats
+        || output.pricing
+        || output.rating
+        || output.metadata;
 
     if (needsCard) {
         texts.push(`# Actor information\n${details.actorCard}`);
@@ -369,10 +355,8 @@ export async function buildActorDetailsTextResponse(options: {
         }
     }
 
-    // Handle MCP tools
-    if (output.mcpTools) {
-        const message = await getMcpToolsMessage(actorName, apifyClient, apifyToken, paymentProvider, mcpSessionId);
-        texts.push(message);
+    if (mcpToolsMessage) {
+        texts.push(mcpToolsMessage);
     }
 
     // Build structured content
