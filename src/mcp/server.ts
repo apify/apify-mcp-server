@@ -80,7 +80,7 @@ import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { isTaskCancelled, processParamsGetTools } from './utils.js';
+import { isTaskCancelled, processParamsGetTools, storeTaskResultWithMessage } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
@@ -1259,16 +1259,21 @@ export class ActorsMcpServer {
                 return;
             }
 
-            // Store the result in the task store
-            log.debug('[executeToolAndUpdateTask] Storing completed result', {
-                taskId,
-                mcpSessionId,
-            });
-            // Set final statusMessage before transitioning to terminal state,
-            // because storeTaskResult does not accept a statusMessage parameter.
-            await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: completed`, mcpSessionId);
-            await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
-            log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
+            // Set final statusMessage + store result. Three paths:
+            // - SUCCEEDED: normal completion
+            // - Pre-flight 402: stored as 'completed' because the x402 payment payload is a valid
+            //   structured result that clients parse to pay (same as non-task mode which returns it directly)
+            // - ABORTED: signal-based abort (client disconnect / notifications/cancelled) — no result to store,
+            //   transition to 'cancelled' to match tasks/cancel behavior
+            log.debug('[executeToolAndUpdateTask] Storing task result', { taskId, toolStatus, mcpSessionId });
+            if (toolStatus === TOOL_STATUS.SUCCEEDED) {
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, `${getToolFullName(tool)}: completed`, mcpSessionId);
+            } else if (paymentRequiredResult) {
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, `${getToolFullName(tool)}: payment required`, mcpSessionId);
+            } else if (toolStatus === TOOL_STATUS.ABORTED) {
+                await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
+            }
+            log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } catch (error) {
@@ -1276,8 +1281,16 @@ export class ActorsMcpServer {
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
-                await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: payment required`, mcpSessionId);
-                await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
+                // Guard: task may have been cancelled while the actor was running. The SDK throws
+                // if we try to transition from terminal 'cancelled' to 'working' (inside storeTaskResultWithMessage).
+                // Track as ABORTED — the cancellation is what matters, not the 402.
+                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
+                    return;
+                }
+                // Store as 'completed' — x402 payment payload is a valid result, not an error (see try-block comment)
+                const paymentResult = buildPaymentRequiredResponse(error);
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', paymentResult, `${getToolFullName(tool)}: payment required`, mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1341,15 +1354,14 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.updateTaskStatus(taskId, 'working', `${getToolFullName(tool)}: failed`, mcpSessionId);
-            await this.taskStore.storeTaskResult(taskId, 'failed', {
+            await storeTaskResultWithMessage(this.taskStore, taskId, 'failed', {
                 content: [{
                     type: 'text' as const,
                     text: userText,
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
-            }, mcpSessionId);
+            }, `${getToolFullName(tool)}: failed`, mcpSessionId);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         }

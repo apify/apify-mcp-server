@@ -2446,6 +2446,42 @@ export function createIntegrationTestsSuite(
             await assertStatusMessagePropagated(client, stream);
         });
 
+        // Regression test for #638: final statusMessage must be ": completed" after task finishes,
+        // not a stale intermediate progress message like "Starting the crawler."
+        it('should set final statusMessage to "completed" after task finishes successfully', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 7,
+                        second_number: 8,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000,
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+                } else if (message.type === 'error') {
+                    throw message.error;
+                }
+            }
+
+            expect(taskId).not.toBeNull();
+            const task = await client.experimental.tasks.getTask(taskId!);
+            expect(task.status).toBe('completed');
+            expect(task.statusMessage).toMatch(/: completed$/);
+        });
+
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();

@@ -1,6 +1,7 @@
 import { parse } from 'node:querystring';
 
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
+import type { Result } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
@@ -46,4 +47,25 @@ export async function isTaskCancelled(
 ): Promise<boolean> {
     const task = await taskStore.getTask(taskId, mcpSessionId);
     return task?.status === 'cancelled';
+}
+
+/**
+ * Stores a task result with a final statusMessage in one logical step.
+ *
+ * WARNING: This is NOT atomic. The SDK's storeTaskResult() does not accept a statusMessage,
+ * so we first call updateTaskStatus('working', message) then storeTaskResult(status, result).
+ * If the process crashes between the two calls, the task stays 'working' with the final message
+ * but never transitions to terminal state. This is acceptable because the same crash would leave
+ * the task stuck regardless — the TTL cleanup will eventually remove it.
+ */
+export async function storeTaskResultWithMessage(
+    taskStore: TaskStore,
+    taskId: string,
+    status: 'completed' | 'failed',
+    result: Result,
+    statusMessage: string,
+    sessionId?: string,
+): Promise<void> {
+    await taskStore.updateTaskStatus(taskId, 'working', statusMessage, sessionId);
+    await taskStore.storeTaskResult(taskId, status, result, sessionId);
 }
