@@ -603,7 +603,10 @@ export class ActorsMcpServer {
                     `Cannot cancel task "${taskId}" with status "${task.status}"`,
                 );
             }
-            await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
+            // Extract tool/actor prefix from the last statusMessage (e.g. "apify/rag-web-browser: Starting...")
+            const toolPrefix = task.statusMessage?.split(':')?.[0];
+            const cancelMessage = toolPrefix ? `${toolPrefix}: cancelled by client` : 'Cancelled by client';
+            await this.taskStore.updateTaskStatus(taskId, 'cancelled', cancelMessage, mcpSessionId);
             const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
             log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
             return updatedTask!;
