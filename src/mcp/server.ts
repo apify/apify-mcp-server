@@ -1259,19 +1259,17 @@ export class ActorsMcpServer {
                 return;
             }
 
-            // Set final statusMessage + store result. Three paths:
-            // - SUCCEEDED: normal completion
-            // - Pre-flight 402: stored as 'completed' because the x402 payment payload is a valid
-            //   structured result that clients parse to pay (same as non-task mode which returns it directly)
-            // - ABORTED: signal-based abort (client disconnect / notifications/cancelled) — no result to store,
-            //   transition to 'cancelled' to match tasks/cancel behavior
-            log.debug('[executeToolAndUpdateTask] Storing task result', { taskId, toolStatus, mcpSessionId });
-            if (toolStatus === TOOL_STATUS.SUCCEEDED) {
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, `${getToolFullName(tool)}: completed`, mcpSessionId);
-            } else if (paymentRequiredResult) {
-                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, `${getToolFullName(tool)}: payment required`, mcpSessionId);
-            } else if (toolStatus === TOOL_STATUS.ABORTED) {
+            // Persist every non-aborted result. Task-supporting tools like call-actor can return
+            // isError/toolStatus without throwing, and task mode must store that payload the same
+            // way non-task mode returns it.
+            log.debug('Storing task result', { taskId, toolStatus, mcpSessionId });
+            if (toolStatus === TOOL_STATUS.ABORTED) {
                 await this.taskStore.updateTaskStatus(taskId, 'cancelled', `${getToolFullName(tool)}: aborted by client`, mcpSessionId);
+            } else {
+                const statusMessage = paymentRequiredResult
+                    ? `${getToolFullName(tool)}: payment required`
+                    : `${getToolFullName(tool)}: completed`;
+                await storeTaskResultWithMessage(this.taskStore, taskId, 'completed', result, statusMessage, mcpSessionId);
             }
             log.debug('Task execution finished', { taskId, toolName: tool.name, toolStatus, mcpSessionId });
 
