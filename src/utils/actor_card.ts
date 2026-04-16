@@ -227,6 +227,7 @@ export function formatActorToStructuredCard(
     return {
         title: data.title,
         url: data.actorUrl,
+        id: actor.id,
         fullName: data.actorFullName,
         pictureUrl: data.pictureUrl,
         developer: data.developer,

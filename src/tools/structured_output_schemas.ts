@@ -101,6 +101,7 @@ export const actorInfoSchema = {
     properties: {
         title: { type: 'string', description: 'Actor title' },
         url: { type: 'string', description: 'Actor URL' },
+        id: { type: 'string', description: 'Actor ID' },
         fullName: { type: 'string', description: 'Full Actor name (username/name)' },
         developer: developerSchema,
         description: { type: 'string', description: 'Actor description' },
@@ -121,7 +122,7 @@ export const actorInfoSchema = {
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
-    required: ['url', 'fullName', 'developer', 'description', 'categories', 'pricing'],
+    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'pricing'],
 };
 
 /**
