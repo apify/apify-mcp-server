@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
@@ -130,9 +131,11 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
  */
 export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof buildMCPResponse> {
     return buildMCPResponse({
-        texts: [`Actor information for '${actorName}' was not found.
-Please verify Actor ID or name format and ensure that the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
+        texts: [dedent`
+            Actor information for '${actorName}' was not found.
+            Please verify Actor ID or name format and ensure that the Actor exists.
+            You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
+        `],
         isError: true,
         telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
     });
@@ -173,15 +176,29 @@ export function buildActorDetailsTextResponse(options: {
     }
 
     if (output.inputSchema) {
-        texts.push(`# [Input schema](${actorUrl}/input)\n\`\`\`json\n${JSON.stringify(details.inputSchema)}\n\`\`\``);
+        texts.push([
+            `# [Input schema](${actorUrl}/input)`,
+            '```json',
+            JSON.stringify(details.inputSchema),
+            '```',
+        ].join('\n'));
     }
 
     if (output.outputSchema) {
         if (actorOutputSchema && Object.keys(actorOutputSchema).length > 0) {
             const typeString = typeObjectToString(actorOutputSchema);
-            texts.push(`# Output Schema (TypeScript)\nInferred from recent successful runs:\n\`\`\`typescript\ntype ActorOutput = ${typeString}\n\`\`\``);
+            texts.push(dedent`
+                # Output Schema (TypeScript)
+                Inferred from recent successful runs:
+                \`\`\`typescript
+                type ActorOutput = ${typeString}
+                \`\`\`
+            `);
         } else {
-            texts.push(`# Output Schema\nNo output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.`);
+            texts.push(dedent`
+                # Output Schema
+                No output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.
+            `);
         }
     }
 

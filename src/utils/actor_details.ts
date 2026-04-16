@@ -195,10 +195,23 @@ export async function getMcpToolsMessage(
     try {
         const toolsResponse = await client.listTools();
         const mcpToolsInfo = toolsResponse.tools
-            .map((tool) => `**${tool.name}**\n${tool.description || 'No description'}\nInput schema:\n\`\`\`json\n${JSON.stringify(tool.inputSchema)}\n\`\`\``)
+            .map((tool) => [
+                `**${tool.name}**`,
+                tool.description || 'No description',
+                'Input schema:',
+                '```json',
+                JSON.stringify(tool.inputSchema),
+                '```',
+            ].join('\n'))
             .join('\n\n');
 
-        return `# Available MCP Tools\nThis Actor is an MCP server with ${toolsResponse.tools.length} tools.\nTo call a tool, use: "${actorName}:{toolName}"\n\n${mcpToolsInfo}`;
+        return [
+            '# Available MCP Tools',
+            `This Actor is an MCP server with ${toolsResponse.tools.length} tools.`,
+            `To call a tool, use: "${actorName}:{toolName}"`,
+            '',
+            mcpToolsInfo,
+        ].join('\n');
     } catch (error) {
         logHttpError(error, `Failed to list MCP tools for Actor '${actorName}'`, { actorName });
         return `Failed to retrieve MCP tools for Actor '${actorName}'. The MCP server may be temporarily unavailable.`;
