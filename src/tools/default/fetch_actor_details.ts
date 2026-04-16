@@ -1,3 +1,4 @@
+import { HelperTools } from '../../const.js';
 import type { ToolEntry } from '../../types.js';
 import {
     buildFetchActorDetailsResult,
@@ -10,5 +11,5 @@ import {
  */
 export const defaultFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
-    call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs, 'fetch-actor-details'),
+    call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs, HelperTools.ACTOR_GET_DETAILS),
 } as const);

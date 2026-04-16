@@ -37,5 +37,5 @@ export const fetchActorDetailsInternalTool: ToolEntry = Object.freeze({
         idempotentHint: true,
         openWorldHint: false,
     },
-    call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs, 'fetch-actor-details-internal'),
+    call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs, HelperTools.ACTOR_GET_DETAILS_INTERNAL),
 } as const);
