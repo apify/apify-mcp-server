@@ -27,7 +27,7 @@ export class ProgressTracker {
         this.currentProgress += 1;
 
         // Send progress notification only if progressToken and sendNotification are available
-        if (this.progressToken && this.sendNotification) {
+        if (this.progressToken !== undefined && this.progressToken !== null && this.sendNotification) {
             try {
                 const notification: ProgressNotification = {
                     method: 'notifications/progress' as const,
@@ -111,7 +111,8 @@ export function createProgressTracker(
     onStatusMessage?: (message: string) => Promise<void>,
 ): ProgressTracker | null {
     // Create tracker if we have either progress notification support or a status message callback
-    if ((!progressToken || !sendNotification) && !onStatusMessage) {
+    const hasProgressNotificationSupport = progressToken !== undefined && progressToken !== null && !!sendNotification;
+    if (!hasProgressNotificationSupport && !onStatusMessage) {
         return null;
     }
 

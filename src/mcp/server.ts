@@ -871,7 +871,7 @@ export class ActorsMcpServer {
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
-                        if (progressToken) {
+                        if (progressToken !== undefined && progressToken !== null) {
                             // Set up notification handlers for the client
                             for (const schema of ServerNotificationSchema.options) {
                                 const method = schema.shape.method.value;

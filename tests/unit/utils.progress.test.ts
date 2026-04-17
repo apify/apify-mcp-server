@@ -133,4 +133,21 @@ describe('createProgressTracker', () => {
         const tracker = createProgressTracker(undefined, undefined, undefined, vi.fn());
         expect(tracker).toBeInstanceOf(ProgressTracker);
     });
+
+    it('should return ProgressTracker and send notifications for progressToken = 0', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = createProgressTracker(0, mockSendNotification);
+
+        expect(tracker).toBeInstanceOf(ProgressTracker);
+        await tracker?.updateProgress('Started');
+
+        expect(mockSendNotification).toHaveBeenCalledWith({
+            method: 'notifications/progress',
+            params: {
+                progressToken: 0,
+                progress: 1,
+                message: 'Started',
+            },
+        });
+    });
 });
