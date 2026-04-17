@@ -1,7 +1,7 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
-import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../const.js';
 
 export class ProgressTracker {
     private progressToken?: string | number;
@@ -27,7 +27,7 @@ export class ProgressTracker {
         this.currentProgress += 1;
 
         // Send progress notification only if progressToken and sendNotification are available
-        if (this.progressToken && this.sendNotification) {
+        if (this.progressToken !== undefined && this.progressToken !== null && this.sendNotification) {
             try {
                 const notification: ProgressNotification = {
                     method: 'notifications/progress' as const,
@@ -39,7 +39,7 @@ export class ProgressTracker {
                     // Per MCP spec: progress notifications during task execution should include related-task metadata
                     ...(this.taskId && {
                         _meta: {
-                            'io.modelcontextprotocol/related-task': {
+                            [RELATED_TASK_META_KEY]: {
                                 taskId: this.taskId,
                             },
                         },
@@ -111,7 +111,8 @@ export function createProgressTracker(
     onStatusMessage?: (message: string) => Promise<void>,
 ): ProgressTracker | null {
     // Create tracker if we have either progress notification support or a status message callback
-    if ((!progressToken || !sendNotification) && !onStatusMessage) {
+    const hasProgressNotificationSupport = progressToken !== undefined && progressToken !== null && !!sendNotification;
+    if (!hasProgressNotificationSupport && !onStatusMessage) {
         return null;
     }
 

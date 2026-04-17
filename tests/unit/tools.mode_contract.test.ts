@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
 import { searchApifyDocsTool } from '../../src/tools/common/search_apify_docs.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import type { ToolBase, ToolEntry } from '../../src/types.js';
@@ -169,6 +169,40 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                         expect(allHelperToolNames.has(tool.name as HelperTools)).toBe(true);
                     });
                 }
+            }
+        }
+    });
+});
+
+describe('taskSupport contract across tool categories', () => {
+    it('should declare taskSupport only on call-actor in default mode, with an allowed value', () => {
+        const defaultCategories = getCategoryTools('default');
+        const toolsWithTaskSupport: { name: string; value: unknown }[] = [];
+
+        for (const categoryName of CATEGORY_NAMES) {
+            for (const tool of defaultCategories[categoryName]) {
+                if (tool.execution?.taskSupport !== undefined) {
+                    toolsWithTaskSupport.push({ name: tool.name, value: tool.execution.taskSupport });
+                }
+            }
+        }
+
+        // Only default-mode call-actor is expected to declare taskSupport among static internal tools.
+        // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those are not
+        // returned by getCategoryTools.)
+        expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HelperTools.ACTOR_CALL]);
+
+        for (const { value } of toolsWithTaskSupport) {
+            expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);
+        }
+    });
+
+    it('should not declare taskSupport on any tool in openai mode', () => {
+        const openaiCategories = getCategoryTools('openai');
+
+        for (const categoryName of CATEGORY_NAMES) {
+            for (const tool of openaiCategories[categoryName]) {
+                expect(tool.execution?.taskSupport).toBeUndefined();
             }
         }
     });

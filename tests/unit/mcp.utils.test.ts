@@ -1,7 +1,8 @@
+import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/const.js';
-import { parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import { isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
@@ -58,6 +59,40 @@ describe('parseInputParamsFromUrl', () => {
         const result = parseInputParamsFromUrl(url);
         expect(result.tools).toEqual(['apify/rag-web-browser']);
         expect(result.actors).toBeUndefined();
+    });
+});
+
+describe('isTaskCancelled', () => {
+    const makeTaskStore = (getTaskReturn: unknown) => ({
+        getTask: vi.fn().mockResolvedValue(getTaskReturn),
+    } as unknown as TaskStore);
+
+    it('should return true when task status is cancelled', async () => {
+        const taskStore = makeTaskStore({ status: 'cancelled' });
+        const result = await isTaskCancelled('task-1', 'session-1', taskStore);
+
+        expect(result).toBe(true);
+    });
+
+    it('should return false when task status is not cancelled', async () => {
+        const taskStore = makeTaskStore({ status: 'working' });
+        const result = await isTaskCancelled('task-1', 'session-1', taskStore);
+
+        expect(result).toBe(false);
+    });
+
+    it('should return false when task is not found (getTask returns undefined)', async () => {
+        const taskStore = makeTaskStore(undefined);
+        const result = await isTaskCancelled('task-1', 'session-1', taskStore);
+
+        expect(result).toBe(false);
+    });
+
+    it('should pass taskId and mcpSessionId through to taskStore.getTask', async () => {
+        const taskStore = makeTaskStore({ status: 'working' });
+        await isTaskCancelled('task-42', 'session-xyz', taskStore);
+
+        expect(taskStore.getTask).toHaveBeenCalledWith('task-42', 'session-xyz');
     });
 });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { ProgressTracker } from '../../src/utils/progress.js';
+import { RELATED_TASK_META_KEY } from '../../src/const.js';
+import { createProgressTracker, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
@@ -82,5 +83,71 @@ describe('ProgressTracker', () => {
         // Should not throw
         await expect(tracker.updateProgress('Test')).resolves.toBeUndefined();
         expect(mockOnStatusMessage).toHaveBeenCalledWith('Test');
+    });
+
+    it('should include related-task metadata with taskId in progress notifications', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({
+            progressToken: 'tok',
+            sendNotification: mockSendNotification,
+            taskId: 'task-abc',
+        });
+
+        await tracker.updateProgress('running');
+
+        expect(mockSendNotification).toHaveBeenCalledWith({
+            method: 'notifications/progress',
+            params: {
+                progressToken: 'tok',
+                progress: 1,
+                message: 'running',
+            },
+            _meta: {
+                [RELATED_TASK_META_KEY]: {
+                    taskId: 'task-abc',
+                },
+            },
+        });
+    });
+
+    it('should not include _meta when taskId is not provided', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({
+            progressToken: 'tok',
+            sendNotification: mockSendNotification,
+        });
+
+        await tracker.updateProgress('running');
+
+        const notification = mockSendNotification.mock.calls[0][0];
+        expect(notification).not.toHaveProperty('_meta');
+    });
+});
+
+describe('createProgressTracker', () => {
+    it('should return null when no progressToken, no sendNotification, and no onStatusMessage', () => {
+        expect(createProgressTracker(undefined, undefined)).toBeNull();
+    });
+
+    it('should return ProgressTracker when only onStatusMessage is provided', () => {
+        const tracker = createProgressTracker(undefined, undefined, undefined, vi.fn());
+        expect(tracker).toBeInstanceOf(ProgressTracker);
+    });
+
+    it('should return ProgressTracker and send notifications for progressToken = 0', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = createProgressTracker(0, mockSendNotification);
+
+        expect(tracker).toBeInstanceOf(ProgressTracker);
+        await tracker?.updateProgress('Started');
+
+        expect(mockSendNotification).toHaveBeenCalledWith({
+            method: 'notifications/progress',
+            params: {
+                progressToken: 0,
+                progress: 1,
+                message: 'Started',
+            },
+        });
     });
 });
