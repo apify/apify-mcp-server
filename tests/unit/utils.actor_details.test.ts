@@ -68,7 +68,7 @@ describe('typeObjectToString', () => {
         })).toBe('{ name: string, tags: string[], meta: { id: string } }');
     });
 
-    it('emits "unknown" for function / symbol / bigint nested inside an array', () => {
+    it('emits "unknown" for function / symbol nested inside an array', () => {
         expect(typeObjectToString({ fns: [() => 1] as unknown[] })).toBe('{ fns: unknown[] }');
         expect(typeObjectToString({ syms: [Symbol('x')] as unknown[] })).toBe('{ syms: unknown[] }');
     });
