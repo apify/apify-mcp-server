@@ -182,11 +182,12 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     } = params;
 
     const errMsg = error instanceof Error ? error.message : String(error);
+    const failureCategory = classifyFailureCategory(error);
     logHttpError(error, 'Failed to call Actor', {
         actorName,
         async: isAsync,
         mcpSessionId,
-        failureCategory: classifyFailureCategory(error),
+        failureCategory,
     });
 
     return buildMCPResponse({
@@ -196,7 +197,7 @@ You can search for available Actors using the tool: ${storeSearchTool}, or get A
         isError: true,
         telemetry: {
             toolStatus: getToolStatusFromError(error, false),
-            failureCategory: classifyFailureCategory(error),
+            failureCategory,
             failureHttpStatus: getHttpStatusCode(error),
             failureDetail: errMsg.slice(0, 200),
             actorId,
