@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Add actor id data to actor info ([#687](https://github.com/apify/apify-mcp-server/pull/687)) ([b568b33](https://github.com/apify/apify-mcp-server/commit/b568b33efbe2593b5083183299762b3ef17fa4ad)) by [@baldasseva](https://github.com/baldasseva)
+- Fill unit-test gaps for MCP task functionality ([#688](https://github.com/apify/apify-mcp-server/pull/688)) ([3899fa7](https://github.com/apify/apify-mcp-server/commit/3899fa7e647a939bbe9fa27b6a525f214e4df90e)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
