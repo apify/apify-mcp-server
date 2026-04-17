@@ -122,7 +122,7 @@ export const actorInfoSchema = {
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
-    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'pricing'],
+    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'pricing', 'isDeprecated'],
 };
 
 /**
