@@ -72,6 +72,11 @@ export const pricingSchema = {
             type: 'string',
             description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)',
         },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
+        },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
         unitName: { type: 'string', description: 'Unit name for pricing' },
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
