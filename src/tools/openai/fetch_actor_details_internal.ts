@@ -1,47 +1,35 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
-import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import {
-    actorDetailsOutputOptionsSchema,
-    buildActorDetailsTextResponse,
-    buildActorNotFoundResponse,
-    buildCardOptions,
-    fetchActorDetails,
-    resolveOutputOptions,
-} from '../../utils/actor_details.js';
+import type { ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
-import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
+import {
+    buildFetchActorDetailsResult,
+    fetchActorDetailsToolArgsSchema,
+} from '../core/fetch_actor_details_common.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
-
-const fetchActorDetailsInternalArgsSchema = z.object({
-    actor: z.string()
-        .min(1)
-        .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
-    output: actorDetailsOutputOptionsSchema.optional()
-        .describe('Specify which information to include in the response to save tokens.'),
-});
 
 export const fetchActorDetailsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_GET_DETAILS_INTERNAL,
-    description: `Fetch Actor details with flexible output options (UI mode internal tool).
+    description: dedent`
+        Fetch Actor details with flexible output options (UI mode internal tool).
 
-This tool is available because the LLM is operating in UI mode. Use it for internal lookups
-where data presentation to the user is NOT needed - this tool does NOT render a widget.
+        This tool is available because the LLM is operating in UI mode. Use it for internal lookups
+        where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
-Use 'output' parameter with boolean flags to control returned information:
-- Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - except mcpTools
-- Selective: Set desired fields to true to save tokens (e.g., output: { inputSchema: true, readme: false })
-- Common patterns: inputSchema only for execution prep, readme + inputSchema for documentation, etc.
+        Use 'output' parameter with boolean flags to control returned information:
+        - Default: Fields: description, stats, pricing, rating, metadata, inputSchema, readme - except mcpTools
+        - Selective: Set desired fields to true to save tokens (e.g., output: { inputSchema: true, readme: false })
+        - Common patterns: inputSchema only for execution prep, readme + inputSchema for documentation, etc.
 
-Use this instead of fetch-actor-details when you need Actor information to prepare execution
-but the user did NOT explicitly ask for Actor details presentation.`,
-    inputSchema: z.toJSONSchema(fetchActorDetailsInternalArgsSchema) as ToolInputSchema,
+        Use this instead of fetch-actor-details when you need Actor information to prepare execution
+        but the user did NOT explicitly ask for Actor details presentation.
+    `,
+    inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsInternalArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
     annotations: {
         title: 'Fetch Actor details internal',
         readOnlyHint: true,
@@ -49,37 +37,5 @@ but the user did NOT explicitly ask for Actor details presentation.`,
         idempotentHint: true,
         openWorldHint: false,
     },
-    call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
-        const parsed = fetchActorDetailsInternalArgsSchema.parse(args);
-        const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details-internal' });
-        const apifyClient = new ApifyClient({ token: apifyToken });
-
-        const resolvedOutput = resolveOutputOptions(parsed.output);
-        const cardOptions = buildCardOptions(resolvedOutput);
-
-        const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
-        if (!details) {
-            return buildActorNotFoundResponse(actorName);
-        }
-
-        // Fetch output schema from ActorStore if available and requested
-        const actorOutputSchema = resolvedOutput.outputSchema
-            ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
-            : undefined;
-
-        const { texts, structuredContent } = await buildActorDetailsTextResponse({
-            actorName,
-            details,
-            output: resolvedOutput,
-            cardOptions,
-            apifyClient,
-            apifyToken,
-            actorOutputSchema,
-            paymentProvider: apifyMcpServer?.options.paymentProvider,
-            mcpSessionId,
-        });
-
-        return buildMCPResponse({ texts, structuredContent });
-    },
+    call: async (toolArgs) => buildFetchActorDetailsResult(toolArgs, HelperTools.ACTOR_GET_DETAILS_INTERNAL),
 } as const);

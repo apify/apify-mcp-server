@@ -1,13 +1,80 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { ApifyClient } from '../../apify_client.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
-import type { HelperTool, ToolInputSchema } from '../../types.js';
+import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
 import {
-    actorDetailsOutputOptionsSchema,
+    type ActorDetailsResult,
+    buildCardOptions,
+    fetchActorDetails,
+    getMcpToolsMessage,
+    resolveReadmeContent,
+    typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
+import { fixActorNameInputAndLog } from './actor_tools_factory.js';
+
+/**
+ * Shared schema for actor details output options.
+ *
+ * Behavior:
+ * - If output is undefined or empty object: use defaults (all true except mcpTools and outputSchema)
+ * - If any property is explicitly set: only include sections with explicit true values
+ */
+export const actorDetailsOutputOptionsSchema = z.object({
+    description: z.boolean().optional().describe('Include Actor description text only.'),
+    stats: z.boolean().optional().describe('Include usage statistics (users, runs, success rate).'),
+    pricing: z.boolean().optional().describe('Include pricing model and costs.'),
+    rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
+    metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
+    inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
+    readme: z.boolean().optional().describe('Include Actor README documentation (summary when available, full otherwise).'),
+    outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
+    mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
+});
+
+export const actorDetailsOutputDefaults = {
+    description: true,
+    stats: true,
+    pricing: true,
+    rating: true,
+    metadata: true,
+    inputSchema: true,
+    readme: true,
+    outputSchema: false,
+    mcpTools: false,
+};
+
+export type ResolvedOutputOptions = typeof actorDetailsOutputDefaults;
+
+/**
+ * Resolve output options with smart defaults.
+ * If output is undefined/empty, returns defaults.
+ * If any property is explicitly set, undefined properties are treated as false.
+ */
+export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputOptionsSchema>): ResolvedOutputOptions {
+    const hasExplicitOptions = output && Object.values(output).some((v) => v !== undefined);
+
+    if (!hasExplicitOptions) {
+        return actorDetailsOutputDefaults;
+    }
+
+    return {
+        description: output?.description === true,
+        stats: output?.stats === true,
+        pricing: output?.pricing === true,
+        rating: output?.rating === true,
+        metadata: output?.metadata === true,
+        inputSchema: output?.inputSchema === true,
+        readme: output?.readme === true,
+        outputSchema: output?.outputSchema === true,
+        mcpTools: output?.mcpTools === true,
+    };
+}
 
 /**
  * Zod schema for fetch-actor-details arguments — shared between default and openai variants.
@@ -58,3 +125,134 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
         openWorldHint: false,
     },
 };
+
+/**
+ * Build error response for when actor is not found.
+ */
+export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof buildMCPResponse> {
+    return buildMCPResponse({
+        texts: [dedent`
+            Actor information for '${actorName}' was not found.
+            Please verify Actor ID or name format and ensure that the Actor exists.
+            You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
+        `],
+        isError: true,
+        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+    });
+}
+
+/**
+ * Build text and structured response for actor details.
+ * Pure/sync: the caller pre-resolves `mcpToolsMessage` when `output.mcpTools` is true.
+ */
+export function buildActorDetailsTextResponse(options: {
+    details: ActorDetailsResult;
+    output: ResolvedOutputOptions;
+    actorOutputSchema?: Record<string, unknown> | null;
+    mcpToolsMessage?: string;
+}): {
+    texts: string[];
+    structuredContent: Record<string, unknown>;
+} {
+    const { details, output, actorOutputSchema, mcpToolsMessage } = options;
+
+    const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+
+    const texts: string[] = [];
+
+    const needsCard = output.description
+        || output.stats
+        || output.pricing
+        || output.rating
+        || output.metadata;
+
+    if (needsCard) {
+        texts.push(`# Actor information\n${details.actorCard}`);
+    }
+
+    const resolvedReadme = output.readme ? resolveReadmeContent(details) : undefined;
+    if (resolvedReadme) {
+        texts.push(`${resolvedReadme.heading}\n${resolvedReadme.content}`);
+    }
+
+    if (output.inputSchema) {
+        texts.push([
+            `# [Input schema](${actorUrl}/input)`,
+            '```json',
+            JSON.stringify(details.inputSchema),
+            '```',
+        ].join('\n'));
+    }
+
+    if (output.outputSchema) {
+        if (actorOutputSchema && Object.keys(actorOutputSchema).length > 0) {
+            const typeString = typeObjectToString(actorOutputSchema);
+            texts.push(dedent`
+                # Output Schema (TypeScript)
+                Inferred from recent successful runs:
+                \`\`\`typescript
+                type ActorOutput = ${typeString}
+                \`\`\`
+            `);
+        } else {
+            texts.push(dedent`
+                # Output Schema
+                No output schema available. The Actor may not have recent successful runs, or the output structure could not be determined.
+            `);
+        }
+    }
+
+    if (mcpToolsMessage) {
+        texts.push(mcpToolsMessage);
+    }
+
+    const structuredContent: Record<string, unknown> = {
+        actorInfo: needsCard ? details.actorCardStructured : undefined,
+        readme: resolvedReadme?.content,
+        inputSchema: output.inputSchema ? details.inputSchema : undefined,
+        outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
+    };
+
+    return { texts, structuredContent };
+}
+
+/**
+ * Shared handler for default and internal fetch-actor-details variants.
+ * Both return the same text + structured response; only the telemetry route differs.
+ */
+export async function buildFetchActorDetailsResult(
+    toolArgs: InternalToolArgs,
+    route: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL,
+): Promise<ReturnType<typeof buildMCPResponse>> {
+    const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+    const parsed = fetchActorDetailsToolArgsSchema.parse(args);
+    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
+    const apifyClient = new ApifyClient({ token: apifyToken });
+
+    const resolvedOutput = resolveOutputOptions(parsed.output);
+    const details = await fetchActorDetails(apifyClient, actorName, buildCardOptions(resolvedOutput));
+    if (!details) {
+        return buildActorNotFoundResponse(actorName);
+    }
+
+    let actorOutputSchema: Record<string, unknown> | null | undefined;
+    if (resolvedOutput.outputSchema) {
+        actorOutputSchema = apifyMcpServer.actorStore
+            ? await apifyMcpServer.actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
+            : null;
+    }
+    const mcpToolsMessage = resolvedOutput.mcpTools
+        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, apifyMcpServer?.options.paymentProvider, mcpSessionId)
+        : undefined;
+
+    // NOTE: Data duplication between texts and structuredContent is intentional and required.
+    // Some MCP clients only read text content, while others only read structured content.
+    const { texts, structuredContent } = buildActorDetailsTextResponse({
+        details,
+        output: resolvedOutput,
+        actorOutputSchema,
+        mcpToolsMessage,
+    });
+
+    return buildMCPResponse({ texts, structuredContent });
+}

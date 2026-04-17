@@ -1,18 +1,20 @@
+import dedent from 'dedent';
+
 import { ApifyClient } from '../../apify_client.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
-    buildActorNotFoundResponse,
+    buildActorDetailsForWidget,
     buildCardOptions,
     fetchActorDetails,
-    processActorDetailsForResponse,
-    resolveOutputOptions,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
+    buildActorNotFoundResponse,
     fetchActorDetailsMetadata,
     fetchActorDetailsToolArgsSchema,
+    resolveOutputOptions,
 } from '../core/fetch_actor_details_common.js';
 
 /**
@@ -27,28 +29,26 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
-        const resolvedOutput = resolveOutputOptions(parsed.output);
-        const cardOptions = buildCardOptions(resolvedOutput);
-
+        const cardOptions = buildCardOptions(resolveOutputOptions(parsed.output));
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
             return buildActorNotFoundResponse(actorName);
         }
 
-        const { structuredContent: processedStructuredContent, actorUrl } = processActorDetailsForResponse(details);
+        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details);
         const structuredContent = {
             actorInfo: details.actorCardStructured,
             inputSchema: details.inputSchema,
-            actorDetails: processedStructuredContent.actorDetails,
+            actorDetails,
         };
 
-        const texts = [`
-# Actor information:
-- **Actor:** ${actorName}
-- **URL:** ${actorUrl}
+        const texts = [dedent`
+            # Actor information:
+            - **Actor:** ${actorName}
+            - **URL:** ${actorUrl}
 
-An interactive widget has been rendered with detailed Actor information.
-`];
+            An interactive widget has been rendered with detailed Actor information.
+        `];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
         return buildMCPResponse({
