@@ -104,8 +104,9 @@ describe('call_actor_common', () => {
             });
 
             expect(response.isError).toBe(true);
-            expect(response.content[0]?.text).toContain(`using the tool: ${HelperTools.STORE_SEARCH}`);
-            expect(response.content[0]?.text).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH}`);
+            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(expect.objectContaining({
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
                 failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
@@ -124,8 +125,9 @@ describe('call_actor_common', () => {
                 storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
             });
 
-            expect(response.content[0]?.text).toContain(`using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}`);
-            expect(response.content[0]?.text).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}`);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}`);
+            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS_INTERNAL}`);
             expect(response.toolTelemetry).toEqual(expect.objectContaining({
                 toolStatus: TOOL_STATUS.FAILED,
                 failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,

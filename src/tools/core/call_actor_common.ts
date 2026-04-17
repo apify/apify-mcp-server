@@ -164,11 +164,12 @@ export function buildStartAsyncResponse(params: {
 
     const responseText = dedent`
         Started Actor "${actorName}" (Run ID: ${actorRun.id}).
+
         A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
-        The widget will update the context with run status and datasetId when the run completes.
-        Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
-        Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}.
-        Wait for the widget state update or user instructions. Ask the user what they would like to do next.
+
+        The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
+
+        Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.
     `;
 
     const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
@@ -205,11 +206,11 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 
     return buildMCPResponse({
-        texts: [dedent`
-            Failed to call Actor '${actorName}': ${errMsg}.
-            Please verify the Actor name, input parameters, and ensure the Actor exists.
-            You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.
-        `],
+        texts: [
+            `Failed to call Actor '${actorName}': ${errMsg}.`,
+            `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
+            `You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.`,
+        ],
         isError: true,
         telemetry: {
             toolStatus: getToolStatusFromError(error, false),
