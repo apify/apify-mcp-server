@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.20 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Add actor id data to actor info ([#687](https://github.com/apify/apify-mcp-server/pull/687)) ([b568b33](https://github.com/apify/apify-mcp-server/commit/b568b33efbe2593b5083183299762b3ef17fa4ad)) by [@baldasseva](https://github.com/baldasseva)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.19](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.19) (2026-04-16)
