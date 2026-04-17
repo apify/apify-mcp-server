@@ -9,7 +9,7 @@
  * - `pricingInfoToStructured`: complete mode
  * - `pricingInfoToSimplifiedStructured`: simplified mode
  *
- * Structured output shape is the same in both modes:
+ * Structured output shape is mostly the same in both modes:
  * {
  *   model: string,
  *   userTier?: PricingTier,
@@ -19,11 +19,13 @@
  *   tieredPricing?: [{ tier: string, pricePerUnit: number }],
  *   events?: [{
  *     title: string,
- *     description: string,
+ *     description?: string,
  *     priceUsd?: number,
  *     tieredPricing?: [{ tier: string, priceUsd: number }],
  *   }],
  *   pricingNote?: string,
+ *   eventDescriptionsOmitted?: boolean,
+ *   eventDescriptionsNote?: string,
  * }
  *
  * Complete mode keeps full tier matrices and never sets `pricingNote`.
@@ -34,6 +36,11 @@
  * Actors, since the user's plan may offer cheaper rates on the Apify platform
  * that this particular Actor hasn't opted into. `pricingNote` is omitted when
  * PAY_PER_EVENT events resolve to different tiers (no truthful single label).
+ *
+ * Simplified `PAY_PER_EVENT` also trims long event lists:
+ * - `events.length <= 5`: keep event descriptions
+ * - `events.length > 5`: omit event descriptions and set
+ *   `eventDescriptionsOmitted` / `eventDescriptionsNote`
  *
  * Single-tier buckets stay as 1-element `tieredPricing` arrays in both modes.
  * `FREE` or `null` input returns the free text / structured shape.
@@ -98,7 +105,7 @@ export type StructuredPricingInfo = {
     }[];
     events?: {
         title: string;
-        description: string;
+        description?: string;
         priceUsd?: number;
         tieredPricing?: {
             tier: string;
@@ -106,6 +113,8 @@ export type StructuredPricingInfo = {
         }[];
     }[];
     pricingNote?: string;
+    eventDescriptionsOmitted?: boolean;
+    eventDescriptionsNote?: string;
 };
 
 type DatasetItemLike = {
@@ -128,6 +137,9 @@ type SimplifiedResult = {
 const FREE_ACTOR_TEXT = 'This Actor is free to use. You are only charged for Apify platform usage.';
 const UNKNOWN_PRICING_TEXT = 'Pricing information is not available.';
 const EVENTS_UNAVAILABLE_TEXT = 'Pricing information for events is not available.';
+const EVENT_DESCRIPTION_LIMIT = 5;
+const EVENT_DESCRIPTIONS_OMITTED_NOTE = 'Event descriptions were omitted because this actor has many pricing events. '
+    + 'Use fetch-actor-details for full pricing details.';
 
 function resolveTier<T>(
     map: Record<string, T>,
@@ -147,6 +159,10 @@ function buildPricingNote(resolvedTier: string): string {
 function getSingleResolvedTier(resolvedTiers: Set<string>): string | null {
     if (resolvedTiers.size !== 1) return null;
     return resolvedTiers.values().next().value ?? null;
+}
+
+function shouldOmitEventDescriptions(eventCount: number): boolean {
+    return eventCount > EVENT_DESCRIPTION_LIMIT;
 }
 
 function convertMinutesToGreatestUnit(minutes: number): { value: number; unit: string } {
@@ -355,6 +371,7 @@ function formatPayPerEventSimplified(
 ): string {
     if (!pricingPerEvent?.actorChargeEvents) return EVENTS_UNAVAILABLE_TEXT;
 
+    const omitDescriptions = shouldOmitEventDescriptions(Object.keys(pricingPerEvent.actorChargeEvents).length);
     const resolvedTiers = new Set<string>();
     const eventLines = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
         let price: number | undefined;
@@ -371,12 +388,17 @@ function formatPayPerEventSimplified(
         }
 
         const detail = typeof price === 'number' ? `$${price} per event` : 'No price info';
+        if (omitDescriptions) return `\t- **${event.eventTitle}**: ${detail}`;
         return `\t- **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
     });
 
     const body = `This Actor is paid per event:\n${eventLines.join('\n')}`;
     const noteTier = getSingleResolvedTier(resolvedTiers);
-    return noteTier ? `${body}\n${buildPricingNote(noteTier)}` : body;
+    const notes = [
+        ...(noteTier ? [buildPricingNote(noteTier)] : []),
+        ...(omitDescriptions ? [EVENT_DESCRIPTIONS_OMITTED_NOTE] : []),
+    ];
+    return notes.length > 0 ? `${body}\n${notes.join('\n')}` : body;
 }
 
 /** Simplified structured contract used by `search-actors`. */
@@ -440,9 +462,13 @@ function structurePayPerEventSimplified(
 ): SimplifiedResult {
     if (!pricingPerEvent?.actorChargeEvents) return { patch: {}, noteTier: null };
 
+    const omitDescriptions = shouldOmitEventDescriptions(Object.keys(pricingPerEvent.actorChargeEvents).length);
     const resolvedTiers = new Set<string>();
     const events = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
-        const baseEvent = { title: event.eventTitle, description: event.eventDescription || '' };
+        const baseEvent = {
+            title: event.eventTitle,
+            ...(omitDescriptions ? {} : { description: event.eventDescription || '' }),
+        };
 
         if (typeof event.eventPriceUsd === 'number') {
             return { ...baseEvent, priceUsd: event.eventPriceUsd };
@@ -458,5 +484,16 @@ function structurePayPerEventSimplified(
     });
 
     const noteTier = getSingleResolvedTier(resolvedTiers);
-    return { patch: { events }, noteTier };
+    return {
+        patch: {
+            events,
+            ...(omitDescriptions
+                ? {
+                    eventDescriptionsOmitted: true,
+                    eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,
+                }
+                : {}),
+        },
+        noteTier,
+    };
 }

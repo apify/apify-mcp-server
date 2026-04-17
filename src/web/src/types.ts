@@ -19,13 +19,16 @@ export type StructuredPricingInfo = {
     }[];
     events?: {
         title: string;
-        description: string;
+        description?: string;
         priceUsd?: number;
         tieredPricing?: {
             tier: string;
             priceUsd: number;
         }[];
     }[];
+    pricingNote?: string;
+    eventDescriptionsOmitted?: boolean;
+    eventDescriptionsNote?: string;
 }
 
 export interface ActorStats {

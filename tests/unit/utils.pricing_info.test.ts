@@ -63,6 +63,44 @@ const mixedTierPayPerEvent = {
     },
 } as unknown as PricingInfo;
 
+const longPayPerEvent = {
+    pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
+    pricingPerEvent: {
+        actorChargeEvents: {
+            a: {
+                eventTitle: 'Result',
+                eventDescription: 'Cost per result returned.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.0037 } },
+            },
+            b: {
+                eventTitle: 'Add-on: Date filter',
+                eventDescription: 'Extra cost when date filtering is used.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.0013 } },
+            },
+            c: {
+                eventTitle: 'Add-on: Popularity filter',
+                eventDescription: 'Extra cost when filtering by popularity is used.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.0013 } },
+            },
+            d: {
+                eventTitle: 'Add-on: Follower / Following',
+                eventDescription: 'Extra cost per follower / following profile returned.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.004 } },
+            },
+            e: {
+                eventTitle: 'Add-on: Search video sorting',
+                eventDescription: 'Extra cost for scraping the sorted videos.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.0013 } },
+            },
+            f: {
+                eventTitle: 'Actor start',
+                eventDescription: 'Flat fee for starting an Actor run.',
+                eventTieredPricingUsd: { FREE: { tieredEventPriceUsd: 0.001 } },
+            },
+        },
+    },
+} as unknown as PricingInfo;
+
 // E4: single-tier actor — raw data has only one bucket.
 const singleTierPayPerEvent = {
     pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
@@ -108,6 +146,8 @@ const NOTE_GOLD = 'Prices shown are for GOLD tier. Higher tiers may offer lower 
     + 'use fetch-actor-details to see the full pricing table.';
 const NOTE_FREE = 'Prices shown are for FREE tier. Higher tiers may offer lower prices — '
     + 'use fetch-actor-details to see the full pricing table.';
+const EVENT_DESCRIPTIONS_OMITTED_NOTE = 'Event descriptions were omitted because this actor has many pricing events. '
+    + 'Use fetch-actor-details for full pricing details.';
 
 // ─── Complete mode: fetch-actor-details ───────────────────────────────────────
 
@@ -337,6 +377,24 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             ],
         });
     });
+
+    it('omits event descriptions and adds omission metadata when PAY_PER_EVENT has more than 5 events', () => {
+        expect(pricingInfoToSimplifiedStructured(longPayPerEvent, 'FREE')).toEqual({
+            model: 'PAY_PER_EVENT',
+            userTier: 'FREE',
+            events: [
+                { title: 'Result', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0037 }] },
+                { title: 'Add-on: Date filter', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Add-on: Popularity filter', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Add-on: Follower / Following', tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }] },
+                { title: 'Add-on: Search video sorting', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Actor start', tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
+            ],
+            pricingNote: NOTE_FREE,
+            eventDescriptionsOmitted: true,
+            eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,
+        });
+    });
 });
 
 describe('pricingInfoToSimplifiedString (simplified mode)', () => {
@@ -378,6 +436,18 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
             'This Actor is paid per event:\n'
             + '\t- **A**:  ($0.005 per event)\n'
             + '\t- **B**:  ($0.02 per event)',
+        );
+    });
+
+    it('omits event descriptions in text when PAY_PER_EVENT has more than 5 events', () => {
+        expect(pricingInfoToSimplifiedString(longPayPerEvent, 'FREE')).toBe(
+            'This Actor is paid per event:\n'
+            + '\t- **Result**: $0.0037 per event\n'
+            + '\t- **Add-on: Date filter**: $0.0013 per event\n'
+            + '\t- **Add-on: Popularity filter**: $0.0013 per event\n'
+            + '\t- **Add-on: Follower / Following**: $0.004 per event\n'
+            + '\t- **Add-on: Search video sorting**: $0.0013 per event\n'
+            + `\t- **Actor start**: $0.001 per event\n${NOTE_FREE}\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
         );
     });
 });
