@@ -1,3 +1,4 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import log from '@apify/log';
@@ -7,7 +8,7 @@ import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
@@ -85,6 +86,52 @@ export type FetchActorRunResult = {
     run: Record<string, unknown>;
     structuredContent: ActorRunStructuredContent;
 };
+
+/**
+ * Builds the standard tool error response for get-actor-run.
+ */
+export function buildGetActorRunError(runId: string, error: unknown): ReturnType<typeof buildMCPResponse> {
+    return buildMCPResponse({
+        texts: [dedent`
+            Failed to get Actor run '${runId}': ${error instanceof Error ? error.message : String(error)}.
+            Please verify the run ID and ensure that the run exists.
+        `],
+        isError: true,
+        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
+    });
+}
+
+/**
+ * Builds the tool success response for get-actor-run in default or widget mode.
+ */
+export function buildGetActorRunSuccessResponse(
+    params: FetchActorRunResult & { widget: boolean },
+): ReturnType<typeof buildMCPResponse> {
+    const { run, structuredContent, widget } = params;
+
+    if (!widget) {
+        return buildMCPResponse({
+            texts: [`# Actor Run Information\n\`\`\`json\n${JSON.stringify(run)}\n\`\`\``],
+            structuredContent,
+            _meta: buildUsageMeta(run),
+        });
+    }
+
+    const statusText = structuredContent.status === 'SUCCEEDED' && structuredContent.dataset
+        ? dedent`Actor run ${structuredContent.runId} completed successfully with
+            ${structuredContent.dataset.totalItemCount} items. A widget has been rendered with the details.`
+        : dedent`Actor run ${structuredContent.runId} status: ${structuredContent.status}.
+            A progress widget has been rendered.`;
+
+    return buildMCPResponse({
+        texts: [statusText],
+        structuredContent,
+        _meta: {
+            ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+            ...(buildUsageMeta(run) ?? {}),
+        },
+    });
+}
 
 /**
  * Fetches actor run data, resolves actor name, and fetches dataset results if completed.
