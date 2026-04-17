@@ -9,6 +9,7 @@ import { getActorMcpUrlCached } from './actor.js';
 import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from './actor_card.js';
 import { searchActorsByKeywords } from './actor_search.js';
 import { logHttpError } from './logging.js';
+import type { PricingTier } from './pricing_info.js';
 
 const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
 
@@ -109,13 +110,13 @@ export async function fetchActorDetails(
  * Build the widget actor-details payload for the openai variant.
  * Returns the Actor URL and the structured `actorDetails` object.
  */
-export function buildActorDetailsForWidget(details: ActorDetailsResult) {
+export function buildActorDetailsForWidget(details: ActorDetailsResult, userTier: PricingTier) {
     const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
     const formattedReadme = details.readme.replace(/^# /, `# [README](${actorUrl}/readme): `);
     return {
         actorUrl,
         actorDetails: {
-            actorInfo: formatActorForWidget(details.actorInfo),
+            actorInfo: formatActorForWidget(details.actorInfo, userTier),
             actorCard: details.actorCard,
             readme: formattedReadme,
             inputSchema: details.inputSchema,
@@ -183,6 +184,7 @@ export async function getMcpToolsMessage(
 /**
  * Build card options from resolved output flags.
  * Maps boolean output flags to card rendering options (explicit true required).
+ * Caller adds `userTier` if needed — this helper stays focused on flags.
  */
 export function buildCardOptions(output: {
     description: boolean;

@@ -10,7 +10,6 @@ declare global {
 
 export type StructuredPricingInfo = {
     model: string;
-    isFree: boolean;
     pricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;

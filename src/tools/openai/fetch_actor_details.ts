@@ -9,6 +9,7 @@ import {
     fetchActorDetails,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
     buildActorNotFoundResponse,
@@ -29,13 +30,14 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
-        const cardOptions = buildCardOptions(resolveOutputOptions(parsed.output));
+        const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
+        const cardOptions = { ...buildCardOptions(resolveOutputOptions(parsed.output)), userTier: userPlanTier };
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
             return buildActorNotFoundResponse(actorName);
         }
 
-        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details);
+        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details, userPlanTier);
         const structuredContent = {
             actorInfo: details.actorCardStructured,
             inputSchema: details.inputSchema,

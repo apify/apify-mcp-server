@@ -7,12 +7,7 @@ import { formatActorForWidget, type WidgetActor } from '../../utils/actor_card.j
 import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import {
-    buildSearchActorsEmptyResponse,
-    buildSearchActorsResult,
-    searchActorsArgsSchema,
-    searchActorsMetadata,
-} from '../core/search_actors_common.js';
+import { buildSearchActorsEmptyResponse, buildSearchActorsResult, searchActorsArgsSchema, searchActorsMetadata } from '../core/search_actors_common.js';
 
 /**
  * OpenAI mode search-actors tool.
@@ -60,7 +55,7 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
         };
 
         // Add widget-formatted actors for the interactive UI
-        structuredContent.widgetActors = actors.map(formatActorForWidget);
+        structuredContent.widgetActors = actors.map((actor) => formatActorForWidget(actor, userPlanTier));
 
         const texts = [dedent`
             # Search results:

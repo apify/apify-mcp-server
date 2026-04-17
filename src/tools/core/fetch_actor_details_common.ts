@@ -15,6 +15,7 @@ import {
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -230,7 +231,9 @@ export async function buildFetchActorDetailsResult(
     const apifyClient = new ApifyClient({ token: apifyToken });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
-    const details = await fetchActorDetails(apifyClient, actorName, buildCardOptions(resolvedOutput));
+    const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
+    const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier };
+    const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {
         return buildActorNotFoundResponse(actorName);
     }

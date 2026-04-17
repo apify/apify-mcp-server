@@ -48,7 +48,7 @@ describe('search-actors with widget (openaiSearchActors)', () => {
 
         expect(structuredContent.widgetActors).toBeDefined();
         expect(structuredContent.widgetActors!.length).toBe(structuredContent.actors.length);
-        expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR));
+        expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR, 'FREE'));
 
         expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
 

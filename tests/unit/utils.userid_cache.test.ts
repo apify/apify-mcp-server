@@ -10,17 +10,38 @@ function stubClient(getImpl: () => Promise<unknown>): ApifyClient {
 }
 
 describe('getUserInfoCached', () => {
-    it('returns userId and userPlanTier from API', async () => {
-        const client = stubClient(async () => ({ id: 'u1', plan: { id: 'GOLD' } }));
+    it('returns userId and userPlanTier read from plan.tier', async () => {
+        const client = stubClient(async () => ({ id: 'u1', plan: { id: 'BUSINESS', tier: 'GOLD' } }));
         const out = await getUserInfoCached(`token-${Math.random()}`, client);
         expect(out.userId).toBe('u1');
         expect(out.userPlanTier).toBe('GOLD');
     });
 
-    it('normalizes lowercase plan id to uppercase tier', async () => {
-        const client = stubClient(async () => ({ id: 'u2', plan: { id: 'silver' } }));
+    it.each([
+        ['FREE', 'FREE'],
+        ['BRONZE', 'BRONZE'],
+        ['SILVER', 'SILVER'],
+        ['GOLD', 'GOLD'],
+        ['PLATINUM', 'PLATINUM'],
+        ['DIAMOND', 'DIAMOND'],
+    ])('maps plan.tier %s to %s', async (input, expected) => {
+        const client = stubClient(async () => ({ id: 'u', plan: { id: 'ANY_PLAN_ID', tier: input } }));
+        const out = await getUserInfoCached(`token-${Math.random()}`, client);
+        expect(out.userPlanTier).toBe(expected);
+    });
+
+    it('normalizes lowercase tier to uppercase', async () => {
+        const client = stubClient(async () => ({ id: 'u2', plan: { tier: 'silver' } }));
         const out = await getUserInfoCached(`token-${Math.random()}`, client);
         expect(out.userPlanTier).toBe('SILVER');
+    });
+
+    it('ignores plan.id when deriving the tier (bug fix: plan.id is not the tier)', async () => {
+        // plan.id values like STARTER/SCALE/BUSINESS don't match PricingTier names;
+        // only plan.tier should drive the tier choice.
+        const client = stubClient(async () => ({ id: 'u', plan: { id: 'STARTER', tier: 'BRONZE' } }));
+        const out = await getUserInfoCached(`token-${Math.random()}`, client);
+        expect(out.userPlanTier).toBe('BRONZE');
     });
 
     it('defaults to FREE when plan is missing', async () => {
@@ -30,8 +51,14 @@ describe('getUserInfoCached', () => {
         expect(out.userPlanTier).toBe('FREE');
     });
 
-    it('defaults to FREE when plan id is unrecognized', async () => {
-        const client = stubClient(async () => ({ id: 'u4', plan: { id: 'CUSTOM_ENTERPRISE' } }));
+    it('defaults to FREE when plan.tier is missing', async () => {
+        const client = stubClient(async () => ({ id: 'u', plan: { id: 'BUSINESS' } }));
+        const out = await getUserInfoCached(`token-${Math.random()}`, client);
+        expect(out.userPlanTier).toBe('FREE');
+    });
+
+    it('defaults to FREE when plan.tier is unrecognized', async () => {
+        const client = stubClient(async () => ({ id: 'u4', plan: { tier: 'UNOBTANIUM' } }));
         const out = await getUserInfoCached(`token-${Math.random()}`, client);
         expect(out.userPlanTier).toBe('FREE');
     });
@@ -43,7 +70,7 @@ describe('getUserInfoCached', () => {
     });
 
     it('caches result and avoids second API call', async () => {
-        const get = vi.fn(async () => ({ id: 'u5', plan: { id: 'PLATINUM' } }));
+        const get = vi.fn(async () => ({ id: 'u5', plan: { tier: 'PLATINUM' } }));
         const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
         const token = `token-${Math.random()}`;
         await getUserInfoCached(token, client);
@@ -56,7 +83,7 @@ describe('getUserInfoCached', () => {
         const get = vi.fn(async () => {
             attempts += 1;
             if (attempts === 1) throw new Error('transient');
-            return { id: 'u6', plan: { id: 'BRONZE' } };
+            return { id: 'u6', plan: { tier: 'BRONZE' } };
         });
         const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
         const token = `token-${Math.random()}`;

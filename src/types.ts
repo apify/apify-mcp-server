@@ -616,12 +616,13 @@ export type ActorCardOptions = {
     includeRating?: boolean;
     /** Include metadata (developer, categories, last modified date, deprecation warning) */
     includeMetadata?: boolean;
-    /**
-     * If set, simplify pricing to only show this tier's price (with FREE fallback)
-     * and append a hint about other tiers. Used by search-actors.
-     * When undefined, full pricing is shown (used by fetch-actor-details).
-     */
+    /** User's plan tier. Defaults to FREE inside the formatters when unset. */
     userTier?: PricingTier;
+    /**
+     * true → filter `tieredPricing` down to the user's resolved tier (search-actors).
+     * false/undefined → keep the full tiered matrix (fetch-actor-details).
+     */
+    simplifyPricingForUserTier?: boolean;
 }
 
 /**

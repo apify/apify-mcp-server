@@ -113,9 +113,9 @@ export type SearchActorsResult = {
 
 export function buildSearchActorsResult(
     actors: ActorStoreList[],
-    userTier?: PricingTier,
+    userTier: PricingTier,
 ): SearchActorsResult {
-    const options = { ...DEFAULT_CARD_OPTIONS, userTier };
+    const options = { ...DEFAULT_CARD_OPTIONS, userTier, simplifyPricingForUserTier: true };
     return {
         actorCardText: actors.map((actor) => formatActorToActorCard(actor, options)).join('\n\n'),
         actorCardStructured: actors.map((actor) => formatActorToStructuredCard(actor, options)),
