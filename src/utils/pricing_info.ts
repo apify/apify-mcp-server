@@ -147,11 +147,21 @@ function resolveTier<T>(
 ): { tier: string; value: T } {
     if (map[userTier]) return { tier: userTier, value: map[userTier] };
     if (map.FREE) return { tier: 'FREE', value: map.FREE };
+    // Pathological fallback: actor provides neither the user's tier nor FREE.
+    // `Object.entries` order is spec-guaranteed to be insertion order for string keys,
+    // so we pick whichever tier the API serialised first. Rarely fires — virtually every
+    // actor defines FREE.
     const [firstTier, firstValue] = Object.entries(map)[0];
     return { tier: firstTier, value: firstValue };
 }
 
-function buildPricingNote(resolvedTier: string): string {
+/**
+ * Builds the simplified-mode pricing note, or returns null when no note should be shown.
+ * DIAMOND is the top tier — "higher tiers may offer lower prices" is vacuous, so we skip
+ * the note for DIAMOND users.
+ */
+function buildPricingNote(resolvedTier: string): string | null {
+    if (resolvedTier === 'DIAMOND') return null;
     return `Prices shown are for ${resolvedTier} tier. `
         + `Higher tiers may offer lower prices — use fetch-actor-details to see the full pricing table.`;
 }
@@ -350,7 +360,9 @@ function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTie
     const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
     if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
-        return `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}. ${buildPricingNote(tier)}`;
+        const base = `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}.`;
+        const note = buildPricingNote(tier);
+        return note ? `${base} ${note}` : base;
     }
     return `This Actor costs $${(info.pricePerUnitUsd ?? 0) * 1000} per 1000 ${unitLabel}.`;
 }
@@ -359,8 +371,10 @@ function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string
     const { value, unit } = convertMinutesToGreatestUnit(info.trialMinutes || 0);
     if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
         const { tier, value: entry } = resolveTier(info.tieredPricing, userTier);
-        return `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, `
-            + `with a trial period of ${value} ${unit}. ${buildPricingNote(tier)}`;
+        const base = `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, `
+            + `with a trial period of ${value} ${unit}.`;
+        const note = buildPricingNote(tier);
+        return note ? `${base} ${note}` : base;
     }
     return `This Actor is rental and costs $${info.pricePerUnitUsd ?? 0} per month, with a trial period of ${value} ${unit}.`;
 }
@@ -394,8 +408,9 @@ function formatPayPerEventSimplified(
 
     const body = `This Actor is paid per event:\n${eventLines.join('\n')}`;
     const noteTier = getSingleResolvedTier(resolvedTiers);
+    const pricingNote = noteTier ? buildPricingNote(noteTier) : null;
     const notes = [
-        ...(noteTier ? [buildPricingNote(noteTier)] : []),
+        ...(pricingNote ? [pricingNote] : []),
         ...(omitDescriptions ? [EVENT_DESCRIPTIONS_OMITTED_NOTE] : []),
     ];
     return notes.length > 0 ? `${body}\n${notes.join('\n')}` : body;
@@ -435,10 +450,11 @@ export function pricingInfoToSimplifiedStructured(
             break;
     }
 
+    const pricingNote = noteTier ? buildPricingNote(noteTier) : null;
     return {
         ...base,
         ...patch,
-        ...(noteTier ? { pricingNote: buildPricingNote(noteTier) } : {}),
+        ...(pricingNote ? { pricingNote } : {}),
     };
 }
 

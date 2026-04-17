@@ -343,6 +343,23 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         });
     });
 
+    it('user on DIAMOND — resolved tier is DIAMOND, pricingNote is suppressed (top tier)', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.005,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.005 },
+                GOLD: { tieredPricePerUnitUsd: 0.002 },
+                DIAMOND: { tieredPricePerUnitUsd: 0.001 },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToSimplifiedStructured(info, 'DIAMOND');
+        expect(out.tieredPricing).toEqual([{ tier: 'DIAMOND', pricePerUnit: 0.001 }]);
+        expect(out.pricePerUnit).toBe(0.001);
+        expect(out.pricingNote).toBeUndefined();
+    });
+
     it('E7: FLAT_PRICE_PER_MONTH simplified includes trialMinutes + resolved tier price', () => {
         expect(pricingInfoToSimplifiedStructured(multiTierRental, 'GOLD')).toEqual({
             model: 'FLAT_PRICE_PER_MONTH',
@@ -427,6 +444,22 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     it('E7: FLAT_PRICE_PER_MONTH simplified — rental price + trial + note', () => {
         expect(pricingInfoToSimplifiedString(multiTierRental, 'GOLD')).toBe(
             `This Actor is rental and costs $20 per month, with a trial period of 7 days. ${NOTE_GOLD}`,
+        );
+    });
+
+    it('user on DIAMOND — resolved tier is DIAMOND, pricingNote is suppressed (top tier)', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.005,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.005 },
+                GOLD: { tieredPricePerUnitUsd: 0.002 },
+                DIAMOND: { tieredPricePerUnitUsd: 0.001 },
+            },
+        } as unknown as PricingInfo;
+        expect(pricingInfoToSimplifiedString(info, 'DIAMOND')).toBe(
+            'This Actor costs $1 per 1000 results.',
         );
     });
 
