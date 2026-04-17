@@ -3,13 +3,14 @@ import type {
     PricePerEventActorPricingInfo as PricePerEventActorPricingInfoOutdated,
 } from 'apify-client';
 
-import { ACTOR_PRICING_MODEL } from '../const.js';
+import { ACTOR_PRICING_MODEL, HelperTools } from '../const.js';
 
 export type TieredEventPrice = {
     tieredEventPriceUsd: number;
 };
 
-export type PricingTier = 'FREE' | 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | 'DIAMOND';
+export const PRICING_TIERS = ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'] as const;
+export type PricingTier = typeof PRICING_TIERS[number];
 
 export type ActorChargeEvent = {
     eventTitle: string;
@@ -61,24 +62,25 @@ export type StructuredPricingInfo = {
     pricingNote?: string;
 };
 
-const SIMPLIFIED_PRICING_NOTE = 'Higher subscription tiers may offer lower prices. Use fetch-actor-details for complete pricing.';
+export const SIMPLIFIED_PRICING_NOTE = `Higher subscription tiers may offer lower prices. Use ${HelperTools.ACTOR_GET_DETAILS} for complete pricing.`;
 
 /**
- * Picks the user's tier from a tiered pricing map, falling back to FREE, then the first available tier.
- * Returns null if the map is empty.
+ * Filters a tiered map down to a single tier (FREE fallback, then first entry).
+ * Returns all entries unchanged when `forTier` is undefined or the map has ≤1 entry.
+ * `simplified` is true only when filtering actually reduced the entry count.
  */
-function pickTierEntry<T>(
-    tieredMap: Record<string, T> | undefined,
-    userTier: PricingTier,
-): { tier: string; value: T } | null {
-    if (!tieredMap) return null;
-    const entries = Object.entries(tieredMap);
-    if (entries.length === 0) return null;
-    const userMatch = entries.find(([t]) => t === userTier);
-    if (userMatch) return { tier: userMatch[0], value: userMatch[1] };
-    const freeMatch = entries.find(([t]) => t === 'FREE');
-    if (freeMatch) return { tier: freeMatch[0], value: freeMatch[1] };
-    return { tier: entries[0][0], value: entries[0][1] };
+function selectTierEntries<T>(
+    map: Record<string, T> | undefined,
+    forTier: PricingTier | undefined,
+): { entries: [string, T][]; simplified: boolean } {
+    if (!map) return { entries: [], simplified: false };
+    const all = Object.entries(map);
+    if (!forTier || all.length <= 1) return { entries: all, simplified: false };
+    let key: string;
+    if (map[forTier]) key = forTier;
+    else if (map.FREE) key = 'FREE';
+    else key = all[0][0];
+    return { entries: [[key, map[key]]], simplified: true };
 }
 
 /**
@@ -131,16 +133,21 @@ function convertMinutesToGreatestUnit(minutes: number): { value: number; unit: s
  * For tiered pricing, the output is more complicated and the question is whether we want to simplify it in the future.
  * @param pricingPerEvent
  */
-
-function payPerEventPricingToString(pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined): string {
+function payPerEventPricingToString(
+    pricingPerEvent: { actorChargeEvents: Record<string, ActorChargeEvent> } | undefined,
+    forTier: PricingTier | undefined,
+): string {
     if (!pricingPerEvent || !pricingPerEvent.actorChargeEvents) return 'Pricing information for events is not available.';
     const eventStrings: string[] = [];
+    let anySimplified = false;
     for (const event of Object.values(pricingPerEvent.actorChargeEvents)) {
         let eventStr = `\t- **${event.eventTitle}**: ${event.eventDescription} `;
         if (typeof event.eventPriceUsd === 'number') {
             eventStr += `(Flat price: $${event.eventPriceUsd} per event)`;
         } else if (event.eventTieredPricingUsd) {
-            const tiers = Object.entries(event.eventTieredPricingUsd)
+            const { entries, simplified } = selectTierEntries(event.eventTieredPricingUsd, forTier);
+            if (simplified) anySimplified = true;
+            const tiers = entries
                 .map(([tier, price]) => `${tier}: $${price.tieredEventPriceUsd}`)
                 .join(', ');
             eventStr += `(Tiered pricing: ${tiers} per event)`;
@@ -149,10 +156,22 @@ function payPerEventPricingToString(pricingPerEvent: { actorChargeEvents: Record
         }
         eventStrings.push(eventStr);
     }
-    return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${eventStrings.join('\n')}`;
+    const suffix = anySimplified ? `\n${SIMPLIFIED_PRICING_NOTE}` : '';
+    return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${eventStrings.join('\n')}${suffix}`;
 }
 
-export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
+/**
+ * Formats pricing info as a human-readable string.
+ *
+ * When `forTier` is provided and the Actor has tiered pricing with more than one
+ * tier, the output is collapsed to that single tier (with FREE fallback, then first
+ * entry) and `SIMPLIFIED_PRICING_NOTE` is appended. Without `forTier`, all tiers
+ * are shown — the original behavior used by fetch-actor-details.
+ */
+export function pricingInfoToString(
+    pricingInfo: PricingInfo | null,
+    forTier?: PricingTier,
+): string {
     // If there is no pricing infos entries the Actor is free to use
     // based on https://github.com/apify/apify-core/blob/058044945f242387dde2422b8f1bef395110a1bf/src/packages/actor/src/paid_actors/paid_actors_common.ts#L691
     if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
@@ -160,28 +179,33 @@ export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
         const customUnitName = pricingInfo.unitName !== 'result' ? pricingInfo.unitName : '';
+        const unitLabel = customUnitName || 'results';
         // Handle tiered pricing if present
-        if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
-            const tiers = Object.entries(pricingInfo.tieredPricing)
-                .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd * 1000} per 1000 ${customUnitName || 'results'}`)
+        const { entries, simplified } = selectTierEntries(pricingInfo.tieredPricing, forTier);
+        if (entries.length > 0) {
+            const tiers = entries
+                .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}`)
                 .join(', ');
-            return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; tiered pricing per 1000 ${customUnitName || 'results'}: ${tiers}.`;
+            const note = simplified ? ` ${SIMPLIFIED_PRICING_NOTE}` : '';
+            return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; tiered pricing per 1000 ${unitLabel}: ${tiers}.${note}`;
         }
-        return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; the price per 1000 ${customUnitName || 'results'} is ${pricingInfo.pricePerUnitUsd as number * 1000} USD.`;
+        return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; the price per 1000 ${unitLabel} is ${(pricingInfo.pricePerUnitUsd as number) * 1000} USD.`;
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
         const { value, unit } = convertMinutesToGreatestUnit(pricingInfo.trialMinutes || 0);
         // Handle tiered pricing if present
-        if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
-            const tiers = Object.entries(pricingInfo.tieredPricing)
+        const { entries, simplified } = selectTierEntries(pricingInfo.tieredPricing, forTier);
+        if (entries.length > 0) {
+            const tiers = entries
                 .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd} per month`)
                 .join(', ');
-            return `This Actor is rental and has tiered pricing per month: ${tiers}, with a trial period of ${value} ${unit}.`;
+            const note = simplified ? ` ${SIMPLIFIED_PRICING_NOTE}` : '';
+            return `This Actor is rental and has tiered pricing per month: ${tiers}, with a trial period of ${value} ${unit}.${note}`;
         }
         return `This Actor is rental and has a flat price of ${pricingInfo.pricePerUnitUsd} USD per month, with a trial period of ${value} ${unit}.`;
     }
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
-        return payPerEventPricingToString(pricingInfo.pricingPerEvent);
+        return payPerEventPricingToString(pricingInfo.pricingPerEvent, forTier);
     }
     return 'Pricing information is not available.';
 }
@@ -189,33 +213,39 @@ export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
 /**
  * Transform and normalize API response to match unstructured text output format
  * instead of just dumping raw API data - ensures consistency across structured & unstructured modes.
+ *
+ * When `forTier` is provided, `tieredPricing` arrays (top-level and per-event) are
+ * collapsed to that tier's entry (FREE fallback, then first) and `pricingNote`
+ * is set — but only when filtering actually reduced an array. Without `forTier`,
+ * all tiers are preserved.
  */
-export function pricingInfoToStructured(pricingInfo: PricingInfo | null): StructuredPricingInfo {
-    const structuredPricing: StructuredPricingInfo = {
+export function pricingInfoToStructured(
+    pricingInfo: PricingInfo | null,
+    forTier?: PricingTier,
+): StructuredPricingInfo {
+    const result: StructuredPricingInfo = {
         model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE,
         isFree: !pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE,
     };
 
     if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
-        return structuredPricing;
+        return result;
     }
 
     if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
-        structuredPricing.pricePerUnit = pricingInfo.pricePerUnitUsd || 0;
-        structuredPricing.unitName = pricingInfo.unitName || 'result';
-
+        result.pricePerUnit = pricingInfo.pricePerUnitUsd || 0;
+        result.unitName = pricingInfo.unitName || 'result';
         if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
-            structuredPricing.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
+            result.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
                 tier,
                 pricePerUnit: obj.tieredPricePerUnitUsd,
             }));
         }
     } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
-        structuredPricing.pricePerUnit = pricingInfo.pricePerUnitUsd;
-        structuredPricing.trialMinutes = pricingInfo.trialMinutes;
-
+        result.pricePerUnit = pricingInfo.pricePerUnitUsd;
+        result.trialMinutes = pricingInfo.trialMinutes;
         if (pricingInfo.tieredPricing && Object.keys(pricingInfo.tieredPricing).length > 0) {
-            structuredPricing.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
+            result.tieredPricing = Object.entries(pricingInfo.tieredPricing).map(([tier, obj]) => ({
                 tier,
                 pricePerUnit: obj.tieredPricePerUnitUsd,
             }));
@@ -223,7 +253,7 @@ export function pricingInfoToStructured(pricingInfo: PricingInfo | null): Struct
     } else if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
         if (pricingInfo.pricingPerEvent?.actorChargeEvents) {
             const { actorChargeEvents } = pricingInfo.pricingPerEvent;
-            structuredPricing.events = Object.entries(actorChargeEvents).map(([, event]) => {
+            result.events = Object.entries(actorChargeEvents).map(([, event]) => {
                 const actorEvent = event as ActorChargeEvent;
                 return {
                     title: actorEvent.eventTitle,
@@ -231,111 +261,34 @@ export function pricingInfoToStructured(pricingInfo: PricingInfo | null): Struct
                     priceUsd: typeof actorEvent.eventPriceUsd === 'number' ? actorEvent.eventPriceUsd : undefined,
                     tieredPricing: actorEvent.eventTieredPricingUsd
                         ? Object.entries(actorEvent.eventTieredPricingUsd)
-                            .map(([tier, price]) => ({
-                                tier,
-                                priceUsd: price.tieredEventPriceUsd,
-                            }))
+                            .map(([tier, price]) => ({ tier, priceUsd: price.tieredEventPriceUsd }))
                         : undefined,
                 };
             });
         }
     }
 
-    return structuredPricing;
-}
+    if (!forTier) return result;
 
-/**
- * Simplified text pricing for search-actors: shows only the user's tier price
- * (with FREE fallback) and appends a hint about other tiers.
- *
- * Defaults to FREE when `userTier` is undefined.
- */
-export function pricingInfoToSimplifiedString(
-    pricingInfo: PricingInfo | null,
-    userTier: PricingTier = 'FREE',
-): string {
-    if (pricingInfo === null || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) {
-        return 'This Actor is free to use. You are only charged for Apify platform usage.';
-    }
-    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM) {
-        const customUnitName = pricingInfo.unitName !== 'result' ? pricingInfo.unitName : '';
-        const unitLabel = customUnitName || 'results';
-        const picked = pickTierEntry(pricingInfo.tieredPricing, userTier);
-        if (picked) {
-            return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; price per 1000 ${unitLabel} for ${picked.tier} tier: $${picked.value.tieredPricePerUnitUsd * 1000}. ${SIMPLIFIED_PRICING_NOTE}`;
-        }
-        return `This Actor charges per results${customUnitName ? ` (in this case named ${customUnitName})` : ''}; the price per 1000 ${unitLabel} is ${(pricingInfo.pricePerUnitUsd as number) * 1000} USD.`;
-    }
-    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH) {
-        const { value, unit } = convertMinutesToGreatestUnit(pricingInfo.trialMinutes || 0);
-        const picked = pickTierEntry(pricingInfo.tieredPricing, userTier);
-        if (picked) {
-            return `This Actor is rental; price for ${picked.tier} tier: $${picked.value.tieredPricePerUnitUsd} per month, with a trial period of ${value} ${unit}. ${SIMPLIFIED_PRICING_NOTE}`;
-        }
-        return `This Actor is rental and has a flat price of ${pricingInfo.pricePerUnitUsd} USD per month, with a trial period of ${value} ${unit}.`;
-    }
-    if (pricingInfo.pricingModel === ACTOR_PRICING_MODEL.PAY_PER_EVENT) {
-        const events = pricingInfo.pricingPerEvent?.actorChargeEvents;
-        if (!events) return 'Pricing information for events is not available.';
-        const lines: string[] = [];
-        let hasTieredEvent = false;
-        for (const rawEvent of Object.values(events)) {
-            const event = rawEvent as ActorChargeEvent;
-            let line = `\t- **${event.eventTitle}**: ${event.eventDescription} `;
-            if (typeof event.eventPriceUsd === 'number') {
-                line += `(Flat price: $${event.eventPriceUsd} per event)`;
-            } else if (event.eventTieredPricingUsd) {
-                hasTieredEvent = true;
-                const picked = pickTierEntry(event.eventTieredPricingUsd, userTier);
-                line += picked
-                    ? `(${picked.tier} tier: $${picked.value.tieredEventPriceUsd} per event)`
-                    : '(No price info)';
-            } else {
-                line += '(No price info)';
-            }
-            lines.push(line);
-        }
-        const suffix = hasTieredEvent ? `\n${SIMPLIFIED_PRICING_NOTE}` : '';
-        return `This Actor is paid per event. You are not charged for the Apify platform usage, but only a fixed price for the following events:\n${lines.join('\n')}${suffix}`;
-    }
-    return 'Pricing information is not available.';
-}
-
-/**
- * Simplified structured pricing for search-actors: collapses tiered pricing arrays
- * to a single entry for the user's tier (with FREE fallback) and sets `pricingNote`.
- *
- * Defaults to FREE when `userTier` is undefined.
- */
-export function pricingInfoToSimplifiedStructured(
-    pricingInfo: PricingInfo | null,
-    userTier: PricingTier = 'FREE',
-): StructuredPricingInfo {
-    const result = pricingInfoToStructured(pricingInfo);
     let simplified = false;
-
-    if (result.tieredPricing && result.tieredPricing.length > 0) {
-        const map = Object.fromEntries(result.tieredPricing.map((t) => [t.tier, t]));
-        const picked = pickTierEntry(map, userTier);
-        if (picked) {
-            result.tieredPricing = [picked.value];
-            simplified = true;
+    if (result.tieredPricing && result.tieredPricing.length > 1) {
+        const picked = result.tieredPricing.find((t) => t.tier === forTier)
+            ?? result.tieredPricing.find((t) => t.tier === 'FREE')
+            ?? result.tieredPricing[0];
+        result.tieredPricing = [picked];
+        simplified = true;
+    }
+    if (result.events) {
+        for (const event of result.events) {
+            if (event.tieredPricing && event.tieredPricing.length > 1) {
+                const picked = event.tieredPricing.find((t) => t.tier === forTier)
+                    ?? event.tieredPricing.find((t) => t.tier === 'FREE')
+                    ?? event.tieredPricing[0];
+                event.tieredPricing = [picked];
+                simplified = true;
+            }
         }
     }
-
-    if (result.events) {
-        result.events = result.events.map((event) => {
-            if (!event.tieredPricing || event.tieredPricing.length === 0) return event;
-            const map = Object.fromEntries(event.tieredPricing.map((t) => [t.tier, t]));
-            const picked = pickTierEntry(map, userTier);
-            if (!picked) return event;
-            simplified = true;
-            return { ...event, tieredPricing: [picked.value] };
-        });
-    }
-
-    if (simplified) {
-        result.pricingNote = SIMPLIFIED_PRICING_NOTE;
-    }
+    if (simplified) result.pricingNote = SIMPLIFIED_PRICING_NOTE;
     return result;
 }

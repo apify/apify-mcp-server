@@ -3,8 +3,6 @@ import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } fro
 import {
     getCurrentPricingInfo,
     type PricingInfo,
-    pricingInfoToSimplifiedString,
-    pricingInfoToSimplifiedStructured,
     pricingInfoToString,
     pricingInfoToStructured,
     type StructuredPricingInfo,
@@ -182,9 +180,7 @@ export function formatActorToActorCard(
     }
 
     if (options.includePricing) {
-        const pricingString = options.userTier
-            ? pricingInfoToSimplifiedString(data.pricingInfo, options.userTier)
-            : pricingInfoToString(data.pricingInfo);
+        const pricingString = pricingInfoToString(data.pricingInfo, options.userTier);
         markdownLines.push(`- **[Pricing](${data.actorUrl}/pricing):** ${pricingString}`);
     }
 
@@ -228,12 +224,9 @@ export function formatActorToStructuredCard(
 ): StructuredActorCard {
     const data = extractActorData(actor, options);
 
-    let pricing: StructuredPricingInfo = { model: 'FREE', isFree: true };
-    if (options.includePricing) {
-        pricing = options.userTier
-            ? pricingInfoToSimplifiedStructured(data.pricingInfo, options.userTier)
-            : pricingInfoToStructured(data.pricingInfo);
-    }
+    const pricing: StructuredPricingInfo = options.includePricing
+        ? pricingInfoToStructured(data.pricingInfo, options.userTier)
+        : { model: 'FREE', isFree: true };
 
     return {
         title: data.title,

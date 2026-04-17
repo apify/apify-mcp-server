@@ -2,10 +2,8 @@ import { createHash } from 'node:crypto';
 
 import type { ApifyClient } from '../apify_client.js';
 import { USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS } from '../const.js';
-import type { PricingTier } from './pricing_info.js';
+import { PRICING_TIERS, type PricingTier } from './pricing_info.js';
 import { TTLLRUCache } from './ttl_lru.js';
-
-const VALID_PRICING_TIERS = new Set<PricingTier>(['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND']);
 
 export type CachedUserInfo = {
     userId: string | null;
@@ -16,9 +14,8 @@ export type CachedUserInfo = {
 const userInfoCache = new TTLLRUCache<CachedUserInfo>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
 
 function normalizePlanTier(planId: string | undefined): PricingTier {
-    if (!planId) return 'FREE';
-    const upper = planId.toUpperCase();
-    return VALID_PRICING_TIERS.has(upper as PricingTier) ? (upper as PricingTier) : 'FREE';
+    const upper = planId?.toUpperCase();
+    return PRICING_TIERS.find((t) => t === upper) ?? 'FREE';
 }
 
 /**

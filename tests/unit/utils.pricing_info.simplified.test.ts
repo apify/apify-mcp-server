@@ -3,24 +3,23 @@ import { describe, expect, it } from 'vitest';
 import { ACTOR_PRICING_MODEL } from '../../src/const.js';
 import {
     type PricingInfo,
-    pricingInfoToSimplifiedString,
-    pricingInfoToSimplifiedStructured,
+    pricingInfoToString,
+    pricingInfoToStructured,
+    SIMPLIFIED_PRICING_NOTE,
 } from '../../src/utils/pricing_info.js';
 
-const HINT = 'Higher subscription tiers may offer lower prices. Use fetch-actor-details for complete pricing.';
-
-describe('pricingInfoToSimplifiedString', () => {
-    it('returns free message for FREE pricing', () => {
-        const out = pricingInfoToSimplifiedString({ pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo, 'GOLD');
+describe('pricingInfoToString with userTier', () => {
+    it('returns free message for FREE pricing regardless of tier', () => {
+        const out = pricingInfoToString({ pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo, 'GOLD');
         expect(out).toContain('free to use');
-        expect(out).not.toContain(HINT);
+        expect(out).not.toContain(SIMPLIFIED_PRICING_NOTE);
     });
 
     it('returns free message when pricingInfo is null', () => {
-        expect(pricingInfoToSimplifiedString(null, 'GOLD')).toContain('free to use');
+        expect(pricingInfoToString(null, 'GOLD')).toContain('free to use');
     });
 
-    it('PRICE_PER_DATASET_ITEM with tiered pricing shows only user tier + hint', () => {
+    it('PRICE_PER_DATASET_ITEM with tiered pricing collapses to user tier + note', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -31,28 +30,11 @@ describe('pricingInfoToSimplifiedString', () => {
                 GOLD: { tieredPricePerUnitUsd: 0.002 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info, 'GOLD');
-        expect(out).toContain('GOLD tier');
-        expect(out).toContain('$2');
+        const out = pricingInfoToString(info, 'GOLD');
+        expect(out).toContain('GOLD: $2');
         expect(out).not.toContain('BRONZE');
         expect(out).not.toContain('FREE:');
-        expect(out).toContain(HINT);
-    });
-
-    it('defaults to FREE tier when userTier is undefined', () => {
-        const info = {
-            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
-            pricePerUnitUsd: 0.005,
-            unitName: 'result',
-            tieredPricing: {
-                FREE: { tieredPricePerUnitUsd: 0.005 },
-                GOLD: { tieredPricePerUnitUsd: 0.002 },
-            },
-        } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info);
-        expect(out).toContain('FREE tier');
-        expect(out).not.toContain('GOLD');
-        expect(out).toContain(HINT);
+        expect(out).toContain(SIMPLIFIED_PRICING_NOTE);
     });
 
     it('falls back to FREE when user tier is missing from actor pricing', () => {
@@ -65,8 +47,9 @@ describe('pricingInfoToSimplifiedString', () => {
                 BRONZE: { tieredPricePerUnitUsd: 0.004 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info, 'DIAMOND');
-        expect(out).toContain('FREE tier');
+        const out = pricingInfoToString(info, 'DIAMOND');
+        expect(out).toContain('FREE: $5');
+        expect(out).not.toContain('BRONZE');
     });
 
     it('falls back to first tier when neither user tier nor FREE exist', () => {
@@ -79,11 +62,28 @@ describe('pricingInfoToSimplifiedString', () => {
                 SILVER: { tieredPricePerUnitUsd: 0.003 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info, 'DIAMOND');
-        expect(out).toContain('BRONZE tier');
+        const out = pricingInfoToString(info, 'DIAMOND');
+        expect(out).toContain('BRONZE: $4');
+        expect(out).not.toContain('SILVER');
     });
 
-    it('PAY_PER_EVENT shows only user tier per event + single hint', () => {
+    it('without userTier shows all tiers and no note', () => {
+        const info = {
+            pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
+            pricePerUnitUsd: 0.005,
+            unitName: 'result',
+            tieredPricing: {
+                FREE: { tieredPricePerUnitUsd: 0.005 },
+                GOLD: { tieredPricePerUnitUsd: 0.002 },
+            },
+        } as unknown as PricingInfo;
+        const out = pricingInfoToString(info);
+        expect(out).toContain('FREE: $5');
+        expect(out).toContain('GOLD: $2');
+        expect(out).not.toContain(SIMPLIFIED_PRICING_NOTE);
+    });
+
+    it('PAY_PER_EVENT collapses each tiered event to user tier + single note', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PAY_PER_EVENT,
             pricingPerEvent: {
@@ -105,16 +105,16 @@ describe('pricingInfoToSimplifiedString', () => {
                 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info, 'GOLD');
-        expect(out).toContain('GOLD tier: $0.002');
+        const out = pricingInfoToString(info, 'GOLD');
+        expect(out).toContain('GOLD: $0.002');
         expect(out).toContain('Flat price: $0.00005');
         expect(out).not.toContain('FREE:');
         expect(out).not.toContain('DIAMOND');
-        // Single hint at the end, not per-event
-        expect(out.match(new RegExp(HINT.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'))?.length).toBe(1);
+        const noteEsc = SIMPLIFIED_PRICING_NOTE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        expect(out.match(new RegExp(noteEsc, 'g'))?.length).toBe(1);
     });
 
-    it('FLAT_PRICE_PER_MONTH with tiered pricing shows user tier + hint', () => {
+    it('FLAT_PRICE_PER_MONTH with tiered pricing collapses to user tier + note', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH,
             pricePerUnitUsd: 30,
@@ -124,15 +124,16 @@ describe('pricingInfoToSimplifiedString', () => {
                 GOLD: { tieredPricePerUnitUsd: 20 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedString(info, 'GOLD');
-        expect(out).toContain('GOLD tier: $20 per month');
-        expect(out).toContain(HINT);
+        const out = pricingInfoToString(info, 'GOLD');
+        expect(out).toContain('GOLD: $20 per month');
+        expect(out).not.toContain('FREE: $30');
+        expect(out).toContain(SIMPLIFIED_PRICING_NOTE);
     });
 });
 
-describe('pricingInfoToSimplifiedStructured', () => {
+describe('pricingInfoToStructured with userTier', () => {
     it('FREE pricing returns isFree without note', () => {
-        const out = pricingInfoToSimplifiedStructured({ pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo, 'GOLD');
+        const out = pricingInfoToStructured({ pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo, 'GOLD');
         expect(out.isFree).toBe(true);
         expect(out.pricingNote).toBeUndefined();
     });
@@ -147,12 +148,12 @@ describe('pricingInfoToSimplifiedStructured', () => {
                 GOLD: { tieredPricePerUnitUsd: 0.002 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'GOLD');
+        const out = pricingInfoToStructured(info, 'GOLD');
         expect(out.tieredPricing).toEqual([{ tier: 'GOLD', pricePerUnit: 0.002 }]);
-        expect(out.pricingNote).toBe(HINT);
+        expect(out.pricingNote).toBe(SIMPLIFIED_PRICING_NOTE);
     });
 
-    it('defaults to FREE tier when userTier is undefined', () => {
+    it('without userTier preserves all tiers and no note', () => {
         const info = {
             pricingModel: ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM,
             pricePerUnitUsd: 0.005,
@@ -162,9 +163,12 @@ describe('pricingInfoToSimplifiedStructured', () => {
                 GOLD: { tieredPricePerUnitUsd: 0.002 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info);
-        expect(out.tieredPricing).toEqual([{ tier: 'FREE', pricePerUnit: 0.005 }]);
-        expect(out.pricingNote).toBe(HINT);
+        const out = pricingInfoToStructured(info);
+        expect(out.tieredPricing).toEqual([
+            { tier: 'FREE', pricePerUnit: 0.005 },
+            { tier: 'GOLD', pricePerUnit: 0.002 },
+        ]);
+        expect(out.pricingNote).toBeUndefined();
     });
 
     it('PAY_PER_EVENT collapses each event tieredPricing to user tier', () => {
@@ -189,13 +193,13 @@ describe('pricingInfoToSimplifiedStructured', () => {
                 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'GOLD');
+        const out = pricingInfoToStructured(info, 'GOLD');
         expect(out.events).toHaveLength(2);
         expect(out.events![0].tieredPricing).toEqual([{ tier: 'GOLD', priceUsd: 0.002 }]);
         // Flat-priced event preserved as-is
         expect(out.events![1].priceUsd).toBe(0.00005);
         expect(out.events![1].tieredPricing).toBeUndefined();
-        expect(out.pricingNote).toBe(HINT);
+        expect(out.pricingNote).toBe(SIMPLIFIED_PRICING_NOTE);
     });
 
     it('does not set pricingNote when nothing was simplified', () => {
@@ -211,7 +215,7 @@ describe('pricingInfoToSimplifiedStructured', () => {
                 },
             },
         } as unknown as PricingInfo;
-        const out = pricingInfoToSimplifiedStructured(info, 'GOLD');
+        const out = pricingInfoToStructured(info, 'GOLD');
         expect(out.pricingNote).toBeUndefined();
     });
 });
