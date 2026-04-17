@@ -235,9 +235,12 @@ export async function buildFetchActorDetailsResult(
         return buildActorNotFoundResponse(actorName);
     }
 
-    const actorOutputSchema = resolvedOutput.outputSchema
-        ? await apifyMcpServer.actorStore?.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
-        : undefined;
+    let actorOutputSchema: Record<string, unknown> | null | undefined;
+    if (resolvedOutput.outputSchema) {
+        actorOutputSchema = apifyMcpServer.actorStore
+            ? await apifyMcpServer.actorStore.getActorOutputSchemaAsTypeObject(actorName).catch(() => null)
+            : null;
+    }
     const mcpToolsMessage = resolvedOutput.mcpTools
         ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, apifyMcpServer?.options.paymentProvider, mcpSessionId)
         : undefined;

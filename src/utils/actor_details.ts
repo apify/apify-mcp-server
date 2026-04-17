@@ -20,7 +20,7 @@ const ACTOR_DETAILS_PICTURE_SEARCH_LIMIT = 5;
  * Input:  { first_number: "number", tags: ["string"], user: { name: "string" } }
  * Output: "{ first_number: number, tags: string[], user: { name: string } }"
  *
- * Top-level values that are not string / object / array are skipped (not rendered).
+ * Values that are not string / object / array are skipped (not rendered) at every nesting level.
  */
 export function typeObjectToString(obj: Record<string, unknown>): string {
     const pairs = Object.entries(obj)
