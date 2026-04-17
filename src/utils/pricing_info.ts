@@ -480,7 +480,14 @@ function structurePayPerEventSimplified(
 
         const { tier, value } = resolveTier(tieredMap, userTier);
         resolvedTiers.add(tier);
-        return { ...baseEvent, tieredPricing: [{ tier, priceUsd: value.tieredEventPriceUsd }] };
+        // `priceUsd` is set in addition to `tieredPricing` so the widget's FREE-tier
+        // fallback (src/web/src/utils/formatting.ts) can render a concrete price for
+        // FREE-tier users instead of the generic "Pay per event" fallback.
+        return {
+            ...baseEvent,
+            priceUsd: value.tieredEventPriceUsd,
+            tieredPricing: [{ tier, priceUsd: value.tieredEventPriceUsd }],
+        };
     });
 
     const noteTier = getSingleResolvedTier(resolvedTiers);

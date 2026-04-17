@@ -267,6 +267,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
+                    priceUsd: 0.0021,
                     tieredPricing: [{ tier: 'GOLD', priceUsd: 0.0021 }],
                 },
                 {
@@ -323,6 +324,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 {
                     title: 'Scraped place',
                     description: 'A Google Maps place scraped',
+                    priceUsd: 0.004,
                     tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
                 },
             ],
@@ -367,11 +369,13 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 {
                     title: 'A',
                     description: '',
+                    priceUsd: 0.005,
                     tieredPricing: [{ tier: 'GOLD', priceUsd: 0.005 }],
                 },
                 {
                     title: 'B',
                     description: '',
+                    priceUsd: 0.02,
                     tieredPricing: [{ tier: 'FREE', priceUsd: 0.02 }],
                 },
             ],
@@ -383,12 +387,12 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             model: 'PAY_PER_EVENT',
             userTier: 'FREE',
             events: [
-                { title: 'Result', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0037 }] },
-                { title: 'Add-on: Date filter', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                { title: 'Add-on: Popularity filter', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                { title: 'Add-on: Follower / Following', tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }] },
-                { title: 'Add-on: Search video sorting', tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                { title: 'Actor start', tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
+                { title: 'Result', priceUsd: 0.0037, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0037 }] },
+                { title: 'Add-on: Date filter', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Add-on: Popularity filter', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Add-on: Follower / Following', priceUsd: 0.004, tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }] },
+                { title: 'Add-on: Search video sorting', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                { title: 'Actor start', priceUsd: 0.001, tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
             ],
             pricingNote: NOTE_FREE,
             eventDescriptionsOmitted: true,

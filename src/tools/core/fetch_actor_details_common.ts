@@ -231,7 +231,13 @@ export async function buildFetchActorDetailsResult(
     const apifyClient = new ApifyClient({ token: apifyToken });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
-    const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
+    // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only
+    // or mcpTools-only requests). In that case `userTier` is only used to fill the
+    // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
+    // read, so defaulting to 'FREE' is safe and saves a request.
+    const userPlanTier = resolvedOutput.pricing
+        ? (await getUserInfoCached(apifyToken, apifyClient)).userPlanTier
+        : 'FREE';
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier };
     const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {
