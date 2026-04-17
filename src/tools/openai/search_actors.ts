@@ -18,20 +18,24 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, userRentedActorIds, apifyMcpServer } = toolArgs;
         const parsed = searchActorsArgsSchema.parse(args);
-        const actors = await searchAndFilterActors({
-            keywords: parsed.keywords,
-            apifyToken,
-            limit: parsed.limit,
-            offset: parsed.offset,
-            paymentProvider: apifyMcpServer.options.paymentProvider,
-            userRentedActorIds,
-        });
+        // Actor search and user-info fetch are independent; run in parallel to avoid a
+        // sequential round-trip on cache miss.
+        const [actors, { userPlanTier }] = await Promise.all([
+            searchAndFilterActors({
+                keywords: parsed.keywords,
+                apifyToken,
+                limit: parsed.limit,
+                offset: parsed.offset,
+                paymentProvider: apifyMcpServer.options.paymentProvider,
+                userRentedActorIds,
+            }),
+            getUserInfoCached(apifyToken, apifyClient),
+        ]);
 
         if (actors.length === 0) {
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
         const structuredContent: {
             actors: typeof actorCardStructured;

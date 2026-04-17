@@ -215,7 +215,7 @@ function formatDatasetItemComplete(info: DatasetItemLike): string {
 
     const price = tierEntries.length === 1
         ? tierEntries[0][1].tieredPricePerUnitUsd
-        : (info.pricePerUnitUsd as number);
+        : (info.pricePerUnitUsd ?? 0);
     return `This Actor costs $${price * 1000} per 1000 ${unitLabel}.`;
 }
 
@@ -233,7 +233,7 @@ function formatRentalComplete(info: RentalLike): string {
 
     const price = tierEntries.length === 1
         ? tierEntries[0][1].tieredPricePerUnitUsd
-        : info.pricePerUnitUsd;
+        : (info.pricePerUnitUsd ?? 0);
     return `This Actor is rental and costs $${price} per month, with a trial period of ${value} ${unit}.`;
 }
 
@@ -352,7 +352,7 @@ function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTie
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
         return `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}. ${buildPricingNote(tier)}`;
     }
-    return `This Actor costs $${(info.pricePerUnitUsd as number) * 1000} per 1000 ${unitLabel}.`;
+    return `This Actor costs $${(info.pricePerUnitUsd ?? 0) * 1000} per 1000 ${unitLabel}.`;
 }
 
 function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string {
@@ -362,7 +362,7 @@ function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string
         return `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, `
             + `with a trial period of ${value} ${unit}. ${buildPricingNote(tier)}`;
     }
-    return `This Actor is rental and costs $${info.pricePerUnitUsd} per month, with a trial period of ${value} ${unit}.`;
+    return `This Actor is rental and costs $${info.pricePerUnitUsd ?? 0} per month, with a trial period of ${value} ${unit}.`;
 }
 
 function formatPayPerEventSimplified(

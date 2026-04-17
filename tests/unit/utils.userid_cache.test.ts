@@ -78,6 +78,14 @@ describe('getUserInfoCached', () => {
         expect(get).toHaveBeenCalledTimes(1);
     });
 
+    it.each([undefined, ''])('returns anonymous FREE default without calling API when token is %p', async (token) => {
+        const get = vi.fn();
+        const client = { user: vi.fn(() => ({ get })) } as unknown as ApifyClient;
+        const out = await getUserInfoCached(token, client);
+        expect(out).toEqual({ userId: null, userPlanTier: 'FREE' });
+        expect(get).not.toHaveBeenCalled();
+    });
+
     it('does NOT cache failed lookups (next call retries)', async () => {
         let attempts = 0;
         const get = vi.fn(async () => {
