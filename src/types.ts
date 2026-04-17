@@ -576,6 +576,7 @@ export type ActorsMcpServerOptions = {
 export type StructuredActorCard = {
     title?: string;
     url: string;
+    id: string;
     fullName: string;
     pictureUrl?: string;
     developer: {
