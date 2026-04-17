@@ -13,8 +13,8 @@ export type CachedUserInfo = {
 // LRU cache with TTL for user info - keyed by hashed token
 const userInfoCache = new TTLLRUCache<CachedUserInfo>(USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS);
 
-function normalizePlanTier(planId: string | undefined): PricingTier {
-    const upper = planId?.toUpperCase();
+function normalizePlanTier(tier: string | undefined): PricingTier {
+    const upper = tier?.toUpperCase();
     return PRICING_TIERS.find((t) => t === upper) ?? 'FREE';
 }
 
@@ -36,9 +36,12 @@ export async function getUserInfoCached(
 
     try {
         const user = await apifyClient.user('me').get();
+        // `tier` is present on /v2/users/me `plan` response (FREE/BRONZE/SILVER/GOLD/PLATINUM/DIAMOND)
+        // but missing from apify-client's type declaration — hence the cast.
+        const planTier = (user?.plan as { tier?: string } | undefined)?.tier;
         const info: CachedUserInfo = {
             userId: user?.id ?? null,
-            userPlanTier: normalizePlanTier(user?.plan?.id),
+            userPlanTier: normalizePlanTier(planTier),
         };
         userInfoCache.set(tokenHash, info);
         return info;
