@@ -11,12 +11,13 @@ import {
     TOOL_STATUS,
 } from '../../const.js';
 import { connectMCPClient } from '../../mcp/client.js';
+import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolInputSchema } from '../../types.js';
 import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { logHttpError } from '../../utils/logging.js';
+import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
-import { extractAjvErrorDetails } from '../../utils/tool_status.js';
+import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
@@ -44,6 +45,164 @@ USAGE:
 /** Shared examples section — identical in both modes. */
 export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;
+
+type CallActorDescriptionParams = {
+    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL;
+    storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
+    useInternalSearchWarning: boolean;
+    alwaysAsync: boolean;
+};
+
+type StartedActorRun = {
+    id: string;
+    status: string;
+    startedAt?: Date;
+};
+
+type StartAsyncResponseResult = {
+    content: { type: 'text'; text: string }[];
+    structuredContent: {
+        runId: string;
+        actorName: string;
+        status: string;
+        startedAt: string;
+        input: Record<string, unknown>;
+    };
+    _meta?: Record<string, unknown>;
+};
+
+type CallActorErrorResponseParams = {
+    actorName: string;
+    error: unknown;
+    actorId?: string;
+    isAsync: boolean;
+    mcpSessionId?: string;
+    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL;
+    storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
+};
+
+export function buildCallActorDescription(params: CallActorDescriptionParams): string {
+    const { actorGetDetailsTool, storeSearchTool, useInternalSearchWarning, alwaysAsync } = params;
+
+    const workflowLines = [
+        'WORKFLOW:',
+        `1. Use ${actorGetDetailsTool} to get the Actor's input schema`,
+        '2. Call this tool with the actor name and proper input based on the schema',
+        '',
+        `If the actor name is not in "username/name" format, use ${storeSearchTool} to resolve the correct Actor first.`,
+    ];
+
+    if (useInternalSearchWarning) {
+        workflowLines.push(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`);
+    }
+
+    const sections = [
+        'Call any Actor from the Apify Store.',
+        workflowLines.join('\n'),
+        CALL_ACTOR_MCP_SERVER_SECTION,
+        alwaysAsync
+            ? `IMPORTANT:
+- This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
+- After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
+- Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
+- Use dedicated Actor tools when available for better experience`
+            : `IMPORTANT:
+- Typically returns a datasetId and preview of output items
+- Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
+- Use dedicated Actor tools when available for better experience`,
+        CALL_ACTOR_USAGE_SECTION,
+        !alwaysAsync
+            ? `- This tool supports async execution via the \`async\` parameter:
+  - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
+  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.`
+            : null,
+        CALL_ACTOR_EXAMPLES_SECTION,
+    ];
+
+    return sections.filter(Boolean).join('\n\n');
+}
+
+export function buildStartAsyncResponse(params: {
+    actorName: string;
+    actorRun: StartedActorRun;
+    input: Record<string, unknown>;
+    widget: boolean;
+}): StartAsyncResponseResult {
+    const { actorName, actorRun, input, widget } = params;
+
+    const structuredContent = {
+        runId: actorRun.id,
+        actorName,
+        status: actorRun.status,
+        startedAt: actorRun.startedAt?.toISOString() || '',
+        input,
+    };
+
+    if (!widget) {
+        return {
+            content: [{
+                type: 'text',
+                text: `Started Actor "${actorName}" (Run ID: ${actorRun.id}).`,
+            }],
+            structuredContent,
+        };
+    }
+
+    const responseText = `Started Actor "${actorName}" (Run ID: ${actorRun.id}).
+
+A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
+
+The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
+
+Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
+
+    const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
+    return {
+        content: [{
+            type: 'text',
+            text: responseText,
+        }],
+        structuredContent,
+        _meta: {
+            ...widgetConfig?.meta,
+            'openai/widgetDescription': `Actor run progress for ${actorName}`,
+        },
+    };
+}
+
+export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ReturnType<typeof buildMCPResponse> {
+    const {
+        actorName,
+        error,
+        actorId,
+        isAsync,
+        mcpSessionId,
+        actorGetDetailsTool,
+        storeSearchTool,
+    } = params;
+
+    const errMsg = error instanceof Error ? error.message : String(error);
+    logHttpError(error, 'Failed to call Actor', {
+        actorName,
+        async: isAsync,
+        mcpSessionId,
+        failureCategory: classifyFailureCategory(error),
+    });
+
+    return buildMCPResponse({
+        texts: [`Failed to call Actor '${actorName}': ${errMsg}.
+Please verify the Actor name, input parameters, and ensure the Actor exists.
+You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.`],
+        isError: true,
+        telemetry: {
+            toolStatus: getToolStatusFromError(error, false),
+            failureCategory: classifyFailureCategory(error),
+            failureHttpStatus: getHttpStatusCode(error),
+            failureDetail: errMsg.slice(0, 200),
+            actorId,
+        },
+    });
+}
 
 /**
  * Zod schema for call-actor arguments — shared between default and openai variants.

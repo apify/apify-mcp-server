@@ -3,16 +3,14 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
-import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
-import { classifyFailureCategory, getToolStatusFromError } from '../../utils/tool_status.js';
+import { buildUsageMeta } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { callActorGetDataset } from '../core/actor_execution.js';
 import { buildActorResponseContent } from '../core/actor_response.js';
 import {
-    CALL_ACTOR_EXAMPLES_SECTION,
-    CALL_ACTOR_MCP_SERVER_SECTION,
-    CALL_ACTOR_USAGE_SECTION,
+    buildCallActorDescription,
+    buildCallActorErrorResponse,
+    buildStartAsyncResponse,
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
@@ -20,30 +18,12 @@ import {
 } from '../core/call_actor_common.js';
 import { callActorOutputSchema } from '../structured_output_schemas.js';
 
-const CALL_ACTOR_DEFAULT_DESCRIPTION = [
-    `Call any Actor from the Apify Store.`,
-
-    `WORKFLOW:
-1. Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema
-2. Call this tool with the actor name and proper input based on the schema
-
-If the actor name is not in "username/name" format, use ${HelperTools.STORE_SEARCH} to resolve the correct Actor first.`,
-
-    CALL_ACTOR_MCP_SERVER_SECTION,
-
-    `IMPORTANT:
-- Typically returns a datasetId and preview of output items
-- Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
-- Use dedicated Actor tools when available for better experience`,
-
-    CALL_ACTOR_USAGE_SECTION,
-
-    `- This tool supports async execution via the \`async\` parameter:
-  - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.`,
-
-    CALL_ACTOR_EXAMPLES_SECTION,
-].join('\n\n');
+const CALL_ACTOR_DEFAULT_DESCRIPTION = buildCallActorDescription({
+    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+    storeSearchTool: HelperTools.STORE_SEARCH,
+    useInternalSearchWarning: false,
+    alwaysAsync: false,
+});
 
 /**
  * Default mode call-actor tool.
@@ -100,23 +80,16 @@ export const defaultCallActor: ToolEntry = Object.freeze({
             if (isAsync) {
                 const actorClient = apifyClient.actor(baseActorName);
                 const actorRun = await actorClient.start(input, callOptions);
-
                 log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-
-                const structuredContent = {
-                    runId: actorRun.id,
+                const response = buildStartAsyncResponse({
                     actorName: baseActorName,
-                    status: actorRun.status,
-                    startedAt: actorRun.startedAt?.toISOString() || '',
+                    actorRun,
                     input,
-                };
+                    widget: false,
+                });
 
                 return {
-                    content: [{
-                        type: 'text',
-                        text: `Started Actor "${baseActorName}" (Run ID: ${actorRun.id}).`,
-                    }],
-                    structuredContent,
+                    ...response,
                     toolTelemetry: { actorId: resolvedActorId },
                 };
             }
@@ -148,25 +121,14 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            logHttpError(error, 'Failed to call Actor', {
+            return buildCallActorErrorResponse({
                 actorName: baseActorName,
-                async: isAsync,
+                error,
+                actorId: resolvedActorId,
+                isAsync,
                 mcpSessionId: toolArgs.mcpSessionId,
-                failureCategory: classifyFailureCategory(error),
-            });
-            return buildMCPResponse({
-                texts: [`Failed to call Actor '${baseActorName}': ${errMsg}.
-Please verify the Actor name, input parameters, and ensure the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}, or get Actor details using: ${HelperTools.ACTOR_GET_DETAILS}.`],
-                isError: true,
-                telemetry: {
-                    toolStatus: getToolStatusFromError(error, false),
-                    failureCategory: classifyFailureCategory(error),
-                    failureHttpStatus: getHttpStatusCode(error),
-                    failureDetail: errMsg.slice(0, 200),
-                    actorId: resolvedActorId,
-                },
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+                storeSearchTool: HelperTools.STORE_SEARCH,
             });
         }
     },
