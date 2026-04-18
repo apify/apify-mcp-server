@@ -1,8 +1,8 @@
-import { TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { logHttpError } from '../../utils/logging.js';
-import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import {
+    buildGetActorRunError,
+    buildGetActorRunSuccessResponse,
     fetchActorRunData,
     getActorRunArgs,
     getActorRunMetadata,
@@ -29,22 +29,10 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 return fetchResult.error;
             }
 
-            const { run, structuredContent } = fetchResult.result;
-            const texts = [`# Actor Run Information\n\`\`\`json\n${JSON.stringify(run)}\n\`\`\``];
-
-            return buildMCPResponse({
-                texts,
-                structuredContent,
-                _meta: buildUsageMeta(run),
-            });
+            return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false });
         } catch (error) {
             logHttpError(error, 'Failed to get Actor run', { runId: parsed.runId });
-            return buildMCPResponse({
-                texts: [`Failed to get Actor run '${parsed.runId}': ${error instanceof Error ? error.message : String(error)}.
-Please verify the run ID and ensure that the run exists.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
-            });
+            return buildGetActorRunError(parsed.runId, error);
         }
     },
 } as const);
