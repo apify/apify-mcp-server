@@ -45,7 +45,7 @@
  * Single-tier buckets stay as 1-element `tieredPricing` arrays in both modes.
  * `FREE` or `null` input returns the free text / structured shape.
  *
- * Full examples: `res/pricing_output_contract.md`.
+ * Full examples and contract details are documented inline in this module.
  */
 
 import type {
