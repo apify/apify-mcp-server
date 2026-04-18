@@ -11,9 +11,30 @@ import type { PricingTier } from '../../utils/pricing_info.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
+ * Shared base schema for search-actors arguments. Used directly by the internal
+ * variant; extended by `searchActorsArgsSchema` with a longer `keywords` description.
+ */
+export const searchActorsBaseArgsSchema = z.object({
+    keywords: z.string()
+        .default('')
+        .describe('Keywords used to search for Actors in the Apify Store.'),
+    limit: z.number()
+        .int()
+        .min(1)
+        .max(100)
+        .default(5)
+        .describe('The maximum number of Actors to return (default = 5)'),
+    offset: z.number()
+        .int()
+        .min(0)
+        .default(0)
+        .describe('The number of elements to skip from the start (default = 0)'),
+});
+
+/**
  * Zod schema for search-actors arguments — shared between default and openai variants.
  */
-export const searchActorsArgsSchema = z.object({
+export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({
     keywords: z.string()
         .default('')
         .describe(dedent`
@@ -33,17 +54,6 @@ export const searchActorsArgsSchema = z.object({
             ❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
             ❌ Bad: "data extraction scraping tools" (too generic)
         `),
-    limit: z.number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(5)
-        .describe('The maximum number of Actors to return (default = 5)'),
-    offset: z.number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe('The number of elements to skip from the start (default = 0)'),
 });
 
 const SEARCH_ACTORS_DESCRIPTION = `

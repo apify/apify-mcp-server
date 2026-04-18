@@ -6,24 +6,10 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { searchAndFilterActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { searchActorsBaseArgsSchema } from '../core/search_actors_common.js';
 import { actorSearchInternalOutputSchema } from '../structured_output_schemas.js';
 
-const searchActorsInternalArgsSchema = z.object({
-    limit: z.number()
-        .int()
-        .min(1)
-        .max(100)
-        .default(5)
-        .describe('The maximum number of Actors to return (default = 5)'),
-    offset: z.number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe('The number of elements to skip from the start (default = 0)'),
-    keywords: z.string()
-        .default('')
-        .describe('Keywords used to search for Actors in the Apify Store.'),
-});
+const searchActorsInternalInputSchema = z.toJSONSchema(searchActorsBaseArgsSchema);
 
 export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
@@ -40,9 +26,9 @@ export const searchActorsInternalTool: ToolEntry = Object.freeze({
 
         Returns only minimal fields (fullName, title, description) needed for subsequent calls.
     `,
-    inputSchema: z.toJSONSchema(searchActorsInternalArgsSchema) as ToolInputSchema,
+    inputSchema: searchActorsInternalInputSchema as ToolInputSchema,
     outputSchema: actorSearchInternalOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsInternalArgsSchema)),
+    ajvValidate: compileSchema(searchActorsInternalInputSchema),
     annotations: {
         title: 'Search Actors (internal)',
         readOnlyHint: true,
@@ -52,7 +38,7 @@ export const searchActorsInternalTool: ToolEntry = Object.freeze({
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, userRentedActorIds, apifyMcpServer } = toolArgs;
-        const parsed = searchActorsInternalArgsSchema.parse(args);
+        const parsed = searchActorsBaseArgsSchema.parse(args);
         const actors = await searchAndFilterActors({
             keywords: parsed.keywords,
             apifyToken,
