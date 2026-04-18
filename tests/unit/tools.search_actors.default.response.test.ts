@@ -5,6 +5,7 @@ import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
 import type { HelperTool } from '../../src/types.js';
 import { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { searchAndFilterActors } from '../../src/utils/actor_search.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -15,9 +16,15 @@ vi.mock('../../src/utils/actor_search.js', () => ({
     searchAndFilterActors: vi.fn(),
 }));
 
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
+
 describe('search-actors without widget (defaultSearchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAndFilterActors).mockReset();
+        vi.mocked(getUserInfoCached).mockReset();
+        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
     it('returns structured actors and markdown text; no widget payload', async () => {

@@ -82,7 +82,11 @@ export const pricingSchema = {
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
         tieredPricing: tieredPricingSchema,
         events: pricingEventsSchema,
-        pricingNote: { type: 'string', description: 'Note about additional pricing tiers available via fetch-actor-details' },
+        pricingNote: {
+            type: 'string',
+            description: 'Note naming the resolved tier; only emitted in simplified mode '
+                + 'when the actor has multiple tiers and they resolve consistently',
+        },
         eventDescriptionsOmitted: {
             type: 'boolean',
             description: 'Whether event descriptions were omitted because the actor has many pricing events',

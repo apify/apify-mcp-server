@@ -316,7 +316,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         expect(out.pricingNote).toContain('BRONZE');
     });
 
-    it('E4: single-tier actor — pricingNote names the single tier (higher tiers may exist on the platform)', () => {
+    it('E4: single-tier actor — no pricingNote (the "higher tiers" promise is vacuous)', () => {
         expect(pricingInfoToSimplifiedStructured(singleTierPayPerEvent, 'GOLD')).toEqual({
             model: 'PAY_PER_EVENT',
             userTier: 'GOLD',
@@ -328,7 +328,6 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                     tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
                 },
             ],
-            pricingNote: NOTE_FREE,
         });
     });
 
@@ -399,7 +398,7 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
         });
     });
 
-    it('omits event descriptions and adds omission metadata when PAY_PER_EVENT has more than 5 events', () => {
+    it('omits event descriptions and adds omission metadata when PAY_PER_EVENT has more than 5 events (single-tier: no pricingNote)', () => {
         expect(pricingInfoToSimplifiedStructured(longPayPerEvent, 'FREE')).toEqual({
             model: 'PAY_PER_EVENT',
             userTier: 'FREE',
@@ -411,7 +410,6 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
                 { title: 'Add-on: Search video sorting', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
                 { title: 'Actor start', priceUsd: 0.001, tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
             ],
-            pricingNote: NOTE_FREE,
             eventDescriptionsOmitted: true,
             eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,
         });
@@ -428,10 +426,10 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
         );
     });
 
-    it('E4: single-tier actor — flat price plus pricingNote naming the single tier', () => {
+    it('E4: single-tier actor — flat price, no pricingNote', () => {
         expect(pricingInfoToSimplifiedString(singleTierPayPerEvent, 'GOLD')).toBe(
             'This Actor is paid per event:\n'
-            + `\t- **Scraped place**: A Google Maps place scraped ($0.004 per event)\n${NOTE_FREE}`,
+            + '\t- **Scraped place**: A Google Maps place scraped ($0.004 per event)',
         );
     });
 
@@ -484,7 +482,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
             + '\t- **Add-on: Popularity filter**: $0.0013 per event\n'
             + '\t- **Add-on: Follower / Following**: $0.004 per event\n'
             + '\t- **Add-on: Search video sorting**: $0.0013 per event\n'
-            + `\t- **Actor start**: $0.001 per event\n${NOTE_FREE}\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
+            + `\t- **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
         );
     });
 });

@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
@@ -225,10 +224,9 @@ export async function buildFetchActorDetailsResult(
     toolArgs: InternalToolArgs,
     route: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL,
 ): Promise<ReturnType<typeof buildMCPResponse>> {
-    const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+    const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
-    const apifyClient = new ApifyClient({ token: apifyToken });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only

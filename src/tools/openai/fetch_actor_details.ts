@@ -38,8 +38,12 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         }
 
         const { actorUrl, actorDetails } = buildActorDetailsForWidget(details, userPlanTier);
+        // Pricing is already carried by `actorDetails.actorInfo.currentPricingInfo` (widget-facing,
+        // tier-aware simplified). Omit the complete-mode `pricing` field from the top-level
+        // `actorInfo` to avoid two conflicting pricing shapes in the same response.
+        const { pricing: _pricing, ...actorInfoWithoutPricing } = details.actorCardStructured;
         const structuredContent = {
-            actorInfo: details.actorCardStructured,
+            actorInfo: actorInfoWithoutPricing,
             inputSchema: details.inputSchema,
             actorDetails,
         };

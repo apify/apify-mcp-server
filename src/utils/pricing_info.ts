@@ -31,11 +31,11 @@
  * Complete mode keeps full tier matrices and never sets `pricingNote`.
  *
  * Simplified mode picks a single tier from each tiered map
- * (requested tier -> FREE -> first entry) and emits `pricingNote` whenever
- * the resolved tier is consistent across the Actor — even for single-tier
- * Actors, since the user's plan may offer cheaper rates on the Apify platform
- * that this particular Actor hasn't opted into. `pricingNote` is omitted when
- * PAY_PER_EVENT events resolve to different tiers (no truthful single label).
+ * (requested tier -> FREE -> first entry) and emits `pricingNote` only when
+ * the Actor actually has multiple tiers *and* they resolve consistently. The
+ * note is omitted for single-tier Actors (the note's "higher tiers may offer
+ * lower prices" promise is vacuous) and when PAY_PER_EVENT events resolve
+ * to different tiers (no truthful single label).
  *
  * Simplified `PAY_PER_EVENT` also trims long event lists:
  * - `events.length <= 5`: keep event descriptions
@@ -169,6 +169,14 @@ function buildPricingNote(resolvedTier: string): string | null {
 function getSingleResolvedTier(resolvedTiers: Set<string>): string | null {
     if (resolvedTiers.size !== 1) return null;
     return resolvedTiers.values().next().value ?? null;
+}
+
+function hasTiers<T>(map: Record<string, T> | undefined): map is Record<string, T> {
+    return !!map && Object.keys(map).length > 0;
+}
+
+function hasMultipleTiers<T>(map: Record<string, T> | undefined): boolean {
+    return !!map && Object.keys(map).length > 1;
 }
 
 function shouldOmitEventDescriptions(eventCount: number): boolean {
@@ -309,7 +317,7 @@ function createStructuredBase(
 function structureTieredUnitComplete(info: DatasetItemLike | RentalLike): Partial<StructuredPricingInfo> {
     const patch: Partial<StructuredPricingInfo> = { pricePerUnit: info.pricePerUnitUsd ?? 0 };
 
-    if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
+    if (hasTiers(info.tieredPricing)) {
         patch.tieredPricing = Object.entries(info.tieredPricing).map(([tier, obj]) => ({
             tier,
             pricePerUnit: obj.tieredPricePerUnitUsd,
@@ -358,10 +366,10 @@ export function pricingInfoToSimplifiedString(
 
 function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTier): string {
     const unitLabel = info.unitName ? `${info.unitName}s` : 'results';
-    if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
+    if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
         const base = `This Actor costs $${value.tieredPricePerUnitUsd * 1000} per 1000 ${unitLabel}.`;
-        const note = buildPricingNote(tier);
+        const note = hasMultipleTiers(info.tieredPricing) ? buildPricingNote(tier) : null;
         return note ? `${base} ${note}` : base;
     }
     return `This Actor costs $${(info.pricePerUnitUsd ?? 0) * 1000} per 1000 ${unitLabel}.`;
@@ -369,11 +377,11 @@ function formatDatasetItemSimplified(info: DatasetItemLike, userTier: PricingTie
 
 function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string {
     const { value, unit } = convertMinutesToGreatestUnit(info.trialMinutes || 0);
-    if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
+    if (hasTiers(info.tieredPricing)) {
         const { tier, value: entry } = resolveTier(info.tieredPricing, userTier);
         const base = `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, `
             + `with a trial period of ${value} ${unit}.`;
-        const note = buildPricingNote(tier);
+        const note = hasMultipleTiers(info.tieredPricing) ? buildPricingNote(tier) : null;
         return note ? `${base} ${note}` : base;
     }
     return `This Actor is rental and costs $${info.pricePerUnitUsd ?? 0} per month, with a trial period of ${value} ${unit}.`;
@@ -385,16 +393,17 @@ function formatPayPerEventSimplified(
 ): string {
     if (!pricingPerEvent?.actorChargeEvents) return EVENTS_UNAVAILABLE_TEXT;
 
-    const omitDescriptions = shouldOmitEventDescriptions(Object.keys(pricingPerEvent.actorChargeEvents).length);
+    const events = Object.values(pricingPerEvent.actorChargeEvents);
+    const omitDescriptions = shouldOmitEventDescriptions(events.length);
     const resolvedTiers = new Set<string>();
-    const eventLines = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
+    const eventLines = events.map((event) => {
         let price: number | undefined;
 
         if (typeof event.eventPriceUsd === 'number') {
             price = event.eventPriceUsd;
         } else if (event.eventTieredPricingUsd) {
             const tieredMap = event.eventTieredPricingUsd as Record<string, TieredEventPrice>;
-            if (Object.keys(tieredMap).length > 0) {
+            if (hasTiers(tieredMap)) {
                 const { tier, value } = resolveTier(tieredMap, userTier);
                 resolvedTiers.add(tier);
                 price = value.tieredEventPriceUsd;
@@ -407,7 +416,8 @@ function formatPayPerEventSimplified(
     });
 
     const body = `This Actor is paid per event:\n${eventLines.join('\n')}`;
-    const noteTier = getSingleResolvedTier(resolvedTiers);
+    const anyMultiTier = events.some((event) => hasMultipleTiers(event.eventTieredPricingUsd));
+    const noteTier = anyMultiTier ? getSingleResolvedTier(resolvedTiers) : null;
     const pricingNote = noteTier ? buildPricingNote(noteTier) : null;
     const notes = [
         ...(pricingNote ? [pricingNote] : []),
@@ -463,11 +473,11 @@ function structureTieredUnitSimplified(
     userTier: PricingTier,
 ): SimplifiedResult {
     const patch: Partial<StructuredPricingInfo> = { pricePerUnit: info.pricePerUnitUsd ?? 0 };
-    if (info.tieredPricing && Object.keys(info.tieredPricing).length > 0) {
+    if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
         patch.tieredPricing = [{ tier, pricePerUnit: value.tieredPricePerUnitUsd }];
         patch.pricePerUnit = value.tieredPricePerUnitUsd;
-        return { patch, noteTier: tier };
+        return { patch, noteTier: hasMultipleTiers(info.tieredPricing) ? tier : null };
     }
     return { patch, noteTier: null };
 }
@@ -478,9 +488,10 @@ function structurePayPerEventSimplified(
 ): SimplifiedResult {
     if (!pricingPerEvent?.actorChargeEvents) return { patch: {}, noteTier: null };
 
-    const omitDescriptions = shouldOmitEventDescriptions(Object.keys(pricingPerEvent.actorChargeEvents).length);
+    const rawEvents = Object.values(pricingPerEvent.actorChargeEvents);
+    const omitDescriptions = shouldOmitEventDescriptions(rawEvents.length);
     const resolvedTiers = new Set<string>();
-    const events = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
+    const events = rawEvents.map((event) => {
         const baseEvent = {
             title: event.eventTitle,
             ...(omitDescriptions ? {} : { description: event.eventDescription || '' }),
@@ -490,9 +501,8 @@ function structurePayPerEventSimplified(
             return { ...baseEvent, priceUsd: event.eventPriceUsd };
         }
 
-        if (!event.eventTieredPricingUsd) return baseEvent;
-        const tieredMap = event.eventTieredPricingUsd as Record<string, TieredEventPrice>;
-        if (Object.keys(tieredMap).length === 0) return baseEvent;
+        const tieredMap = event.eventTieredPricingUsd as Record<string, TieredEventPrice> | undefined;
+        if (!hasTiers(tieredMap)) return baseEvent;
 
         const { tier, value } = resolveTier(tieredMap, userTier);
         resolvedTiers.add(tier);
@@ -506,7 +516,8 @@ function structurePayPerEventSimplified(
         };
     });
 
-    const noteTier = getSingleResolvedTier(resolvedTiers);
+    const anyMultiTier = rawEvents.some((event) => hasMultipleTiers(event.eventTieredPricingUsd));
+    const noteTier = anyMultiTier ? getSingleResolvedTier(resolvedTiers) : null;
     return {
         patch: {
             events,
