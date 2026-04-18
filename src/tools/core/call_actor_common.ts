@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import log from '@apify/log';
@@ -84,42 +85,55 @@ type CallActorErrorResponseParams = {
 export function buildCallActorDescription(params: CallActorDescriptionParams): string {
     const { actorGetDetailsTool, storeSearchTool, useInternalSearchWarning, alwaysAsync } = params;
 
-    const workflowLines = [
-        'WORKFLOW:',
-        `1. Use ${actorGetDetailsTool} to get the Actor's input schema`,
-        '2. Call this tool with the actor name and proper input based on the schema',
-        '',
-        `If the actor name is not in "username/name" format, use ${storeSearchTool} to resolve the correct Actor first.`,
-    ];
+    const sections: string[] = [];
 
+    sections.push('Call any Actor from the Apify Store.');
+
+    const workflowLines = dedent`
+        WORKFLOW:
+        1. Use ${actorGetDetailsTool} to get the Actor's input schema
+        2. Call this tool with the actor name and proper input based on the schema
+
+        If the actor name is not in "username/name" format, use ${storeSearchTool} to resolve the correct Actor first.
+    `;
     if (useInternalSearchWarning) {
-        workflowLines.push(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`);
+        sections.push(`${workflowLines}\nDo NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`);
+    } else {
+        sections.push(workflowLines);
     }
 
-    const sections = [
-        'Call any Actor from the Apify Store.',
-        workflowLines.join('\n'),
-        CALL_ACTOR_MCP_SERVER_SECTION,
-        alwaysAsync
-            ? `IMPORTANT:
-- This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
-- After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
-- Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
-- Use dedicated Actor tools when available for better experience`
-            : `IMPORTANT:
-- Typically returns a datasetId and preview of output items
-- Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
-- Use dedicated Actor tools when available for better experience`,
-        CALL_ACTOR_USAGE_SECTION,
-        !alwaysAsync
-            ? `- This tool supports async execution via the \`async\` parameter:
-  - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-  - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.`
-            : null,
-        CALL_ACTOR_EXAMPLES_SECTION,
-    ];
+    sections.push(CALL_ACTOR_MCP_SERVER_SECTION);
 
-    return sections.filter(Boolean).join('\n\n');
+    if (alwaysAsync) {
+        sections.push(dedent`
+            IMPORTANT:
+            - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
+            - After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
+            - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
+            - Use dedicated Actor tools when available for better experience
+        `);
+    } else {
+        sections.push(dedent`
+            IMPORTANT:
+            - Typically returns a datasetId and preview of output items
+            - Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
+            - Use dedicated Actor tools when available for better experience
+        `);
+    }
+
+    sections.push(CALL_ACTOR_USAGE_SECTION);
+
+    if (!alwaysAsync) {
+        sections.push(dedent`
+            - This tool supports async execution via the \`async\` parameter:
+              - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
+              - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.
+        `);
+    }
+
+    sections.push(CALL_ACTOR_EXAMPLES_SECTION);
+
+    return sections.join('\n\n');
 }
 
 export function buildStartAsyncResponse(params: {
@@ -148,13 +162,15 @@ export function buildStartAsyncResponse(params: {
         };
     }
 
-    const responseText = `Started Actor "${actorName}" (Run ID: ${actorRun.id}).
+    const responseText = dedent`
+        Started Actor "${actorName}" (Run ID: ${actorRun.id}).
 
-A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
+        A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
 
-The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
+        The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
 
-Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
+        Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.
+    `;
 
     const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
     return {
@@ -191,9 +207,11 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 
     return buildMCPResponse({
-        texts: [`Failed to call Actor '${actorName}': ${errMsg}.
-Please verify the Actor name, input parameters, and ensure the Actor exists.
-You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.`],
+        texts: [
+            `Failed to call Actor '${actorName}': ${errMsg}.`,
+            `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
+            `You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.`,
+        ],
         isError: true,
         telemetry: {
             toolStatus: getToolStatusFromError(error, false),
@@ -210,27 +228,41 @@ You can search for available Actors using the tool: ${storeSearchTool}, or get A
  */
 export const callActorArgs = z.object({
     actor: z.string()
-        .describe(`The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
+        .describe(dedent`
+            The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
 
-For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").`),
+            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
+        `),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
     async: z.boolean()
         .optional()
-        .describe(`When true, starts the run and returns immediately with runId. When false or omitted, behavior depends on the active server mode/tool variant. IMPORTANT: use async=true only when the user explicitly asks to run in the background or does not need immediate results.`),
+        .describe(dedent`
+            When true, starts the run and returns immediately with runId.
+            When false or omitted, behavior depends on the active server mode/tool variant.
+            IMPORTANT: use async=true only when the user explicitly asks to run in the background or does not need immediate results.
+        `),
     previewOutput: z.boolean()
         .optional()
-        .describe('When true (default): includes preview items. When false: metadata only (reduces context). Use when fetching fields via get-actor-output.'),
+        .describe(dedent`
+            When true (default): includes preview items. When false: metadata only (reduces context).
+            Use when fetching fields via get-actor-output.`),
     callOptions: z.object({
         memory: z.number()
             .min(128, 'Memory must be at least 128 MB')
             .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
             .optional()
-            .describe(`Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768). Minimum: 128 MB, Maximum: 32768 MB (32 GB).`),
+            .describe(dedent`
+                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
+                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
+            `),
         timeout: z.number()
             .min(0, 'Timeout must be 0 or greater')
             .optional()
-            .describe(`Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated. Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).`),
+            .describe(dedent`
+                Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
+                Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
+            `),
     }).optional()
         .describe('Optional call options for the Actor run configuration.'),
 });
@@ -316,8 +348,9 @@ export async function handleMcpToolCall(params: {
             actorName: baseActorName,
             toolName: mcpToolName,
         });
+        const errMsg = error instanceof Error ? error.message : String(error);
         return buildMCPResponse({
-            texts: [`Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
+            texts: [`Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${errMsg}. The MCP server may be temporarily unavailable.`],
             isError: true,
         });
     } finally {
@@ -342,9 +375,11 @@ export async function resolveAndValidateActor(params: {
     if (!actor) {
         return {
             error: buildMCPResponse({
-                texts: [`Actor '${actorName}' was not found.
-Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
-You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.`],
+                texts: [dedent`
+                    Actor '${actorName}' was not found.
+                    Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
+                    You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
+                `],
                 isError: true,
                 telemetry: {
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -385,7 +420,9 @@ You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
         const ajvDetails = extractAjvErrorDetails(errors ?? null);
-        const validationSummary = errors?.map((e) => (e as { message?: string; }).message).join(', ') ?? '';
+        const validationSummary = errors
+            ?.map((e) => (e as { message?: string }).message)
+            .join(', ') ?? '';
 
         log.softFail('Input validation failed for Actor', {
             actorName,
@@ -458,7 +495,10 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
     if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {
         return {
             earlyResponse: buildMCPResponse({
-                texts: [`This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider. To use this Actor, please provide a valid Apify token instead.`],
+                texts: [dedent`
+                    This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider.
+                    To use this Actor, please provide a valid Apify token instead.
+                `],
                 isError: true,
                 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             }),
