@@ -171,11 +171,17 @@ function getSingleResolvedTier(resolvedTiers: Set<string>): string | null {
     return resolvedTiers.values().next().value ?? null;
 }
 
+function isFreeActor(
+    info: PricingInfo | null,
+): info is null | (PricingInfo & { pricingModel: typeof ACTOR_PRICING_MODEL.FREE }) {
+    return !info || info.pricingModel === ACTOR_PRICING_MODEL.FREE;
+}
+
 function hasTiers<T>(map: Record<string, T> | undefined): map is Record<string, T> {
     return !!map && Object.keys(map).length > 0;
 }
 
-function hasMultipleTiers<T>(map: Record<string, T> | undefined): boolean {
+function hasMultipleTiers(map: Record<string, unknown> | undefined): boolean {
     return !!map && Object.keys(map).length > 1;
 }
 
@@ -206,7 +212,7 @@ export function getCurrentPricingInfo(pricingInfos: PricingInfo[], now: Date): P
 
 /** Complete text contract used by `fetch-actor-details`. */
 export function pricingInfoToString(pricingInfo: PricingInfo | null): string {
-    if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) return FREE_ACTOR_TEXT;
+    if (isFreeActor(pricingInfo)) return FREE_ACTOR_TEXT;
 
     switch (pricingInfo.pricingModel) {
         case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM:
@@ -261,27 +267,24 @@ function formatPayPerEventComplete(
     if (!pricingPerEvent?.actorChargeEvents) return EVENTS_UNAVAILABLE_TEXT;
 
     const eventLines = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
-        let detail: string;
-
-        if (typeof event.eventPriceUsd === 'number') {
-            detail = `$${event.eventPriceUsd} per event`;
-        } else if (event.eventTieredPricingUsd) {
-            const entries = Object.entries(event.eventTieredPricingUsd);
-            if (entries.length > 1) {
-                detail = `${entries.map(([tier, price]) => `${tier}: $${price.tieredEventPriceUsd}`).join(', ')} per event`;
-            } else if (entries.length === 1) {
-                detail = `$${entries[0][1].tieredEventPriceUsd} per event`;
-            } else {
-                detail = 'No price info';
-            }
-        } else {
-            detail = 'No price info';
-        }
-
+        const detail = formatCompleteEventDetail(event);
         return `\t- **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
     });
 
     return `This Actor is paid per event:\n${eventLines.join('\n')}`;
+}
+
+function formatCompleteEventDetail(event: ActorChargeEvent): string {
+    if (typeof event.eventPriceUsd === 'number') return `$${event.eventPriceUsd} per event`;
+    const tiered = event.eventTieredPricingUsd as Record<string, TieredEventPrice> | undefined;
+    if (!hasTiers(tiered)) return 'No price info';
+    if (hasMultipleTiers(tiered)) {
+        return `${Object.entries(tiered)
+            .map(([tier, price]) => `${tier}: $${price.tieredEventPriceUsd}`)
+            .join(', ')} per event`;
+    }
+    const [price] = Object.values(tiered);
+    return `$${price.tieredEventPriceUsd} per event`;
 }
 
 /** Complete structured contract used by `fetch-actor-details`. */
@@ -290,7 +293,7 @@ export function pricingInfoToStructured(
     userTier: PricingTier,
 ): StructuredPricingInfo {
     const base = createStructuredBase(pricingInfo, userTier);
-    if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) return base;
+    if (isFreeActor(pricingInfo)) return base;
 
     switch (pricingInfo.pricingModel) {
         case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM:
@@ -350,7 +353,7 @@ export function pricingInfoToSimplifiedString(
     pricingInfo: PricingInfo | null,
     userTier: PricingTier,
 ): string {
-    if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) return FREE_ACTOR_TEXT;
+    if (isFreeActor(pricingInfo)) return FREE_ACTOR_TEXT;
 
     switch (pricingInfo.pricingModel) {
         case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM:
@@ -419,11 +422,10 @@ function formatPayPerEventSimplified(
     const anyMultiTier = events.some((event) => hasMultipleTiers(event.eventTieredPricingUsd));
     const noteTier = anyMultiTier ? getSingleResolvedTier(resolvedTiers) : null;
     const pricingNote = noteTier ? buildPricingNote(noteTier) : null;
-    const notes = [
-        ...(pricingNote ? [pricingNote] : []),
-        ...(omitDescriptions ? [EVENT_DESCRIPTIONS_OMITTED_NOTE] : []),
-    ];
-    return notes.length > 0 ? `${body}\n${notes.join('\n')}` : body;
+    const tail = [pricingNote, omitDescriptions ? EVENT_DESCRIPTIONS_OMITTED_NOTE : null]
+        .filter((n): n is string => !!n)
+        .join('\n');
+    return tail ? `${body}\n${tail}` : body;
 }
 
 /** Simplified structured contract used by `search-actors`. */
@@ -432,40 +434,32 @@ export function pricingInfoToSimplifiedStructured(
     userTier: PricingTier,
 ): StructuredPricingInfo {
     const base = createStructuredBase(pricingInfo, userTier);
-    if (!pricingInfo || pricingInfo.pricingModel === ACTOR_PRICING_MODEL.FREE) return base;
+    if (isFreeActor(pricingInfo)) return base;
 
-    let patch: Partial<StructuredPricingInfo> = {};
-    let noteTier: string | null = null;
-
-    switch (pricingInfo.pricingModel) {
-        case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM: {
-            const result = structureTieredUnitSimplified(pricingInfo, userTier);
-            patch = { unitName: pricingInfo.unitName || 'result', ...result.patch };
-            noteTier = result.noteTier;
-            break;
-        }
-        case ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH: {
-            const result = structureTieredUnitSimplified(pricingInfo, userTier);
-            patch = { trialMinutes: pricingInfo.trialMinutes, ...result.patch };
-            noteTier = result.noteTier;
-            break;
-        }
-        case ACTOR_PRICING_MODEL.PAY_PER_EVENT: {
-            const result = structurePayPerEventSimplified(pricingInfo.pricingPerEvent, userTier);
-            patch = result.patch;
-            noteTier = result.noteTier;
-            break;
-        }
-        default:
-            break;
-    }
-
+    const { patch, noteTier } = resolveSimplifiedPatch(pricingInfo, userTier);
     const pricingNote = noteTier ? buildPricingNote(noteTier) : null;
     return {
         ...base,
         ...patch,
         ...(pricingNote ? { pricingNote } : {}),
     };
+}
+
+function resolveSimplifiedPatch(pricingInfo: PricingInfo, userTier: PricingTier): SimplifiedResult {
+    switch (pricingInfo.pricingModel) {
+        case ACTOR_PRICING_MODEL.PRICE_PER_DATASET_ITEM: {
+            const r = structureTieredUnitSimplified(pricingInfo, userTier);
+            return { patch: { unitName: pricingInfo.unitName || 'result', ...r.patch }, noteTier: r.noteTier };
+        }
+        case ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH: {
+            const r = structureTieredUnitSimplified(pricingInfo, userTier);
+            return { patch: { trialMinutes: pricingInfo.trialMinutes, ...r.patch }, noteTier: r.noteTier };
+        }
+        case ACTOR_PRICING_MODEL.PAY_PER_EVENT:
+            return structurePayPerEventSimplified(pricingInfo.pricingPerEvent, userTier);
+        default:
+            return { patch: {}, noteTier: null };
+    }
 }
 
 function structureTieredUnitSimplified(
