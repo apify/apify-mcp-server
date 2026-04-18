@@ -2,15 +2,6 @@
 
 TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.ts`) and **HTTP Streamable** (`dev_server.ts`).
 
-### Core philosophy
-
-- Simple is better than complex
-- If the implementation is hard to explain, it's (usually) a bad idea.
-- **Ruthlessly minimal**: Only implement what's explicitly in scope
-- **Lightweight**: Measure complexity by lines of code, not abstractions
-- **No over-engineering**: Solve the current problem, not hypothetical future ones
-- **No unsolicited features**: Don't add anything not explicitly requested by the human operator
-
 ### Communication style — MANDATORY
 
 **This applies to ALL written output: code comments, commit messages, PR descriptions, issue specs**
@@ -19,12 +10,12 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 ## Scope discipline
 
+- **Minimal.** Implement only what's explicitly requested. No speculative features, no hypothetical future-proofing — solve the current problem, not imagined ones.
 - **One thing per change.** Bug fix fixes only the bug — no cleanup, no renames, no drive-by refactors. Mention unrelated issues; don't fix them.
 - **Test first for bug fixes.** Write a failing test that reproduces the bug, confirm it fails, then fix.
 - **Refactoring is a separate PR.** If a feature needs refactoring, land the refactor first, then the feature. Never mix.
 - **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
 - **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
-- **Refactoring is a separate PR.** If a feature requires refactoring, do the refactoring first in its own PR, get it merged, then implement the feature. Never mix refactoring with feature work — the combined diff is hard to review and easy to break.
 
 ## Git: branch names, commits, PR titles
 
