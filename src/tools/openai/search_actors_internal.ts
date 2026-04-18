@@ -9,6 +9,8 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { searchActorsBaseArgsSchema } from '../core/search_actors_common.js';
 import { actorSearchInternalOutputSchema } from '../structured_output_schemas.js';
 
+const searchActorsInternalInputSchema = z.toJSONSchema(searchActorsBaseArgsSchema);
+
 export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
@@ -24,9 +26,9 @@ export const searchActorsInternalTool: ToolEntry = Object.freeze({
 
         Returns only minimal fields (fullName, title, description) needed for subsequent calls.
     `,
-    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
+    inputSchema: searchActorsInternalInputSchema as ToolInputSchema,
     outputSchema: actorSearchInternalOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
+    ajvValidate: compileSchema(searchActorsInternalInputSchema),
     annotations: {
         title: 'Search Actors (internal)',
         readOnlyHint: true,
