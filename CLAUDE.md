@@ -50,7 +50,7 @@ Default tools to cover: `search-actors`, `fetch-actor-details`, `call-actor`, `g
 
 - **Unit tests**: `npm run test:unit`.
 - **Integration tests**: `npm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
-- `tests/integration/suite.ts` is the main suite, reused by stdio/SSE/streamable-http transports. Add new integration cases there, NOT in separate files.
+- `tests/integration/suite.ts` is the main suite, reused by stdio/streamable-http transports. Add new integration cases there, NOT in separate files.
 - Follow existing test patterns (names, structure) — check neighboring files.
 
 ## External dependencies
