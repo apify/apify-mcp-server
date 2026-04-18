@@ -15,9 +15,9 @@ export const searchActorsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.STORE_SEARCH_INTERNAL,
     description: dedent`
-        Search Actors internally (UI mode internal tool).
+        Search Actors internally (apps mode internal tool).
 
-        This tool is available because the LLM is operating in UI mode. Use it for internal lookups
+        This tool is available because the LLM is operating in apps mode. Use it for internal lookups
         where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
         Use this instead of ${HelperTools.STORE_SEARCH} when you need to find an Actor but the user

@@ -19,10 +19,10 @@ import {
 } from '../core/fetch_actor_details_common.js';
 
 /**
- * OpenAI mode fetch-actor-details tool.
+ * Apps mode fetch-actor-details tool.
  * Returns simplified structured content with interactive widget metadata.
  */
-export const openaiFetchActorDetails: ToolEntry = Object.freeze({
+export const appsFetchActorDetails: ToolEntry = Object.freeze({
     ...fetchActorDetailsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, mcpSessionId } = toolArgs;
@@ -60,7 +60,7 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         return buildMCPResponse({
             texts,
             structuredContent,
-            // Response-level meta; only returned in openai mode (this handler is openai-only)
+            // Response-level meta; only returned in apps mode (this handler is apps-only)
             _meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Actor details for ${actorName} from Apify Store`,

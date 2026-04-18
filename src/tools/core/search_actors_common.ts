@@ -32,7 +32,7 @@ export const searchActorsBaseArgsSchema = z.object({
 });
 
 /**
- * Zod schema for search-actors arguments — shared between default and openai variants.
+ * Zod schema for search-actors arguments — shared between default and apps variants.
  */
 export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({
     keywords: z.string()
@@ -96,7 +96,7 @@ Returns list of Actor cards with the following info:
 
 /**
  * Shared tool metadata for search-actors — everything except the `call` handler.
- * Used by both default and OpenAI variants.
+ * Used by both default and apps variants.
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -105,7 +105,7 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
-    // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
+    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: { ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta },
     annotations: {
         title: 'Search Actors',

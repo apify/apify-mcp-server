@@ -13,7 +13,7 @@ import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Zod schema for get-actor-run arguments — shared between default and openai variants.
+ * Zod schema for get-actor-run arguments — shared between default and apps variants.
  */
 export const getActorRunArgs = z.object({
     runId: z.string()
@@ -37,7 +37,7 @@ USAGE EXAMPLES:
 
 /**
  * Shared tool metadata for get-actor-run — everything except the `call` handler.
- * Used by both default and openai variants.
+ * Used by both default and apps variants.
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -47,7 +47,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
     paymentRequired: true,
-    // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
+    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },
@@ -133,7 +133,7 @@ export function buildGetActorRunSuccessResponse(
 
 /**
  * Fetches actor run data, resolves actor name, and fetches dataset results if completed.
- * Shared data-fetching logic used by both default and openai variants.
+ * Shared data-fetching logic used by both default and apps variants.
  *
  * Returns the run data and structured content, or an early error response.
  */

@@ -44,7 +44,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (mode === 'openai') {
+        if (mode === 'apps') {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -74,7 +74,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (mode === 'openai' && uri.startsWith('ui://widget/')) {
+        if (mode === 'apps' && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {

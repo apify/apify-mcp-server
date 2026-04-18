@@ -53,9 +53,9 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets, RESOURCE_MIME_TYPE } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { appsActorExecutor } from '../tools/apps/actor_executor.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
-import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
@@ -69,6 +69,7 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
+import { resolveServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -85,7 +86,7 @@ import { isTaskCancelled, processParamsGetTools } from './utils.js';
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
     default: defaultActorExecutor,
-    openai: openaiActorExecutor,
+    apps: appsActorExecutor,
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -132,7 +133,10 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        this.serverMode = options.uiMode ?? 'default';
+        if (options.uiMode === 'openai') {
+            log.warning(`UI mode 'openai' is deprecated; use 'apps' instead.`);
+        }
+        this.serverMode = resolveServerMode(options.uiMode);
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -1390,7 +1394,7 @@ export class ActorsMcpServer {
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== 'openai') {
+        if (this.serverMode !== 'apps') {
             return;
         }
 

@@ -224,7 +224,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
 }
 
 /**
- * Zod schema for call-actor arguments — shared between default and openai variants.
+ * Zod schema for call-actor arguments — shared between default and apps variants.
  */
 export const callActorArgs = z.object({
     actor: z.string()
@@ -282,7 +282,7 @@ export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
 
 /**
  * Resolves MCP URL and parses the "actor:tool" format.
- * Shared pre-processing step used by both default and OpenAI variants.
+ * Shared pre-processing step used by both default and apps variants.
  */
 export function resolveActorContext(actorName: string): {
     baseActorName: string;

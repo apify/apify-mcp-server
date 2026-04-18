@@ -122,13 +122,13 @@ describe('MCP resources', () => {
         expect(defaultResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
     });
 
-    it('lists OpenAI widgets only when available', async () => {
+    it('lists apps widgets only when available', async () => {
         const widgets = new Map<string, AvailableWidget>([
             [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
             [WIDGET_URIS.ACTOR_RUN, buildAvailableWidget(WIDGET_URIS.ACTOR_RUN, false)],
         ]);
         const service = createResourceService({
-            mode: 'openai',
+            mode: 'apps',
             getAvailableWidgets: () => widgets,
         });
 
@@ -164,7 +164,7 @@ describe('MCP resources', () => {
 
     it('returns a plain-text message for unknown widgets', async () => {
         const service = createResourceService({
-            mode: 'openai',
+            mode: 'apps',
             getAvailableWidgets: () => new Map(),
         });
 
@@ -183,7 +183,7 @@ describe('MCP resources', () => {
             [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
         ]);
         const service = createResourceService({
-            mode: 'openai',
+            mode: 'apps',
             getAvailableWidgets: () => widgets,
         });
 

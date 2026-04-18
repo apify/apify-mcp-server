@@ -7,26 +7,26 @@ import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
-    it('should not auto-add openai ui tools when tools are explicitly empty', async () => {
+    it('should not auto-add apps ui tools when tools are explicitly empty', async () => {
         const tools = await loadToolsFromInput({
             tools: [],
-        }, apifyClient, 'openai');
+        }, apifyClient, 'apps');
 
         expect(tools).toHaveLength(0);
     });
 
-    it('should not auto-add openai ui tools when actors are explicitly empty', async () => {
+    it('should not auto-add apps ui tools when actors are explicitly empty', async () => {
         const tools = await loadToolsFromInput({
             actors: [],
-        }, apifyClient, 'openai');
+        }, apifyClient, 'apps');
 
         expect(tools).toHaveLength(0);
     });
 
-    it('should keep openai ui tools and get-actor-run for non-empty selectors', async () => {
+    it('should keep apps ui tools and get-actor-run for non-empty selectors', async () => {
         const tools = await loadToolsFromInput({
             tools: ['docs'],
-        }, apifyClient, 'openai');
+        }, apifyClient, 'apps');
 
         const toolNames = tools.map((tool) => tool.name);
         expect(toolNames).toContain(HelperTools.DOCS_SEARCH);

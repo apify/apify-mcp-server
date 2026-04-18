@@ -37,7 +37,7 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
-import { parseUiMode } from './types.js';
+import { parseUiMode, resolveServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools_loader.js';
@@ -59,8 +59,8 @@ type CliArgs = {
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
     /** UI mode for tool responses.
-     * - 'true': Enable widget rendering (recommended)
-     * - 'openai': Alias for 'true' (deprecated)
+     * - 'true' or 'apps': Enable MCP Apps widget rendering
+     * - 'openai': deprecated alias for 'apps'
      * If not specified, there will be no widget rendering.
      */
     ui: UiMode;
@@ -218,7 +218,7 @@ async function main() {
 
     const apifyClient = new ApifyClient({ token: apifyToken });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? 'default');
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, resolveServerMode(argv.ui));
 
     mcpServer.upsertTools(tools);
 

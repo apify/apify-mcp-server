@@ -158,8 +158,8 @@ export async function loadToolsFromInput(
         }
     }
 
-    // In openai mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (mode === 'openai' && !explicitlyNoToolsRequested) {
+    // In apps mode, unconditionally add UI-specific tools (regardless of selectors)
+    if (mode === 'apps' && !explicitlyNoToolsRequested) {
         result.push(...categories.ui);
     }
 
@@ -183,7 +183,7 @@ export async function loadToolsFromInput(
     const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || (mode === 'openai' && !explicitlyNoToolsRequested))) {
+    if (!hasGetActorRun && (hasCallActor || (mode === 'apps' && !explicitlyNoToolsRequested))) {
         // Use mode-resolved get-actor-run variant
         const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
         if (modeGetActorRun) toolsToInject.push(modeGetActorRun);
