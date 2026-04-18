@@ -1,8 +1,7 @@
 import log from '@apify/log';
 
-import { HelperTools } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
+import { buildStartAsyncResponse } from '../core/call_actor_common.js';
 
 /**
  * OpenAI actor executor for UI mode.
@@ -24,32 +23,11 @@ export const openaiActorExecutor: ActorExecutor = {
             mcpSessionId: params.mcpSessionId,
         });
 
-        const structuredContent: Record<string, unknown> = {
-            runId: actorRun.id,
+        return buildStartAsyncResponse({
             actorName: params.actorFullName,
-            status: actorRun.status,
-            startedAt: actorRun.startedAt?.toISOString() || '',
+            actorRun,
             input: params.input,
-        };
-
-        const responseText = `Started Actor "${params.actorFullName}" (Run ID: ${actorRun.id}).
-
-A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
-
-The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
-
-Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.`;
-
-        // _meta carries widget rendering config (not usage meta — the run is still in progress)
-        const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
-        return {
-            content: [{ type: 'text' as const, text: responseText }],
-            structuredContent,
-            // Response-level meta; only returned in openai mode (this executor is openai-only)
-            _meta: {
-                ...widgetConfig?.meta,
-                'openai/widgetDescription': `Actor run progress for ${params.actorFullName}`,
-            },
-        };
+            widget: true,
+        });
     },
 };
