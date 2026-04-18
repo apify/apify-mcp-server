@@ -46,11 +46,14 @@ export async function getUserInfoCached(
 
     try {
         const user = await apifyClient.user('me').get();
+        if (!user?.id) {
+            return { ...ANONYMOUS_USER_INFO };
+        }
         // `tier` is present on /v2/users/me `plan` response (FREE/BRONZE/SILVER/GOLD/PLATINUM/DIAMOND)
         // but missing from apify-client's type declaration — hence the cast.
-        const planTier = (user?.plan as { tier?: string } | undefined)?.tier;
+        const planTier = (user.plan as { tier?: string } | undefined)?.tier;
         const info: CachedUserInfo = {
-            userId: user?.id ?? null,
+            userId: user.id,
             userPlanTier: normalizePlanTier(planTier),
         };
         userInfoCache.set(tokenHash, info);

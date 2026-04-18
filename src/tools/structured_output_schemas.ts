@@ -92,7 +92,7 @@ export const pricingSchema = {
             description: 'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
         },
     },
-    required: ['model'],
+    required: ['model', 'userTier'],
 };
 
 /**

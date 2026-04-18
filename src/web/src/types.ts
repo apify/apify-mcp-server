@@ -8,13 +8,16 @@ declare global {
 
 // --- App Specific Types ---
 
+export type PricingTier = string;
+
 export type StructuredPricingInfo = {
     model: string;
+    userTier?: PricingTier;
     pricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;
     tieredPricing?: {
-        tier: string;
+        tier: PricingTier;
         pricePerUnit: number;
     }[];
     events?: {
@@ -22,7 +25,7 @@ export type StructuredPricingInfo = {
         description?: string;
         priceUsd?: number;
         tieredPricing?: {
-            tier: string;
+            tier: PricingTier;
             priceUsd: number;
         }[];
     }[];
