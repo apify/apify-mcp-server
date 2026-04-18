@@ -30,29 +30,10 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`. Append `!` for breaking changes. PR title ≤70 chars.
 
-## ⚠️ MANDATORY: Verification after every implementation
+## Verification (mandatory)
 
-**THIS IS NON-NEGOTIABLE. DO NOT SKIP.**
-
-After completing ANY code change (feature, fix, refactor), you MUST:
-
-1. **Type check**: `npm run type-check`
-   - Fix ALL TypeScript errors before proceeding
-   - Zero tolerance for type errors
-
-2. **Lint**: `npm run lint`
-   - Fix ALL lint errors before proceeding
-   - Use `npm run lint:fix` for auto-fixable issues
-
-3. **Unit tests**: `npm run test:unit`
-   - ALL tests must pass
-   - If a test fails, fix it before moving on
-
-**What to do if verification fails:**
-1. DO NOT proceed to the next task
-2. Fix the issue immediately
-3. Re-run verification until green
-4. Only then continue
+After every code change, run `npm run type-check`, `npm run lint`, and `npm run test:unit`.
+Zero tolerance for errors — fix before proceeding, don't defer.
 
 ## Agent constraints
 
