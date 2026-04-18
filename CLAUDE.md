@@ -42,29 +42,18 @@ Zero tolerance for errors — fix before proceeding, don't defer.
 
 ## Testing the MCP server end-to-end
 
-After code changes, verify the server works — not just that it compiles. There are two ways:
+After code changes, verify the server works — not just that it compiles.
 
-**1. mcpc** — CLI client, best for scripted/automated verification.
-- Requires `APIFY_TOKEN` in the environment (see [DEVELOPMENT.md](./DEVELOPMENT.md) § *Configuring APIFY_TOKEN*).
-- Requires `npm run build` before each session (mcpc runs `dist/stdio.js`).
-- Discover tools with `mcpc @stdio tools-list`.
-- Test all default tools: `search-actors`, `fetch-actor-details`, `call-actor`, `get-actor-run`, `get-actor-output`, `search-apify-docs`, `fetch-apify-docs`.
-
+**mcpc** (scripted): needs `npm run build` first (runs `dist/stdio.js`) and `APIFY_TOKEN` in env.
 ```bash
 npm run build
-mcpc connect .mcp.json:stdio @stdio   # first time
+mcpc connect .mcp.json:stdio @stdio   # first time only
 mcpc @stdio restart                    # after code changes
 mcpc @stdio tools-call search-actors keywords:="web scraper"
 ```
+Default tools to cover: `search-actors`, `fetch-actor-details`, `call-actor`, `get-actor-run`, `get-actor-output`, `search-apify-docs`, `fetch-apify-docs`.
 
-**2. Native MCP client** (e.g. Claude Code, Cursor) — the server is already connected and tools are in context.
-- Auth is handled by the user's MCP config (token or OAuth).
-- Tools are already discoverable — just call them directly.
-- Use this when verifying behavior as a real client sees it.
-
-If unsure which approach to use or how to authenticate, ask the user.
-
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for mcpc setup details and examples.
+**Native client** (Claude Code, Cursor): server is already connected — call tools directly. Ask the user if unsure which approach to use.
 
 ## Testing
 
