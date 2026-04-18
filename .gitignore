@@ -20,6 +20,7 @@ storage/key_value_stores/default/*
 
 # Aider coding agent files
 .aider*
+.codex
 
 
 # MCP registry private key

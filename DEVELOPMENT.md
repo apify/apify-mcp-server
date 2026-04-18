@@ -110,6 +110,15 @@ To trigger the eval workflow on a PR, apply the **`validated`** label.
 The workflow then runs automatically and posts results to Phoenix.
 It also runs automatically on every merge to the `master` branch.
 
+### Test structure
+
+- `tests/unit/` — unit tests for individual modules
+- `tests/integration/` — integration tests for MCP server functionality
+  - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
+  - Other files in this directory set up different transport modes (stdio, SSE, streamable-http) that all use `suite.ts`
+- `tests/helpers.ts` — shared test utilities
+- `tests/const.ts` — test constants
+
 ### Live probing with mcpc
 
 `mcpc` (`@apify/mcpc`) provides a CLI feedback loop against the local server.
