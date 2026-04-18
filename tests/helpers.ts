@@ -17,7 +17,7 @@ export type McpClientOptions = {
         enabled?: boolean; // Enable or disable telemetry (default: false for tests)
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
-    uiMode?: string; // Raw UI mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'openai', 'true')
+    uiMode?: string; // Raw UI mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
     payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
 }
 

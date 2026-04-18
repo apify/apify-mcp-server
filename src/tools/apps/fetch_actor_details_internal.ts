@@ -14,9 +14,9 @@ export const fetchActorDetailsInternalTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_GET_DETAILS_INTERNAL,
     description: dedent`
-        Fetch Actor details with flexible output options (UI mode internal tool).
+        Fetch Actor details with flexible output options (apps mode internal tool).
 
-        This tool is available because the LLM is operating in UI mode. Use it for internal lookups
+        This tool is available because the LLM is operating in apps mode. Use it for internal lookups
         where data presentation to the user is NOT needed - this tool does NOT render a widget.
 
         Use 'output' parameter with boolean flags to control returned information:

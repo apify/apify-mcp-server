@@ -107,7 +107,7 @@ export async function fetchActorDetails(
 }
 
 /**
- * Build the widget actor-details payload for the openai variant.
+ * Build the widget actor-details payload for the apps variant.
  * Returns the Actor URL and the structured `actorDetails` object.
  */
 export function buildActorDetailsForWidget(details: ActorDetailsResult, userTier: PricingTier) {

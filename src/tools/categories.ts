@@ -10,10 +10,16 @@
  *
  * Each tool entry can be:
  * - A plain ToolEntry — mode-independent, always included
- * - A mode map (e.g. { default: ToolEntry, openai: ToolEntry }) — resolver picks entry[mode]
- * - A partial mode map (e.g. { openai: ToolEntry }) — included only for listed modes
+ * - A mode map (e.g. { default: ToolEntry, apps: ToolEntry }) — resolver picks entry[mode]
+ * - A partial mode map (e.g. { apps: ToolEntry }) — included only for listed modes
  */
 import type { ServerMode, ToolEntry } from '../types.js';
+import { appsCallActor } from './apps/call_actor.js';
+import { appsFetchActorDetails } from './apps/fetch_actor_details.js';
+import { fetchActorDetailsInternalTool } from './apps/fetch_actor_details_internal.js';
+import { appsGetActorRun } from './apps/get_actor_run.js';
+import { appsSearchActors } from './apps/search_actors.js';
+import { searchActorsInternalTool } from './apps/search_actors_internal.js';
 import { abortActorRun } from './common/abort_actor_run.js';
 import { addTool } from './common/add_actor.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
@@ -33,12 +39,6 @@ import { defaultCallActor } from './default/call_actor.js';
 import { defaultFetchActorDetails } from './default/fetch_actor_details.js';
 import { defaultGetActorRun } from './default/get_actor_run.js';
 import { defaultSearchActors } from './default/search_actors.js';
-import { openaiCallActor } from './openai/call_actor.js';
-import { openaiFetchActorDetails } from './openai/fetch_actor_details.js';
-import { fetchActorDetailsInternalTool } from './openai/fetch_actor_details_internal.js';
-import { openaiGetActorRun } from './openai/get_actor_run.js';
-import { openaiSearchActors } from './openai/search_actors.js';
-import { searchActorsInternalTool } from './openai/search_actors_internal.js';
 
 /**
  * A mode map: maps one or more ServerMode keys to their ToolEntry variant.
@@ -68,20 +68,20 @@ export const toolCategories = {
         addTool,
     ],
     actors: [
-        { default: defaultSearchActors, openai: openaiSearchActors },
-        { default: defaultFetchActorDetails, openai: openaiFetchActorDetails },
-        { default: defaultCallActor, openai: openaiCallActor },
+        { default: defaultSearchActors, apps: appsSearchActors },
+        { default: defaultFetchActorDetails, apps: appsFetchActorDetails },
+        { default: defaultCallActor, apps: appsCallActor },
     ],
     ui: [
-        { openai: searchActorsInternalTool },
-        { openai: fetchActorDetailsInternalTool },
+        { apps: searchActorsInternalTool },
+        { apps: fetchActorDetailsInternalTool },
     ],
     docs: [
         searchApifyDocsTool,
         fetchApifyDocsTool,
     ],
     runs: [
-        { default: defaultGetActorRun, openai: openaiGetActorRun },
+        { default: defaultGetActorRun, apps: appsGetActorRun },
         getUserRunsList,
         getActorRunLog,
         abortActorRun,
@@ -137,11 +137,11 @@ function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: Ser
 /**
  * Resolve tool categories for a given server mode.
  *
- * Returns mode-resolved tool variants: openai mode gets openai-specific implementations
+ * Returns mode-resolved tool variants: apps mode gets MCP-Apps-specific implementations
  * (async execution, widget metadata), default mode gets standard implementations.
- * Openai-only tools are excluded in default mode.
+ * Apps-only tools are excluded in default mode.
  *
- * @param mode - Required. Use `'default'` or `'openai'`.
+ * @param mode - Required. Use `'default'` or `'apps'`.
  *   Made explicit (no default value) to prevent accidentally serving wrong-mode tools.
  */
 export function getCategoryTools(mode: ServerMode = 'default'): ToolCategoryMap {

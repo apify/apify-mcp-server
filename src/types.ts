@@ -393,38 +393,51 @@ export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
  * server instructions) uses this type.
  *
  * - `'default'` — standard MCP tools for generic clients (sync/async execution, text responses)
- * - `'openai'` — OpenAI-specific tool variants (always-async execution, widget metadata)
+ * - `'apps'` — MCP Apps tool variants (always-async execution, widget metadata)
  *
- * **Relationship to {@link UiMode}:** `ServerMode` is the internal representation;
- * `UiMode` is the external API surface exposed to callers (currently only `'openai'`).
- * The conversion happens in `ActorsMcpServer` constructor: `options.uiMode ?? 'default'`.
+ * **Relationship to {@link UiMode}:** `ServerMode` is the canonical internal representation.
+ * `UiMode` is the external API surface; `'openai'` is accepted there as a deprecated alias
+ * for `'apps'` and normalized in `ActorsMcpServer` constructor via {@link resolveServerMode}.
  */
-export type ServerMode = 'default' | 'openai';
+export type ServerMode = 'default' | 'apps';
 
 /** All valid server modes, for iteration in tests and caches. */
-export const SERVER_MODES: readonly ServerMode[] = ['default', 'openai'] as const;
+export const SERVER_MODES: readonly ServerMode[] = ['default', 'apps'] as const;
 
 /**
  * External API surface for selecting a UI mode — passed via `options.uiMode` in
- * {@link ActorsMcpServerOptions}. Excludes `'default'` because the absence of a
- * UI mode (`undefined`) maps to `ServerMode = 'default'` internally.
+ * {@link ActorsMcpServerOptions}.
  *
- * **Relationship to {@link ServerMode}:** `UiMode` is a strict subset of `ServerMode`.
- * Callers set `uiMode?: UiMode`; the server normalizes it to `ServerMode` at construction.
+ * - `'apps'` — canonical value.
+ * - `'openai'` — deprecated alias for `'apps'`, accepted during the transition to
+ *   the MCP Apps naming. Normalized to `'apps'` at ingestion; a deprecation warning
+ *   is logged in the `ActorsMcpServer` constructor.
+ *
+ * The absence of a UI mode (`undefined`) maps to `ServerMode = 'default'` internally.
  */
-export type UiMode = Exclude<ServerMode, 'default'>;
-
-/** Set of valid UiMode values for O(1) membership checks at runtime. */
-const UI_MODES: ReadonlySet<string> = new Set<string>(SERVER_MODES.filter((m): m is UiMode => m !== 'default'));
+export type UiMode = 'apps' | 'openai';
 
 /**
  * Parse an untrusted string into a valid UiMode, returning `undefined` for invalid values.
+ * Accepts `'apps'`, `'true'` (alias for `'apps'`), and `'openai'` (deprecated alias — kept
+ * for backward compatibility, normalized downstream).
  * Use at ingestion boundaries (URL params, env vars) to prevent invalid modes from propagating.
  */
 export function parseUiMode(value: string | null | undefined): UiMode | undefined {
     if (!value) return undefined;
-    if (value === 'true') return 'openai'; // 'true' is the new standard; 'openai' is deprecated alias
-    return UI_MODES.has(value) ? (value as UiMode) : undefined;
+    if (value === 'true' || value === 'apps') return 'apps';
+    if (value === 'openai') return 'openai';
+    return undefined;
+}
+
+/**
+ * Resolve a {@link UiMode} to its canonical {@link ServerMode}. `'openai'` normalizes
+ * to `'apps'`; `undefined` normalizes to `'default'`. The caller should log the
+ * deprecation warning when it detects the `'openai'` alias (has logger context).
+ */
+export function resolveServerMode(uiMode: UiMode | undefined): ServerMode {
+    if (uiMode === 'openai') return 'apps';
+    return uiMode ?? 'default';
 }
 
 /**
@@ -461,7 +474,7 @@ export type ActorExecutionResult = {
 /**
  * Executor for direct actor tools (`type: 'actor'`).
  * Selected at server construction time based on serverMode.
- * Default mode runs synchronously; OpenAI mode runs async with widget metadata.
+ * Default mode runs synchronously; apps mode runs async with widget metadata.
  */
 export type ActorExecutor = {
     executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult>;
@@ -566,7 +579,8 @@ export type ActorsMcpServerOptions = {
     token?: string;
     /**
      * UI mode for tool responses.
-     * - 'openai': OpenAI specific widget rendering
+     * - 'apps': MCP Apps widget rendering (canonical)
+     * - 'openai': deprecated alias for 'apps' — normalized at server construction with a warning
      * If not specified, defaults to 'default' mode (no widget rendering).
      * Normalized to {@link ServerMode} at server construction.
      */

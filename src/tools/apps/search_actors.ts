@@ -10,10 +10,10 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { buildSearchActorsEmptyResponse, buildSearchActorsResult, searchActorsArgsSchema, searchActorsMetadata } from '../core/search_actors_common.js';
 
 /**
- * OpenAI mode search-actors tool.
+ * Apps mode search-actors tool.
  * Returns widget-formatted actors with interactive widget metadata.
  */
-export const openaiSearchActors: ToolEntry = Object.freeze({
+export const appsSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, userRentedActorIds, apifyMcpServer } = toolArgs;
@@ -92,7 +92,7 @@ export const openaiSearchActors: ToolEntry = Object.freeze({
         return buildMCPResponse({
             texts,
             structuredContent,
-            // Response-level meta; only returned in OpenAI mode (this handler is openai-only)
+            // Response-level meta; only returned in apps mode (this handler is apps-only)
             _meta: {
                 ...widgetConfig?.meta,
                 'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,

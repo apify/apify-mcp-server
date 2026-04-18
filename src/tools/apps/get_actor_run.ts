@@ -9,10 +9,10 @@ import {
 } from '../core/get_actor_run_common.js';
 
 /**
- * OpenAI mode get-actor-run tool.
+ * Apps mode get-actor-run tool.
  * Returns abbreviated text with widget metadata for interactive progress display.
  */
-export const openaiGetActorRun: ToolEntry = Object.freeze({
+export const appsGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client, mcpSessionId } = toolArgs;
