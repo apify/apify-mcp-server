@@ -1,13 +1,6 @@
 # Apify MCP server
 
-MCP server that exposes [Apify Actors](https://apify.com/store) as tools for AI assistants.
-
-The codebase is built with TypeScript using ES modules and follows a modular architecture with clear separation of concerns.
-
-The server can run in multiple modes:
-- **Standard Input/Output (stdio)**: For local integrations and command-line tools like Claude Desktop
-- **HTTP Streamable**: For hosted deployments and web-based MCP clients
-- **Legacy SSE over HTTP**: Legacy version of the protocol for hosted deployments and web-based clients (deprecated and will be removed in the future)
+TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.ts`) and **HTTP Streamable** (`dev_server.ts`).
 
 ### Core philosophy
 
@@ -32,6 +25,10 @@ The server can run in multiple modes:
 - **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
 - **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
 - **Refactoring is a separate PR.** If a feature requires refactoring, do the refactoring first in its own PR, get it merged, then implement the feature. Never mix refactoring with feature work — the combined diff is hard to review and easy to break.
+
+## Git: branch names, commits, PR titles
+
+Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`. Append `!` for breaking changes. PR title ≤70 chars.
 
 ## ⚠️ MANDATORY: Verification after every implementation
 
