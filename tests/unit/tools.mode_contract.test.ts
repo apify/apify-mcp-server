@@ -8,9 +8,11 @@
  * - _meta stripping works for non-openai modes
  */
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
 import { searchApifyDocsTool } from '../../src/tools/common/search_apify_docs.js';
+import { searchActorsBaseArgsSchema } from '../../src/tools/core/search_actors_common.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
 import type { ToolBase, ToolEntry } from '../../src/types.js';
 import { SERVER_MODES } from '../../src/types.js';
@@ -124,6 +126,14 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 expect(defaultTool!.inputSchema).toEqual(openaiTool!.inputSchema);
             });
         }
+
+        // Locks the invariant that search-actors-internal reuses the shared base schema
+        // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
+        it('should use searchActorsBaseArgsSchema for search-actors-internal inputSchema', () => {
+            const internalTool = openaiCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_INTERNAL);
+            expect(internalTool).toBeDefined();
+            expect(internalTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema));
+        });
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
