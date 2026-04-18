@@ -118,10 +118,8 @@ export function buildGetActorRunSuccessResponse(
     }
 
     const statusText = structuredContent.status === 'SUCCEEDED' && structuredContent.dataset
-        ? dedent`Actor run ${structuredContent.runId} completed successfully with
-            ${structuredContent.dataset.totalItemCount} items. A widget has been rendered with the details.`
-        : dedent`Actor run ${structuredContent.runId} status: ${structuredContent.status}.
-            A progress widget has been rendered.`;
+        ? `Actor run ${structuredContent.runId} completed successfully with ${structuredContent.dataset.totalItemCount} items. A widget has been rendered with the details.`
+        : `Actor run ${structuredContent.runId} status: ${structuredContent.status}. A progress widget has been rendered.`;
 
     return buildMCPResponse({
         texts: [statusText],
