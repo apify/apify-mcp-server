@@ -19,9 +19,9 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 ## Scope discipline
 
-- **Bug fix = bug fix.** When fixing a bug, fix only the bug. Don't refactor surrounding code, don't improve naming, don't add comments, don't "clean up while you're here."
-- **One thing per change.** Each change should do exactly one thing: fix a bug, add a feature, or refactor. Never combine. If you spot something unrelated that needs fixing, mention it — don't fix it.
-- **Test first.** For bug fixes, write a failing test that reproduces the bug before touching source code. Run it to confirm it fails. Then fix.
+- **One thing per change.** Bug fix fixes only the bug — no cleanup, no renames, no drive-by refactors. Mention unrelated issues; don't fix them.
+- **Test first for bug fixes.** Write a failing test that reproduces the bug, confirm it fails, then fix.
+- **Refactoring is a separate PR.** If a feature needs refactoring, land the refactor first, then the feature. Never mix.
 - **Fix by adjusting, not adding.** Prefer a 1-line fix over a 10-line fix. Prefer adjusting existing code over adding new branches. Search for existing helpers and patterns that already handle similar cases. Ask: "Am I adding code, or fixing the code that's already there?"
 - **Self-review your diff.** Before declaring done, review: Is this the minimal fix? Am I reusing existing patterns? Did I leave any debug artifacts?
 - **Refactoring is a separate PR.** If a feature requires refactoring, do the refactoring first in its own PR, get it merged, then implement the feature. Never mix refactoring with feature work — the combined diff is hard to review and easy to break.
