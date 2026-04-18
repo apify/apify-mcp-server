@@ -67,9 +67,15 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 - **Expose methods on `ActorsMcpServer`**, not raw data exports via `./internals` — minimize the coupling surface
 - When designing a new feature, ask: can this land in one repo? Prefer exposing a method or interface over exporting internals that the other repo re-implements
 
+## Code conventions
+
+- **Validate tool inputs with Zod.** No ad-hoc shape checks.
+- **Reference tool names via the `HelperTools` enum**, not hardcoded strings (exception: integration tests).
+- Always follow the latest [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25) and [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).
+
 ## Further reading
 
 - **[CONTRIBUTING.md](./CONTRIBUTING.md)** — coding standards, patterns, anti-patterns, commit format, PR guidelines, design system rules
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** — project structure, setup, build system, hot-reload workflow, manual MCP testing
 - **[DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md](./DESIGN_SYSTEM_AGENT_INSTRUCTIONS.md)** — UI widget design system rules (read this when doing any UI/widget work)
-- **[res/](./res/index.md)** — architecture analyses, refactor plans, and protocol references (MCP tasks, SDK features, tool mode separation, etc.)
+- **[res/](./res/index.md)** — ad-hoc notes: architecture analyses, refactor plans, protocol references. **May be obsolete** — verify against current code before trusting.
