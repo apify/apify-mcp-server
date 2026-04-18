@@ -57,58 +57,18 @@ Default tools to cover: `search-actors`, `fetch-actor-details`, `call-actor`, `g
 
 ## Testing
 
-### Running tests
-
-- **Unit tests**: `npm run test:unit` (runs `vitest run tests/unit`)
-- **Integration tests**: `npm run test:integration` (requires build first, requires `APIFY_TOKEN` — humans only)
-
-### Test structure
-
-- `tests/unit/` — unit tests for individual modules
-- `tests/integration/` — integration tests for MCP server functionality
-  - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport modes (stdio, SSE, streamable-http) that all use `suite.ts`
-- `tests/helpers.ts` — shared test utilities
-- `tests/const.ts` — test constants
-
-### Test guidelines
-
-- Write tests for new features and bug fixes
-- Use descriptive test names that explain what is being tested
-- Follow existing test patterns in the codebase
-- Ensure all tests pass before submitting a PR
-
-### Adding integration tests
-
-**IMPORTANT**: Add integration test cases to `tests/integration/suite.ts`, NOT as separate test files.
-
-`suite.ts` exports `createIntegrationTestsSuite()`, used by all transport modes (stdio, SSE, streamable-http). Adding tests here ensures they run across all transport types.
-
-**How to add a test case:**
-1. Open `tests/integration/suite.ts`
-2. Add your test case inside the `describe` block
-3. Use `it()` or `it.runIf()` for conditional tests
-4. Use `client = await createClientFn(options)` to create the test client
-5. Always call `await client.close()` when done
-
-**Example:**
-```typescript
-it('should do something awesome', async () => {
-    client = await createClientFn({ tools: ['actors'] });
-    const result = await client.callTool({
-        name: HelperTools.SOME_TOOL,
-        arguments: { /* ... */ },
-    });
-    expect(result.content).toBeDefined();
-    await client.close();
-});
-```
+- **Unit tests**: `npm run test:unit`.
+- **Integration tests**: `npm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
+- `tests/integration/suite.ts` is the main suite, reused by stdio/SSE/streamable-http transports. Add new integration cases there, NOT in separate files.
+- Follow existing test patterns (names, structure) — check neighboring files.
 
 ## External dependencies
 
-**IMPORTANT**: This package (`@apify/actors-mcp-server`) is used in the private `apify-mcp-server-internal` repository for the hosted server. Changes here may affect that server. Breaking changes must be coordinated; check whether updates are needed in `apify-mcp-server-internal` before submitting a PR. See README.md for canary (`beta`) releases via `pkg.pr.new`.
+**IMPORTANT**: This package (`@apify/actors-mcp-server`) is used in the private `apify-mcp-server-internal` repository for the hosted server.
+Changes here may affect that server.
+Breaking changes must be coordinated; check whether updates are needed in `apify-mcp-server-internal` before submitting a PR.
 
-### Public/internal repo separation (see [internal#419](https://github.com/apify/apify-mcp-server-internal/issues/419))
+### Public/internal repo separation
 
 - **Public repo** = core MCP server logic, interfaces, types (with generic/plain data types only)
 - **Internal repo** = backend/DB/proprietary logic (Redis, MongoDB, IAM auth, multi-node)
