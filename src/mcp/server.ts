@@ -2,7 +2,7 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
@@ -783,7 +783,7 @@ export class ActorsMcpServer {
                         {
                             ttl: request.params.task.ttl,
                         },
-                        `call-tool-${name}-${randomUUID()}`,
+                        `${tool.name}-${randomBytes(9).toString('base64url')}`,
                         request,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });

@@ -2289,6 +2289,8 @@ export function createIntegrationTestsSuite(
             for await (const message of stream) {
                 if (message.type === 'taskCreated') {
                     taskId = message.task.taskId;
+                    // Format: "<tool-name>-<12 base64url chars>" (see src/mcp/server.ts, issue #705)
+                    expect(taskId).toMatch(new RegExp(`^${actorNameToToolName(ACTOR_PYTHON_EXAMPLE)}-[A-Za-z0-9_-]{12}$`));
 
                     // Now we can get the task status
                     const taskStatus = await client.experimental.tasks.getTask(taskId);

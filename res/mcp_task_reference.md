@@ -42,7 +42,7 @@ Tools declare task support via `execution.taskSupport`:
 ```typescript
 // Task object
 interface Task {
-    taskId: string;            // 32 hex chars
+    taskId: string;            // Format: "<tool-name>-<12-char-suffix>"
     status: TaskStatus;        // "working" | "input_required" | "completed" | "failed" | "cancelled"
     ttl: number | null;
     createdAt: string;         // ISO 8601
