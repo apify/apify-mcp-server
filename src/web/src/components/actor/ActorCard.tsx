@@ -79,9 +79,9 @@ const StyledSeparator = styled(Box)`
     width: 1px;
 `;
 
-const DescriptionText = styled(Text)<{ isDetail: boolean }>`
+const DescriptionText = styled(Text)<{ $isDetail: boolean }>`
     white-space: pre-wrap;
-    ${({ isDetail }) => !isDetail && clampLines(1)};
+    ${({ $isDetail }) => !$isDetail && clampLines(1)};
 `;
 
 const ActorHeader = styled.div`
@@ -232,7 +232,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                 size="small"
                 weight="normal"
                 color={theme.color.neutral.text}
-                isDetail={isDetail}
+                $isDetail={isDetail}
             >
                 {actor.description}
             </DescriptionText>

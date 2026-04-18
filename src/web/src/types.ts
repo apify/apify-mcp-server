@@ -10,7 +10,7 @@ declare global {
 
 export type StructuredPricingInfo = {
     model: string;
-    isFree: boolean;
+    userTier?: string;
     pricePerUnit?: number;
     unitName?: string;
     trialMinutes?: number;
@@ -20,13 +20,16 @@ export type StructuredPricingInfo = {
     }[];
     events?: {
         title: string;
-        description: string;
+        description?: string;
         priceUsd?: number;
         tieredPricing?: {
             tier: string;
             priceUsd: number;
         }[];
     }[];
+    pricingNote?: string;
+    eventDescriptionsOmitted?: boolean;
+    eventDescriptionsNote?: string;
 }
 
 export interface ActorStats {

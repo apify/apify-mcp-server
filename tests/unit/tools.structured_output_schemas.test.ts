@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
-import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import {
+    actorDetailsOutputSchema,
+    actorInfoSchema,
+    buildEnrichedCallActorOutputSchema,
+    callActorOutputSchema,
+} from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
+import { compileSchema } from '../../src/utils/ajv.js';
 
 // Helper type for testing schema structure
 type EnrichedSchema = {
@@ -111,6 +117,43 @@ describe('Structured Output Schemas', () => {
 
             const itemsSchema = enrichedSchema.properties.items.items;
             expect(itemsSchema.properties).toEqual({});
+        });
+    });
+
+    describe('actorInfoSchema', () => {
+        // openai/fetch-actor-details intentionally strips `pricing` from `actorInfo` so the
+        // widget's tier-aware pricing under `actorDetails.actorInfo.currentPricingInfo` is
+        // the single source of truth. The shared actor-info schema must accept that shape.
+        it('validates an actorInfo object without pricing (openai fetch-actor-details shape)', () => {
+            const validate = compileSchema(actorInfoSchema);
+            const actorInfoWithoutPricing = {
+                title: 'Web Scraper',
+                url: 'https://apify.com/apify/web-scraper',
+                id: 'actor-id',
+                fullName: 'apify/web-scraper',
+                developer: { username: 'apify', isOfficialApify: true, url: 'https://apify.com/apify' },
+                description: 'Scrapes stuff.',
+                categories: ['SCRAPING'],
+                isDeprecated: false,
+            };
+            expect(validate(actorInfoWithoutPricing)).toBe(true);
+        });
+
+        it('accepts the openai fetch-actor-details structured content shape', () => {
+            const validate = compileSchema(actorDetailsOutputSchema);
+            const structuredContent = {
+                actorInfo: {
+                    url: 'https://apify.com/apify/web-scraper',
+                    id: 'actor-id',
+                    fullName: 'apify/web-scraper',
+                    developer: { username: 'apify', isOfficialApify: true, url: 'https://apify.com/apify' },
+                    description: 'Scrapes stuff.',
+                    categories: ['SCRAPING'],
+                    isDeprecated: false,
+                },
+                inputSchema: { type: 'object', properties: {} },
+            };
+            expect(validate(structuredContent)).toBe(true);
         });
     });
 

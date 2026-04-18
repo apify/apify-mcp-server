@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
@@ -15,6 +14,7 @@ import {
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
 import { fixActorNameInputAndLog } from './actor_tools_factory.js';
 
@@ -224,13 +224,20 @@ export async function buildFetchActorDetailsResult(
     toolArgs: InternalToolArgs,
     route: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL,
 ): Promise<ReturnType<typeof buildMCPResponse>> {
-    const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+    const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
     const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
-    const apifyClient = new ApifyClient({ token: apifyToken });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
-    const details = await fetchActorDetails(apifyClient, actorName, buildCardOptions(resolvedOutput));
+    // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only
+    // or mcpTools-only requests). In that case `userTier` is only used to fill the
+    // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
+    // read, so defaulting to 'FREE' is safe and saves a request.
+    const userPlanTier = resolvedOutput.pricing
+        ? (await getUserInfoCached(apifyToken, apifyClient)).userPlanTier
+        : 'FREE';
+    const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier };
+    const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {
         return buildActorNotFoundResponse(actorName);
     }

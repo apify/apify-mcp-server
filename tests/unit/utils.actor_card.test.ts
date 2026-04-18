@@ -467,7 +467,6 @@ describe('formatActorToStructuredCard', () => {
 
             // Should have default pricing
             expect(result.pricing.model).toBe('FREE');
-            expect(result.pricing.isFree).toBe(true);
         });
 
         it('should include actual pricing when includePricing is true', () => {
@@ -480,7 +479,6 @@ describe('formatActorToStructuredCard', () => {
             });
 
             expect(result.pricing.model).toBe('PER_ACTOR_RUN');
-            expect(result.pricing.isFree).toBe(false);
         });
     });
 

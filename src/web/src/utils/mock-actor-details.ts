@@ -19,7 +19,7 @@ export const MOCK_ACTOR_DETAILS_RESPONSE = {
             "description": "Extract posts published by specified X (Twitter) profiles. Retrieve URLs, IDs, content, publication dates, text and engagement metrics. Ideal for social media monitoring solutions.",
             "pricing": {
                 "model": "PAY_PER_EVENT",
-                "isFree": false,
+                "userTier": "FREE",
                 "events": [
                     {
                         "title": "Initialize actor",
@@ -140,7 +140,6 @@ export const MOCK_ACTOR_DETAILS_RESPONSE = {
                 },
                 "currentPricingInfo": {
                     "model": "PAY_PER_EVENT",
-                    "isFree": false,
                     "events": [
                         {
                             "title": "Initialize actor",

@@ -3,8 +3,11 @@ import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } fro
 import {
     getCurrentPricingInfo,
     type PricingInfo,
+    pricingInfoToSimplifiedString,
+    pricingInfoToSimplifiedStructured,
     pricingInfoToString,
     pricingInfoToStructured,
+    type PricingTier,
     type StructuredPricingInfo,
 } from './pricing_info.js';
 
@@ -34,7 +37,7 @@ function getActorPricingInfo(actor: Actor | ActorStoreList): PricingInfo | null 
     return getCurrentPricingInfo(actor.pricingInfos || [], new Date());
 }
 
-const DEFAULT_CARD_OPTIONS: ActorCardOptions = {
+export const DEFAULT_CARD_OPTIONS: ActorCardOptions = {
     includeDescription: true,
     includeStats: true,
     includePricing: true,
@@ -169,6 +172,7 @@ export function formatActorToActorCard(
     options: ActorCardOptions = DEFAULT_CARD_OPTIONS,
 ): string {
     const data = extractActorData(actor, options);
+    const userTier = options.userTier ?? 'FREE';
 
     const markdownLines = [
         `## [${data.title}](${data.actorUrl}) (\`${data.actorFullName}\`)`,
@@ -180,7 +184,9 @@ export function formatActorToActorCard(
     }
 
     if (options.includePricing) {
-        const pricingString = pricingInfoToString(data.pricingInfo);
+        const pricingString = options.simplifyPricingForUserTier
+            ? pricingInfoToSimplifiedString(data.pricingInfo, userTier)
+            : pricingInfoToString(data.pricingInfo);
         markdownLines.push(`- **[Pricing](${data.actorUrl}/pricing):** ${pricingString}`);
     }
 
@@ -223,6 +229,11 @@ export function formatActorToStructuredCard(
     options: ActorCardOptions = DEFAULT_CARD_OPTIONS,
 ): StructuredActorCard {
     const data = extractActorData(actor, options);
+    const userTier = options.userTier ?? 'FREE';
+
+    const pricing = options.simplifyPricingForUserTier
+        ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
+        : pricingInfoToStructured(data.pricingInfo, userTier);
 
     return {
         title: data.title,
@@ -233,9 +244,7 @@ export function formatActorToStructuredCard(
         developer: data.developer,
         description: data.description,
         categories: data.categories,
-        pricing: options.includePricing
-            ? pricingInfoToStructured(data.pricingInfo)
-            : { model: 'FREE', isFree: true },
+        pricing,
         stats: data.stats,
         rating: data.rating,
         modifiedAt: data.modifiedAt,
@@ -266,9 +275,14 @@ export type WidgetActor = {
 /**
  * Formats Actor for widget UI components.
  * Used only in OpenAI (widget) mode — search results and Actor details widgets.
+ *
+ * Always uses simplified tier-aware pricing so the widget's top-level
+ * `pricePerUnit` / `events[0].priceUsd` (which is what the widget UI renders)
+ * matches the tier-filtered prices shown in the LLM text and structured output.
  */
 export function formatActorForWidget(
     actor: Actor | ActorStoreList,
+    userTier: PricingTier,
 ): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
     return {
@@ -287,6 +301,6 @@ export function formatActorForWidget(
             totalUsers: actor.stats?.totalUsers || 0,
         },
         url: `${APIFY_STORE_URL}/${fullName}`,
-        currentPricingInfo: pricingInfoToStructured(getActorPricingInfo(actor)),
+        currentPricingInfo: pricingInfoToSimplifiedStructured(getActorPricingInfo(actor), userTier),
     };
 }

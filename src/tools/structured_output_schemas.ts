@@ -68,15 +68,35 @@ const tieredPricingSchema = {
 export const pricingSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
-        model: { type: 'string', description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)' },
-        isFree: { type: 'boolean', description: 'Whether the Actor is free to use' },
+        model: {
+            type: 'string',
+            description: 'Pricing model (FREE, PRICE_PER_DATASET_ITEM, FLAT_PRICE_PER_MONTH, PAY_PER_EVENT)',
+        },
+        userTier: {
+            type: 'string',
+            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            description: "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
+        },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
         unitName: { type: 'string', description: 'Unit name for pricing' },
         trialMinutes: { type: 'number', description: 'Trial period in minutes' },
         tieredPricing: tieredPricingSchema,
         events: pricingEventsSchema,
+        pricingNote: {
+            type: 'string',
+            description: 'Note naming the resolved tier; only emitted in simplified mode '
+                + 'when the actor has multiple tiers and they resolve consistently',
+        },
+        eventDescriptionsOmitted: {
+            type: 'boolean',
+            description: 'Whether event descriptions were omitted because the actor has many pricing events',
+        },
+        eventDescriptionsNote: {
+            type: 'string',
+            description: 'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
+        },
     },
-    required: ['model', 'isFree'],
+    required: ['model', 'userTier'],
 };
 
 /**
@@ -122,7 +142,10 @@ export const actorInfoSchema = {
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
-    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'pricing', 'isDeprecated'],
+    // Note: `pricing` is not required. openai/fetch-actor-details intentionally omits it from
+    // `actorInfo` so the widget's tier-aware pricing (under `actorDetails.actorInfo.currentPricingInfo`)
+    // is the single source of truth — see src/tools/openai/fetch_actor_details.ts.
+    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
 
 /**

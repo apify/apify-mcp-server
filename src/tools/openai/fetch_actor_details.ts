@@ -9,6 +9,7 @@ import {
     fetchActorDetails,
 } from '../../utils/actor_details.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
 import {
     buildActorNotFoundResponse,
@@ -29,15 +30,20 @@ export const openaiFetchActorDetails: ToolEntry = Object.freeze({
         const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: 'fetch-actor-details' });
         const apifyClient = new ApifyClient({ token: apifyToken });
 
-        const cardOptions = buildCardOptions(resolveOutputOptions(parsed.output));
+        const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
+        const cardOptions = { ...buildCardOptions(resolveOutputOptions(parsed.output)), userTier: userPlanTier };
         const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
         if (!details) {
             return buildActorNotFoundResponse(actorName);
         }
 
-        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details);
+        const { actorUrl, actorDetails } = buildActorDetailsForWidget(details, userPlanTier);
+        // Pricing is already carried by `actorDetails.actorInfo.currentPricingInfo` (widget-facing,
+        // tier-aware simplified). Omit the complete-mode `pricing` field from the top-level
+        // `actorInfo` to avoid two conflicting pricing shapes in the same response.
+        const { pricing: _pricing, ...actorInfoWithoutPricing } = details.actorCardStructured;
         const structuredContent = {
-            actorInfo: details.actorCardStructured,
+            actorInfo: actorInfoWithoutPricing,
             inputSchema: details.inputSchema,
             actorDetails,
         };

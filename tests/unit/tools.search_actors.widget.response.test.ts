@@ -4,8 +4,9 @@ import { HelperTools } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { openaiSearchActors } from '../../src/tools/openai/search_actors.js';
 import type { HelperTool } from '../../src/types.js';
-import { formatActorForWidget, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
+import { DEFAULT_CARD_OPTIONS, formatActorForWidget, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { searchAndFilterActors } from '../../src/utils/actor_search.js';
+import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
@@ -15,9 +16,15 @@ vi.mock('../../src/utils/actor_search.js', () => ({
     searchAndFilterActors: vi.fn(),
 }));
 
+vi.mock('../../src/utils/userid_cache.js', () => ({
+    getUserInfoCached: vi.fn(),
+}));
+
 describe('search-actors with widget (openaiSearchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAndFilterActors).mockReset();
+        vi.mocked(getUserInfoCached).mockReset();
+        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
     it('returns widgetActors, _meta, and OpenAI-specific instructions and text', async () => {
@@ -44,11 +51,17 @@ describe('search-actors with widget (openaiSearchActors)', () => {
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
         expect(structuredContent.count).toBe(1);
         expect(structuredContent.actors).toHaveLength(1);
-        expect(structuredContent.actors[0]).toStrictEqual(formatActorToStructuredCard(MOCK_STORE_ACTOR));
+        expect(structuredContent.actors[0]).toStrictEqual(
+            formatActorToStructuredCard(MOCK_STORE_ACTOR, {
+                ...DEFAULT_CARD_OPTIONS,
+                userTier: 'FREE',
+                simplifyPricingForUserTier: true,
+            }),
+        );
 
         expect(structuredContent.widgetActors).toBeDefined();
         expect(structuredContent.widgetActors!.length).toBe(structuredContent.actors.length);
-        expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR));
+        expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR, 'FREE'));
 
         expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
 

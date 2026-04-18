@@ -18,7 +18,7 @@ import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
-import type { StructuredPricingInfo } from './utils/pricing_info.js';
+import type { PricingTier, StructuredPricingInfo } from './utils/pricing_info.js';
 import type { ProgressTracker } from './utils/progress.js';
 
 export type SchemaProperties = {
@@ -616,6 +616,13 @@ export type ActorCardOptions = {
     includeRating?: boolean;
     /** Include metadata (developer, categories, last modified date, deprecation warning) */
     includeMetadata?: boolean;
+    /** User's plan tier. Defaults to FREE inside the formatters when unset. */
+    userTier?: PricingTier;
+    /**
+     * true → filter `tieredPricing` down to the user's resolved tier (search-actors).
+     * false/undefined → keep the full tiered matrix (fetch-actor-details).
+     */
+    simplifyPricingForUserTier?: boolean;
 }
 
 /**
