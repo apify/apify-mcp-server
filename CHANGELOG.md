@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.20 - **not yet released**
 
+### 🚀 Features
+
+- Add simplified pricing display for search-actors with user tier ([#695](https://github.com/apify/apify-mcp-server/pull/695)) ([d7288ba](https://github.com/apify/apify-mcp-server/commit/d7288ba5337fb4e50f5fb6d319e8c6f88d74e04f)) by [@jirispilka](https://github.com/jirispilka), closes [#578](https://github.com/apify/apify-mcp-server/issues/578)
+
 ### 🐛 Bug Fixes
 
 - Add actor id data to actor info ([#687](https://github.com/apify/apify-mcp-server/pull/687)) ([b568b33](https://github.com/apify/apify-mcp-server/commit/b568b33efbe2593b5083183299762b3ef17fa4ad)) by [@baldasseva](https://github.com/baldasseva)
