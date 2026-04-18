@@ -142,7 +142,10 @@ export const actorInfoSchema = {
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
-    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'pricing', 'isDeprecated'],
+    // Note: `pricing` is not required. openai/fetch-actor-details intentionally omits it from
+    // `actorInfo` so the widget's tier-aware pricing (under `actorDetails.actorInfo.currentPricingInfo`)
+    // is the single source of truth — see src/tools/openai/fetch_actor_details.ts.
+    required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
 
 /**
