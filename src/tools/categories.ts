@@ -16,8 +16,7 @@
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
-import { appsFetchActorDetails } from './apps/fetch_actor_details.js';
-import { fetchActorDetailsInternalTool } from './apps/fetch_actor_details_internal.js';
+import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
 import { appsGetActorRun } from './apps/get_actor_run.js';
 import { appsSearchActors } from './apps/search_actors.js';
 import { searchActorsInternalTool } from './apps/search_actors_internal.js';
@@ -70,12 +69,12 @@ export const toolCategories = {
     ],
     actors: [
         { default: defaultSearchActors, apps: appsSearchActors },
-        { default: defaultFetchActorDetails, apps: appsFetchActorDetails },
+        defaultFetchActorDetails,
         { default: defaultCallActor, apps: appsCallActor },
     ],
     ui: [
         { apps: searchActorsInternalTool },
-        { apps: fetchActorDetailsInternalTool },
+        { apps: fetchActorDetailsWidgetTool },
     ],
     docs: [
         searchApifyDocsTool,
