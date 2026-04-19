@@ -134,7 +134,10 @@ export class ActorsMcpServer {
         }
         this.actorStore = options.actorStore;
         if (options.uiMode === 'openai') {
-            log.warning(`UI mode 'openai' is deprecated; use 'apps' instead.`);
+            // Use console.warn so the notice always reaches stderr, regardless of the
+            // ambient @apify/log level (stdio mode sets it to ERROR at startup).
+            // eslint-disable-next-line no-console
+            console.warn(`UI mode 'openai' is deprecated; use 'apps' instead.`);
         }
         this.serverMode = resolveServerMode(options.uiMode);
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
