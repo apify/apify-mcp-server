@@ -43,9 +43,9 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(defaultCategories.ui)).toEqual([]);
         });
 
-        it('should have internal + widget tools in ui category in apps mode', () => {
+        it('should have widget tools in ui category in apps mode', () => {
             expect(toolNames(appsCategories.ui)).toEqual([
-                HelperTools.STORE_SEARCH_INTERNAL,
+                HelperTools.STORE_SEARCH_WIDGET,
                 HelperTools.ACTOR_GET_DETAILS_WIDGET,
             ]);
         });
@@ -106,18 +106,21 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         }
     });
 
-    describe('base fetch-actor-details has no widget meta in either mode', () => {
+    describe('base data tools have no widget meta in either mode', () => {
+        const baseToolNames = [HelperTools.ACTOR_GET_DETAILS, HelperTools.STORE_SEARCH];
         for (const mode of SERVER_MODES) {
-            it(`should have no ui/openai _meta keys in ${mode} mode`, () => {
-                const categories = getCategoryTools(mode);
-                const base = categories.actors.find((t) => t.name === HelperTools.ACTOR_GET_DETAILS);
-                expect(base).toBeDefined();
-                const meta = base!._meta ?? {};
-                for (const key of Object.keys(meta)) {
-                    expect(key).not.toMatch(/^openai\//);
-                    expect(key).not.toBe('ui');
-                }
-            });
+            for (const name of baseToolNames) {
+                it(`${name} should have no ui/openai _meta keys in ${mode} mode`, () => {
+                    const categories = getCategoryTools(mode);
+                    const base = categories.actors.find((t) => t.name === name);
+                    expect(base).toBeDefined();
+                    const meta = base!._meta ?? {};
+                    for (const key of Object.keys(meta)) {
+                        expect(key).not.toMatch(/^openai\//);
+                        expect(key).not.toBe('ui');
+                    }
+                });
+            }
         }
     });
 
@@ -142,12 +145,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             });
         }
 
-        // Locks the invariant that search-actors-internal reuses the shared base schema
+        // Locks the invariant that search-actors-widget reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
-        it('should use searchActorsBaseArgsSchema for search-actors-internal inputSchema', () => {
-            const internalTool = appsCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_INTERNAL);
-            expect(internalTool).toBeDefined();
-            expect(internalTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema));
+        it('should use searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
+            const widgetTool = appsCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_WIDGET);
+            expect(widgetTool).toBeDefined();
+            expect(widgetTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema.strict()));
         });
     });
 

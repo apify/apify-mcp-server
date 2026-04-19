@@ -49,7 +49,7 @@ export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 
 type CallActorDescriptionParams = {
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
+    storeSearchTool: HelperTools.STORE_SEARCH;
     useInternalSearchWarning: boolean;
     alwaysAsync: boolean;
 };
@@ -79,7 +79,7 @@ type CallActorErrorResponseParams = {
     isAsync: boolean;
     mcpSessionId?: string;
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
+    storeSearchTool: HelperTools.STORE_SEARCH;
 };
 
 export function buildCallActorDescription(params: CallActorDescriptionParams): string {

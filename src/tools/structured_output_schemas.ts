@@ -207,9 +207,9 @@ export const actorSearchOutputSchema = {
 };
 
 /**
- * Schema for internal search results (search-actors-internal tool)
+ * Schema for widget search results (search-actors-widget tool)
  */
-export const actorSearchInternalOutputSchema = {
+export const actorSearchWidgetOutputSchema = {
     type: 'object' as const,
     properties: {
         actors: {

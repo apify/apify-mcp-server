@@ -258,7 +258,7 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            // Note: UI tools (search-actors-internal, fetch-actor-details-widget) are only available in apps mode
+            // Note: UI tools (search-actors-widget, fetch-actor-details-widget) are only available in apps mode
             const expectedActorsTools = [
                 'fetch-actor-details',
                 'search-actors',
@@ -2465,7 +2465,7 @@ export function createIntegrationTestsSuite(
 
             // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-            expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
+            expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled
             expectWidgetToolMeta(tools);
@@ -2481,7 +2481,7 @@ export function createIntegrationTestsSuite(
 
             // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-            expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
+            expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
@@ -2499,7 +2499,7 @@ export function createIntegrationTestsSuite(
 
                 // Verify that apps-only internal tools are present when ui=true is used
                 expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-                expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
+                expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
 
                 // Verify that tools have widget metadata when ui=true is used
                 expectWidgetToolMeta(tools);

@@ -18,8 +18,7 @@ import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
 import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
 import { appsGetActorRun } from './apps/get_actor_run.js';
-import { appsSearchActors } from './apps/search_actors.js';
-import { searchActorsInternalTool } from './apps/search_actors_internal.js';
+import { searchActorsWidgetTool } from './apps/search_actors_widget.js';
 import { abortActorRun } from './common/abort_actor_run.js';
 import { addTool } from './common/add_actor.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
@@ -68,12 +67,12 @@ export const toolCategories = {
         addTool,
     ],
     actors: [
-        { default: defaultSearchActors, apps: appsSearchActors },
+        defaultSearchActors,
         defaultFetchActorDetails,
         { default: defaultCallActor, apps: appsCallActor },
     ],
     ui: [
-        { apps: searchActorsInternalTool },
+        { apps: searchActorsWidgetTool },
         { apps: fetchActorDetailsWidgetTool },
     ],
     docs: [

@@ -17,8 +17,8 @@ import { callActorOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorDescription({
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-    storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
-    useInternalSearchWarning: true,
+    storeSearchTool: HelperTools.STORE_SEARCH,
+    useInternalSearchWarning: false,
     alwaysAsync: true,
 });
 
@@ -91,7 +91,7 @@ export const appsCallActor: ToolEntry = Object.freeze({
                 isAsync: true,
                 mcpSessionId: toolArgs.mcpSessionId,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
+                storeSearchTool: HelperTools.STORE_SEARCH,
             });
         }
     },

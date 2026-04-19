@@ -24,19 +24,19 @@ describe('call_actor_common', () => {
             expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
         });
 
-        it('builds the apps description with internal search helper and async guidance', () => {
+        it('builds the apps description with public search helper and async guidance', () => {
             const description = buildCallActorDescription({
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
-                useInternalSearchWarning: true,
+                storeSearchTool: HelperTools.STORE_SEARCH,
+                useInternalSearchWarning: false,
                 alwaysAsync: true,
             });
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`use ${HelperTools.STORE_SEARCH_INTERNAL} to resolve the correct Actor first`);
+            expect(description).toContain(`use ${HelperTools.STORE_SEARCH} to resolve the correct Actor first`);
             expect(description).toContain('always runs asynchronously');
             expect(description).toContain('do NOT poll or call any other tool');
-            expect(description).toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
+            expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
             expect(description).not.toContain('When `async: false` or not provided');
         });
     });
@@ -116,17 +116,17 @@ describe('call_actor_common', () => {
             }));
         });
 
-        it('uses internal search helper name in apps mode', () => {
+        it('uses public search helper name in apps mode', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
                 error: new Error('boom'),
                 isAsync: true,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
+                storeSearchTool: HelperTools.STORE_SEARCH,
             });
 
             const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH_INTERNAL}`);
+            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH}`);
             expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(expect.objectContaining({
                 toolStatus: TOOL_STATUS.FAILED,

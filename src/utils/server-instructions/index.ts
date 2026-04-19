@@ -74,9 +74,9 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 - **\`${HelperTools.STORE_SEARCH}\` vs \`${HelperTools.ACTOR_GET_DETAILS}\`:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
 ${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**
-  - \`${HelperTools.STORE_SEARCH_INTERNAL}\` is for silent name resolution; \`${HelperTools.STORE_SEARCH}\` renders an interactive UI element (widget) for user-facing discovery.
+  - \`${HelperTools.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HelperTools.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
   - \`${HelperTools.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
-  - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH_INTERNAL}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
+  - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
 ` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HelperTools.ACTOR_CALL}\`:**
