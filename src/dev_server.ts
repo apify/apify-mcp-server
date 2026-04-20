@@ -19,7 +19,7 @@ import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
-import { parseUiMode } from './types.js';
+import { parseServerMode } from './types.js';
 
 enum TransportType {
     HTTP = 'HTTP',
@@ -75,7 +75,7 @@ export function createExpressApp(): express.Express {
                 ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
-            const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
+            const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
 
             // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
             const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
@@ -87,7 +87,7 @@ export function createExpressApp(): express.Express {
                 telemetry: {
                     enabled: telemetryEnabled,
                 },
-                uiMode,
+                serverMode,
                 paymentProvider,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
@@ -206,7 +206,7 @@ export function createExpressApp(): express.Express {
                     ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
-                const uiMode = parseUiMode(urlParams.get('ui')) ?? parseUiMode(process.env.UI_MODE);
+                const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
 
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
                 const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
@@ -219,7 +219,7 @@ export function createExpressApp(): express.Express {
                     telemetry: {
                         enabled: telemetryEnabled,
                     },
-                    uiMode,
+                    serverMode,
                     paymentProvider,
                 });
 

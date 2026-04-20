@@ -13,7 +13,8 @@
  * - A mode map (e.g. { default: ToolEntry, apps: ToolEntry }) — resolver picks entry[mode]
  * - A partial mode map (e.g. { apps: ToolEntry }) — included only for listed modes
  */
-import type { ServerMode, ToolEntry } from '../types.js';
+import type { ToolEntry } from '../types.js';
+import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
 import { appsFetchActorDetails } from './apps/fetch_actor_details.js';
 import { fetchActorDetailsInternalTool } from './apps/fetch_actor_details_internal.js';
@@ -144,7 +145,7 @@ function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: Ser
  * @param mode - Required. Use `'default'` or `'apps'`.
  *   Made explicit (no default value) to prevent accidentally serving wrong-mode tools.
  */
-export function getCategoryTools(mode: ServerMode = 'default'): ToolCategoryMap {
+export function getCategoryTools(mode: ServerMode = ServerMode.DEFAULT): ToolCategoryMap {
     return Object.fromEntries(
         CATEGORY_NAMES.map((name) => [name, resolveCategoryEntries(toolCategories[name], mode)]),
     ) as ToolCategoryMap;

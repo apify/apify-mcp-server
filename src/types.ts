@@ -388,56 +388,42 @@ export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_error_count'>;
 
 /**
- * Internal server mode that controls which tool variants, descriptions, and response
- * formats are served. Every internal call site (tool loading, category resolution,
- * server instructions) uses this type.
+ * Server mode — controls which tool variants, descriptions, and response formats are served.
  *
  * - `'default'` — standard MCP tools for generic clients (sync/async execution, text responses)
- * - `'apps'` — MCP Apps tool variants (always-async execution, widget metadata)
+ * - `'apps'`    — MCP Apps tool variants (always-async execution, widget metadata)
  *
- * **Relationship to {@link UiMode}:** `ServerMode` is the canonical internal representation.
- * `UiMode` is the external API surface; `'openai'` is accepted there as a deprecated alias
- * for `'apps'` and normalized in `ActorsMcpServer` constructor via {@link resolveServerMode}.
+ * The `'apps'` name comes from the [MCP Apps specification (2026-01-26)](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx),
+ * the open standard for widget-embedded UI in MCP clients. The value was previously
+ * named `'openai'` but is renamed here to reflect that the protocol is no longer
+ * OpenAI-specific; `'openai'` is kept as a deprecated alias at CLI/env ingestion
+ * (see {@link parseServerMode}) and is silently normalized to `'apps'`.
  */
-export type ServerMode = 'default' | 'apps';
+export const ServerMode = {
+    DEFAULT: 'default',
+    APPS: 'apps',
+} as const;
+export type ServerMode = (typeof ServerMode)[keyof typeof ServerMode];
 
 /** All valid server modes, for iteration in tests and caches. */
-export const SERVER_MODES: readonly ServerMode[] = ['default', 'apps'] as const;
+export const SERVER_MODES: readonly ServerMode[] = Object.values(ServerMode);
 
 /**
- * External API surface for selecting a UI mode — passed via `options.uiMode` in
- * {@link ActorsMcpServerOptions}.
+ * Parse an untrusted raw mode string (from CLI flag, env var, or URL param) into a {@link ServerMode}.
  *
- * - `'apps'` — canonical value.
- * - `'openai'` — deprecated alias for `'apps'`, accepted during the transition to
- *   the MCP Apps naming. Normalized to `'apps'` at ingestion; a deprecation warning
- *   is logged in the `ActorsMcpServer` constructor.
+ * Accepts:
+ * - `'default'` / `'apps'` — canonical values
+ * - `'true'` / `'false'` — CLI shorthand for `'apps'` / `'default'`
+ * - `'openai'` — deprecated alias for `'apps'` (pre-MCP-Apps naming); silently normalized
  *
- * The absence of a UI mode (`undefined`) maps to `ServerMode = 'default'` internally.
+ * Returns `undefined` for invalid input; the caller should fall back to `ServerMode.DEFAULT`.
+ * Use at ingestion boundaries only — the internal API type is `ServerMode`.
  */
-export type UiMode = 'apps' | 'openai';
-
-/**
- * Parse an untrusted string into a valid UiMode, returning `undefined` for invalid values.
- * Accepts `'apps'`, `'true'` (alias for `'apps'`), and `'openai'` (deprecated alias — kept
- * for backward compatibility, normalized downstream).
- * Use at ingestion boundaries (URL params, env vars) to prevent invalid modes from propagating.
- */
-export function parseUiMode(value: string | null | undefined): UiMode | undefined {
-    if (!value) return undefined;
-    if (value === 'true' || value === 'apps') return 'apps';
-    if (value === 'openai') return 'openai';
+export function parseServerMode(rawMode: string | null | undefined): ServerMode | undefined {
+    if (!rawMode) return undefined;
+    if (rawMode === 'true' || rawMode === ServerMode.APPS || rawMode === 'openai') return ServerMode.APPS;
+    if (rawMode === 'false' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
     return undefined;
-}
-
-/**
- * Resolve a {@link UiMode} to its canonical {@link ServerMode}. `'openai'` normalizes
- * to `'apps'`; `undefined` normalizes to `'default'`. The caller should log the
- * deprecation warning when it detects the `'openai'` alias (has logger context).
- */
-export function resolveServerMode(uiMode: UiMode | undefined): ServerMode {
-    if (uiMode === 'openai') return 'apps';
-    return uiMode ?? 'default';
 }
 
 /**
@@ -578,13 +564,10 @@ export type ActorsMcpServerOptions = {
      */
     token?: string;
     /**
-     * UI mode for tool responses.
-     * - 'apps': MCP Apps widget rendering (canonical)
-     * - 'openai': deprecated alias for 'apps' — normalized at server construction with a warning
-     * If not specified, defaults to 'default' mode (no widget rendering).
-     * Normalized to {@link ServerMode} at server construction.
+     * Server mode — controls tool variants and response formats. See {@link ServerMode}.
+     * Defaults to `ServerMode.DEFAULT` when unset.
      */
-    uiMode?: UiMode;
+    serverMode?: ServerMode;
 }
 
 export type StructuredActorCard = {

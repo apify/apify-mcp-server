@@ -1260,7 +1260,7 @@ export function createIntegrationTestsSuite(
         it('should return README content via fetch-actor-details-internal in apps mode', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'apps',
+                serverMode: 'apps',
             });
 
             // fetch-actor-details-internal is only available in apps mode
@@ -2449,7 +2449,7 @@ export function createIntegrationTestsSuite(
         // Uses the deprecated 'openai' alias deliberately to exercise the backward-compat path;
         // a deprecation warning is expected in the logs.
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided', async () => {
-            client = await createClientFn({ useEnv: true, uiMode: 'openai' });
+            client = await createClientFn({ useEnv: true, serverMode: 'openai' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
@@ -2464,8 +2464,8 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use uiMode URL parameter when provided', async () => {
-            client = await createClientFn({ uiMode: 'apps' });
+        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use serverMode URL parameter when provided', async () => {
+            client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
@@ -2482,8 +2482,8 @@ export function createIntegrationTestsSuite(
 
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')(
             'should treat ui=true URL parameter the same as ui=apps', async () => {
-                // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseUiMode)
-                client = await createClientFn({ uiMode: 'true' });
+                // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
+                client = await createClientFn({ serverMode: 'true' });
                 const tools = await client.listTools();
                 const toolNames = getToolNames(tools);
                 expect(tools.tools.length).toBeGreaterThan(0);
@@ -2498,12 +2498,12 @@ export function createIntegrationTestsSuite(
                 await client.close();
             });
 
-        it('should automatically include get-actor-run when uiMode is enabled', async () => {
-            client = await createClientFn({ uiMode: 'apps' });
+        it('should automatically include get-actor-run when serverMode is enabled', async () => {
+            client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            // When uiMode is enabled, default tools include call-actor, so get-actor-run should be included
+            // When serverMode is enabled, default tools include call-actor, so get-actor-run should be included
             expect(toolNames).toContain(HelperTools.ACTOR_CALL);
             expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
 
@@ -2511,11 +2511,11 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should include get-actor-run without call-actor', async () => {
-            client = await createClientFn({ uiMode: 'apps', tools: ['docs'] });
+            client = await createClientFn({ serverMode: 'apps', tools: ['docs'] });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            // get-actor-run should be included when uiMode is enabled, even if call-actor is not present
+            // get-actor-run should be included when serverMode is enabled, even if call-actor is not present
             expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
             // Docs tools should be present
             expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
@@ -2644,7 +2644,7 @@ export function createIntegrationTestsSuite(
         it('should return required structuredContent fields for ActorSearch widget (search-actors)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'apps', // Enable UI mode to get widgetActors
+                serverMode: 'apps', // Enable UI mode to get widgetActors
             });
 
             const result = await client.callTool({
@@ -2679,7 +2679,7 @@ export function createIntegrationTestsSuite(
         it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'apps', // Enable UI mode to get widget structured content
+                serverMode: 'apps', // Enable UI mode to get widget structured content
             });
 
             const result = await client.callTool({

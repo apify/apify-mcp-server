@@ -4,7 +4,8 @@ import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../const.js';
-import type { CallDiagnostics, HelperTool, ServerMode, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import { ServerMode } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -92,7 +93,7 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
     const { mode, filterWidgetMeta = false } = options;
-    const meta = filterWidgetMeta && mode !== 'apps'
+    const meta = filterWidgetMeta && mode !== ServerMode.APPS
         ? stripWidgetMeta(tool._meta)
         : tool._meta;
 
