@@ -3,7 +3,7 @@ import { getHttpStatusCode } from './logging.js';
 
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
- * Uses MCP-compliant key names with com.apify/ prefix as per MCP specification.
+ * Returned keys: `usageTotalUsd`, `usageUsd`.
  * @param source - Object containing usage cost information
  * @param source.usageTotalUsd - Total cost in USD (optional)
  * @param source.usageUsd - Breakdown of costs by resource type (optional)
