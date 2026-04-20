@@ -31,6 +31,7 @@ export enum HelperTools {
     ACTOR_OUTPUT_GET = 'get-actor-output',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',
+    ACTOR_RUNS_GET_WIDGET = 'get-actor-run-widget',
     ACTOR_RUNS_LOG = 'get-actor-log',
     ACTOR_RUN_LIST_GET = 'get-actor-run-list',
     DATASET_GET = 'get-dataset',
