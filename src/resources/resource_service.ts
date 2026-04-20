@@ -3,7 +3,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, ReadResourceResu
 import log from '@apify/log';
 
 import type { PaymentProvider } from '../payments/types.js';
-import type { ServerMode } from '../types.js';
+import { ServerMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
 
@@ -44,7 +44,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (mode === 'apps') {
+        if (mode === ServerMode.APPS) {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -74,7 +74,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (mode === 'apps' && uri.startsWith('ui://widget/')) {
+        if (mode === ServerMode.APPS && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {

@@ -17,7 +17,7 @@ export type McpClientOptions = {
         enabled?: boolean; // Enable or disable telemetry (default: false for tests)
         env?: TelemetryEnv; // Telemetry environment (default: 'PROD', only used when telemetry.enabled is true)
     };
-    uiMode?: string; // Raw UI mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
+    serverMode?: string; // Raw server-mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
     payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
 }
 
@@ -28,7 +28,7 @@ function checkApifyToken(): void {
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
-    const { actors, enableAddingActors, tools, telemetry, uiMode, payment } = options || {};
+    const { actors, enableAddingActors, tools, telemetry, serverMode, payment } = options || {};
     if (actors !== undefined) {
         url.searchParams.append('actors', actors.join(','));
     }
@@ -41,8 +41,8 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     // Append telemetry parameters (default to false for tests when not explicitly set)
     const telemetryEnabled = telemetry?.enabled !== undefined ? telemetry.enabled : false;
     url.searchParams.append('telemetry-enabled', telemetryEnabled.toString());
-    if (uiMode !== undefined) {
-        url.searchParams.append('ui', uiMode);
+    if (serverMode !== undefined) {
+        url.searchParams.append('ui', serverMode);
     }
     if (payment) {
         url.searchParams.append('payment', payment);
@@ -109,7 +109,7 @@ export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
     checkApifyToken();
-    const { actors, enableAddingActors, tools, useEnv, telemetry, uiMode, payment } = options || {};
+    const { actors, enableAddingActors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {
         APIFY_TOKEN: process.env.APIFY_TOKEN as string,
@@ -133,8 +133,8 @@ export async function createMcpStdioClient(
         if (telemetry?.env !== undefined) {
             env.TELEMETRY_ENV = telemetry.env;
         }
-        if (uiMode !== undefined) {
-            env.UI_MODE = uiMode;
+        if (serverMode !== undefined) {
+            env.UI_MODE = serverMode;
         }
         if (payment !== undefined) {
             env.PAYMENT = payment;
@@ -154,8 +154,8 @@ export async function createMcpStdioClient(
         if (telemetry?.env !== undefined && telemetryEnabled) {
             args.push('--telemetry-env', telemetry.env);
         }
-        if (uiMode !== undefined) {
-            args.push('--ui', uiMode);
+        if (serverMode !== undefined) {
+            args.push('--ui', serverMode);
         }
         if (payment !== undefined) {
             args.push('--payment', payment);

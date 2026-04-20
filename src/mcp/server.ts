@@ -63,13 +63,12 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
-    ServerMode,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { resolveServerMode } from '../types.js';
+import { ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -85,8 +84,8 @@ import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
-    default: defaultActorExecutor,
-    apps: appsActorExecutor,
+    [ServerMode.DEFAULT]: defaultActorExecutor,
+    [ServerMode.APPS]: appsActorExecutor,
 };
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
@@ -103,7 +102,7 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
-    /** Resolved server mode — normalized once at construction from options.uiMode. */
+    /** Server mode — fixed at construction from `options.serverMode`. */
     public readonly serverMode: ServerMode;
     /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
     private readonly actorExecutor: ActorExecutor;
@@ -133,13 +132,7 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        if (options.uiMode === 'openai') {
-            // Use console.warn so the notice always reaches stderr, regardless of the
-            // ambient @apify/log level (stdio mode sets it to ERROR at startup).
-            // eslint-disable-next-line no-console
-            console.warn(`UI mode 'openai' is deprecated; use 'apps' instead.`);
-        }
-        this.serverMode = resolveServerMode(options.uiMode);
+        this.serverMode = options.serverMode ?? ServerMode.DEFAULT;
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -1397,7 +1390,7 @@ export class ActorsMcpServer {
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== 'apps') {
+        if (this.serverMode !== ServerMode.APPS) {
             return;
         }
 

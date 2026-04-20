@@ -12,8 +12,8 @@ import { CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { getActorsAsTools } from '../tools/index.js';
-import type { ActorStore, Input, ServerMode, ToolCategory, ToolEntry } from '../types.js';
-import { SERVER_MODES } from '../types.js';
+import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
+import { SERVER_MODES, ServerMode } from '../types.js';
 
 /**
  * Set of all known internal tool names across ALL modes.
@@ -51,7 +51,7 @@ function getAllInternalToolNames(): Set<string> {
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
-    mode: ServerMode = 'default',
+    mode: ServerMode = ServerMode.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     // Build mode-resolved categories — tools are already the correct variant for this mode
@@ -159,7 +159,7 @@ export async function loadToolsFromInput(
     }
 
     // In apps mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (mode === 'apps' && !explicitlyNoToolsRequested) {
+    if (mode === ServerMode.APPS && !explicitlyNoToolsRequested) {
         result.push(...categories.ui);
     }
 
@@ -183,7 +183,7 @@ export async function loadToolsFromInput(
     const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || (mode === 'apps' && !explicitlyNoToolsRequested))) {
+    if (!hasGetActorRun && (hasCallActor || (mode === ServerMode.APPS && !explicitlyNoToolsRequested))) {
         // Use mode-resolved get-actor-run variant
         const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
         if (modeGetActorRun) toolsToInject.push(modeGetActorRun);

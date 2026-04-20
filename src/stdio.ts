@@ -36,8 +36,8 @@ import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
-import { parseUiMode, resolveServerMode } from './types.js';
+import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector } from './types.js';
+import { parseServerMode, ServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools_loader.js';
@@ -58,12 +58,13 @@ type CliArgs = {
     telemetryEnabled: boolean;
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
-    /** UI mode for tool responses.
+    /** Server mode for tool responses.
      * - 'true' or 'apps': Enable MCP Apps widget rendering
+     * - 'false' or 'default': No widget rendering
      * - 'openai': deprecated alias for 'apps'
-     * If not specified, there will be no widget rendering.
+     * If not specified, defaults to no widget rendering.
      */
-    ui: UiMode;
+    ui: ServerMode;
 }
 
 /**
@@ -135,7 +136,7 @@ Only used when --telemetry-enabled is true`,
         coerce: (arg: string | boolean | undefined) => {
             // Normalize: bare --ui flag (boolean true) or empty string both mean 'true'
             const normalized = arg === true || arg === '' ? 'true' : arg;
-            return parseUiMode((normalized as string) || process.env.UI_MODE);
+            return parseServerMode((normalized as string) || process.env.UI_MODE);
         },
         describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
 --ui or --ui true: Enable widget rendering
@@ -202,7 +203,7 @@ async function main() {
             env: getTelemetryEnv(argv.telemetryEnv),
         },
         token: apifyToken,
-        uiMode: argv.ui,
+        serverMode: argv.ui,
         allowUnauthMode: !requiresAuthentication,
     });
 
@@ -218,7 +219,7 @@ async function main() {
 
     const apifyClient = new ApifyClient({ token: apifyToken });
     // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, resolveServerMode(argv.ui));
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? ServerMode.DEFAULT);
 
     mcpServer.upsertTools(tools);
 

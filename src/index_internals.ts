@@ -12,8 +12,8 @@ import { addTool } from './tools/common/add_actor.js';
 import { getActorsAsTools, getCategoryTools, getDefaultTools, getUnauthEnabledToolCategories,
     toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
-import type { ActorStore, ServerCard, ServerMode, ToolCategory, UiMode } from './types.js';
-import { parseUiMode, SERVER_MODES } from './types.js';
+import type { ActorStore, ServerCard, ToolCategory } from './types.js';
+import { parseServerMode, SERVER_MODES, ServerMode } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
@@ -34,14 +34,13 @@ export {
     getDefaultTools,
     addTool,
     getCategoryTools,
-    parseUiMode,
+    parseServerMode,
+    ServerMode,
     SERVER_MODES,
-    type ServerMode,
     toolCategoriesEnabledByDefault,
     type ActorStore,
     type ServerCard,
     type ToolCategory,
-    type UiMode,
     processParamsGetTools,
     getActorsAsTools,
     getToolPublicFieldOnly,
