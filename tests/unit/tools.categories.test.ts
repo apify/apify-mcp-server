@@ -66,7 +66,7 @@ describe('getCategoryTools', () => {
         expect(defaultCallActor).not.toBe(appsCallActor);
     });
 
-    it('should return different get-actor-run variants based on mode', () => {
+    it('should share the same get-actor-run tool across modes (mode-independent)', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');
 
@@ -75,8 +75,8 @@ describe('getCategoryTools', () => {
 
         expect(defaultGetRun).toBeDefined();
         expect(appsGetRun).toBeDefined();
-        // Different objects (different implementations)
-        expect(defaultGetRun).not.toBe(appsGetRun);
+        // Same object — data-only, mode-independent. UI rendering lives in get-actor-run-widget.
+        expect(defaultGetRun).toBe(appsGetRun);
     });
 
     it('should share identical tools for mode-independent categories', () => {

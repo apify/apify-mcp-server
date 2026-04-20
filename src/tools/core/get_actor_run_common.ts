@@ -13,7 +13,7 @@ import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Zod schema for get-actor-run arguments — shared between default and apps variants.
+ * Zod schema for get-actor-run arguments — shared between default and widget variants.
  */
 export const getActorRunArgs = z.object({
     runId: z.string()
@@ -28,6 +28,7 @@ USAGE:
 - Use when the user asks about a specific run's status or details.
 - Use to check the status of a run started with call-actor (e.g., before fetching output).
 - If you used call-actor-widget and a widget was rendered, do not poll get-actor-run; the widget handles status.
+- Returns pure data with no UI.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
@@ -35,7 +36,8 @@ USAGE EXAMPLES:
 
 /**
  * Shared tool metadata for get-actor-run — everything except the `call` handler.
- * Used by both default and apps variants.
+ * Mode-independent, data-only. No widget _meta here; the widget variant in
+ * `src/tools/apps/get_actor_run_widget.ts` owns UI rendering.
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -45,10 +47,6 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
     paymentRequired: true,
-    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
-    },
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
@@ -125,6 +123,7 @@ export function buildGetActorRunSuccessResponse(
         _meta: {
             ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
             ...(buildUsageMeta(run) ?? {}),
+            'openai/widgetDescription': `Actor run progress for ${structuredContent.actorName ?? structuredContent.runId}`,
         },
     });
 }

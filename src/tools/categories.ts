@@ -18,7 +18,7 @@ import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
 import { appsCallActorWidget } from './apps/call_actor_widget.js';
 import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
-import { appsGetActorRun } from './apps/get_actor_run.js';
+import { getActorRunWidgetTool } from './apps/get_actor_run_widget.js';
 import { searchActorsWidgetTool } from './apps/search_actors_widget.js';
 import { abortActorRun } from './common/abort_actor_run.js';
 import { addTool } from './common/add_actor.js';
@@ -76,13 +76,14 @@ export const toolCategories = {
         { apps: searchActorsWidgetTool },
         { apps: fetchActorDetailsWidgetTool },
         { apps: appsCallActorWidget },
+        { apps: getActorRunWidgetTool },
     ],
     docs: [
         searchApifyDocsTool,
         fetchApifyDocsTool,
     ],
     runs: [
-        { default: defaultGetActorRun, apps: appsGetActorRun },
+        defaultGetActorRun,
         getUserRunsList,
         getActorRunLog,
         abortActorRun,
