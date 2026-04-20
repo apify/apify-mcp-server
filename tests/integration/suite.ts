@@ -2446,8 +2446,8 @@ export function createIntegrationTestsSuite(
             await assertStatusMessagePropagated(client, stream);
         });
 
-        // Uses the deprecated 'openai' alias deliberately to exercise the backward-compat path;
-        // a deprecation warning is expected in the logs.
+        // Uses the deprecated 'openai' alias deliberately to verify it is silently
+        // normalized to 'apps' at the CLI/env ingestion boundary (no warning emitted).
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, serverMode: 'openai' });
             const tools = await client.listTools();

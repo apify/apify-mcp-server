@@ -68,7 +68,7 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { ServerMode } from '../types.js';
+import { parseServerMode, ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -132,7 +132,13 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        this.serverMode = options.serverMode ?? ServerMode.DEFAULT;
+        // Constructor is an ingestion boundary for programmatic callers. Normalize via
+        // parseServerMode so that runtime-invalid values ('openai' alias, stray strings)
+        // and the legacy `uiMode` field name are accepted gracefully during the transition
+        // to the canonical `serverMode` API. Remove the `uiMode` fallback once internal
+        // consumers have migrated (see apify-mcp-server-internal#454).
+        const legacyUiMode = (options as { uiMode?: string }).uiMode;
+        this.serverMode = parseServerMode(options.serverMode ?? legacyUiMode) ?? ServerMode.DEFAULT;
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
