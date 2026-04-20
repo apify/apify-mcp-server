@@ -5,6 +5,7 @@ import { parseServerMode, ServerMode } from '../../src/types.js';
 describe('parseServerMode', () => {
     it.each([
         ['true', ServerMode.APPS],
+        ['on', ServerMode.APPS],
         [ServerMode.APPS, ServerMode.APPS],
         ['openai', ServerMode.APPS],
     ])('maps %s → apps', (input, expected) => {
@@ -13,16 +14,21 @@ describe('parseServerMode', () => {
 
     it.each([
         ['false', ServerMode.DEFAULT],
+        ['off', ServerMode.DEFAULT],
         [ServerMode.DEFAULT, ServerMode.DEFAULT],
     ])('maps %s → default', (input, expected) => {
         expect(parseServerMode(input)).toBe(expected);
     });
 
-    it.each([null, undefined, ''])('returns undefined for %s', (input) => {
-        expect(parseServerMode(input)).toBeUndefined();
+    it('maps auto → auto', () => {
+        expect(parseServerMode('auto')).toBe('auto');
     });
 
-    it('returns undefined for unrecognized values', () => {
-        expect(parseServerMode('bogus')).toBeUndefined();
+    it.each([null, undefined, ''])('returns auto for %s', (input) => {
+        expect(parseServerMode(input)).toBe('auto');
+    });
+
+    it('returns auto for unrecognized values', () => {
+        expect(parseServerMode('bogus')).toBe('auto');
     });
 });

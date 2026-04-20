@@ -36,8 +36,8 @@ import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector } from './types.js';
-import { parseServerMode, ServerMode } from './types.js';
+import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
+import { parseServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { loadToolsFromInput } from './utils/tools_loader.js';
@@ -59,12 +59,12 @@ type CliArgs = {
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
     /** Server mode for tool responses.
-     * - 'true' or 'apps': Enable MCP Apps widget rendering
-     * - 'false' or 'default': No widget rendering
-     * - 'openai': deprecated alias for 'apps'
-     * If not specified, defaults to no widget rendering.
+     * - `'apps'` / `'true'` / `'on'`: force MCP Apps widget rendering
+     * - `'default'` / `'false'` / `'off'`: force standard (non-widget) tool set
+     * - `'auto'` (default): resolve from the client's `initialize` capabilities
+     * - `'openai'`: deprecated alias for `'apps'`
      */
-    ui: ServerMode | undefined;
+    ui: ServerModeOption;
 }
 
 /**
@@ -133,14 +133,15 @@ Only used when --telemetry-enabled is true`,
     })
     .option('ui', {
         default: undefined,
-        coerce: (arg: string | boolean | undefined) => {
+        coerce: (arg: string | boolean | undefined): ServerModeOption => {
             // Normalize: bare --ui flag (boolean true) or empty string both mean 'true'
             const normalized = arg === true || arg === '' ? 'true' : arg;
             return parseServerMode((normalized as string) || process.env.UI_MODE);
         },
-        describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
---ui or --ui true: Enable widget rendering
-Default: undefined (no widget rendering)`,
+        describe: `Server mode. Can also be set via UI_MODE environment variable.
+--ui apps | --ui true | --ui on   : force MCP Apps widget rendering
+--ui default | --ui false | --ui off : force standard tool set
+--ui auto (default)               : resolve from client capabilities`,
     })
     .help('help')
     .alias('h', 'help')
@@ -218,8 +219,10 @@ async function main() {
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? ServerMode.DEFAULT);
+    // Use the shared tools loading logic. `mcpServer.serverMode` is already resolved
+    // from `argv.ui` via the constructor (with 'auto' → DEFAULT until capability
+    // negotiation lands).
+    const tools = await loadToolsFromInput(normalizedInput, apifyClient, mcpServer.serverMode);
 
     mcpServer.upsertTools(tools);
 

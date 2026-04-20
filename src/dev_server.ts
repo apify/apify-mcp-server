@@ -75,7 +75,8 @@ export function createExpressApp(): express.Express {
                 ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
-            const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
+            const uiParam = urlParams.get('ui');
+            const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
 
             // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
             const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
@@ -206,7 +207,8 @@ export function createExpressApp(): express.Express {
                     ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
-                const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
+                const uiParam = urlParams.get('ui');
+                const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
 
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
                 const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));

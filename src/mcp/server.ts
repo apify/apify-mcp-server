@@ -68,7 +68,7 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { parseServerMode, ServerMode } from '../types.js';
+import { parseServerMode, resolveServerMode, ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -138,7 +138,10 @@ export class ActorsMcpServer {
         // to the canonical `serverMode` API. Remove the `uiMode` fallback once internal
         // consumers have migrated (see apify-mcp-server-internal#454).
         const legacyUiMode = (options as { uiMode?: string }).uiMode;
-        this.serverMode = parseServerMode(options.serverMode ?? legacyUiMode) ?? ServerMode.DEFAULT;
+        const option = options.serverMode ?? parseServerMode(legacyUiMode);
+        // 'auto' resolves to DEFAULT at construction without a connected client; the
+        // auto-detect path updates this later from `initialize` capabilities.
+        this.serverMode = resolveServerMode(option, false);
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
