@@ -568,6 +568,10 @@ export type ActorsMcpServerOptions = {
      * Defaults to `ServerMode.DEFAULT` when unset.
      */
     serverMode?: ServerMode;
+    /**
+     * @deprecated Use `serverMode` instead.
+     */
+    uiMode?: string;
 }
 
 export type StructuredActorCard = {

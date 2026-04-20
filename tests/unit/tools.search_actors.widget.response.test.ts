@@ -27,7 +27,7 @@ describe('search-actors with widget (appsSearchActors)', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
-    it('returns widgetActors, _meta, and OpenAI-specific instructions and text', async () => {
+    it('returns widgetActors, _meta, and apps-mode instructions and text', async () => {
         vi.mocked(searchAndFilterActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (appsSearchActors as HelperTool).call(stubInternalToolArgs({

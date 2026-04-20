@@ -142,8 +142,7 @@ function resolveCategoryEntries(entries: readonly CategoryToolEntry[], mode: Ser
  * (async execution, widget metadata), default mode gets standard implementations.
  * Apps-only tools are excluded in default mode.
  *
- * @param mode - Required. Use `'default'` or `'apps'`.
- *   Made explicit (no default value) to prevent accidentally serving wrong-mode tools.
+ * @param mode - Optional. Use `'default'` or `'apps'`. Defaults to `ServerMode.DEFAULT` when omitted.
  */
 export function getCategoryTools(mode: ServerMode = ServerMode.DEFAULT): ToolCategoryMap {
     return Object.fromEntries(
