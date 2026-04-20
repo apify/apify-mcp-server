@@ -64,7 +64,7 @@ type CliArgs = {
      * - 'openai': deprecated alias for 'apps'
      * If not specified, defaults to no widget rendering.
      */
-    ui: ServerMode;
+    ui: ServerMode | undefined;
 }
 
 /**
