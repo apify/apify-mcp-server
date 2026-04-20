@@ -22,7 +22,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import yargs from 'yargs';
 // Had to ignore the eslint import extension error for the yargs package.
 // Using .js or /index.js didn't resolve it due to the @types package issues.
@@ -219,12 +219,12 @@ async function main() {
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Use the shared tools loading logic. `mcpServer.serverMode` is already resolved
-    // from `argv.ui` via the constructor (with 'auto' → DEFAULT until capability
-    // negotiation lands).
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, mcpServer.serverMode);
-
-    mcpServer.upsertTools(tools);
+    // Defer tool loading until `prepareForInitialize` finalizes `serverMode` from the
+    // client's initialize request. The closure reads `mcpServer.serverMode` at call time
+    // so the loaded tool variants match the resolved mode.
+    mcpServer.setDeferredToolsLoader(
+        async () => loadToolsFromInput(normalizedInput, apifyClient, mcpServer.serverMode),
+    );
 
     // Start server
     const transport = new StdioServerTransport();
@@ -234,16 +234,18 @@ async function main() {
     // so we generate a UUID4 to represent this single session interaction for telemetry tracking
     const mcpSessionId = randomUUID();
 
-    // Create a proxy for transport.onmessage to intercept and capture initialize request data
-    // This is a hacky way to inject client information into the ActorsMcpServer class
-    const originalOnMessage = transport.onmessage;
+    // Connect first so the SDK installs its own onmessage handler; then wrap it so we can
+    // AWAIT `prepareForInitialize` before the SDK dispatches `initialize`. The SDK calls
+    // pre-existing handlers synchronously, so wrapping BEFORE connect would not let us
+    // delay dispatch.
+    await mcpServer.connect(transport);
 
-    transport.onmessage = (message: JSONRPCMessage) => {
-        // Extract client information from initialize message
+    const sdkOnMessage = transport.onmessage;
+    const handleMessage = async (message: JSONRPCMessage) => {
         const msgRecord = message as Record<string, unknown>;
         if (msgRecord.method === 'initialize') {
-            // Update mcpServer options with initialize request data
             (mcpServer.options as Record<string, unknown>).initializeRequestData = msgRecord as Record<string, unknown>;
+            await mcpServer.prepareForInitialize(msgRecord as unknown as InitializeRequest);
         }
         // Inject session ID into all requests for task isolation and session tracking.
         // CRITICAL: Always create params object if missing (some requests like listTasks/getTasks don't have params),
@@ -253,13 +255,18 @@ async function main() {
         params._meta.mcpSessionId = mcpSessionId;
         msgRecord.params = params;
 
-        // Call the original onmessage handler
-        if (originalOnMessage) {
-            originalOnMessage(message);
-        }
+        sdkOnMessage?.(message);
     };
-
-    await mcpServer.connect(transport);
+    transport.onmessage = (message) => {
+        // Surface async failures — otherwise a rejected prepareForInitialize (e.g. tool
+        // loader network error) becomes an unhandled rejection and the client hangs
+        // forever waiting for the InitializeResult. Log and close; the client will fail
+        // fast rather than hang.
+        handleMessage(message).catch(async (error) => {
+            log.error('Failed to handle transport message', { error });
+            try { await transport.close(); } catch { /* already closed */ }
+        });
+    };
 }
 
 main().catch(async (error) => {

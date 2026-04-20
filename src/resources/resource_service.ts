@@ -24,12 +24,18 @@ type ResourceService = {
 
 type ResourceServiceOptions = {
     paymentProvider?: PaymentProvider;
-    mode?: ServerMode;
+    /**
+     * Read the current server mode at call time. Callers must pass a getter rather than
+     * a value: `serverMode` can flip from the preliminary DEFAULT to APPS after
+     * `prepareForInitialize` resolves the `'auto'` option against client capabilities,
+     * and a captured value would freeze resource listings to the preliminary mode.
+     */
+    getMode: () => ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { paymentProvider, mode = 'default', getAvailableWidgets } = options;
+    const { paymentProvider, getMode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
@@ -44,7 +50,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (mode === ServerMode.APPS) {
+        if (getMode() === ServerMode.APPS) {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -74,7 +80,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (mode === ServerMode.APPS && uri.startsWith('ui://widget/')) {
+        if (getMode() === ServerMode.APPS && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {

@@ -63,6 +63,7 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
+    ServerModeOption,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
@@ -88,6 +89,18 @@ const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
     [ServerMode.APPS]: appsActorExecutor,
 };
 
+const MCP_APPS_EXTENSION_ID = 'io.modelcontextprotocol/ui';
+
+/**
+ * True iff the initialize request advertises the MCP Apps UI extension
+ * with the widget MIME type. Used to resolve `'auto'` server mode.
+ */
+function detectClientSupportsUi(request: InitializeRequest | undefined): boolean {
+    const extensions = request?.params?.capabilities?.extensions as Record<string, unknown> | undefined;
+    const uiCap = extensions?.[MCP_APPS_EXTENSION_ID] as { mimeTypes?: string[] } | undefined;
+    return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
+}
+
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
 /**
@@ -102,10 +115,30 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
-    /** Server mode — fixed at construction from `options.serverMode`. */
-    public readonly serverMode: ServerMode;
-    /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
-    private readonly actorExecutor: ActorExecutor;
+    /**
+     * Resolved server mode. Preliminary value set in the constructor (`'auto'` → `DEFAULT`
+     * until capability negotiation runs). Finalized by {@link prepareForInitialize}
+     * from the client's `initialize` request before the `InitializeResult` is sent.
+     */
+    public serverMode: ServerMode;
+    /** Mode-specific executor for direct actor tools (`type: 'actor'`). Finalized with `serverMode`. */
+    private actorExecutor: ActorExecutor;
+    /**
+     * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
+     * in {@link prepareForInitialize} when set to `'auto'`; explicit `'default'`/`'apps'`
+     * values bypass auto-detect.
+     */
+    private readonly serverModeOption: ServerModeOption;
+    /**
+     * Optional loader run during {@link prepareForInitialize}, after `serverMode` is
+     * finalized. Entry points (stdio, dev_server) register this so tool variants match
+     * the resolved mode by the time the `InitializeResult` is sent — clients that
+     * ignore `notifications/tools/list_changed` still see the correct tool set on their
+     * first `tools/list`.
+     */
+    private deferredToolsLoader: (() => Promise<ToolEntry[]>) | undefined;
+    /** Guard so `prepareForInitialize` runs at most once per connection. */
+    private initializePrepared = false;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -116,7 +149,9 @@ export class ActorsMcpServer {
 
     /**
      * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
-     * NOTE: This is currently informational only (logged for observability) and does not yet gate widget behavior.
+     * Set during {@link prepareForInitialize} from the initialize request. Falls back to
+     * the post-initialize capability read in {@link setupCapabilityNegotiation} if a caller
+     * bypasses the prepare step (e.g. tests wiring a Server directly).
      */
     public clientSupportsUi = false;
 
@@ -138,10 +173,10 @@ export class ActorsMcpServer {
         // to the canonical `serverMode` API. Remove the `uiMode` fallback once internal
         // consumers have migrated (see apify-mcp-server-internal#454).
         const legacyUiMode = (options as { uiMode?: string }).uiMode;
-        const option = options.serverMode ?? parseServerMode(legacyUiMode);
-        // 'auto' resolves to DEFAULT at construction without a connected client; the
-        // auto-detect path updates this later from `initialize` capabilities.
-        this.serverMode = resolveServerMode(option, false);
+        this.serverModeOption = options.serverMode ?? parseServerMode(legacyUiMode);
+        // Preliminary resolution — `prepareForInitialize` re-resolves once the
+        // client's capabilities are known (only for 'auto').
+        this.serverMode = resolveServerMode(this.serverModeOption, false);
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -211,20 +246,83 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Detects MCP Apps UI support from client capabilities after initialization.
-     * Checks for the `io.modelcontextprotocol/ui` extension with `text/html;profile=mcp-app` MIME type.
+     * Fallback client-capability detection, used only when `prepareForInitialize`
+     * was NOT called upstream (e.g. tests that connect a Server directly). The
+     * transport wrappers in `stdio.ts` / `dev_server.ts` call `prepareForInitialize`
+     * before the SDK dispatches `initialize`, so in production this handler only
+     * logs; it never flips the final mode.
      */
     private setupCapabilityNegotiation() {
-        const MCP_APPS_EXTENSION_ID = 'io.modelcontextprotocol/ui';
-
         this.server.oninitialized = () => {
-            const caps = this.server.getClientCapabilities() as
-                (Record<string, unknown> & { extensions?: Record<string, unknown> }) | undefined;
-            const uiCap = caps?.extensions?.[MCP_APPS_EXTENSION_ID] as
-                { mimeTypes?: string[] } | undefined;
-            this.clientSupportsUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
-            log.info('Client MCP Apps UI support', { clientSupportsUi: this.clientSupportsUi });
+            if (!this.initializePrepared) {
+                const caps = this.server.getClientCapabilities() as
+                    (Record<string, unknown> & { extensions?: Record<string, unknown> }) | undefined;
+                const uiCap = caps?.extensions?.[MCP_APPS_EXTENSION_ID] as
+                    { mimeTypes?: string[] } | undefined;
+                this.clientSupportsUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
+            }
+            log.info('MCP server initialized', {
+                clientSupportsUi: this.clientSupportsUi,
+                serverMode: this.serverMode,
+            });
         };
+    }
+
+    /**
+     * Register a deferred tool loader. Invoked during {@link prepareForInitialize} after
+     * `serverMode` is finalized. Entry points use this to load tool variants matching
+     * the resolved mode, so the first `tools/list` after initialize returns the right set.
+     */
+    public setDeferredToolsLoader(loader: () => Promise<ToolEntry[]>): void {
+        this.deferredToolsLoader = loader;
+    }
+
+    /**
+     * Finalize server mode from the client's initialize request and run the deferred tool
+     * loader (if any). Must be awaited by transport wrappers BEFORE the SDK's default
+     * initialize handler responds, so the `InitializeResult` and first `tools/list`
+     * reflect the resolved mode.
+     *
+     * Only re-resolves `serverMode` when the original option was `'auto'`; an explicit
+     * `'default'` / `'apps'` bypasses auto-detect.
+     *
+     * Idempotent: subsequent calls within the same connection are no-ops.
+     */
+    public async prepareForInitialize(request: InitializeRequest): Promise<void> {
+        if (this.initializePrepared) return;
+        this.initializePrepared = true;
+
+        this.clientSupportsUi = detectClientSupportsUi(request);
+
+        if (this.serverModeOption === 'auto') {
+            const resolved = resolveServerMode('auto', this.clientSupportsUi);
+            if (resolved !== this.serverMode) {
+                this.serverMode = resolved;
+                this.actorExecutor = actorExecutorsByMode[this.serverMode];
+                // Refresh instructions the SDK will return in the InitializeResult.
+                // The SDK stores `instructions` at construction time and exposes no setter,
+                // so mutate the private field directly. Safe here because the transport
+                // wrapper awaits this method before the SDK dispatches `initialize`.
+                // eslint-disable-next-line no-underscore-dangle
+                (this.server as unknown as { _instructions?: string })._instructions = getServerInstructions(this.serverMode);
+            }
+        }
+
+        log.info('Resolved server mode for connection', {
+            serverMode: this.serverMode,
+            serverModeOption: this.serverModeOption,
+            clientSupportsUi: this.clientSupportsUi,
+        });
+
+        if (this.deferredToolsLoader) {
+            const tools = await this.deferredToolsLoader();
+            if (tools.length > 0) this.upsertTools(tools);
+        }
+
+        // Widgets depend on the resolved mode; re-resolve once here to cover the common
+        // path where preliminary mode was `DEFAULT` (auto option) and the client
+        // promotes it to `APPS`. `resolveWidgets` is idempotent and returns early for DEFAULT.
+        await this.resolveWidgets();
     }
 
     /**
@@ -466,7 +564,7 @@ export class ActorsMcpServer {
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             paymentProvider: this.options.paymentProvider,
-            mode: this.serverMode,
+            getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
 
