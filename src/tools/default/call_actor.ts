@@ -1,7 +1,6 @@
 import log from '@apify/log';
 
 import { HelperTools } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { buildUsageMeta } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -36,10 +35,6 @@ export const defaultCallActor: ToolEntry = Object.freeze({
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
-    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
-    },
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,

@@ -1,7 +1,6 @@
 import log from '@apify/log';
 
 import { HelperTools } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { extractActorId } from '../../utils/tools.js';
 import {
@@ -22,8 +21,8 @@ const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorDescription({
 
 /**
  * Apps mode call-actor tool.
- * Always runs asynchronously — starts the run and returns immediately with widget metadata.
- * The widget automatically tracks progress and updates the UI.
+ * Always runs asynchronously — starts the run and returns immediately with runId.
+ * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
 export const appsCallActor: ToolEntry = Object.freeze({
     type: 'internal',
@@ -33,10 +32,6 @@ export const appsCallActor: ToolEntry = Object.freeze({
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
-    // apps-only tool; apps-mode _meta (ui/* and openai/* keys) stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
-    },
     annotations: {
         title: 'Call Actor',
         readOnlyHint: false,
@@ -75,7 +70,7 @@ export const appsCallActor: ToolEntry = Object.freeze({
                 actorName: baseActorName,
                 actorRun,
                 input,
-                widget: true,
+                widget: false,
             });
             return {
                 ...response,

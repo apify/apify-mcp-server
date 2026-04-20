@@ -143,9 +143,7 @@ function validateStructuredOutputForTool(result: unknown, toolName: string, mode
 
 /** Validates that the listed tools have widget metadata (_meta) with MCP Apps ui.* keys. */
 function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
-    // Widget meta moved from base `fetch-actor-details` to `fetch-actor-details-widget` in the split.
-    // `search-actors` and `call-actor` still carry widget meta on the base name until their own splits land.
-    const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS_WIDGET, HelperTools.ACTOR_CALL];
+    const toolNames = [HelperTools.STORE_SEARCH_WIDGET, HelperTools.ACTOR_GET_DETAILS_WIDGET, HelperTools.ACTOR_CALL_WIDGET];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
@@ -2466,6 +2464,7 @@ export function createIntegrationTestsSuite(
             // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled
             expectWidgetToolMeta(tools);
@@ -2482,6 +2481,7 @@ export function createIntegrationTestsSuite(
             // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
@@ -2500,6 +2500,7 @@ export function createIntegrationTestsSuite(
                 // Verify that apps-only internal tools are present when ui=true is used
                 expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
                 expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
+                expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
 
                 // Verify that tools have widget metadata when ui=true is used
                 expectWidgetToolMeta(tools);

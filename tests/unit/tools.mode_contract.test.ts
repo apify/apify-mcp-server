@@ -47,6 +47,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(appsCategories.ui)).toEqual([
                 HelperTools.STORE_SEARCH_WIDGET,
                 HelperTools.ACTOR_GET_DETAILS_WIDGET,
+                HelperTools.ACTOR_CALL_WIDGET,
             ]);
         });
 
@@ -107,7 +108,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('base data tools have no widget meta in either mode', () => {
-        const baseToolNames = [HelperTools.ACTOR_GET_DETAILS, HelperTools.STORE_SEARCH];
+        const baseToolNames = [HelperTools.ACTOR_GET_DETAILS, HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL];
         for (const mode of SERVER_MODES) {
             for (const name of baseToolNames) {
                 it(`${name} should have no ui/openai _meta keys in ${mode} mode`, () => {
@@ -155,12 +156,13 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
-        it('should document that apps call-actor always runs asynchronously', () => {
+        it('should document that apps call-actor always runs asynchronously and points to the widget sibling for UI', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
             expect(appsCallActor!.description).toContain('always runs asynchronously');
-            expect(appsCallActor!.description).toContain('do NOT poll or call any other tool');
+            expect(appsCallActor!.description).toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(appsCallActor!.description).toContain('It renders no UI');
         });
 
         it('should not advertise long-running task support for apps call-actor', () => {
