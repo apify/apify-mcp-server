@@ -148,9 +148,8 @@ export class ActorsMcpServer {
 
     /**
      * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
-     * Set during {@link prepareForInitialize} from the initialize request. Falls back to
-     * the post-initialize capability read in {@link setupCapabilityNegotiation} if a caller
-     * bypasses the prepare step (e.g. tests wiring a Server directly).
+     * Set inside the `initialize` request handler (see {@link setupInitializeHandler})
+     * from the incoming initialize request, before the InitializeResult is sent.
      */
     public clientSupportsUi = false;
 
