@@ -4,6 +4,10 @@
 
 import { randomUUID } from 'node:crypto';
 
+// The ext-apps package exposes `./server` via conditional exports only (no `./server/index.js`
+// wildcard), so we can't satisfy the `import/extensions` rule on this subpath.
+// eslint-disable-next-line import/extensions
+import { getUiCapability, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
@@ -52,7 +56,7 @@ import { prepareToolCallContext } from '../payments/helpers.js';
 import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
-import { resolveAvailableWidgets, RESOURCE_MIME_TYPE } from '../resources/widgets.js';
+import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { appsActorExecutor } from '../tools/apps/actor_executor.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
@@ -90,15 +94,16 @@ const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
     [ServerMode.APPS]: appsActorExecutor,
 };
 
-const MCP_APPS_EXTENSION_ID = 'io.modelcontextprotocol/ui';
-
 /**
- * True iff the initialize request advertises the MCP Apps UI extension
- * with the widget MIME type. Used to resolve `'auto'` server mode.
+ * True iff the initialize request advertises the MCP Apps UI extension with the
+ * widget MIME type. Used to resolve `'auto'` server mode.
+ *
+ * Uses {@link getUiCapability} from `@modelcontextprotocol/ext-apps/server` to
+ * read the `io.modelcontextprotocol/ui` extension from client capabilities — the
+ * canonical way per the MCP Apps spec.
  */
 function detectClientSupportsUi(request: InitializeRequest | undefined): boolean {
-    const extensions = request?.params?.capabilities?.extensions as Record<string, unknown> | undefined;
-    const uiCap = extensions?.[MCP_APPS_EXTENSION_ID] as { mimeTypes?: string[] } | undefined;
+    const uiCap = getUiCapability(request?.params?.capabilities);
     return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
 }
 
