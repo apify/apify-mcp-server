@@ -144,11 +144,12 @@ export class ActorsMcpServer {
     /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
     private serverModeResolved: boolean;
     /**
-     * Tool inputs queued before mode is final. Actor tools are upserted immediately
-     * (mode-agnostic); only the input is stored so mode-specific internal tools can
-     * be composed once mode resolves.
+     * Tool requests queued before mode is final. Actor tools are upserted immediately
+     * (mode-agnostic); we also capture the exact actor-tool slice fetched for each
+     * request so the flush composes every entry against *its own* actor list rather
+     * than the accumulated union across unrelated requests.
      */
-    private pendingToolsAfterModeResolved: Input[] = [];
+    private pendingToolsAfterModeResolved: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -178,7 +179,10 @@ export class ActorsMcpServer {
         // to the canonical `serverMode` API. Remove the `uiMode` fallback once internal
         // consumers have migrated (see apify-mcp-server-internal#454).
         const legacyUiMode = (options as { uiMode?: string }).uiMode;
-        this.serverModeOption = options.serverMode ?? parseServerMode(legacyUiMode);
+        const rawServerMode = options.serverMode as string | undefined;
+        this.serverModeOption = rawServerMode !== undefined
+            ? parseServerMode(rawServerMode)
+            : parseServerMode(legacyUiMode);
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
@@ -262,6 +266,12 @@ export class ActorsMcpServer {
      */
     private setupInitializeHandler() {
         // Capture the SDK's default initialize handler installed in its constructor.
+        // Private-field access on the SDK Server — verified against
+        // @modelcontextprotocol/sdk ^1.25.x (see package.json). On SDK bumps, re-check
+        // `@modelcontextprotocol/sdk/shared/protocol.js` for a still-named `_oninitialize`;
+        // if renamed or made non-delegable, rebuild the InitializeResult shape here
+        // (protocolVersion, serverInfo, capabilities, instructions) instead of delegating.
+        // The capability-gating unit tests construct a server and act as a canary.
         // eslint-disable-next-line no-underscore-dangle
         const sdkInitHandler = (this.server as unknown as {
             _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
@@ -298,14 +308,18 @@ export class ActorsMcpServer {
     private updateToolsAfterServerModeResolved(): void {
         if (this.pendingToolsAfterModeResolved.length === 0) return;
 
-        const actorTools = Array.from(this.tools.values()).filter((t) => t.type === 'actor');
         const tools = this.pendingToolsAfterModeResolved.flatMap(
-            (input) => getToolsForServerMode(input, actorTools, this.serverMode),
+            ({ input, actorTools }) => getToolsForServerMode(input, actorTools, this.serverMode),
         );
 
         this.pendingToolsAfterModeResolved = [];
 
-        if (tools.length > 0) this.upsertTools(tools);
+        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see
+        // the final tool set, including mode-specific helpers added here. Pre-init,
+        // `loadToolsByName` may have fired `upsertTools(actorTools, true)` with actor
+        // tools only (helpers still queued), and `loadToolsFromUrl` / `loadToolsFromInput`
+        // don't notify at all — this call reconciles both paths to the complete set.
+        if (tools.length > 0) this.upsertTools(tools, true);
     }
 
     /**
@@ -397,7 +411,7 @@ export class ActorsMcpServer {
         const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
 
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push(restoreInput);
+            this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools, true);
             return;
         }
@@ -429,7 +443,7 @@ export class ActorsMcpServer {
         const actorTools = await getActors(input, apifyClient, this.actorStore);
 
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push(input);
+            this.pendingToolsAfterModeResolved.push({ input, actorTools });
             if (actorTools.length > 0) {
                 log.debug('Loading actor tools from query parameters before mode resolution');
                 this.upsertTools(actorTools, false);
@@ -448,7 +462,7 @@ export class ActorsMcpServer {
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
         const actorTools = await getActors(input, apifyClient, this.actorStore);
         if (!this.serverModeResolved) {
-            this.pendingToolsAfterModeResolved.push(input);
+            this.pendingToolsAfterModeResolved.push({ input, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }

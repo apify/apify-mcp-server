@@ -38,8 +38,8 @@ Key entry points:
 Tool loading is intentionally split into two phases in [`src/utils/tools_loader.ts`](./src/utils/tools_loader.ts):
 
 - `getActors()` — async, mode-agnostic. Fetches Actor metadata and preserves the caller's requested tool/actor selection without choosing any mode-dependent tool variants.
-- `getToolsServerModeDependent()` — sync, mode-dependent. Takes the pre-fetched sources plus a resolved `ServerMode` and produces the concrete tool entries to expose to the client.
-- `loadToolsFromInput()` — convenience wrapper that runs both phases back-to-back when the mode is already known.
+- `getToolsForServerMode()` — sync, mode-dependent. Takes the pre-fetched sources plus a resolved `ServerMode` and produces the concrete tool entries to expose to the client.
+- `loadToolsFromInput()` in `tools_loader.ts` — convenience wrapper running both phases back-to-back with an explicit `ServerMode`. **Not to be confused with** `ActorsMcpServer.loadToolsFromInput()` (the public method), which queues sources when mode is still `'auto'` and registers them onto the server — call the server method from transport entry points, the plain function only when you already have a resolved mode.
 
 This split matters for `serverMode: 'auto'`.
 
@@ -51,7 +51,7 @@ This split matters for `serverMode: 'auto'`.
 Rule of thumb:
 
 - If code may run before `initialize` in `auto` mode, it must stay in the mode-agnostic phase.
-- Only code running after mode resolution should call `getToolsServerModeDependent()` or otherwise choose concrete mode-dependent tool variants.
+- Only code running after mode resolution should call `getToolsForServerMode()` or otherwise choose concrete mode-dependent tool variants.
 
 ## Node.js version policy
 
