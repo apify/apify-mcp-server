@@ -17,7 +17,6 @@ import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
-import { processParamsGetTools } from './mcp/utils.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
 import { parseServerMode } from './types.js';
@@ -97,20 +96,15 @@ export function createExpressApp(): express.Express {
             // Generate a unique session ID for this SSE connection
             const mcpSessionId = transport.sessionId;
 
-            // Defer tool loading until the initialize handler finalizes `serverMode`.
             const apifyToken = process.env.APIFY_TOKEN as string;
-            log.debug('Deferring tool load until initialize', { mcpSessionId: transport.sessionId, tr: TransportType.SSE });
             const apifyClient = new ApifyClient({ token: apifyToken });
-            mcpServer.setDeferredToolsLoader(
-                async () => processParamsGetTools(req.url, apifyClient, mcpServer.serverMode),
-            );
+            // Fetch actor metadata and queue mode-agnostic sources. Composed with
+            // the final mode inside the initialize request handler.
+            await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
 
-            // Connect first, then wrap onmessage to inject mcpSessionId. Mode
-            // resolution + deferred tool loading happen inside the server's initialize
-            // request handler (see src/mcp/server.ts setupInitializeHandler).
             await mcpServer.connect(transport);
 
             const sdkOnMessage = transport.onmessage as ((msg: JSONRPCMessage, extra?: unknown) => void) | undefined;
@@ -224,18 +218,12 @@ export function createExpressApp(): express.Express {
                     paymentProvider,
                 });
 
-                // Defer tool loading; the server's initialize request handler runs
-                // the loader after resolving `serverMode` from client capabilities.
                 const apifyToken = process.env.APIFY_TOKEN as string;
-                log.debug('Deferring tool load until initialize', { tr: TransportType.HTTP });
                 const apifyClient = new ApifyClient({ token: apifyToken });
-                mcpServer.setDeferredToolsLoader(
-                    async () => processParamsGetTools(req.url, apifyClient, mcpServer.serverMode),
-                );
+                // Fetch actor metadata and queue mode-agnostic sources. Composed with
+                // the final mode inside the initialize request handler.
+                await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
-                // Connect and let the SDK dispatch handleRequest → our initialize
-                // handler runs mode resolution + tool loading → InitializeResult
-                // reflects the resolved mode. No transport-level wrapping needed.
                 await mcpServer.connect(transport);
                 await transport.handleRequest(req, res, req.body);
 

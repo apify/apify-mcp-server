@@ -39,7 +39,6 @@ import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSel
 import { parseServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
-import { loadToolsFromInput } from './utils/tools_loader.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -218,13 +217,10 @@ async function main() {
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Defer tool loading until the server's initialize request handler finalizes
-    // `serverMode` from the client's capabilities. The closure reads
-    // `mcpServer.serverMode` at call time so the loaded tool variants match the
-    // resolved mode.
-    mcpServer.setDeferredToolsLoader(
-        async () => loadToolsFromInput(normalizedInput, apifyClient, mcpServer.serverMode),
-    );
+    // Fetch actor metadata and queue mode-agnostic sources. Sources are composed
+    // with the final mode inside the initialize request handler once the client's
+    // capabilities are known (see src/mcp/server.ts#setupInitializeHandler).
+    await mcpServer.loadToolsFromInput(normalizedInput, apifyClient);
 
     // Start server
     const transport = new StdioServerTransport();
@@ -234,9 +230,6 @@ async function main() {
     // so we generate a UUID4 to represent this single session interaction for telemetry tracking
     const mcpSessionId = randomUUID();
 
-    // Connect first, then wrap onmessage to inject mcpSessionId. Mode resolution +
-    // deferred tool loading happen inside the server's initialize request handler
-    // (see src/mcp/server.ts setupInitializeHandler); no async work needed here.
     await mcpServer.connect(transport);
 
     const sdkOnMessage = transport.onmessage;

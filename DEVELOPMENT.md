@@ -33,6 +33,26 @@ Key entry points:
 - `src/dev_server.ts` - Express HTTP server for local development (`npm start`)
 - `src/input.ts` - Input processing and validation
 
+## Tool loading phases
+
+Tool loading is intentionally split into two phases in [`src/utils/tools_loader.ts`](./src/utils/tools_loader.ts):
+
+- `getActors()` — async, mode-agnostic. Fetches Actor metadata and preserves the caller's requested tool/actor selection without choosing any mode-dependent tool variants.
+- `getToolsServerModeDependent()` — sync, mode-dependent. Takes the pre-fetched sources plus a resolved `ServerMode` and produces the concrete tool entries to expose to the client.
+- `loadToolsFromInput()` — convenience wrapper that runs both phases back-to-back when the mode is already known.
+
+This split matters for `serverMode: 'auto'`.
+
+- Before `initialize`, the server does not yet know whether the client supports MCP Apps.
+- Public preload helpers such as `ActorsMcpServer.loadToolsByName()` and `loadToolsFromUrl()` therefore queue mode-agnostic sources first.
+- Actor tools may still be loaded immediately because they are mode-agnostic.
+- During `initialize`, once client capabilities are known, the server resolves the queued sources into the final mode-dependent tool set.
+
+Rule of thumb:
+
+- If code may run before `initialize` in `auto` mode, it must stay in the mode-agnostic phase.
+- Only code running after mode resolution should call `getToolsServerModeDependent()` or otherwise choose concrete mode-dependent tool variants.
+
 ## Node.js version policy
 
 The minimum supported Node.js version is **20** (`engines.node >= 20` in `package.json`).

@@ -60,7 +60,7 @@ import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { appsActorExecutor } from '../tools/apps/actor_executor.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
-import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
+import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
@@ -68,6 +68,7 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
+    Input,
     ServerModeOption,
     TelemetryEnv,
     ToolCallTelemetryProperties,
@@ -82,11 +83,16 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
+import {
+    getActors,
+    getToolsForServerMode,
+    toolNamesToInput,
+} from '../utils/tools_loader.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { isTaskCancelled, processParamsGetTools } from './utils.js';
+import { isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
@@ -135,14 +141,10 @@ export class ActorsMcpServer {
      * values bypass auto-detect.
      */
     private readonly serverModeOption: ServerModeOption;
-    /**
-     * Optional loader run inside the `initialize` request handler, after `serverMode`
-     * is finalized. Entry points (stdio, dev_server) register this so tool variants
-     * match the resolved mode by the time the `InitializeResult` is sent — clients
-     * that ignore `notifications/tools/list_changed` still see the correct tool set
-     * on their first `tools/list`.
-     */
-    private deferredToolsLoader: (() => Promise<ToolEntry[]>) | undefined;
+    /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
+    private hasResolvedServerMode: boolean;
+    /** Tool batches queued before mode is final; flushed with the resolved mode in the initialize handler. */
+    private pendingToolSources: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -151,11 +153,7 @@ export class ActorsMcpServer {
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
-    /**
-     * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
-     * Set inside the `initialize` request handler (see {@link setupInitializeHandler})
-     * from the incoming initialize request, before the InitializeResult is sent.
-     */
+    /** Set in the initialize handler once client capabilities are known. */
     public clientSupportsUi = false;
 
     constructor(options: ActorsMcpServerOptions = {}) {
@@ -180,6 +178,7 @@ export class ActorsMcpServer {
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
+        this.hasResolvedServerMode = this.serverModeOption !== 'auto';
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -249,52 +248,13 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Override the SDK's default `initialize` request handler so we can run our
-     * mode resolution + deferred tool loading BEFORE the `InitializeResult` is sent.
-     * The SDK awaits the handler's promise, so async work here naturally blocks the
-     * response; on rejection the SDK sends a JSON-RPC error to the client.
+     * Override the SDK's `initialize` request handler to run mode resolution and
+     * pending-source flush before `InitializeResult` is sent. Delegates boilerplate
+     * (protocolVersion, capabilities, instructions) to the SDK's captured `_oninitialize`.
      *
-     * We delegate to the SDK's captured `_oninitialize` for the boilerplate
-     * (protocolVersion negotiation, `_clientCapabilities` assignment, InitializeResult
-     * shape, instructions), so we don't fork the SDK's initialization semantics.
-     *
-     * ## Why this lives in the initialize REQUEST handler, not in `server.oninitialized`
-     *
-     * A natural-looking alternative is the MCP reference pattern: read capabilities
-     * in `server.oninitialized` (which fires on `notifications/initialized`) and
-     * register conditional tools there. See the ext-apps SDK docstring for
-     * `getUiCapability`:
-     *   https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx
-     *
-     * That pattern works when conditional registration is **synchronous** and the
-     * server has no state that must be reflected in the `InitializeResult` itself.
-     * For us, neither holds:
-     *
-     * 1. **The SDK does NOT block inbound requests until `notifications/initialized`
-     *    has been processed.** The base protocol lifecycle says the client MUST
-     *    send `initialized` before any other request, but nothing on the server
-     *    side gates subsequent requests on the `oninitialized` callback completing:
-     *       https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
-     *    Notification handlers are dispatched fire-and-forget via
-     *    `Promise.resolve().then(handler)` —
-     *    see `node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js`
-     *    (around the `_onnotification` implementation). A client — or an
-     *    intermediary — that sends `initialized` and `tools/list` back-to-back
-     *    can race past our `oninitialized` even if the callback body itself is
-     *    synchronous, because tool registration happens in a separate microtask
-     *    from the already-queued `tools/list` request handler.
-     *
-     * 2. **We need mode-specific data in the InitializeResult.** The MCP Apps
-     *    capability is advertised by the client in the `initialize` request
-     *    itself, and the Apps spec recommends that servers check client
-     *    capabilities *before* registering UI-enabled tools (see the Apps spec
-     *    URL above). Doing mode resolution inside the initialize request/response
-     *    cycle is the only approach that (a) guarantees tools are finalized before
-     *    `InitializeResult` goes out and (b) guarantees the first `tools/list`
-     *    sees the correct mode-specific variants, regardless of client timing.
-     *
-     * `oninitialized` stays available for post-initialize observability (e.g.
-     * logging, root syncing) but does not gate tool registration here.
+     * Not using `server.oninitialized`: the SDK dispatches notification handlers
+     * fire-and-forget (separate microtask), so a follow-up `tools/list` can race past them.
+     * The request handler guarantees tools are final before the response and the first `tools/list`.
      */
     private setupInitializeHandler() {
         // Capture the SDK's default initialize handler installed in its constructor.
@@ -312,10 +272,9 @@ export class ActorsMcpServer {
                     this.serverMode = resolved;
                     this.actorExecutor = actorExecutorsByMode[this.serverMode];
                 }
+                this.hasResolvedServerMode = true;
             }
 
-            // Stash the initialize request so telemetry paths can read client info.
-            // Previously poked via transport onmessage wrappers; now a single source.
             (this.options as Record<string, unknown>).initializeRequestData = request;
 
             log.info('Resolved server mode for connection', {
@@ -324,27 +283,19 @@ export class ActorsMcpServer {
                 clientSupportsUi: this.clientSupportsUi,
             });
 
-            if (this.deferredToolsLoader) {
-                const tools = await this.deferredToolsLoader();
-                if (tools.length > 0) this.upsertTools(tools);
-            }
+            this.flushPendingToolSources();
 
-            // Widgets depend on the resolved mode; `resolveWidgets` is idempotent
-            // and early-returns when mode is DEFAULT.
             await this.resolveWidgets();
 
             return sdkInitHandler(request);
         });
     }
 
-    /**
-     * Register a deferred tool loader. Invoked inside the `initialize` request handler
-     * after `serverMode` is finalized. Entry points use this to load tool variants
-     * matching the resolved mode, so the first `tools/list` after initialize returns
-     * the right set.
-     */
-    public setDeferredToolsLoader(loader: () => Promise<ToolEntry[]>): void {
-        this.deferredToolsLoader = loader;
+    private flushPendingToolSources(): void {
+        if (this.pendingToolSources.length === 0) return;
+        const tools = this.pendingToolSources.flatMap(({ input, actorTools }) => getToolsForServerMode(input, actorTools, this.serverMode));
+        this.pendingToolSources = [];
+        if (tools.length > 0) this.upsertTools(tools);
     }
 
     /**
@@ -428,31 +379,22 @@ export class ActorsMcpServer {
     * @param apifyClient
     */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
-        const loadedTools = this.listAllToolNames();
-        const actorsToLoad: string[] = [];
-        const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([
-            ...getDefaultTools(this.serverMode),
-            ...Object.values(getCategoryTools(this.serverMode)).flat(),
-        ].map((tool) => [tool.name, tool]));
+        const loadedTools = new Set(this.listAllToolNames());
+        const missingToolNames = toolNames.filter((toolName) => !loadedTools.has(toolName));
+        if (missingToolNames.length === 0) return;
 
-        for (const tool of toolNames) {
-            // Skip if the tool is already loaded
-            if (loadedTools.includes(tool)) continue;
-            // Load internal tool
-            if (internalToolMap.has(tool)) {
-                toolsToLoad.push(internalToolMap.get(tool) as ToolEntry);
-            // Load Actor
-            } else {
-                actorsToLoad.push(tool);
-            }
+        const restoreInput = toolNamesToInput(missingToolNames);
+        const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
+
+        if (!this.hasResolvedServerMode) {
+            this.pendingToolSources.push({ input: restoreInput, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools, true);
+            return;
         }
+
+        const toolsToLoad = getToolsForServerMode(restoreInput, actorTools, this.serverMode);
         if (toolsToLoad.length > 0) {
-            this.upsertTools(toolsToLoad);
-        }
-
-        if (actorsToLoad.length > 0) {
-            await this.loadActorsAsTools(actorsToLoad, apifyClient);
+            this.upsertTools(toolsToLoad, actorTools.length > 0);
         }
     }
 
@@ -471,19 +413,36 @@ export class ActorsMcpServer {
         return actorTools;
     }
 
-    /**
-     * Loads tools from URL params.
-     *
-     * This method also handles enabling of Actor autoloading via the processParamsGetTools.
-     *
-     * Used primarily for SSE.
-     */
+    /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient, this.serverMode, this.actorStore);
+        const input = parseInputParamsFromUrl(url);
+        const actorTools = await getActors(input, apifyClient, this.actorStore);
+
+        if (!this.hasResolvedServerMode) {
+            this.pendingToolSources.push({ input, actorTools });
+            if (actorTools.length > 0) {
+                log.debug('Loading actor tools from query parameters before mode resolution');
+                this.upsertTools(actorTools, false);
+            }
+            return;
+        }
+
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
+    }
+
+    /** Load tools from a pre-parsed input. Queues when mode is `'auto'`; composed with the resolved mode in the initialize handler. */
+    public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
+        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        if (!this.hasResolvedServerMode) {
+            this.pendingToolSources.push({ input, actorTools });
+            return;
+        }
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        if (tools.length > 0) this.upsertTools(tools);
     }
 
     /** Delete tools from the server and notify the handler.

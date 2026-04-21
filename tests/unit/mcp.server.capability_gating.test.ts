@@ -1,10 +1,15 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
-import type { ServerModeOption, ToolEntry } from '../../src/types.js';
+import { appsCallActor } from '../../src/tools/apps/call_actor.js';
+import { appsSearchActors } from '../../src/tools/apps/search_actors.js';
+import { searchActorsInternalTool } from '../../src/tools/apps/search_actors_internal.js';
+import type { ServerModeOption } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
@@ -51,6 +56,7 @@ describe('ActorsMcpServer initialize handler', () => {
     afterEach(async () => {
         while (servers.length > 0) {
             const server = servers.pop();
+            server?.tools.clear();
             await server?.close();
         }
     });
@@ -81,18 +87,20 @@ describe('ActorsMcpServer initialize handler', () => {
         }
     });
 
-    it('runs the deferred tools loader after finalizing the mode', async () => {
+    it('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
         const server = track(makeServer('auto'));
-        const loader = vi.fn<() => Promise<ToolEntry[]>>(async () => {
-            // Loader reads the resolved mode — verify it sees APPS, not preliminary DEFAULT.
-            expect(server.serverMode).toBe(ServerMode.APPS);
-            return [];
-        });
-        server.setDeferredToolsLoader(loader);
+        const apifyClient = new ApifyClient({ token: 'test-token' });
+
+        await server.loadToolsFromInput({ tools: [HelperTools.STORE_SEARCH] }, apifyClient);
+
+        // Sources are pending — no tools visible yet
+        expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
 
         await dispatchInitialize(server, makeInitializeRequest(true));
 
-        expect(loader).toHaveBeenCalledTimes(1);
+        // After initialize (apps mode): composed with APPS-mode variants
+        expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(appsSearchActors);
+        expect(server.tools.get(HelperTools.STORE_SEARCH_INTERNAL)).toBe(searchActorsInternalTool);
     });
 
     it('defaults to preliminary DEFAULT mode before initialize runs', () => {
@@ -121,5 +129,36 @@ describe('ActorsMcpServer initialize handler', () => {
         await dispatchInitialize(server, request);
 
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
+    });
+
+    it('rebuilds preloaded internal tools after auto mode resolves to apps', async () => {
+        const server = track(makeServer('auto'));
+        const apifyClient = new ApifyClient({ token: 'test-token' });
+
+        await server.loadToolsByName([HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL], apifyClient);
+
+        expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
+        expect(server.tools.has(HelperTools.ACTOR_CALL)).toBe(false);
+
+        await dispatchInitialize(server, makeInitializeRequest(true));
+
+        expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(appsSearchActors);
+        expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(appsCallActor);
+        expect(server.tools.get(HelperTools.STORE_SEARCH_INTERNAL)).toBe(searchActorsInternalTool);
+    });
+
+    it('keeps apps-only internal names mode-agnostic before initialize', async () => {
+        const server = track(makeServer('auto'));
+        const apifyClient = new ApifyClient({ token: 'test-token' });
+        const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);
+
+        await server.loadToolsByName([HelperTools.STORE_SEARCH_INTERNAL], apifyClient);
+
+        expect(loadActorsAsTools).not.toHaveBeenCalled();
+        expect(server.tools.has(HelperTools.STORE_SEARCH_INTERNAL)).toBe(false);
+
+        await dispatchInitialize(server, makeInitializeRequest(true));
+
+        expect(server.tools.get(HelperTools.STORE_SEARCH_INTERNAL)).toBe(searchActorsInternalTool);
     });
 });

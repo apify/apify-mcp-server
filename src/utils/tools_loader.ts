@@ -1,21 +1,6 @@
 /**
- * Shared logic for loading tools based on Input type.
- *
- * Exports a two-phase API:
- *
- * - {@link fetchToolSources} — async, **mode-agnostic**. Does the network work
- *   (Actor metadata fetch) and returns a bundle suitable for any mode.
- * - {@link buildToolsForMode} — sync, **mode-dependent**. Takes pre-fetched
- *   sources plus a resolved `ServerMode` and produces the final mode-specific
- *   tool list (correct `-widget` variants, apps-mode-only tools, auto-injected
- *   `get-actor-run`/`get-actor-output`, dedup).
- *
- * The combined {@link loadToolsFromInput} wrapper preserves the original
- * single-call signature and runs both phases in sequence.
- *
- * This split lets the server's `initialize` request handler delay mode
- * resolution until the client's capabilities are known while still doing the
- * expensive network fetch early. See `src/mcp/server.ts#setupInitializeHandler`.
+ * Two-phase tool loading: {@link getActors} fetches Actor metadata (async, mode-agnostic);
+ * {@link loadToolsFromInput} runs both in sequence.
  */
 
 import type { ApifyClient } from 'apify-client';
@@ -30,11 +15,7 @@ import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
 
-/**
- * Set of all known internal tool names across ALL modes.
- * Used for classifying selectors: if a selector matches a known internal tool name,
- * it's not treated as an Actor ID — even if it's absent from the current mode's categories.
- */
+// All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
 let ALL_INTERNAL_TOOL_NAMES_CACHE: Set<string> | null = null;
 function getAllInternalToolNames(): Set<string> {
     if (!ALL_INTERNAL_TOOL_NAMES_CACHE) {
@@ -52,17 +33,6 @@ function getAllInternalToolNames(): Set<string> {
     }
     return ALL_INTERNAL_TOOL_NAMES_CACHE;
 }
-
-/**
- * Mode-agnostic source bundle produced by {@link fetchToolSources} and consumed
- * by {@link buildToolsForMode}.
- */
-export type ToolSources = {
-    /** The original input that generated these sources. */
-    input: Input;
-    /** Pre-fetched Actor tool entries — same regardless of server mode. */
-    actorTools: ToolEntry[];
-};
 
 type NormalizedInput = {
     /**
@@ -144,42 +114,44 @@ function resolveActorsToLoad(input: Input): string[] {
     return [];
 }
 
-/**
- * Phase 1 — async, **mode-agnostic**.
- *
- * Fetch Actor definitions from the Apify API for every Actor name derivable
- * from `input` (either the `actors` field or unknown selectors in `tools`).
- * Returns a {@link ToolSources} bundle that can later be composed against any
- * resolved `ServerMode` via {@link buildToolsForMode}.
- *
- * Call this BEFORE connecting the transport so the network cost is paid up
- * front. The synchronous {@link buildToolsForMode} can then run inside the
- * `initialize` request handler once the mode is known.
- */
-export async function fetchToolSources(
+/** Fetch Actor tool entries for all Actor names in `input`. */
+export async function getActors(
     input: Input,
     apifyClient: ApifyClient,
     actorStore?: ActorStore,
-): Promise<ToolSources> {
-    const actorNamesToLoad = resolveActorsToLoad(input);
-    const actorTools = actorNamesToLoad.length > 0
-        ? await getActorsAsTools(actorNamesToLoad, apifyClient, { actorStore })
+): Promise<ToolEntry[]> {
+    const actorNames = resolveActorsToLoad(input);
+    return actorNames.length > 0
+        ? getActorsAsTools(actorNames, apifyClient, { actorStore })
         : [];
-    return { input, actorTools };
 }
 
-/**
- * Phase 2 — sync, **mode-dependent**.
- *
- * Given pre-fetched {@link ToolSources} and a resolved `ServerMode`, build the
- * final tool list the server exposes to the client: mode-specific internal
- * variants (`-widget` tools in apps mode, the non-widget ones in default),
- * apps-only UI tools, the pre-fetched Actor tools, and auto-injected
- * `get-actor-run` / `get-actor-output` where appropriate.
- */
-export function buildToolsForMode(sources: ToolSources, mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
-    const { input, actorTools } = sources;
+/** Build a restore {@link Input} from concrete tool names: internal names → `tools`, actor names → `actors`. */
+export function toolNamesToInput(toolNames: string[]): Input {
+    const internalToolNames: string[] = [];
+    const actorToolNames: string[] = [];
 
+    for (const toolName of toolNames) {
+        if (getAllInternalToolNames().has(toolName)) {
+            internalToolNames.push(toolName);
+        } else {
+            actorToolNames.push(toolName);
+        }
+    }
+
+    const input: Input = {
+        tools: internalToolNames,
+    };
+
+    if (actorToolNames.length > 0) {
+        input.actors = actorToolNames;
+    }
+
+    return input;
+}
+
+/** Compose the final tool list from pre-fetched actor tools and the original input for the given mode. */
+export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
 
@@ -218,7 +190,7 @@ export function buildToolsForMode(sources: ToolSources, mode: ServerMode = Serve
                 internalSelections.push(internalByName);
                 continue;
             }
-            // Internal tool from another mode → skip silently (fetchToolSources already
+            // Internal tool from another mode → skip silently (getActors already
             // routed it away from actor names).
             if (getAllInternalToolNames().has(sel)) {
                 log.debug(`Skipping selector "${sel}" — it is an internal tool from another mode (current: "${mode}")`);
@@ -295,26 +267,13 @@ export function buildToolsForMode(sources: ToolSources, mode: ServerMode = Serve
     return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
 }
 
-/**
- * Load tools based on the provided Input object. Convenience wrapper that
- * runs {@link fetchToolSources} (async, mode-agnostic) and then
- * {@link buildToolsForMode} (sync, mode-dependent) in sequence.
- *
- * Callers that need to pay the network cost before the mode is known should
- * use {@link fetchToolSources} directly and call {@link buildToolsForMode} later.
- *
- * @param input The processed Input object
- * @param apifyClient The Apify client instance
- * @param mode Server mode for tool variant resolution
- * @param actorStore
- * @returns An array of tool entries
- */
+/** Convenience wrapper: {@link getActors} + {@link getToolsForServerMode} in sequence. */
 export async function loadToolsFromInput(
     input: Input,
     apifyClient: ApifyClient,
     mode: ServerMode = ServerMode.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
-    const sources = await fetchToolSources(input, apifyClient, actorStore);
-    return buildToolsForMode(sources, mode);
+    const actorTools = await getActors(input, apifyClient, actorStore);
+    return getToolsForServerMode(input, actorTools, mode);
 }
