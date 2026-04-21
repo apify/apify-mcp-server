@@ -131,7 +131,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 
-    it('rebuilds preloaded internal tools after auto mode resolves to apps', async () => {
+    it('defers internal tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -147,7 +147,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect(server.tools.get(HelperTools.STORE_SEARCH_INTERNAL)).toBe(searchActorsInternalTool);
     });
 
-    it('keeps apps-only internal names mode-agnostic before initialize', async () => {
+    it('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
         const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);

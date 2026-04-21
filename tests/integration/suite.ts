@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
+import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -2522,6 +2523,37 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.DOCS_FETCH);
             // call-actor should NOT be present since only 'docs' was selected
             expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+
+            await client.close();
+        });
+
+        it('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+            // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
+            client = await createClientFn({
+                clientCapabilities: {
+                    extensions: {
+                        'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] },
+                    },
+                },
+            });
+            const tools = await client.listTools();
+            expectWidgetToolMeta(tools);
+            await client.close();
+        });
+
+        it('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
+            // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
+            client = await createClientFn();
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+
+            expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_INTERNAL);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            for (const toolName of [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]) {
+                const tool = tools.tools.find((t) => t.name === toolName);
+                expect(tool).toBeDefined();
+                expect((tool?._meta as Record<string, unknown> | undefined)?.ui).toBeUndefined();
+            }
 
             await client.close();
         });
