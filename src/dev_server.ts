@@ -110,11 +110,12 @@ export function createExpressApp(): express.Express {
             const sdkOnMessage = transport.onmessage as ((msg: JSONRPCMessage, extra?: unknown) => void) | undefined;
             transport.onmessage = (message, extra) => {
                 const msgRecord = message as Record<string, unknown>;
-                if (msgRecord.params) {
-                    const params = msgRecord.params as ApifyRequestParams;
-                    params._meta ??= {};
-                    params._meta.mcpSessionId = mcpSessionId;
+                if (!msgRecord.params || typeof msgRecord.params !== 'object' || Array.isArray(msgRecord.params)) {
+                    msgRecord.params = {};
                 }
+                const params = msgRecord.params as ApifyRequestParams;
+                params._meta ??= {};
+                params._meta.mcpSessionId = mcpSessionId;
                 sdkOnMessage?.(message, extra);
             };
 
