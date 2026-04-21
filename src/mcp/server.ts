@@ -252,6 +252,44 @@ export class ActorsMcpServer {
      * We delegate to the SDK's captured `_oninitialize` for the boilerplate
      * (protocolVersion negotiation, `_clientCapabilities` assignment, InitializeResult
      * shape, instructions), so we don't fork the SDK's initialization semantics.
+     *
+     * ## Why this lives in the initialize REQUEST handler, not in `server.oninitialized`
+     *
+     * A natural-looking alternative is the MCP reference pattern: read capabilities
+     * in `server.oninitialized` (which fires on `notifications/initialized`) and
+     * register conditional tools there. See the ext-apps SDK docstring for
+     * `getUiCapability`:
+     *   https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx
+     *
+     * That pattern works when conditional registration is **synchronous** and the
+     * server has no state that must be reflected in the `InitializeResult` itself.
+     * For us, neither holds:
+     *
+     * 1. **The SDK does NOT block inbound requests until `notifications/initialized`
+     *    has been processed.** The base protocol lifecycle says the client MUST
+     *    send `initialized` before any other request, but nothing on the server
+     *    side gates subsequent requests on the `oninitialized` callback completing:
+     *       https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
+     *    Notification handlers are dispatched fire-and-forget via
+     *    `Promise.resolve().then(handler)` —
+     *    see `node_modules/@modelcontextprotocol/sdk/dist/esm/shared/protocol.js`
+     *    (around the `_onnotification` implementation). A client — or an
+     *    intermediary — that sends `initialized` and `tools/list` back-to-back
+     *    can race past our `oninitialized` even if the callback body itself is
+     *    synchronous, because tool registration happens in a separate microtask
+     *    from the already-queued `tools/list` request handler.
+     *
+     * 2. **We need mode-specific data in the InitializeResult.** The MCP Apps
+     *    capability is advertised by the client in the `initialize` request
+     *    itself, and the Apps spec recommends that servers check client
+     *    capabilities *before* registering UI-enabled tools (see the Apps spec
+     *    URL above). Doing mode resolution inside the initialize request/response
+     *    cycle is the only approach that (a) guarantees tools are finalized before
+     *    `InitializeResult` goes out and (b) guarantees the first `tools/list`
+     *    sees the correct mode-specific variants, regardless of client timing.
+     *
+     * `oninitialized` stays available for post-initialize observability (e.g.
+     * logging, root syncing) but does not gate tool registration here.
      */
     private setupInitializeHandler() {
         // Capture the SDK's default initialize handler installed in its constructor.
