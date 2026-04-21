@@ -218,9 +218,10 @@ async function main() {
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Defer tool loading until `prepareForInitialize` finalizes `serverMode` from the
-    // client's initialize request. The closure reads `mcpServer.serverMode` at call time
-    // so the loaded tool variants match the resolved mode.
+    // Defer tool loading until the server's initialize request handler finalizes
+    // `serverMode` from the client's capabilities. The closure reads
+    // `mcpServer.serverMode` at call time so the loaded tool variants match the
+    // resolved mode.
     mcpServer.setDeferredToolsLoader(
         async () => loadToolsFromInput(normalizedInput, apifyClient, mcpServer.serverMode),
     );

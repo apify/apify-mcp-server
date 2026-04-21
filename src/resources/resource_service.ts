@@ -25,10 +25,11 @@ type ResourceService = {
 type ResourceServiceOptions = {
     paymentProvider?: PaymentProvider;
     /**
-     * Read the current server mode at call time. Callers must pass a getter rather than
-     * a value: `serverMode` can flip from the preliminary DEFAULT to APPS after
-     * `prepareForInitialize` resolves the `'auto'` option against client capabilities,
-     * and a captured value would freeze resource listings to the preliminary mode.
+     * Read the current server mode at call time. Callers must pass a getter rather
+     * than a value: `serverMode` can flip from the preliminary DEFAULT to APPS when
+     * the server's initialize request handler resolves the `'auto'` option against
+     * client capabilities, and a captured value would freeze resource listings to
+     * the preliminary mode.
      */
     getMode: () => ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
