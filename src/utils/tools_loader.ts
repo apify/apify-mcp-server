@@ -3,11 +3,11 @@
  *
  * Exports a two-phase API:
  *
- * - {@link fetchToolSources} — async, mode-agnostic. Does the network work
+ * - {@link fetchToolSources} — async, **mode-agnostic**. Does the network work
  *   (Actor metadata fetch) and returns a bundle suitable for any mode.
- * - {@link composeTools} — sync, mode-dependent. Takes pre-fetched sources
- *   plus a resolved `ServerMode` and produces the final mode-specific tool
- *   list (correct `-widget` variants, apps-mode-only tools, auto-injected
+ * - {@link buildToolsForMode} — sync, **mode-dependent**. Takes pre-fetched
+ *   sources plus a resolved `ServerMode` and produces the final mode-specific
+ *   tool list (correct `-widget` variants, apps-mode-only tools, auto-injected
  *   `get-actor-run`/`get-actor-output`, dedup).
  *
  * The combined {@link loadToolsFromInput} wrapper preserves the original
@@ -55,7 +55,7 @@ function getAllInternalToolNames(): Set<string> {
 
 /**
  * Mode-agnostic source bundle produced by {@link fetchToolSources} and consumed
- * by {@link composeTools}.
+ * by {@link buildToolsForMode}.
  */
 export type ToolSources = {
     /** The original input that generated these sources. */
@@ -64,18 +64,44 @@ export type ToolSources = {
     actorTools: ToolEntry[];
 };
 
-function normalizeSelectors(value: Input['tools']): (string | ToolCategory)[] | undefined {
-    if (value === undefined) return undefined;
-    return (Array.isArray(value) ? value : [value])
-        .map(String)
-        .map((s) => s.trim())
-        .filter((s) => s !== '');
+type NormalizedInput = {
+    /**
+     * Cleaned tool selectors (trimmed, non-empty). `undefined` when `input.tools`
+     * was not provided at all. Use `selectors?.length === 0` to detect an
+     * explicitly-empty list.
+     */
+    selectors: string[] | undefined;
+    /** `true` when `input.enableAddingActors === true`. */
+    addActorEnabled: boolean;
+    /** `true` when `input.actors` was explicitly empty (`[]` or `''`). */
+    actorsExplicitlyEmpty: boolean;
+};
+
+/**
+ * Normalize the raw {@link Input} into cleaned selectors + two non-derivable flags.
+ * Shared by both loader phases so semantics stay consistent.
+ */
+function normalizeInput(input: Input): NormalizedInput {
+    const raw = input.tools;
+    const selectors = raw === undefined
+        ? undefined
+        : (Array.isArray(raw) ? raw : [raw])
+            .map(String)
+            .map((s) => s.trim())
+            .filter((s) => s !== '');
+    return {
+        selectors,
+        addActorEnabled: input.enableAddingActors === true,
+        actorsExplicitlyEmpty: input.actors === '' || (Array.isArray(input.actors) && input.actors.length === 0),
+    };
 }
 
 /**
- * Compute the list of Actor names (`username/name`) to fetch. Mode-independent:
- * an Actor tool is identified by name, and the same Actor tool entry is reused
- * across modes — only the *internal* tool variants around it differ by mode.
+ * Resolve the list of Actor names (`username/name`) to fetch from the input.
+ *
+ * **Mode-agnostic** — the result does NOT depend on `ServerMode`. An Actor tool
+ * is identified by name, and the same Actor entry is reused across modes; only
+ * the *internal* tool variants around it differ by mode.
  *
  * Selectors classified as "actor names":
  *   - NOT the deprecated `'preview'` pseudo-category
@@ -85,18 +111,13 @@ function normalizeSelectors(value: Input['tools']): (string | ToolCategory)[] | 
  * If no selectors / no explicit actors: the defaults apply (or empty when
  * add-actor mode is on).
  */
-function computeActorNamesToLoad(input: Input): string[] {
-    const selectors = normalizeSelectors(input.tools);
-    const selectorsProvided = selectors !== undefined;
-    const selectorsExplicitEmpty = selectorsProvided && (selectors as string[]).length === 0;
-    const addActorEnabled = input.enableAddingActors === true;
-    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
+function resolveActorsToLoad(input: Input): string[] {
+    const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
 
     // Selectors that aren't categories or internal tools in any mode → Actor names.
     const actorSelectorsFromTools: string[] = [];
-    if (selectorsProvided && !selectorsExplicitEmpty) {
-        for (const selector of selectors as (string | ToolCategory)[]) {
-            const sel = String(selector);
+    if (selectors !== undefined) {
+        for (const sel of selectors) {
             if (sel === 'preview') continue;
             if (CATEGORY_NAME_SET.has(sel)) continue;
             if (getAllInternalToolNames().has(sel)) continue;
@@ -115,7 +136,7 @@ function computeActorNamesToLoad(input: Input): string[] {
 
     if (actorsFromField !== undefined) return actorsFromField;
     if (actorSelectorsFromTools.length > 0) return actorSelectorsFromTools;
-    if (!selectorsProvided) {
+    if (selectors === undefined) {
         // No selectors supplied: use defaults unless add-actor mode is enabled
         return addActorEnabled || actorsExplicitlyEmpty ? [] : defaults.actors;
     }
@@ -124,15 +145,15 @@ function computeActorNamesToLoad(input: Input): string[] {
 }
 
 /**
- * Phase 1 — async, mode-agnostic.
+ * Phase 1 — async, **mode-agnostic**.
  *
  * Fetch Actor definitions from the Apify API for every Actor name derivable
  * from `input` (either the `actors` field or unknown selectors in `tools`).
  * Returns a {@link ToolSources} bundle that can later be composed against any
- * resolved `ServerMode` via {@link composeTools}.
+ * resolved `ServerMode` via {@link buildToolsForMode}.
  *
  * Call this BEFORE connecting the transport so the network cost is paid up
- * front. The synchronous {@link composeTools} can then run inside the
+ * front. The synchronous {@link buildToolsForMode} can then run inside the
  * `initialize` request handler once the mode is known.
  */
 export async function fetchToolSources(
@@ -140,7 +161,7 @@ export async function fetchToolSources(
     apifyClient: ApifyClient,
     actorStore?: ActorStore,
 ): Promise<ToolSources> {
-    const actorNamesToLoad = computeActorNamesToLoad(input);
+    const actorNamesToLoad = resolveActorsToLoad(input);
     const actorTools = actorNamesToLoad.length > 0
         ? await getActorsAsTools(actorNamesToLoad, apifyClient, { actorStore })
         : [];
@@ -148,7 +169,7 @@ export async function fetchToolSources(
 }
 
 /**
- * Phase 2 — sync, mode-dependent.
+ * Phase 2 — sync, **mode-dependent**.
  *
  * Given pre-fetched {@link ToolSources} and a resolved `ServerMode`, build the
  * final tool list the server exposes to the client: mode-specific internal
@@ -156,17 +177,14 @@ export async function fetchToolSources(
  * apps-only UI tools, the pre-fetched Actor tools, and auto-injected
  * `get-actor-run` / `get-actor-output` where appropriate.
  */
-export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
+export function buildToolsForMode(sources: ToolSources, mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
     const { input, actorTools } = sources;
 
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
 
-    const selectors = normalizeSelectors(input.tools);
-    const selectorsProvided = selectors !== undefined;
-    const selectorsExplicitEmpty = selectorsProvided && (selectors as string[]).length === 0;
-    const addActorEnabled = input.enableAddingActors === true;
-    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
+    const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
+    const selectorsExplicitEmpty = selectors?.length === 0;
     const explicitlyNoToolsRequested = selectorsExplicitEmpty || actorsExplicitlyEmpty;
 
     // Build mode-specific tool-by-name map for individual tool selection
@@ -178,12 +196,10 @@ export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode
     }
 
     // Walk selectors for internal picks (mode-specific). Actor-name classification
-    // happened in `computeActorNamesToLoad`; we don't need to partition again here.
+    // happened in `resolveActorsToLoad`; we don't need to partition again here.
     const internalSelections: ToolEntry[] = [];
-    if (selectorsProvided && !selectorsExplicitEmpty) {
-        for (const selector of selectors as (string | ToolCategory)[]) {
-            const sel = String(selector);
-
+    if (selectors !== undefined && selectors.length > 0) {
+        for (const sel of selectors) {
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
@@ -192,7 +208,7 @@ export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode
                 continue;
             }
 
-            const categoryTools = categories[selector as ToolCategory];
+            const categoryTools = categories[sel as ToolCategory];
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
@@ -215,7 +231,7 @@ export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode
     const result: ToolEntry[] = [];
 
     // Internal tools
-    if (selectorsProvided) {
+    if (selectors !== undefined) {
         result.push(...internalSelections);
         // If add-actor mode is enabled, ensure add-actor tool is available alongside selected tools.
         if (addActorEnabled && !selectorsExplicitEmpty && !actorsExplicitlyEmpty) {
@@ -282,10 +298,10 @@ export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode
 /**
  * Load tools based on the provided Input object. Convenience wrapper that
  * runs {@link fetchToolSources} (async, mode-agnostic) and then
- * {@link composeTools} (sync, mode-dependent) in sequence.
+ * {@link buildToolsForMode} (sync, mode-dependent) in sequence.
  *
  * Callers that need to pay the network cost before the mode is known should
- * use {@link fetchToolSources} directly and call {@link composeTools} later.
+ * use {@link fetchToolSources} directly and call {@link buildToolsForMode} later.
  *
  * @param input The processed Input object
  * @param apifyClient The Apify client instance
@@ -300,5 +316,5 @@ export async function loadToolsFromInput(
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
     const sources = await fetchToolSources(input, apifyClient, actorStore);
-    return composeTools(sources, mode);
+    return buildToolsForMode(sources, mode);
 }
