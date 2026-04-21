@@ -22,7 +22,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import yargs from 'yargs';
 // Had to ignore the eslint import extension error for the yargs package.
 // Using .js or /index.js didn't resolve it due to the @types package issues.
@@ -234,19 +233,14 @@ async function main() {
     // so we generate a UUID4 to represent this single session interaction for telemetry tracking
     const mcpSessionId = randomUUID();
 
-    // Connect first so the SDK installs its own onmessage handler; then wrap it so we can
-    // AWAIT `prepareForInitialize` before the SDK dispatches `initialize`. The SDK calls
-    // pre-existing handlers synchronously, so wrapping BEFORE connect would not let us
-    // delay dispatch.
+    // Connect first, then wrap onmessage to inject mcpSessionId. Mode resolution +
+    // deferred tool loading happen inside the server's initialize request handler
+    // (see src/mcp/server.ts setupInitializeHandler); no async work needed here.
     await mcpServer.connect(transport);
 
     const sdkOnMessage = transport.onmessage;
-    const handleMessage = async (message: JSONRPCMessage) => {
+    transport.onmessage = (message) => {
         const msgRecord = message as Record<string, unknown>;
-        if (msgRecord.method === 'initialize') {
-            (mcpServer.options as Record<string, unknown>).initializeRequestData = msgRecord as Record<string, unknown>;
-            await mcpServer.prepareForInitialize(msgRecord as unknown as InitializeRequest);
-        }
         // Inject session ID into all requests for task isolation and session tracking.
         // CRITICAL: Always create params object if missing (some requests like listTasks/getTasks don't have params),
         // otherwise mcpSessionId injection fails, breaking session isolation in multi-node setups.
@@ -256,16 +250,6 @@ async function main() {
         msgRecord.params = params;
 
         sdkOnMessage?.(message);
-    };
-    transport.onmessage = (message) => {
-        // Surface async failures — otherwise a rejected prepareForInitialize (e.g. tool
-        // loader network error) becomes an unhandled rejection and the client hangs
-        // forever waiting for the InitializeResult. Log and close; the client will fail
-        // fast rather than hang.
-        handleMessage(message).catch(async (error) => {
-            log.error('Failed to handle transport message', { error });
-            try { await transport.close(); } catch { /* already closed */ }
-        });
     };
 }
 

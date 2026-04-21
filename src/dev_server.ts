@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -97,7 +97,7 @@ export function createExpressApp(): express.Express {
             // Generate a unique session ID for this SSE connection
             const mcpSessionId = transport.sessionId;
 
-            // Defer tool loading until `prepareForInitialize` finalizes `serverMode`.
+            // Defer tool loading until the initialize handler finalizes `serverMode`.
             const apifyToken = process.env.APIFY_TOKEN as string;
             log.debug('Deferring tool load until initialize', { mcpSessionId: transport.sessionId, tr: TransportType.SSE });
             const apifyClient = new ApifyClient({ token: apifyToken });
@@ -108,32 +108,20 @@ export function createExpressApp(): express.Express {
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
 
-            // Connect first; then wrap `transport.onmessage` so we can AWAIT
-            // `prepareForInitialize` before the SDK dispatches `initialize`. This lets
-            // clients that ignore `notifications/tools/list_changed` still see the
-            // correct tool set on the first `tools/list` response.
+            // Connect first, then wrap onmessage to inject mcpSessionId. Mode
+            // resolution + deferred tool loading happen inside the server's initialize
+            // request handler (see src/mcp/server.ts setupInitializeHandler).
             await mcpServer.connect(transport);
 
             const sdkOnMessage = transport.onmessage as ((msg: JSONRPCMessage, extra?: unknown) => void) | undefined;
-            const handleMessage = async (message: JSONRPCMessage, extra?: unknown) => {
+            transport.onmessage = (message, extra) => {
                 const msgRecord = message as Record<string, unknown>;
-                if (msgRecord.method === 'initialize') {
-                    await mcpServer.prepareForInitialize(msgRecord as unknown as InitializeRequest);
-                }
                 if (msgRecord.params) {
                     const params = msgRecord.params as ApifyRequestParams;
                     params._meta ??= {};
                     params._meta.mcpSessionId = mcpSessionId;
                 }
                 sdkOnMessage?.(message, extra);
-            };
-            transport.onmessage = (message, extra) => {
-                // Catch rejections so tool-loader network errors surface instead of
-                // producing an unhandled promise rejection + hung client.
-                handleMessage(message, extra).catch(async (error) => {
-                    log.error('Failed to handle SSE transport message', { mcpSessionId, error });
-                    try { await transport.close(); } catch { /* already closed */ }
-                });
             };
 
             res.on('close', () => {
@@ -207,13 +195,6 @@ export function createExpressApp(): express.Express {
                     req.body.params._meta.mcpSessionId = sessionId;
                 }
             } else if (!sessionId && isInitializeRequest(req.body)) {
-                // New initialization request. JSON-RPC batches are technically allowed:
-                // extract the actual initialize message so capability detection and
-                // telemetry don't silently fall back to undefined on an array body.
-                const initMsg = Array.isArray(req.body)
-                    ? (req.body as Record<string, unknown>[]).find((m) => m?.method === 'initialize') as InitializeRequest
-                    : req.body as InitializeRequest;
-
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
@@ -235,7 +216,6 @@ export function createExpressApp(): express.Express {
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
                     setupSigintHandler: false,
-                    initializeRequestData: initMsg,
                     transportType: 'http',
                     telemetry: {
                         enabled: telemetryEnabled,
@@ -244,8 +224,8 @@ export function createExpressApp(): express.Express {
                     paymentProvider,
                 });
 
-                // Defer tool loading; `prepareForInitialize` runs it after finalizing
-                // `serverMode` from the initialize request's capabilities.
+                // Defer tool loading; the server's initialize request handler runs
+                // the loader after resolving `serverMode` from client capabilities.
                 const apifyToken = process.env.APIFY_TOKEN as string;
                 log.debug('Deferring tool load until initialize', { tr: TransportType.HTTP });
                 const apifyClient = new ApifyClient({ token: apifyToken });
@@ -253,16 +233,10 @@ export function createExpressApp(): express.Express {
                     async () => processParamsGetTools(req.url, apifyClient, mcpServer.serverMode),
                 );
 
-                // Finalize mode + load tools BEFORE the transport dispatches the initialize
-                // request, so the InitializeResult and first `tools/list` reflect the
-                // resolved mode even for clients that ignore
-                // `notifications/tools/list_changed`.
-                await mcpServer.prepareForInitialize(initMsg);
-
-                // Connect the transport to the MCP server BEFORE handling the request
+                // Connect and let the SDK dispatch handleRequest → our initialize
+                // handler runs mode resolution + tool loading → InitializeResult
+                // reflects the resolved mode. No transport-level wrapping needed.
                 await mcpServer.connect(transport);
-
-                // After handling the request, if we get a session ID back, store the transport
                 await transport.handleRequest(req, res, req.body);
 
                 // Store the transport by session ID for future requests

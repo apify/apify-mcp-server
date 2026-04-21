@@ -10,7 +10,7 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, InitializeResult, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -19,6 +19,7 @@ import {
     GetPromptRequestSchema,
     GetTaskPayloadRequestSchema,
     GetTaskRequestSchema,
+    InitializeRequestSchema,
     ListPromptsRequestSchema,
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
@@ -116,29 +117,27 @@ export class ActorsMcpServer {
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
     /**
-     * Resolved server mode. Preliminary value set in the constructor (`'auto'` → `DEFAULT`
-     * until capability negotiation runs). Finalized by {@link prepareForInitialize}
-     * from the client's `initialize` request before the `InitializeResult` is sent.
+     * Resolved server mode. Preliminary value at construction (`'auto'` → `DEFAULT`).
+     * Finalized inside the `initialize` request handler (see constructor) once the
+     * client's capabilities are known. Effectively set-once per connection.
      */
     public serverMode: ServerMode;
     /** Mode-specific executor for direct actor tools (`type: 'actor'`). Finalized with `serverMode`. */
     private actorExecutor: ActorExecutor;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
-     * in {@link prepareForInitialize} when set to `'auto'`; explicit `'default'`/`'apps'`
+     * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
      * values bypass auto-detect.
      */
     private readonly serverModeOption: ServerModeOption;
     /**
-     * Optional loader run during {@link prepareForInitialize}, after `serverMode` is
-     * finalized. Entry points (stdio, dev_server) register this so tool variants match
-     * the resolved mode by the time the `InitializeResult` is sent — clients that
-     * ignore `notifications/tools/list_changed` still see the correct tool set on their
-     * first `tools/list`.
+     * Optional loader run inside the `initialize` request handler, after `serverMode`
+     * is finalized. Entry points (stdio, dev_server) register this so tool variants
+     * match the resolved mode by the time the `InitializeResult` is sent — clients
+     * that ignore `notifications/tools/list_changed` still see the correct tool set
+     * on their first `tools/list`.
      */
     private deferredToolsLoader: (() => Promise<ToolEntry[]>) | undefined;
-    /** Guard so `prepareForInitialize` runs at most once per connection. */
-    private initializePrepared = false;
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -174,8 +173,8 @@ export class ActorsMcpServer {
         // consumers have migrated (see apify-mcp-server-internal#454).
         const legacyUiMode = (options as { uiMode?: string }).uiMode;
         this.serverModeOption = options.serverMode ?? parseServerMode(legacyUiMode);
-        // Preliminary resolution — `prepareForInitialize` re-resolves once the
-        // client's capabilities are known (only for 'auto').
+        // Preliminary resolution — re-resolved inside the initialize handler once
+        // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
@@ -209,11 +208,11 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
-                instructions: getServerInstructions(this.serverMode),
+                instructions: getServerInstructions(),
             },
         );
         this.setupTelemetry();
-        this.setupCapabilityNegotiation();
+        this.setupInitializeHandler();
         this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
@@ -246,83 +245,64 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Fallback client-capability detection, used only when `prepareForInitialize`
-     * was NOT called upstream (e.g. tests that connect a Server directly). The
-     * transport wrappers in `stdio.ts` / `dev_server.ts` call `prepareForInitialize`
-     * before the SDK dispatches `initialize`, so in production this handler only
-     * logs; it never flips the final mode.
+     * Override the SDK's default `initialize` request handler so we can run our
+     * mode resolution + deferred tool loading BEFORE the `InitializeResult` is sent.
+     * The SDK awaits the handler's promise, so async work here naturally blocks the
+     * response; on rejection the SDK sends a JSON-RPC error to the client.
+     *
+     * We delegate to the SDK's captured `_oninitialize` for the boilerplate
+     * (protocolVersion negotiation, `_clientCapabilities` assignment, InitializeResult
+     * shape, instructions), so we don't fork the SDK's initialization semantics.
      */
-    private setupCapabilityNegotiation() {
-        this.server.oninitialized = () => {
-            if (!this.initializePrepared) {
-                const caps = this.server.getClientCapabilities() as
-                    (Record<string, unknown> & { extensions?: Record<string, unknown> }) | undefined;
-                const uiCap = caps?.extensions?.[MCP_APPS_EXTENSION_ID] as
-                    { mimeTypes?: string[] } | undefined;
-                this.clientSupportsUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
+    private setupInitializeHandler() {
+        // Capture the SDK's default initialize handler installed in its constructor.
+        // eslint-disable-next-line no-underscore-dangle
+        const sdkInitHandler = (this.server as unknown as {
+            _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
+        })._oninitialize.bind(this.server);
+
+        this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+            this.clientSupportsUi = detectClientSupportsUi(request);
+
+            if (this.serverModeOption === 'auto') {
+                const resolved = resolveServerMode('auto', this.clientSupportsUi);
+                if (resolved !== this.serverMode) {
+                    this.serverMode = resolved;
+                    this.actorExecutor = actorExecutorsByMode[this.serverMode];
+                }
             }
-            log.info('MCP server initialized', {
-                clientSupportsUi: this.clientSupportsUi,
+
+            // Stash the initialize request so telemetry paths can read client info.
+            // Previously poked via transport onmessage wrappers; now a single source.
+            (this.options as Record<string, unknown>).initializeRequestData = request;
+
+            log.info('Resolved server mode for connection', {
                 serverMode: this.serverMode,
+                serverModeOption: this.serverModeOption,
+                clientSupportsUi: this.clientSupportsUi,
             });
-        };
+
+            if (this.deferredToolsLoader) {
+                const tools = await this.deferredToolsLoader();
+                if (tools.length > 0) this.upsertTools(tools);
+            }
+
+            // Widgets depend on the resolved mode; `resolveWidgets` is idempotent
+            // and early-returns when mode is DEFAULT.
+            await this.resolveWidgets();
+
+            return sdkInitHandler(request);
+        });
     }
 
     /**
-     * Register a deferred tool loader. Invoked during {@link prepareForInitialize} after
-     * `serverMode` is finalized. Entry points use this to load tool variants matching
-     * the resolved mode, so the first `tools/list` after initialize returns the right set.
+     * Register a deferred tool loader. Invoked inside the `initialize` request handler
+     * after `serverMode` is finalized. Entry points use this to load tool variants
+     * matching the resolved mode, so the first `tools/list` after initialize returns
+     * the right set.
      */
     public setDeferredToolsLoader(loader: () => Promise<ToolEntry[]>): void {
         this.deferredToolsLoader = loader;
-    }
-
-    /**
-     * Finalize server mode from the client's initialize request and run the deferred tool
-     * loader (if any). Must be awaited by transport wrappers BEFORE the SDK's default
-     * initialize handler responds, so the `InitializeResult` and first `tools/list`
-     * reflect the resolved mode.
-     *
-     * Only re-resolves `serverMode` when the original option was `'auto'`; an explicit
-     * `'default'` / `'apps'` bypasses auto-detect.
-     *
-     * Idempotent: subsequent calls within the same connection are no-ops.
-     */
-    public async prepareForInitialize(request: InitializeRequest): Promise<void> {
-        if (this.initializePrepared) return;
-        this.initializePrepared = true;
-
-        this.clientSupportsUi = detectClientSupportsUi(request);
-
-        if (this.serverModeOption === 'auto') {
-            const resolved = resolveServerMode('auto', this.clientSupportsUi);
-            if (resolved !== this.serverMode) {
-                this.serverMode = resolved;
-                this.actorExecutor = actorExecutorsByMode[this.serverMode];
-                // Refresh instructions the SDK will return in the InitializeResult.
-                // The SDK stores `instructions` at construction time and exposes no setter,
-                // so mutate the private field directly. Safe here because the transport
-                // wrapper awaits this method before the SDK dispatches `initialize`.
-                // eslint-disable-next-line no-underscore-dangle
-                (this.server as unknown as { _instructions?: string })._instructions = getServerInstructions(this.serverMode);
-            }
-        }
-
-        log.info('Resolved server mode for connection', {
-            serverMode: this.serverMode,
-            serverModeOption: this.serverModeOption,
-            clientSupportsUi: this.clientSupportsUi,
-        });
-
-        if (this.deferredToolsLoader) {
-            const tools = await this.deferredToolsLoader();
-            if (tools.length > 0) this.upsertTools(tools);
-        }
-
-        // Widgets depend on the resolved mode; re-resolve once here to cover the common
-        // path where preliminary mode was `DEFAULT` (auto option) and the client
-        // promotes it to `APPS`. `resolveWidgets` is idempotent and returns early for DEFAULT.
-        await this.resolveWidgets();
     }
 
     /**

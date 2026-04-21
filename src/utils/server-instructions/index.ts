@@ -1,21 +1,14 @@
 /**
- * Server instructions entry point.
- * Selects the appropriate instructions based on server mode.
+ * Server instructions entry point. Unified across all modes — widget-specific
+ * guidance is inert for clients without the MCP Apps UI capability because
+ * `-widget` tool names never appear in their `tools/list`.
  */
 
-import { ServerMode } from '../../types.js';
-import { getAppsInstructions } from './apps.js';
-import { getDefaultInstructions } from './default.js';
-
-/** Mode → instructions builder. Add new modes here. */
-const instructionsByMode: Record<ServerMode, () => string> = {
-    [ServerMode.DEFAULT]: getDefaultInstructions,
-    [ServerMode.APPS]: getAppsInstructions,
-};
+import { getCommonInstructions } from './common.js';
 
 /**
- * Build server instructions for the given server mode.
+ * Build unified server instructions. Mode-agnostic.
  */
-export function getServerInstructions(mode: ServerMode = ServerMode.DEFAULT): string {
-    return instructionsByMode[mode]();
+export function getServerInstructions(): string {
+    return getCommonInstructions();
 }

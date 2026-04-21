@@ -7,6 +7,8 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import type { ServerModeOption, ToolEntry } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 
+type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
+
 function makeInitializeRequest(supportsUi: boolean): InitializeRequest {
     const extensions = supportsUi
         ? { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } }
@@ -30,7 +32,20 @@ function makeServer(serverMode: ServerModeOption): ActorsMcpServer {
     });
 }
 
-describe('ActorsMcpServer prepareForInitialize', () => {
+/**
+ * Drive the SDK-registered `initialize` request handler directly (bypassing the
+ * transport layer). Mirrors what the SDK does when a real client sends `initialize`.
+ */
+async function dispatchInitialize(server: ActorsMcpServer, request: InitializeRequest): Promise<void> {
+    // eslint-disable-next-line no-underscore-dangle
+    const handler = (server.server as unknown as {
+        _requestHandlers: Map<string, InitHandler>;
+    })._requestHandlers.get('initialize');
+    if (!handler) throw new Error('initialize handler not registered');
+    await handler(request, {});
+}
+
+describe('ActorsMcpServer initialize handler', () => {
     const servers: ActorsMcpServer[] = [];
 
     afterEach(async () => {
@@ -58,7 +73,7 @@ describe('ActorsMcpServer prepareForInitialize', () => {
         for (const { option, supportsUi, expectedMode } of cases) {
             it(`option=${option} supportsUi=${supportsUi} finalizes mode=${expectedMode}`, async () => {
                 const server = track(makeServer(option));
-                await server.prepareForInitialize(makeInitializeRequest(supportsUi));
+                await dispatchInitialize(server, makeInitializeRequest(supportsUi));
 
                 expect(server.serverMode).toBe(expectedMode);
                 expect(server.clientSupportsUi).toBe(supportsUi);
@@ -75,41 +90,36 @@ describe('ActorsMcpServer prepareForInitialize', () => {
         });
         server.setDeferredToolsLoader(loader);
 
-        await server.prepareForInitialize(makeInitializeRequest(true));
+        await dispatchInitialize(server, makeInitializeRequest(true));
 
         expect(loader).toHaveBeenCalledTimes(1);
     });
 
-    it('is idempotent — second call does not re-run the loader', async () => {
-        const server = track(makeServer('auto'));
-        const loader = vi.fn<() => Promise<ToolEntry[]>>(async () => []);
-        server.setDeferredToolsLoader(loader);
-
-        await server.prepareForInitialize(makeInitializeRequest(true));
-        await server.prepareForInitialize(makeInitializeRequest(false));
-
-        expect(loader).toHaveBeenCalledTimes(1);
-        // Mode stays at the first resolution — subsequent calls are no-ops.
-        expect(server.serverMode).toBe(ServerMode.APPS);
-        expect(server.clientSupportsUi).toBe(true);
-    });
-
-    it('defaults to preliminary DEFAULT mode before prepareForInitialize runs', () => {
+    it('defaults to preliminary DEFAULT mode before initialize runs', () => {
         const server = track(makeServer('auto'));
         expect(server.serverMode).toBe(ServerMode.DEFAULT);
         expect(server.clientSupportsUi).toBe(false);
     });
 
-    it('preliminary mode is APPS when option=apps, even before prepareForInitialize', () => {
+    it('preliminary mode is APPS when option=apps, even before initialize', () => {
         const server = track(makeServer(ServerMode.APPS));
         expect(server.serverMode).toBe(ServerMode.APPS);
     });
 
     it('explicit option bypasses auto-detect — apps-capable client does not override default', async () => {
         const server = track(makeServer(ServerMode.DEFAULT));
-        await server.prepareForInitialize(makeInitializeRequest(true));
+        await dispatchInitialize(server, makeInitializeRequest(true));
 
         expect(server.serverMode).toBe(ServerMode.DEFAULT);
         expect(server.clientSupportsUi).toBe(true);
+    });
+
+    it('populates options.initializeRequestData so telemetry paths can read client info', async () => {
+        const server = track(makeServer('auto'));
+        const request = makeInitializeRequest(true);
+
+        await dispatchInitialize(server, request);
+
+        expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 });
