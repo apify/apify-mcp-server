@@ -1,6 +1,21 @@
 /**
  * Shared logic for loading tools based on Input type.
- * This eliminates duplication between stdio.ts and processParamsGetTools.
+ *
+ * Exports a two-phase API:
+ *
+ * - {@link fetchToolSources} — async, mode-agnostic. Does the network work
+ *   (Actor metadata fetch) and returns a bundle suitable for any mode.
+ * - {@link composeTools} — sync, mode-dependent. Takes pre-fetched sources
+ *   plus a resolved `ServerMode` and produces the final mode-specific tool
+ *   list (correct `-widget` variants, apps-mode-only tools, auto-injected
+ *   `get-actor-run`/`get-actor-output`, dedup).
+ *
+ * The combined {@link loadToolsFromInput} wrapper preserves the original
+ * single-call signature and runs both phases in sequence.
+ *
+ * This split lets the server's `initialize` request handler delay mode
+ * resolution until the client's capabilities are known while still doing the
+ * expensive network fetch early. See `src/mcp/server.ts#setupInitializeHandler`.
  */
 
 import type { ApifyClient } from 'apify-client';
@@ -8,7 +23,7 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from '../tools/categories.js';
+import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from '../tools/categories.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -39,32 +54,113 @@ function getAllInternalToolNames(): Set<string> {
 }
 
 /**
- * Load tools based on the provided Input object.
- * This function is used by both the stdio.ts and the processParamsGetTools function.
- *
- * @param input The processed Input object
- * @param apifyClient The Apify client instance
- * @param mode Server mode for tool variant resolution
- * @param actorStore
- * @returns An array of tool entries
+ * Mode-agnostic source bundle produced by {@link fetchToolSources} and consumed
+ * by {@link composeTools}.
  */
-export async function loadToolsFromInput(
+export type ToolSources = {
+    /** The original input that generated these sources. */
+    input: Input;
+    /** Pre-fetched Actor tool entries — same regardless of server mode. */
+    actorTools: ToolEntry[];
+};
+
+function normalizeSelectors(value: Input['tools']): (string | ToolCategory)[] | undefined {
+    if (value === undefined) return undefined;
+    return (Array.isArray(value) ? value : [value])
+        .map(String)
+        .map((s) => s.trim())
+        .filter((s) => s !== '');
+}
+
+/**
+ * Compute the list of Actor names (`username/name`) to fetch. Mode-independent:
+ * an Actor tool is identified by name, and the same Actor tool entry is reused
+ * across modes — only the *internal* tool variants around it differ by mode.
+ *
+ * Selectors classified as "actor names":
+ *   - NOT the deprecated `'preview'` pseudo-category
+ *   - NOT a category name (from `CATEGORY_NAME_SET`)
+ *   - NOT the name of an internal tool in any mode (from `getAllInternalToolNames`)
+ *
+ * If no selectors / no explicit actors: the defaults apply (or empty when
+ * add-actor mode is on).
+ */
+function computeActorNamesToLoad(input: Input): string[] {
+    const selectors = normalizeSelectors(input.tools);
+    const selectorsProvided = selectors !== undefined;
+    const selectorsExplicitEmpty = selectorsProvided && (selectors as string[]).length === 0;
+    const addActorEnabled = input.enableAddingActors === true;
+    const actorsExplicitlyEmpty = (Array.isArray(input.actors) && input.actors.length === 0) || input.actors === '';
+
+    // Selectors that aren't categories or internal tools in any mode → Actor names.
+    const actorSelectorsFromTools: string[] = [];
+    if (selectorsProvided && !selectorsExplicitEmpty) {
+        for (const selector of selectors as (string | ToolCategory)[]) {
+            const sel = String(selector);
+            if (sel === 'preview') continue;
+            if (CATEGORY_NAME_SET.has(sel)) continue;
+            if (getAllInternalToolNames().has(sel)) continue;
+            actorSelectorsFromTools.push(sel);
+        }
+    }
+
+    let actorsFromField: string[] | undefined;
+    if (input.actors === undefined) {
+        actorsFromField = undefined;
+    } else if (Array.isArray(input.actors)) {
+        actorsFromField = input.actors;
+    } else {
+        actorsFromField = [input.actors];
+    }
+
+    if (actorsFromField !== undefined) return actorsFromField;
+    if (actorSelectorsFromTools.length > 0) return actorSelectorsFromTools;
+    if (!selectorsProvided) {
+        // No selectors supplied: use defaults unless add-actor mode is enabled
+        return addActorEnabled || actorsExplicitlyEmpty ? [] : defaults.actors;
+    }
+    // Selectors provided but none are actors => do not load defaults
+    return [];
+}
+
+/**
+ * Phase 1 — async, mode-agnostic.
+ *
+ * Fetch Actor definitions from the Apify API for every Actor name derivable
+ * from `input` (either the `actors` field or unknown selectors in `tools`).
+ * Returns a {@link ToolSources} bundle that can later be composed against any
+ * resolved `ServerMode` via {@link composeTools}.
+ *
+ * Call this BEFORE connecting the transport so the network cost is paid up
+ * front. The synchronous {@link composeTools} can then run inside the
+ * `initialize` request handler once the mode is known.
+ */
+export async function fetchToolSources(
     input: Input,
     apifyClient: ApifyClient,
-    mode: ServerMode = ServerMode.DEFAULT,
     actorStore?: ActorStore,
-): Promise<ToolEntry[]> {
+): Promise<ToolSources> {
+    const actorNamesToLoad = computeActorNamesToLoad(input);
+    const actorTools = actorNamesToLoad.length > 0
+        ? await getActorsAsTools(actorNamesToLoad, apifyClient, { actorStore })
+        : [];
+    return { input, actorTools };
+}
+
+/**
+ * Phase 2 — sync, mode-dependent.
+ *
+ * Given pre-fetched {@link ToolSources} and a resolved `ServerMode`, build the
+ * final tool list the server exposes to the client: mode-specific internal
+ * variants (`-widget` tools in apps mode, the non-widget ones in default),
+ * apps-only UI tools, the pre-fetched Actor tools, and auto-injected
+ * `get-actor-run` / `get-actor-output` where appropriate.
+ */
+export function composeTools(sources: ToolSources, mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
+    const { input, actorTools } = sources;
+
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
-
-    // Helpers for readability
-    const normalizeSelectors = (value: Input['tools']): (string | ToolCategory)[] | undefined => {
-        if (value === undefined) return undefined;
-        return (Array.isArray(value) ? value : [value])
-            .map(String)
-            .map((s) => s.trim())
-            .filter((s) => s !== '');
-    };
 
     const selectors = normalizeSelectors(input.tools);
     const selectorsProvided = selectors !== undefined;
@@ -81,13 +177,15 @@ export async function loadToolsFromInput(
         }
     }
 
-    // Partition selectors into internal picks (by category or by name) and Actor names
+    // Walk selectors for internal picks (mode-specific). Actor-name classification
+    // happened in `computeActorNamesToLoad`; we don't need to partition again here.
     const internalSelections: ToolEntry[] = [];
-    const actorSelectorsFromTools: string[] = [];
     if (selectorsProvided && !selectorsExplicitEmpty) {
         for (const selector of selectors as (string | ToolCategory)[]) {
-            if (selector === 'preview') {
-                // 'preview' category is deprecated. It contained `call-actor` which is now default
+            const sel = String(selector);
+
+            if (sel === 'preview') {
+                // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
                 const callActorTool = modeToolByName.get(HelperTools.ACTOR_CALL);
                 if (callActorTool) internalSelections.push(callActorTool);
@@ -95,47 +193,23 @@ export async function loadToolsFromInput(
             }
 
             const categoryTools = categories[selector as ToolCategory];
-
             if (categoryTools) {
                 internalSelections.push(...categoryTools);
                 continue;
             }
-            const internalByName = modeToolByName.get(String(selector));
+            const internalByName = modeToolByName.get(sel);
             if (internalByName) {
                 internalSelections.push(internalByName);
                 continue;
             }
-            // If this is a known internal tool name (from another mode), skip it
-            // rather than treating it as an Actor ID
-            if (getAllInternalToolNames().has(String(selector))) {
-                log.debug(`Skipping selector "${selector}" — it is an internal tool from another mode (current: "${mode}")`);
-                continue;
+            // Internal tool from another mode → skip silently (fetchToolSources already
+            // routed it away from actor names).
+            if (getAllInternalToolNames().has(sel)) {
+                log.debug(`Skipping selector "${sel}" — it is an internal tool from another mode (current: "${mode}")`);
             }
-            // Treat unknown selectors as Actor IDs/full names.
-            // Potential heuristic (future): if (String(selector).includes('/')) => definitely an Actor.
-            actorSelectorsFromTools.push(String(selector));
+            // Else: selector was an Actor name; it's already in `actorTools`.
         }
     }
-
-    // Decide which Actors to load
-    let actorsFromField: string[] | undefined;
-    if (input.actors === undefined) {
-        actorsFromField = undefined;
-    } else if (Array.isArray(input.actors)) {
-        actorsFromField = input.actors;
-    } else {
-        actorsFromField = [input.actors];
-    }
-
-    let actorNamesToLoad: string[] = [];
-    if (actorsFromField !== undefined) {
-        actorNamesToLoad = actorsFromField;
-    } else if (actorSelectorsFromTools.length > 0) {
-        actorNamesToLoad = actorSelectorsFromTools;
-    } else if (!selectorsProvided) {
-        // No selectors supplied: use defaults unless add-actor mode is enabled
-        actorNamesToLoad = addActorEnabled ? [] : defaults.actors;
-    } // else: selectors provided but none are actors => do not load defaults
 
     // Compose final tool list
     const result: ToolEntry[] = [];
@@ -163,9 +237,8 @@ export async function loadToolsFromInput(
         result.push(...categories.ui);
     }
 
-    // Actor tools (if any)
-    if (actorNamesToLoad.length > 0) {
-        const actorTools = await getActorsAsTools(actorNamesToLoad, apifyClient, { actorStore });
+    // Actor tools (pre-fetched, mode-agnostic)
+    if (actorTools.length > 0) {
         result.push(...actorTools);
     }
 
@@ -201,18 +274,31 @@ export async function loadToolsFromInput(
         }
     }
 
-    // TEMP: for now we disable this swapping logic as the add-actor tool was misbehaving in some clients
-    // Handle client capabilities logic for 'actors' category to swap call-actor for add-actor
-    // if client supports dynamic tools.
-    // const selectorContainsCallActor = selectors?.some((s) => s === HelperTools.ACTOR_CALL);
-    // if (doesMcpClientSupportDynamicTools(initializeRequestData) && hasCallActor && !selectorContainsCallActor) {
-    //    // Remove call-actor
-    //    result = result.filter((entry) => entry.tool.name !== HelperTools.ACTOR_CALL);
-    //    // Replace with add-actor if not already present
-    //    if (!hasAddActorTool) result.push(addTool);
-    // }
-
     // De-duplicate by tool name for safety
     const seen = new Set<string>();
     return result.filter((entry) => !seen.has(entry.name) && seen.add(entry.name));
+}
+
+/**
+ * Load tools based on the provided Input object. Convenience wrapper that
+ * runs {@link fetchToolSources} (async, mode-agnostic) and then
+ * {@link composeTools} (sync, mode-dependent) in sequence.
+ *
+ * Callers that need to pay the network cost before the mode is known should
+ * use {@link fetchToolSources} directly and call {@link composeTools} later.
+ *
+ * @param input The processed Input object
+ * @param apifyClient The Apify client instance
+ * @param mode Server mode for tool variant resolution
+ * @param actorStore
+ * @returns An array of tool entries
+ */
+export async function loadToolsFromInput(
+    input: Input,
+    apifyClient: ApifyClient,
+    mode: ServerMode = ServerMode.DEFAULT,
+    actorStore?: ActorStore,
+): Promise<ToolEntry[]> {
+    const sources = await fetchToolSources(input, apifyClient, actorStore);
+    return composeTools(sources, mode);
 }
