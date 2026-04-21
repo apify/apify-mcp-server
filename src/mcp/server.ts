@@ -142,9 +142,13 @@ export class ActorsMcpServer {
      */
     private readonly serverModeOption: ServerModeOption;
     /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
-    private hasResolvedServerMode: boolean;
-    /** Tool batches queued before mode is final; flushed with the resolved mode in the initialize handler. */
-    private pendingToolSources: { input: Input; actorTools: ToolEntry[] }[] = [];
+    private serverModeResolved: boolean;
+    /**
+     * Tool inputs queued before mode is final. Actor tools are upserted immediately
+     * (mode-agnostic); only the input is stored so mode-specific internal tools can
+     * be composed once mode resolves.
+     */
+    private pendingToolsAfterModeResolved: Input[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -178,7 +182,7 @@ export class ActorsMcpServer {
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
-        this.hasResolvedServerMode = this.serverModeOption !== 'auto';
+        this.serverModeResolved = this.serverModeOption !== 'auto';
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -272,7 +276,7 @@ export class ActorsMcpServer {
                     this.serverMode = resolved;
                     this.actorExecutor = actorExecutorsByMode[this.serverMode];
                 }
-                this.hasResolvedServerMode = true;
+                this.serverModeResolved = true;
             }
 
             (this.options as Record<string, unknown>).initializeRequestData = request;
@@ -283,7 +287,7 @@ export class ActorsMcpServer {
                 clientSupportsUi: this.clientSupportsUi,
             });
 
-            this.flushPendingToolSources();
+            this.updateToolsAfterServerModeResolved();
 
             await this.resolveWidgets();
 
@@ -291,10 +295,16 @@ export class ActorsMcpServer {
         });
     }
 
-    private flushPendingToolSources(): void {
-        if (this.pendingToolSources.length === 0) return;
-        const tools = this.pendingToolSources.flatMap(({ input, actorTools }) => getToolsForServerMode(input, actorTools, this.serverMode));
-        this.pendingToolSources = [];
+    private updateToolsAfterServerModeResolved(): void {
+        if (this.pendingToolsAfterModeResolved.length === 0) return;
+
+        const actorTools = Array.from(this.tools.values()).filter((t) => t.type === 'actor');
+        const tools = this.pendingToolsAfterModeResolved.flatMap(
+            (input) => getToolsForServerMode(input, actorTools, this.serverMode),
+        );
+
+        this.pendingToolsAfterModeResolved = [];
+
         if (tools.length > 0) this.upsertTools(tools);
     }
 
@@ -386,8 +396,8 @@ export class ActorsMcpServer {
         const restoreInput = toolNamesToInput(missingToolNames);
         const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
 
-        if (!this.hasResolvedServerMode) {
-            this.pendingToolSources.push({ input: restoreInput, actorTools });
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push(restoreInput);
             if (actorTools.length > 0) this.upsertTools(actorTools, true);
             return;
         }
@@ -418,8 +428,8 @@ export class ActorsMcpServer {
         const input = parseInputParamsFromUrl(url);
         const actorTools = await getActors(input, apifyClient, this.actorStore);
 
-        if (!this.hasResolvedServerMode) {
-            this.pendingToolSources.push({ input, actorTools });
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push(input);
             if (actorTools.length > 0) {
                 log.debug('Loading actor tools from query parameters before mode resolution');
                 this.upsertTools(actorTools, false);
@@ -437,8 +447,9 @@ export class ActorsMcpServer {
     /** Load tools from a pre-parsed input. Queues when mode is `'auto'`; composed with the resolved mode in the initialize handler. */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
         const actorTools = await getActors(input, apifyClient, this.actorStore);
-        if (!this.hasResolvedServerMode) {
-            this.pendingToolSources.push({ input, actorTools });
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push(input);
+            if (actorTools.length > 0) this.upsertTools(actorTools);
             return;
         }
         const tools = getToolsForServerMode(input, actorTools, this.serverMode);
