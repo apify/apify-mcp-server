@@ -101,14 +101,14 @@ const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
 };
 
 /**
- * True iff the initialize request advertises the MCP Apps UI extension with the
- * widget MIME type. Used to resolve `'auto'` server mode.
+ * Returns true when the initialize request advertises the MCP Apps UI extension
+ * with the widget MIME type. Used to resolve `'auto'` server mode.
  *
  * Uses {@link getUiCapability} from `@modelcontextprotocol/ext-apps/server` to
  * read the `io.modelcontextprotocol/ui` extension from client capabilities — the
  * canonical way per the MCP Apps spec.
  */
-function detectClientSupportsUi(request: InitializeRequest | undefined): boolean {
+function isUiSupportedByClient(request: InitializeRequest | undefined): boolean {
     const uiCap = getUiCapability(request?.params?.capabilities);
     return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
 }
@@ -278,7 +278,7 @@ export class ActorsMcpServer {
         })._oninitialize.bind(this.server);
 
         this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
-            this.clientSupportsUi = detectClientSupportsUi(request);
+            this.clientSupportsUi = isUiSupportedByClient(request);
 
             if (this.serverModeOption === 'auto') {
                 const resolved = resolveServerMode('auto', this.clientSupportsUi);
@@ -301,7 +301,9 @@ export class ActorsMcpServer {
 
             await this.resolveWidgets();
 
-            return sdkInitHandler(request);
+            const result = await sdkInitHandler(request);
+            result.instructions = getServerInstructions(this.serverMode);
+            return result;
         });
     }
 

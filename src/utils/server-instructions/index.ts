@@ -1,9 +1,10 @@
 /**
- * Unified server instructions — mode-agnostic text served to all clients.
+ * Server instructions — mode-aware text served to clients.
  *
- * Widget-specific guidance is included unconditionally. Clients without the MCP
- * Apps UI capability receive the same text, but the per-tool response payloads
- * they see do not include widget metadata, so the rules are benign.
+ * Apps-only sections (widget workflow, widget tool disambiguation) are included
+ * only when the resolved server mode is `'apps'`. Default-mode clients never
+ * see tool names like `search-actors-internal` or `fetch-actor-details-internal`,
+ * avoiding hallucinated calls to tools absent from `tools/list`.
  *
  * Note: the `-widget` suffix split (separating widget-backed tools from silent
  * variants by name) is planned in follow-up PRs. Until then, widget rendering
@@ -12,11 +13,17 @@
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
+import { ServerMode } from '../../types.js';
 
 /**
- * Build unified server instructions. Mode-agnostic.
+ * Build server instructions for the given mode.
+ *
+ * Apps-only sections are omitted in default mode to prevent models from
+ * attempting to call widget tools that are not registered.
  */
-export function getServerInstructions(): string {
+export function getServerInstructions(mode: ServerMode = ServerMode.DEFAULT): string {
+    const isApps = mode === ServerMode.APPS;
+
     return `
 Apify is the world's largest marketplace of tools for web scraping, data extraction, and web automation.
 These tools are called **Actors**. They enable you to extract structured data from social media, e-commerce, search engines, maps, travel sites, and many other sources.
@@ -42,14 +49,14 @@ These tools are called **Actors**. They enable you to extract structured data fr
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
-
+${isApps ? `
 ## Widget workflow (applies when tool responses include widget metadata)
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
 - **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after a widget-backed \`${HelperTools.ACTOR_CALL}\` response.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
 - When \`${HelperTools.ACTOR_CALL}\` runs without a widget (the tool response is plain text / structured data only), polling \`${HelperTools.ACTOR_RUNS_GET}\` for status is expected.
 - Follow-up PRs will split widget-backed tools into a dedicated \`-widget\`-suffixed namespace; until then, widget rendering happens on the base tool names when the client supports it.
-
+` : ''}
 ## Tool dependencies and disambiguation
 
 ### Tool dependencies
@@ -66,8 +73,8 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **\`${HelperTools.STORE_SEARCH}\` vs \`${HelperTools.ACTOR_GET_DETAILS}\`:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
-- **Widget-backed variants (when the client supports them):** Some \`${HelperTools.STORE_SEARCH}\` / \`${HelperTools.ACTOR_GET_DETAILS}\` responses render an interactive widget for the user. Prefer the widget-backed variant when the user explicitly asks to *see*, *browse*, or *view* something; when the next step is to actually run an Actor or perform a programmatic flow, prefer a silent lookup if such a variant is available (for example, \`${HelperTools.STORE_SEARCH_INTERNAL}\` or \`${HelperTools.ACTOR_GET_DETAILS_INTERNAL}\`), otherwise use the standard lookup tools. A \`-widget\` suffix split is planned in a follow-up PR; until then, widget rendering is selected by the server based on client capabilities.
-- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
+${isApps ? `- **Widget-backed variants (when the client supports them):** Some \`${HelperTools.STORE_SEARCH}\` / \`${HelperTools.ACTOR_GET_DETAILS}\` responses render an interactive widget for the user. Prefer the widget-backed variant when the user explicitly asks to *see*, *browse*, or *view* something; when the next step is to actually run an Actor or perform a programmatic flow, prefer a silent lookup if such a variant is available (for example, \`${HelperTools.STORE_SEARCH_INTERNAL}\` or \`${HelperTools.ACTOR_GET_DETAILS_INTERNAL}\`), otherwise use the standard lookup tools. A \`-widget\` suffix split is planned in a follow-up PR; until then, widget rendering is selected by the server based on client capabilities.
+` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HelperTools.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.
