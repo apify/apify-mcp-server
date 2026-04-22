@@ -6,7 +6,6 @@ import { randomBytes } from 'node:crypto';
 
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -80,6 +79,7 @@ import { getUserIdFromTokenCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
+import { ApifyTaskStore } from './task_store.js';
 import { isTaskCancelled, processParamsGetTools } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
@@ -125,7 +125,7 @@ export class ActorsMcpServer {
 
         // for stdio use in memory task store if not provided, otherwise use provided task store
         if (this.options.transportType === 'stdio' && !this.options.taskStore) {
-            this.taskStore = new InMemoryTaskStore();
+            this.taskStore = new ApifyTaskStore();
         } else if (this.options.taskStore) {
             this.taskStore = this.options.taskStore;
         } else {
@@ -782,8 +782,9 @@ export class ActorsMcpServer {
                     const task = await this.taskStore.createTask(
                         {
                             ttl: request.params.task.ttl,
+                            context: { taskId: `${tool.name}-${randomBytes(9).toString('base64url')}` },
                         },
-                        `${tool.name}-${randomBytes(9).toString('base64url')}`,
+                        '',
                         request,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
