@@ -140,6 +140,25 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 - `get-actor-output` — test field filtering with dot notation, non-existent dataset
 - `search-apify-docs` / `fetch-apify-docs` — test relevant and non-existent queries
 
+**Testing task mode (long-running calls):**
+
+Use `--task` to request task execution. Use `--detach` to start a task and return immediately with the task ID.
+
+```bash
+# Reject: tool does not support task mode
+mcpc @stdio tools-call search-apify-docs --task query:="web scraping"
+
+# Start call-actor as a task and wait for result
+mcpc @stdio tools-call call-actor --task actorId:="apify/python-example" runInput:='{"first_number":3,"second_number":4}'
+
+# Start a task and detach (returns taskId immediately)
+mcpc @stdio tools-call call-actor --detach actorId:="apify/python-example" runInput:='{"first_number":3,"second_number":4}'
+
+# Inspect a running/completed task
+mcpc @stdio tasks-list
+mcpc @stdio tasks-get <taskId>
+```
+
 
 ### Testing with MCPJam (optional)
 
