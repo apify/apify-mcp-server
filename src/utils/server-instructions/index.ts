@@ -3,7 +3,7 @@
  *
  * Apps-only sections (widget workflow, widget tool disambiguation) are included
  * only when the resolved server mode is `'apps'`. Default-mode clients never
- * see tool names like `search-actors-internal` or `fetch-actor-details-internal`,
+ * see tool names like `search-actors-internal` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
  *
  * Note: the `-widget` suffix split (separating widget-backed tools from silent
