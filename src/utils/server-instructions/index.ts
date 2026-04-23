@@ -6,10 +6,10 @@
  * see tool names like `search-actors-internal` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
  *
- * Note: the `-widget` suffix split (separating widget-backed tools from silent
- * variants by name) is planned in follow-up PRs. Until then, widget rendering
- * happens on the base tool names (`call-actor`, `search-actors`,
- * `fetch-actor-details`) in apps mode.
+ * Note: the `-widget` suffix split is rolling out per-tool.
+ * `fetch-actor-details-widget` is the first split; `call-actor`, `search-actors`,
+ * and `get-actor-run` still render widgets on their base names until their own
+ * splits land.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -55,7 +55,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 
 - **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after a widget-backed \`${HelperTools.ACTOR_CALL}\` response.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
 - When \`${HelperTools.ACTOR_CALL}\` runs without a widget (the tool response is plain text / structured data only), polling \`${HelperTools.ACTOR_RUNS_GET}\` for status is expected.
-- Follow-up PRs will split widget-backed tools into a dedicated \`-widget\`-suffixed namespace; until then, widget rendering happens on the base tool names when the client supports it.
+- The \`-widget\` suffix split is rolling out per-tool (\`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` already split); until the rest split, widget rendering happens on the base \`${HelperTools.ACTOR_CALL}\`, \`${HelperTools.STORE_SEARCH}\`, and \`${HelperTools.ACTOR_RUNS_GET}\` tool names when the client supports it.
 ` : ''}
 ## Tool dependencies and disambiguation
 

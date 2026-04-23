@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
@@ -19,6 +18,8 @@ import {
     buildActorNotFoundResponse,
 } from '../core/fetch_actor_details_common.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
+
+const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
 
 /**
  * Widget-only input: `actor` only. `.strict()` rejects stray keys such as `output`
@@ -53,7 +54,7 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsWidgetArgsSchema)),
     // Tool-level widget meta; only registered in apps mode so stripWidgetMeta is a no-op here.
     _meta: {
-        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
+        ...widgetConfig?.meta,
     },
     annotations: {
         title: 'Fetch Actor details (widget)',
@@ -63,10 +64,9 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, mcpSessionId } = toolArgs;
-        const parsed = fetchActorDetailsWidgetArgsSchema.parse(args);
+        const { apifyToken, apifyClient, mcpSessionId } = toolArgs;
+        const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
         const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HelperTools.ACTOR_GET_DETAILS_WIDGET });
-        const apifyClient = new ApifyClient({ token: apifyToken });
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
         const cardOptions = { ...buildCardOptions(actorDetailsOutputDefaults), userTier: userPlanTier };
@@ -79,6 +79,7 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
         const structuredContent = {
             actorDetails: {
                 actorInfo: actorDetails.actorInfo,
+                actorCard: actorDetails.actorCard,
                 readme: actorDetails.readme,
             },
         };
@@ -91,7 +92,6 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
             An interactive widget has been rendered with detailed Actor information.
         `];
 
-        const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
         return buildMCPResponse({
             texts,
             structuredContent,

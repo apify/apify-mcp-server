@@ -217,11 +217,10 @@ export function buildActorDetailsTextResponse(options: {
  */
 export async function buildFetchActorDetailsResult(
     toolArgs: InternalToolArgs,
-    route: HelperTools.ACTOR_GET_DETAILS,
 ): Promise<ReturnType<typeof buildMCPResponse>> {
     const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
+    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HelperTools.ACTOR_GET_DETAILS });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only

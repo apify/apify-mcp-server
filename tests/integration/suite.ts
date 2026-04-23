@@ -2714,14 +2714,14 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
+        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details-widget)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
                 serverMode: 'apps', // Enable UI mode to get widget structured content
             });
 
             const result = await client.callTool({
-                name: HelperTools.ACTOR_GET_DETAILS,
+                name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                 },
@@ -2746,7 +2746,7 @@ export function createIntegrationTestsSuite(
             const details = content.structuredContent!.actorDetails!;
             expect(typeof details.actorCard).toBe('string');
 
-            // OpenAI widget path always returns full readme
+            // Apps widget path always returns full readme
             expect(details.readme).toBeDefined();
             expect(typeof details.readme).toBe('string');
 

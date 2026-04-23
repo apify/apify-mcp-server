@@ -177,12 +177,15 @@ export const actorDetailsWidgetOutputSchema = {
             type: 'object' as const, // Literal type required for MCP SDK type compatibility
             properties: {
                 actorInfo: { type: 'object' as const, description: 'Widget-formatted Actor info (tier-aware pricing, widget display fields).' },
+                actorCard: { type: 'string', description: 'Rendered Actor card markdown for widget display.' },
                 readme: { type: 'string', description: 'Formatted Actor README for widget display.' },
             },
-            required: ['actorInfo', 'readme'],
+            required: ['actorInfo', 'actorCard', 'readme'],
+            additionalProperties: false,
         },
     },
     required: ['actorDetails'],
+    additionalProperties: false,
 };
 
 /**
