@@ -86,7 +86,27 @@ Use comments to guide reviewers:
     * **Classes, Types, Schemas, Components:** Use capitalized `PascalCase` format.
     * **Files & Folders:** Use lowercase `snake_case` format.
     * **Endpoint Paths:** Use lowercase `kebab-case` format.
-    * **Booleans:** Prefix with `is`, `has`, or `should` (e.g., `isValid`, `hasFinished`, `shouldRetry`).
+    * **Booleans:** Prefix with `is`, `has`, `can`, or `should` (e.g., `isValid`, `hasFinished`, `canRetry`, `shouldRetry`).
+    * **Function verbs:** Choose the verb based on what the function does:
+        * `get` — synchronous or cheap lookup from local state, cache, or in-memory data (e.g., `getToolFullName`, `getDefaultTools`).
+        * `fetch` — async retrieval from an external API or network call (e.g., `fetchActorDetails`, `fetchActorRunData`).
+        * `build` — construct and return a new object from inputs (e.g., `buildMCPResponse`, `buildActorInputSchema`).
+        * `create` — factory function that instantiates a class, service, or complex object (e.g., `createExpressApp`, `createProgressTracker`).
+        * `parse` — extract structured data from raw/untrusted input (e.g., `parseServerMode`, `parseInputParamsFromUrl`).
+        * `resolve` — determine a value from context, configuration, or multiple sources (e.g., `resolveOutputOptions`, `resolveServerMode`).
+        * `format` — convert data to a display or output representation (e.g., `formatActorToActorCard`, `formatActorForWidget`).
+        * `extract` — pull a specific piece of data from a larger structure (e.g., `extractActorId`, `extractActorName`).
+        * `validate` — check correctness and throw/return errors (e.g., `validateInput`).
+        * Avoid `make` and `compute` — use `build`/`create` and `get`/`resolve` respectively.
+    * **Type suffixes:** Use consistent suffixes for type names:
+        * `Options` — configuration passed to a function or constructor (e.g., `ActorsMcpServerOptions`, `SchemaGenerationOptions`).
+        * `Result` — return type of a function (e.g., `ActorDetailsResult`, `CallActorGetDatasetResult`).
+        * `Params` — input parameters grouped into an object (e.g., `ActorExecutionParams`, `ApifyRequestParams`).
+        * `Info` — read-only data describing an entity (e.g., `ActorInfo`, `PricingInfo`).
+        * `Context` — ambient state passed through a call chain (e.g., `ToolTelemetryContext`).
+        * `Config` — static configuration shape (e.g., `WidgetConfig`).
+        * Do not use `Type` or `Kind` suffixes.
+    * **Collections:** Name arrays as plurals (e.g., `actorTools`, `PRICING_TIERS`). Suffix Sets with `_SET` or use a descriptive plural (e.g., `CATEGORY_NAME_SET`, `SKYFIRE_ENABLED_TOOLS`). Name Maps and Records descriptively (e.g., `WIDGET_REGISTRY`, `LOG_LEVEL_MAP`).
     * **Units:** Suffix with the unit of measure (e.g., `externalCostUsd`, `intervalMillis`).
     * **Date/Time:** Suffix with `At` (e.g., `updateStartedAt`, `paidAt`).
     * **Zod Validators:** Suffix with `Validator`.
