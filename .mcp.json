@@ -19,14 +19,16 @@
             "command": "node",
             "args": ["dist/stdio.js"],
             "env": {
-                "APIFY_TOKEN": "${APIFY_TOKEN}"
+                "APIFY_TOKEN": "${APIFY_TOKEN}",
+                "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}"
             }
         },
         "stdio-full": {
             "command": "node",
             "args": ["dist/stdio.js", "--tools=actors,docs,experimental,runs,storage,apify/rag-web-browser"],
             "env": {
-                "APIFY_TOKEN": "${APIFY_TOKEN}"
+                "APIFY_TOKEN": "${APIFY_TOKEN}",
+                "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}"
             }
         }
     }
