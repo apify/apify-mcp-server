@@ -22,8 +22,10 @@ import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js'
 const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
 
 /**
- * Widget-only input: `actor` only. `.strict()` rejects stray keys such as `output`
- * so callers can't smuggle the base tool's options into the widget variant.
+ * Widget-only input: `actor` only. `additionalProperties: false` + AJV's
+ * `removeAdditional: true` means stray keys like `output` are silently stripped
+ * at the server boundary; the `.strict()` Zod parse below is belt-and-braces
+ * for any path that bypasses AJV.
  */
 const fetchActorDetailsWidgetArgsSchema = z.object({
     actor: z.string()

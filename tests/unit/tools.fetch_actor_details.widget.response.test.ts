@@ -10,8 +10,9 @@ import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
  * Apps / UI mode: fetch-actor-details-widget renders an interactive UI element
- * (widget) with only `{ actorDetails: { actorInfo, readme } }` in structuredContent
- * and carries widget `_meta` on both the tool definition and the response.
+ * (widget) with `{ actorDetails: { actorInfo, actorCard, readme } }` in
+ * structuredContent and carries widget `_meta` on both the tool definition and
+ * the response.
  */
 vi.mock('../../src/utils/actor_details.js', async () => {
     const actual = await vi.importActual<Record<string, unknown>>(
@@ -61,7 +62,7 @@ describe('fetch-actor-details-widget response', () => {
         vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
-    it('returns only { actorDetails: { actorInfo, readme } } as structuredContent plus widget _meta', async () => {
+    it('returns { actorDetails: { actorInfo, actorCard, readme } } as structuredContent plus widget _meta', async () => {
         vi.mocked(fetchActorDetails).mockResolvedValue(MOCK_DETAILS);
 
         const result = await (fetchActorDetailsWidgetTool as HelperTool).call(
@@ -69,7 +70,9 @@ describe('fetch-actor-details-widget response', () => {
         );
 
         const { structuredContent, content, _meta } = result as {
-            structuredContent: { actorDetails?: { actorInfo?: unknown; readme?: string } } & Record<string, unknown>;
+            structuredContent: {
+                actorDetails?: { actorInfo?: unknown; actorCard?: string; readme?: string };
+            } & Record<string, unknown>;
             content: { type: string; text: string }[];
             _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
         };
@@ -78,6 +81,7 @@ describe('fetch-actor-details-widget response', () => {
         expect(Object.keys(structuredContent)).toEqual(['actorDetails']);
         expect(structuredContent.actorDetails).toBeDefined();
         expect(structuredContent.actorDetails!.actorInfo).toBeDefined();
+        expect(typeof structuredContent.actorDetails!.actorCard).toBe('string');
         expect(typeof structuredContent.actorDetails!.readme).toBe('string');
         expect(structuredContent.actorDetails!.readme!.length).toBeGreaterThan(0);
 

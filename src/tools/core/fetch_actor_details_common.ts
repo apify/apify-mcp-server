@@ -76,7 +76,9 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
 }
 
 /**
- * Zod schema for fetch-actor-details arguments — shared between default and apps variants.
+ * Zod schema for fetch-actor-details arguments — used by the mode-independent
+ * base tool. The `-widget` sibling has its own `actor`-only schema in
+ * `src/tools/apps/fetch_actor_details_widget.ts`.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -102,8 +104,9 @@ EXAMPLES:
 - What tools does apify/actors-mcp-server provide?`;
 
 /**
- * Shared tool metadata for fetch-actor-details — everything except the `call` handler.
- * Used by both default and apps variants.
+ * Tool metadata for the mode-independent `fetch-actor-details` — everything
+ * except the `call` handler. No widget `_meta`; the `-widget` sibling (apps-only)
+ * carries its own widget metadata.
  */
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
