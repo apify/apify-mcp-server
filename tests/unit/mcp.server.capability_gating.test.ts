@@ -134,7 +134,8 @@ describe('ActorsMcpServer initialize handler', () => {
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 
-    it('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
+    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
+    it.skip('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 

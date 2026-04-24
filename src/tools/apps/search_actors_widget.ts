@@ -17,8 +17,9 @@ import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Widget-only input: mirrors the base tool's keywords/limit/offset. `.strict()`
- * rejects stray keys so callers can't smuggle base-tool options into the widget
- * variant.
+ * marks additional properties as disallowed; in practice the server's AJV layer
+ * strips unknown keys before this schema runs, so stray keys are removed silently
+ * rather than causing a hard rejection.
  */
 const searchActorsWidgetArgsSchema = searchActorsBaseArgsSchema.strict();
 

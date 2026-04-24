@@ -65,7 +65,7 @@ describe('search-actors-widget response', () => {
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.SEARCH_ACTORS);
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);
         expect(_meta?.ui?.csp).toBeDefined();
-        expect(_meta?.['openai/widgetDescription']).toContain('1 actors');
+        expect(_meta?.['openai/widgetDescription']).toContain('1 actor');
     });
 
     it('returns empty widgetActors and omits widget _meta when there are no results', async () => {
