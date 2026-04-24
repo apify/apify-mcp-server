@@ -135,7 +135,6 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
                 isAsync: true,
                 mcpSessionId: toolArgs.mcpSessionId,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH,
             });
         }
     },
