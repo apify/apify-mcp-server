@@ -118,7 +118,7 @@ describe('call-actor-widget response', () => {
         expect(meta.ui?.csp).toBeDefined();
     });
 
-    it('declares a strict input schema rejecting stray keys like async/previewOutput', () => {
+    it('declares a strict input schema that silently strips stray keys like async/previewOutput', () => {
         const tool = appsCallActorWidget as HelperTool;
 
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
@@ -144,5 +144,23 @@ describe('call-actor-widget response', () => {
         const tool = appsCallActorWidget as HelperTool;
         const ok = tool.ajvValidate({ actor: 'apify/rag-web-browser', input: { query: 'test' } });
         expect(ok).toBe(true);
+    });
+
+    it('rejects MCP "actor:toolName" syntax and points at call-actor', async () => {
+        const startSpy = vi.fn();
+        const apifyClient = stubApifyClient(startSpy);
+
+        const result = await (appsCallActorWidget as HelperTool).call(stubArgs(
+            { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
+            apifyClient,
+        ));
+
+        const { content, isError } = result as { content: { type: string; text: string }[]; isError?: boolean };
+        expect(isError).toBe(true);
+        expect(startSpy).not.toHaveBeenCalled();
+        const joined = content.map((c) => c.text).join(' ');
+        expect(joined).toContain('call-actor-widget');
+        expect(joined).toContain('call-actor');
+        expect(joined).toContain('actorName:toolName');
     });
 });

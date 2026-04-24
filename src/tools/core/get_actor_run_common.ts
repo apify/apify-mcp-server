@@ -24,12 +24,9 @@ export const getActorRunArgs = z.object({
 const GET_ACTOR_RUN_DESCRIPTION = `Get detailed information about a specific Actor run by runId.
 The results will include run metadata (status, timestamps), performance stats, and resource IDs (datasetId, keyValueStoreId, requestQueueId).
 
-CRITICAL WARNING: NEVER call this tool immediately after call-actor in UI mode. The call-actor response includes a widget that automatically polls for updates. Calling this tool after call-actor is FORBIDDEN and unnecessary.
-
 USAGE:
-- Use ONLY when user explicitly asks about a specific run's status or details.
-- Use ONLY for runs that were started outside the current conversation.
-- DO NOT use this tool as part of the call-actor workflow in UI mode.
+- Use when the user asks about a specific run's status or details.
+- Use to check the status of a run started with call-actor (e.g., before fetching output).
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)

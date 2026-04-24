@@ -6,9 +6,9 @@
  * see widget tool names like `search-actors-widget` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
  *
- * Note: the `-widget` suffix split is rolling out per-tool.
- * `fetch-actor-details` and `search-actors` are already split; `call-actor` and
- * `get-actor-run` still render widgets on their base names until their own splits land.
+ * Note: the `-widget` suffix split is rolling out per-tool. `fetch-actor-details`,
+ * `search-actors`, and `call-actor` are already split; `get-actor-run` still renders
+ * a widget on its base name until its own split lands.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -61,10 +61,11 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 - \`${HelperTools.ACTOR_CALL}\`:
   - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.
   - Then call with proper input to execute the Actor.
-  - For MCP server Actors, use format "actorName:toolName" to call specific tools.
+  - For MCP server Actors, use format "actorName:toolName" to call specific tools.${isApps ? `
+  - In this mode \`${HelperTools.ACTOR_CALL}\` always runs asynchronously — it starts the run and returns immediately with a runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and \`${HelperTools.ACTOR_OUTPUT_GET}\` to fetch output once the run completes.` : `
   - Supports async execution via the \`async\` parameter:
     - \`async: false\` or unset: waits for completion and returns results immediately.
-    - \`async: true\`: starts the run and returns immediately with a runId.
+    - \`async: true\`: starts the run and returns immediately with a runId.`}
 
 ### Tool disambiguation
 - **\`${HelperTools.ACTOR_OUTPUT_GET}\` vs \`${HelperTools.DATASET_GET_ITEMS}\`:**

@@ -7,6 +7,7 @@ import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import {
     buildCallActorErrorResponse,
@@ -17,17 +18,16 @@ import {
 import { callActorOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Widget-only input: `actor` + `input` + optional `callOptions`. `.strict()` rejects stray keys
- * (e.g. `async`, `previewOutput`) so callers can't smuggle the base tool's options into the
- * widget variant. The widget is always async.
+ * Widget-only input: `actor` + `input` + optional `callOptions`. `additionalProperties: false`
+ * + AJV's `removeAdditional: true` means stray keys like `async` or `previewOutput` are
+ * silently stripped at the server boundary; the `.strict()` Zod parse below is belt-and-braces
+ * for any path that bypasses AJV. The widget is always async.
+ *
+ * The widget variant does not support MCP `actor:toolName` syntax — use `call-actor` for that.
  */
 const callActorWidgetArgsSchema = z.object({
     actor: z.string()
-        .describe(dedent`
-            The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
-
-            For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
-        `),
+        .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
     callOptions: z.object({
@@ -92,7 +92,18 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
         openWorldHint: true,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const preResult = await callActorPreExecute(toolArgs);
+        const rawActor = toolArgs.args?.actor;
+        if (typeof rawActor === 'string' && rawActor.includes(':')) {
+            return buildMCPResponse({
+                texts: [
+                    `${HelperTools.ACTOR_CALL_WIDGET} does not render widgets for MCP tool calls.`,
+                    `Use ${HelperTools.ACTOR_CALL} for the "actorName:toolName" syntax.`,
+                ],
+                isError: true,
+            });
+        }
+
+        const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL_WIDGET });
         if ('earlyResponse' in preResult) {
             return preResult.earlyResponse;
         }

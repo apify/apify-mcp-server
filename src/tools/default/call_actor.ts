@@ -47,7 +47,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
         taskSupport: 'optional',
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const preResult = await callActorPreExecute(toolArgs);
+        const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL });
         if ('earlyResponse' in preResult) {
             return preResult.earlyResponse;
         }

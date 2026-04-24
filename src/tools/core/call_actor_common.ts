@@ -464,7 +464,10 @@ export async function resolveAndValidateActor(params: {
  * clients cannot pass a clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo:
  * e.g. trailing `` ` `` on `apify/rag-web-browser`).
  */
-export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
+export async function callActorPreExecute(
+    toolArgs: InternalToolArgs,
+    options: { route: string },
+): Promise<
     | { earlyResponse: object }
     | {
         parsed: CallActorParsedArgs;
@@ -474,7 +477,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 > {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
-    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: 'call-actor' });
+    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
     const parsed: CallActorParsedArgs = { ...parsedArgs, actor: actorName };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
