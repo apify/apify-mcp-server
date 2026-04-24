@@ -12,31 +12,25 @@ describe('call_actor_common', () => {
         it('builds the default description with public helper tools and sync guidance', () => {
             const description = buildCallActorDescription({
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH,
-                useInternalSearchWarning: false,
                 alwaysAsync: false,
             });
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`use ${HelperTools.STORE_SEARCH} to resolve the correct Actor first`);
+            expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
             expect(description).toContain('When `async: false` or not provided');
             expect(description).not.toContain('always runs asynchronously');
-            expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
         });
 
         it('builds the apps description with public search helper and async guidance', () => {
             const description = buildCallActorDescription({
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH,
-                useInternalSearchWarning: false,
                 alwaysAsync: true,
             });
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`use ${HelperTools.STORE_SEARCH} to resolve the correct Actor first`);
+            expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
             expect(description).toContain('always runs asynchronously');
             expect(description).toContain('do NOT poll or call any other tool');
-            expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
             expect(description).not.toContain('When `async: false` or not provided');
         });
     });
@@ -100,12 +94,11 @@ describe('call_actor_common', () => {
                 isAsync: false,
                 mcpSessionId: 'session-123',
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH,
             });
 
             expect(response.isError).toBe(true);
             const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH}`);
+            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(expect.objectContaining({
                 toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -122,11 +115,10 @@ describe('call_actor_common', () => {
                 error: new Error('boom'),
                 isAsync: true,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                storeSearchTool: HelperTools.STORE_SEARCH,
             });
 
             const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`using the tool: ${HelperTools.STORE_SEARCH}`);
+            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
             expect(response.toolTelemetry).toEqual(expect.objectContaining({
                 toolStatus: TOOL_STATUS.FAILED,

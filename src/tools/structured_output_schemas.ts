@@ -207,27 +207,28 @@ export const actorSearchOutputSchema = {
 };
 
 /**
- * Schema for widget search results (search-actors-widget tool)
+ * Schema for widget search results (search-actors-widget tool).
+ * `actors` mirrors the non-widget `actorSearchOutputSchema` shape (StructuredActorCard),
+ * `widgetActors` is the widget-formatted list (from `formatActorForWidget`), kept loose
+ * for the same reason `actorDetailsWidgetOutputSchema.actorInfo` is loose.
  */
 export const actorSearchWidgetOutputSchema = {
     type: 'object' as const,
     properties: {
         actors: {
             type: 'array' as const,
-            items: {
-                type: 'object' as const,
-                properties: {
-                    fullName: { type: 'string', description: 'Full Actor name (username/name)' },
-                    title: { type: 'string', description: 'Actor title' },
-                    description: { type: 'string', description: 'Actor description' },
-                },
-                required: ['fullName'],
-            },
+            items: actorInfoSchema,
+            description: 'List of Actor cards matching the search query',
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
+        widgetActors: {
+            type: 'array' as const,
+            items: { type: 'object' as const, description: 'Widget-formatted Actor (tier-aware pricing, widget display fields).' },
+            description: 'Widget-formatted Actor list for UI rendering',
+        },
     },
-    required: ['actors', 'query', 'count'],
+    required: ['actors', 'query', 'count', 'widgetActors'],
 };
 
 export const searchApifyDocsToolOutputSchema = {

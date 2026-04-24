@@ -2555,7 +2555,7 @@ export function createIntegrationTestsSuite(
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_INTERNAL);
+            expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
             expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             for (const toolName of [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]) {
                 const tool = tools.tools.find((t) => t.name === toolName);

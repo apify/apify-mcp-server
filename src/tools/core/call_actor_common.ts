@@ -49,8 +49,6 @@ export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 
 type CallActorDescriptionParams = {
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    storeSearchTool: HelperTools.STORE_SEARCH;
-    useInternalSearchWarning: boolean;
     alwaysAsync: boolean;
 };
 
@@ -79,28 +77,22 @@ type CallActorErrorResponseParams = {
     isAsync: boolean;
     mcpSessionId?: string;
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    storeSearchTool: HelperTools.STORE_SEARCH;
 };
 
 export function buildCallActorDescription(params: CallActorDescriptionParams): string {
-    const { actorGetDetailsTool, storeSearchTool, useInternalSearchWarning, alwaysAsync } = params;
+    const { actorGetDetailsTool, alwaysAsync } = params;
 
     const sections: string[] = [];
 
     sections.push('Call any Actor from the Apify Store.');
 
-    const workflowLines = dedent`
+    sections.push(dedent`
         WORKFLOW:
         1. Use ${actorGetDetailsTool} to get the Actor's input schema
         2. Call this tool with the actor name and proper input based on the schema
 
-        If the actor name is not in "username/name" format, use ${storeSearchTool} to resolve the correct Actor first.
-    `;
-    if (useInternalSearchWarning) {
-        sections.push(`${workflowLines}\nDo NOT use ${HelperTools.STORE_SEARCH} for name resolution when the next step is running an Actor.`);
-    } else {
-        sections.push(workflowLines);
-    }
+        If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
+    `);
 
     sections.push(CALL_ACTOR_MCP_SERVER_SECTION);
 
@@ -194,7 +186,6 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         isAsync,
         mcpSessionId,
         actorGetDetailsTool,
-        storeSearchTool,
     } = params;
 
     const errMsg = error instanceof Error ? error.message : String(error);
@@ -210,7 +201,8 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         texts: [
             `Failed to call Actor '${actorName}': ${errMsg}.`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
-            `You can search for available Actors using the tool: ${storeSearchTool}, or get Actor details using: ${actorGetDetailsTool}.`,
+            // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
+            `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to + search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
         ],
         isError: true,
         telemetry: {

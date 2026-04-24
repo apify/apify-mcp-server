@@ -3,13 +3,12 @@
  *
  * Apps-only sections (widget workflow, widget tool disambiguation) are included
  * only when the resolved server mode is `'apps'`. Default-mode clients never
- * see tool names like `search-actors-internal` or `fetch-actor-details-widget`,
+ * see widget tool names like `search-actors-widget` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
  *
  * Note: the `-widget` suffix split is rolling out per-tool.
- * `fetch-actor-details-widget` is the first split; `call-actor`, `search-actors`,
- * and `get-actor-run` still render widgets on their base names until their own
- * splits land.
+ * `fetch-actor-details` and `search-actors` are already split; `call-actor` and
+ * `get-actor-run` still render widgets on their base names until their own splits land.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -55,7 +54,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 
 - **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after a widget-backed \`${HelperTools.ACTOR_CALL}\` response.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
 - When \`${HelperTools.ACTOR_CALL}\` runs without a widget (the tool response is plain text / structured data only), polling \`${HelperTools.ACTOR_RUNS_GET}\` for status is expected.
-- The \`-widget\` suffix split is rolling out per-tool (\`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` already split); until the rest split, widget rendering happens on the base \`${HelperTools.ACTOR_CALL}\`, \`${HelperTools.STORE_SEARCH}\`, and \`${HelperTools.ACTOR_RUNS_GET}\` tool names when the client supports it.
+- The \`-widget\` suffix split is rolling out per-tool (\`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` and \`${HelperTools.STORE_SEARCH_WIDGET}\` already split); until the rest split, widget rendering happens on the base \`${HelperTools.ACTOR_CALL}\` and \`${HelperTools.ACTOR_RUNS_GET}\` tool names when the client supports it.
 ` : ''}
 ## Tool dependencies and disambiguation
 
