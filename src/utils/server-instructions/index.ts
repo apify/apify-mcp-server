@@ -5,10 +5,6 @@
  * only when the resolved server mode is `'apps'`. Default-mode clients never
  * see widget tool names like `search-actors-widget` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
- *
- * Note: the `-widget` suffix split is rolling out per-tool. `fetch-actor-details`,
- * `search-actors`, and `call-actor` are already split; `get-actor-run` still renders
- * a widget on its base name until its own split lands.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -52,7 +48,7 @@ ${isApps ? `
 ## Widget workflow (applies when tool responses include widget metadata)
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
-- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\`.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
+- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status.
 - Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` (the silent async variant, no widget) is fine — that tool renders no UI, so polling is expected when you need the run status.
 ` : ''}
 ## Tool dependencies and disambiguation
