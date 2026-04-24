@@ -14,6 +14,7 @@
     <a href="https://www.npmjs.com/package/@apify/actors-mcp-server" rel="nofollow"><img src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" alt="Downloads" data-canonical-src="https://img.shields.io/npm/dm/@apify/actors-mcp-server.svg" style="max-width: 100%;"></a>
     <a href="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml"><img src="https://github.com/apify/actors-mcp-server/actions/workflows/check.yaml/badge.svg?branch=master" alt="Build Status" style="max-width: 100%;"></a>
     <a href="https://smithery.ai/server/@apify/mcp"><img src="https://smithery.ai/badge/@apify/mcp" alt="smithery badge"></a>
+    <a href="https://kiro.dev/launch/mcp/add?name=apify&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22%40apify%2Factors-mcp-server%22%5D%2C%22env%22%3A%7B%22APIFY_TOKEN%22%3A%22your-apify-token%22%7D%7D"><img src="https://kiro.dev/images/add-to-kiro.svg" alt="Add to Kiro"></a>
 </p>
 
 
@@ -82,6 +83,24 @@ Update your MCP client config before April 1, 2026.
 Apify MCP Server is dropping Server-Sent Events (SSE) transport in favor of Streamable HTTP, in line with the official MCP spec.
 
 Go to [mcp.apify.com](https://mcp.apify.com/) to update the installation for your client of choice, with a valid endpoint.
+
+### Kiro
+
+To install in [Kiro](https://kiro.dev), click the badge at the top of this README or manually add the following to your Kiro MCP config file (`.kiro/settings/mcp.json` or `~/.kiro/settings/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "apify": {
+      "command": "npx",
+      "args": ["@apify/actors-mcp-server"],
+      "env": {
+        "APIFY_TOKEN": "your-apify-token"
+      }
+    }
+  }
+}
+```
 
 # 🤖 MCP clients
 
