@@ -10,7 +10,6 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
-    buildSearchActorsEmptyResponse,
     buildSearchActorsResult,
     searchActorsBaseArgsSchema,
 } from '../core/search_actors_common.js';
@@ -73,7 +72,22 @@ export const searchActorsWidgetTool: ToolEntry = Object.freeze({
         ]);
 
         if (actors.length === 0) {
-            return buildSearchActorsEmptyResponse(parsed.keywords);
+            // Honor the widget tool's declared outputSchema: widgetActors is required, so
+            // emit an empty array rather than dropping the field.
+            const instructions = dedent`
+                No Actors were found for the search query "${parsed.keywords}".
+                You MUST retry with broader, more generic keywords - use just the platform name
+                (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
+            `;
+            return buildMCPResponse({
+                texts: [instructions],
+                structuredContent: {
+                    actors: [],
+                    query: parsed.keywords,
+                    count: 0,
+                    widgetActors: [],
+                },
+            });
         }
 
         const { actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);

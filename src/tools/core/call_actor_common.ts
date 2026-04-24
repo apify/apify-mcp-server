@@ -202,7 +202,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
             `Failed to call Actor '${actorName}': ${errMsg}.`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
-            `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to + search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
+            `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
         ],
         isError: true,
         telemetry: {

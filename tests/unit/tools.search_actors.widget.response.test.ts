@@ -68,7 +68,7 @@ describe('search-actors-widget response', () => {
         expect(_meta?.['openai/widgetDescription']).toContain('1 actors');
     });
 
-    it('omits widget _meta when there are no results (same empty payload as default)', async () => {
+    it('returns empty widgetActors and omits widget _meta when there are no results', async () => {
         vi.mocked(searchAndFilterActors).mockResolvedValue([]);
 
         const result = await (searchActorsWidgetTool as HelperTool).call(stubInternalToolArgs({
@@ -82,8 +82,7 @@ describe('search-actors-widget response', () => {
                 actors: unknown[];
                 query: string;
                 count: number;
-                instructions: string;
-                widgetActors?: unknown;
+                widgetActors: unknown[];
             };
             content: { type: string; text: string }[];
             _meta?: unknown;
@@ -91,7 +90,7 @@ describe('search-actors-widget response', () => {
 
         expect(structuredContent.actors).toEqual([]);
         expect(structuredContent.count).toBe(0);
-        expect(structuredContent.widgetActors).toBeUndefined();
+        expect(structuredContent.widgetActors).toEqual([]);
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(_meta).toBeUndefined();
