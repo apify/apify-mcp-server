@@ -2,6 +2,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
@@ -19,6 +20,7 @@ export type McpClientOptions = {
     };
     serverMode?: string; // Raw server-mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
     payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
+    clientCapabilities?: ClientCapabilities; // Extra capabilities advertised by the client during initialize
 }
 
 function checkApifyToken(): void {
@@ -72,6 +74,7 @@ export async function createMcpSseClient(
         name: options?.clientName || 'sse-client',
         version: '1.0.0',
     });
+    if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
     await client.connect(transport);
 
     return client;
@@ -100,6 +103,7 @@ export async function createMcpStreamableClient(
         name: options?.clientName || 'streamable-http-client',
         version: '1.0.0',
     });
+    if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
     await client.connect(transport);
 
     return client;
@@ -171,6 +175,7 @@ export async function createMcpStdioClient(
         name: options?.clientName || 'stdio-client',
         version: '1.0.0',
     });
+    if (options?.clientCapabilities) client.registerCapabilities(options.clientCapabilities);
     await client.connect(transport);
 
     return client;

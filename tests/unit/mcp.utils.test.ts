@@ -105,12 +105,12 @@ describe('MCP resources', () => {
 
     it('lists the Skyfire readme only when enabled', async () => {
         const skyfireService = createResourceService({
-            mode: 'default',
+            getMode: () => 'default',
             paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
         const defaultService = createResourceService({
-            mode: 'default',
+            getMode: () => 'default',
             paymentProvider: undefined,
             getAvailableWidgets: () => new Map(),
         });
@@ -128,7 +128,7 @@ describe('MCP resources', () => {
             [WIDGET_URIS.ACTOR_RUN, buildAvailableWidget(WIDGET_URIS.ACTOR_RUN, false)],
         ]);
         const service = createResourceService({
-            mode: 'apps',
+            getMode: () => 'apps',
             getAvailableWidgets: () => widgets,
         });
 
@@ -139,7 +139,7 @@ describe('MCP resources', () => {
 
     it('returns a plain-text message for missing resources', async () => {
         const service = createResourceService({
-            mode: 'default',
+            getMode: () => 'default',
             getAvailableWidgets: () => new Map(),
         });
 
@@ -151,7 +151,7 @@ describe('MCP resources', () => {
 
     it('returns the Skyfire readme content when requested', async () => {
         const service = createResourceService({
-            mode: 'default',
+            getMode: () => 'default',
             paymentProvider: await resolvePaymentProvider('skyfire'),
             getAvailableWidgets: () => new Map(),
         });
@@ -164,7 +164,7 @@ describe('MCP resources', () => {
 
     it('returns a plain-text message for unknown widgets', async () => {
         const service = createResourceService({
-            mode: 'apps',
+            getMode: () => 'apps',
             getAvailableWidgets: () => new Map(),
         });
 
@@ -183,7 +183,7 @@ describe('MCP resources', () => {
             [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
         ]);
         const service = createResourceService({
-            mode: 'apps',
+            getMode: () => 'apps',
             getAvailableWidgets: () => widgets,
         });
 
@@ -196,7 +196,7 @@ describe('MCP resources', () => {
 
     it('returns an empty resource templates list', async () => {
         const service = createResourceService({
-            mode: 'default',
+            getMode: () => 'default',
             getAvailableWidgets: () => new Map(),
         });
 

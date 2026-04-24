@@ -409,21 +409,39 @@ export type ServerMode = (typeof ServerMode)[keyof typeof ServerMode];
 export const SERVER_MODES: readonly ServerMode[] = Object.values(ServerMode);
 
 /**
- * Parse an untrusted raw mode string (from CLI flag, env var, or URL param) into a {@link ServerMode}.
+ * Server mode option — a concrete {@link ServerMode} or `'auto'` to resolve from
+ * the client's `initialize` capabilities at connection time.
+ */
+export type ServerModeOption = ServerMode | 'auto';
+
+/**
+ * Parse an untrusted raw mode string (from CLI flag, env var, or URL param) into a {@link ServerModeOption}.
  *
  * Accepts:
  * - `'default'` / `'apps'` — canonical values
- * - `'true'` / `'false'` — CLI shorthand for `'apps'` / `'default'`
+ * - `'true'` / `'on'` / `'false'` / `'off'` — CLI shorthand
+ * - `'auto'` — resolve from client capabilities (default for missing/unknown input)
  * - `'openai'` — deprecated alias for `'apps'` (pre-MCP-Apps naming); silently normalized
  *
- * Returns `undefined` for invalid input; the caller should fall back to `ServerMode.DEFAULT`.
- * Use at ingestion boundaries only — the internal API type is `ServerMode`.
+ * Missing or unrecognized input returns `'auto'`, so a typo in an env var becomes
+ * capability-driven resolution instead of silently forcing default mode.
  */
-export function parseServerMode(rawMode: string | null | undefined): ServerMode | undefined {
-    if (!rawMode) return undefined;
-    if (rawMode === 'true' || rawMode === ServerMode.APPS || rawMode === 'openai') return ServerMode.APPS;
-    if (rawMode === 'false' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
-    return undefined;
+export function parseServerMode(rawMode: string | null | undefined): ServerModeOption {
+    if (!rawMode) return 'auto';
+    if (rawMode === 'true' || rawMode === 'on' || rawMode === ServerMode.APPS || rawMode === 'openai') return ServerMode.APPS;
+    if (rawMode === 'false' || rawMode === 'off' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
+    if (rawMode === 'auto') return 'auto';
+    return 'auto';
+}
+
+/**
+ * Resolve a {@link ServerModeOption} to a concrete {@link ServerMode}.
+ * Concrete modes are returned as-is. `'auto'` resolves to {@link ServerMode.APPS}
+ * when the client advertises MCP Apps UI support, {@link ServerMode.DEFAULT} otherwise.
+ */
+export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): ServerMode {
+    if (option !== 'auto') return option;
+    return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
 }
 
 /**
@@ -565,9 +583,11 @@ export type ActorsMcpServerOptions = {
     token?: string;
     /**
      * Server mode — controls tool variants and response formats. See {@link ServerMode}.
-     * Defaults to `ServerMode.DEFAULT` when unset.
+     * Pass `'auto'` (or omit) to resolve from the client's `initialize` capabilities;
+     * pass `'default'` or `'apps'` to force a specific mode and skip auto-detect.
+     * Defaults to `'auto'` when unset.
      */
-    serverMode?: ServerMode;
+    serverMode?: ServerModeOption;
     /**
      * @deprecated Use `serverMode` instead.
      */

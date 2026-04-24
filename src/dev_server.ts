@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import type { InitializeRequest, JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
 import express from 'express';
 
@@ -75,7 +75,8 @@ export function createExpressApp(): express.Express {
                 ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                 ?? true;
 
-            const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
+            const uiParam = urlParams.get('ui');
+            const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
 
             // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
             const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
@@ -95,32 +96,28 @@ export function createExpressApp(): express.Express {
             // Generate a unique session ID for this SSE connection
             const mcpSessionId = transport.sessionId;
 
-            // Load MCP server tools
             const apifyToken = process.env.APIFY_TOKEN as string;
-            log.debug('Loading tools from URL', { mcpSessionId: transport.sessionId, tr: TransportType.SSE });
             const apifyClient = new ApifyClient({ token: apifyToken });
+            // Fetch actor metadata and queue mode-agnostic sources. Composed with
+            // the final mode inside the initialize request handler.
             await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
             transportsSSE[transport.sessionId] = transport;
             mcpServers[transport.sessionId] = mcpServer;
 
-            // Create a proxy for transport.onmessage to inject session ID into all requests
-            const originalOnMessage = transport.onmessage;
-            transport.onmessage = (message: JSONRPCMessage) => {
-                const msgRecord = message as Record<string, unknown>;
-                // Inject session ID into all requests with params
-                if (msgRecord.params) {
-                    const params = msgRecord.params as ApifyRequestParams;
-                    params._meta ??= {};
-                    params._meta.mcpSessionId = mcpSessionId;
-                }
-                // Call the original onmessage handler
-                if (originalOnMessage) {
-                    originalOnMessage(message);
-                }
-            };
-
             await mcpServer.connect(transport);
+
+            const sdkOnMessage = transport.onmessage as ((msg: JSONRPCMessage, extra?: unknown) => void) | undefined;
+            transport.onmessage = (message, extra) => {
+                const msgRecord = message as Record<string, unknown>;
+                if (!msgRecord.params || typeof msgRecord.params !== 'object' || Array.isArray(msgRecord.params)) {
+                    msgRecord.params = {};
+                }
+                const params = msgRecord.params as ApifyRequestParams;
+                params._meta ??= {};
+                params._meta.mcpSessionId = mcpSessionId;
+                sdkOnMessage?.(message, extra);
+            };
 
             res.on('close', () => {
                 log.info('Connection closed, cleaning up', {
@@ -193,7 +190,6 @@ export function createExpressApp(): express.Express {
                     req.body.params._meta.mcpSessionId = sessionId;
                 }
             } else if (!sessionId && isInitializeRequest(req.body)) {
-                // New initialization request
                 transport = new StreamableHTTPServerTransport({
                     sessionIdGenerator: () => randomUUID(),
                     enableJsonResponse: false, // Use SSE response mode
@@ -206,7 +202,8 @@ export function createExpressApp(): express.Express {
                     ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
                     ?? true;
 
-                const serverMode = parseServerMode(urlParams.get('ui')) ?? parseServerMode(process.env.UI_MODE);
+                const uiParam = urlParams.get('ui');
+                const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
 
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
                 const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
@@ -214,7 +211,6 @@ export function createExpressApp(): express.Express {
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
                     setupSigintHandler: false,
-                    initializeRequestData: req.body as InitializeRequest,
                     transportType: 'http',
                     telemetry: {
                         enabled: telemetryEnabled,
@@ -223,16 +219,13 @@ export function createExpressApp(): express.Express {
                     paymentProvider,
                 });
 
-                // Load MCP server tools
                 const apifyToken = process.env.APIFY_TOKEN as string;
-                log.debug('Loading tools from URL', { mcpSessionId: transport.sessionId, tr: TransportType.HTTP });
                 const apifyClient = new ApifyClient({ token: apifyToken });
+                // Fetch actor metadata and queue mode-agnostic sources. Composed with
+                // the final mode inside the initialize request handler.
                 await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
-                // Connect the transport to the MCP server BEFORE handling the request
                 await mcpServer.connect(transport);
-
-                // After handling the request, if we get a session ID back, store the transport
                 await transport.handleRequest(req, res, req.body);
 
                 // Store the transport by session ID for future requests

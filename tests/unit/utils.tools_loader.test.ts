@@ -2,7 +2,7 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
+import { loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
@@ -34,5 +34,24 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
         expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+    });
+});
+
+describe('toolNamesToInput', () => {
+    it('should keep internal tool names in tools and move actor names to actors', () => {
+        expect(toolNamesToInput([
+            HelperTools.STORE_SEARCH,
+            'apify/rag-web-browser',
+        ])).toEqual({
+            tools: [HelperTools.STORE_SEARCH],
+            actors: ['apify/rag-web-browser'],
+        });
+    });
+
+    it('should suppress default categories when restoring only actor tools', () => {
+        expect(toolNamesToInput(['apify/rag-web-browser'])).toEqual({
+            tools: [],
+            actors: ['apify/rag-web-browser'],
+        });
     });
 });
