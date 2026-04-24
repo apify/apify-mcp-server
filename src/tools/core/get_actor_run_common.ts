@@ -27,6 +27,7 @@ The results will include run metadata (status, timestamps), performance stats, a
 USAGE:
 - Use when the user asks about a specific run's status or details.
 - Use to check the status of a run started with call-actor (e.g., before fetching output).
+- If you used call-actor-widget and a widget was rendered, do not poll get-actor-run; the widget handles status.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
