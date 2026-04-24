@@ -18,10 +18,12 @@ import {
 import { callActorOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Widget-only input: `actor` + `input` + optional `callOptions`. `additionalProperties: false`
- * + AJV's `removeAdditional: true` means stray keys like `async` or `previewOutput` are
- * silently stripped at the server boundary; the `.strict()` Zod parse below is belt-and-braces
- * for any path that bypasses AJV. The widget is always async.
+ * Widget-only input: `actor` + `input` + optional `callOptions`.
+ *
+ * This schema is declared as `.strict()` so the widget tool's contract excludes stray keys
+ * such as `async` or `previewOutput`. AJV may also remove unknown properties at the server
+ * boundary, but any non-AJV execution path must explicitly parse with this schema in the
+ * handler to enforce the same runtime contract. The widget is always async.
  *
  * The widget variant does not support MCP `actor:toolName` syntax — use `call-actor` for that.
  */
