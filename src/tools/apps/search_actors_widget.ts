@@ -115,7 +115,7 @@ export const searchActorsWidgetTool: ToolEntry = Object.freeze({
             // Response-level meta; only returned in apps mode (this handler is apps-only).
             _meta: {
                 ...widgetConfig?.meta,
-                'openai/widgetDescription': `Interactive actor search results showing ${actors.length} actors from Apify Store`,
+                'openai/widgetDescription': `Interactive actor search results showing ${actors.length} ${actors.length === 1 ? 'actor' : 'actors'} from Apify Store`,
             },
         });
     },
