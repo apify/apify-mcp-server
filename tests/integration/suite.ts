@@ -2682,14 +2682,14 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should return required structuredContent fields for ActorSearch widget (search-actors)', async () => {
+        it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
                 serverMode: 'apps', // Enable UI mode to get widgetActors
             });
 
             const result = await client.callTool({
-                name: HelperTools.STORE_SEARCH,
+                name: HelperTools.STORE_SEARCH_WIDGET,
                 arguments: {
                     keywords: 'python',
                     limit: 5,
