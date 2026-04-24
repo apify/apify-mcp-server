@@ -2634,7 +2634,7 @@ export function createIntegrationTestsSuite(
             },
         );
 
-        it('should return required structuredContent fields for ActorRun widget (get-actor-run)', async () => {
+        it('should return required structuredContent fields for get-actor-run', async () => {
             client = await createClientFn({ tools: ['actors', 'runs'] });
 
             // First, start an async actor run to get a runId
