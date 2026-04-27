@@ -190,10 +190,6 @@ export function createExpressApp(): express.Express {
                     req.body.params._meta.mcpSessionId = sessionId;
                 }
             } else if (!sessionId && isInitializeRequest(req.body)) {
-                transport = new StreamableHTTPServerTransport({
-                    sessionIdGenerator: () => randomUUID(),
-                    enableJsonResponse: false, // Use SSE response mode
-                });
                 // Extract telemetry query parameters
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
@@ -225,14 +221,20 @@ export function createExpressApp(): express.Express {
                 // the final mode inside the initialize request handler.
                 await mcpServer.loadToolsFromUrl(req.url, apifyClient);
 
+                // SDK awaits onsessioninitialized before flushing InitializeResult, so registering
+                // the maps here closes the (single-process, narrow) window where a follow-up
+                // request could arrive before post-handleRequest map population runs.
+                transport = new StreamableHTTPServerTransport({
+                    sessionIdGenerator: () => randomUUID(),
+                    enableJsonResponse: false, // Use SSE response mode
+                    onsessioninitialized: (newSessionId) => {
+                        transports[newSessionId] = transport;
+                        mcpServers[newSessionId] = mcpServer;
+                    },
+                });
+
                 await mcpServer.connect(transport);
                 await transport.handleRequest(req, res, req.body);
-
-                // Store the transport by session ID for future requests
-                if (transport.sessionId) {
-                    transports[transport.sessionId] = transport;
-                    mcpServers[transport.sessionId] = mcpServer;
-                }
                 return; // Already handled
             } else {
                 // Invalid request - no session ID or not initialization request
