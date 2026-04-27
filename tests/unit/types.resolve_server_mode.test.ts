@@ -10,11 +10,13 @@ describe('resolveServerMode', () => {
         expect(resolveServerMode(ServerMode.DEFAULT, true)).toBe(ServerMode.DEFAULT);
     });
 
-    it('resolves auto to apps when client supports UI', () => {
+    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
+    it.skip('resolves auto to apps when client supports UI', () => {
         expect(resolveServerMode('auto', true)).toBe(ServerMode.APPS);
     });
 
-    it('resolves auto to default when client does not support UI', () => {
+    it('resolves auto to default regardless of client capabilities (auto-detect disabled)', () => {
         expect(resolveServerMode('auto', false)).toBe(ServerMode.DEFAULT);
+        expect(resolveServerMode('auto', true)).toBe(ServerMode.DEFAULT);
     });
 });
