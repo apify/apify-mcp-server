@@ -27,7 +27,7 @@ The results will include run metadata (status, timestamps), performance stats, a
 USAGE:
 - Use when the user asks about a specific run's status or details.
 - Use to check the status of a run started with call-actor (e.g., before fetching output).
-- If you used call-actor-widget and a widget was rendered, do not poll get-actor-run; the widget handles status.
+- For a visual progress widget, use ${HelperTools.ACTOR_RUNS_GET_WIDGET} instead.
 - Returns pure data with no UI.
 
 USAGE EXAMPLES:
@@ -46,7 +46,6 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
-    paymentRequired: true,
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
