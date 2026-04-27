@@ -14,8 +14,9 @@ import {
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Widget-only input: `runId` only. `.strict()` rejects stray keys so callers
- * can't smuggle extra options into the widget variant.
+ * Widget-only input: `runId` only. In the normal tool path, AJV validation
+ * runs first and strips unknown keys at the boundary; `.strict()` mainly
+ * protects any bypass paths by rejecting stray keys before use here.
  */
 const getActorRunWidgetArgsSchema = z.object({
     runId: z.string()
