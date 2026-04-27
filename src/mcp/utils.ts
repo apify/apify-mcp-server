@@ -1,6 +1,7 @@
 import { parse } from 'node:querystring';
 
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
+import type { Result } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
@@ -46,4 +47,27 @@ export async function isTaskCancelled(
 ): Promise<boolean> {
     const task = await taskStore.getTask(taskId, mcpSessionId);
     return task?.status === 'cancelled';
+}
+
+/**
+ * Stores a task result with a final statusMessage in one logical step.
+ *
+ * WARNING: This is NOT atomic. The SDK's storeTaskResult() does not accept a statusMessage,
+ * so we first call updateTaskStatus('working', message) then storeTaskResult(status, result).
+ * That creates a race: after the tool has already finished, tasks/cancel can still win before
+ * storeTaskResult() runs, and the computed result is lost. We keep this workaround so tasks/list
+ * shows the final statusMessage until the SDK supports atomic result + statusMessage storage.
+ */
+export async function storeTaskResultWithMessage(
+    taskStore: TaskStore,
+    taskId: string,
+    // Always 'completed' — the SDK's requestStream() only delivers results for 'completed' tasks;
+    // 'failed' tasks yield a generic error and discard the stored result. See res/task_status_workaround.md.
+    status: 'completed',
+    result: Result,
+    statusMessage: string,
+    sessionId?: string,
+): Promise<void> {
+    await taskStore.updateTaskStatus(taskId, 'working', statusMessage, sessionId);
+    await taskStore.storeTaskResult(taskId, status, result, sessionId);
 }

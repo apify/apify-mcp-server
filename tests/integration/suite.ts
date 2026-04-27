@@ -2446,6 +2446,42 @@ export function createIntegrationTestsSuite(
             await assertStatusMessagePropagated(client, stream);
         });
 
+        // Regression test for #638: final statusMessage must be ": completed" after task finishes,
+        // not a stale intermediate progress message like "Starting the crawler."
+        it('should set final statusMessage to "completed" after task finishes successfully', async () => {
+            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    arguments: {
+                        first_number: 7,
+                        second_number: 8,
+                    },
+                },
+                CallToolResultSchema,
+                {
+                    task: {
+                        ttl: 60000,
+                    },
+                },
+            );
+
+            let taskId: string | null = null;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    taskId = message.task.taskId;
+                } else if (message.type === 'error') {
+                    throw message.error;
+                }
+            }
+
+            expect(taskId).not.toBeNull();
+            const task = await client.experimental.tasks.getTask(taskId!);
+            expect(task.status).toBe('completed');
+            expect(task.statusMessage).toMatch(/: completed$/);
+        });
+
         it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
             client = await createClientFn({ useEnv: true, uiMode: 'openai' });
             const tools = await client.listTools();
@@ -2586,6 +2622,60 @@ export function createIntegrationTestsSuite(
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content[0].text).toContain('x402');
+
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        // This test verifies PR #680: payment-required errors are stored as 'completed' (not 'failed')
+        // so the SDK's requestStream() delivers the x402 payload to the client for auto-pay retry.
+        it.runIf(options.transport === 'streamable-http')(
+            'should return x402 payment error via task mode when calling paymentRequired tool without payment signature',
+            async () => {
+                client = await createClientFn({ tools: ['actors'], payment: 'x402' });
+
+                const stream = client.experimental.tasks.callToolStream(
+                    {
+                        name: HelperTools.ACTOR_CALL,
+                        arguments: {
+                            actor: ACTOR_PYTHON_EXAMPLE,
+                            input: { first_number: 1, second_number: 2 },
+                        },
+                    },
+                    CallToolResultSchema,
+                    { task: { ttl: 60000 } },
+                );
+
+                let taskCreated = false;
+                let resultReceived = false;
+                for await (const message of stream) {
+                    switch (message.type) {
+                        case 'taskCreated':
+                            taskCreated = true;
+                            expect(message.task.taskId).toBeDefined();
+                            break;
+                        case 'taskStatus':
+                            expect(['working', 'completed']).toContain(message.task.status);
+                            break;
+                        case 'result': {
+                            // x402 payment payload must reach the client — not a generic "Task X failed"
+                            expect(message.result.isError).toBe(true);
+                            const content = message.result.content as { text: string }[];
+                            expect(content[0].text).toContain('x402');
+                            resultReceived = true;
+                            break;
+                        }
+                        case 'error':
+                            // Must NOT throw — the PR guarantees task result is delivered, not discarded
+                            throw new Error(`Expected structured result delivery but got error: ${message.error.message}`);
+                        default:
+                            throw new Error(`Unknown message type: ${(message as unknown as { type: string }).type}`);
+                    }
+                }
+
+                expect(taskCreated).toBe(true);
+                expect(resultReceived).toBe(true);
 
                 await client.close();
             },

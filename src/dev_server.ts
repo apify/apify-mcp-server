@@ -317,6 +317,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         process.exit(1);
     }
 
+    log.setLevel(process.env.LOG_LEVEL === 'info' ? log.LEVELS.INFO : log.LEVELS.DEBUG);
+
     const HOST = process.env.HOST ?? 'http://localhost';
     const PORT = Number(process.env.PORT ?? 3001);
 
