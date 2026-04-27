@@ -460,7 +460,15 @@ export class ActorsMcpServer {
         }
     }
 
-    /** Load tools from a pre-parsed input. Queues when mode is `'auto'`; composed with the resolved mode in the initialize handler. */
+    /**
+     * Two-phase: getActors (async, mode-agnostic Apify fetch) then getToolsForServerMode
+     * (sync, mode-dependent compose). When mode is unresolved, queue actorTools and let
+     * the initialize handler compose them later.
+     *
+     * Don't move the getActors await into the initialize handler — clients time out
+     * waiting for InitializeResult. The queue buffers already-fetched data, not network
+     * work. See #721.
+     */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
         const actorTools = await getActors(input, apifyClient, this.actorStore);
         if (!this.serverModeResolved) {
