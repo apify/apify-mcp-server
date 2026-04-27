@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.9.21 - **not yet released**
 
+### 🚀 Features
+
+- Split fetch-actor-details into data + -widget tools ([#722](https://github.com/apify/apify-mcp-server/pull/722)) ([1a455a5](https://github.com/apify/apify-mcp-server/commit/1a455a58d761f4c7939bb010934b41321e43fccc)) by [@jirispilka](https://github.com/jirispilka), closes [#716](https://github.com/apify/apify-mcp-server/issues/716)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.20) (2026-04-27)
