@@ -22,7 +22,6 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import yargs from 'yargs';
 // Had to ignore the eslint import extension error for the yargs package.
 // Using .js or /index.js didn't resolve it due to the @types package issues.
@@ -36,11 +35,10 @@ import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
-import type { ApifyRequestParams, Input, TelemetryEnv, ToolSelector, UiMode } from './types.js';
-import { parseUiMode } from './types.js';
+import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
+import { parseServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
-import { loadToolsFromInput } from './utils/tools_loader.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -58,12 +56,13 @@ type CliArgs = {
     telemetryEnabled: boolean;
     /** Telemetry environment: 'PROD' or 'DEV' (default: 'PROD', only used when telemetry-enabled is true) */
     telemetryEnv: TelemetryEnv;
-    /** UI mode for tool responses.
-     * - 'true': Enable widget rendering (recommended)
-     * - 'openai': Alias for 'true' (deprecated)
-     * If not specified, there will be no widget rendering.
+    /** Server mode for tool responses.
+     * - `'apps'` / `'true'` / `'on'`: force MCP Apps widget rendering
+     * - `'default'` / `'false'` / `'off'`: force standard (non-widget) tool set
+     * - `'auto'` (default): resolve from the client's `initialize` capabilities
+     * - `'openai'`: deprecated alias for `'apps'`
      */
-    ui: UiMode;
+    ui: ServerModeOption;
 }
 
 /**
@@ -132,14 +131,15 @@ Only used when --telemetry-enabled is true`,
     })
     .option('ui', {
         default: undefined,
-        coerce: (arg: string | boolean | undefined) => {
+        coerce: (arg: string | boolean | undefined): ServerModeOption => {
             // Normalize: bare --ui flag (boolean true) or empty string both mean 'true'
             const normalized = arg === true || arg === '' ? 'true' : arg;
-            return parseUiMode((normalized as string) || process.env.UI_MODE);
+            return parseServerMode((normalized as string) || process.env.UI_MODE);
         },
-        describe: `UI mode for tool responses. Can also be set via UI_MODE environment variable.
---ui or --ui true: Enable widget rendering
-Default: undefined (no widget rendering)`,
+        describe: `Server mode. Can also be set via UI_MODE environment variable.
+--ui apps | --ui true | --ui on   : force MCP Apps widget rendering
+--ui default | --ui false | --ui off : force standard tool set
+--ui auto (default)               : resolve from client capabilities`,
     })
     .help('help')
     .alias('h', 'help')
@@ -202,7 +202,7 @@ async function main() {
             env: getTelemetryEnv(argv.telemetryEnv),
         },
         token: apifyToken,
-        uiMode: argv.ui,
+        serverMode: argv.ui,
         allowUnauthMode: !requiresAuthentication,
     });
 
@@ -217,10 +217,10 @@ async function main() {
     const normalizedInput = processInput(input);
 
     const apifyClient = new ApifyClient({ token: apifyToken });
-    // Use the shared tools loading logic
-    const tools = await loadToolsFromInput(normalizedInput, apifyClient, argv.ui ?? 'default');
-
-    mcpServer.upsertTools(tools);
+    // Fetch actor metadata and queue mode-agnostic sources. Sources are composed
+    // with the final mode inside the initialize request handler once the client's
+    // capabilities are known (see src/mcp/server.ts#setupInitializeHandler).
+    await mcpServer.loadToolsFromInput(normalizedInput, apifyClient);
 
     // Start server
     const transport = new StdioServerTransport();
@@ -230,17 +230,11 @@ async function main() {
     // so we generate a UUID4 to represent this single session interaction for telemetry tracking
     const mcpSessionId = randomUUID();
 
-    // Create a proxy for transport.onmessage to intercept and capture initialize request data
-    // This is a hacky way to inject client information into the ActorsMcpServer class
-    const originalOnMessage = transport.onmessage;
+    await mcpServer.connect(transport);
 
-    transport.onmessage = (message: JSONRPCMessage) => {
-        // Extract client information from initialize message
+    const sdkOnMessage = transport.onmessage;
+    transport.onmessage = (message) => {
         const msgRecord = message as Record<string, unknown>;
-        if (msgRecord.method === 'initialize') {
-            // Update mcpServer options with initialize request data
-            (mcpServer.options as Record<string, unknown>).initializeRequestData = msgRecord as Record<string, unknown>;
-        }
         // Inject session ID into all requests for task isolation and session tracking.
         // CRITICAL: Always create params object if missing (some requests like listTasks/getTasks don't have params),
         // otherwise mcpSessionId injection fails, breaking session isolation in multi-node setups.
@@ -249,13 +243,8 @@ async function main() {
         params._meta.mcpSessionId = mcpSessionId;
         msgRecord.params = params;
 
-        // Call the original onmessage handler
-        if (originalOnMessage) {
-            originalOnMessage(message);
-        }
+        sdkOnMessage?.(message);
     };
-
-    await mcpServer.connect(transport);
 }
 
 main().catch(async (error) => {

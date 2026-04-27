@@ -388,43 +388,64 @@ export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_error_count'>;
 
 /**
- * Internal server mode that controls which tool variants, descriptions, and response
- * formats are served. Every internal call site (tool loading, category resolution,
- * server instructions) uses this type.
+ * Server mode — controls which tool variants, descriptions, and response formats are served.
  *
  * - `'default'` — standard MCP tools for generic clients (sync/async execution, text responses)
- * - `'openai'` — OpenAI-specific tool variants (always-async execution, widget metadata)
+ * - `'apps'`    — MCP Apps tool variants (always-async execution, widget metadata)
  *
- * **Relationship to {@link UiMode}:** `ServerMode` is the internal representation;
- * `UiMode` is the external API surface exposed to callers (currently only `'openai'`).
- * The conversion happens in `ActorsMcpServer` constructor: `options.uiMode ?? 'default'`.
+ * The `'apps'` name comes from the [MCP Apps specification (2026-01-26)](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx),
+ * the open standard for widget-embedded UI in MCP clients. The value was previously
+ * named `'openai'` but is renamed here to reflect that the protocol is no longer
+ * OpenAI-specific; `'openai'` is kept as a deprecated alias at CLI/env ingestion
+ * (see {@link parseServerMode}) and is silently normalized to `'apps'`.
  */
-export type ServerMode = 'default' | 'openai';
+export const ServerMode = {
+    DEFAULT: 'default',
+    APPS: 'apps',
+} as const;
+export type ServerMode = (typeof ServerMode)[keyof typeof ServerMode];
 
 /** All valid server modes, for iteration in tests and caches. */
-export const SERVER_MODES: readonly ServerMode[] = ['default', 'openai'] as const;
+export const SERVER_MODES: readonly ServerMode[] = Object.values(ServerMode);
 
 /**
- * External API surface for selecting a UI mode — passed via `options.uiMode` in
- * {@link ActorsMcpServerOptions}. Excludes `'default'` because the absence of a
- * UI mode (`undefined`) maps to `ServerMode = 'default'` internally.
+ * Server mode option — a concrete {@link ServerMode} or `'auto'` to resolve from
+ * the client's `initialize` capabilities at connection time.
+ */
+export type ServerModeOption = ServerMode | 'auto';
+
+/**
+ * Parse an untrusted raw mode string (from CLI flag, env var, or URL param) into a {@link ServerModeOption}.
  *
- * **Relationship to {@link ServerMode}:** `UiMode` is a strict subset of `ServerMode`.
- * Callers set `uiMode?: UiMode`; the server normalizes it to `ServerMode` at construction.
+ * Accepts:
+ * - `'default'` / `'apps'` — canonical values
+ * - `'true'` / `'on'` / `'false'` / `'off'` — CLI shorthand
+ * - `'auto'` — resolve from client capabilities (default for missing/unknown input)
+ * - `'openai'` — deprecated alias for `'apps'` (pre-MCP-Apps naming); silently normalized
+ *
+ * Missing or unrecognized input returns `'auto'`, so a typo in an env var becomes
+ * capability-driven resolution instead of silently forcing default mode.
  */
-export type UiMode = Exclude<ServerMode, 'default'>;
-
-/** Set of valid UiMode values for O(1) membership checks at runtime. */
-const UI_MODES: ReadonlySet<string> = new Set<string>(SERVER_MODES.filter((m): m is UiMode => m !== 'default'));
+export function parseServerMode(rawMode: string | null | undefined): ServerModeOption {
+    if (!rawMode) return 'auto';
+    if (rawMode === 'true' || rawMode === 'on' || rawMode === ServerMode.APPS || rawMode === 'openai') return ServerMode.APPS;
+    if (rawMode === 'false' || rawMode === 'off' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
+    if (rawMode === 'auto') return 'auto';
+    return 'auto';
+}
 
 /**
- * Parse an untrusted string into a valid UiMode, returning `undefined` for invalid values.
- * Use at ingestion boundaries (URL params, env vars) to prevent invalid modes from propagating.
+ * Resolve a {@link ServerModeOption} to a concrete {@link ServerMode}.
+ * Concrete modes are returned as-is. `'auto'` resolves to {@link ServerMode.APPS}
+ * when the client advertises MCP Apps UI support, {@link ServerMode.DEFAULT} otherwise.
  */
-export function parseUiMode(value: string | null | undefined): UiMode | undefined {
-    if (!value) return undefined;
-    if (value === 'true') return 'openai'; // 'true' is the new standard; 'openai' is deprecated alias
-    return UI_MODES.has(value) ? (value as UiMode) : undefined;
+export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): ServerMode {
+    if (option !== 'auto') return option;
+    // TODO: re-enable auto-detect from client capabilities. Disabled for the
+    // initial release so APPS mode is opt-in via `?ui=apps` or `UI_MODE=apps`.
+    // return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
+    void clientSupportsUi;
+    return ServerMode.DEFAULT;
 }
 
 /**
@@ -461,7 +482,7 @@ export type ActorExecutionResult = {
 /**
  * Executor for direct actor tools (`type: 'actor'`).
  * Selected at server construction time based on serverMode.
- * Default mode runs synchronously; OpenAI mode runs async with widget metadata.
+ * Default mode runs synchronously; apps mode runs async with widget metadata.
  */
 export type ActorExecutor = {
     executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult>;
@@ -565,12 +586,16 @@ export type ActorsMcpServerOptions = {
      */
     token?: string;
     /**
-     * UI mode for tool responses.
-     * - 'openai': OpenAI specific widget rendering
-     * If not specified, defaults to 'default' mode (no widget rendering).
-     * Normalized to {@link ServerMode} at server construction.
+     * Server mode — controls tool variants and response formats. See {@link ServerMode}.
+     * Pass `'auto'` (or omit) to resolve from the client's `initialize` capabilities;
+     * pass `'default'` or `'apps'` to force a specific mode and skip auto-detect.
+     * Defaults to `'auto'` when unset.
      */
-    uiMode?: UiMode;
+    serverMode?: ServerModeOption;
+    /**
+     * @deprecated Use `serverMode` instead.
+     */
+    uiMode?: string;
 }
 
 export type StructuredActorCard = {

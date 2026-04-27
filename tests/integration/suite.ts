@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { ApifyClient } from '../../src/apify_client.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
+import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -255,7 +256,7 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            // Note: Internal tools (fetch-actor-details-internal, search-actors-internal) are only available in openai mode
+            // Note: Internal tools (fetch-actor-details-internal, search-actors-internal) are only available in apps mode
             const expectedActorsTools = [
                 'fetch-actor-details',
                 'search-actors',
@@ -1257,13 +1258,13 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema, 'fetch-actor-details');
         });
 
-        it('should return README content via fetch-actor-details-internal in openai mode', async () => {
+        it('should return README content via fetch-actor-details-internal in apps mode', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'openai',
+                serverMode: 'apps',
             });
 
-            // fetch-actor-details-internal is only available in openai mode
+            // fetch-actor-details-internal is only available in apps mode
             const result = await client.callTool({
                 name: 'fetch-actor-details-internal',
                 arguments: {
@@ -1658,7 +1659,7 @@ export function createIntegrationTestsSuite(
 
             const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
             // Only assert that all tools from the selected category are present.
-            // Note: UI category tools are only loaded in openai mode, so they won't be present in default mode
+            // Note: UI category tools are only loaded in apps mode, so they won't be present in default mode
             for (const expectedToolName of expectedToolNames) {
                 if (category !== 'ui') {
                     expect(toolNames).toContain(expectedToolName);
@@ -2446,47 +2447,49 @@ export function createIntegrationTestsSuite(
             await assertStatusMessagePropagated(client, stream);
         });
 
-        it.runIf(options.transport === 'stdio')('should use UI_MODE env var when CLI arg is not provided', async () => {
-            client = await createClientFn({ useEnv: true, uiMode: 'openai' });
+        // Uses the deprecated 'openai' alias deliberately to verify it is silently
+        // normalized to 'apps' at the CLI/env ingestion boundary (no warning emitted).
+        it.runIf(options.transport === 'stdio')('should use UI_MODE env var (deprecated "openai" alias) when CLI arg is not provided', async () => {
+            client = await createClientFn({ useEnv: true, serverMode: 'openai' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
 
-            // Verify that openai-only internal tools are present in openai mode
+            // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
-            // Verify that tools have OpenAI metadata when UI mode is enabled
+            // Verify that tools have widget metadata when UI mode is enabled
             expectWidgetToolMeta(tools);
 
             await client.close();
         });
 
-        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use uiMode URL parameter when provided', async () => {
-            client = await createClientFn({ uiMode: 'openai' });
+        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use serverMode URL parameter when provided', async () => {
+            client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
 
-            // Verify that openai-only internal tools are present in openai mode
+            // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
-            // Verify that tools have OpenAI metadata when UI mode is enabled via URL parameter
+            // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
 
             await client.close();
         });
 
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')(
-            'should treat ui=true URL parameter the same as ui=openai', async () => {
-                // 'true' is the new standard external value for ?ui= (maps to 'openai' internally via parseUiMode)
-                client = await createClientFn({ uiMode: 'true' });
+            'should treat ui=true URL parameter the same as ui=apps', async () => {
+                // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
+                client = await createClientFn({ serverMode: 'true' });
                 const tools = await client.listTools();
                 const toolNames = getToolNames(tools);
                 expect(tools.tools.length).toBeGreaterThan(0);
 
-                // Verify that openai-only internal tools are present when ui=true is used
+                // Verify that apps-only internal tools are present when ui=true is used
                 expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
                 expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
@@ -2496,12 +2499,12 @@ export function createIntegrationTestsSuite(
                 await client.close();
             });
 
-        it('should automatically include get-actor-run when uiMode is enabled', async () => {
-            client = await createClientFn({ uiMode: 'openai' });
+        it('should automatically include get-actor-run when serverMode is enabled', async () => {
+            client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            // When uiMode is enabled, default tools include call-actor, so get-actor-run should be included
+            // When serverMode is enabled, default tools include call-actor, so get-actor-run should be included
             expect(toolNames).toContain(HelperTools.ACTOR_CALL);
             expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
 
@@ -2509,17 +2512,48 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should include get-actor-run without call-actor', async () => {
-            client = await createClientFn({ uiMode: 'openai', tools: ['docs'] });
+            client = await createClientFn({ serverMode: 'apps', tools: ['docs'] });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            // get-actor-run should be included when uiMode is enabled, even if call-actor is not present
+            // get-actor-run should be included when serverMode is enabled, even if call-actor is not present
             expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
             // Docs tools should be present
             expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
             expect(toolNames).toContain(HelperTools.DOCS_FETCH);
             // call-actor should NOT be present since only 'docs' was selected
             expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+
+            await client.close();
+        });
+
+        it('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+            // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
+            client = await createClientFn({
+                clientCapabilities: {
+                    extensions: {
+                        'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] },
+                    },
+                },
+            });
+            const tools = await client.listTools();
+            expectWidgetToolMeta(tools);
+            await client.close();
+        });
+
+        it('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
+            // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
+            client = await createClientFn();
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+
+            expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_INTERNAL);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            for (const toolName of [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]) {
+                const tool = tools.tools.find((t) => t.name === toolName);
+                expect(tool).toBeDefined();
+                expect((tool?._meta as Record<string, unknown> | undefined)?.ui).toBeUndefined();
+            }
 
             await client.close();
         });
@@ -2642,7 +2676,7 @@ export function createIntegrationTestsSuite(
         it('should return required structuredContent fields for ActorSearch widget (search-actors)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'openai', // Enable UI mode to get widgetActors
+                serverMode: 'apps', // Enable UI mode to get widgetActors
             });
 
             const result = await client.callTool({
@@ -2661,7 +2695,7 @@ export function createIntegrationTestsSuite(
             expect(content.structuredContent).toBeDefined();
             expect(Array.isArray(content.structuredContent?.actors)).toBe(true);
 
-            // Check widgetActors presence in OpenAI mode
+            // Check widgetActors presence in apps mode
             expect(Array.isArray(content.structuredContent?.widgetActors)).toBe(true);
 
             // Check first widget actor for required fields
@@ -2677,7 +2711,7 @@ export function createIntegrationTestsSuite(
         it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
-                uiMode: 'openai', // Enable UI mode to get widget structured content
+                serverMode: 'apps', // Enable UI mode to get widget structured content
             });
 
             const result = await client.callTool({

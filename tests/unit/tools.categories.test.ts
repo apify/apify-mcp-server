@@ -14,24 +14,24 @@ describe('CATEGORY_NAMES', () => {
 describe('getCategoryTools', () => {
     it('should return all category keys matching CATEGORY_NAMES', () => {
         const defaultResult = getCategoryTools('default');
-        const openaiResult = getCategoryTools('openai');
+        const appsResult = getCategoryTools('apps');
 
         for (const name of CATEGORY_NAMES) {
             expect(defaultResult).toHaveProperty(name);
-            expect(openaiResult).toHaveProperty(name);
+            expect(appsResult).toHaveProperty(name);
         }
     });
 
     it('should return no undefined entries in any category (circular-init safety)', () => {
         const defaultResult = getCategoryTools('default');
-        const openaiResult = getCategoryTools('openai');
+        const appsResult = getCategoryTools('apps');
 
         for (const name of CATEGORY_NAMES) {
             for (const tool of defaultResult[name]) {
                 expect(tool).toBeDefined();
                 expect(tool.name).toBeDefined();
             }
-            for (const tool of openaiResult[name]) {
+            for (const tool of appsResult[name]) {
                 expect(tool).toBeDefined();
                 expect(tool.name).toBeDefined();
             }
@@ -43,44 +43,44 @@ describe('getCategoryTools', () => {
         expect(result.ui).toEqual([]);
     });
 
-    it('should return non-empty ui category in openai mode', () => {
-        const result = getCategoryTools('openai');
+    it('should return non-empty ui category in apps mode', () => {
+        const result = getCategoryTools('apps');
         expect(result.ui.length).toBeGreaterThan(0);
     });
 
     it('should return different tool variants for actors category based on mode', () => {
         const defaultResult = getCategoryTools('default');
-        const openaiResult = getCategoryTools('openai');
+        const appsResult = getCategoryTools('apps');
 
         // Both modes should have the same tool names in actors category
         const defaultNames = defaultResult.actors.map((t: ToolEntry) => t.name);
-        const openaiNames = openaiResult.actors.map((t: ToolEntry) => t.name);
-        expect(defaultNames).toEqual(openaiNames);
+        const appsNames = appsResult.actors.map((t: ToolEntry) => t.name);
+        expect(defaultNames).toEqual(appsNames);
 
         // But the actual tool objects should be different (different call implementations)
-        expect(defaultResult.actors[0]).not.toBe(openaiResult.actors[0]);
+        expect(defaultResult.actors[0]).not.toBe(appsResult.actors[0]);
     });
 
     it('should return different get-actor-run variants based on mode', () => {
         const defaultResult = getCategoryTools('default');
-        const openaiResult = getCategoryTools('openai');
+        const appsResult = getCategoryTools('apps');
 
         const defaultGetRun = defaultResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
-        const openaiGetRun = openaiResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
+        const appsGetRun = appsResult.runs.find((t: ToolEntry) => t.name === HelperTools.ACTOR_RUNS_GET);
 
         expect(defaultGetRun).toBeDefined();
-        expect(openaiGetRun).toBeDefined();
+        expect(appsGetRun).toBeDefined();
         // Different objects (different implementations)
-        expect(defaultGetRun).not.toBe(openaiGetRun);
+        expect(defaultGetRun).not.toBe(appsGetRun);
     });
 
     it('should share identical tools for mode-independent categories', () => {
         const defaultResult = getCategoryTools('default');
-        const openaiResult = getCategoryTools('openai');
+        const appsResult = getCategoryTools('apps');
 
         const modeIndependentCategories: ToolCategory[] = ['experimental', 'docs', 'storage', 'dev'];
         for (const cat of modeIndependentCategories) {
-            expect(defaultResult[cat]).toEqual(openaiResult[cat]);
+            expect(defaultResult[cat]).toEqual(appsResult[cat]);
         }
     });
 

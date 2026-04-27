@@ -77,7 +77,7 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
 }
 
 /**
- * Zod schema for fetch-actor-details arguments — shared between default and openai variants.
+ * Zod schema for fetch-actor-details arguments — shared between default and apps variants.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -104,7 +104,7 @@ EXAMPLES:
 
 /**
  * Shared tool metadata for fetch-actor-details — everything except the `call` handler.
- * Used by both default and openai variants.
+ * Used by both default and apps variants.
  */
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -113,7 +113,7 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
-    // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
+    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
     },

@@ -38,7 +38,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
     outputSchema: callActorOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
-    // openai/* and ui keys are stripped in non-openai mode by stripWidgetMeta() in src/utils/tools.ts
+    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
     _meta: {
         ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     },

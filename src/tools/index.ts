@@ -1,5 +1,6 @@
 import { HelperTools } from '../const.js';
-import type { ServerMode, ToolCategory, ToolEntry } from '../types.js';
+import type { ToolCategory, ToolEntry } from '../types.js';
+import { ServerMode } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
 import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
 import { callActorGetDataset } from './core/actor_execution.js';
@@ -21,7 +22,7 @@ export { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, to
  * Returns the tool entries for the default-enabled categories resolved for the given mode.
  * Computed here (not in helper file) to avoid module initialization issues.
  */
-export function getDefaultTools(mode: ServerMode = 'default'): ToolEntry[] {
+export function getDefaultTools(mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
     return getExpectedToolsByCategories(toolCategoriesEnabledByDefault, mode);
 }
 
@@ -32,7 +33,7 @@ export function getDefaultTools(mode: ServerMode = 'default'): ToolEntry[] {
  */
 export function getUnauthEnabledToolCategories(): ToolCategory[] {
     const unauthEnabledToolsSet = new Set(unauthEnabledTools);
-    const categories = getCategoryTools('default');
+    const categories = getCategoryTools(ServerMode.DEFAULT);
     return (Object.entries(categories) as [ToolCategory, ToolEntry[]][])
         .filter(([, tools]) => tools.every((tool) => unauthEnabledToolsSet.has(tool.name)))
         .map(([category]) => category);

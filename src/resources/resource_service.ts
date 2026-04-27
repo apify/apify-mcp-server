@@ -3,7 +3,7 @@ import type { ListResourcesResult, ListResourceTemplatesResult, ReadResourceResu
 import log from '@apify/log';
 
 import type { PaymentProvider } from '../payments/types.js';
-import type { ServerMode } from '../types.js';
+import { ServerMode } from '../types.js';
 import type { AvailableWidget } from './widgets.js';
 import { RESOURCE_MIME_TYPE } from './widgets.js';
 
@@ -24,12 +24,19 @@ type ResourceService = {
 
 type ResourceServiceOptions = {
     paymentProvider?: PaymentProvider;
-    mode?: ServerMode;
+    /**
+     * Read the current server mode at call time. Callers must pass a getter rather
+     * than a value: `serverMode` can flip from the preliminary DEFAULT to APPS when
+     * the server's initialize request handler resolves the `'auto'` option against
+     * client capabilities, and a captured value would freeze resource listings to
+     * the preliminary mode.
+     */
+    getMode: () => ServerMode;
     getAvailableWidgets: () => Map<string, AvailableWidget>;
 };
 
 export function createResourceService(options: ResourceServiceOptions): ResourceService {
-    const { paymentProvider, mode = 'default', getAvailableWidgets } = options;
+    const { paymentProvider, getMode, getAvailableWidgets } = options;
 
     const listResources = async (): Promise<ListResourcesResult> => {
         const resources: Resource[] = [];
@@ -44,7 +51,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             });
         }
 
-        if (mode === 'openai') {
+        if (getMode() === ServerMode.APPS) {
             for (const widget of getAvailableWidgets().values()) {
                 if (!widget.exists) {
                     continue;
@@ -74,7 +81,7 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             };
         }
 
-        if (mode === 'openai' && uri.startsWith('ui://widget/')) {
+        if (getMode() === ServerMode.APPS && uri.startsWith('ui://widget/')) {
             const widget = getAvailableWidgets().get(uri);
 
             if (!widget || !widget.exists) {

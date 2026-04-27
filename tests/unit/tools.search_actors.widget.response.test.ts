@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
-import { openaiSearchActors } from '../../src/tools/openai/search_actors.js';
+import { appsSearchActors } from '../../src/tools/apps/search_actors.js';
 import type { HelperTool } from '../../src/types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorForWidget, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { searchAndFilterActors } from '../../src/utils/actor_search.js';
@@ -10,7 +10,7 @@ import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
 /**
- * OpenAI / UI mode: search-actors adds widgetActors and tool _meta for the Actor Search widget.
+ * Apps / UI mode: search-actors adds widgetActors and tool _meta for the Actor Search widget.
  */
 vi.mock('../../src/utils/actor_search.js', () => ({
     searchAndFilterActors: vi.fn(),
@@ -20,17 +20,17 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
     getUserInfoCached: vi.fn(),
 }));
 
-describe('search-actors with widget (openaiSearchActors)', () => {
+describe('search-actors with widget (appsSearchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAndFilterActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
         vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
-    it('returns widgetActors, _meta, and OpenAI-specific instructions and text', async () => {
+    it('returns widgetActors, _meta, and apps-mode instructions and text', async () => {
         vi.mocked(searchAndFilterActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (openaiSearchActors as HelperTool).call(stubInternalToolArgs({
+        const result = await (appsSearchActors as HelperTool).call(stubInternalToolArgs({
             keywords: SEARCH_KEYWORDS,
             limit: 5,
             offset: 0,
@@ -78,7 +78,7 @@ describe('search-actors with widget (openaiSearchActors)', () => {
     it('omits widget _meta when there are no results (same empty payload as default)', async () => {
         vi.mocked(searchAndFilterActors).mockResolvedValue([]);
 
-        const result = await (openaiSearchActors as HelperTool).call(stubInternalToolArgs({
+        const result = await (appsSearchActors as HelperTool).call(stubInternalToolArgs({
             keywords: SEARCH_KEYWORDS,
             limit: 5,
             offset: 0,

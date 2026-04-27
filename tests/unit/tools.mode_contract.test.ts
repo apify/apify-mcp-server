@@ -5,7 +5,7 @@
  * - Each mode produces the expected set of tools per category
  * - Mode-variant tools share identical inputSchema (same args accepted)
  * - Tool definitions are frozen (immutable)
- * - _meta stripping works for non-openai modes
+ * - _meta stripping works for non-apps modes
  */
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -25,26 +25,26 @@ function toolNames(tools: ToolEntry[]): string[] {
 
 describe('getCategoryTools mode contract (tool-mode separation)', () => {
     const defaultCategories = getCategoryTools('default');
-    const openaiCategories = getCategoryTools('openai');
+    const appsCategories = getCategoryTools('apps');
 
     describe('per-mode tool lists', () => {
         it('should have correct tools in experimental category (both modes)', () => {
             expect(toolNames(defaultCategories.experimental)).toEqual([HelperTools.ACTOR_ADD]);
-            expect(toolNames(openaiCategories.experimental)).toEqual([HelperTools.ACTOR_ADD]);
+            expect(toolNames(appsCategories.experimental)).toEqual([HelperTools.ACTOR_ADD]);
         });
 
         it('should have correct tools in actors category (both modes)', () => {
             const expected = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
-            expect(toolNames(openaiCategories.actors)).toEqual(expected);
+            expect(toolNames(appsCategories.actors)).toEqual(expected);
         });
 
         it('should have empty ui category in default mode', () => {
             expect(toolNames(defaultCategories.ui)).toEqual([]);
         });
 
-        it('should have internal tools in ui category in openai mode', () => {
-            expect(toolNames(openaiCategories.ui)).toEqual([
+        it('should have internal tools in ui category in apps mode', () => {
+            expect(toolNames(appsCategories.ui)).toEqual([
                 HelperTools.STORE_SEARCH_INTERNAL,
                 HelperTools.ACTOR_GET_DETAILS_INTERNAL,
             ]);
@@ -53,7 +53,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         it('should have correct tools in docs category (both modes)', () => {
             const expected = [HelperTools.DOCS_SEARCH, HelperTools.DOCS_FETCH];
             expect(toolNames(defaultCategories.docs)).toEqual(expected);
-            expect(toolNames(openaiCategories.docs)).toEqual(expected);
+            expect(toolNames(appsCategories.docs)).toEqual(expected);
         });
 
         it('should have correct tools in runs category (both modes)', () => {
@@ -64,7 +64,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HelperTools.ACTOR_RUNS_ABORT,
             ];
             expect(toolNames(defaultCategories.runs)).toEqual(expected);
-            expect(toolNames(openaiCategories.runs)).toEqual(expected);
+            expect(toolNames(appsCategories.runs)).toEqual(expected);
         });
 
         it('should have correct tools in storage category (both modes)', () => {
@@ -80,12 +80,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HelperTools.KEY_VALUE_STORE_LIST_GET,
             ];
             expect(toolNames(defaultCategories.storage)).toEqual(expected);
-            expect(toolNames(openaiCategories.storage)).toEqual(expected);
+            expect(toolNames(appsCategories.storage)).toEqual(expected);
         });
 
         it('should have correct tools in dev category (both modes)', () => {
             expect(toolNames(defaultCategories.dev)).toEqual([]);
-            expect(toolNames(openaiCategories.dev)).toEqual([]);
+            expect(toolNames(appsCategories.dev)).toEqual([]);
         });
     });
 
@@ -95,12 +95,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         // and isApiTokenRequired — which all hardcode 'default' mode internally.
         for (const categoryName of CATEGORY_NAMES) {
             const defaultNames = toolNames(defaultCategories[categoryName]);
-            const openaiNames = toolNames(openaiCategories[categoryName]);
+            const appsNames = toolNames(appsCategories[categoryName]);
 
-            // Only check categories that exist in both modes (ui category is openai-only)
-            if (defaultNames.length > 0 && openaiNames.length > 0) {
+            // Only check categories that exist in both modes (ui category is apps-only)
+            if (defaultNames.length > 0 && appsNames.length > 0) {
                 it(`should have identical tool names in ${categoryName} category across modes`, () => {
-                    expect(defaultNames).toEqual(openaiNames);
+                    expect(defaultNames).toEqual(appsNames);
                 });
             }
         }
@@ -118,38 +118,38 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             it(`should have identical inputSchema for ${name} across modes`, () => {
                 const defaultTool = [...defaultCategories.actors, ...defaultCategories.runs]
                     .find((t) => t.name === name);
-                const openaiTool = [...openaiCategories.actors, ...openaiCategories.runs]
+                const appsTool = [...appsCategories.actors, ...appsCategories.runs]
                     .find((t) => t.name === name);
 
                 expect(defaultTool).toBeDefined();
-                expect(openaiTool).toBeDefined();
-                expect(defaultTool!.inputSchema).toEqual(openaiTool!.inputSchema);
+                expect(appsTool).toBeDefined();
+                expect(defaultTool!.inputSchema).toEqual(appsTool!.inputSchema);
             });
         }
 
         // Locks the invariant that search-actors-internal reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
         it('should use searchActorsBaseArgsSchema for search-actors-internal inputSchema', () => {
-            const internalTool = openaiCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_INTERNAL);
+            const internalTool = appsCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_INTERNAL);
             expect(internalTool).toBeDefined();
             expect(internalTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema));
         });
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
-        it('should document that openai call-actor always runs asynchronously', () => {
-            const openaiCallActor = openaiCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+        it('should document that apps call-actor always runs asynchronously', () => {
+            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
 
-            expect(openaiCallActor).toBeDefined();
-            expect(openaiCallActor!.description).toContain('always runs asynchronously');
-            expect(openaiCallActor!.description).toContain('do NOT poll or call any other tool');
+            expect(appsCallActor).toBeDefined();
+            expect(appsCallActor!.description).toContain('always runs asynchronously');
+            expect(appsCallActor!.description).toContain('do NOT poll or call any other tool');
         });
 
-        it('should not advertise long-running task support for openai call-actor', () => {
-            const openaiCallActor = openaiCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+        it('should not advertise long-running task support for apps call-actor', () => {
+            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
 
-            expect(openaiCallActor).toBeDefined();
-            expect(openaiCallActor!.execution?.taskSupport).toBeUndefined();
+            expect(appsCallActor).toBeDefined();
+            expect(appsCallActor!.execution?.taskSupport).toBeUndefined();
         });
     });
 
@@ -207,11 +207,11 @@ describe('taskSupport contract across tool categories', () => {
         }
     });
 
-    it('should not declare taskSupport on any tool in openai mode', () => {
-        const openaiCategories = getCategoryTools('openai');
+    it('should not declare taskSupport on any tool in apps mode', () => {
+        const appsCategories = getCategoryTools('apps');
 
         for (const categoryName of CATEGORY_NAMES) {
-            for (const tool of openaiCategories[categoryName]) {
+            for (const tool of appsCategories[categoryName]) {
                 expect(tool.execution?.taskSupport).toBeUndefined();
             }
         }
@@ -232,7 +232,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         },
     };
 
-    it('should strip openai/ and ui _meta keys when filterWidgetMeta is true and not in openai mode', () => {
+    it('should strip openai/ and ui _meta keys when filterWidgetMeta is true and not in apps mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterWidgetMeta: true,
             mode: 'default',
@@ -244,10 +244,10 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         expect(result._meta).not.toHaveProperty('ui');
     });
 
-    it('should preserve all _meta keys in openai mode', () => {
+    it('should preserve all _meta keys in apps mode', () => {
         const result = getToolPublicFieldOnly(toolWithOpenAiMeta, {
             filterWidgetMeta: true,
-            mode: 'openai',
+            mode: 'apps',
         });
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
@@ -259,7 +259,7 @@ describe('getToolPublicFieldOnly _meta filtering', () => {
         expect(result._meta).toEqual(toolWithOpenAiMeta._meta);
     });
 
-    it('should return undefined _meta when all keys are widget-specific and mode is not openai', () => {
+    it('should return undefined _meta when all keys are widget-specific and mode is not apps', () => {
         const toolWithOnlyWidgetMeta = {
             ...toolWithOpenAiMeta,
             _meta: {

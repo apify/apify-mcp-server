@@ -4,13 +4,17 @@
 
 import { randomUUID } from 'node:crypto';
 
+// The ext-apps package exposes `./server` via conditional exports only (no `./server/index.js`
+// wildcard), so we can't satisfy the `import/extensions` rule on this subpath.
+// eslint-disable-next-line import/extensions
+import { getUiCapability, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type { InitializeRequest, InitializeResult, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -19,6 +23,7 @@ import {
     GetPromptRequestSchema,
     GetTaskPayloadRequestSchema,
     GetTaskRequestSchema,
+    InitializeRequestSchema,
     ListPromptsRequestSchema,
     ListResourcesRequestSchema,
     ListResourceTemplatesRequestSchema,
@@ -51,11 +56,11 @@ import { prepareToolCallContext } from '../payments/helpers.js';
 import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
-import { resolveAvailableWidgets, RESOURCE_MIME_TYPE } from '../resources/widgets.js';
+import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { appsActorExecutor } from '../tools/apps/actor_executor.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
-import { getActorsAsTools, getCategoryTools, getDefaultTools } from '../tools/index.js';
-import { openaiActorExecutor } from '../tools/openai/actor_executor.js';
+import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorExecutor,
@@ -63,12 +68,14 @@ import type {
     ActorStore,
     ApifyRequestParams,
     CallDiagnostics,
-    ServerMode,
+    Input,
+    ServerModeOption,
     TelemetryEnv,
     ToolCallTelemetryProperties,
     ToolEntry,
     ToolStatus,
 } from '../types.js';
+import { parseServerMode, resolveServerMode, ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -76,17 +83,35 @@ import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
+import {
+    getActors,
+    getToolsForServerMode,
+    toolNamesToInput,
+} from '../utils/tools_loader.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { isTaskCancelled, processParamsGetTools } from './utils.js';
+import { isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
-    default: defaultActorExecutor,
-    openai: openaiActorExecutor,
+    [ServerMode.DEFAULT]: defaultActorExecutor,
+    [ServerMode.APPS]: appsActorExecutor,
 };
+
+/**
+ * Returns true when the initialize request advertises the MCP Apps UI extension
+ * with the widget MIME type. Used to resolve `'auto'` server mode.
+ *
+ * Uses {@link getUiCapability} from `@modelcontextprotocol/ext-apps/server` to
+ * read the `io.modelcontextprotocol/ui` extension from client capabilities — the
+ * canonical way per the MCP Apps spec.
+ */
+function isUiSupportedByClient(request: InitializeRequest | undefined): boolean {
+    const uiCap = getUiCapability(request?.params?.capabilities);
+    return uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
+}
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
@@ -102,10 +127,29 @@ export class ActorsMcpServer {
     public readonly options: ActorsMcpServerOptions;
     public readonly taskStore: TaskStore;
     public readonly actorStore?: ActorStore;
-    /** Resolved server mode — normalized once at construction from options.uiMode. */
-    public readonly serverMode: ServerMode;
-    /** Mode-specific executor for direct actor tools (`type: 'actor'`). */
-    private readonly actorExecutor: ActorExecutor;
+    /**
+     * Resolved server mode. Preliminary value at construction (`'auto'` → `DEFAULT`).
+     * Finalized inside the `initialize` request handler (see constructor) once the
+     * client's capabilities are known. Effectively set-once per connection.
+     */
+    public serverMode: ServerMode;
+    /** Mode-specific executor for direct actor tools (`type: 'actor'`). Finalized with `serverMode`. */
+    private actorExecutor: ActorExecutor;
+    /**
+     * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
+     * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
+     * values bypass auto-detect.
+     */
+    private readonly serverModeOption: ServerModeOption;
+    /** True once mode is final. False for `'auto'` until the initialize handler resolves client capabilities. */
+    private serverModeResolved: boolean;
+    /**
+     * Tool requests queued before mode is final. Actor tools are upserted immediately
+     * (mode-agnostic); we also capture the exact actor-tool slice fetched for each
+     * request so the flush composes every entry against *its own* actor list rather
+     * than the accumulated union across unrelated requests.
+     */
+    private pendingToolsAfterModeResolved: { input: Input; actorTools: ToolEntry[] }[] = [];
 
     // Telemetry configuration (resolved from options and env vars in setupTelemetry)
     private telemetryEnabled: boolean | null = null;
@@ -114,10 +158,7 @@ export class ActorsMcpServer {
     // List of widgets that are ready to be served
     private availableWidgets: Map<string, AvailableWidget> = new Map();
 
-    /**
-     * Whether the connected client advertises MCP Apps UI support (`io.modelcontextprotocol/ui` extension).
-     * NOTE: This is currently informational only (logged for observability) and does not yet gate widget behavior.
-     */
+    /** Set in the initialize handler once client capabilities are known. */
     public clientSupportsUi = false;
 
     constructor(options: ActorsMcpServerOptions = {}) {
@@ -132,7 +173,20 @@ export class ActorsMcpServer {
             throw new Error('Task store must be provided for non-stdio transport types');
         }
         this.actorStore = options.actorStore;
-        this.serverMode = options.uiMode ?? 'default';
+        // Constructor is an ingestion boundary for programmatic callers. Normalize via
+        // parseServerMode so that runtime-invalid values ('openai' alias, stray strings)
+        // and the legacy `uiMode` field name are accepted gracefully during the transition
+        // to the canonical `serverMode` API. Remove the `uiMode` fallback once internal
+        // consumers have migrated (see apify-mcp-server-internal#454).
+        const legacyUiMode = (options as { uiMode?: string }).uiMode;
+        const rawServerMode = options.serverMode as string | undefined;
+        this.serverModeOption = rawServerMode !== undefined
+            ? parseServerMode(rawServerMode)
+            : parseServerMode(legacyUiMode);
+        // Preliminary resolution — re-resolved inside the initialize handler once
+        // client capabilities are known (only for 'auto').
+        this.serverMode = resolveServerMode(this.serverModeOption, false);
+        this.serverModeResolved = this.serverModeOption !== 'auto';
         this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
@@ -165,11 +219,11 @@ export class ActorsMcpServer {
                     prompts: { },
                     logging: {},
                 },
-                instructions: getServerInstructions(this.serverMode),
+                instructions: getServerInstructions(),
             },
         );
         this.setupTelemetry();
-        this.setupCapabilityNegotiation();
+        this.setupInitializeHandler();
         this.setupLoggingProxy();
         this.tools = new Map();
         this.setupErrorHandling(setupSigintHandler);
@@ -202,20 +256,72 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Detects MCP Apps UI support from client capabilities after initialization.
-     * Checks for the `io.modelcontextprotocol/ui` extension with `text/html;profile=mcp-app` MIME type.
+     * Override the SDK's `initialize` request handler to run mode resolution and
+     * pending-source flush before `InitializeResult` is sent. Delegates boilerplate
+     * (protocolVersion, capabilities, instructions) to the SDK's captured `_oninitialize`.
+     *
+     * Not using `server.oninitialized`: the SDK dispatches notification handlers
+     * fire-and-forget (separate microtask), so a follow-up `tools/list` can race past them.
+     * The request handler guarantees tools are final before the response and the first `tools/list`.
      */
-    private setupCapabilityNegotiation() {
-        const MCP_APPS_EXTENSION_ID = 'io.modelcontextprotocol/ui';
+    private setupInitializeHandler() {
+        // Capture the SDK's default initialize handler installed in its constructor.
+        // Private-field access on the SDK Server — verified against
+        // @modelcontextprotocol/sdk ^1.25.x (see package.json). On SDK bumps, re-check
+        // `@modelcontextprotocol/sdk/shared/protocol.js` for a still-named `_oninitialize`;
+        // if renamed or made non-delegable, rebuild the InitializeResult shape here
+        // (protocolVersion, serverInfo, capabilities, instructions) instead of delegating.
+        // The capability-gating unit tests construct a server and act as a canary.
+        // eslint-disable-next-line no-underscore-dangle
+        const sdkInitHandler = (this.server as unknown as {
+            _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
+        })._oninitialize.bind(this.server);
 
-        this.server.oninitialized = () => {
-            const caps = this.server.getClientCapabilities() as
-                (Record<string, unknown> & { extensions?: Record<string, unknown> }) | undefined;
-            const uiCap = caps?.extensions?.[MCP_APPS_EXTENSION_ID] as
-                { mimeTypes?: string[] } | undefined;
-            this.clientSupportsUi = uiCap?.mimeTypes?.includes(RESOURCE_MIME_TYPE) ?? false;
-            log.info('Client MCP Apps UI support', { clientSupportsUi: this.clientSupportsUi });
-        };
+        this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
+            this.clientSupportsUi = isUiSupportedByClient(request);
+
+            if (this.serverModeOption === 'auto') {
+                const resolved = resolveServerMode('auto', this.clientSupportsUi);
+                if (resolved !== this.serverMode) {
+                    this.serverMode = resolved;
+                    this.actorExecutor = actorExecutorsByMode[this.serverMode];
+                }
+                this.serverModeResolved = true;
+            }
+
+            (this.options as Record<string, unknown>).initializeRequestData = request;
+
+            log.info('Resolved server mode for connection', {
+                serverMode: this.serverMode,
+                serverModeOption: this.serverModeOption,
+                clientSupportsUi: this.clientSupportsUi,
+            });
+
+            this.updateToolsAfterServerModeResolved();
+
+            await this.resolveWidgets();
+
+            const result = await sdkInitHandler(request);
+            result.instructions = getServerInstructions(this.serverMode);
+            return result;
+        });
+    }
+
+    private updateToolsAfterServerModeResolved(): void {
+        if (this.pendingToolsAfterModeResolved.length === 0) return;
+
+        const tools = this.pendingToolsAfterModeResolved.flatMap(
+            ({ input, actorTools }) => getToolsForServerMode(input, actorTools, this.serverMode),
+        );
+
+        this.pendingToolsAfterModeResolved = [];
+
+        // Notify after the flush so shared-state handlers (e.g. Redis recovery) see
+        // the final tool set, including mode-specific helpers added here. Pre-init,
+        // `loadToolsByName` may have fired `upsertTools(actorTools, true)` with actor
+        // tools only (helpers still queued), and `loadToolsFromUrl` / `loadToolsFromInput`
+        // don't notify at all — this call reconciles both paths to the complete set.
+        if (tools.length > 0) this.upsertTools(tools, true);
     }
 
     /**
@@ -299,31 +405,22 @@ export class ActorsMcpServer {
     * @param apifyClient
     */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
-        const loadedTools = this.listAllToolNames();
-        const actorsToLoad: string[] = [];
-        const toolsToLoad: ToolEntry[] = [];
-        const internalToolMap = new Map([
-            ...getDefaultTools(this.serverMode),
-            ...Object.values(getCategoryTools(this.serverMode)).flat(),
-        ].map((tool) => [tool.name, tool]));
+        const loadedTools = new Set(this.listAllToolNames());
+        const missingToolNames = toolNames.filter((toolName) => !loadedTools.has(toolName));
+        if (missingToolNames.length === 0) return;
 
-        for (const tool of toolNames) {
-            // Skip if the tool is already loaded
-            if (loadedTools.includes(tool)) continue;
-            // Load internal tool
-            if (internalToolMap.has(tool)) {
-                toolsToLoad.push(internalToolMap.get(tool) as ToolEntry);
-            // Load Actor
-            } else {
-                actorsToLoad.push(tool);
-            }
+        const restoreInput = toolNamesToInput(missingToolNames);
+        const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
+
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools, true);
+            return;
         }
+
+        const toolsToLoad = getToolsForServerMode(restoreInput, actorTools, this.serverMode);
         if (toolsToLoad.length > 0) {
-            this.upsertTools(toolsToLoad);
-        }
-
-        if (actorsToLoad.length > 0) {
-            await this.loadActorsAsTools(actorsToLoad, apifyClient);
+            this.upsertTools(toolsToLoad, actorTools.length > 0);
         }
     }
 
@@ -342,19 +439,45 @@ export class ActorsMcpServer {
         return actorTools;
     }
 
-    /**
-     * Loads tools from URL params.
-     *
-     * This method also handles enabling of Actor autoloading via the processParamsGetTools.
-     *
-     * Used primarily for SSE.
-     */
+    /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
-        const tools = await processParamsGetTools(url, apifyClient, this.serverMode, this.actorStore);
+        const input = parseInputParamsFromUrl(url);
+        const actorTools = await getActors(input, apifyClient, this.actorStore);
+
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push({ input, actorTools });
+            if (actorTools.length > 0) {
+                log.debug('Loading actor tools from query parameters before mode resolution');
+                this.upsertTools(actorTools, false);
+            }
+            return;
+        }
+
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
         if (tools.length > 0) {
             log.debug('Loading tools from query parameters');
             this.upsertTools(tools, false);
         }
+    }
+
+    /**
+     * Two-phase: getActors (async, mode-agnostic Apify fetch) then getToolsForServerMode
+     * (sync, mode-dependent compose). When mode is unresolved, queue actorTools and let
+     * the initialize handler compose them later.
+     *
+     * Don't move the getActors await into the initialize handler — clients time out
+     * waiting for InitializeResult. The queue buffers already-fetched data, not network
+     * work. See #721.
+     */
+    public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
+        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        if (!this.serverModeResolved) {
+            this.pendingToolsAfterModeResolved.push({ input, actorTools });
+            if (actorTools.length > 0) this.upsertTools(actorTools);
+            return;
+        }
+        const tools = getToolsForServerMode(input, actorTools, this.serverMode);
+        if (tools.length > 0) this.upsertTools(tools);
     }
 
     /** Delete tools from the server and notify the handler.
@@ -457,7 +580,7 @@ export class ActorsMcpServer {
     private setupResourceHandlers(): void {
         const resourceService = createResourceService({
             paymentProvider: this.options.paymentProvider,
-            mode: this.serverMode,
+            getMode: () => this.serverMode,
             getAvailableWidgets: () => this.availableWidgets,
         });
 
@@ -1390,7 +1513,7 @@ export class ActorsMcpServer {
      * Resolves widgets and determines which ones are ready to be served.
      */
     private async resolveWidgets(): Promise<void> {
-        if (this.serverMode !== 'openai') {
+        if (this.serverMode !== ServerMode.APPS) {
             return;
         }
 

@@ -4,11 +4,11 @@ import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '
 import { buildStartAsyncResponse } from '../core/call_actor_common.js';
 
 /**
- * OpenAI actor executor for UI mode.
+ * Apps-mode actor executor.
  * Runs actors asynchronously — starts the run and returns immediately with widget metadata.
  * The widget automatically tracks progress and updates the UI.
  */
-export const openaiActorExecutor: ActorExecutor = {
+export const appsActorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
         if (params.abortSignal?.aborted) {
             return null;

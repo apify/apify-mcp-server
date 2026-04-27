@@ -24,7 +24,7 @@ describe('call_actor_common', () => {
             expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
         });
 
-        it('builds the openai description with internal helper tools and async guidance', () => {
+        it('builds the apps description with internal helper tools and async guidance', () => {
             const description = buildCallActorDescription({
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS_INTERNAL,
                 storeSearchTool: HelperTools.STORE_SEARCH_INTERNAL,
@@ -70,7 +70,7 @@ describe('call_actor_common', () => {
             expect(response._meta).toBeUndefined();
         });
 
-        it('builds the openai async response with widget metadata', () => {
+        it('builds the apps async response with widget metadata', () => {
             const response = buildStartAsyncResponse({
                 actorName: 'apify/rag-web-browser',
                 actorRun,
@@ -116,7 +116,7 @@ describe('call_actor_common', () => {
             }));
         });
 
-        it('uses internal helper tool names in openai mode', () => {
+        it('uses internal helper tool names in apps mode', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
                 error: new Error('boom'),

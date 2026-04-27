@@ -4,7 +4,8 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import type { ApifyClient } from 'apify-client';
 
 import { processInput } from '../input.js';
-import type { ActorStore, Input, ServerMode } from '../types.js';
+import type { ActorStore, Input } from '../types.js';
+import { ServerMode } from '../types.js';
 import { loadToolsFromInput } from '../utils/tools_loader.js';
 
 /**
@@ -18,7 +19,7 @@ import { loadToolsFromInput } from '../utils/tools_loader.js';
 export async function processParamsGetTools(
     url: string,
     apifyClient: ApifyClient,
-    mode: ServerMode = 'default',
+    mode: ServerMode = ServerMode.DEFAULT,
     actorStore?: ActorStore,
 ) {
     const input = parseInputParamsFromUrl(url);
