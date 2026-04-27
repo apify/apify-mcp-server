@@ -2,7 +2,6 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
 import {
     type ActorDetailsResult,
@@ -77,7 +76,9 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
 }
 
 /**
- * Zod schema for fetch-actor-details arguments — shared between default and apps variants.
+ * Zod schema for fetch-actor-details arguments — used by the mode-independent
+ * base tool. The `-widget` sibling has its own `actor`-only schema in
+ * `src/tools/apps/fetch_actor_details_widget.ts`.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
     actor: z.string()
@@ -103,8 +104,9 @@ EXAMPLES:
 - What tools does apify/actors-mcp-server provide?`;
 
 /**
- * Shared tool metadata for fetch-actor-details — everything except the `call` handler.
- * Used by both default and apps variants.
+ * Tool metadata for the mode-independent `fetch-actor-details` — everything
+ * except the `call` handler. No widget `_meta`; the `-widget` sibling (apps-only)
+ * carries its own widget metadata.
  */
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -113,10 +115,6 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
     outputSchema: actorDetailsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(fetchActorDetailsToolArgsSchema)),
-    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: {
-        ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta,
-    },
     annotations: {
         title: 'Fetch Actor details',
         readOnlyHint: true,
@@ -217,16 +215,15 @@ export function buildActorDetailsTextResponse(options: {
 }
 
 /**
- * Shared handler for default and internal fetch-actor-details variants.
- * Both return the same text + structured response; only the telemetry route differs.
+ * Shared handler for the base fetch-actor-details tool.
+ * Returns the same text + structured response in both modes.
  */
 export async function buildFetchActorDetailsResult(
     toolArgs: InternalToolArgs,
-    route: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL,
 ): Promise<ReturnType<typeof buildMCPResponse>> {
     const { args, apifyToken, apifyClient, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsed = fetchActorDetailsToolArgsSchema.parse(args);
-    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route });
+    const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HelperTools.ACTOR_GET_DETAILS });
 
     const resolvedOutput = resolveOutputOptions(parsed.output);
     // Skip the /users/me round-trip when pricing isn't rendered (e.g. inputSchema-only

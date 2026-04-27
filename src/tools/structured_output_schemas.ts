@@ -142,9 +142,6 @@ export const actorInfoSchema = {
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
     },
-    // Note: `pricing` is not required. apps/fetch-actor-details intentionally omits it from
-    // `actorInfo` so the widget's tier-aware pricing (under `actorDetails.actorInfo.currentPricingInfo`)
-    // is the single source of truth — see src/tools/apps/fetch_actor_details.ts.
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
 
@@ -165,6 +162,30 @@ export const actorDetailsOutputSchema = {
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
     },
+};
+
+/**
+ * Schema for fetch-actor-details-widget output.
+ * Widget-only; renders as an interactive UI element in apps mode.
+ * `actorInfo` is the widget-shaped actor (from `formatActorForWidget`), kept as a loose
+ * object because it doesn't align with `actorInfoSchema` (adds `currentPricingInfo` etc.).
+ */
+export const actorDetailsWidgetOutputSchema = {
+    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    properties: {
+        actorDetails: {
+            type: 'object' as const, // Literal type required for MCP SDK type compatibility
+            properties: {
+                actorInfo: { type: 'object' as const, description: 'Widget-formatted Actor info (tier-aware pricing, widget display fields).' },
+                actorCard: { type: 'string', description: 'Rendered Actor card markdown for widget display.' },
+                readme: { type: 'string', description: 'Formatted Actor README for widget display.' },
+            },
+            required: ['actorInfo', 'actorCard', 'readme'],
+            additionalProperties: false,
+        },
+    },
+    required: ['actorDetails'],
+    additionalProperties: false,
 };
 
 /**

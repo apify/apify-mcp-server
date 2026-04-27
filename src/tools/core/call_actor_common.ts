@@ -48,7 +48,7 @@ export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;
 
 type CallActorDescriptionParams = {
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL;
+    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
     storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
     useInternalSearchWarning: boolean;
     alwaysAsync: boolean;
@@ -78,7 +78,7 @@ type CallActorErrorResponseParams = {
     actorId?: string;
     isAsync: boolean;
     mcpSessionId?: string;
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS | HelperTools.ACTOR_GET_DETAILS_INTERNAL;
+    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
     storeSearchTool: HelperTools.STORE_SEARCH | HelperTools.STORE_SEARCH_INTERNAL;
 };
 

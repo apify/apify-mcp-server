@@ -143,7 +143,9 @@ function validateStructuredOutputForTool(result: unknown, toolName: string, mode
 
 /** Validates that the listed tools have widget metadata (_meta) with MCP Apps ui.* keys. */
 function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<string, unknown> }[] }): void {
-    const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
+    // Widget meta moved from base `fetch-actor-details` to `fetch-actor-details-widget` in the split.
+    // `search-actors` and `call-actor` still carry widget meta on the base name until their own splits land.
+    const toolNames = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS_WIDGET, HelperTools.ACTOR_CALL];
     for (const toolName of toolNames) {
         const tool = tools.tools.find((t) => t.name === toolName);
         expect(tool).toBeDefined();
@@ -256,7 +258,7 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(tools);
 
             // Should be equivalent to tools=actors,docs,apify/rag-web-browser
-            // Note: Internal tools (fetch-actor-details-internal, search-actors-internal) are only available in apps mode
+            // Note: UI tools (search-actors-internal, fetch-actor-details-widget) are only available in apps mode
             const expectedActorsTools = [
                 'fetch-actor-details',
                 'search-actors',
@@ -1258,15 +1260,15 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema, 'fetch-actor-details');
         });
 
-        it('should return README content via fetch-actor-details-internal in apps mode', async () => {
+        it('should render widget payload via fetch-actor-details-widget in apps mode', async () => {
             client = await createClientFn({
                 tools: ['actors'],
                 serverMode: 'apps',
             });
 
-            // fetch-actor-details-internal is only available in apps mode
+            // fetch-actor-details-widget is only available in apps mode
             const result = await client.callTool({
-                name: 'fetch-actor-details-internal',
+                name: 'fetch-actor-details-widget',
                 arguments: {
                     actor: RAG_WEB_BROWSER,
                 },
@@ -1276,11 +1278,17 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string }[];
             const allText = content.map((item) => item.text).join('\n');
 
-            // Default output includes README content and input schema
-            expect(allText).toMatch(/# README summary|# README/);
-            expect(allText).toContain('Input schema');
+            // Widget tool returns a short text pointer to the rendered widget
+            expect(allText).toContain('Actor information');
+            expect(allText).toContain('interactive widget');
 
-            expectReadmeInStructuredContent(result);
+            const structured = result.structuredContent as {
+                actorDetails?: { actorInfo?: unknown; readme?: string };
+            };
+            expect(structured.actorDetails).toBeDefined();
+            expect(structured.actorDetails!.actorInfo).toBeDefined();
+            expect(typeof structured.actorDetails!.readme).toBe('string');
+            expect(structured.actorDetails!.readme!.length).toBeGreaterThan(0);
         });
 
         it('should use default values when output object is not provided', async () => {
@@ -2456,7 +2464,7 @@ export function createIntegrationTestsSuite(
             expect(tools.tools.length).toBeGreaterThan(0);
 
             // Verify that apps-only internal tools are present in apps mode
-            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have widget metadata when UI mode is enabled
@@ -2472,7 +2480,7 @@ export function createIntegrationTestsSuite(
             expect(tools.tools.length).toBeGreaterThan(0);
 
             // Verify that apps-only internal tools are present in apps mode
-            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
             // Verify that tools have widget metadata when UI mode is enabled via URL parameter
@@ -2490,7 +2498,7 @@ export function createIntegrationTestsSuite(
                 expect(tools.tools.length).toBeGreaterThan(0);
 
                 // Verify that apps-only internal tools are present when ui=true is used
-                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
                 expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
 
                 // Verify that tools have widget metadata when ui=true is used
@@ -2548,7 +2556,7 @@ export function createIntegrationTestsSuite(
             const toolNames = getToolNames(tools);
 
             expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_INTERNAL);
-            expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             for (const toolName of [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]) {
                 const tool = tools.tools.find((t) => t.name === toolName);
                 expect(tool).toBeDefined();
@@ -2708,14 +2716,14 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details)', async () => {
+        it('should return required structuredContent fields for ActorSearchDetail widget (fetch-actor-details-widget)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
                 serverMode: 'apps', // Enable UI mode to get widget structured content
             });
 
             const result = await client.callTool({
-                name: HelperTools.ACTOR_GET_DETAILS,
+                name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                 },
@@ -2740,7 +2748,7 @@ export function createIntegrationTestsSuite(
             const details = content.structuredContent!.actorDetails!;
             expect(typeof details.actorCard).toBe('string');
 
-            // OpenAI widget path always returns full readme
+            // Apps widget path always returns full readme
             expect(details.readme).toBeDefined();
             expect(typeof details.readme).toBe('string');
 

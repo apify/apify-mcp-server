@@ -43,10 +43,10 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             expect(toolNames(defaultCategories.ui)).toEqual([]);
         });
 
-        it('should have internal tools in ui category in apps mode', () => {
+        it('should have internal + widget tools in ui category in apps mode', () => {
             expect(toolNames(appsCategories.ui)).toEqual([
                 HelperTools.STORE_SEARCH_INTERNAL,
-                HelperTools.ACTOR_GET_DETAILS_INTERNAL,
+                HelperTools.ACTOR_GET_DETAILS_WIDGET,
             ]);
         });
 
@@ -103,6 +103,21 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                     expect(defaultNames).toEqual(appsNames);
                 });
             }
+        }
+    });
+
+    describe('base fetch-actor-details has no widget meta in either mode', () => {
+        for (const mode of SERVER_MODES) {
+            it(`should have no ui/openai _meta keys in ${mode} mode`, () => {
+                const categories = getCategoryTools(mode);
+                const base = categories.actors.find((t) => t.name === HelperTools.ACTOR_GET_DETAILS);
+                expect(base).toBeDefined();
+                const meta = base!._meta ?? {};
+                for (const key of Object.keys(meta)) {
+                    expect(key).not.toMatch(/^openai\//);
+                    expect(key).not.toBe('ui');
+                }
+            });
         }
     });
 

@@ -3,13 +3,13 @@
  *
  * Apps-only sections (widget workflow, widget tool disambiguation) are included
  * only when the resolved server mode is `'apps'`. Default-mode clients never
- * see tool names like `search-actors-internal` or `fetch-actor-details-internal`,
+ * see tool names like `search-actors-internal` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
  *
- * Note: the `-widget` suffix split (separating widget-backed tools from silent
- * variants by name) is planned in follow-up PRs. Until then, widget rendering
- * happens on the base tool names (`call-actor`, `search-actors`,
- * `fetch-actor-details`) in apps mode.
+ * Note: the `-widget` suffix split is rolling out per-tool.
+ * `fetch-actor-details-widget` is the first split; `call-actor`, `search-actors`,
+ * and `get-actor-run` still render widgets on their base names until their own
+ * splits land.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -55,7 +55,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 
 - **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after a widget-backed \`${HelperTools.ACTOR_CALL}\` response.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
 - When \`${HelperTools.ACTOR_CALL}\` runs without a widget (the tool response is plain text / structured data only), polling \`${HelperTools.ACTOR_RUNS_GET}\` for status is expected.
-- Follow-up PRs will split widget-backed tools into a dedicated \`-widget\`-suffixed namespace; until then, widget rendering happens on the base tool names when the client supports it.
+- The \`-widget\` suffix split is rolling out per-tool (\`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` already split); until the rest split, widget rendering happens on the base \`${HelperTools.ACTOR_CALL}\`, \`${HelperTools.STORE_SEARCH}\`, and \`${HelperTools.ACTOR_RUNS_GET}\` tool names when the client supports it.
 ` : ''}
 ## Tool dependencies and disambiguation
 
@@ -73,7 +73,10 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **\`${HelperTools.STORE_SEARCH}\` vs \`${HelperTools.ACTOR_GET_DETAILS}\`:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
-${isApps ? `- **Widget-backed variants (when the client supports them):** Some \`${HelperTools.STORE_SEARCH}\` / \`${HelperTools.ACTOR_GET_DETAILS}\` responses render an interactive widget for the user. Prefer the widget-backed variant when the user explicitly asks to *see*, *browse*, or *view* something; when the next step is to actually run an Actor or perform a programmatic flow, prefer a silent lookup if such a variant is available (for example, \`${HelperTools.STORE_SEARCH_INTERNAL}\` or \`${HelperTools.ACTOR_GET_DETAILS_INTERNAL}\`), otherwise use the standard lookup tools. A \`-widget\` suffix split is planned in a follow-up PR; until then, widget rendering is selected by the server based on client capabilities.
+${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**
+  - \`${HelperTools.STORE_SEARCH_INTERNAL}\` is for silent name resolution; \`${HelperTools.STORE_SEARCH}\` renders an interactive UI element (widget) for user-facing discovery.
+  - \`${HelperTools.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
+  - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH_INTERNAL}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
 ` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HelperTools.ACTOR_CALL}\`:**

@@ -63,12 +63,14 @@ describe('search-actors with widget (appsSearchActors)', () => {
         expect(structuredContent.widgetActors!.length).toBe(structuredContent.actors.length);
         expect(structuredContent.widgetActors![0]).toStrictEqual(formatActorForWidget(MOCK_STORE_ACTOR, 'FREE'));
 
-        expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+        expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(structuredContent.instructions).toContain(HelperTools.ACTOR_GET_DETAILS);
 
         expect(content).toHaveLength(1);
         const { text } = content[0];
         expect(text).toContain('do NOT print or summarize the Actor list');
-        expect(text).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+        expect(text).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(text).toContain(HelperTools.ACTOR_GET_DETAILS);
         expect(text).toContain('Choosing the right details tool:');
 
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.SEARCH_ACTORS);

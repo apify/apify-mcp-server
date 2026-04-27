@@ -32,7 +32,7 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
         expect(toolNames).toContain(HelperTools.DOCS_FETCH);
         expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
-        expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_INTERNAL);
+        expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
     });
 });

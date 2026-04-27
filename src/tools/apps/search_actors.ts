@@ -48,10 +48,11 @@ export const appsSearchActors: ToolEntry = Object.freeze({
             query: parsed.keywords,
             count: actors.length,
             instructions: dedent`
-                Choosing the right details tool: Use ${HelperTools.ACTOR_GET_DETAILS} when the user
-                wants to browse or explore Actors (e.g., "show me", "find me").
-                Use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL} when the user wants to execute a task and
-                you need the input schema (e.g., "scrape", "extract").
+                Choosing the right details tool: Use ${HelperTools.ACTOR_GET_DETAILS_WIDGET} when the user
+                wants to see or browse Actor details — it renders an interactive UI element (widget) for the user
+                (e.g., "show me", "tell me about this Actor").
+                Use ${HelperTools.ACTOR_GET_DETAILS} for silent data lookups (input schema, README, metadata)
+                when preparing an Actor run or making a decision (e.g., "scrape", "extract") — no UI is rendered.
                 IMPORTANT: You MUST always do a second search with broader, more generic keywords
                 (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
                 you haven't missed a better Actor.
@@ -75,12 +76,12 @@ export const appsSearchActors: ToolEntry = Object.freeze({
             ${actorCardText}
 
             ## Choosing the right details tool:
-            - Use ${HelperTools.ACTOR_GET_DETAILS} when the user wants to **browse or explore**
-              Actors (e.g., "show me Google Maps scrapers", "find me a TikTok scraper", "what Actors
-              exist for LinkedIn"). This renders an interactive widget for the user.
-            - Use ${HelperTools.ACTOR_GET_DETAILS_INTERNAL} when the user wants to **execute a task**
-              and you need the Actor's input schema to prepare the run (e.g., "scrape Google Maps for
-              restaurants", "extract emails from this website"). This is a silent lookup — no widget
+            - Use ${HelperTools.ACTOR_GET_DETAILS_WIDGET} when the user wants to **see or browse**
+              an Actor (e.g., "show me apify/rag-web-browser", "tell me about this Actor"). This renders
+              an **interactive UI element (widget)** the user can view directly.
+            - Use ${HelperTools.ACTOR_GET_DETAILS} for **silent data lookups** — fetching the input
+              schema to prepare a run, reading the README for decision making, or inspecting metadata
+              (e.g., "scrape Google Maps for restaurants", "extract emails from this website"). No UI
               is rendered.
 
             IMPORTANT: You MUST always do a second search with broader, more generic keywords
