@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.20 - **not yet released**
+## [0.9.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.20) (2026-04-27)
 
 ### 🚀 Features
 
@@ -15,7 +14,6 @@ All notable changes to this project will be documented in this file.
 - Fill unit-test gaps for MCP task functionality ([#688](https://github.com/apify/apify-mcp-server/pull/688)) ([3899fa7](https://github.com/apify/apify-mcp-server/commit/3899fa7e647a939bbe9fa27b6a525f214e4df90e)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.19](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.19) (2026-04-16)
 
 ### 🐛 Bug Fixes
