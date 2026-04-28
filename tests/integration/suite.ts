@@ -2536,7 +2536,10 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+        // TODO: re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
+        // Currently 'auto' resolves to DEFAULT regardless of client UI capability, so these
+        // tests cannot exercise capability-driven mode resolution.
+        it.skip('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
             client = await createClientFn({
                 clientCapabilities: {
@@ -2550,7 +2553,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
+        it.skip('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
             client = await createClientFn();
             const tools = await client.listTools();
@@ -2718,7 +2721,7 @@ export function createIntegrationTestsSuite(
                 startedAt: string;
                 dataset?: {
                     datasetId: string;
-                    itemCount: number;
+                    totalItemCount: number;
                 };
             } };
 
@@ -2733,7 +2736,7 @@ export function createIntegrationTestsSuite(
             if (runContent.structuredContent?.status === 'SUCCEEDED') {
                 expect(runContent.structuredContent?.dataset).toBeDefined();
                 expect(runContent.structuredContent?.dataset?.datasetId).toBeDefined();
-                expect(runContent.structuredContent?.dataset?.itemCount).toBeDefined();
+                expect(runContent.structuredContent?.dataset?.totalItemCount).toBeDefined();
             }
         });
 
