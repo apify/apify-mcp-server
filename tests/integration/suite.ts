@@ -2614,6 +2614,61 @@ export function createIntegrationTestsSuite(
 
         // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
         it.runIf(options.transport === 'streamable-http')(
+            'should advertise x402 metadata on all paymentRequired tools when x402 payment is enabled',
+            async () => {
+                // Hardcoded list of tools expected to advertise _meta.x402 (i.e. paymentRequired: true).
+                // Kept independent of any production constant so this test pins the expected paid set
+                // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
+                const paidToolNames = [
+                    HelperTools.ACTOR_CALL,
+                    HelperTools.ACTOR_OUTPUT_GET,
+                    HelperTools.ACTOR_RUNS_GET,
+                    HelperTools.ACTOR_RUNS_LOG,
+                    HelperTools.ACTOR_RUNS_ABORT,
+                    HelperTools.DATASET_GET,
+                    HelperTools.DATASET_GET_ITEMS,
+                    HelperTools.DATASET_SCHEMA_GET,
+                    HelperTools.KEY_VALUE_STORE_GET,
+                    HelperTools.KEY_VALUE_STORE_KEYS_GET,
+                    HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                ];
+                const freeToolNames = [HelperTools.STORE_SEARCH, HelperTools.DOCS_SEARCH];
+
+                client = await createClientFn({
+                    payment: 'x402',
+                    tools: [...paidToolNames, ...freeToolNames],
+                });
+
+                const toolsList = await client.listTools();
+
+                // Positive: paid tools advertise _meta.x402 with the expected fields.
+                for (const toolName of paidToolNames) {
+                    const tool = toolsList.tools.find((t) => t.name === toolName);
+                    expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
+
+                    const x402 = tool?._meta?.x402 as Record<string, unknown> | undefined;
+                    expect(x402, `Tool "${toolName}" should advertise _meta.x402`).toBeDefined();
+                    expect(x402?.paymentRequired, `Tool "${toolName}" x402.paymentRequired should be true`).toBe(true);
+
+                    for (const field of ['scheme', 'network', 'asset', 'payTo', 'amount'] as const) {
+                        expect(x402?.[field], `Tool "${toolName}" should advertise x402.${field}`).toBeDefined();
+                    }
+                }
+
+                // Negative: free tools must not advertise _meta.x402.
+                for (const toolName of freeToolNames) {
+                    const tool = toolsList.tools.find((t) => t.name === toolName);
+                    expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
+                    const meta = tool?._meta as Record<string, unknown> | undefined;
+                    expect(meta?.x402, `Tool "${toolName}" should not advertise _meta.x402`).toBeUndefined();
+                }
+
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
             'should return x402 payment error when calling paymentRequired tool without payment signature',
             async () => {
                 client = await createClientFn({ tools: ['actors'], payment: 'x402' });
