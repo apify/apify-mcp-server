@@ -254,7 +254,9 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    if (hasCallActor) {
+    // In default mode call-actor is synchronous, so get-actor-run is only needed when call-actor
+    // is present. In apps mode call-actor is always async, so actor tools also need get-actor-run.
+    if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
