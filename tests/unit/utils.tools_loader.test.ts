@@ -31,10 +31,9 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         const toolNames = tools.map((tool) => tool.name);
         expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
         expect(toolNames).toContain(HelperTools.DOCS_FETCH);
-        // get-actor-run is auto-injected in apps mode, so its widget pairs with it
-        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
-        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
-        // Widgets whose base tools are not in the selection must NOT appear
+        // get-actor-run is not requested and not triggered by call-actor, so no widgets appear
+        expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET);
+        expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
         expect(toolNames).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
         expect(toolNames).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
         expect(toolNames).not.toContain(HelperTools.ACTOR_CALL_WIDGET);

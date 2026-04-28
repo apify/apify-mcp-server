@@ -17,6 +17,7 @@ import {
 } from '../tools/categories.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
+import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
@@ -167,19 +168,18 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
     const selectorsExplicitEmpty = selectors?.length === 0;
-    const explicitlyNoToolsRequested = selectorsExplicitEmpty || actorsExplicitlyEmpty;
 
     // Build mode-specific tool-by-name map for individual tool selection
-    const modeToolByName = new Map<string, ToolEntry>();
+    const toolsByName = new Map<string, ToolEntry>();
     for (const name of CATEGORY_NAMES) {
         for (const tool of categories[name]) {
-            modeToolByName.set(tool.name, tool);
+            toolsByName.set(tool.name, tool);
         }
     }
     // Widgets are apps-only and not in any category; include for direct selection
     if (mode === ServerMode.APPS) {
         for (const widget of WIDGET_BY_BASE_TOOL.values()) {
-            modeToolByName.set(widget.name, widget);
+            toolsByName.set(widget.name, widget);
         }
     }
 
@@ -191,7 +191,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = modeToolByName.get(HelperTools.ACTOR_CALL);
+                const callActorTool = toolsByName.get(HelperTools.ACTOR_CALL);
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -201,7 +201,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
                 internalSelections.push(...categoryTools);
                 continue;
             }
-            const internalByName = modeToolByName.get(sel);
+            const internalByName = toolsByName.get(sel);
             if (internalByName) {
                 internalSelections.push(internalByName);
                 continue;
@@ -251,16 +251,13 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
-    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
-    const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
+    // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || (mode === ServerMode.APPS && !explicitlyNoToolsRequested))) {
-        // Use mode-resolved get-actor-run variant
-        const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
-        if (modeGetActorRun) toolsToInject.push(modeGetActorRun);
+    if (hasCallActor) {
+        toolsToInject.push(defaultGetActorRun);
     }
-    if (!hasGetActorOutput && (hasCallActor || hasActorTools || hasAddActorTool)) {
+    if (hasCallActor || hasActorTools || hasAddActorTool) {
         toolsToInject.push(getActorOutput);
     }
 
