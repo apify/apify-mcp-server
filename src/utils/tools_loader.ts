@@ -265,10 +265,11 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     // Apps mode: append a widget tool for each base tool already in the result.
     // Runs after the get-actor-run auto-inject so an auto-injected base still
-    // brings its widget sibling. Duplicates are removed by the de-dup pass below.
+    // brings its widget sibling.
     if (mode === ServerMode.APPS) {
         for (const entry of [...result]) {
             const widget = WIDGET_BY_BASE_TOOL.get(entry.name);
+            // Push unconditionally; any duplicates are stripped by the de-dup pass below.
             if (widget) result.push(widget);
         }
     }
