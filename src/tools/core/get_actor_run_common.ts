@@ -46,6 +46,7 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
+    paymentRequired: true,
     annotations: {
         title: 'Get Actor run',
         readOnlyHint: true,
