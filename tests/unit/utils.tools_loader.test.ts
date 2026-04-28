@@ -77,7 +77,7 @@ describe('loadToolsFromInput explicit widget selection', () => {
         );
         const toolNames = tools.map((t) => t.name);
         expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-        // Actor names must NOT include the widget name
+        // The widget tool should be present exactly once (no duplicate tool entries)
         expect(toolNames.filter((n) => n === HelperTools.STORE_SEARCH_WIDGET)).toHaveLength(1);
     });
 });
