@@ -245,8 +245,6 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
      * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
      * Insert them right after call-actor to follow the logical workflow order:
      * search → details → call → run status → output → docs → actor tools
-     *
-     * Uses mode-resolved variants from getCategoryTools() for get-actor-run.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -277,7 +275,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     // brings its widget sibling.
     if (mode === ServerMode.APPS) {
         for (const entry of [...result]) {
-            const widget = WIDGET_BY_BASE_TOOL.get(entry.name);
+            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperTools);
             // Push unconditionally; any duplicates are stripped by the de-dup pass below.
             if (widget) result.push(widget);
         }

@@ -224,6 +224,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
         expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
     });
 
     it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
@@ -245,7 +246,7 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
     });
 
-    it('tools: ["actors"] category in apps mode pairs all three actor widgets', () => {
+    it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
         const names = namesFor({ tools: ['actors'] }, ServerMode.APPS);
         expect(names).toContain(HelperTools.STORE_SEARCH_WIDGET);
         expect(names).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);

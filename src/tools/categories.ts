@@ -160,7 +160,7 @@ export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] =
  * does NOT auto-bring its base; callers asking for widget-only get a UI without
  * the programmatic data tool. To get both, select the base (or both explicitly).
  */
-export const WIDGET_BY_BASE_TOOL: ReadonlyMap<string, ToolEntry> = new Map([
+export const WIDGET_BY_BASE_TOOL: ReadonlyMap<HelperTools, ToolEntry> = new Map([
     [HelperTools.STORE_SEARCH, searchActorsWidgetTool],
     [HelperTools.ACTOR_GET_DETAILS, fetchActorDetailsWidgetTool],
     [HelperTools.ACTOR_CALL, appsCallActorWidget],

@@ -2527,7 +2527,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // TODO: re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
+        // TODO(#771): re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
         // Currently 'auto' resolves to DEFAULT regardless of client UI capability, so these
         // tests cannot exercise capability-driven mode resolution.
         it.skip('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
