@@ -76,7 +76,18 @@ describe('loadToolsFromInput explicit widget selection', () => {
         );
         const toolNames = tools.map((t) => t.name);
         expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-        // The widget tool should be present exactly once (no duplicate tool entries)
+    });
+
+    it('should not duplicate the widget when both base and widget are explicitly selected', async () => {
+        const tools = await loadToolsFromInput(
+            { tools: [HelperTools.STORE_SEARCH, HelperTools.STORE_SEARCH_WIDGET] },
+            apifyClient,
+            'apps',
+        );
+        const toolNames = tools.map((t) => t.name);
+        // Base selected explicitly + widget selected explicitly + pairing pass would push widget again.
+        // The de-dup pass must collapse to exactly one widget entry.
         expect(toolNames.filter((n) => n === HelperTools.STORE_SEARCH_WIDGET)).toHaveLength(1);
+        expect(toolNames.filter((n) => n === HelperTools.STORE_SEARCH)).toHaveLength(1);
     });
 });
