@@ -48,7 +48,7 @@ ${isApps ? `
 ## Widget workflow (applies when tool responses include widget metadata)
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
-- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status.
+- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
 - Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` (the silent async variant, no widget) is fine — that tool renders no UI, so polling is expected when you need the run status.
 ` : ''}
 ## Tool dependencies and disambiguation
