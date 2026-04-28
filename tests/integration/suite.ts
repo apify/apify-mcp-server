@@ -1665,11 +1665,8 @@ export function createIntegrationTestsSuite(
 
             const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
             // Only assert that all tools from the selected category are present.
-            // Note: UI category tools are only loaded in apps mode, so they won't be present in default mode
             for (const expectedToolName of expectedToolNames) {
-                if (category !== 'ui') {
-                    expect(toolNames).toContain(expectedToolName);
-                }
+                expect(toolNames).toContain(expectedToolName);
             }
         });
 

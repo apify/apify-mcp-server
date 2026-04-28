@@ -8,7 +8,13 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from '../tools/categories.js';
+import {
+    CATEGORY_NAME_SET,
+    CATEGORY_NAMES,
+    getCategoryTools,
+    toolCategoriesEnabledByDefault,
+    WIDGET_BY_BASE_TOOL,
+} from '../tools/categories.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -220,11 +226,6 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         }
     }
 
-    // In apps mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (mode === ServerMode.APPS && !explicitlyNoToolsRequested) {
-        result.push(...categories.ui);
-    }
-
     // Actor tools (pre-fetched, mode-agnostic)
     if (actorTools.length > 0) {
         result.push(...actorTools);
@@ -259,6 +260,16 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             result.splice(callActorIndex + 1, 0, ...toolsToInject);
         } else {
             result.push(...toolsToInject);
+        }
+    }
+
+    // Apps mode: append a widget tool for each base tool already in the result.
+    // Runs after the get-actor-run auto-inject so an auto-injected base still
+    // brings its widget sibling. Duplicates are removed by the de-dup pass below.
+    if (mode === ServerMode.APPS) {
+        for (const entry of [...result]) {
+            const widget = WIDGET_BY_BASE_TOOL.get(entry.name);
+            if (widget) result.push(widget);
         }
     }
 

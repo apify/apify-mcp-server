@@ -13,6 +13,7 @@
  * - A mode map (e.g. { default: ToolEntry, apps: ToolEntry }) — resolver picks entry[mode]
  * - A partial mode map (e.g. { apps: ToolEntry }) — included only for listed modes
  */
+import { HelperTools } from '../const.js';
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
@@ -71,12 +72,6 @@ export const toolCategories = {
         defaultSearchActors,
         defaultFetchActorDetails,
         { default: defaultCallActor, apps: appsCallActor },
-    ],
-    ui: [
-        { apps: searchActorsWidgetTool },
-        { apps: fetchActorDetailsWidgetTool },
-        { apps: appsCallActorWidget },
-        { apps: getActorRunWidgetTool },
     ],
     docs: [
         searchApifyDocsTool,
@@ -155,3 +150,15 @@ export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] =
     'actors',
     'docs',
 ];
+
+/**
+ * Apps-mode pairing: each base tool name maps to its widget sibling.
+ * In apps mode, a widget is added to the resolved tool list iff its base
+ * tool is already present — see `getToolsForServerMode` in tools_loader.ts.
+ */
+export const WIDGET_BY_BASE_TOOL: ReadonlyMap<string, ToolEntry> = new Map([
+    [HelperTools.STORE_SEARCH, searchActorsWidgetTool],
+    [HelperTools.ACTOR_GET_DETAILS, fetchActorDetailsWidgetTool],
+    [HelperTools.ACTOR_CALL, appsCallActorWidget],
+    [HelperTools.ACTOR_RUNS_GET, getActorRunWidgetTool],
+]);
