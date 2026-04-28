@@ -58,4 +58,26 @@ describe('toolNamesToInput', () => {
             actors: ['apify/rag-web-browser'],
         });
     });
+
+    it('should classify widget tool names as internal tools, not actor IDs', () => {
+        expect(toolNamesToInput([HelperTools.STORE_SEARCH_WIDGET])).toEqual({
+            tools: [HelperTools.STORE_SEARCH_WIDGET],
+        });
+    });
+});
+
+describe('loadToolsFromInput explicit widget selection', () => {
+    const apifyClient = new ApifyClient({ token: 'test-token' });
+
+    it('should resolve an explicit widget name to the widget tool in apps mode', async () => {
+        const tools = await loadToolsFromInput(
+            { tools: [HelperTools.STORE_SEARCH_WIDGET] },
+            apifyClient,
+            'apps',
+        );
+        const toolNames = tools.map((t) => t.name);
+        expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
+        // Actor names must NOT include the widget name
+        expect(toolNames.filter((n) => n === HelperTools.STORE_SEARCH_WIDGET)).toHaveLength(1);
+    });
 });

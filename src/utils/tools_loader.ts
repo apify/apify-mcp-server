@@ -35,6 +35,10 @@ function getAllInternalToolNames(): Set<string> {
                 }
             }
         }
+        // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            allNames.add(widget.name);
+        }
         ALL_INTERNAL_TOOL_NAMES_CACHE = allNames;
     }
     return ALL_INTERNAL_TOOL_NAMES_CACHE;
@@ -170,6 +174,12 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     for (const name of CATEGORY_NAMES) {
         for (const tool of categories[name]) {
             modeToolByName.set(tool.name, tool);
+        }
+    }
+    // Widgets are apps-only and not in any category; include for direct selection
+    if (mode === ServerMode.APPS) {
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            modeToolByName.set(widget.name, widget);
         }
     }
 
