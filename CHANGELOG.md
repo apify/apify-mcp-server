@@ -12,6 +12,10 @@ All notable changes to this project will be documented in this file.
 - Split call-actor into data + -widget tools ([#724](https://github.com/apify/apify-mcp-server/pull/724)) ([92870a6](https://github.com/apify/apify-mcp-server/commit/92870a67614f3d17cdf577931215d655a534f58e)) by [@jirispilka](https://github.com/jirispilka), closes [#718](https://github.com/apify/apify-mcp-server/issues/718)
 - Split get-actor-run into data + -widget tools ([#734](https://github.com/apify/apify-mcp-server/pull/734)) ([8dd6d32](https://github.com/apify/apify-mcp-server/commit/8dd6d3240eccc707b95c57132c873deb469a0589)) by [@jirispilka](https://github.com/jirispilka), closes [#719](https://github.com/apify/apify-mcp-server/issues/719)
 
+### 🐛 Bug Fixes
+
+- Widget pairing: move from category-based to base-tool-based ([#767](https://github.com/apify/apify-mcp-server/pull/767)) ([36b5923](https://github.com/apify/apify-mcp-server/commit/36b5923b111c1bff05b9d5eb4727b76a70961a84)) by [@jirispilka](https://github.com/jirispilka)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.9.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.20) (2026-04-27)
