@@ -328,9 +328,9 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should list two loaded Actors', async () => {
+        it('should list two loaded Actors plus get-actor-output', async () => {
             const actors = ['apify/python-example', 'apify/rag-web-browser'];
-            client = await createClientFn({ actors, enableAddingActors: false });
+            client = await createClientFn({ actors, enableAddingActors: false, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             expect(names.length).toEqual(actors.length + 1);
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
@@ -341,7 +341,7 @@ export function createIntegrationTestsSuite(
 
         it('should load only specified actors when actors param is provided (no other tools)', async () => {
             const actors = ['apify/python-example'];
-            client = await createClientFn({ actors });
+            client = await createClientFn({ actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
 
             // Should only load the specified actor, no default tools or categories
@@ -398,7 +398,7 @@ export function createIntegrationTestsSuite(
 
         it('should load only specified Actors via tools selectors when actors param omitted', async () => {
             const actors = ['apify/python-example'];
-            client = await createClientFn({ tools: actors });
+            client = await createClientFn({ tools: actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             // Only the Actor should be loaded
             expect(names).toHaveLength(actors.length + 1);
@@ -1665,11 +1665,8 @@ export function createIntegrationTestsSuite(
 
             const expectedToolNames = getExpectedToolNamesByCategories([category as ToolCategory]);
             // Only assert that all tools from the selected category are present.
-            // Note: UI category tools are only loaded in apps mode, so they won't be present in default mode
             for (const expectedToolName of expectedToolNames) {
-                if (category !== 'ui') {
-                    expect(toolNames).toContain(expectedToolName);
-                }
+                expect(toolNames).toContain(expectedToolName);
             }
         });
 
@@ -2472,13 +2469,12 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should use serverMode URL parameter when provided', async () => {
+        it('should enable apps mode when serverMode is apps', async () => {
             client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
             expect(tools.tools.length).toBeGreaterThan(0);
 
-            // Verify that apps-only internal tools are present in apps mode
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
             expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
@@ -2489,26 +2485,22 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')(
-            'should treat ui=true URL parameter the same as ui=apps', async () => {
-                // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
-                client = await createClientFn({ serverMode: 'true' });
-                const tools = await client.listTools();
-                const toolNames = getToolNames(tools);
-                expect(tools.tools.length).toBeGreaterThan(0);
+        it('should treat serverMode=true the same as serverMode=apps', async () => {
+            // 'true' is the standard external value for ?ui= (maps to 'apps' internally via parseServerMode)
+            client = await createClientFn({ serverMode: 'true' });
+            const tools = await client.listTools();
+            const toolNames = getToolNames(tools);
+            expect(tools.tools.length).toBeGreaterThan(0);
 
-                // Verify that apps-only internal tools are present when ui=true is used
-                expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
-                expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
-                expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+            expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expectWidgetToolMeta(tools);
 
-                // Verify that tools have widget metadata when ui=true is used
-                expectWidgetToolMeta(tools);
+            await client.close();
+        });
 
-                await client.close();
-            });
-
-        it('should automatically include get-actor-run when serverMode is enabled', async () => {
+        it('should automatically include get-actor-run for default settings when call-actor is enabled', async () => {
             client = await createClientFn({ serverMode: 'apps' });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
@@ -2520,13 +2512,14 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.runIf(options.transport === 'sse' || options.transport === 'streamable-http')('should include get-actor-run without call-actor', async () => {
+        it('should not include get-actor-run when only docs tools are selected', async () => {
             client = await createClientFn({ serverMode: 'apps', tools: ['docs'] });
             const tools = await client.listTools();
             const toolNames = getToolNames(tools);
 
-            // get-actor-run should be included when serverMode is enabled, even if call-actor is not present
-            expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+            // No actor tools selected — get-actor-run and its widget must not appear
+            expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
             // Docs tools should be present
             expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
             expect(toolNames).toContain(HelperTools.DOCS_FETCH);
@@ -2536,7 +2529,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // TODO: re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
+        // TODO(#771): re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
         // Currently 'auto' resolves to DEFAULT regardless of client UI capability, so these
         // tests cannot exercise capability-driven mode resolution.
         it.skip('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {

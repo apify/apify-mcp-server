@@ -8,9 +8,16 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
-import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategoriesEnabledByDefault } from '../tools/categories.js';
+import {
+    CATEGORY_NAME_SET,
+    CATEGORY_NAMES,
+    getCategoryTools,
+    toolCategoriesEnabledByDefault,
+    WIDGET_BY_BASE_TOOL,
+} from '../tools/categories.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
+import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
@@ -28,6 +35,10 @@ function getAllInternalToolNames(): Set<string> {
                     allNames.add(tool.name);
                 }
             }
+        }
+        // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            allNames.add(widget.name);
         }
         ALL_INTERNAL_TOOL_NAMES_CACHE = allNames;
     }
@@ -157,13 +168,18 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     const { selectors, addActorEnabled, actorsExplicitlyEmpty } = normalizeInput(input);
     const selectorsExplicitEmpty = selectors?.length === 0;
-    const explicitlyNoToolsRequested = selectorsExplicitEmpty || actorsExplicitlyEmpty;
 
     // Build mode-specific tool-by-name map for individual tool selection
-    const modeToolByName = new Map<string, ToolEntry>();
+    const toolsByName = new Map<string, ToolEntry>();
     for (const name of CATEGORY_NAMES) {
         for (const tool of categories[name]) {
-            modeToolByName.set(tool.name, tool);
+            toolsByName.set(tool.name, tool);
+        }
+    }
+    // Widgets are apps-only and not in any category; include for direct selection
+    if (mode === ServerMode.APPS) {
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            toolsByName.set(widget.name, widget);
         }
     }
 
@@ -175,7 +191,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             if (sel === 'preview') {
                 // 'preview' category is deprecated. It contained `call-actor` which is now default.
                 log.warning('Tool category "preview" is deprecated');
-                const callActorTool = modeToolByName.get(HelperTools.ACTOR_CALL);
+                const callActorTool = toolsByName.get(HelperTools.ACTOR_CALL);
                 if (callActorTool) internalSelections.push(callActorTool);
                 continue;
             }
@@ -185,7 +201,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
                 internalSelections.push(...categoryTools);
                 continue;
             }
-            const internalByName = modeToolByName.get(sel);
+            const internalByName = toolsByName.get(sel);
             if (internalByName) {
                 internalSelections.push(internalByName);
                 continue;
@@ -220,11 +236,6 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         }
     }
 
-    // In apps mode, unconditionally add UI-specific tools (regardless of selectors)
-    if (mode === ServerMode.APPS && !explicitlyNoToolsRequested) {
-        result.push(...categories.ui);
-    }
-
     // Actor tools (pre-fetched, mode-agnostic)
     if (actorTools.length > 0) {
         result.push(...actorTools);
@@ -234,22 +245,19 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
      * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
      * Insert them right after call-actor to follow the logical workflow order:
      * search → details → call → run status → output → docs → actor tools
-     *
-     * Uses mode-resolved variants from getCategoryTools() for get-actor-run.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
-    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
-    const hasGetActorOutput = result.some((entry) => entry.name === HelperTools.ACTOR_OUTPUT_GET);
 
+    // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    if (!hasGetActorRun && (hasCallActor || (mode === ServerMode.APPS && !explicitlyNoToolsRequested))) {
-        // Use mode-resolved get-actor-run variant
-        const modeGetActorRun = modeToolByName.get(HelperTools.ACTOR_RUNS_GET);
-        if (modeGetActorRun) toolsToInject.push(modeGetActorRun);
+    // In default mode call-actor is synchronous, so get-actor-run is only needed when call-actor
+    // is present. In apps mode call-actor is always async, so actor tools also need get-actor-run.
+    if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
+        toolsToInject.push(defaultGetActorRun);
     }
-    if (!hasGetActorOutput && (hasCallActor || hasActorTools || hasAddActorTool)) {
+    if (hasCallActor || hasActorTools || hasAddActorTool) {
         toolsToInject.push(getActorOutput);
     }
 
@@ -259,6 +267,17 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             result.splice(callActorIndex + 1, 0, ...toolsToInject);
         } else {
             result.push(...toolsToInject);
+        }
+    }
+
+    // Apps mode: append a widget tool for each base tool already in the result.
+    // Runs after the get-actor-run auto-inject so an auto-injected base still
+    // brings its widget sibling.
+    if (mode === ServerMode.APPS) {
+        for (const entry of [...result]) {
+            const widget = WIDGET_BY_BASE_TOOL.get(entry.name as HelperTools);
+            // Push unconditionally; any duplicates are stripped by the de-dup pass below.
+            if (widget) result.push(widget);
         }
     }
 

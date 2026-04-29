@@ -38,16 +38,6 @@ describe('getCategoryTools', () => {
         }
     });
 
-    it('should return empty ui category in default mode', () => {
-        const result = getCategoryTools('default');
-        expect(result.ui).toEqual([]);
-    });
-
-    it('should return non-empty ui category in apps mode', () => {
-        const result = getCategoryTools('apps');
-        expect(result.ui.length).toBeGreaterThan(0);
-    });
-
     it('should return different tool variants for actors category based on mode', () => {
         const defaultResult = getCategoryTools('default');
         const appsResult = getCategoryTools('apps');

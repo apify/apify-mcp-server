@@ -11,12 +11,14 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { ALLOWED_TASK_TOOL_EXECUTION_MODES, HelperTools } from '../../src/const.js';
+import { WIDGET_BY_BASE_TOOL } from '../../src/tools/categories.js';
 import { searchApifyDocsTool } from '../../src/tools/common/search_apify_docs.js';
 import { searchActorsBaseArgsSchema } from '../../src/tools/core/search_actors_common.js';
 import { CATEGORY_NAMES, getCategoryTools } from '../../src/tools/index.js';
-import type { ToolBase, ToolEntry } from '../../src/types.js';
-import { SERVER_MODES } from '../../src/types.js';
+import type { Input, ToolBase, ToolEntry } from '../../src/types.js';
+import { SERVER_MODES, ServerMode } from '../../src/types.js';
 import { getToolPublicFieldOnly } from '../../src/utils/tools.js';
+import { getToolsForServerMode } from '../../src/utils/tools_loader.js';
 
 /** Helper to extract tool names from a category. */
 function toolNames(tools: ToolEntry[]): string[] {
@@ -37,19 +39,6 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             const expected = [HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL];
             expect(toolNames(defaultCategories.actors)).toEqual(expected);
             expect(toolNames(appsCategories.actors)).toEqual(expected);
-        });
-
-        it('should have empty ui category in default mode', () => {
-            expect(toolNames(defaultCategories.ui)).toEqual([]);
-        });
-
-        it('should have widget tools in ui category in apps mode', () => {
-            expect(toolNames(appsCategories.ui)).toEqual([
-                HelperTools.STORE_SEARCH_WIDGET,
-                HelperTools.ACTOR_GET_DETAILS_WIDGET,
-                HelperTools.ACTOR_CALL_WIDGET,
-                HelperTools.ACTOR_RUNS_GET_WIDGET,
-            ]);
         });
 
         it('should have correct tools in docs category (both modes)', () => {
@@ -99,7 +88,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             const defaultNames = toolNames(defaultCategories[categoryName]);
             const appsNames = toolNames(appsCategories[categoryName]);
 
-            // Only check categories that exist in both modes (ui category is apps-only)
+            // Only check categories that exist in both modes
             if (defaultNames.length > 0 && appsNames.length > 0) {
                 it(`should have identical tool names in ${categoryName} category across modes`, () => {
                     expect(defaultNames).toEqual(appsNames);
@@ -155,8 +144,9 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         // Locks the invariant that search-actors-widget reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
         it('should use searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
-            const widgetTool = appsCategories.ui.find((t) => t.name === HelperTools.STORE_SEARCH_WIDGET);
+            const widgetTool = WIDGET_BY_BASE_TOOL.get(HelperTools.STORE_SEARCH);
             expect(widgetTool).toBeDefined();
+            expect(widgetTool!.name).toBe(HelperTools.STORE_SEARCH_WIDGET);
             expect(widgetTool!.inputSchema).toEqual(z.toJSONSchema(searchActorsBaseArgsSchema.strict()));
         });
     });
@@ -191,6 +181,12 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 }
             }
         }
+
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            it(`${widget.name} widget should be frozen`, () => {
+                expect(Object.isFrozen(widget)).toBe(true);
+            });
+        }
     });
 
     describe('all tool names match HelperTools enum values', () => {
@@ -207,6 +203,63 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 }
             }
         }
+
+        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+            it(`${widget.name} widget should be a known HelperTools value`, () => {
+                expect(allHelperToolNames.has(widget.name as HelperTools)).toBe(true);
+            });
+        }
+    });
+});
+
+describe('apps-mode widget pairing in getToolsForServerMode', () => {
+    function namesFor(input: Input, mode: ServerMode): string[] {
+        return getToolsForServerMode(input, [], mode).map((t) => t.name);
+    }
+
+    it('tools: ["docs"] in apps mode includes no widget tools', () => {
+        const names = namesFor({ tools: ['docs'] }, ServerMode.APPS);
+        expect(names).toContain(HelperTools.DOCS_SEARCH);
+        expect(names).toContain(HelperTools.DOCS_FETCH);
+        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+    });
+
+    it('tools: ["search-actors"] in apps mode pairs only the search-actors widget', () => {
+        const names = namesFor({ tools: ['search-actors'] }, ServerMode.APPS);
+        expect(names).toContain(HelperTools.STORE_SEARCH);
+        expect(names).toContain(HelperTools.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+    });
+
+    it('tools: ["call-actor"] in apps mode pairs call-actor-widget and the auto-injected get-actor-run-widget', () => {
+        const names = namesFor({ tools: ['call-actor'] }, ServerMode.APPS);
+        expect(names).toContain(HelperTools.ACTOR_CALL);
+        expect(names).toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
+        expect(names).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+        expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+    });
+
+    it('tools: ["actors"] category in apps mode pairs all four actor widgets', () => {
+        const names = namesFor({ tools: ['actors'] }, ServerMode.APPS);
+        expect(names).toContain(HelperTools.STORE_SEARCH_WIDGET);
+        expect(names).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
+    });
+
+    it('default mode adds no widget tools regardless of selection', () => {
+        const names = namesFor({ tools: ['actors'] }, ServerMode.DEFAULT);
+        expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+        expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
     });
 });
 
