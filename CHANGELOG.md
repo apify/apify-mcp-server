@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Split fetch-actor-details into data + -widget tools ([#722](https://github.com/apify/apify-mcp-server/pull/722)) ([1a455a5](https://github.com/apify/apify-mcp-server/commit/1a455a58d761f4c7939bb010934b41321e43fccc)) by [@jirispilka](https://github.com/jirispilka), closes [#716](https://github.com/apify/apify-mcp-server/issues/716)
+- Split search-actors into data + -widget tools ([#723](https://github.com/apify/apify-mcp-server/pull/723)) ([fad46a9](https://github.com/apify/apify-mcp-server/commit/fad46a9c8977428f7e5900adafb6927f33b8af1f)) by [@jirispilka](https://github.com/jirispilka), closes [#717](https://github.com/apify/apify-mcp-server/issues/717)
 
 
 <!-- git-cliff-unreleased-end -->
