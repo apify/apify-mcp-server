@@ -21,7 +21,7 @@ describe('call_actor_common', () => {
             expect(description).not.toContain('always runs asynchronously');
         });
 
-        it('builds the apps description with public search helper and async guidance', () => {
+        it('builds the apps description with public search helper and silent-async guidance pointing to the widget sibling', () => {
             const description = buildCallActorDescription({
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
                 alwaysAsync: true,
@@ -30,7 +30,10 @@ describe('call_actor_common', () => {
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
             expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
             expect(description).toContain('always runs asynchronously');
-            expect(description).toContain('do NOT poll or call any other tool');
+            expect(description).toContain('It renders no UI');
+            expect(description).toContain(`call ${HelperTools.ACTOR_CALL_WIDGET} instead`);
+            expect(description).toContain(`poll ${HelperTools.ACTOR_RUNS_GET} with the runId`);
+            expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
             expect(description).not.toContain('When `async: false` or not provided');
         });
     });

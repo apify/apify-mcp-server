@@ -16,6 +16,7 @@
 import type { ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { appsCallActor } from './apps/call_actor.js';
+import { appsCallActorWidget } from './apps/call_actor_widget.js';
 import { fetchActorDetailsWidgetTool } from './apps/fetch_actor_details_widget.js';
 import { appsGetActorRun } from './apps/get_actor_run.js';
 import { searchActorsWidgetTool } from './apps/search_actors_widget.js';
@@ -74,6 +75,7 @@ export const toolCategories = {
     ui: [
         { apps: searchActorsWidgetTool },
         { apps: fetchActorDetailsWidgetTool },
+        { apps: appsCallActorWidget },
     ],
     docs: [
         searchApifyDocsTool,

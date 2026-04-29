@@ -25,6 +25,7 @@ export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
+    ACTOR_CALL_WIDGET = 'call-actor-widget',
     ACTOR_GET_DETAILS = 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET = 'fetch-actor-details-widget',
     ACTOR_OUTPUT_GET = 'get-actor-output',

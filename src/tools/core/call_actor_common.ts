@@ -99,8 +99,9 @@ export function buildCallActorDescription(params: CallActorDescriptionParams): s
     if (alwaysAsync) {
         sections.push(dedent`
             IMPORTANT:
-            - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. A live widget automatically tracks the run progress.
-            - After calling this tool, do NOT poll or call any other tool. Wait for the user to respond — the widget will update them when the run completes.
+            - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. It renders no UI.
+            - For a live progress widget the user can watch, call ${HelperTools.ACTOR_CALL_WIDGET} instead.
+            - To check status or wait for completion, poll ${HelperTools.ACTOR_RUNS_GET} with the runId.
             - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
             - Use dedicated Actor tools when available for better experience
         `);
@@ -463,7 +464,10 @@ export async function resolveAndValidateActor(params: {
  * clients cannot pass a clean-enough id for definition fetch but a dirty id to `apifyClient.actor()` (see Mezmo:
  * e.g. trailing `` ` `` on `apify/rag-web-browser`).
  */
-export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
+export async function callActorPreExecute(
+    toolArgs: InternalToolArgs,
+    options: { route: string },
+): Promise<
     | { earlyResponse: object }
     | {
         parsed: CallActorParsedArgs;
@@ -473,7 +477,7 @@ export async function callActorPreExecute(toolArgs: InternalToolArgs): Promise<
 > {
     const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
-    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: 'call-actor' });
+    const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
     const parsed: CallActorParsedArgs = { ...parsedArgs, actor: actorName };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
