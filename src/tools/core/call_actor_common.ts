@@ -103,6 +103,7 @@ export function buildCallActorDescription(params: CallActorDescriptionParams): s
             - For a live progress widget the user can watch, call ${HelperTools.ACTOR_CALL_WIDGET} instead.
             - To check status or wait for completion, poll ${HelperTools.ACTOR_RUNS_GET} with the runId.
             - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
+            - If the Actor name needs resolving first, use ${HelperTools.STORE_SEARCH} (silent). Do NOT use ${HelperTools.STORE_SEARCH_WIDGET} for name resolution.
             - Use dedicated Actor tools when available for better experience
         `);
     } else {
