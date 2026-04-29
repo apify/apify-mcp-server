@@ -3,48 +3,16 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { sanitizeEnvValue, sanitizeProcessEnv } from '../../evals/shared/config.js';
 
 describe('sanitizeEnvValue', () => {
-    it('returns undefined for undefined', () => {
+    it('passes through undefined and null', () => {
         expect(sanitizeEnvValue(undefined)).toBeUndefined();
-    });
-
-    it('returns null for null', () => {
         expect(sanitizeEnvValue(null as unknown as undefined)).toBeNull();
     });
 
-    it('strips trailing newline', () => {
+    it('strips newlines and trims surrounding whitespace', () => {
         expect(sanitizeEnvValue('sk-abc123\n')).toBe('sk-abc123');
-    });
-
-    it('strips carriage-return + newline', () => {
         expect(sanitizeEnvValue('sk-abc123\r\n')).toBe('sk-abc123');
-    });
-
-    it('strips embedded newlines', () => {
         expect(sanitizeEnvValue('sk-\nabc\r\n123\n')).toBe('sk-abc123');
-    });
-
-    it('trims surrounding whitespace', () => {
         expect(sanitizeEnvValue('  sk-abc123  ')).toBe('sk-abc123');
-    });
-
-    it('strips surrounding double quotes', () => {
-        expect(sanitizeEnvValue('"sk-abc123"')).toBe('sk-abc123');
-    });
-
-    it('strips only outer quotes (not inner)', () => {
-        expect(sanitizeEnvValue('"sk-"abc"-123"')).toBe('sk-"abc"-123');
-    });
-
-    it('does not strip single quotes', () => {
-        expect(sanitizeEnvValue("'sk-abc123'")).toBe("'sk-abc123'");
-    });
-
-    it('handles combined whitespace, newlines, and quotes', () => {
-        expect(sanitizeEnvValue('  "sk-abc123"\n')).toBe('sk-abc123');
-    });
-
-    it('returns empty string for empty input', () => {
-        expect(sanitizeEnvValue('')).toBe('');
     });
 
     it('strips control characters', () => {
@@ -54,6 +22,17 @@ describe('sanitizeEnvValue', () => {
         expect(sanitizeEnvValue('sk-abc\x0c123')).toBe('sk-abc123'); // form feed
         expect(sanitizeEnvValue('sk-abc\x1f123')).toBe('sk-abc123'); // unit separator
         expect(sanitizeEnvValue('sk-abc\x7f123')).toBe('sk-abc123'); // DEL
+    });
+
+    it('strips surrounding double quotes only', () => {
+        expect(sanitizeEnvValue('"sk-abc123"')).toBe('sk-abc123');
+        expect(sanitizeEnvValue('"sk-"abc"-123"')).toBe('sk-"abc"-123');
+        expect(sanitizeEnvValue("'sk-abc123'")).toBe("'sk-abc123'");
+    });
+
+    it('handles combined inputs and edge cases', () => {
+        expect(sanitizeEnvValue('  "sk-abc123"\n')).toBe('sk-abc123');
+        expect(sanitizeEnvValue('')).toBe('');
     });
 
     it('is idempotent', () => {

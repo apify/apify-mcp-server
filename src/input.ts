@@ -6,17 +6,9 @@
  * intent via `undefined` (use defaults later) vs empty (explicitly none).
  */
 import log from '@apify/log';
+import { parseBooleanOrNull } from '@apify/utilities';
 
 import type { Input, ToolSelector } from './types.js';
-
-// Helpers
-// Normalize booleans that may arrive as strings or be undefined.
-export function toBoolean(value: unknown, defaultValue: boolean): boolean {
-    if (value === undefined) return defaultValue;
-    if (typeof value === 'boolean') return value;
-    if (typeof value === 'string') return value.toLowerCase() === 'true';
-    return defaultValue;
-}
 
 // Normalize lists from comma-separated strings or arrays.
 export function normalizeList(value: string | unknown[] | undefined): string[] | undefined {
@@ -46,9 +38,9 @@ export function processInput(originalInput: Partial<Input>): Input {
     let enableAddingActors: boolean;
     if (originalInput.enableAddingActors === undefined && originalInput.enableActorAutoLoading !== undefined) {
         log.warning('enableActorAutoLoading is deprecated, use enableAddingActors instead');
-        enableAddingActors = toBoolean(originalInput.enableActorAutoLoading, false);
+        enableAddingActors = parseBooleanOrNull(originalInput.enableActorAutoLoading) ?? false;
     } else {
-        enableAddingActors = toBoolean(originalInput.enableAddingActors, false);
+        enableAddingActors = parseBooleanOrNull(originalInput.enableAddingActors) ?? false;
     }
 
     // Normalize tools (strings/arrays) to a clean array or undefined
