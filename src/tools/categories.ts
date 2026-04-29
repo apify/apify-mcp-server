@@ -71,6 +71,7 @@ export const toolCategories = {
     actors: [
         defaultSearchActors,
         defaultFetchActorDetails,
+        // call-actor is different for default and apps mode (sync vs async call)
         { default: defaultCallActor, apps: appsCallActor },
     ],
     docs: [

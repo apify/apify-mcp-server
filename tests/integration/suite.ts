@@ -2478,6 +2478,8 @@ export function createIntegrationTestsSuite(
             expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
             expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
             expect(toolNames).toContain(HelperTools.ACTOR_CALL_WIDGET);
+
+            // Verify that tools have widget metadata when UI mode is enabled via URL parameter
             expectWidgetToolMeta(tools);
 
             await client.close();
