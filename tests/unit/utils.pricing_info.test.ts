@@ -226,17 +226,17 @@ describe('pricingInfoToString (complete mode)', () => {
         const out = pricingInfoToString(multiTierPayPerEvent);
         expect(out).toBe(
             'This Actor is paid per event:\n'
-            + '\t- **Scraped place**: A Google Maps place scraped '
+            + '  - **Scraped place**: A Google Maps place scraped '
             + '(FREE: $0.004, BRONZE: $0.004, SILVER: $0.003, '
             + 'GOLD: $0.0021, PLATINUM: $0.00126, DIAMOND: $0.00076 per event)\n'
-            + '\t- **Actor start**: Initial fee for starting the Actor ($0.00005 per event)',
+            + '  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)',
         );
     });
 
     it('E4: single-tier event renders as flat (no tier label)', () => {
         expect(pricingInfoToString(singleTierPayPerEvent)).toBe(
             'This Actor is paid per event:\n'
-            + '\t- **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+            + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
         );
     });
 
@@ -420,8 +420,8 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     it('E2: user on GOLD — one price per event, pricingNote appended', () => {
         expect(pricingInfoToSimplifiedString(multiTierPayPerEvent, 'GOLD')).toBe(
             `This Actor is paid per event:\n`
-            + `\t- **Scraped place**: A Google Maps place scraped ($0.0021 per event)\n`
-            + `\t- **Actor start**: Initial fee for starting the Actor ($0.00005 per event)\n${
+            + `  - **Scraped place**: A Google Maps place scraped ($0.0021 per event)\n`
+            + `  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)\n${
                 NOTE_GOLD}`,
         );
     });
@@ -429,7 +429,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     it('E4: single-tier actor — flat price, no pricingNote', () => {
         expect(pricingInfoToSimplifiedString(singleTierPayPerEvent, 'GOLD')).toBe(
             'This Actor is paid per event:\n'
-            + '\t- **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+            + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
         );
     });
 
@@ -469,20 +469,20 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     it('omits pricingNote text when PAY_PER_EVENT events resolve to different tiers', () => {
         expect(pricingInfoToSimplifiedString(mixedTierPayPerEvent, 'GOLD')).toBe(
             'This Actor is paid per event:\n'
-            + '\t- **A**:  ($0.005 per event)\n'
-            + '\t- **B**:  ($0.02 per event)',
+            + '  - **A**:  ($0.005 per event)\n'
+            + '  - **B**:  ($0.02 per event)',
         );
     });
 
     it('omits event descriptions in text when PAY_PER_EVENT has more than 5 events', () => {
         expect(pricingInfoToSimplifiedString(longPayPerEvent, 'FREE')).toBe(
             'This Actor is paid per event:\n'
-            + '\t- **Result**: $0.0037 per event\n'
-            + '\t- **Add-on: Date filter**: $0.0013 per event\n'
-            + '\t- **Add-on: Popularity filter**: $0.0013 per event\n'
-            + '\t- **Add-on: Follower / Following**: $0.004 per event\n'
-            + '\t- **Add-on: Search video sorting**: $0.0013 per event\n'
-            + `\t- **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
+            + '  - **Result**: $0.0037 per event\n'
+            + '  - **Add-on: Date filter**: $0.0013 per event\n'
+            + '  - **Add-on: Popularity filter**: $0.0013 per event\n'
+            + '  - **Add-on: Follower / Following**: $0.004 per event\n'
+            + '  - **Add-on: Search video sorting**: $0.0013 per event\n'
+            + `  - **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
         );
     });
 });
