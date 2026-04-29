@@ -2,7 +2,6 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -11,7 +10,7 @@ import type { PricingTier } from '../../utils/pricing_info.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Shared base schema for search-actors arguments. Used directly by the internal
+ * Shared base schema for search-actors arguments. Used directly by the widget
  * variant; extended by `searchActorsArgsSchema` with a longer `keywords` description.
  */
 export const searchActorsBaseArgsSchema = z.object({
@@ -32,7 +31,8 @@ export const searchActorsBaseArgsSchema = z.object({
 });
 
 /**
- * Zod schema for search-actors arguments — shared between default and apps variants.
+ * Zod schema for the base search-actors tool arguments. Not used by the widget
+ * variant (which reuses the shorter-description base schema via `.strict()`).
  */
 export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({
     keywords: z.string()
@@ -59,7 +59,6 @@ export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({
 const SEARCH_ACTORS_DESCRIPTION = `
 Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
 This tool provides INFORMATION about available Actors - it does NOT retrieve actual data or run any scraping tasks.
-Do NOT use this tool for helper name resolution before running an Actor; use ${HelperTools.STORE_SEARCH_INTERNAL} instead.
 
 Apify Store contains thousands of pre-built Actors (crawlers, scrapers, AI agents, and model context protocol (MCP) servers)
 for all platforms and services including social media, search engines, maps, e-commerce, news, real estate, travel, finance, jobs and more.
@@ -95,8 +94,8 @@ Returns list of Actor cards with the following info:
 `;
 
 /**
- * Shared tool metadata for search-actors — everything except the `call` handler.
- * Used by both default and apps variants.
+ * Tool metadata for the base search-actors tool — mode-independent, no widget `_meta`.
+ * Used by `defaultSearchActors` in both default and apps modes.
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
@@ -105,8 +104,6 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
-    // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-    _meta: { ...getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS)?.meta },
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,

@@ -57,8 +57,13 @@ describe('getCategoryTools', () => {
         const appsNames = appsResult.actors.map((t: ToolEntry) => t.name);
         expect(defaultNames).toEqual(appsNames);
 
-        // But the actual tool objects should be different (different call implementations)
-        expect(defaultResult.actors[0]).not.toBe(appsResult.actors[0]);
+        // call-actor still has mode-specific variants (sync-capable default vs always-async apps).
+        // search-actors and fetch-actor-details are mode-independent and share the same object.
+        const defaultCallActor = defaultResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
+        const appsCallActor = appsResult.actors.find((t: ToolEntry) => t.name === HelperTools.ACTOR_CALL);
+        expect(defaultCallActor).toBeDefined();
+        expect(appsCallActor).toBeDefined();
+        expect(defaultCallActor).not.toBe(appsCallActor);
     });
 
     it('should return different get-actor-run variants based on mode', () => {

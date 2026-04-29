@@ -41,7 +41,7 @@ export enum HelperTools {
     KEY_VALUE_STORE_KEYS_GET = 'get-key-value-store-keys',
     KEY_VALUE_STORE_RECORD_GET = 'get-key-value-store-record',
     STORE_SEARCH = 'search-actors',
-    STORE_SEARCH_INTERNAL = 'search-actors-internal',
+    STORE_SEARCH_WIDGET = 'search-actors-widget',
     DOCS_SEARCH = 'search-apify-docs',
     DOCS_FETCH = 'fetch-apify-docs',
 }

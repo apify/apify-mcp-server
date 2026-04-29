@@ -31,7 +31,7 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
         const toolNames = tools.map((tool) => tool.name);
         expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
         expect(toolNames).toContain(HelperTools.DOCS_FETCH);
-        expect(toolNames).toContain(HelperTools.STORE_SEARCH_INTERNAL);
+        expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
         expect(toolNames).toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
     });
