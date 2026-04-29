@@ -30,6 +30,14 @@
                 "APIFY_TOKEN": "${APIFY_TOKEN}",
                 "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}"
             }
+        },
+        "stdio-apps": {
+            "command": "node",
+            "args": ["dist/stdio.js", "--ui", "apps"],
+            "env": {
+                "APIFY_TOKEN": "${APIFY_TOKEN}",
+                "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}"
+            }
         }
     }
 }
