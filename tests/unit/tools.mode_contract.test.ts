@@ -48,6 +48,7 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HelperTools.STORE_SEARCH_WIDGET,
                 HelperTools.ACTOR_GET_DETAILS_WIDGET,
                 HelperTools.ACTOR_CALL_WIDGET,
+                HelperTools.ACTOR_RUNS_GET_WIDGET,
             ]);
         });
 
@@ -108,12 +109,17 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('base data tools have no widget meta in either mode', () => {
-        const baseToolNames = [HelperTools.ACTOR_GET_DETAILS, HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL];
+        const baseTools: { name: HelperTools; category: keyof typeof defaultCategories }[] = [
+            { name: HelperTools.ACTOR_GET_DETAILS, category: 'actors' },
+            { name: HelperTools.STORE_SEARCH, category: 'actors' },
+            { name: HelperTools.ACTOR_CALL, category: 'actors' },
+            { name: HelperTools.ACTOR_RUNS_GET, category: 'runs' },
+        ];
         for (const mode of SERVER_MODES) {
-            for (const name of baseToolNames) {
+            for (const { name, category } of baseTools) {
                 it(`${name} should have no ui/openai _meta keys in ${mode} mode`, () => {
                     const categories = getCategoryTools(mode);
-                    const base = categories.actors.find((t) => t.name === name);
+                    const base = categories[category].find((t) => t.name === name);
                     expect(base).toBeDefined();
                     const meta = base!._meta ?? {};
                     for (const key of Object.keys(meta)) {

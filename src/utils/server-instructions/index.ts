@@ -5,10 +5,6 @@
  * only when the resolved server mode is `'apps'`. Default-mode clients never
  * see widget tool names like `search-actors-widget` or `fetch-actor-details-widget`,
  * avoiding hallucinated calls to tools absent from `tools/list`.
- *
- * Note: the `-widget` suffix split is rolling out per-tool. `fetch-actor-details`,
- * `search-actors`, and `call-actor` are already split; `get-actor-run` still renders
- * a widget on its base name until its own split lands.
  */
 
 import { HelperTools, RAG_WEB_BROWSER } from '../../const.js';
@@ -52,7 +48,7 @@ ${isApps ? `
 ## Widget workflow (applies when tool responses include widget metadata)
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
-- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\`.** The widget renders live progress and polls itself — stop after the widget response and defer to it for run status.
+- **Never call \`${HelperTools.ACTOR_RUNS_GET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` after \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
 - Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` (the silent async variant, no widget) is fine — that tool renders no UI, so polling is expected when you need the run status.
 ` : ''}
 ## Tool dependencies and disambiguation
@@ -76,6 +72,7 @@ ${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**
   - \`${HelperTools.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HelperTools.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
   - \`${HelperTools.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
   - \`${HelperTools.ACTOR_CALL}\` is a silent async start (returns runId, no UI); \`${HelperTools.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
+  - \`${HelperTools.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.
   - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
 ` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
