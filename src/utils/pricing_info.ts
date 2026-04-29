@@ -268,7 +268,7 @@ function formatPayPerEventComplete(
 
     const eventLines = Object.values(pricingPerEvent.actorChargeEvents).map((event) => {
         const detail = formatCompleteEventDetail(event);
-        return `\t- **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
+        return `  - **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
     });
 
     return `This Actor is paid per event:\n${eventLines.join('\n')}`;
@@ -414,8 +414,8 @@ function formatPayPerEventSimplified(
         }
 
         const detail = typeof price === 'number' ? `$${price} per event` : 'No price info';
-        if (omitDescriptions) return `\t- **${event.eventTitle}**: ${detail}`;
-        return `\t- **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
+        if (omitDescriptions) return `  - **${event.eventTitle}**: ${detail}`;
+        return `  - **${event.eventTitle}**: ${event.eventDescription ?? ''} (${detail})`;
     });
 
     const body = `This Actor is paid per event:\n${eventLines.join('\n')}`;

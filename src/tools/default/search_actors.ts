@@ -54,15 +54,18 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             `,
         };
 
-        const instructions = dedent`
+        // Build header and footer with separate `dedent` calls and concatenate around
+        // `actorCardText` — Actor cards may contain tab-indented lines (pay-per-event
+        // pricing) that would corrupt `dedent`'s indent detection if interpolated into
+        // the surrounding template.
+        const header = dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
             - **Number of Actors found:** ${actors.length}
 
             # Actors:
-
-            ${actorCardText}
-
+        `;
+        const footer = dedent`
             If you need more detailed information about any of these Actors, including their input
             schemas and usage instructions, use the ${HelperTools.ACTOR_GET_DETAILS} tool with the
             specific Actor name.
@@ -70,6 +73,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
             you haven't missed a better Actor.
         `;
-        return buildMCPResponse({ texts: [instructions], structuredContent });
+        const texts = [`${header}\n\n${actorCardText}\n\n${footer}`];
+        return buildMCPResponse({ texts, structuredContent });
     },
 } as const);
