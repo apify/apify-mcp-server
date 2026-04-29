@@ -11,7 +11,7 @@ const mockRunData = {
 };
 
 const mockToolResponseMetadata = {
-    usageTotalUsd: 0.0456,
+    "com.apify/ActorRun": { usageTotalUsd: 0.0456 },
 };
 
 const LOADING_DELAY_MS = 2000;
@@ -189,7 +189,7 @@ export function setupActorRunWidgetDev(): void {
                 return {
                     result: "success",
                     _meta: {
-                        usageTotalUsd: isComplete ? 0.0456 : 0.0123,
+                        "com.apify/ActorRun": { usageTotalUsd: isComplete ? 0.0456 : 0.0123 },
                     },
                     structuredContent: {
                         runId: (args.runId as string) || "test_run_123",

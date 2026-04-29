@@ -191,14 +191,14 @@ function expectEmbeddedSchemaWithMetadataAndCrawl(text: string): void {
 /** Validates that the result contains Apify usage cost metadata with expected structure. */
 function expectUsageCostMeta(result: unknown): void {
     const resultWithMeta = result as {
-        _meta?: { usageTotalUsd?: number; usageUsd?: Record<string, number> };
+        _meta?: { 'com.apify/ActorRun'?: { usageTotalUsd?: number; usageUsd?: Record<string, number> } };
     };
     expect(resultWithMeta._meta).toBeDefined();
-    const usageTotalUsd = resultWithMeta._meta?.usageTotalUsd;
-    expect(typeof usageTotalUsd).toBe('number');
-    expect(usageTotalUsd!).toBeGreaterThanOrEqual(0);
-    const usageUsd = resultWithMeta._meta?.usageUsd;
-    expect(typeof usageUsd).toBe('object');
+    const actorRun = resultWithMeta._meta?.['com.apify/ActorRun'];
+    expect(actorRun).toBeDefined();
+    expect(typeof actorRun?.usageTotalUsd).toBe('number');
+    expect(actorRun!.usageTotalUsd!).toBeGreaterThanOrEqual(0);
+    expect(typeof actorRun?.usageUsd).toBe('object');
 }
 
 export function createIntegrationTestsSuite(
