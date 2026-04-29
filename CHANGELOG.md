@@ -16,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 - Widget pairing: move from category-based to base-tool-based ([#767](https://github.com/apify/apify-mcp-server/pull/767)) ([36b5923](https://github.com/apify/apify-mcp-server/commit/36b5923b111c1bff05b9d5eb4727b76a70961a84)) by [@jirispilka](https://github.com/jirispilka)
 - Replace custom `toBoolean` with `parseBooleanOrNull` ([#772](https://github.com/apify/apify-mcp-server/pull/772)) ([a8e6dc9](https://github.com/apify/apify-mcp-server/commit/a8e6dc923fa109c7e9bb0cf0944c3284576edc3f)) by [@jirispilka](https://github.com/jirispilka)
+- Strip leading whitespace from search-actors text output ([#760](https://github.com/apify/apify-mcp-server/pull/760)) ([b8c7ddb](https://github.com/apify/apify-mcp-server/commit/b8c7ddb8ad3d2e0e974828d1ab907cf817c04b4e)) by [@jirispilka](https://github.com/jirispilka), closes [#740](https://github.com/apify/apify-mcp-server/issues/740)
 
 
 <!-- git-cliff-unreleased-end -->
