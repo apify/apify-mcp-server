@@ -2,7 +2,7 @@
  * Model Context Protocol (MCP) server for Apify Actors
  */
 
-import { randomUUID } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 // The ext-apps package exposes `./server` via conditional exports only (no `./server/index.js`
 // wildcard), so we can't satisfy the `import/extensions` rule on this subpath.
@@ -10,7 +10,6 @@ import { randomUUID } from 'node:crypto';
 import { getUiCapability, RESOURCE_MIME_TYPE } from '@modelcontextprotocol/ext-apps/server';
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
-import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
@@ -94,6 +93,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
+import { ApifyInMemoryTaskStore } from './task_store.js';
 import { isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
@@ -168,7 +168,7 @@ export class ActorsMcpServer {
 
         // for stdio use in memory task store if not provided, otherwise use provided task store
         if (this.options.transportType === 'stdio' && !this.options.taskStore) {
-            this.taskStore = new InMemoryTaskStore();
+            this.taskStore = new ApifyInMemoryTaskStore();
         } else if (this.options.taskStore) {
             this.taskStore = this.options.taskStore;
         } else {
@@ -909,11 +909,16 @@ export class ActorsMcpServer {
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
                 if (request.params.task) {
+                    // Short, human-readable taskId: `<tool-name>-<12 base64url chars>` (~35 chars).
+                    // Both task stores (ApifyInMemoryTaskStore for stdio, RedisTaskStore for hosted)
+                    // use String(requestId) as the taskId, so this string surfaces unchanged.
+                    // 9 bytes → 12 base64url chars, 72 bits of entropy; combined with session scope
+                    // (mcpSessionId in taskStore) this is well above any practical collision risk.
                     const task = await this.taskStore.createTask(
                         {
                             ttl: request.params.task.ttl,
                         },
-                        `call-tool-${name}-${randomUUID()}`,
+                        `${tool.name}-${randomBytes(9).toString('base64url')}`,
                         request,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
