@@ -38,6 +38,20 @@
                 "APIFY_TOKEN": "${APIFY_TOKEN}",
                 "NODE_EXTRA_CA_CERTS": "${NODE_EXTRA_CA_CERTS}"
             }
+        },
+        "remote": {
+            "type": "http",
+            "url": "https://mcp.apify.com/",
+            "headers": {
+                "Authorization": "Bearer ${APIFY_TOKEN}"
+            }
+        },
+        "remote-apps": {
+            "type": "http",
+            "url": "https://mcp.apify.com/?ui=true",
+            "headers": {
+                "Authorization": "Bearer ${APIFY_TOKEN}"
+            }
         }
     }
 }
