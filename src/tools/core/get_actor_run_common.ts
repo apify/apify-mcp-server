@@ -27,8 +27,8 @@ The results will include run metadata (status, timestamps), performance stats, a
 USAGE:
 - Use when the user asks about a specific run's status or details.
 - Use to check the status of a run started with call-actor (e.g., before fetching output).
-- If a visual progress widget is available in this session, prefer that tool for UI rendering.
 - Returns pure data with no UI.
+- If \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` are available in this session, do NOT call this after them — those render self-polling widgets, additional polling here is forbidden duplicate work.
 
 USAGE EXAMPLES:
 - user_input: Show details of run y2h7sK3Wc (where y2h7sK3Wc is an existing run)
