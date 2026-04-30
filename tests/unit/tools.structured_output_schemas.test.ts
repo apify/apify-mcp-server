@@ -118,6 +118,57 @@ describe('Structured Output Schemas', () => {
             const itemsSchema = enrichedSchema.properties.items.items;
             expect(itemsSchema.properties).toEqual({});
         });
+
+        // Issue #738: dataset-derived `itemProperties` from the internal repo can contain
+        // invalid JSON Schema `type` values (e.g., `"unknown"` for arrays whose item type
+        // could not be inferred). AJV-strict clients (LibreChat) reject the whole tools/list
+        // response when this leaks into the served outputSchema.
+        it('strips invalid string type values like "unknown" from nested item properties', () => {
+            const itemProperties = {
+                reactionIds: { type: 'array', items: { type: 'unknown' } },
+                comments: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            engagement: {
+                                type: 'object',
+                                properties: {
+                                    reactions: { type: 'array', items: { type: 'unknown' } },
+                                    likes: { type: 'number' },
+                                },
+                            },
+                        },
+                    },
+                },
+                // A property literally named "type" must not be confused with a schema's type keyword.
+                type: { type: 'string' },
+            };
+            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const compiled = compileSchema(enrichedSchema as unknown as Record<string, unknown>);
+            expect(compiled).toBeDefined();
+
+            const itemsSchema = enrichedSchema.properties.items.items;
+            const props = itemsSchema.properties as Record<string, { type?: unknown; items?: { type?: unknown } }>;
+            expect(props.reactionIds.items?.type).toBeUndefined();
+            const commentsItems = (props.comments.items as {
+                properties: { engagement: { properties: { reactions: { items: { type?: unknown } } } } };
+            });
+            expect(commentsItems.properties.engagement.properties.reactions.items.type).toBeUndefined();
+            expect((props.type as { type: unknown }).type).toBe('string');
+        });
+
+        it('filters invalid entries from array-form type values', () => {
+            const itemProperties = {
+                weird: { type: ['string', 'unknown', null] },
+            };
+            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const compiled = compileSchema(enrichedSchema as unknown as Record<string, unknown>);
+            expect(compiled).toBeDefined();
+
+            const props = enrichedSchema.properties.items.items.properties as Record<string, { type?: unknown }>;
+            expect(props.weird.type).toBe('string');
+        });
     });
 
     describe('actorInfoSchema', () => {

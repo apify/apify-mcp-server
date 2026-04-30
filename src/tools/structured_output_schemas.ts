@@ -339,6 +339,64 @@ export const datasetItemsOutputSchema = {
     required: ['datasetId', 'items', 'itemCount'],
 };
 
+// Defensive sanitizer for dataset-derived item schemas. The internal repo's schema
+// inference can emit invalid JSON Schema `type` values (e.g. `"unknown"` for arrays
+// whose element type can't be inferred). AJV-strict clients reject the whole
+// tools/list response when that leaks into the served outputSchema (issue #738).
+const VALID_JSON_SCHEMA_TYPES = new Set(['string', 'number', 'integer', 'boolean', 'object', 'array', 'null']);
+const SCHEMA_VALUE_KEYS = new Set(['enum', 'default', 'examples', 'const', 'prefill', 'description', 'title']);
+const SCHEMA_BAG_KEYS = new Set(['properties', 'patternProperties', 'definitions', '$defs', 'dependentSchemas']);
+const SCHEMA_KEYS = new Set([
+    'items', 'additionalProperties', 'unevaluatedProperties', 'unevaluatedItems',
+    'contains', 'not', 'if', 'then', 'else', 'propertyNames',
+]);
+const SCHEMA_LIST_KEYS = new Set(['oneOf', 'anyOf', 'allOf', 'prefixItems']);
+
+function sanitizeTypeValue(value: unknown): string | string[] | undefined {
+    if (typeof value === 'string') {
+        return VALID_JSON_SCHEMA_TYPES.has(value) ? value : undefined;
+    }
+    if (Array.isArray(value)) {
+        const filtered = value.filter((v): v is string => typeof v === 'string' && VALID_JSON_SCHEMA_TYPES.has(v));
+        if (filtered.length === 0) return undefined;
+        if (filtered.length === 1) return filtered[0];
+        return filtered;
+    }
+    return undefined;
+}
+
+function sanitizeSchema(schema: unknown): unknown {
+    if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) return schema;
+    const obj = schema as Record<string, unknown>;
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        if (key === 'type') {
+            const sanitized = sanitizeTypeValue(value);
+            if (sanitized !== undefined) result[key] = sanitized;
+        } else if (SCHEMA_BAG_KEYS.has(key)) {
+            result[key] = sanitizePropertiesBag(value);
+        } else if (SCHEMA_KEYS.has(key)) {
+            result[key] = sanitizeSchema(value);
+        } else if (SCHEMA_LIST_KEYS.has(key)) {
+            result[key] = Array.isArray(value) ? value.map(sanitizeSchema) : sanitizeSchema(value);
+        } else if (SCHEMA_VALUE_KEYS.has(key)) {
+            result[key] = value;
+        } else {
+            result[key] = value;
+        }
+    }
+    return result;
+}
+
+function sanitizePropertiesBag(bag: unknown): unknown {
+    if (bag === null || typeof bag !== 'object' || Array.isArray(bag)) return bag;
+    const result: Record<string, unknown> = {};
+    for (const [name, schema] of Object.entries(bag as Record<string, unknown>)) {
+        result[name] = sanitizeSchema(schema);
+    }
+    return result;
+}
+
 /**
  * Creates an enriched version of callActorOutputSchema where the `items` field
  * contains actual property definitions inferred from Actor run history.
@@ -350,6 +408,7 @@ export const datasetItemsOutputSchema = {
 export function buildEnrichedCallActorOutputSchema(
     itemProperties: Record<string, unknown>,
 ): typeof callActorOutputSchema {
+    const sanitizedProperties = sanitizePropertiesBag(itemProperties) as Record<string, unknown>;
     return {
         ...callActorOutputSchema,
         properties: {
@@ -358,7 +417,7 @@ export function buildEnrichedCallActorOutputSchema(
                 type: 'array' as const,
                 items: {
                     type: 'object' as const,
-                    properties: itemProperties,
+                    properties: sanitizedProperties,
                 } as unknown as { type: 'object' },
                 description: callActorOutputSchema.properties.items.description,
             },
