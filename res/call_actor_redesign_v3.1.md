@@ -6,15 +6,18 @@ Supersedes v3 after settling open questions. Read v3 first for the candidate ana
 
 | ID | Decision |
 |---|---|
-| **T1** | Use `storages` object (with `dataset` + `keyValueStore` substructures), not a flat `dataset` field. Future-proof for KV-store keys, request-queue stats, etc. |
+| **T1** | Use `storages` object (with `dataset` + `keyValueStore` substructures) whose shape **mirrors the Apify storage API verbatim** — same field names, same types as the `Dataset` and `KeyValueStore` interfaces in `apify-client`. We only omit security/auth fields and add `sampleItem`. |
 | **T2** | Field naming: **`summary`** describes the past, **`next_step`** prescribes one action. No `context`, no `hint`, no `instructions`. |
 | **R1** | Push notifications are **required** server work, not optional polish. `notifications/tasks/status` and `notifications/progress` must fire on actor run-status changes. |
 | **R4** | Rename `call-actor` → **`run-actor`**. Backward-compatible alias retained for one minor cycle. |
 | Q1 | `sampleItem` is the entire data preview — minimal, deeply truncated, one item only. |
-| Q2 | `get-actor-run` mirrors `run-actor`'s terminal shape, including `storages.dataset.{schema,fields,sampleItem}`. |
+| Q2 | `get-actor-run` mirrors `run-actor`'s terminal shape, including `storages.dataset.{fields,sampleItem}`. |
 | Q3 | Promote `abort-actor-run` and `get-dataset-items` into the default toolset. |
+| **TEST** | Every implementation change validated against `dist/stdio.js` via mcpc before merge — start, terminal, RUNNING-on-timeout, task-mode push notifications, cancellation, and the `call-actor` alias all probed end-to-end. |
 
 ## Final response shape (canonical, shared by `run-actor` + `get-actor-run`)
+
+`storages.dataset` and `storages.keyValueStore` mirror the `apify-client` `Dataset` and `KeyValueStore` interfaces verbatim — same field names, same nesting. We omit security/identity/access-control fields the LLM has no use for (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `accessedAt`, `actId`, `actRunId`, `*PublicUrl`). We add one field: `sampleItem`.
 
 ```ts
 {
@@ -22,31 +25,57 @@ Supersedes v3 after settling open questions. Read v3 first for the candidate ana
   actorName: string,
   status: "READY" | "RUNNING" | "SUCCEEDED" | "FAILED" | "ABORTED" | "TIMED-OUT",
   startedAt: string,
-  finishedAt?: string,                      // when terminal
-  stats?: {                                 // when terminal
+  finishedAt?: string,                              // when terminal
+  stats?: {                                         // when terminal — actor run stats, not storage
     runTimeSecs: number,
     computeUnits: number,
     memMaxBytes: number,
   },
 
   storages: {
+    // Subset of apify-client.Dataset, verbatim names:
     dataset: {
-      id: string,                           // always present
-      itemCount?: number,                   // when terminal
-      fields?: string[],                    // when terminal — flat dot-notation, e.g. ["searchResult.title", "metadata.url"]
-      schema?: object,                      // when terminal — JSON Schema inferred from items
-      sampleItem?: object,                  // when terminal AND itemCount > 0 — 1 item, deeply truncated
+      id: string,                                   // always present
+      name?: string,                                // when set
+      title?: string,                               // when set
+      createdAt?: string,                           // ISO 8601
+      modifiedAt?: string,                          // ISO 8601
+      itemCount?: number,                           // when terminal
+      cleanItemCount?: number,                      // when terminal
+      fields?: string[],                            // when terminal — Apify slash notation, e.g. ["crawl/httpStatusCode", "searchResult/title"]
+      stats?: {                                     // when terminal — Apify DatasetStats verbatim
+        readCount?: number,
+        writeCount?: number,
+        deleteCount?: number,
+        storageBytes?: number,
+      },
+      // Our addition (not in Apify shape):
+      sampleItem?: object,                          // when terminal AND itemCount > 0 — 1 item, deeply truncated, ≤ 2 KB
     },
+    // Subset of apify-client.KeyValueStore, verbatim names:
     keyValueStore: {
-      id: string,                           // always present
-      // future expansion: keys, recordSizes, output — added without breaking shape
+      id: string,                                   // always present
+      name?: string,
+      title?: string,
+      createdAt?: string,
+      modifiedAt?: string,
+      stats?: {                                     // Apify KeyValueStoreStats verbatim
+        readCount?: number,
+        writeCount?: number,
+        deleteCount?: number,
+        listCount?: number,
+        storageBytes?: number,
+      },
+      // Future expansion (kept compatible with Apify shape): keys?: string[]
     },
   },
 
-  summary: string,                          // "SUCCEEDED in 22s. 47 items, 8 fields."
-  next_step: string,                        // "Use get-dataset-items with datasetId=xyz, fields=searchResult.title,metadata.url to fetch results."
+  summary: string,                                  // "SUCCEEDED in 22s. 47 items, 8 fields."
+  next_step: string,                                // "Use get-dataset-items with datasetId=xyz to fetch items. Apify returns field paths in slash notation (e.g. crawl/httpStatusCode); convert to dot notation and pass flatten=crawl when querying nested fields."
 }
 ```
+
+**Note on `fields` slash-notation:** Apify's storage API returns field paths with `/` (e.g. `"crawl/httpStatusCode"`). `get-dataset-items` `fields` parameter expects `.` (e.g. `"crawl.httpStatusCode"`) AND requires `flatten=crawl` for any nested access. The `next_step` text must call this out explicitly so the LLM constructs the correct `get-dataset-items` call. Server does NOT translate — preserves Apify shape fidelity.
 
 `isError`:
 - `false` for any observed terminal status, including FAILED/ABORTED/TIMED-OUT — the tool succeeded in observing the run; LLM reads `status` + `summary` to react.
@@ -126,8 +155,8 @@ sequenceDiagram
   Server->>Apify: start + waitForFinish(30s)
   Apify-->>Server: SUCCEEDED at 10s
   Server->>Apify: dataset.listItems(limit:1) + dataset.get + schema
-  Server-->>LLM: status:SUCCEEDED,<br/>storages.dataset:{id,itemCount,fields,schema,sampleItem},<br/>summary:"SUCCEEDED in 10s. 1 item, 5 fields.",<br/>next_step:"Use get-dataset-items with datasetId=xyz, fields=metadata.url,markdown to fetch results."
-  LLM->>Server: get-dataset-items(datasetId:xyz, fields:"metadata.url,markdown")
+  Server-->>LLM: status:SUCCEEDED,<br/>storages.dataset:{id,itemCount,fields,sampleItem,stats},<br/>summary:"SUCCEEDED in 10s. 1 item, 5 fields.",<br/>next_step:"Use get-dataset-items with datasetId=xyz; convert slash-paths to dot notation (e.g. crawl/httpStatusCode → crawl.httpStatusCode) and pass flatten=crawl,searchResult,metadata."
+  LLM->>Server: get-dataset-items(datasetId:xyz, flatten:"crawl,searchResult,metadata", fields:"metadata.url,markdown")
   Server-->>LLM: items:[...]
 ```
 
@@ -163,6 +192,7 @@ sequenceDiagram
 | Response shape: `items` removed (sync mode) | Hard. Clients that read `structuredContent.items` break. They must call `get-dataset-items`. |
 | `previewItems` → `storages.dataset.sampleItem` (single, truncated) | Hard. Different field, different content. |
 | `instructions` → `summary` + `next_step` | Hard. Different semantics. |
+| Apify shape adoption — no `schema` field, `fields` use Apify slash notation | Hard. Inferred JSON Schema is dropped from the response; agents fetch via `get-dataset-schema` if needed. |
 | `async` parameter removed | Hard. Use `waitSecs: 0` instead. |
 | `previewOutput` parameter removed | Hard. Replaced by `sampleItem` truncation rule (always present, always tiny). |
 | `get-actor-output` deprecated, retained one cycle | Soft. Existing callers keep working until v0.11. |
@@ -185,7 +215,26 @@ Acceptable per CLAUDE.md scope discipline: breaking changes are okay when they p
 
 ## Testing checklist
 
-- Unit: `summary` text per status; `next_step` text per status; `sampleItem` truncation rule; `legacyToolNameToNew["call-actor"]`.
-- Integration: end-to-end `run-actor` against rag-web-browser; verify shape; verify `call-actor` alias produces identical output; verify push notifications arrive in task mode.
-- Widget: `actor-run-widget.tsx` reads `storages.dataset.id` instead of `datasetId`; `get-actor-run` polled with `waitSecs: 0`.
-- Manual: Claude Desktop (stdio), MCPJam, ChatGPT (apps mode).
+Every change validated end-to-end via `mcpc` against the local `dist/stdio.js` build before merge. CLAUDE.md mandates this; this redesign locks it in as a per-change requirement.
+
+mcpc command sequence per change:
+```bash
+npm run build                    # must succeed first
+mcpc connect .mcp.json:stdio @stdio  # one-time
+mcpc @stdio restart                  # after each rebuild
+mcpc @stdio tools-list               # confirm tool surface
+mcpc @stdio tools-call run-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":1}' waitSecs:=30
+mcpc @stdio tools-call run-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":5}' waitSecs:=5      # forces RUNNING return
+mcpc @stdio tools-call get-actor-run runId:=<id> waitSecs:=30
+mcpc @stdio tools-call get-dataset-items datasetId:=<id>
+mcpc @stdio tools-call abort-actor-run runId:=<id>
+mcpc @stdio tools-call call-actor actor:=apify/rag-web-browser input:='{"query":"x","maxResults":1}'                   # alias parity
+mcpc @stdio tools-call get-actor-output datasetId:=<id>                                                                # deprecated path still works
+```
+
+Plus existing test suite:
+
+- **Unit:** `summary` text per status; `next_step` text per status; `sampleItem` truncation rule (≤2 KB, all leaf field names visible); `legacyToolNameToNew["call-actor"]`; storages shape conforms to Apify SDK types.
+- **Integration:** end-to-end `run-actor` against rag-web-browser; verify shape against the `Dataset`/`KeyValueStore` interfaces in `apify-client`; verify `call-actor` alias produces identical output; verify push notifications arrive in task mode (`scripts/probe-tasks.mjs` style).
+- **Widget:** `actor-run-widget.tsx` reads `storages.dataset.id` instead of `datasetId`; `get-actor-run` polled with `waitSecs: 0`.
+- **Manual:** Claude Desktop (stdio), MCPJam, ChatGPT (apps mode).
