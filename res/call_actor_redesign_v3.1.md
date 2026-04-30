@@ -1,281 +1,348 @@
-# V3.1 — Final design (delta on v3)
+# V3.1 - Final design (delta on v3)
 
-Supersedes v3 after settling open questions and the v3.1 review pass. Read v3 first for the candidate analysis, real I/O baseline, and decision matrix. This file locks the contract.
+Supersedes v3 after settling open questions and the v3.1 review pass. Read v3 first for the candidate analysis, real I/O baseline, and decision matrix. This file locks the contract for this PR.
+
+This PR deliberately keeps the public tool name `call-actor`. The behavioral contract changes are already large: response shape, output retrieval, task notifications, and dataset field handling. Renaming the tool at the same time would add a second migration axis without fixing the core client problem.
 
 ## Locked decisions
 
 | ID | Decision |
 |---|---|
-| **T1** | `storages` is a **subset of the Apify storage API** — same field names as `apify-client.Dataset`/`KeyValueStore`, but timestamps are ISO 8601 strings (not `Date`), and fields that are required upstream are optional here when not yet known (e.g. `itemCount` only when terminal). We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus the redundant `accessedAt`. We add one field: `sampleItems`. |
-| **T2** | `summary` describes the past, `nextStep` prescribes one action. **camelCase** to match the rest of the response. |
-| **R1** | Push notifications are required server work. `notifications/progress` is already wired (see `src/utils/progress.ts:30-53`); only `notifications/tasks/status` is missing — TODO at `src/mcp/server.ts:1310`. New tracker emits `tasks/status` on every state change AND a heartbeat every ≥120 s of silence. |
-| **R4** | Rename `call-actor` → `run-actor`. `call-actor` resolves via a new `TOOL_NAME_ALIASES` map for one minor cycle but is **not** listed in `tools/list`. |
-| **Q1** | `sampleItems` carries up to 3 deeply truncated items, ≤2 KB serialized total. |
-| **Q2** | `get-actor-run` mirrors `run-actor`'s terminal shape, including `storages.dataset.{fields,sampleItems}`. |
-| **Q3** | Promote `abort-actor-run` and `get-dataset-items` into the default toolset; auto-inject of `get-actor-output` next to `call-actor` swaps to `get-dataset-items`. |
-| **Q4** | Slash→dot translation handled by the **server** for `storages.dataset.fields`. `get-dataset-items` is changed to **auto-flatten** any parent referenced in dot-notation `fields` — no separate `flatten` parameter required. The `flatten` arg remains as a diagnostic override. LLM never sees slashes; never has to compute a flatten set. |
-| **Q5** | `isError` is unified: **always `false`** when we observe any terminal actor status (SUCCEEDED, FAILED, ABORTED, TIMED-OUT). Task mode always lands in `status: completed`; the actor outcome lives in `status`/`summary`. Task `status: failed` is reserved for infrastructure failures (auth, network, server crash). For those, failure reason is stored in `task.statusMessage` to work around the MCP-spec gap on `tasks/result` returning a reason. |
+| **T1** | `storages` is a subset of the Apify storage API: same field names as `apify-client.Dataset` and `KeyValueStore`, but timestamps are ISO 8601 strings, and fields that are required upstream are optional here when not yet known. We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus redundant `accessedAt`. We add one field: `sampleItems`. |
+| **T2** | `summary` describes the past. `nextStep` prescribes one primary action. Both are camelCase to match the rest of the response. |
+| **R1** | Push notifications are required server work. `notifications/progress` is already wired in `src/utils/progress.ts`; `notifications/tasks/status` is missing at the task-store transition points in `src/mcp/server.ts`. Emit `tasks/status` after every task state change and after a heartbeat interval of at least 120 s of silence while a task is still working. |
+| **R4** | Keep `call-actor` as the canonical tool name in this PR. Do not add `run-actor`, do not add an alias, and do not change `HelperTools.ACTOR_CALL`. Defer the rename to a separate migration proposal after the new response contract is stable. |
+| **Q1** | `sampleItems` carries up to 3 deeply truncated items and never exceeds 2 KB serialized total. |
+| **Q2** | `get-actor-run` mirrors `call-actor`'s canonical shape, including `storages.dataset.{fields,sampleItems}` when available. |
+| **Q3** | `get-dataset-items` and `abort-actor-run` become available in actor-running workflows through loader auto-injection. Do not add a new globally default category. Keep `get-actor-output` available for one minor cycle, but mark it deprecated and order it after `get-dataset-items`. |
+| **Q4** | Slash-to-dot translation is handled by the server for `storages.dataset.fields`. `get-dataset-items` auto-flattens any parent referenced in dot-notation `fields`. The explicit `flatten` arg remains as a diagnostic override. The LLM never sees slashes and never has to compute a flatten set. |
+| **Q5** | `isError` is `false` whenever we observe any terminal actor status (`SUCCEEDED`, `FAILED`, `ABORTED`, `TIMED-OUT`). Task mode lands in `status: completed` for observed actor terminal states. Task `status: failed` is reserved for tool-side failures such as auth, validation, network, and server errors. |
 | **Q6** | `get-dataset-items` accepts `runId` as an alternative to `datasetId`. |
-| **Q7** | `keyValueStore.output` (the conventional `OUTPUT` record) is surfaced inline when present and dataset is empty. |
-| **Q8** | Status enum is the full Apify set: `READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED`. ABORTING/TIMING-OUT pass through with their own `summary`/`nextStep` templates. |
+| **Q7** | `keyValueStore.output` surfaces the conventional `OUTPUT` record inline when present and the dataset has no items. |
+| **Q8** | Status enum is the full Apify set: `READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED`. `ABORTING` and `TIMING-OUT` pass through with their own `summary` and `nextStep` templates. |
 
-Per-change mcpc validation against `dist/stdio.js` is required. That requirement lives in `CONTRIBUTING.md`, not as a doc decision.
+Per-change mcpc validation against `dist/stdio.js` is required by `CONTRIBUTING.md`; this plan only spells out the representative cases.
 
-## Final response shape (canonical, shared by `run-actor` + `get-actor-run`)
+## Why `run-actor` is deferred
+
+The name `run-actor` is clearer, but this PR should not rename the tool.
+
+- The current name is used in the public repo, internal repo tests, internal UI constants, public assets, docs, examples, and MCP Apps widget wiring.
+- A hidden alias is not a soft migration. Clients that choose tools from `tools/list` would stop seeing `call-actor`, while hardcoded clients would only work if their arguments and response readers also migrated.
+- This PR already changes the output contract. Combining that with a tool identity migration makes regressions harder to isolate.
+- The observed client failures are not caused mainly by the word `call`. They are caused by unclear output shape, unclear next action, missing task push updates, and awkward result retrieval.
+- A rename can be reconsidered later with a normal deprecation plan: list both tools for one cycle or keep `call-actor` listed with `DEPRECATED:` text, update internal repo first, then remove the old name in a major or explicitly coordinated minor release.
+
+This PR may still use "run" in prose when describing Actor execution. It must not change the MCP tool name.
+
+## Final response shape
+
+Canonical shape shared by `call-actor` and `get-actor-run` after Apify has returned a run. Tool-side failures before a run exists use the existing MCP error response path and do not try to conform to this shape.
 
 `storages.dataset` and `storages.keyValueStore` use Apify-client field names. Timestamps become ISO 8601 strings. `sampleItems` is added.
 
 ```ts
 {
-  responseVersion: "v3.1",                            // bumps on breaking shape changes
-  runId?: string,                                     // present once Apify returned a run; absent on pre-start errors
-  actorName: string,                                  // canonical "username/actor-name" from the run record
+  responseVersion: "v3.1",
+  runId: string,
+  actorName: string, // canonical "username/actor-name" when resolvable from the run or actor record
   status: "READY" | "RUNNING" | "TIMING-OUT" | "TIMED-OUT"
         | "ABORTING" | "ABORTED" | "SUCCEEDED" | "FAILED",
-  startedAt?: string,                                 // ISO 8601; present once Apify reports a start time
-  finishedAt?: string,                                // when terminal
-  stats?: {                                           // when terminal — actor run stats, not storage
-    runTimeSecs: number,
-    computeUnits: number,
-    memMaxBytes: number,
+  startedAt?: string,
+  finishedAt?: string,
+  stats?: {
+    runTimeSecs?: number,
+    computeUnits?: number,
+    memMaxBytes?: number,
   },
 
   storages: {
-    // Subset of apify-client.Dataset:
     dataset: {
-      id: string,                                     // always present
+      id: string,
       name?: string,
       title?: string,
-      createdAt?: string,                             // ISO 8601
-      modifiedAt?: string,                            // ISO 8601
-      itemCount?: number,                             // present whenever Apify returns it (may be 0; eventual-consistency caveat below)
+      createdAt?: string,
+      modifiedAt?: string,
+      itemCount?: number,
       cleanItemCount?: number,
-      fields?: string[],                              // dot notation, e.g. ["crawl.httpStatusCode", "searchResult.title"]
-                                                      // server translates from Apify's slash form
-      stats?: {                                       // DatasetStats subset
+      fields?: string[], // dot notation, e.g. ["crawl.httpStatusCode", "searchResult.title"]
+      stats?: {
         readCount?: number,
         writeCount?: number,
         deleteCount?: number,
         storageBytes?: number,
       },
-      // Our addition (not in Apify shape):
-      sampleItems?: object[],                         // when itemCount > 0 — up to 3 deeply truncated items, ≤2 KB total
+      sampleItems?: Record<string, unknown>[],
     },
-    // Subset of apify-client.KeyValueStore:
     keyValueStore: {
       id: string,
       name?: string,
       title?: string,
       createdAt?: string,
       modifiedAt?: string,
-      stats?: {                                       // KeyValueStoreStats subset
+      stats?: {
         readCount?: number,
         writeCount?: number,
         deleteCount?: number,
         listCount?: number,
         storageBytes?: number,
       },
-      // Our addition: inline OUTPUT record when present and dataset is empty
       output?: {
-        contentType: string,
-        value: object | string,                       // for binary content types: descriptor "[binary, N bytes]"
+        contentType?: string,
+        value?: unknown,
+        sizeBytes?: number,
         truncated: boolean,
       },
     },
   },
 
-  summary: string,                                    // see template table
-  nextStep: string,                                   // see template table
+  summary: string,
+  nextStep: string,
 }
 ```
 
 `_meta` continues to carry usage data via `buildUsageMeta(...)` (`usageTotalUsd`, `usageUsd`). It is not part of the canonical structured shape and is not affected by this redesign.
 
-**Notes:**
+Notes:
 
-- `itemCount` may briefly lag behind reality. Apify's pagination counter is eventually consistent (up to ~5 s after a run terminates). When we observe `itemCount: 0` immediately post-terminal but `dataset.listItems(limit:3)` returns ≥1 item, we re-fetch `dataset.get()` once and use the larger of `dataset.itemCount` or `items.length`.
-- `actorName` is taken from the Apify run record (`actor.username` + `actor.name`), not the tool name.
-- `fields` is in dot notation. Server reads Apify's slash-form (`"crawl/httpStatusCode"`) and rewrites to dot (`"crawl.httpStatusCode"`).
-- `runId` is optional because pre-start error paths (Zod validation, auth, actor-not-found) return before `actorClient.start()` succeeds.
+- `itemCount` may briefly lag behind reality. When we observe `itemCount: 0` immediately post-terminal but `dataset.listItems({ limit: 3 })` returns at least one item, re-fetch `dataset.get()` once and use the larger of `dataset.itemCount` or `items.length`.
+- `actorName` is taken from the Apify run or actor record, not the tool name. If the canonical name cannot be fetched, use the requested actor name and do not fail the tool because of display-name lookup.
+- `fields` is in dot notation. Server reads Apify's slash-form field names and rewrites `/` to `.` before returning them.
+- `storages.dataset.id` and `storages.keyValueStore.id` come from the run record (`defaultDatasetId`, `defaultKeyValueStoreId`).
 
 ## isError semantics
 
-`isError: false` whenever we observed any terminal actor status — SUCCEEDED, FAILED, ABORTED, TIMED-OUT. The tool succeeded in observing the run; the LLM reads `status`/`summary` to react. Same rule for sync mode and task mode.
+`isError: false` whenever we observed any terminal actor status: `SUCCEEDED`, `FAILED`, `ABORTED`, or `TIMED-OUT`. The tool succeeded in observing the run; the actor outcome lives in `status` and `summary`.
 
-`isError: true` is reserved for tool-side failures: invalid input (Zod), Apify auth failure, network unreachable, server crash. These all return before we have an observed terminal status.
+`isError: true` is reserved for tool-side failures: invalid input, Apify auth failure, network unreachable, server crash, and similar failures before or outside observed actor completion.
 
-In task mode the task always transitions to `status: completed` when we observed the actor finishing (regardless of outcome). The task transitions to `status: failed` only for the same set of tool-side infrastructure failures. **MCP-spec gap workaround**: the spec doesn't define a dedicated reason field on `tasks/result` when `task.status === 'failed'`. We populate `task.statusMessage` with the failure reason at the moment we set status to `failed`, so clients reading `tasks/get` see it. Track upstream MCP spec for a future dedicated field.
+In task mode, the task transitions to `status: completed` when we observed the actor finishing, regardless of actor outcome. The task transitions to `status: failed` only for tool-side failures. Because the current MCP task result shape has no dedicated failure reason field, store the failure reason in `task.statusMessage` at the moment the task is marked failed.
 
-A consequence: an actor `ABORTED` because of `tasks/cancel` no longer maps to `task.failed`. Cancellation already updates the task to `status: cancelled` via the existing `tasks/cancel` handler (`src/mcp/server.ts:729`); the actor outcome flows through as `status: ABORTED` in the response shape if the result is fetched.
+An actor `ABORTED` because of `tasks/cancel` maps to task `status: cancelled` through the existing cancel handler. If a result is later fetched, the actor outcome remains `status: ABORTED` inside the response.
 
 ## Status template table
 
-Every status returns a concrete `summary` (past) and `nextStep` (one action). Templates use `${...}` placeholders; server fills them in.
+Every status returns a concrete `summary` and one primary `nextStep`.
 
 | Status | summary | nextStep |
 |---|---|---|
-| READY | `"READY. Run ${runId} created but has not started."` | `"Use get-actor-run with runId=${runId} and waitSecs to wait for it to start."` |
-| RUNNING | `"RUNNING for ${elapsedSecs}s. ${statusMessage \|\| 'in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs to poll, or abort-actor-run with runId=${runId} to cancel."` |
-| TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage \|\| 'Apify run-time limit reached; cleanup in progress.'}"` | `"Use get-actor-run with runId=${runId} and waitSecs to observe terminal state."` |
-| ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage \|\| 'cancellation in progress.'}"` | `"Use get-actor-run with runId=${runId} and waitSecs to observe terminal state."` |
-| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items, ${fieldCount} fields."` | `"Use get-dataset-items with runId=${runId} (optionally fields=...) to fetch items."` |
-| SUCCEEDED, dataset empty + KV OUTPUT present | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store."` | `"Output already inlined as storages.keyValueStore.output; for the full record use get-key-value-store-record with storeId=${kvId} key=OUTPUT."` |
-| SUCCEEDED, no dataset items, no OUTPUT | `"SUCCEEDED in ${runTimeSecs}s. No items, no OUTPUT record."` | `"Inspect logs via get-actor-run-log with runId=${runId} if this was unexpected."` |
-| FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Inspect logs via get-actor-run-log with runId=${runId}. Check input parameters and re-run if the cause is fixable."` |
-| ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Re-run via run-actor if intended; otherwise no further action."` |
-| TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Increase callOptions.timeout and re-run, or fetch partial output via get-dataset-items with runId=${runId}."` |
+| READY | `"READY. Run ${runId} was created but has not started."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to wait for progress."` |
+| RUNNING | `"RUNNING for ${elapsedSecs}s. ${statusMessage || 'In progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to poll for completion."` |
+| TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage || 'Run-time limit reached; cleanup in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
+| ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage || 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
+| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items, ${fieldCount} sample fields."` | `"Use get-dataset-items with runId=${runId} and limit=100 to fetch items."` |
+| SUCCEEDED, dataset empty + KV OUTPUT present | `"SUCCEEDED in ${runTimeSecs}s. Output was written to key-value store."` | `"Read storages.keyValueStore.output, or use get-key-value-store-record with storeId=${kvId} and recordKey=OUTPUT for the full record."` |
+| SUCCEEDED, no dataset items, no OUTPUT | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no OUTPUT record were found."` | `"Use get-actor-log with runId=${runId} if this was unexpected."` |
+| FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use get-actor-log with runId=${runId} to inspect the failure."` |
+| ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use call-actor again if you want to rerun the actor."` |
+| TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Use get-dataset-items with runId=${runId} and limit=100 to fetch any partial output."` |
 
-`elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is the count of distinct top-level keys across `sampleItems` (zero if no items).
+`elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is the count of distinct top-level keys visible in `sampleItems`.
 
-## TEXT response shape
+## Text response shape
 
 Most clients consume `structuredContent`; some only see `text`. The text payload is two ordered text blocks:
 
-1. `JSON.stringify(sampleItems)` (or `"No sample items available."` when absent).
+1. `JSON.stringify(sampleItems)` or `"No sample items available."`.
 2. A summary block:
-   ```
+   ```text
    ${summary}
    ${nextStep}
 
    Run: ${runId} | Status: ${status} | Dataset: ${storages.dataset.id}
    ```
 
-Total text payload capped at `TOOL_MAX_OUTPUT_CHARS`. If exceeded, `sampleItems` JSON is truncated first; the summary block is always preserved verbatim.
+Total text payload is capped at `TOOL_MAX_OUTPUT_CHARS`. If exceeded, truncate or omit the sample block first; preserve the summary block verbatim.
 
 ## sampleItems truncation rule
 
-Up to 3 items. Per item, walk the JSON tree:
+Return up to 3 items. The serialized `sampleItems` payload must be at most 2 KB total.
 
-- Strings → first 80 chars + `[truncated, N chars]` (UTF-16 code units, i.e. JS string length).
-- Arrays → first element + `[N more]`.
-- Nested objects → recurse with the same rule.
+Per item, walk the JSON tree:
 
-After per-item truncation, if serialized `sampleItems` exceeds 2 KB total, drop items from the end until ≤2 KB. If even one truncated item exceeds 2 KB, ship that single item (we never drop below 1).
+- Strings: first 80 UTF-16 code units plus `[truncated, N chars]` when truncated.
+- Arrays: first element plus a sentinel string `[N more]` when more elements exist.
+- Objects: recurse into properties in original order.
+- Numbers, booleans, and null: preserve as-is.
 
-Goal: every leaf field name visible to the LLM, no value field carries enough content to be useful as data.
+After per-item truncation, if serialized `sampleItems` still exceeds 2 KB, drop items from the end until either the payload fits or only one item remains. If one item still exceeds 2 KB, run a second pass on that item that replaces deep or long values with short sentinels and drops properties from the end until the payload fits.
+
+Goal: preserve representative field names and enough small values for orientation. Do not promise that every leaf field name is visible.
 
 ## callOptions allowlist
 
-`run-actor` (and any future tool that accepts `callOptions`) validates the object via Zod. Allowed keys:
+`call-actor` validates `callOptions` with a strict Zod object. Allowed keys:
 
 | Key | Type | Why |
 |---|---|---|
-| `timeout` | number (secs) | Run-time cap |
-| `memory` | number (MB) | Memory cap |
+| `timeout` | number, seconds | Actor run-time cap |
+| `memory` | number, MB | Actor memory allocation |
 | `build` | string | Specific actor build |
-| `maxItems` | number | Output-item cap |
-| `maxTotalChargeUsd` | number | Cost cap |
+| `maxItems` | number | Charge cap for pay-per-result actors |
+| `maxTotalChargeUsd` | number | Charge cap for pay-per-event actors |
 
-Rejected (Zod refinement, not silent drop):
+Rejected keys:
 
-- `webhooks` — lets the caller redirect run output to an arbitrary URL; security risk in multi-tenant context.
-- `proxy` — use the actor's own input schema instead.
-- Any other key.
+- `waitForFinish`: use top-level `waitSecs`.
+- `webhooks`: redirects run events to caller-controlled URLs.
+- `contentType`: this tool sends JSON object input.
+- `forcePermissionLevel`: permission escalation should not be exposed here.
+- `restartOnError`: can multiply cost without an explicit client workflow.
+- `proxy` and any other unknown key.
 
-## Tool surface (final)
+Current code only documents `memory` and `timeout`; verify current Zod behavior in tests before labeling unknown-key handling as a migration break. The new behavior should be strict rejection, not silent stripping.
 
-| Tool | Status | Notes |
-|---|---|---|
-| `run-actor` | New name (canonical) | Takes `actor`, `input`, `waitSecs?` (0–120, default 30), `callOptions?`. `taskSupport: "optional"`. |
-| `call-actor` | Deprecated alias | Resolves via `TOOL_NAME_ALIASES`; **not** listed in `tools/list`. Removed in v0.11. |
-| `get-actor-run` | Modified | Adds `waitSecs` (0–120, default 30). Returns the canonical shape. |
-| `get-dataset-items` | **Promoted to default**, behavior change | Accepts `runId` OR `datasetId`. Auto-flattens any parent referenced in dot-notation `fields` (e.g. `fields="crawl.httpStatusCode"` works without explicit `flatten`). The `flatten` param remains as a diagnostic override. Auto-injected next to `run-actor` in place of `get-actor-output`. |
-| `abort-actor-run` | **Promoted to default** | No behavior change. |
-| `get-actor-output` | Deprecated, retained one minor cycle | Listed in `tools/list` with `DEPRECATED:` prefix. No longer auto-injected next to `run-actor`. Removal in v0.11. |
+## Input compatibility
 
-## Backward-compatibility: alias mechanism
-
-Today's `legacyToolNameToNew(name)` (`src/tools/utils.ts:51-54`) is a function that handles only the `-slash-` → `--` rename — it cannot express arbitrary aliases.
-
-Add a separate `TOOL_NAME_ALIASES` map and a single resolver in `src/tools/utils.ts`:
+Canonical input for this PR:
 
 ```ts
-export const TOOL_NAME_ALIASES: Record<string, string> = {
-    'call-actor': 'run-actor',
-};
-
-export function resolveToolName(name: string): string {
-    return TOOL_NAME_ALIASES[name] ?? legacyToolNameToNew(name) ?? name;
+{
+  actor: string,
+  input?: unknown,
+  waitSecs?: number, // 0-120, default 30 for call-actor
+  callOptions?: {
+    timeout?: number,
+    memory?: number,
+    build?: string,
+    maxItems?: number,
+    maxTotalChargeUsd?: number,
+  },
 }
 ```
 
-Update the single existing caller (`src/mcp/server.ts:819`) to use `resolveToolName(name)`. Do **not** add `call-actor` to `tools/list` — listing two tools with one handler confuses LLMs into picking the deprecated name. Telemetry: log a `tool.deprecated_invoked` event (`{ alias, canonical, mcpSessionId }`) the moment the alias resolves.
+Deprecated input compatibility for one minor cycle:
 
-`get-actor-output` stays a separately registered tool (not an alias) because its `fields` semantics differ. It emits the same `tool.deprecated_invoked` telemetry on every invocation. Removed in v0.11.
+- `async: true` maps to `waitSecs: 0`.
+- `async: false` maps to the default `waitSecs`.
+- If both `async` and `waitSecs` are provided, reject the request as ambiguous.
+- `previewOutput` is accepted but ignored. `sampleItems` is always capped to 2 KB, so the old token-risk reason for disabling previews no longer applies.
 
-## R1 — push-notification implementation
+Do not promote deprecated fields in the tool description. They exist only so old hardcoded callers do not fail immediately.
 
-Today's accurate state, per the code:
+## call-actor wait behavior
 
-- `src/utils/progress.ts:30-53` already emits `notifications/progress` on every state change when `progressToken` is supplied.
-- `src/mcp/server.ts:1310` carries the TODO: `notifications/tasks/status` is not emitted.
+For normal tool calls, `waitSecs` controls how long the server waits for actor completion before returning a non-terminal shape.
+
+- `waitSecs: 0` returns after `actor.start(...)` with `READY` or `RUNNING`.
+- `waitSecs` from 1 to 120 starts the actor, then calls `run.waitForFinish({ waitSecs })`.
+- Default is 30. Long-running actors return `READY`, `RUNNING`, `TIMING-OUT`, or `ABORTING` with a polling `nextStep`.
+- Do not pass `waitForFinish` through `actor.start(...)`; Apify start options cap API-side waiting at 60 s. Use `run.waitForFinish({ waitSecs })` after start.
+
+For task mode, the background task waits until actor terminal state or cancellation. `waitSecs` is ignored in task mode because the client already opted into asynchronous task execution.
+
+## Tool surface
+
+| Tool | Status | Notes |
+|---|---|---|
+| `call-actor` | Canonical | Keeps existing name. Takes `actor`, `input`, `waitSecs?`, `callOptions?`. `taskSupport: "optional"`. |
+| `run-actor` | Deferred | Not implemented in this PR. No alias. |
+| `get-actor-run` | Modified | Adds `waitSecs` (0-120, default 0 to preserve current polling behavior). Returns the canonical shape. |
+| `get-dataset-items` | Promoted in actor workflows | Accepts `runId` OR `datasetId`. Defaults `limit` to 100 when omitted. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as an override. |
+| `abort-actor-run` | Promoted in actor workflows | Auto-injected when actor-running tools are present. |
+| `get-actor-output` | Deprecated | Kept for one minor cycle. Still callable. Description starts with `DEPRECATED:` and points to `get-dataset-items`. |
+
+## Loader implementation
+
+Do not change `toolCategoriesEnabledByDefault`. Default categories remain `actors` and `docs`.
+
+Update the auto-inject block in `src/utils/tools_loader.ts`:
+
+- Detect `call-actor`, direct actor tools, and `add-actor` as actor-running workflows.
+- Inject `get-actor-run` as today where status polling is needed.
+- Inject `get-dataset-items` whenever `call-actor`, direct actor tools, or `add-actor` is present.
+- Inject `abort-actor-run` whenever `call-actor`, direct actor tools, or `add-actor` is present.
+- Keep `get-actor-output` injected for one minor cycle, but place it after `get-dataset-items` and mark it deprecated in the public description.
+- Let the existing de-dup pass handle tools also selected by category.
+
+No `TOOL_NAME_ALIASES` work is needed in this PR because there is no rename.
+
+## get-dataset-items changes
+
+1. Accept `runId` OR `datasetId` with a Zod union/refinement that requires exactly one.
+2. When `runId` is provided, resolve `defaultDatasetId` from the run record before calling the dataset API.
+3. Default `limit` to 100 when omitted. Keep `offset` default 0.
+4. Cap text output with the same `TOOL_MAX_OUTPUT_CHARS` discipline used by actor output tools.
+5. Auto-flatten dot-notation `fields`: when any field contains `.`, derive the unique top-level parent before the first dot and pass that as `flatten` to `dataset.listItems`. Add a unit test with a two-level nested field; if Apify flattening is not recursive for that case, derive all needed prefixes instead.
+6. If explicit `flatten` is provided, use it and skip auto-derivation.
+
+This removes the main reason `get-actor-output` existed: LLMs can use dot fields without knowing about Apify's `flatten` parameter.
+
+## keyValueStore.output surfacing
+
+When the effective dataset item count is 0 and the run has `defaultKeyValueStoreId`, inspect the `OUTPUT` key.
+
+Implementation order:
+
+1. Call `keyValueStore(kvId).listKeys({ prefix: 'OUTPUT', limit: 1 })`.
+2. If `OUTPUT` is absent, omit `storages.keyValueStore.output`.
+3. If `OUTPUT` is present and `size > 2048`, do not fetch the body. Return:
+   ```ts
+   {
+     sizeBytes: size,
+     value: "[OUTPUT record present, ${size} bytes]",
+     truncated: true,
+   }
+   ```
+4. If `size <= 2048`, fetch `getRecord('OUTPUT')`.
+5. Inline JSON-compatible values as `value: unknown`.
+6. For non-JSON small records, inline text only when safe; otherwise return a descriptor string and `truncated: true`.
+
+Use the effective item count after the post-terminal re-fetch, not only the first `dataset.itemCount` value.
+
+## Push-notification implementation
+
+Current state:
+
+- `src/utils/progress.ts` emits `notifications/progress` when `progressToken` is supplied.
+- `src/mcp/server.ts` updates task state but does not emit `notifications/tasks/status`.
 
 Required changes:
 
-1. **`src/utils/progress.ts`** — `ProgressTracker.updateProgress(message)`:
-   - When `taskId` is set, emit `notifications/tasks/status` with the full Task object (after `taskStore.updateTaskStatus` returns).
-   - Throttle: emit on state change (status enum or `statusMessage` text changes), AND emit a heartbeat at most once per ≥120 s of silence so clients can verify liveness for slow runs.
+1. Add a server-side helper near task handling:
+   ```ts
+   async function updateTaskAndNotify(taskId, status, statusMessage, mcpSessionId) {
+       await this.taskStore.updateTaskStatus(taskId, status, statusMessage, mcpSessionId);
+       const task = await this.taskStore.getTask(taskId, mcpSessionId);
+       if (task) await extra.sendNotification({ method: 'notifications/tasks/status', params: task });
+   }
+   ```
+   Keep the exact signature idiomatic to the surrounding code.
+2. Use that helper for working status updates, cancellation, completed results, payment-required completed results, and failed results. If `storeTaskResult` is the transition point, notify after storing and then fetching the task.
+3. `notifications/tasks/status` does not depend on `progressToken`; it depends on task mode and `sendNotification`.
+4. Keep `notifications/progress` monotonic. Do not parse percentages from actor `statusMessage`.
+5. Heartbeat: while a task is still working and actor status/statusMessage has not changed, emit a `tasks/status` notification no more often than once per 120 s. Use fake timers in unit tests.
+6. Store infra failure reasons in `task.statusMessage` before notifying failed status.
 
-2. **Progress derivation** for `notifications/progress`: monotonic counter (current behavior). We do not parse `statusMessage` for percentages; the message itself tells the LLM what's happening.
+## Widget impact
 
-3. **Status messages**: `${actorName}: ${statusMessage || status}` (current code already does this).
+The actor-run widget must support the new shape:
 
-4. **Failure-reason workaround** for the MCP-spec gap: when `taskStore.updateTaskStatus(taskId, 'failed', reason, ...)` fires (infra failures only), `reason` lands in `task.statusMessage`. Document this in code so the workaround stays visible.
+- Read `storages.dataset.id` instead of top-level `datasetId`.
+- Read `storages.dataset.sampleItems` instead of `dataset.previewItems`, or fetch `get-dataset-items` with `runId` and `limit` when it needs a larger table.
+- Poll `get-actor-run` with `waitSecs: 0` so widget refreshes do not block.
+- Accept old shape for one minor cycle only if the widget can do so cheaply. Do not add complex compatibility branches.
 
-5. **Tests**:
-   - Integration test asserts at least one `notifications/tasks/status` arrives between `taskCreated` and `completed`.
-   - A long-running test asserts a heartbeat fires after 120+ s of state silence.
-
-## Promoted tools — implementation plan
-
-Locations (correcting the v3 doc): `src/tools/common/abort_actor_run.ts` and `src/tools/common/get_dataset_items.ts`. Both already live in `common/`.
-
-1. Add both to a default-enabled category in `src/tools/categories.ts`. Verify both default mode (`ServerMode.DEFAULT`) and apps mode (`ServerMode.APPS`). Apps mode runs the widget-injection block in `src/utils/tools_loader.ts:276-282`; abort/get-dataset-items don't have widgets, so they appear without one — fine.
-
-2. In `src/utils/tools_loader.ts:249-271`, the auto-inject block currently injects `defaultGetActorRun` and `getActorOutput` next to `call-actor`. **Swap `getActorOutput` for `getDatasetItems`.** `get-actor-output` stays in the default toolset for one minor cycle but is no longer paired with `run-actor` in tool-list ordering — discoverability degrades intentionally because it's deprecated.
-
-## `get-dataset-items` changes
-
-1. Accept `runId` OR `datasetId` (Zod union, exactly one required). When `runId` is provided, server resolves `defaultDatasetId` from the run record before calling Apify dataset API.
-
-2. **Auto-flatten dot-notation fields**: when any entry in `fields` contains a `.`, derive the unique parent set and pass them as `flatten` to Apify's `dataset.listItems({ flatten })` automatically. The explicit `flatten` parameter remains as a diagnostic override and short-circuits the auto-derivation when both are provided.
-
-This is the substantive behavior change of v3.1: it makes `fields` work as the LLM expects without a parallel `flatten` parameter, removing the pitfall that drove the original `get-actor-output` workaround.
-
-## `keyValueStore.output` surfacing
-
-When `dataset.itemCount === 0` and the run has a `defaultKeyValueStoreId`, server attempts:
-
-```ts
-const record = await client.keyValueStore(kvId).getRecord('OUTPUT');
-```
-
-If present and JSON-typed, inline as:
-```ts
-storages.keyValueStore.output = { contentType, value, truncated }
-```
-
-with the same ≤2 KB truncation rule as `sampleItems`. For non-JSON content types (binary, large text), set `value` to a short descriptor (`"[binary, ${N} bytes]"`) without fetching the body — descriptor size is determined by `HEAD`-style metadata where available, otherwise omit `value`.
-
-## Updated mermaid — Tier A (fast actor)
+## Updated mermaid - Tier A
 
 ```mermaid
 sequenceDiagram
   participant LLM
   participant Server
   participant Apify
-  LLM->>Server: run-actor(actor, input, waitSecs:30)
-  Server->>Apify: start + waitForFinish(30s)
+  LLM->>Server: call-actor(actor, input, waitSecs:30)
+  Server->>Apify: actor.start(input, callOptions)
+  Server->>Apify: run.waitForFinish({ waitSecs:30 })
   Apify-->>Server: SUCCEEDED at 10s
-  Server->>Apify: dataset.get + dataset.listItems(limit:3)
-  Note over Server: server translates fields slash→dot,<br/>truncates sampleItems to ≤2 KB total
-  Server-->>LLM: status:SUCCEEDED, storages.dataset:{id,itemCount,fields(dot),sampleItems,stats}, summary:"SUCCEEDED in 10s. 3 items, 5 fields.", nextStep:"Use get-dataset-items with runId=xyz."
-  LLM->>Server: get-dataset-items(runId:xyz, fields:"metadata.url,markdown")
+  Server->>Apify: dataset.get + dataset.listItems({ limit:3 })
+  Note over Server: server translates fields slash->dot,<br/>truncates sampleItems to <=2 KB total
+  Server-->>LLM: status:SUCCEEDED, storages.dataset:{id,itemCount,fields,sampleItems}, summary, nextStep
+  LLM->>Server: get-dataset-items(runId:xyz, fields:"metadata.url,markdown", limit:100)
   Note over Server: auto-flatten parent "metadata"<br/>before calling Apify
   Server-->>LLM: items:[...]
 ```
 
-## Updated mermaid — Tier B (task mode)
+## Updated mermaid - Tier B task mode
 
 ```mermaid
 sequenceDiagram
@@ -283,13 +350,13 @@ sequenceDiagram
   participant Client
   participant Server
   participant Apify
-  LLM->>Client: run-actor(...)
+  LLM->>Client: call-actor(...)
   Client->>Server: tools/call + task:{ttl:600000} + _meta:{progressToken:"p1"}
   Server-->>Client: CreateTaskResult{taskId,status:working,pollInterval:5000}
-  Server-)Apify: start + waitForFinish (no cap)
-  Note over Server: state change OR ≥120s silence →<br/>emit both notifications
-  Apify--)Server: status: "Crawling page 5/20"
-  Server--)Client: notifications/progress{progressToken:p1, progress:N (monotonic), message:"apify/x: Crawling page 5/20"}
+  Server-)Apify: start + waitForFinish
+  Note over Server: state change or >=120s silence -> emit task status
+  Apify--)Server: statusMessage: "Crawling page 5/20"
+  Server--)Client: notifications/progress{progressToken:p1, progress:N, message:"apify/x: Crawling page 5/20"}
   Server--)Client: notifications/tasks/status{taskId, status:working, statusMessage:"apify/x: Crawling page 5/20"}
   Apify--)Server: SUCCEEDED
   Server--)Client: notifications/tasks/status{taskId, status:completed}
@@ -302,77 +369,90 @@ sequenceDiagram
 
 | Change | Impact |
 |---|---|
-| `call-actor` → `run-actor` (alias resolves but not listed) | Soft for legacy callers; tools/list shows only `run-actor`. |
-| Response: `datasetId` → `storages.dataset.id` | Hard. Widgets and clients reading `structuredContent.datasetId` break. |
-| Response: `items` removed | Hard. Replaced by `sampleItems` + `get-dataset-items` call. |
-| `previewItems` → `storages.dataset.sampleItems` (≤3 items, truncated, ≤2 KB total) | Hard. Different field, different content. |
-| `instructions` → `summary` + `nextStep` (camelCase) | Hard. Different semantics, different names. |
-| `schema` field dropped from response; `fields` in dot notation (server translates) | Hard. JSON Schema is gone; field names in dot form. Compute cost reduced (no `generateSchemaFromItems`). |
-| `async` parameter removed | Hard. Use `waitSecs: 0`. |
-| `previewOutput` parameter removed | Hard. Replaced by always-on `sampleItems`. |
-| `get-actor-output` deprecated, no longer auto-injected | Soft for one cycle; reachable via default toolset until v0.11. |
-| `get-dataset-items` auto-flattens dot-notation `fields` | Soft. Old explicit `flatten` still works as override. |
+| Tool remains `call-actor` | No tool-name migration in this PR. |
+| Response: `datasetId` -> `storages.dataset.id` | Hard. Widgets and clients reading top-level `datasetId` must update. |
+| Response: `items` removed from `call-actor` / `get-actor-run` | Hard. Replaced by `sampleItems` plus `get-dataset-items`. |
+| `previewItems` -> `storages.dataset.sampleItems` | Hard. Different field, smaller capped content. |
+| `instructions` -> `summary` + `nextStep` | Hard. Different semantics and names. |
+| `schema` field dropped; `fields` returned in dot notation | Hard. JSON Schema generation is removed from this path. |
+| `call-actor` default wait changes to 30 s | Hard for long-running actors. They now return a non-terminal status plus `nextStep` instead of blocking indefinitely. |
+| `async` parameter deprecated but accepted | Soft. `async: true` maps to `waitSecs: 0`; remove in a later cycle. |
+| `previewOutput` deprecated but accepted | Soft. Ignored because `sampleItems` is capped. Remove in a later cycle. |
+| `get-actor-output` deprecated | Soft for one cycle. Still callable and still listed when injected or selected, but description points to `get-dataset-items`. |
+| `get-dataset-items` auto-flattens dot-notation `fields` | Soft. Explicit `flatten` still works as override. |
 | `get-dataset-items` accepts `runId` | Soft. Additive. |
-| `abort-actor-run` in default toolset | Soft. Additive. |
-| `get-actor-run`: `waitSecs` parameter, mirrored shape | Hard. Existing callers without `waitSecs` now wait up to 30s. Widget passes `waitSecs:0`. |
-| `isError` unified (always `false` on observed terminal) | For sync mode: no-op for SUCCEEDED, soft change for FAILED/ABORTED/TIMED-OUT (was already `false` per v3 prose). For task mode: tasks no longer transition to `failed` on actor FAILED — they `complete` with inner status. Clients reading `task.status === 'failed'` to branch break; they should read inner `status`. |
+| `abort-actor-run` auto-injected in actor workflows | Soft. Additive. |
+| `get-actor-run` adds `waitSecs`, default 0 | Soft. Existing callers keep immediate poll behavior. |
+| `isError` unified | Soft for tool-call semantics, but clients using task `failed` to detect actor failure must read inner `status` instead. |
 | `keyValueStore.output` surfaced inline when dataset empty | Soft. Additive. |
-| `responseVersion: "v3.1"` field added | Soft. Additive. |
-| `waitSecs` cap raised 60 → 120 | Soft. Additive. |
-| `callOptions` allowlist | Hard for callers passing `webhooks` / `proxy` / unknown keys (formerly silently passed through). |
-| Auto-inject swap: `get-actor-output` → `get-dataset-items` next to `run-actor` | Soft. Both remain reachable. |
-| Status enum widened to all 8 Apify states | Soft. Additive — new TEMPLATEs for ABORTING/TIMING-OUT. |
+| `responseVersion: "v3.1"` added | Soft. Additive. |
+| `callOptions` strict allowlist | Potentially hard. Verify current unknown-key behavior first; reject unsafe keys explicitly. |
+| Status enum widened to all 8 Apify states | Soft. Additive. |
 
-Acceptable per `CLAUDE.md` scope discipline: breaking changes are okay when they produce a simpler, clearer implementation.
+Breaking changes must be coordinated with `apify-mcp-server-internal` before merge.
 
 ## Internal repo impact
 
-Verify before merge: search `apify-mcp-server-internal` for imports of changed handlers, response-shape readers (`datasetId`, `items`, `instructions` keys), `call-actor` string references, and any `getActorOutput` injection assumptions. The `TOOL_NAME_ALIASES` mechanism resolves the legacy `call-actor` name, so internal callers continue to function.
+Verify before merge:
 
-## Open follow-ups (out of scope)
+- `call-actor` string references should keep working because the tool is not renamed.
+- Response-shape readers must migrate from `datasetId`, `items`, `previewItems`, and `instructions`.
+- Tool-list tests must be updated for `get-dataset-items` and `abort-actor-run` injection.
+- UI constants and public assets can keep the `call-actor` label in this PR.
+- Any internal code assuming `get-actor-output` is the default retrieval tool must move to `get-dataset-items`.
 
-- Direct actor tools (e.g. `apify--rag-web-browser`) keep the old shape; convert in a follow-up PR after `run-actor` ships and stabilizes.
-- `taskSupport` on `get-actor-run` — deferred until task adoption is measured.
-- Heartbeat interval tuning (currently 120 s) after a soak window.
-- Future expansion: `keyValueStore.keys?: string[]` if KV store key listing becomes useful.
-- `_meta` usage data (`usageTotalUsd`, `usageUsd`) staying in `_meta` rather than canonical structured shape — revisit if widgets want it surfaced.
+Do not claim the internal repo is automatically compatible. It is only spared the tool-name migration.
+
+## Open follow-ups
+
+- Rename `call-actor` to `run-actor`, if still desired, as a separate migration after v3.1 output shape lands.
+- Convert direct actor tools (for example `apify--rag-web-browser`) to the canonical shape. This is important because descriptions currently tell clients to prefer dedicated actor tools. It should be its own PR unless this PR explicitly expands scope.
+- Decide when to remove deprecated `async`, `previewOutput`, and `get-actor-output`.
+- Consider `taskSupport` on `get-actor-run` after task adoption is measured.
+- Tune heartbeat interval after observing real clients.
 
 ## Testing checklist
 
-Per-change mcpc validation against `dist/stdio.js` is required and documented in `CONTRIBUTING.md`. Representative command sequence:
+Representative mcpc sequence:
 
 ```bash
-npm run build                                                                                                             # must succeed first
-mcpc connect .mcp.json:stdio @stdio                                                                                       # one-time
-mcpc @stdio restart                                                                                                       # after each rebuild
-mcpc @stdio tools-list                                                                                                    # confirm tool surface; call-actor MUST NOT appear
-mcpc @stdio tools-call run-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":1}' waitSecs:=30
-mcpc @stdio tools-call run-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":5}' waitSecs:=5         # forces RUNNING return
+npm run build
+mcpc connect .mcp.json:stdio @stdio
+mcpc @stdio restart
+mcpc @stdio tools-list
+mcpc @stdio tools-call call-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":1}' waitSecs:=30
+mcpc @stdio tools-call call-actor actor:=apify/rag-web-browser input:='{"query":"mcp","maxResults":5}' waitSecs:=0
+mcpc @stdio tools-call get-actor-run runId:=<id> waitSecs:=0
 mcpc @stdio tools-call get-actor-run runId:=<id> waitSecs:=30
-mcpc @stdio tools-call get-dataset-items runId:=<id>                                                                      # runId path
-mcpc @stdio tools-call get-dataset-items datasetId:=<id> fields:="crawl.httpStatusCode,searchResult.title"                # auto-flatten
-mcpc @stdio tools-call abort-actor-run runId:=<id>
-mcpc @stdio tools-call call-actor actor:=apify/rag-web-browser input:='{"query":"x","maxResults":1}'                      # alias parity (resolved server-side)
-mcpc @stdio tools-call get-actor-output datasetId:=<id>                                                                   # deprecated path still works
+mcpc @stdio tools-call get-dataset-items runId:=<id> limit:=100
+mcpc @stdio tools-call get-dataset-items datasetId:=<id> fields:="crawl.httpStatusCode,searchResult.title" limit:=100
+mcpc @stdio tools-call abort-actor-run runId:=<running-id>
+mcpc @stdio tools-call get-actor-output datasetId:=<id> limit:=100
 ```
 
-Plus existing test suite:
+Use a known long-running actor or controlled test actor for the abort case. Do not rely on `waitSecs:=5` to force a running state.
 
-- **Unit:**
-  - `summary` / `nextStep` text per status (every row of the template table).
-  - `sampleItems` truncation rule (≤2 KB total, all leaf field names visible, drop-from-end ordering).
-  - `TOOL_NAME_ALIASES['call-actor'] === 'run-actor'`; `resolveToolName` precedence (alias > legacy > identity).
-  - storages shape conforms to subset of Apify SDK types.
-  - `callOptions` allowlist (Zod rejects `webhooks` / `proxy` / unknown).
-  - `get-dataset-items` auto-flatten parent derivation from dot-notation `fields`.
-  - `keyValueStore.output` surfacing only when dataset empty.
-- **Integration:**
-  - end-to-end `run-actor` against rag-web-browser; verify shape against `Dataset` / `KeyValueStore` interfaces in apify-client.
-  - verify legacy `call-actor` resolves to `run-actor` and produces identical output.
-  - verify `notifications/tasks/status` arrives in task mode (extends `scripts/probe-tasks.mjs`).
-  - verify heartbeat fires after 120+ s of silence (long-running).
-  - verify `get-dataset-items` with dot-notation `fields` returns nested values without explicit `flatten`.
-  - verify `keyValueStore.output` inlined for KV-only actor.
-  - verify task mode lands in `completed` for actor FAILED; verify `task.statusMessage` populated for synthetic infra failures.
-- **Widget:** `actor-run-widget.tsx` reads `storages.dataset.id` instead of `datasetId`; `get-actor-run` polled with `waitSecs: 0`.
-- **Manual:** Claude Desktop (stdio), MCPJam, ChatGPT (apps mode).
+Unit tests:
+
+- `summary` and `nextStep` text for every status row.
+- `sampleItems` truncation never exceeds 2 KB and preserves representative fields.
+- `call-actor` parser accepts deprecated `async` and `previewOutput` compatibility fields.
+- `callOptions` strict allowlist rejects `waitForFinish`, `webhooks`, `contentType`, `forcePermissionLevel`, `restartOnError`, `proxy`, and unknown keys.
+- `get-dataset-items` requires exactly one of `runId` or `datasetId`.
+- `get-dataset-items` resolves `runId` to `defaultDatasetId`.
+- `get-dataset-items` derives auto-flatten parents from dot-notation `fields`.
+- `keyValueStore.output` uses key metadata before fetching and does not fetch large records.
+- Task status notifications are emitted after working, completed, failed, and cancelled transitions.
+- Heartbeat uses fake timers; do not sleep for 120 s in tests.
+
+Integration/manual tests:
+
+- End-to-end `call-actor` against `apify/rag-web-browser`; verify canonical shape.
+- `get-actor-run` returns the same canonical shape for the same run.
+- `get-dataset-items` with dot-notation `fields` returns nested values without explicit `flatten`.
+- KV-only actor inlines `storages.keyValueStore.output`.
+- Task mode lands in `completed` for actor `FAILED`.
+- Synthetic infra failure lands in task `failed` and populates `task.statusMessage`.
+- MCP Apps widget reads the new shape and polls with `waitSecs: 0`.
+
+Agents must not run integration tests; they require `APIFY_TOKEN` and are for humans or CI.
