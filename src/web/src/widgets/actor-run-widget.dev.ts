@@ -1,4 +1,5 @@
 import { setupMockOpenAi, updateMockOpenAiState } from "../utils/mock-openai";
+import { ACTOR_RUN_META_KEY } from "../utils/actor-run";
 
 const mockRunData = {
     runId: "test_run_123",
@@ -11,7 +12,7 @@ const mockRunData = {
 };
 
 const mockToolResponseMetadata = {
-    "com.apify/ActorRun": { usageTotalUsd: 0.0456 },
+    [ACTOR_RUN_META_KEY]: { usageTotalUsd: 0.0456 },
 };
 
 const LOADING_DELAY_MS = 2000;
@@ -189,7 +190,7 @@ export function setupActorRunWidgetDev(): void {
                 return {
                     result: "success",
                     _meta: {
-                        "com.apify/ActorRun": { usageTotalUsd: isComplete ? 0.0456 : 0.0123 },
+                        [ACTOR_RUN_META_KEY]: { usageTotalUsd: isComplete ? 0.0456 : 0.0123 },
                     },
                     structuredContent: {
                         runId: (args.runId as string) || "test_run_123",

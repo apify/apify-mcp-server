@@ -6,7 +6,7 @@ import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useMcpApp } from "../../context/mcp-app-context";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
-import { extractActorRunErrorMessage } from "../../utils/actor-run";
+import { extractActorRunErrorMessage, ACTOR_RUN_META_KEY } from "../../utils/actor-run";
 import { TableSkeleton } from "./ActorRun.skeleton";
 
 interface ActorRunData {
@@ -274,10 +274,10 @@ const SuccessMessage = styled.p`
     margin: 0;
 `;
 
-type ActorRunMeta = { "com.apify/ActorRun"?: { usageTotalUsd?: number } } | null | undefined;
+type ActorRunMeta = { [key in typeof ACTOR_RUN_META_KEY]?: { usageTotalUsd?: number } } | null | undefined;
 
 function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
-    const value = meta?.["com.apify/ActorRun"]?.usageTotalUsd;
+    const value = meta?.[ACTOR_RUN_META_KEY]?.usageTotalUsd;
     return typeof value === "number" ? value : undefined;
 }
 
