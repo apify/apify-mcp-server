@@ -70,7 +70,7 @@ Goal: every leaf field name visible to the LLM, no value field carries enough co
 | `get-actor-run` | Modified | Adds `waitSecs` (0–60, default 30). Returns the canonical shape above. |
 | `get-dataset-items` | **Promoted to default toolset** | Already exists in storage tool group; move to defaults. |
 | `abort-actor-run` | **Promoted to default toolset** | Already exists in runs tool group; move to defaults. |
-| `get-actor-output` | Removed | `get-dataset-items` replaces it. Schema-incompatible — no alias. |
+| `get-actor-output` | Deprecated, retained one minor cycle | Kept as a separate deprecated tool, NOT an alias (input semantics differ — see below). Description prefixed with deprecation notice. Removal in v0.11. |
 
 ## Backward-compatibility plan for `call-actor` → `run-actor`
 
@@ -85,7 +85,14 @@ The codebase already has a legacy-name resolution path (`legacyToolNameToNew` in
 4. Telemetry: when invoked via `call-actor`, log a deprecation event so we can measure adoption before removal.
 5. Remove the alias in v0.11 (one minor version after release of v3.1).
 
-Same pattern is NOT applied to `get-actor-output`: its response shape is fundamentally different from `get-dataset-items` (different field names, different pagination semantics), so an alias would silently change behavior. Document the migration in CHANGELOG and tool descriptions instead.
+Same pattern is **not** applied as a one-shot alias to `get-actor-output`: its `fields` parameter auto-flattens dot-notation (`fields:"searchResult.title"` works), whereas `get-dataset-items` requires explicit `flatten=searchResult` first. Aliasing the name would silently change `fields` semantics. Instead:
+
+- Keep the `get-actor-output` handler intact for one minor cycle.
+- Add to its description: `"DEPRECATED: use get-dataset-items. This tool will be removed in v0.11. Note: get-dataset-items requires flatten=<parent> for dot-notation fields."`
+- Telemetry: log every `get-actor-output` invocation as a deprecation event.
+- Remove in v0.11.
+
+This gives existing callers a working tool until they migrate, without silent behavior changes.
 
 ## R1 — push-notification implementation scope
 
@@ -158,7 +165,7 @@ sequenceDiagram
 | `instructions` → `summary` + `next_step` | Hard. Different semantics. |
 | `async` parameter removed | Hard. Use `waitSecs: 0` instead. |
 | `previewOutput` parameter removed | Hard. Replaced by `sampleItem` truncation rule (always present, always tiny). |
-| `get-actor-output` removed | Hard. Use `get-dataset-items`. |
+| `get-actor-output` deprecated, retained one cycle | Soft. Existing callers keep working until v0.11. |
 | `get-dataset-items` in default toolset | Soft. New tool appears, no removals. |
 | `abort-actor-run` in default toolset | Soft. New tool appears. |
 | `get-actor-run`: `waitSecs` parameter, mirrored shape | Hard. Existing callers without `waitSecs` now wait up to 30 s. Widget passes `waitSecs: 0`. |
