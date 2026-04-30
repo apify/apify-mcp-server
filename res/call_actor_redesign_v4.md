@@ -16,19 +16,6 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 
 **The public tool name stays `call-actor`.** The cleaner name `run-actor` is a separate, later migration — this PR already changes too much to add a name change on top.
 
-## Why this matters
-
-Concrete failure modes seen in current clients:
-
-1. **Token-budget unpredictability.** Sync `call-actor` embeds full dataset items in the response (truncated to a global character cap). Some actors return 3 rows × 200 B; others return 500 rows × 8 KB. The LLM cannot plan around this.
-2. **Sync vs async shape divergence.** Sync returns `{runId, datasetId, items, instructions}`. Async returns just `{runId, ...}`. Two different shapes for the same operation.
-3. **Free-form `instructions` text.** Today's `instructions` is opaque English prose, varying per actor and per retry path. There is no machine-checkable contract; LLMs sometimes ignore it.
-4. **Silent-failure on dot-notation fields.** `get-dataset-items` requires an Apify `flatten` parameter to access nested fields like `crawl.httpStatusCode`. LLMs that pass `fields: "crawl.httpStatusCode"` without `flatten` get empty rows back with no error. The parallel tool `get-actor-output` papers over this with local projection but is a footgun-shaped wrapper.
-5. **No task progress.** Server already emits `notifications/progress` for clients passing `progressToken`, but never emits `notifications/tasks/status` — clients have no push channel for long-running tasks and must poll.
-6. **Orphaned Apify runs after cancellation.** `tasks/cancel` marks the task cancelled but does not abort the run. Users continue to be billed for the actor.
-7. **No path for KV-only actors.** Many actors write only to the key-value store's `OUTPUT` record. The current response has no place for it; LLMs guess (or fail).
-8. **Status enum gaps.** Current code handles `SUCCEEDED`, `FAILED`, `ABORTED`, `TIMED-OUT`. Apify also returns `READY`, `RUNNING`, `TIMING-OUT`, `ABORTING`. Templates and readers ignore four of eight states.
-
 ## Goals
 
 - **One canonical shape** returned by `call-actor` and `get-actor-run` — same fields across sync, task mode, terminal, and non-terminal cases.
