@@ -2,10 +2,6 @@
 
 Supersedes v3 after settling open questions and the v3.1 review pass. Read v3 first for the candidate analysis, real I/O baseline, and decision matrix. This file locks the contract for this PR.
 
-Notable deltas from v3: `waitSecs` ceiling raised from 60 to 120; canonical shape adds `actorId`, `statusMessage`, `exitCode`, and `sampleNote`; `get-actor-log` is no longer referenced from `nextStep` templates (agents read in-response fields and fall back to the run record); rename to `run-actor` is deferred to a separate migration.
-
-This PR deliberately keeps the public tool name `call-actor`. The behavioral contract changes are already large: response shape, output retrieval, task notifications, and dataset field handling. Renaming the tool at the same time would add a second migration axis without fixing the core client problem.
-
 ## Locked decisions
 
 | ID | Decision |
@@ -13,7 +9,7 @@ This PR deliberately keeps the public tool name `call-actor`. The behavioral con
 | **T1** | `storages` is a subset of the Apify storage API: same field names as `apify-client.Dataset` and `KeyValueStore`, but timestamps are ISO 8601 strings, and fields that are required upstream are optional here when not yet known. We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus redundant `accessedAt`. We add three fields: `storages.dataset.sampleItems`, `storages.dataset.sampleNote` (only present on truncation), and `storages.keyValueStore.output` (only present when dataset is empty). |
 | **T2** | `summary` describes the past. `nextStep` prescribes one primary action. Both are camelCase to match the rest of the response. |
 | **R1** | Push notifications are required server work. `notifications/progress` is already wired in `src/utils/progress.ts`; `notifications/tasks/status` is missing at the task-store transition points in `src/mcp/server.ts`. Emit `tasks/status` after every task state change and after a heartbeat interval of at least 120 s of silence while a task is still working. |
-| **R4** | Keep `call-actor` as the canonical tool name in this PR. Do not add `run-actor`, do not add an alias, and do not change `HelperTools.ACTOR_CALL`. Defer the rename to a separate migration proposal after the new response contract is stable. |
+| **R4** | Keep `call-actor`; defer the `run-actor` rename. The current name lives in public repo, internal repo tests, UI constants, examples, docs, and MCP Apps widget wiring; combining identity rename with this contract change would make regressions hard to isolate. Do not add `run-actor`, do not alias, do not change `HelperTools.ACTOR_CALL`. Plan rename as a separate migration once this contract is stable. |
 | **Q1** | `sampleItems` carries up to 3 deeply truncated items and never exceeds 2 KB serialized total. |
 | **Q2** | `get-actor-run` mirrors `call-actor`'s canonical shape, including `storages.dataset.{fields,sampleItems}` when available. |
 | **Q3** | `get-dataset-items` and `abort-actor-run` become available in actor-running workflows through loader auto-injection. Do not add a new globally default category. Keep `get-actor-output` available for one minor cycle, but mark it deprecated and order it after `get-dataset-items`. |
@@ -25,23 +21,9 @@ This PR deliberately keeps the public tool name `call-actor`. The behavioral con
 
 Per-change mcpc validation against `dist/stdio.js` is required by `CONTRIBUTING.md`; this plan only spells out the representative cases.
 
-## Why `run-actor` is deferred
-
-The name `run-actor` is clearer, but this PR should not rename the tool.
-
-- The current name is used in the public repo, internal repo tests, internal UI constants, public assets, docs, examples, and MCP Apps widget wiring.
-- A hidden alias is not a soft migration. Clients that choose tools from `tools/list` would stop seeing `call-actor`, while hardcoded clients would only work if their arguments and response readers also migrated.
-- This PR already changes the output contract. Combining that with a tool identity migration makes regressions harder to isolate.
-- The observed client failures are not caused mainly by the word `call`. They are caused by unclear output shape, unclear next action, missing task push updates, and awkward result retrieval.
-- A rename can be reconsidered later with a normal deprecation plan: list both tools for one cycle or keep `call-actor` listed with `DEPRECATED:` text, update internal repo first, then remove the old name in a major or explicitly coordinated minor release.
-
-This PR may still use "run" in prose when describing Actor execution. It must not change the MCP tool name.
-
 ## Final response shape
 
-Canonical shape shared by `call-actor` and `get-actor-run` after Apify has returned a run. Tool-side failures before a run exists use the existing MCP error response path and do not try to conform to this shape.
-
-`storages.dataset` and `storages.keyValueStore` use Apify-client field names. Timestamps become ISO 8601 strings. `sampleItems` is added.
+Canonical shape returned by `call-actor` and `get-actor-run` once Apify has created a run. Pre-run failures (Zod, auth, network) use the standard MCP error response path and do not conform to this shape.
 
 ```ts
 {
@@ -178,8 +160,6 @@ After per-item truncation, if serialized `sampleItems` still exceeds 2 KB, drop 
 
 When any truncation happens — strings shortened, arrays clipped, items dropped, or properties removed — set `storages.dataset.sampleNote` (sibling to `sampleItems`) to a short string describing what was clipped, e.g. `"sample preserves first array element only; long strings truncated to 80 chars"`. Omit `sampleNote` when no truncation occurred.
 
-Goal: preserve representative field names and enough small values for orientation. Do not promise that every leaf field name is visible.
-
 ## callOptions allowlist
 
 `call-actor` validates `callOptions` with a strict Zod object. Allowed keys:
@@ -275,18 +255,7 @@ The doc's contract, response shape, and migration tables refer to the run-produc
 
 ## Loader implementation
 
-Do not change `toolCategoriesEnabledByDefault`. Default categories remain `actors` and `docs`.
-
-Update the auto-inject block in `src/utils/tools_loader.ts`:
-
-- Detect `call-actor`, direct actor tools, and `add-actor` as actor-running workflows.
-- Inject `get-actor-run` as today where status polling is needed.
-- Inject `get-dataset-items` whenever `call-actor`, direct actor tools, or `add-actor` is present.
-- Inject `abort-actor-run` whenever `call-actor`, direct actor tools, or `add-actor` is present.
-- Keep `get-actor-output` injected for one minor cycle, but place it after `get-dataset-items` and mark it deprecated in the public description.
-- Let the existing de-dup pass handle tools also selected by category.
-
-No `TOOL_NAME_ALIASES` work is needed in this PR because there is no rename.
+Default categories stay `actors` and `docs` (no change to `toolCategoriesEnabledByDefault`). Update the auto-inject block in `src/utils/tools_loader.ts` so that whenever `call-actor`, a direct actor tool, or `add-actor` is present, the loader injects `get-actor-run` (today's behavior), plus `get-dataset-items` and `abort-actor-run` (new). Keep `get-actor-output` injected for one minor cycle, ordered after `get-dataset-items` and marked deprecated. Existing de-dup handles category overlap.
 
 ## get-dataset-items changes
 
@@ -437,7 +406,6 @@ sequenceDiagram
 
 | Change | Impact |
 |---|---|
-| Tool remains `call-actor` | No tool-name migration in this PR. |
 | Response: `datasetId` -> `storages.dataset.id` | Hard. Widgets and clients reading top-level `datasetId` must update. |
 | Response: `items` removed from `call-actor` / `get-actor-run` | Hard. Replaced by `sampleItems` plus `get-dataset-items`. |
 | `previewItems` -> `storages.dataset.sampleItems` | Hard. Different field, smaller capped content. |
@@ -467,15 +435,11 @@ Breaking changes must be coordinated with `apify-mcp-server-internal` before mer
 
 ## Internal repo impact
 
-Verify before merge:
+`apify-mcp-server-internal` is spared the tool-name migration (no rename), but **not** the contract migration. Verify before merge:
 
-- `call-actor` string references should keep working because the tool is not renamed.
 - Response-shape readers must migrate from `datasetId`, `items`, `previewItems`, and `instructions`.
-- Tool-list tests must be updated for `get-dataset-items` and `abort-actor-run` injection.
-- UI constants and public assets can keep the `call-actor` label in this PR.
+- Tool-list tests must reflect `get-dataset-items` and `abort-actor-run` auto-injection.
 - Any internal code assuming `get-actor-output` is the default retrieval tool must move to `get-dataset-items`.
-
-Do not claim the internal repo is automatically compatible. It is only spared the tool-name migration.
 
 ## Open follow-ups
 
@@ -531,12 +495,8 @@ Unit tests:
 - `get-dataset-items` resolves `runId` to `defaultDatasetId`.
 - `get-dataset-items` derives auto-flatten parents from dot-notation `fields`.
 - `keyValueStore.output` uses key metadata before fetching and does not fetch large records.
-- Task status notifications are emitted after working, completed, failed, and cancelled transitions.
 - Heartbeat uses fake timers; do not sleep for 120 s in tests.
-- `tasks/cancel` calls `abortController.abort()` on the in-flight handle, and the `actor_execution.ts` cancellation race issues `apifyClient.run(runId).abort()`.
-- `tasks/cancel` invoked before `runId` exists still cancels the in-flight start; any run created during the race is aborted (verify `status === 'ABORTED'`), no run is left running.
 - Task mode entrypoint forces `waitSecs` to wait-until-terminal regardless of `waitSecs` / `async` in the args.
-- MCP-server pass-through (`actor:toolName` route) returns the remote MCP tool result and is **not** wrapped in the canonical shape; `responseVersion` is absent.
 - `actorName` is omitted on `get-actor-run` when the actor record fetch fails; `actorId` is still present.
 - `input` is required on `call-actor`; missing `input` rejects with a Zod validation error (current behavior).
 
