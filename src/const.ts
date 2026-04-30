@@ -199,8 +199,12 @@ export const TOOL_STATUS = {
 export const FAILURE_CATEGORY = {
     INVALID_INPUT: 'INVALID_INPUT',
     AUTH: 'AUTH',
+    PERMISSION_APPROVAL_REQUIRED: 'PERMISSION_APPROVAL_REQUIRED',
     INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
+
+// Apify API error types
+export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

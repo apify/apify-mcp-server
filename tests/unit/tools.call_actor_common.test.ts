@@ -1,9 +1,12 @@
+import { ApifyApiError } from 'apify-client';
+import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
+    buildPermissionApprovalResponse,
     buildStartAsyncResponse,
 } from '../../src/tools/core/call_actor_common.js';
 
@@ -112,6 +115,72 @@ describe('call_actor_common', () => {
             }));
         });
 
+        it('returns approval URL for full-permission-actor-not-approved error', () => {
+            const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';
+            const error = new ApifyApiError({
+                data: {
+                    error: {
+                        type: 'full-permission-actor-not-approved',
+                        message: 'This Actor requires full access to your account. You must approve its permissions before running it.',
+                        data: { approvalUrl },
+                    },
+                },
+                status: 403,
+            } as AxiosResponse, 1);
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/some-actor',
+                error,
+                actorId: 'actor-456',
+                isAsync: false,
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain('This Actor requires full access to your account');
+            expect(allText).toContain(approvalUrl);
+            expect(response.toolTelemetry).toEqual(expect.objectContaining({
+                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+                failureHttpStatus: 403,
+                actorId: 'actor-456',
+            }));
+        });
+    });
+
+    describe('buildPermissionApprovalResponse', () => {
+        const makeError = (approvalUrl?: string) => new ApifyApiError({
+            data: {
+                error: {
+                    type: 'full-permission-actor-not-approved',
+                    message: 'This Actor requires full access to your account. You must approve its permissions before running it.',
+                    ...(approvalUrl ? { data: { approvalUrl } } : {}),
+                },
+            },
+            status: 403,
+        } as AxiosResponse, 1);
+
+        it('includes the approval URL when present', () => {
+            const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';
+            const response = buildPermissionApprovalResponse(makeError(approvalUrl));
+
+            expect(response.isError).toBe(true);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain('This Actor requires full access to your account');
+            expect(allText).toContain(approvalUrl);
+        });
+
+        it('omits the URL line when approvalUrl is missing from error.data', () => {
+            const response = buildPermissionApprovalResponse(makeError());
+
+            expect(response.isError).toBe(true);
+            expect(response.content).toHaveLength(1);
+            expect(response.content[0]?.text).toContain('This Actor requires full access to your account');
+        });
+    });
+
+    describe('buildCallActorErrorResponse', () => {
         it('uses public search helper name in apps mode', () => {
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/rag-web-browser',
