@@ -2,6 +2,8 @@
 
 Supersedes v3 after settling open questions and the v3.1 review pass. Read v3 first for the candidate analysis, real I/O baseline, and decision matrix. This file locks the contract for this PR.
 
+Notable deltas from v3: `waitSecs` ceiling raised from 60 to 120; canonical shape adds `actorId`, `statusMessage`, `exitCode`, and `_sampleNote`; `get-actor-log` is no longer referenced from `nextStep` templates (agents read in-response fields and fall back to the run record); rename to `run-actor` is deferred to a separate migration.
+
 This PR deliberately keeps the public tool name `call-actor`. The behavioral contract changes are already large: response shape, output retrieval, task notifications, and dataset field handling. Renaming the tool at the same time would add a second migration axis without fixing the core client problem.
 
 ## Locked decisions
@@ -45,9 +47,12 @@ Canonical shape shared by `call-actor` and `get-actor-run` after Apify has retur
 {
   responseVersion: "v3.1",
   runId: string,
-  actorName: string, // canonical "username/actor-name" when resolvable from the run or actor record
+  actorId: string,                 // stable Apify actor ID from the run record; always present
+  actorName: string,               // canonical "username/actor-name" when resolvable; otherwise the caller-provided name
   status: "READY" | "RUNNING" | "TIMING-OUT" | "TIMED-OUT"
         | "ABORTING" | "ABORTED" | "SUCCEEDED" | "FAILED",
+  statusMessage?: string,          // pass-through from Apify run.statusMessage
+  exitCode?: number,               // actor process exit code; populated for terminal states (especially FAILED)
   startedAt?: string,
   finishedAt?: string,
   stats?: {
@@ -73,6 +78,7 @@ Canonical shape shared by `call-actor` and `get-actor-run` after Apify has retur
         storageBytes?: number,
       },
       sampleItems?: Record<string, unknown>[],
+      _sampleNote?: string,        // present only when sampleItems were truncated; describes what was clipped
     },
     keyValueStore: {
       id: string,
@@ -106,7 +112,10 @@ Canonical shape shared by `call-actor` and `get-actor-run` after Apify has retur
 Notes:
 
 - `itemCount` may briefly lag behind reality. When we observe `itemCount: 0` immediately post-terminal but `dataset.listItems({ limit: 3 })` returns at least one item, re-fetch `dataset.get()` once and use the larger of `dataset.itemCount` or `items.length`.
+- `actorId` is the stable Apify actor ID from `run.actId`. Prefer it as the identifier in code paths that pin a specific actor; `actorName` is for display.
 - `actorName` is taken from the Apify run or actor record, not the tool name. If the canonical name cannot be fetched, use the requested actor name and do not fail the tool because of display-name lookup.
+- `statusMessage` mirrors `run.statusMessage` verbatim. Templates use it; surfacing it at the top level lets clients and widgets render it without re-fetching.
+- `exitCode` mirrors `run.exitCode`. It is most useful for `FAILED`; `SUCCEEDED` runs typically have `exitCode: 0`, and aborts may not populate it.
 - `fields` is in dot notation. Server reads Apify's slash-form field names and rewrites `/` to `.` before returning them.
 - `storages.dataset.id` and `storages.keyValueStore.id` come from the run record (`defaultDatasetId`, `defaultKeyValueStoreId`).
 
@@ -132,8 +141,8 @@ Every status returns a concrete `summary` and one primary `nextStep`.
 | ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage || 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
 | SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items, ${fieldCount} sample fields."` | `"Use get-dataset-items with runId=${runId} and limit=100 to fetch items."` |
 | SUCCEEDED, dataset empty + KV OUTPUT present | `"SUCCEEDED in ${runTimeSecs}s. Output was written to key-value store."` | `"Read storages.keyValueStore.output, or use get-key-value-store-record with storeId=${kvId} and recordKey=OUTPUT for the full record."` |
-| SUCCEEDED, no dataset items, no OUTPUT | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no OUTPUT record were found."` | `"Use get-actor-log with runId=${runId} if this was unexpected."` |
-| FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use get-actor-log with runId=${runId} to inspect the failure."` |
+| SUCCEEDED, no dataset items, no OUTPUT | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no OUTPUT record were found."` | `"Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run call-actor with adjusted input."` |
+| FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Diagnose using statusMessage and exitCode in this response; re-run call-actor with adjusted input if the cause is fixable."` |
 | ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use call-actor again if you want to rerun the actor."` |
 | TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Use get-dataset-items with runId=${runId} and limit=100 to fetch any partial output."` |
 
@@ -143,7 +152,7 @@ Every status returns a concrete `summary` and one primary `nextStep`.
 
 Most clients consume `structuredContent`; some only see `text`. The text payload is two ordered text blocks:
 
-1. `JSON.stringify(sampleItems)` or `"No sample items available."`.
+1. `JSON.stringify(storages.dataset.sampleItems)` (the same array carried in the structured shape) or `"No sample items available."` when absent.
 2. A summary block:
    ```text
    ${summary}
@@ -161,11 +170,13 @@ Return up to 3 items. The serialized `sampleItems` payload must be at most 2 KB 
 Per item, walk the JSON tree:
 
 - Strings: first 80 UTF-16 code units plus `[truncated, N chars]` when truncated.
-- Arrays: first element plus a sentinel string `[N more]` when more elements exist.
+- Arrays: keep the first element only and recurse into it. Arrays stay homogeneous — do not embed sentinel strings inside the array, because mixing types misleads downstream schema inference.
 - Objects: recurse into properties in original order.
 - Numbers, booleans, and null: preserve as-is.
 
 After per-item truncation, if serialized `sampleItems` still exceeds 2 KB, drop items from the end until either the payload fits or only one item remains. If one item still exceeds 2 KB, run a second pass on that item that replaces deep or long values with short sentinels and drops properties from the end until the payload fits.
+
+When any truncation happens — strings shortened, arrays clipped, items dropped, or properties removed — set `storages.dataset._sampleNote` (sibling to `sampleItems`) to a short string describing what was clipped, e.g. `"sample preserves first array element only; long strings truncated to 80 chars"`. Omit `_sampleNote` when no truncation occurred.
 
 Goal: preserve representative field names and enough small values for orientation. Do not promise that every leaf field name is visible.
 
@@ -316,10 +327,18 @@ Required changes:
 
 ## Widget impact
 
-The actor-run widget must support the new shape:
+Three apps-mode tools share this canonical shape and must all be updated together:
+
+- `src/tools/apps/call_actor.ts` — apps-mode `call-actor` handler. Always async today; returns the new shape, no widget renders here.
+- `src/tools/apps/call_actor_widget.ts` — apps-mode `call-actor-widget`. Returns the new shape; the widget reads it.
+- `src/tools/apps/get_actor_run_widget.ts` — apps-mode `get-actor-run-widget`. Returns the new shape; the widget reads it.
+
+The actor-run widget must:
 
 - Read `storages.dataset.id` instead of top-level `datasetId`.
 - Read `storages.dataset.sampleItems` instead of `dataset.previewItems`, or fetch `get-dataset-items` with `runId` and `limit` when it needs a larger table.
+- Read `storages.dataset._sampleNote` (when present) and surface a "preview truncated" indicator if appropriate.
+- Read top-level `statusMessage` and `exitCode` directly instead of re-fetching.
 - Poll `get-actor-run` with `waitSecs: 0` so widget refreshes do not block.
 - Accept old shape for one minor cycle only if the widget can do so cheaply. Do not add complex compatibility branches.
 
@@ -432,10 +451,22 @@ mcpc @stdio tools-call get-actor-output datasetId:=<id> limit:=100
 
 Use a known long-running actor or controlled test actor for the abort case. Do not rely on `waitSecs:=5` to force a running state.
 
+Task-mode probe (extend `scripts/probe-tasks.mjs` rather than driving via raw mcpc, which does not model task notifications well):
+
+- Issue `tools/call call-actor` with `task: { ttl: 600000 }` and `_meta.progressToken`. Capture the `tasks/created` reply and collect notifications until terminal.
+- Assert at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`. Assert each carries the full Task object (taskId, status, statusMessage where applicable).
+- Run a long-ish actor and assert a heartbeat `tasks/status` fires after ≥120 s of `statusMessage` silence. Use a short-tick override exposed through env or a test hook so the suite stays fast — never sleep 120 s.
+- Run an actor expected to FAIL and assert the task transitions to `completed` (not `failed`) with inner `status: "FAILED"` in the result.
+- Synthesize a tool-side failure (invalid `actor` name; revoked token in a sandboxed run) and assert the task transitions to `failed` and `task.statusMessage` carries the reason.
+- Trigger `tasks/cancel` mid-run and assert the actor run aborts and the task transitions to `cancelled`. Verify a `tasks/status: cancelled` notification fires.
+
 Unit tests:
 
-- `summary` and `nextStep` text for every status row.
+- `summary` and `nextStep` text for every status row. Assert templates only reference tools that the LLM can plausibly obtain: auto-injected (`get-actor-run`, `get-dataset-items`, `abort-actor-run`, `get-actor-output` for one cycle) or available via standard tool categories (`get-key-value-store-record` from the `storage` category, used in the KV-OUTPUT row as a fallback when the inlined `output.value` is truncated).
+- Canonical shape includes `actorId`, `actorName`, `statusMessage`, and `exitCode` populated from the run record where Apify supplies them; `actorName` falls back to the caller-provided name when the actor record cannot be fetched.
 - `sampleItems` truncation never exceeds 2 KB and preserves representative fields.
+- `sampleItems` arrays remain homogeneous after truncation — no string sentinel embedded in arrays.
+- `storages.dataset._sampleNote` is set when any truncation occurred, absent otherwise.
 - `call-actor` parser accepts deprecated `async` and `previewOutput` compatibility fields.
 - `callOptions` strict allowlist rejects `waitForFinish`, `webhooks`, `contentType`, `forcePermissionLevel`, `restartOnError`, `proxy`, and unknown keys.
 - `get-dataset-items` requires exactly one of `runId` or `datasetId`.
