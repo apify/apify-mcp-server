@@ -312,7 +312,7 @@ function toolOutputToRunData(
 export const ActorRun: React.FC = () => {
     const { app, toolResult } = useMcpApp();
     const toolOutput = useWidgetProps<ToolOutput>();
-    const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
+    const toolResponseMetadata = (toolResult?._meta ?? null) as ActorRunMeta;
     const stableRunId = getRunIdFromUrl();
     const toolErrorMessage = extractActorRunErrorMessage(toolResult);
 

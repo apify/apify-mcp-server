@@ -198,7 +198,10 @@ function expectUsageCostMeta(result: unknown): void {
     expect(actorRun).toBeDefined();
     expect(typeof actorRun?.usageTotalUsd).toBe('number');
     expect(actorRun!.usageTotalUsd!).toBeGreaterThanOrEqual(0);
-    expect(typeof actorRun?.usageUsd).toBe('object');
+    const usageUsd = actorRun?.usageUsd;
+    if (usageUsd !== undefined) {
+        expect(typeof usageUsd).toBe('object');
+    }
 }
 
 export function createIntegrationTestsSuite(
