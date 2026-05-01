@@ -51,6 +51,8 @@ export async function waitForActorRunAbortStatus(
     apiClient: ApifyClient,
     actorId: string,
 ) {
+    // Apify run state propagation can take >10s under load; budget more time so the
+    // server-side abort has a fair chance of being observed before the test gives up.
     await vi.waitUntil(async () => {
         const runsList = await apiClient.runs().list({ limit: 5, desc: true });
         const currentRun = runsList.items.find((run) => run.actId === actorId);
@@ -58,5 +60,5 @@ export async function waitForActorRunAbortStatus(
             return false;
         }
         return currentRun.status === 'ABORTED' || currentRun.status === 'ABORTING';
-    }, { timeout: 10000, interval: 500 });
+    }, { timeout: 30000, interval: 500 });
 }
