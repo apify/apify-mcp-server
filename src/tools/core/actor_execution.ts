@@ -119,6 +119,7 @@ export async function callActorGetDataset(options: {
     }
 
     if (potentialAbortedRun === CLIENT_ABORT) {
+        progressTracker?.stop();
         await abortRequestPromise;
         log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
         return null;

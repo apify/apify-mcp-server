@@ -28,6 +28,7 @@ export class ProgressTracker {
     private currentProgress = 0;
     private intervalId?: NodeJS.Timeout;
     private stopped = false;
+    private lastEmittedMessage?: string;
     private taskId?: string;
     private onStatusMessage?: (message: string) => Promise<void>;
 
@@ -44,6 +45,12 @@ export class ProgressTracker {
     }
 
     async updateProgress(message?: string): Promise<void> {
+        // Dedup consecutive identical messages so a polling tick that emitted the
+        // terminal status doesn't double-emit when the caller also explicitly emits.
+        if (message !== undefined && message === this.lastEmittedMessage) {
+            return;
+        }
+        this.lastEmittedMessage = message;
         this.currentProgress += 1;
 
         // Send progress notification only if progressToken and sendNotification are available

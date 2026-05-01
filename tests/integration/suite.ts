@@ -2403,8 +2403,8 @@ export function createIntegrationTestsSuite(
         });
 
         // WARNING: These tests can be flaky on streamable HTTP transport due to timing —
-        // the Actor may complete before the 5s progress polling interval fires a statusMessage.
-        // See: https://github.com/apify/apify-mcp-server/issues/558
+        // the Actor may complete before the progress polling interval (PROGRESS_NOTIFICATION_INTERVAL_MS)
+        // fires a statusMessage. See: https://github.com/apify/apify-mcp-server/issues/558
         it('should propagate statusMessage to tasks/get and tasks/list for internal tools in task mode', { retry: 1 }, async () => {
             client = await createClientFn({ tools: ['actors'] });
 

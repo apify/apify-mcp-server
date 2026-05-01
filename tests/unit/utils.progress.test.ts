@@ -49,6 +49,23 @@ describe('ProgressTracker', () => {
         });
     });
 
+    it('dedups consecutive identical messages', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done');
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done');
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done with extra');
+
+        expect(mockSendNotification).toHaveBeenCalledTimes(2);
+        expect(mockSendNotification).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            params: expect.objectContaining({ progress: 1, message: 'apify/foo: SUCCEEDED — Done' }),
+        }));
+        expect(mockSendNotification).toHaveBeenNthCalledWith(2, expect.objectContaining({
+            params: expect.objectContaining({ progress: 2, message: 'apify/foo: SUCCEEDED — Done with extra' }),
+        }));
+    });
+
     it('should handle notification send errors gracefully', async () => {
         const mockSendNotification = vi.fn().mockRejectedValue(new Error('Network error'));
         const tracker = new ProgressTracker({ progressToken: 'test-token', sendNotification: mockSendNotification });
