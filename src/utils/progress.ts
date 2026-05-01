@@ -99,8 +99,13 @@ export class ProgressTracker {
         this.stopped = false;
         let lastStatus = initial?.status ?? '';
         let lastStatusMessage = initial?.statusMessage || '';
+        let tickInFlight = false;
 
         this.intervalId = setInterval(async () => {
+            // Skip if a previous tick is still awaiting run.get() / updateProgress() — otherwise
+            // a slow tick can overlap with the next one and cause out-of-order emissions.
+            if (tickInFlight) return;
+            tickInFlight = true;
             try {
                 const run = await apifyClient.run(runId).get();
                 // stop() may have been called while run.get() was awaiting; clearInterval can't
@@ -124,6 +129,8 @@ export class ProgressTracker {
                 }
             } catch {
                 // Silent fail - continue polling
+            } finally {
+                tickInFlight = false;
             }
         }, PROGRESS_NOTIFICATION_INTERVAL_MS);
     }

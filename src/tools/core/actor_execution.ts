@@ -136,7 +136,11 @@ export async function callActorGetDataset(options: {
     const [datasetItems, defaultBuild, finalRunStatus] = await Promise.all([
         dataset.listItems(),
         (await actorClient.defaultBuild()).get(),
-        progressTracker ? apifyClient.run(completedRun.id).get() : Promise.resolve(undefined),
+        // Catch-and-coerce so a 404/transient API failure on the re-fetch can't fail the
+        // whole tool call; the formatter falls back to the waitForFinish snapshot.
+        progressTracker
+            ? apifyClient.run(completedRun.id).get().catch(() => undefined)
+            : Promise.resolve(undefined),
     ]);
 
     if (progressTracker) {

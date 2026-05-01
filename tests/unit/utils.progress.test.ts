@@ -159,6 +159,37 @@ describe('ProgressTracker', () => {
         }
     });
 
+    it('skips overlapping poll ticks when a previous tick is still in-flight', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            let resolveGet: ((run: unknown) => void) | undefined;
+            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
+                resolveGet = resolve;
+            }));
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
+            // First tick fires; run.get() is now in-flight.
+            await vi.advanceTimersByTimeAsync(2_500);
+            expect(get).toHaveBeenCalledTimes(1);
+
+            // Several more interval ticks fire while the first is still awaiting — guard should skip them.
+            await vi.advanceTimersByTimeAsync(6_000);
+            expect(get).toHaveBeenCalledTimes(1);
+
+            // Resolve the first tick; the next interval should fire a fresh get().
+            resolveGet!({ status: 'RUNNING', statusMessage: 'Crawling' });
+            await vi.advanceTimersByTimeAsync(2_500);
+            expect(get).toHaveBeenCalledTimes(2);
+
+            tracker.stop();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
     it('does not emit when stop() is called while a poll tick is in-flight', async () => {
         vi.useFakeTimers();
         try {
