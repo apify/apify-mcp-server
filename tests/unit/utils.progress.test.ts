@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { RELATED_TASK_META_KEY } from '../../src/const.js';
-import { createProgressTracker, ProgressTracker } from '../../src/utils/progress.js';
+import { createProgressTracker, formatRunStatusMessage, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
@@ -121,6 +121,83 @@ describe('ProgressTracker', () => {
 
         const notification = mockSendNotification.mock.calls[0][0];
         expect(notification).not.toHaveProperty('_meta');
+    });
+
+    it('does not re-emit on first poll tick when run state matches the seeded initial', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            const get = vi.fn().mockResolvedValue({ status: 'RUNNING', statusMessage: null });
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING', statusMessage: null });
+            await vi.advanceTimersByTimeAsync(2_500);
+            tracker.stop();
+
+            expect(get).toHaveBeenCalled();
+            expect(mockSendNotification).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not emit when stop() is called while a poll tick is in-flight', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            let resolveGet: ((run: unknown) => void) | undefined;
+            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
+                resolveGet = resolve;
+            }));
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
+            await vi.advanceTimersByTimeAsync(2_500);
+            expect(get).toHaveBeenCalled();
+
+            tracker.stop();
+            resolveGet!({ status: 'SUCCEEDED', statusMessage: 'Done', isStatusMessageTerminal: true });
+            await Promise.resolve();
+            await Promise.resolve();
+
+            expect(mockSendNotification).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('formatRunStatusMessage', () => {
+    it('leads with status and appends in-progress statusMessage', () => {
+        expect(formatRunStatusMessage('apify/foo', { status: 'RUNNING', statusMessage: 'Crawled 5/10 pages' }))
+            .toBe('apify/foo: RUNNING — Crawled 5/10 pages');
+    });
+
+    it('appends terminal statusMessage only when the actor marked it terminal', () => {
+        expect(formatRunStatusMessage('apify/foo', {
+            status: 'SUCCEEDED',
+            statusMessage: 'Actor finished with 1 result',
+            isStatusMessageTerminal: true,
+        })).toBe('apify/foo: SUCCEEDED — Actor finished with 1 result');
+    });
+
+    it('omits non-terminal statusMessage at terminal status to avoid showing stale text', () => {
+        for (const isStatusMessageTerminal of [false, null, undefined]) {
+            expect(formatRunStatusMessage('apify/foo', {
+                status: 'SUCCEEDED',
+                statusMessage: 'Starting the crawler.',
+                isStatusMessageTerminal,
+            })).toBe('apify/foo: SUCCEEDED');
+        }
+    });
+
+    it('uses status alone when statusMessage is missing', () => {
+        for (const status of ['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']) {
+            expect(formatRunStatusMessage('apify/foo', { status, statusMessage: null })).toBe(`apify/foo: ${status}`);
+            expect(formatRunStatusMessage('apify/foo', { status })).toBe(`apify/foo: ${status}`);
+        }
     });
 });
 

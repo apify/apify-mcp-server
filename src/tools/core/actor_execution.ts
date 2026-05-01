@@ -7,7 +7,7 @@ import { TOOL_MAX_OUTPUT_CHARS } from '../../const.js';
 import type { ActorDefinitionStorage, DatasetItem } from '../../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../../utils/actor.js';
 import { logHttpError, redactSkyfirePayId } from '../../utils/logging.js';
-import type { ProgressTracker } from '../../utils/progress.js';
+import { formatRunStatusMessage, type ProgressTracker } from '../../utils/progress.js';
 import type { JsonSchemaProperty } from '../../utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 
@@ -102,12 +102,8 @@ export async function callActorGetDataset(options: {
 
     // Start progress tracking if a tracker is provided
     if (progressTracker) {
-        const message = actorRun.statusMessage
-            ? `${actorName}: ${actorRun.statusMessage}`
-            : `${actorName}: ${actorRun.status}`;
-
-        await progressTracker.updateProgress(message);
-        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
+        await progressTracker.updateProgress(formatRunStatusMessage(actorName, actorRun));
+        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName, actorRun);
     }
 
     // Wait for completion or cancellation
@@ -129,12 +125,25 @@ export async function callActorGetDataset(options: {
     }
     const completedRun = potentialAbortedRun as ActorRun;
 
-    // Process the completed run
+    // Stop the polling tracker before any final emit so a late tick can't duplicate it.
+    progressTracker?.stop();
+
+    // The platform may write the actor's final statusMessage just after the status
+    // flips, so the snapshot from waitForFinish() can be stale. Re-fetch in parallel
+    // with the dataset/build fetches to keep it off the critical path.
     const dataset = apifyClient.dataset(completedRun.defaultDatasetId);
-    const [datasetItems, defaultBuild] = await Promise.all([
+    const [datasetItems, defaultBuild, finalRunStatus] = await Promise.all([
         dataset.listItems(),
         (await actorClient.defaultBuild()).get(),
+        progressTracker ? apifyClient.run(completedRun.id).get() : Promise.resolve(undefined),
     ]);
+
+    if (progressTracker) {
+        // Fall back to the waitForFinish snapshot only if the re-fetch 404s (very rare).
+        await progressTracker.updateProgress(
+            formatRunStatusMessage(actorName, finalRunStatus ?? completedRun),
+        );
+    }
 
     // Generate schema using the shared utility
     const generatedSchema = generateSchemaFromItems(datasetItems.items, {
