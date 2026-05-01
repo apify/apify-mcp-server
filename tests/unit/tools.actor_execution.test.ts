@@ -29,6 +29,7 @@ describe('callActorGetDataset', () => {
         const actorRun = {
             id: 'run-123',
             defaultDatasetId: 'dataset-123',
+            status: 'RUNNING',
             usageTotalUsd: 0,
             usageUsd: {},
         };
@@ -62,11 +63,12 @@ describe('callActorGetDataset', () => {
         expect(waitForFinish).not.toHaveBeenCalled();
     });
 
-    it('should return null immediately when cancelled after start even if API abort is slow', async () => {
+    it('should abort and return null when cancelled after start even if waitForFinish resolves', async () => {
         const controller = new AbortController();
         const actorRun = {
             id: 'run-456',
             defaultDatasetId: 'dataset-456',
+            status: 'RUNNING',
             usageTotalUsd: 0,
             usageUsd: {},
         };
@@ -84,10 +86,7 @@ describe('callActorGetDataset', () => {
 
         const apifyClient = {
             actor: vi.fn().mockReturnValue({ start }),
-            run: vi.fn().mockReturnValue({
-                abort,
-                waitForFinish,
-            }),
+            run: vi.fn().mockReturnValue({ abort, waitForFinish }),
             dataset: vi.fn().mockReturnValue({ listItems }),
         };
 
@@ -102,12 +101,48 @@ describe('callActorGetDataset', () => {
         controller.abort();
         resolveWaitForFinish!(actorRun);
 
-        const result = await resultPromise;
-
-        expect(result).toBeNull();
         await vi.waitUntil(() => abort.mock.calls.length > 0);
         expect(abort).toHaveBeenCalledWith({ gracefully: false });
         expect(listItems).not.toHaveBeenCalled();
         resolveAbort!();
+
+        const result = await resultPromise;
+
+        expect(result).toBeNull();
+        expect(listItems).not.toHaveBeenCalled();
+    });
+
+    it('should report the initial actor run status before waiting for finish', async () => {
+        const actorRun = {
+            id: 'run-789',
+            defaultDatasetId: 'dataset-789',
+            status: 'RUNNING',
+            statusMessage: 'Loading page',
+            usageTotalUsd: 0,
+            usageUsd: {},
+        };
+        const updateProgress = vi.fn().mockResolvedValue(undefined);
+        const startActorRunUpdates = vi.fn();
+        const waitForFinish = vi.fn().mockResolvedValue(actorRun);
+        const start = vi.fn().mockResolvedValue(actorRun);
+        const listItems = vi.fn().mockResolvedValue({ items: [], total: 0 });
+        const getDefaultBuild = vi.fn().mockResolvedValue(undefined);
+
+        const apifyClient = {
+            actor: vi.fn().mockReturnValue({ start, defaultBuild: vi.fn().mockResolvedValue({ get: getDefaultBuild }) }),
+            run: vi.fn().mockReturnValue({ waitForFinish }),
+            dataset: vi.fn().mockReturnValue({ listItems }),
+        };
+
+        await callActorGetDataset({
+            actorName: 'apify/rag-web-browser',
+            input: { query: 'https://apify.com' },
+            apifyClient: apifyClient as never,
+            progressTracker: { updateProgress, startActorRunUpdates } as never,
+        });
+
+        expect(updateProgress).toHaveBeenCalledWith('apify/rag-web-browser: Loading page');
+        expect(startActorRunUpdates).toHaveBeenCalledWith('run-789', apifyClient, 'apify/rag-web-browser');
+        expect(updateProgress.mock.invocationCallOrder[0]).toBeLessThan(waitForFinish.mock.invocationCallOrder[0]);
     });
 });

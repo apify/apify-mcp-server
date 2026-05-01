@@ -87,22 +87,28 @@ export async function callActorGetDataset(options: {
         return null;
     }
 
-    // Start progress tracking if a tracker is provided
-    if (progressTracker) {
-        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
-    }
-
-    // Resolve the race immediately on cancellation and abort the Actor run in the background.
-    // If we waited for the abort API call to finish first, waitForFinish() could win the race
-    // and the run might complete before we treat the request as cancelled.
+    // Resolve the race immediately on cancellation so waitForFinish() cannot win after the
+    // client cancelled the request. Keep the abort promise so the run is actually aborted
+    // before this function returns.
     let abortListener: (() => void) | undefined;
+    let abortRequestPromise: Promise<void> | undefined;
     const abortPromise = new Promise<typeof CLIENT_ABORT>((resolve) => {
         abortListener = () => {
+            abortRequestPromise = abortActorRun(actorRun.id);
             resolve(CLIENT_ABORT);
-            void abortActorRun(actorRun.id);
         };
         abortSignal?.addEventListener('abort', abortListener, { once: true });
     });
+
+    // Start progress tracking if a tracker is provided
+    if (progressTracker) {
+        const message = actorRun.statusMessage
+            ? `${actorName}: ${actorRun.statusMessage}`
+            : `${actorName}: ${actorRun.status}`;
+
+        await progressTracker.updateProgress(message);
+        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
+    }
 
     // Wait for completion or cancellation
     const potentialAbortedRun = await Promise.race([
@@ -117,6 +123,7 @@ export async function callActorGetDataset(options: {
     }
 
     if (potentialAbortedRun === CLIENT_ABORT) {
+        await abortRequestPromise;
         log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
         return null;
     }

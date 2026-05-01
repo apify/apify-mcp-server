@@ -160,7 +160,7 @@ export const ALLOWED_DOC_DOMAINS = [
     'https://crawlee.dev',
 ] as const;
 
-export const PROGRESS_NOTIFICATION_INTERVAL_MS = 5_000; // 5 seconds
+export const PROGRESS_NOTIFICATION_INTERVAL_MS = 2_000; // 2 seconds
 
 export const APIFY_STORE_URL = 'https://apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
