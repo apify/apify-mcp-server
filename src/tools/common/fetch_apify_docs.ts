@@ -32,6 +32,23 @@ export function buildMarkdownUrl(url: string): string {
     return parsed.toString();
 }
 
+const ALLOWED_DOC_HOSTS: ReadonlySet<string> = new Set(
+    ALLOWED_DOC_DOMAINS.map((d) => new URL(d).hostname),
+);
+
+// `startsWith` on the raw URL is bypassable via `https://docs.apify.com.evil.com/`
+// or `https://docs.apify.com@evil.com/` — parse and compare the hostname instead.
+export function isAllowedDocsUrl(url: string): boolean {
+    let parsed: URL;
+    try {
+        parsed = new URL(url);
+    } catch {
+        return false;
+    }
+    if (parsed.protocol !== 'https:') return false;
+    return ALLOWED_DOC_HOSTS.has(parsed.hostname);
+}
+
 function buildFetchErrorMessage(url: string, detail: string): string {
     return `Failed to fetch the documentation page at "${url}". ${detail} \
 Please verify the URL is correct and accessible. \
@@ -68,7 +85,7 @@ USAGE EXAMPLES:
         const url = parsed.url.trim();
 
         // Allow URLs from Apify and Crawlee documentation
-        const isAllowedDomain = ALLOWED_DOC_DOMAINS.some((domain) => url.startsWith(domain));
+        const isAllowedDomain = isAllowedDocsUrl(url);
 
         if (!isAllowedDomain) {
             log.softFail(`[fetch-apify-docs] Invalid URL domain: ${url}`);
