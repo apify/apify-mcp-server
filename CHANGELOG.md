@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.21 - **not yet released**
+## [0.9.21](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.21) (2026-05-04)
 
 ### 🚀 Features
 
@@ -22,7 +21,6 @@ All notable changes to this project will be documented in this file.
 - Stop sending request headers to Sentry ([#782](https://github.com/apify/apify-mcp-server/pull/782)) ([8e437b5](https://github.com/apify/apify-mcp-server/commit/8e437b5cb00aa99be93dbf3247ea60c018449798)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.20](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.20) (2026-04-27)
 
 ### 🚀 Features
