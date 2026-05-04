@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.22 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Handling for SSE stream conflicts and client disconnects ([#787](https://github.com/apify/apify-mcp-server/pull/787)) ([f0c5bc8](https://github.com/apify/apify-mcp-server/commit/f0c5bc8c2ffea8c06a35d6b3a82f407ae334ffa4)) by [@jirispilka](https://github.com/jirispilka)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.21](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.21) (2026-05-04)
 
 ### 🚀 Features
