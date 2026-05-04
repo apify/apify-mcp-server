@@ -529,11 +529,13 @@ export class ActorsMcpServer {
 
     private setupErrorHandling(setupSIGINTHandler = true): void {
         this.server.onerror = (error) => {
-            // Client-disconnect noise from the MCP SDK (protocol.js). Two messages we see in prod:
+            // Client-disconnect noise from the MCP SDK. Messages we see in prod:
             //   - "No connection established" (sendRequest before transport attached)
             //   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
-            // Both are expected; log as softFail so they don't flood Mezmo error alerts.
-            if (/Not connected|No connection established/i.test(error.message ?? '')) {
+            //   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET on the
+            //     streamable-http transport, e.g. tab refresh before the old SSE controller is GC'd)
+            // All are expected; log as softFail so they don't flood Mezmo error alerts.
+            if (/Not connected|No connection established|Only one SSE stream/i.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
                 const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
