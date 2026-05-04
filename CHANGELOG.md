@@ -19,6 +19,7 @@ All notable changes to this project will be documented in this file.
 - Strip leading whitespace from search-actors text output ([#760](https://github.com/apify/apify-mcp-server/pull/760)) ([b8c7ddb](https://github.com/apify/apify-mcp-server/commit/b8c7ddb8ad3d2e0e974828d1ab907cf817c04b4e)) by [@jirispilka](https://github.com/jirispilka), closes [#740](https://github.com/apify/apify-mcp-server/issues/740)
 - Refine usage guidelines for actor run tools and clarify handling of widgets ([#774](https://github.com/apify/apify-mcp-server/pull/774)) ([400bcad](https://github.com/apify/apify-mcp-server/commit/400bcad5c8c7b4ed311a915a82a5700d8eb9fd47)) by [@jirispilka](https://github.com/jirispilka)
 - Validate fetch-apify-docs URL by hostname, not prefix ([#781](https://github.com/apify/apify-mcp-server/pull/781)) ([e39bdee](https://github.com/apify/apify-mcp-server/commit/e39bdee530da1db0b3b3d3713558b33c9608e629)) by [@MQ37](https://github.com/MQ37)
+- Stop sending request headers to Sentry ([#782](https://github.com/apify/apify-mcp-server/pull/782)) ([8e437b5](https://github.com/apify/apify-mcp-server/commit/8e437b5cb00aa99be93dbf3247ea60c018449798)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
