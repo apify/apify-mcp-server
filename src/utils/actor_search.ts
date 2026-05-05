@@ -20,10 +20,7 @@ export type SearchActorsByKeywordsOptions = {
     limit?: number;
     offset?: number;
     allowsAgenticUsers?: boolean;
-    /**
-     * Ask `GET /v2/store` to project a compact `inputSchema` per Actor (apify-core#27466).
-     * Forces `limit <= STORE_INPUT_SCHEMA_PAGE_LIMIT`; the API rejects larger pages.
-     */
+    /** When true, `limit` is clamped to `STORE_INPUT_SCHEMA_PAGE_LIMIT` since apify-core rejects larger pages. */
     includeInputSchema?: boolean;
 };
 
@@ -44,7 +41,10 @@ export async function searchActorsByKeywords(
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
 
-    const results = await storeClient.list({ search, limit, offset });
+    const effectiveLimit = includeInputSchema && limit !== undefined
+        ? Math.min(limit, STORE_INPUT_SCHEMA_PAGE_LIMIT)
+        : limit;
+    const results = await storeClient.list({ search, limit: effectiveLimit, offset });
     return results.items as ActorStoreList[];
 }
 
@@ -58,7 +58,6 @@ export async function searchAndFilterActors(
     options: SearchAndFilterActorsOptions,
 ): Promise<ActorStoreList[]> {
     const { keywords, apifyToken, limit, offset, paymentProvider } = options;
-    const includeInputSchema = limit <= STORE_INPUT_SCHEMA_PAGE_LIMIT;
 
     const actors = await searchActorsByKeywords({
         search: keywords,
@@ -66,7 +65,7 @@ export async function searchAndFilterActors(
         limit,
         offset,
         allowsAgenticUsers: paymentProvider ? true : undefined,
-        includeInputSchema: includeInputSchema || undefined,
+        includeInputSchema: limit <= STORE_INPUT_SCHEMA_PAGE_LIMIT || undefined,
     });
 
     // Observability: apify-core's `AGENT_SAFE_PRICING_MODELS` filter should mean we never see rentals here.

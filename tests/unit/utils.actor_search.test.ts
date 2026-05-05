@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { searchActorsByKeywords, searchAndFilterActors } from '../../src/utils/actor_search.js';
 
@@ -51,6 +52,23 @@ describe('searchActorsByKeywords', () => {
         await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok' });
         expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
+    });
+
+    it('clamps `limit` to STORE_INPUT_SCHEMA_PAGE_LIMIT when `includeInputSchema=true` (apify-core would otherwise 400)', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({
+            search: 'foo',
+            apifyToken: 'tok',
+            limit: 50,
+            includeInputSchema: true,
+        });
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: STORE_INPUT_SCHEMA_PAGE_LIMIT, offset: undefined });
+    });
+
+    it('does not clamp `limit` when `includeInputSchema` is omitted', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 50 });
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 50, offset: undefined });
     });
 });
 
