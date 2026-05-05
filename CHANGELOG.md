@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.9.23 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Namespace _meta usage fields under com.apify&#x2F;ActorRun ([#775](https://github.com/apify/apify-mcp-server/pull/775)) ([2be272d](https://github.com/apify/apify-mcp-server/commit/2be272d1603bd93b3c8fad24fb2a13522e6a2a02)) by [@jirispilka](https://github.com/jirispilka), closes [#703](https://github.com/apify/apify-mcp-server/issues/703)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.9.22](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.22) (2026-05-04)
 
 ### 🐛 Bug Fixes
