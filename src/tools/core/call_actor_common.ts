@@ -1,4 +1,5 @@
 import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { ApifyApiError } from 'apify-client';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -6,6 +7,7 @@ import log from '@apify/log';
 
 import { ApifyClient } from '../../apify_client.js';
 import {
+    APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     FAILURE_CATEGORY,
     HelperTools,
@@ -180,6 +182,45 @@ export function buildStartAsyncResponse(params: {
     };
 }
 
+export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
+}
+
+/** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
+export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
+    const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
+    return buildMCPResponse({
+        texts: [
+            error.message,
+            ...(approvalUrl ? [`Approve here: ${approvalUrl}`] : []),
+        ],
+        isError: true,
+    });
+}
+
+function buildPermissionApprovalErrorResponse(
+    actorName: string,
+    error: ApifyApiError,
+    actorId: string | undefined,
+    logContext: { async: boolean; mcpSessionId: string | undefined },
+): ReturnType<typeof buildMCPResponse> {
+    logHttpError(error, 'Failed to call Actor — permission approval required', {
+        actorName,
+        ...logContext,
+        failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+    });
+    return {
+        ...buildPermissionApprovalResponse(error),
+        toolTelemetry: {
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+            failureHttpStatus: error.statusCode,
+            failureDetail: APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
+            actorId,
+        },
+    };
+}
+
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ReturnType<typeof buildMCPResponse> {
     const {
         actorName,
@@ -189,6 +230,10 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         mcpSessionId,
         actorGetDetailsTool,
     } = params;
+
+    if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
+        return buildPermissionApprovalErrorResponse(actorName, error, actorId, { async: isAsync, mcpSessionId });
+    }
 
     const errMsg = error instanceof Error ? error.message : String(error);
     const failureCategory = classifyFailureCategory(error);

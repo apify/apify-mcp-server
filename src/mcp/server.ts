@@ -59,6 +59,7 @@ import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { appsActorExecutor } from '../tools/apps/actor_executor.js';
+import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
@@ -1106,6 +1107,17 @@ export class ActorsMcpServer {
                     return buildPaymentRequiredResponse(error);
                 }
 
+                if (isPermissionApprovalError(error)) {
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+                        failure_http_status: error.statusCode,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    logHttpError(error, 'Permission approval required while calling tool', { toolName: name, mcpSessionId });
+                    return buildPermissionApprovalResponse(error);
+                }
+
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
                 // returns them as JSON-RPC errors. failInvalidParams already set callDiagnostics
                 // with the correct semantic category (e.g. AUTH), so we must not overwrite it.
@@ -1402,6 +1414,17 @@ export class ActorsMcpServer {
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
+                    ...buildActorFields(actorName, actorId),
+                });
+                return;
+            }
+
+            if (isPermissionApprovalError(error)) {
+                logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
+                await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
+                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
+                    failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+                    failure_http_status: error.statusCode,
                     ...buildActorFields(actorName, actorId),
                 });
                 return;
