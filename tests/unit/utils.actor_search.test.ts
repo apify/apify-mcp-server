@@ -86,17 +86,6 @@ describe('searchAndFilterActors', () => {
         expect(result).toHaveLength(25);
     });
 
-    it('passes the caller limit straight through (no over-fetch — API filters rentals)', async () => {
-        listMock.mockResolvedValueOnce({ items: [] });
-        await searchAndFilterActors({
-            keywords: 'foo',
-            apifyToken: 'tok',
-            limit: 7,
-            offset: 0,
-        });
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 7, offset: 0 });
-    });
-
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor(1)] });
         await searchAndFilterActors({

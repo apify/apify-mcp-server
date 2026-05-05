@@ -566,12 +566,7 @@ export type ActorsMcpServerOptions = {
     uiMode?: string;
 }
 
-/**
- * Compact JSON Schema returned by `GET /v2/store?includeInputSchema=true`.
- * Mirrors the shape produced by apify-core's `trimInputSchema` — types only,
- * `required` omitted when empty. `properties[].type` may be an array for
- * mixed-type fields (e.g. `['string', 'integer']`).
- */
+/** Compact schema returned by `GET /v2/store?includeInputSchema=true`; produced by apify-core `trimInputSchema`. */
 export type ActorStoreInputSchema = {
     type: 'object';
     properties: Record<string, { type: string | string[] }>;

@@ -11,31 +11,19 @@ import {
     type StructuredPricingInfo,
 } from './pricing_info.js';
 
-/** `inputSchema` is only attached when the search call requested it; other Actor types don't carry it. */
 function getInputSchema(actor: Actor | ActorStoreList): ActorStoreInputSchema | undefined {
     return 'inputSchema' in actor ? actor.inputSchema : undefined;
 }
 
-/**
- * Render an `inputSchema.properties` entry's `type` (string or mixed-type array)
- * as a human-readable hint. Mixed types come from apify-core's `trimInputSchema`.
- */
-function formatPropertyType(type: string | string[]): string {
-    return Array.isArray(type) ? type.join('|') : type;
-}
-
-/**
- * Render every property of `inputSchema` as a TypeScript-like inline list
- * (`name?: type, name: type, ...`). Returns null when no properties exist.
- * Mirrors the structured card so important-but-late fields are not lost.
- */
 function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | null {
     const entries = Object.entries(inputSchema.properties);
     if (entries.length === 0) return null;
+
     const requiredSet = new Set(inputSchema.required ?? []);
     const fields = entries
-        .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${formatPropertyType(prop.type)}`)
+        .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`)
         .join(', ');
+
     return `- **Input schema:** ${fields}`;
 }
 

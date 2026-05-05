@@ -69,16 +69,12 @@ export async function searchAndFilterActors(
         includeInputSchema: includeInputSchema || undefined,
     });
 
-    // Observability: the API filters rentals by default (apify-core's `AGENT_SAFE_PRICING_MODELS`),
-    // so a rental in our results means an upstream contract change we should notice.
-    const rentals = actors.filter(
-        (actor) => actor.currentPricingInfo?.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH,
-    );
-    if (rentals.length > 0) {
-        log.error('Unexpected rental Actors in store search results', {
-            keywords,
-            rentalActors: rentals.map((actor) => `${actor.username}/${actor.name}`),
-        });
+    // Observability: apify-core's `AGENT_SAFE_PRICING_MODELS` filter should mean we never see rentals here.
+    const rentalActors = actors
+        .filter((actor) => actor.currentPricingInfo?.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH)
+        .map((actor) => `${actor.username}/${actor.name}`);
+    if (rentalActors.length > 0) {
+        log.error('Unexpected rental Actors in store search results', { keywords, rentalActors });
     }
 
     return actors;

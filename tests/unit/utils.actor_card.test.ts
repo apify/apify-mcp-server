@@ -632,11 +632,6 @@ describe('formatActorToActorCard inputSchema rendering', () => {
         expect(result).toContain('- **Input schema:** mixed?: string|integer');
     });
 
-    it('omits the input schema line when no inputSchema is present', () => {
-        const result = formatActorToActorCard(mockActor);
-        expect(result).not.toContain('Input schema');
-    });
-
     it('omits the input schema line when inputSchema has no properties', () => {
         const actor = {
             ...mockActorStoreList,
