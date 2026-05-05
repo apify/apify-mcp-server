@@ -535,8 +535,11 @@ export class ActorsMcpServer {
             //   - "Failed to send response: Error: Not connected" (client vanished mid-flight)
             //   - "Conflict: Only one SSE stream is allowed per session" (duplicate GET on the
             //     streamable-http transport, e.g. tab refresh before the old SSE controller is GC'd)
+            //   - "Invalid state: Controller is already closed" (ERR_INVALID_STATE from
+            //     WebStandardStreamableHTTPServerTransport.writeSSEEvent when the SSE ReadableStream
+            //     controller was closed by client cancellation before a queued event was flushed)
             // All are expected; log as softFail so they don't flood Mezmo error alerts.
-            if (/Not connected|No connection established|Only one SSE stream/i.test(error.message ?? '')) {
+            if (/Not connected|No connection established|Only one SSE stream|Controller is already closed/i.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
                 const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
