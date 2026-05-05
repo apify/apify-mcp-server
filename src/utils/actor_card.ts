@@ -1,4 +1,4 @@
-import { APIFY_STORE_URL, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT } from '../const.js';
+import { APIFY_STORE_URL } from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import {
     getCurrentPricingInfo,
@@ -25,20 +25,18 @@ function formatPropertyType(type: string | string[]): string {
 }
 
 /**
- * Render the first {@link STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT} properties of `inputSchema`
- * as a TypeScript-like inline list (`name?: type, name: type, ...`). Returns null
- * when no properties exist; the structured card always exposes the full schema.
+ * Render every property of `inputSchema` as a TypeScript-like inline list
+ * (`name?: type, name: type, ...`). Returns null when no properties exist.
+ * Mirrors the structured card so important-but-late fields are not lost.
  */
 function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | null {
     const entries = Object.entries(inputSchema.properties);
     if (entries.length === 0) return null;
     const requiredSet = new Set(inputSchema.required ?? []);
-    const shown = entries.slice(0, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT);
-    const fields = shown
+    const fields = entries
         .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${formatPropertyType(prop.type)}`)
         .join(', ');
-    const suffix = entries.length > shown.length ? ` (${shown.length} of ${entries.length})` : '';
-    return `- **Input fields${suffix}:** ${fields}`;
+    return `- **Input schema:** ${fields}`;
 }
 
 // Helper function to format categories from uppercase with underscores to a proper case

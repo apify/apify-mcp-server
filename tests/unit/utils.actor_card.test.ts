@@ -610,15 +610,17 @@ describe('formatActorToActorCard inputSchema rendering', () => {
     it('renders input schema as a TypeScript-like inline list with required marker', () => {
         const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
+        expect(result).toContain('- **Input schema:** url: string, maxResults?: number');
     });
 
-    it('renders an `(N of M)` truncation suffix when properties exceed the text-render cap', () => {
+    it('renders every property without truncation so structured output and text stay in sync', () => {
         const properties: Record<string, { type: string }> = {};
         for (let i = 0; i < 15; i++) properties[`field${i}`] = { type: 'string' };
         const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain('- **Input fields (10 of 15):**');
+        expect(result).toContain('field0?: string');
+        expect(result).toContain('field14?: string');
+        expect(result).not.toMatch(/Input schema \(\d+ of \d+\)/);
     });
 
     it('joins mixed-type property arrays with `|`', () => {
@@ -627,20 +629,20 @@ describe('formatActorToActorCard inputSchema rendering', () => {
             inputSchema: { type: 'object' as const, properties: { mixed: { type: ['string', 'integer'] } } },
         } as unknown as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain('- **Input fields:** mixed?: string|integer');
+        expect(result).toContain('- **Input schema:** mixed?: string|integer');
     });
 
-    it('omits the input fields line when no inputSchema is present', () => {
+    it('omits the input schema line when no inputSchema is present', () => {
         const result = formatActorToActorCard(mockActor);
-        expect(result).not.toContain('Input fields');
+        expect(result).not.toContain('Input schema');
     });
 
-    it('omits the input fields line when inputSchema has no properties', () => {
+    it('omits the input schema line when inputSchema has no properties', () => {
         const actor = {
             ...mockActorStoreList,
             inputSchema: { type: 'object' as const, properties: {} },
         } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).not.toContain('Input fields');
+        expect(result).not.toContain('Input schema');
     });
 });
