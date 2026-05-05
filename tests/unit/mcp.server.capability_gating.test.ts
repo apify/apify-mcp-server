@@ -10,7 +10,7 @@ import { appsCallActor } from '../../src/tools/apps/call_actor.js';
 import { searchActorsWidgetTool } from '../../src/tools/apps/search_actors_widget.js';
 import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
 import type { ServerModeOption } from '../../src/types.js';
-import { ServerMode } from '../../src/types.js';
+import { IS_SERVER_MODE_AUTO_DETECTION_ENABLED, ServerMode } from '../../src/types.js';
 
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
@@ -50,6 +50,8 @@ async function dispatchInitialize(server: ActorsMcpServer, request: InitializeRe
     await handler(request, {});
 }
 
+const itIfAutoDetect = IS_SERVER_MODE_AUTO_DETECTION_ENABLED ? it : it.skip;
+
 describe('ActorsMcpServer initialize handler', () => {
     const servers: ActorsMcpServer[] = [];
 
@@ -72,7 +74,11 @@ describe('ActorsMcpServer initialize handler', () => {
             { option: ServerMode.APPS, supportsUi: false, expectedMode: ServerMode.APPS },
             { option: ServerMode.DEFAULT, supportsUi: true, expectedMode: ServerMode.DEFAULT },
             { option: ServerMode.DEFAULT, supportsUi: false, expectedMode: ServerMode.DEFAULT },
-            { option: 'auto', supportsUi: true, expectedMode: ServerMode.APPS },
+            {
+                option: 'auto',
+                supportsUi: true,
+                expectedMode: IS_SERVER_MODE_AUTO_DETECTION_ENABLED ? ServerMode.APPS : ServerMode.DEFAULT,
+            },
             { option: 'auto', supportsUi: false, expectedMode: ServerMode.DEFAULT },
         ];
 
@@ -87,7 +93,7 @@ describe('ActorsMcpServer initialize handler', () => {
         }
     });
 
-    it('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
+    itIfAutoDetect('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -132,7 +138,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 
-    it('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
+    itIfAutoDetect('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -148,7 +154,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
     });
 
-    it('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
+    itIfAutoDetect('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
         const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);

@@ -11,7 +11,7 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
+import { IS_SERVER_MODE_AUTO_DETECTION_ENABLED, type ServerMode, type ToolCategory, type ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
@@ -2532,7 +2532,8 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+        const itIfAutoDetect = IS_SERVER_MODE_AUTO_DETECTION_ENABLED ? it : it.skip;
+        itIfAutoDetect('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
             client = await createClientFn({
                 clientCapabilities: {

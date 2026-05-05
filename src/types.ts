@@ -435,12 +435,21 @@ export function parseServerMode(rawMode: string | null | undefined): ServerModeO
 }
 
 /**
+ * Emergency kill-switch for capability-driven auto-detection. When `false`,
+ * `resolveServerMode('auto', supportsUi)` ignores client capabilities and
+ * forces {@link ServerMode.DEFAULT}. Flip to `false` to roll back without
+ * reverting code.
+ */
+export const IS_SERVER_MODE_AUTO_DETECTION_ENABLED = true;
+
+/**
  * Resolve a {@link ServerModeOption} to a concrete {@link ServerMode}.
  * Concrete modes are returned as-is. `'auto'` resolves to {@link ServerMode.APPS}
  * when the client advertises MCP Apps UI support, {@link ServerMode.DEFAULT} otherwise.
  */
 export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): ServerMode {
     if (option !== 'auto') return option;
+    if (!IS_SERVER_MODE_AUTO_DETECTION_ENABLED) return ServerMode.DEFAULT;
     return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
 }
 
