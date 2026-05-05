@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { RELATED_TASK_META_KEY } from '../../src/const.js';
-import { createProgressTracker, ProgressTracker } from '../../src/utils/progress.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../../src/const.js';
+import { createProgressTracker, formatRunStatusMessage, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
@@ -47,6 +47,23 @@ describe('ProgressTracker', () => {
                 message: 'test-actor: SUCCEEDED',
             },
         });
+    });
+
+    it('dedups consecutive identical messages', async () => {
+        const mockSendNotification = vi.fn();
+        const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done');
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done');
+        await tracker.updateProgress('apify/foo: SUCCEEDED — Done with extra');
+
+        expect(mockSendNotification).toHaveBeenCalledTimes(2);
+        expect(mockSendNotification).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            params: expect.objectContaining({ progress: 1, message: 'apify/foo: SUCCEEDED — Done' }),
+        }));
+        expect(mockSendNotification).toHaveBeenNthCalledWith(2, expect.objectContaining({
+            params: expect.objectContaining({ progress: 2, message: 'apify/foo: SUCCEEDED — Done with extra' }),
+        }));
     });
 
     it('should handle notification send errors gracefully', async () => {
@@ -121,6 +138,114 @@ describe('ProgressTracker', () => {
 
         const notification = mockSendNotification.mock.calls[0][0];
         expect(notification).not.toHaveProperty('_meta');
+    });
+
+    it('does not re-emit on first poll tick when run state matches the seeded initial', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            const get = vi.fn().mockResolvedValue({ status: 'RUNNING', statusMessage: null });
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING', statusMessage: null });
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
+            tracker.stop();
+
+            expect(get).toHaveBeenCalled();
+            expect(mockSendNotification).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('skips overlapping poll ticks when a previous tick is still in-flight', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            let resolveGet: ((run: unknown) => void) | undefined;
+            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
+                resolveGet = resolve;
+            }));
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
+            // First tick fires; run.get() is now in-flight.
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
+            expect(get).toHaveBeenCalledTimes(1);
+
+            // Several more interval ticks fire while the first is still awaiting — guard should skip them.
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS * 2);
+            expect(get).toHaveBeenCalledTimes(1);
+
+            // Resolve the first tick; the next interval should fire a fresh get().
+            resolveGet!({ status: 'RUNNING', statusMessage: 'Crawling' });
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
+            expect(get).toHaveBeenCalledTimes(2);
+
+            tracker.stop();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('does not emit when stop() is called while a poll tick is in-flight', async () => {
+        vi.useFakeTimers();
+        try {
+            const mockSendNotification = vi.fn();
+            const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
+            let resolveGet: ((run: unknown) => void) | undefined;
+            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
+                resolveGet = resolve;
+            }));
+            const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
+
+            tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
+            expect(get).toHaveBeenCalled();
+
+            tracker.stop();
+            resolveGet!({ status: 'SUCCEEDED', statusMessage: 'Done', isStatusMessageTerminal: true });
+            await Promise.resolve();
+            await Promise.resolve();
+
+            expect(mockSendNotification).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+});
+
+describe('formatRunStatusMessage', () => {
+    it('leads with status and appends in-progress statusMessage', () => {
+        expect(formatRunStatusMessage('apify/foo', { status: 'RUNNING', statusMessage: 'Crawled 5/10 pages' }))
+            .toBe('apify/foo: RUNNING — Crawled 5/10 pages');
+    });
+
+    it('appends terminal statusMessage only when the actor marked it terminal', () => {
+        expect(formatRunStatusMessage('apify/foo', {
+            status: 'SUCCEEDED',
+            statusMessage: 'Actor finished with 1 result',
+            isStatusMessageTerminal: true,
+        })).toBe('apify/foo: SUCCEEDED — Actor finished with 1 result');
+    });
+
+    it('omits non-terminal statusMessage at terminal status to avoid showing stale text', () => {
+        for (const isStatusMessageTerminal of [false, null, undefined]) {
+            expect(formatRunStatusMessage('apify/foo', {
+                status: 'SUCCEEDED',
+                statusMessage: 'Starting the crawler.',
+                isStatusMessageTerminal,
+            })).toBe('apify/foo: SUCCEEDED');
+        }
+    });
+
+    it('uses status alone when statusMessage is missing', () => {
+        for (const status of ['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']) {
+            expect(formatRunStatusMessage('apify/foo', { status, statusMessage: null })).toBe(`apify/foo: ${status}`);
+            expect(formatRunStatusMessage('apify/foo', { status })).toBe(`apify/foo: ${status}`);
+        }
     });
 });
 

@@ -7,7 +7,7 @@ import { TOOL_MAX_OUTPUT_CHARS } from '../../const.js';
 import type { ActorDefinitionStorage, DatasetItem } from '../../types.js';
 import { ensureOutputWithinCharLimit, getActorDefinitionStorageFieldNames } from '../../utils/actor.js';
 import { logHttpError, redactSkyfirePayId } from '../../utils/logging.js';
-import type { ProgressTracker } from '../../utils/progress.js';
+import { formatRunStatusMessage, type ProgressTracker } from '../../utils/progress.js';
 import type { JsonSchemaProperty } from '../../utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 
@@ -87,22 +87,24 @@ export async function callActorGetDataset(options: {
         return null;
     }
 
-    // Start progress tracking if a tracker is provided
-    if (progressTracker) {
-        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName);
-    }
-
-    // Resolve the race immediately on cancellation and abort the Actor run in the background.
-    // If we waited for the abort API call to finish first, waitForFinish() could win the race
-    // and the run might complete before we treat the request as cancelled.
+    // Resolve the race immediately on cancellation so waitForFinish() cannot win after the
+    // client cancelled the request. Keep the abort promise so the run is actually aborted
+    // before this function returns.
     let abortListener: (() => void) | undefined;
+    let abortRequestPromise: Promise<void> | undefined;
     const abortPromise = new Promise<typeof CLIENT_ABORT>((resolve) => {
         abortListener = () => {
+            abortRequestPromise = abortActorRun(actorRun.id);
             resolve(CLIENT_ABORT);
-            void abortActorRun(actorRun.id);
         };
         abortSignal?.addEventListener('abort', abortListener, { once: true });
     });
+
+    // Start progress tracking if a tracker is provided
+    if (progressTracker) {
+        await progressTracker.updateProgress(formatRunStatusMessage(actorName, actorRun));
+        progressTracker.startActorRunUpdates(actorRun.id, apifyClient, actorName, actorRun);
+    }
 
     // Wait for completion or cancellation
     const potentialAbortedRun = await Promise.race([
@@ -117,17 +119,36 @@ export async function callActorGetDataset(options: {
     }
 
     if (potentialAbortedRun === CLIENT_ABORT) {
+        progressTracker?.stop();
+        await abortRequestPromise;
         log.info('Actor run aborted by client', { actorName, mcpSessionId, input: redactSkyfirePayId(input) });
         return null;
     }
     const completedRun = potentialAbortedRun as ActorRun;
 
-    // Process the completed run
+    // Stop the polling tracker before any final emit so a late tick can't duplicate it.
+    progressTracker?.stop();
+
+    // The platform may write the actor's final statusMessage just after the status
+    // flips, so the snapshot from waitForFinish() can be stale. Re-fetch in parallel
+    // with the dataset/build fetches to keep it off the critical path.
     const dataset = apifyClient.dataset(completedRun.defaultDatasetId);
-    const [datasetItems, defaultBuild] = await Promise.all([
+    const [datasetItems, defaultBuild, finalRunStatus] = await Promise.all([
         dataset.listItems(),
         (await actorClient.defaultBuild()).get(),
+        // Catch-and-coerce so a 404/transient API failure on the re-fetch can't fail the
+        // whole tool call; the formatter falls back to the waitForFinish snapshot.
+        progressTracker
+            ? apifyClient.run(completedRun.id).get().catch(() => undefined)
+            : Promise.resolve(undefined),
     ]);
+
+    if (progressTracker) {
+        // Fall back to the waitForFinish snapshot only if the re-fetch 404s (very rare).
+        await progressTracker.updateProgress(
+            formatRunStatusMessage(actorName, finalRunStatus ?? completedRun),
+        );
+    }
 
     // Generate schema using the shared utility
     const generatedSchema = generateSchemaFromItems(datasetItems.items, {
