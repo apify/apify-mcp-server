@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { RELATED_TASK_META_KEY } from '../../src/const.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../../src/const.js';
 import { createProgressTracker, formatRunStatusMessage, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
@@ -149,7 +149,7 @@ describe('ProgressTracker', () => {
             const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING', statusMessage: null });
-            await vi.advanceTimersByTimeAsync(2_500);
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
             tracker.stop();
 
             expect(get).toHaveBeenCalled();
@@ -172,16 +172,16 @@ describe('ProgressTracker', () => {
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
             // First tick fires; run.get() is now in-flight.
-            await vi.advanceTimersByTimeAsync(2_500);
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
             expect(get).toHaveBeenCalledTimes(1);
 
             // Several more interval ticks fire while the first is still awaiting — guard should skip them.
-            await vi.advanceTimersByTimeAsync(6_000);
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS * 2);
             expect(get).toHaveBeenCalledTimes(1);
 
             // Resolve the first tick; the next interval should fire a fresh get().
             resolveGet!({ status: 'RUNNING', statusMessage: 'Crawling' });
-            await vi.advanceTimersByTimeAsync(2_500);
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
             expect(get).toHaveBeenCalledTimes(2);
 
             tracker.stop();
@@ -202,7 +202,7 @@ describe('ProgressTracker', () => {
             const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
-            await vi.advanceTimersByTimeAsync(2_500);
+            await vi.advanceTimersByTimeAsync(PROGRESS_NOTIFICATION_INTERVAL_MS + 500);
             expect(get).toHaveBeenCalled();
 
             tracker.stop();
