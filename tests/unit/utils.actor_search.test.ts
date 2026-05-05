@@ -1,8 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ACTOR_PRICING_MODEL, STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
-import { filterRentalActors, searchAndFilterActors } from '../../src/utils/actor_search.js';
+import { searchActorsByKeywords, searchAndFilterActors } from '../../src/utils/actor_search.js';
 
 const listMock = vi.fn();
 const paramsHolder: { params: Record<string, unknown> } = { params: {} };
@@ -17,33 +16,41 @@ vi.mock('../../src/apify_client.js', () => ({
     })),
 }));
 
-function makeActor(idSuffix: number, pricingModel: string = ACTOR_PRICING_MODEL.FREE): ActorStoreList {
+function makeActor(idSuffix: number): ActorStoreList {
     return {
         id: `id-${idSuffix}`,
         name: `actor-${idSuffix}`,
         username: 'user',
-        currentPricingInfo: { pricingModel },
+        currentPricingInfo: { pricingModel: 'FREE' },
         stats: {},
     } as unknown as ActorStoreList;
 }
 
-describe('filterRentalActors', () => {
-    it('drops rental actors that the user has not rented', () => {
-        const actors = [
-            makeActor(1, ACTOR_PRICING_MODEL.FREE),
-            makeActor(2, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH),
-            makeActor(3, ACTOR_PRICING_MODEL.PAY_PER_EVENT),
-        ];
-        const filtered = filterRentalActors(actors, []);
-        expect(filtered.map((a) => a.id)).toEqual(['id-1', 'id-3']);
+describe('searchActorsByKeywords', () => {
+    beforeEach(() => {
+        listMock.mockReset();
+        paramsHolder.params = {};
     });
 
-    it('keeps rental actors that the user has rented', () => {
-        const actors = [
-            makeActor(1, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH),
-            makeActor(2, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH),
-        ];
-        expect(filterRentalActors(actors, ['id-1']).map((a) => a.id)).toEqual(['id-1']);
+    it('forwards `includeInputSchema` and `allowsAgenticUsers` as store-client params', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({
+            search: 'foo',
+            apifyToken: 'tok',
+            limit: 5,
+            offset: 0,
+            includeInputSchema: true,
+            allowsAgenticUsers: true,
+        });
+        expect(paramsHolder.params).toMatchObject({ includeInputSchema: true, allowsAgenticUsers: true });
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: 0 });
+    });
+
+    it('omits both flags when not provided', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok' });
+        expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
+        expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });
 });
 
@@ -53,7 +60,7 @@ describe('searchAndFilterActors', () => {
         paramsHolder.params = {};
     });
 
-    it('passes includeInputSchema=true and a page-sized limit to the API', async () => {
+    it('requests includeInputSchema=true when caller limit fits the API cap', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor(1), makeActor(2), makeActor(3)] });
         const result = await searchAndFilterActors({
             keywords: 'foo',
@@ -61,68 +68,33 @@ describe('searchAndFilterActors', () => {
             limit: 3,
             offset: 0,
         });
-        expect(listMock).toHaveBeenCalledTimes(1);
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: STORE_INPUT_SCHEMA_PAGE_LIMIT, offset: 0 });
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 3, offset: 0 });
         expect(paramsHolder.params).toMatchObject({ includeInputSchema: true });
         expect(result).toHaveLength(3);
     });
 
-    it('paginates when the first page does not yield enough non-rental actors', async () => {
-        // First page: all rentals → 0 non-rentals; second page: 3 non-rentals.
-        listMock
-            .mockResolvedValueOnce({ items: Array.from({ length: 10 }, (_, i) => makeActor(i, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH)) })
-            .mockResolvedValueOnce({ items: [makeActor(100), makeActor(101), makeActor(102)] });
+    it('drops includeInputSchema when caller limit exceeds the API cap', async () => {
+        listMock.mockResolvedValueOnce({ items: Array.from({ length: 25 }, (_, i) => makeActor(i)) });
         const result = await searchAndFilterActors({
             keywords: 'foo',
             apifyToken: 'tok',
-            limit: 3,
+            limit: 25,
             offset: 0,
         });
-        expect(listMock).toHaveBeenCalledTimes(2);
-        expect(listMock.mock.calls[1][0]).toMatchObject({ offset: 10 });
-        expect(result.map((a) => a.id)).toEqual(['id-100', 'id-101', 'id-102']);
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 25, offset: 0 });
+        expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
+        expect(result).toHaveLength(25);
     });
 
-    it('returns at most `limit` actors even when more are accumulated across pages', async () => {
-        listMock
-            .mockResolvedValueOnce({ items: Array.from({ length: 10 }, (_, i) => makeActor(i)) })
-            .mockResolvedValueOnce({ items: Array.from({ length: 10 }, (_, i) => makeActor(i + 100)) });
-        const result = await searchAndFilterActors({
+    it('passes the caller limit straight through (no over-fetch — API filters rentals)', async () => {
+        listMock.mockResolvedValueOnce({ items: [] });
+        await searchAndFilterActors({
             keywords: 'foo',
             apifyToken: 'tok',
-            limit: 5,
+            limit: 7,
             offset: 0,
         });
-        // First page already covers `limit`; no second call should happen.
-        expect(listMock).toHaveBeenCalledTimes(1);
-        expect(result).toHaveLength(5);
-    });
-
-    it('short-circuits when a page returns fewer items than requested (end of upstream results)', async () => {
-        // Single rental in a 10-slot page → upstream has nothing more; should not roundtrip again.
-        listMock.mockResolvedValueOnce({ items: [makeActor(1, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH)] });
-        const result = await searchAndFilterActors({
-            keywords: 'foo',
-            apifyToken: 'tok',
-            limit: 5,
-            offset: 0,
-        });
-        expect(listMock).toHaveBeenCalledTimes(1);
-        expect(result).toEqual([]);
-    });
-
-    it('stops on an empty page when previous pages were full (rentals burned the budget)', async () => {
-        listMock
-            .mockResolvedValueOnce({ items: Array.from({ length: 10 }, (_, i) => makeActor(i, ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH)) })
-            .mockResolvedValueOnce({ items: [] });
-        const result = await searchAndFilterActors({
-            keywords: 'foo',
-            apifyToken: 'tok',
-            limit: 5,
-            offset: 0,
-        });
-        expect(listMock).toHaveBeenCalledTimes(2);
-        expect(result).toEqual([]);
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 7, offset: 0 });
     });
 
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {

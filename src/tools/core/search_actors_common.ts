@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../../const.js';
+import { HelperTools } from '../../const.js';
 import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -12,11 +12,6 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 /**
  * Shared base schema for search-actors arguments. Used directly by the widget
  * variant; extended by `searchActorsArgsSchema` with a longer `keywords` description.
- *
- * `limit` is capped at {@link STORE_INPUT_SCHEMA_PAGE_LIMIT} to match the cap that
- * `GET /v2/store?includeInputSchema=true` enforces in apify-core. Larger values
- * would either trigger 400s or require dropping schema enrichment, both worse
- * trade-offs than just narrowing the public range.
  */
 export const searchActorsBaseArgsSchema = z.object({
     keywords: z.string()
@@ -25,9 +20,9 @@ export const searchActorsBaseArgsSchema = z.object({
     limit: z.number()
         .int()
         .min(1)
-        .max(STORE_INPUT_SCHEMA_PAGE_LIMIT)
+        .max(100)
         .default(5)
-        .describe(`The maximum number of Actors to return (default = 5, max = ${STORE_INPUT_SCHEMA_PAGE_LIMIT})`),
+        .describe('The maximum number of Actors to return (default = 5)'),
     offset: z.number()
         .int()
         .min(0)
@@ -97,7 +92,7 @@ Returns list of Actor cards with the following info:
 - **Pricing:** Details with pricing link
 - **Stats:** Usage, success rate, bookmarks
 - **Rating:** Out of 5 (if available)
-- **Input fields:** Compact list of input property names and types
+- **Input schema:** Compact JSON Schema of input properties (types only)
 `;
 
 /**
