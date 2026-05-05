@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.9.23 - **not yet released**
+## [0.10.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.0) (2026-05-05)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Handle full permission approval errors in actor calls ([#779](https://github.com/apify/apify-mcp-server/pull/779)) ([780eb37](https://github.com/apify/apify-mcp-server/commit/780eb378a8f0f783edc95240cf6843177eb75cf8)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.9.22](https://github.com/apify/apify-mcp-server/releases/tag/v0.9.22) (2026-05-04)
 
 ### 🐛 Bug Fixes
