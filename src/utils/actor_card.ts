@@ -1,5 +1,5 @@
-import { APIFY_STORE_URL } from '../const.js';
-import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } from '../types.js';
+import { APIFY_STORE_URL, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT } from '../const.js';
+import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import {
     getCurrentPricingInfo,
     type PricingInfo,
@@ -10,6 +10,36 @@ import {
     type PricingTier,
     type StructuredPricingInfo,
 } from './pricing_info.js';
+
+/** `inputSchema` is only attached when the search call requested it; other Actor types don't carry it. */
+function getInputSchema(actor: Actor | ActorStoreList): ActorStoreInputSchema | undefined {
+    return 'inputSchema' in actor ? actor.inputSchema : undefined;
+}
+
+/**
+ * Render an `inputSchema.properties` entry's `type` (string or mixed-type array)
+ * as a human-readable hint. Mixed types come from apify-core's `trimInputSchema`.
+ */
+function formatPropertyType(type: string | string[]): string {
+    return Array.isArray(type) ? type.join('|') : type;
+}
+
+/**
+ * Render the first {@link STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT} properties of `inputSchema`
+ * as a TypeScript-like inline list (`name?: type, name: type, ...`). Returns null
+ * when no properties exist; the structured card always exposes the full schema.
+ */
+function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | null {
+    const entries = Object.entries(inputSchema.properties);
+    if (entries.length === 0) return null;
+    const requiredSet = new Set(inputSchema.required ?? []);
+    const shown = entries.slice(0, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT);
+    const fields = shown
+        .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${formatPropertyType(prop.type)}`)
+        .join(', ');
+    const suffix = entries.length > shown.length ? ` (${shown.length} of ${entries.length})` : '';
+    return `- **Input fields${suffix}:** ${fields}`;
+}
 
 // Helper function to format categories from uppercase with underscores to a proper case
 function formatCategories(categories?: string[]): string[] {
@@ -217,6 +247,11 @@ export function formatActorToActorCard(
             markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
         }
     }
+    const inputSchema = getInputSchema(actor);
+    if (inputSchema) {
+        const line = formatInputSchemaForText(inputSchema);
+        if (line) markdownLines.push(line);
+    }
     return markdownLines.join('\n');
 }
 
@@ -249,6 +284,7 @@ export function formatActorToStructuredCard(
         rating: data.rating,
         modifiedAt: data.modifiedAt,
         isDeprecated: data.isDeprecated,
+        inputSchema: getInputSchema(actor),
     };
 }
 

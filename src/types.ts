@@ -246,6 +246,8 @@ export type ActorStoreList = ActorStoreListOutdated & {
     isWhiteListedForAgenticPayments?: boolean;
     notice?: string | null;
     userFullName?: string;
+    /** Populated when the search call is made with `includeInputSchema=true`. */
+    inputSchema?: ActorStoreInputSchema;
     stats: ActorStats & {
         actorReviewCount?: number;
         actorReviewRating?: number;
@@ -564,6 +566,18 @@ export type ActorsMcpServerOptions = {
     uiMode?: string;
 }
 
+/**
+ * Compact JSON Schema returned by `GET /v2/store?includeInputSchema=true`.
+ * Mirrors the shape produced by apify-core's `trimInputSchema` — types only,
+ * `required` omitted when empty. `properties[].type` may be an array for
+ * mixed-type fields (e.g. `['string', 'integer']`).
+ */
+export type ActorStoreInputSchema = {
+    type: 'object';
+    properties: Record<string, { type: string | string[] }>;
+    required?: string[];
+};
+
 export type StructuredActorCard = {
     title?: string;
     url: string;
@@ -590,6 +604,7 @@ export type StructuredActorCard = {
     };
     modifiedAt?: string;
     isDeprecated: boolean;
+    inputSchema?: ActorStoreInputSchema;
 }
 
 /**

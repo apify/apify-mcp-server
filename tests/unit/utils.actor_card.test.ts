@@ -573,4 +573,74 @@ describe('formatActorToStructuredCard', () => {
             expect(result.modifiedAt).toBeUndefined();
         });
     });
+
+    describe('inputSchema', () => {
+        const inputSchema = {
+            type: 'object' as const,
+            properties: {
+                url: { type: 'string' },
+                maxResults: { type: 'number' },
+            },
+            required: ['url'],
+        };
+
+        it('passes inputSchema through from ActorStoreList to the structured card', () => {
+            const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
+            const result = formatActorToStructuredCard(actor);
+            expect(result.inputSchema).toEqual(inputSchema);
+        });
+
+        it('omits inputSchema when the actor has no schema', () => {
+            const result = formatActorToStructuredCard(mockActor);
+            expect(result.inputSchema).toBeUndefined();
+        });
+    });
+});
+
+describe('formatActorToActorCard inputSchema rendering', () => {
+    const inputSchema = {
+        type: 'object' as const,
+        properties: {
+            url: { type: 'string' },
+            maxResults: { type: 'number' },
+        },
+        required: ['url'],
+    };
+
+    it('renders input schema as a TypeScript-like inline list with required marker', () => {
+        const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
+    });
+
+    it('renders an `(N of M)` truncation suffix when properties exceed the text-render cap', () => {
+        const properties: Record<string, { type: string }> = {};
+        for (let i = 0; i < 15; i++) properties[`field${i}`] = { type: 'string' };
+        const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain('- **Input fields (10 of 15):**');
+    });
+
+    it('joins mixed-type property arrays with `|`', () => {
+        const actor = {
+            ...mockActorStoreList,
+            inputSchema: { type: 'object' as const, properties: { mixed: { type: ['string', 'integer'] } } },
+        } as unknown as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain('- **Input fields:** mixed?: string|integer');
+    });
+
+    it('omits the input fields line when no inputSchema is present', () => {
+        const result = formatActorToActorCard(mockActor);
+        expect(result).not.toContain('Input fields');
+    });
+
+    it('omits the input fields line when inputSchema has no properties', () => {
+        const actor = {
+            ...mockActorStoreList,
+            inputSchema: { type: 'object' as const, properties: {} },
+        } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).not.toContain('Input fields');
+    });
 });
