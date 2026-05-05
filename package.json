@@ -44,7 +44,7 @@
     "@apify/log": "^2.5.16",
     "@apify/utilities": "^2.25.1",
     "@modelcontextprotocol/ext-apps": "^1.1.2",
-    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@segment/analytics-node": "^2.3.0",
     "@sentry/node": "^10.38.0",
     "ajv": "^8.17.1",
@@ -106,5 +106,8 @@
     "evals:workflow": "npm run build && tsx evals/workflows/run_workflow_evals.ts"
   },
   "author": "Apify",
-  "license": "MIT"
+  "license": "MIT",
+  "overrides": {
+    "@modelcontextprotocol/sdk": "1.29.0"
+  }
 }
