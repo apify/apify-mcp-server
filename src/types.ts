@@ -441,11 +441,7 @@ export function parseServerMode(rawMode: string | null | undefined): ServerModeO
  */
 export function resolveServerMode(option: ServerModeOption, clientSupportsUi: boolean): ServerMode {
     if (option !== 'auto') return option;
-    // TODO: re-enable auto-detect from client capabilities. Disabled for the
-    // initial release so APPS mode is opt-in via `?ui=apps` or `UI_MODE=apps`.
-    // return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
-    void clientSupportsUi;
-    return ServerMode.DEFAULT;
+    return clientSupportsUi ? ServerMode.APPS : ServerMode.DEFAULT;
 }
 
 /**

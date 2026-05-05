@@ -72,8 +72,7 @@ describe('ActorsMcpServer initialize handler', () => {
             { option: ServerMode.APPS, supportsUi: false, expectedMode: ServerMode.APPS },
             { option: ServerMode.DEFAULT, supportsUi: true, expectedMode: ServerMode.DEFAULT },
             { option: ServerMode.DEFAULT, supportsUi: false, expectedMode: ServerMode.DEFAULT },
-            // TODO: re-enable APPS expectation when auto-detect is restored in resolveServerMode (src/types.ts).
-            { option: 'auto', supportsUi: true, expectedMode: ServerMode.DEFAULT },
+            { option: 'auto', supportsUi: true, expectedMode: ServerMode.APPS },
             { option: 'auto', supportsUi: false, expectedMode: ServerMode.DEFAULT },
         ];
 
@@ -88,8 +87,7 @@ describe('ActorsMcpServer initialize handler', () => {
         }
     });
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
+    it('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -134,8 +132,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
+    it('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -151,8 +148,7 @@ describe('ActorsMcpServer initialize handler', () => {
         expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
     });
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
+    it('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
         const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);
