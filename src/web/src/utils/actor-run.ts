@@ -1,5 +1,7 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 
+export const ACTOR_RUN_META_KEY = "com.apify/ActorRun";
+
 /**
  * Strip noise that is meant for the model, not the end-user:
  *  - trailing JSON blobs like `{"statusCode":404}`

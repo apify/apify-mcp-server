@@ -6,7 +6,7 @@ import { CheckIcon, CrossIcon, LoaderIcon } from "@apify/ui-icons";
 import { useMcpApp } from "../../context/mcp-app-context";
 import { useWidgetProps } from "../../hooks/use-widget-props";
 import { formatDuration, formatTimestamp, humanizeActorName } from "../../utils/formatting";
-import { extractActorRunErrorMessage } from "../../utils/actor-run";
+import { extractActorRunErrorMessage, ACTOR_RUN_META_KEY } from "../../utils/actor-run";
 import { TableSkeleton } from "./ActorRun.skeleton";
 
 interface ActorRunData {
@@ -274,9 +274,16 @@ const SuccessMessage = styled.p`
     margin: 0;
 `;
 
+type ActorRunMeta = { [key in typeof ACTOR_RUN_META_KEY]?: { usageTotalUsd?: number } } | null | undefined;
+
+function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
+    const value = meta?.[ACTOR_RUN_META_KEY]?.usageTotalUsd;
+    return typeof value === "number" ? value : undefined;
+}
+
 function toolOutputToRunData(
     toolOutput: ToolOutput,
-    meta?: { usageTotalUsd?: number } | null
+    meta?: ActorRunMeta
 ): ActorRunData {
     const startedAt = toolOutput.startedAt as string;
     const finishedAt = toolOutput.finishedAt;
@@ -285,7 +292,7 @@ function toolOutputToRunData(
     const actorNameOnly = extractActorName(fullActorName);
     const humanizedName = humanizeActorName(actorNameOnly);
     const developerUsername = extractDeveloperUsername(fullActorName);
-    const usageTotalUsd = typeof meta?.usageTotalUsd === "number" ? meta.usageTotalUsd : undefined;
+    const usageTotalUsd = extractUsageTotalUsd(meta);
     return {
         runId: toolOutput.runId!,
         actorName: humanizedName,
@@ -305,7 +312,7 @@ function toolOutputToRunData(
 export const ActorRun: React.FC = () => {
     const { app, toolResult } = useMcpApp();
     const toolOutput = useWidgetProps<ToolOutput>();
-    const toolResponseMetadata = (toolResult?._meta ?? null) as Record<string, unknown> | null;
+    const toolResponseMetadata = (toolResult?._meta ?? null) as ActorRunMeta;
     const stableRunId = getRunIdFromUrl();
     const toolErrorMessage = extractActorRunErrorMessage(toolResult);
 
@@ -332,7 +339,7 @@ export const ActorRun: React.FC = () => {
                 if (cancelled) return;
                 const data = response?.structuredContent as ToolOutput | undefined;
                 if (data?.runId) {
-                    const meta = response?._meta as { usageTotalUsd?: number } | undefined;
+                    const meta = response?._meta as ActorRunMeta;
                     setRunData(toolOutputToRunData(data, meta));
                 }
             } catch (err) {
@@ -404,9 +411,7 @@ export const ActorRun: React.FC = () => {
                         const humanizedName = humanizeActorName(actorNameOnly);
                         const developerUsername = extractDeveloperUsername(fullActorName);
 
-                        const pollUsageTotalUsd = typeof response._meta?.usageTotalUsd === 'number'
-                            ? response._meta.usageTotalUsd
-                            : undefined;
+                        const pollUsageTotalUsd = extractUsageTotalUsd(response._meta as ActorRunMeta);
 
                         const updatedRunData: ActorRunData = {
                             runId: newData.runId!,

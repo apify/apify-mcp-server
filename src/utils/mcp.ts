@@ -1,13 +1,14 @@
 import type { ToolTelemetryContext } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
+/** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
+export const APIFY_ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
+
 /**
  * Builds usage metadata for MCP response from a source object containing Apify run costs.
- * Uses MCP-compliant key names with com.apify/ prefix as per MCP specification.
- * @param source - Object containing usage cost information
- * @param source.usageTotalUsd - Total cost in USD (optional)
- * @param source.usageUsd - Breakdown of costs by resource type (optional)
- * @returns Usage metadata object or undefined if no usage data is available
+ * Nests fields under the `com.apify/ActorRun` namespaced key as required by the MCP `_meta` spec
+ * (https://modelcontextprotocol.io/specification/2025-11-25/basic/index#_meta).
+ * @returns `{ 'com.apify/ActorRun': { usageTotalUsd, usageUsd } }`, or undefined if no usage data.
  */
 export function buildUsageMeta(source: {
     usageTotalUsd?: number;
@@ -16,8 +17,7 @@ export function buildUsageMeta(source: {
     const { usageTotalUsd, usageUsd } = source;
     return usageTotalUsd !== undefined
         ? {
-            usageTotalUsd,
-            usageUsd,
+            [APIFY_ACTOR_RUN_META_KEY]: { usageTotalUsd, usageUsd },
         }
         : undefined;
 }
