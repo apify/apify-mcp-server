@@ -59,7 +59,7 @@ A new `code` tool category, opt-in only — not in `toolCategoriesEnabledByDefau
 
 | Field | Value |
 |---|---|
-| Input | `{ topic: enum }` (5 values) |
+| Input | `{ topic: enum }` |
 | Output | Markdown recipe (~300–500 tokens), TypeScript fenced |
 | paymentRequired | `false` |
 | readOnlyHint | `true` |
