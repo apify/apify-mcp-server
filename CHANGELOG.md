@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.10.1 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Handle SSE controller closed state in error logging ([#795](https://github.com/apify/apify-mcp-server/pull/795)) ([4031a79](https://github.com/apify/apify-mcp-server/commit/4031a7921dd4160ca9a042ffa675da99fcf9dc2a)) by [@jirispilka](https://github.com/jirispilka), closes [#793](https://github.com/apify/apify-mcp-server/issues/793)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.10.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.0) (2026-05-05)
 
 ### 🐛 Bug Fixes
