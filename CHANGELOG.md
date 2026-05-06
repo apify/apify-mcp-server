@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Handle SSE controller closed state in error logging ([#795](https://github.com/apify/apify-mcp-server/pull/795)) ([4031a79](https://github.com/apify/apify-mcp-server/commit/4031a7921dd4160ca9a042ffa675da99fcf9dc2a)) by [@jirispilka](https://github.com/jirispilka), closes [#793](https://github.com/apify/apify-mcp-server/issues/793)
+- Remove `_meta.ui.domain` from widget configuration ([#799](https://github.com/apify/apify-mcp-server/pull/799)) ([d912bdf](https://github.com/apify/apify-mcp-server/commit/d912bdf0dfebccef588210d798c04f761f62370c)) by [@jirispilka](https://github.com/jirispilka)
 
 
 <!-- git-cliff-unreleased-end -->
