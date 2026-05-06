@@ -4,6 +4,7 @@ import type { AxiosRequestConfig } from 'axios';
 
 import type { PaymentHeaders } from './payments/types.js';
 
+// User agent headers
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
