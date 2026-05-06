@@ -2,8 +2,9 @@ import React from "react";
 import styled from "styled-components";
 
 import { Actor } from "../../types";
-import { Text, Box, ActorAvatar, theme, clampLines, Link } from "@apify/ui-library";
+import { Text, Box, ActorAvatar, theme, clampLines } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
+import { useMcpApp } from "../../context/mcp-app-context";
 import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
 import { ActorStats, StructuredPricingInfo } from "../../types";
 
@@ -50,19 +51,20 @@ const BoxGroup = styled(Box)`
     align-items: center;
 `;
 
-const ExternalLinkButton = styled(Link)`
+const ExternalLinkButton = styled.button`
     display: inline-flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
     width: 32px;
     height: 32px;
+    padding: 0;
     border-radius: ${theme.radius.radius6};
     background-color: ${theme.color.neutral.backgroundMuted};
     border: 1px solid ${theme.color.neutral.border};
     color: ${theme.color.neutral.text};
     flex-shrink: 0;
-    text-decoration: none;
+    cursor: pointer;
 
     &:hover {
         background-color: ${theme.color.neutral.hover};
@@ -192,10 +194,17 @@ export const ActorCard: React.FC<ActorCardProps> = ({
     isDetail = false,
     customActionButton,
 }) => {
+    const { app } = useMcpApp();
     const statsProps = {
         stats: actor.stats,
         pricingInfo: actor.currentPricingInfo,
         isDetail
+    };
+
+    const handleOpenActor = () => {
+        if (app) {
+            app.openLink({ url: actor.url });
+        }
     };
 
     return (
@@ -223,7 +232,7 @@ export const ActorCard: React.FC<ActorCardProps> = ({
                         </ActorTitleWrapper>
                     </ActorHeader>
                     {customActionButton || (
-                        <ExternalLinkButton to={actor.url} hideExternalIcon className="flexShrink0"><ExternalLinkIcon size="16" /></ExternalLinkButton>
+                        <ExternalLinkButton type="button" onClick={handleOpenActor} className="flexShrink0"><ExternalLinkIcon size="16" /></ExternalLinkButton>
                     )}
                 </ActorHeaderWithActionButton>
             </BoxRow>
