@@ -40,7 +40,6 @@ const OPENAI_WIDGET_CSP = {
 const WIDGET_BASE_UI = {
     visibility: ['model', 'app'] as const,
     prefersBorder: true,
-    domain: WIDGET_DOMAIN,
     csp: WIDGET_CSP,
 } as const;
 
@@ -59,13 +58,12 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
   // 'openai/widgetAccessible'?: boolean;
   'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
   // 'openai/widgetPrefersBorder'?: boolean;
-  // 'openai/widgetDomain'?: string;
+  'openai/widgetDomain'?: string;
   // MCP Apps standard metadata (SEP-1865)
   ui: {
     resourceUri: string;
     visibility: readonly string[];
     prefersBorder: boolean;
-    domain: string;
     csp: typeof WIDGET_CSP;
   };
 };
@@ -81,6 +79,12 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
  *
  * The `openai/toolInvocation/*` keys are safe — they're UX hints only and don't affect
  * renderer detection.
+ *
+ * `_meta.ui.domain` intentionally omitted. Claude hashes the literal connector
+ * URL (including `?tools=...`, `?ui=true`); no static value can match. Spec
+ * lists OAuth/CORS/API-key allowlists as use cases — none apply (DCR for OAuth,
+ * `api.apify.com` is `Access-Control-Allow-Origin: *`, bearer-token auth).
+ * ChatGPT uses `openai/widgetDomain` below, unaffected.
  */
 function createWidgetMeta(params: {
     resourceUri: string;
@@ -97,7 +101,7 @@ function createWidgetMeta(params: {
         // 'openai/widgetAccessible': true,
         'openai/widgetCSP': OPENAI_WIDGET_CSP,
         // 'openai/widgetPrefersBorder': WIDGET_BASE_UI.prefersBorder,
-        // 'openai/widgetDomain': WIDGET_BASE_UI.domain,
+        'openai/widgetDomain': WIDGET_DOMAIN,
         ui: { ...WIDGET_BASE_UI, resourceUri },
     };
 }
@@ -112,8 +116,7 @@ export type WidgetConfig = {
 };
 
 /**
- * Widget registry configuration
- * Maps widget URIs to their configuration
+ * Widget registry, keyed by URI.
  */
 export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
     [WIDGET_URIS.SEARCH_ACTORS]: {
