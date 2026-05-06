@@ -21,6 +21,8 @@ TypeScript, ES modules. Runs in two modes: **stdio** (local CLI clients, `stdio.
 
 Conventional Commits for all three. Branch: `type/short-desc` (e.g. `fix/connection-timeout`). Commit/PR title: `type: Description` (e.g. `fix: Handle connection errors`). Types: `feat`, `fix`, `chore`, `refactor`, `docs`. Append `!` for breaking changes. PR title ≤70 chars.
 
+Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rather than delete+create.
+
 ## Verification (mandatory)
 
 After every code change, run `npm run type-check`, `npm run lint`, and `npm run test:unit`.

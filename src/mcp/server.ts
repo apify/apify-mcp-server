@@ -76,11 +76,12 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { parseServerMode, resolveServerMode, ServerMode } from '../types.js';
+import { ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
+import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';

@@ -19,7 +19,7 @@ import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
-import { parseServerMode } from './types.js';
+import { parseServerMode } from './utils/server_mode.js';
 
 enum TransportType {
     HTTP = 'HTTP',

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { IS_SERVER_MODE_AUTO_DETECTION_ENABLED, resolveServerMode, ServerMode } from '../../src/types.js';
+import { SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
+import { ServerMode } from '../../src/types.js';
+import { resolveServerMode } from '../../src/utils/server_mode.js';
 
 describe('resolveServerMode', () => {
     it('returns concrete option as-is (capabilities ignored)', () => {
@@ -14,15 +16,15 @@ describe('resolveServerMode', () => {
         expect(resolveServerMode('auto', false)).toBe(ServerMode.DEFAULT);
     });
 
-    it.runIf(IS_SERVER_MODE_AUTO_DETECTION_ENABLED)(
-        'with kill switch on, resolves auto to apps when client supports UI',
+    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
+        'with auto-detection enabled, resolves auto to apps when client supports UI',
         () => {
             expect(resolveServerMode('auto', true)).toBe(ServerMode.APPS);
         },
     );
 
-    it.runIf(!IS_SERVER_MODE_AUTO_DETECTION_ENABLED)(
-        'with kill switch off, resolves auto to default regardless of client UI support',
+    it.runIf(!SERVER_MODE_AUTO_DETECTION_ENABLED)(
+        'with auto-detection disabled, resolves auto to default regardless of client UI support',
         () => {
             expect(resolveServerMode('auto', true)).toBe(ServerMode.DEFAULT);
         },

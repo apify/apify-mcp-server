@@ -5,13 +5,20 @@ import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
+import {
+    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    defaults,
+    HelperTools,
+    RAG_WEB_BROWSER,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+    SKYFIRE_ENABLED_TOOLS,
+} from '../../src/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import { IS_SERVER_MODE_AUTO_DETECTION_ENABLED, type ServerMode, type ToolCategory, type ToolEntry } from '../../src/types.js';
+import { type ServerMode, type ToolCategory, type ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
@@ -2532,8 +2539,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        const itIfAutoDetect = IS_SERVER_MODE_AUTO_DETECTION_ENABLED ? it : it.skip;
-        itIfAutoDetect('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+        it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
             client = await createClientFn({
                 clientCapabilities: {
