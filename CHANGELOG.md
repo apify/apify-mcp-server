@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.1 - **not yet released**
+## [0.10.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.1) (2026-05-06)
 
 ### 🐛 Bug Fixes
 
@@ -12,7 +11,6 @@ All notable changes to this project will be documented in this file.
 - Open Actor card link via app.openLink ([#796](https://github.com/apify/apify-mcp-server/pull/796)) ([e58ee79](https://github.com/apify/apify-mcp-server/commit/e58ee79e581f33406d09a0e9942c65a4b848b926)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.0](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.0) (2026-05-05)
 
 ### 🐛 Bug Fixes
