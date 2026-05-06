@@ -18,7 +18,7 @@ export const TOOL_MAX_OUTPUT_CHARS = 50000;
 
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
-export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
+export const SERVER_MODE_AUTO_DETECTION_ENABLED = false;
 
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
