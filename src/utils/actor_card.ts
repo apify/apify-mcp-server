@@ -273,7 +273,7 @@ export function formatActorToStructuredCard(
         rating: data.rating,
         modifiedAt: data.modifiedAt,
         isDeprecated: data.isDeprecated,
-        inputSchema: getInputSchema(actor),
+        inputFields: getInputSchema(actor),
     };
 }
 

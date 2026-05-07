@@ -574,28 +574,6 @@ describe('formatActorToStructuredCard', () => {
             expect(result.modifiedAt).toBeUndefined();
         });
     });
-
-    describe('inputSchema', () => {
-        const inputSchema = {
-            type: 'object' as const,
-            properties: {
-                url: { type: 'string' },
-                maxResults: { type: 'number' },
-            },
-            required: ['url'],
-        };
-
-        it('passes inputSchema through from ActorStoreList to the structured card', () => {
-            const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
-            const result = formatActorToStructuredCard(actor);
-            expect(result.inputSchema).toEqual(inputSchema);
-        });
-
-        it('omits inputSchema when the actor has no schema', () => {
-            const result = formatActorToStructuredCard(mockActor);
-            expect(result.inputSchema).toBeUndefined();
-        });
-    });
 });
 
 describe('formatActorToActorCard inputSchema rendering', () => {

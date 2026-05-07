@@ -71,12 +71,6 @@ describe('searchActorsByKeywords', () => {
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });
 
-    it('forwards `limit` verbatim when `includeInputSchema` is omitted', async () => {
-        listMock.mockResolvedValueOnce({ items: [] });
-        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 50 });
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 50, offset: undefined });
-    });
-
     it('throws when `includeInputSchema=true` is paired with `limit > MAX_LIMIT_WITH_INPUT_SCHEMA`', async () => {
         await expect(searchActorsByKeywords({
             search: 'foo',

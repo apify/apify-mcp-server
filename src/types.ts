@@ -599,7 +599,7 @@ export type StructuredActorCard = {
     };
     modifiedAt?: string;
     isDeprecated: boolean;
-    inputSchema?: ActorStoreInputSchema;
+    inputFields?: ActorStoreInputSchema;
 }
 
 /**

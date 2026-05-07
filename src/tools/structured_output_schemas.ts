@@ -141,10 +141,9 @@ export const actorInfoSchema = {
         },
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
-        inputSchema: {
+        inputFields: {
             type: 'object' as const,
-            description: 'Compact JSON Schema of the Actor\'s input — types only, raw property keys.'
-                + ' LLMs use this to construct valid Actor input without a separate fetch-actor-details call.',
+            description: 'Input fields with their types (e.g. `url: string, maxResults?: number`).',
         },
     },
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
