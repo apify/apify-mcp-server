@@ -23,12 +23,6 @@ function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
     return updatedConfig;
 }
 
-export function getApifyAPIBaseUrl(): string {
-    // Workaround for Actor server where the platform APIFY_API_BASE_URL did not work with getActorDefinition from actors.ts
-    if (process.env.APIFY_IS_AT_HOME) return 'https://api.apify.com';
-    return process.env.APIFY_API_BASE_URL || 'https://api.apify.com';
-}
-
 export class ApifyClient extends _ApifyClient {
     constructor(options: ExtendedApifyClientOptions) {
         /**
@@ -59,7 +53,6 @@ export class ApifyClient extends _ApifyClient {
         super({
             // token null case is handled, we can assert type here
             ...clientOptions as ApifyClientOptions,
-            baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors,
         });
     }
