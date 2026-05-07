@@ -74,7 +74,6 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 - **Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for all naming and coding standards.** It is the single source of truth for naming rules (function verbs, boolean prefixes, type suffixes, enumerations, file names, etc.), string formatting, parameters, error handling, and anti-patterns. Read it before writing code.
 - **Validate tool inputs with Zod.** No ad-hoc shape checks.
 - **Reference tool names via the `HelperTools` enum**, not hardcoded strings (exception: integration tests).
-- **Put constants in `src/const.ts`**, not as local variables in individual files. This includes cache sizes/TTLs, concurrency limits, magic numbers, and string enums.
 - Always follow the latest [MCP spec](https://modelcontextprotocol.io/specification/2025-11-25) and [MCP Apps spec](https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx).
 
 ## Further reading
