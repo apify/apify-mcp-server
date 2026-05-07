@@ -7,10 +7,7 @@
  * MCP-side rental over-fetch / filter is needed.
  */
 
-import log from '@apify/log';
-
 import { ApifyClient } from '../apify_client.js';
-import { ACTOR_PRICING_MODEL, STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
 
@@ -20,7 +17,7 @@ export type SearchActorsByKeywordsOptions = {
     limit?: number;
     offset?: number;
     allowsAgenticUsers?: boolean;
-    /** When true, `limit` is clamped to `STORE_INPUT_SCHEMA_PAGE_LIMIT` since apify-core rejects larger pages. */
+    /** Caller must keep `limit` within apify-core's `MAX_LIMIT_WITH_INPUT_SCHEMA` (10); apify-core 400s above the cap. */
     includeInputSchema?: boolean;
 };
 
@@ -41,40 +38,26 @@ export async function searchActorsByKeywords(
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
     if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
 
-    const effectiveLimit = includeInputSchema && limit !== undefined
-        ? Math.min(limit, STORE_INPUT_SCHEMA_PAGE_LIMIT)
-        : limit;
-    const results = await storeClient.list({ search, limit: effectiveLimit, offset });
+    const results = await storeClient.list({ search, limit, offset });
     return results.items as ActorStoreList[];
 }
 
 /**
- * Search Actors by keywords. Requests `includeInputSchema=true` when the
- * caller's `limit` fits within the API cap ({@link STORE_INPUT_SCHEMA_PAGE_LIMIT});
- * larger requests fall back to a plain search since the API rejects the flag
- * above the cap. Tracked in apify-mcp-server#791.
+ * Search Actors by keywords with compact input-schema enrichment via
+ * `includeInputSchema=true`. The public arg schema caps `limit` at
+ * apify-core's hard cap (10), so every result includes `inputSchema`.
  */
 export async function searchAndFilterActors(
     options: SearchAndFilterActorsOptions,
 ): Promise<ActorStoreList[]> {
     const { keywords, apifyToken, limit, offset, paymentProvider } = options;
 
-    const actors = await searchActorsByKeywords({
+    return searchActorsByKeywords({
         search: keywords,
         apifyToken,
         limit,
         offset,
         allowsAgenticUsers: paymentProvider ? true : undefined,
-        includeInputSchema: limit <= STORE_INPUT_SCHEMA_PAGE_LIMIT || undefined,
+        includeInputSchema: true,
     });
-
-    // Observability: apify-core's `AGENT_SAFE_PRICING_MODELS` filter should mean we never see rentals here.
-    const rentalActors = actors
-        .filter((actor) => actor.currentPricingInfo?.pricingModel === ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH)
-        .map((actor) => `${actor.username}/${actor.name}`);
-    if (rentalActors.length > 0) {
-        log.error('Unexpected rental Actors in store search results', { keywords, rentalActors });
-    }
-
-    return actors;
 }

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { searchActorsByKeywords, searchAndFilterActors } from '../../src/utils/actor_search.js';
 
@@ -54,21 +53,10 @@ describe('searchActorsByKeywords', () => {
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });
 
-    it('clamps `limit` to STORE_INPUT_SCHEMA_PAGE_LIMIT when `includeInputSchema=true` (apify-core would otherwise 400)', async () => {
+    it('forwards `limit` verbatim — caller is responsible for the API cap', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
-        await searchActorsByKeywords({
-            search: 'foo',
-            apifyToken: 'tok',
-            limit: 50,
-            includeInputSchema: true,
-        });
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: STORE_INPUT_SCHEMA_PAGE_LIMIT, offset: undefined });
-    });
-
-    it('does not clamp `limit` when `includeInputSchema` is omitted', async () => {
-        listMock.mockResolvedValueOnce({ items: [] });
-        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 50 });
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 50, offset: undefined });
+        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 5 });
+        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 5, offset: undefined });
     });
 });
 
@@ -78,7 +66,7 @@ describe('searchAndFilterActors', () => {
         paramsHolder.params = {};
     });
 
-    it('requests includeInputSchema=true when caller limit fits the API cap', async () => {
+    it('always sets includeInputSchema=true (public limit is capped at the API max)', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor(1), makeActor(2), makeActor(3)] });
         const result = await searchAndFilterActors({
             keywords: 'foo',
@@ -89,19 +77,6 @@ describe('searchAndFilterActors', () => {
         expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 3, offset: 0 });
         expect(paramsHolder.params).toMatchObject({ includeInputSchema: true });
         expect(result).toHaveLength(3);
-    });
-
-    it('drops includeInputSchema when caller limit exceeds the API cap', async () => {
-        listMock.mockResolvedValueOnce({ items: Array.from({ length: 25 }, (_, i) => makeActor(i)) });
-        const result = await searchAndFilterActors({
-            keywords: 'foo',
-            apifyToken: 'tok',
-            limit: 25,
-            offset: 0,
-        });
-        expect(listMock).toHaveBeenCalledWith({ search: 'foo', limit: 25, offset: 0 });
-        expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
-        expect(result).toHaveLength(25);
     });
 
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
