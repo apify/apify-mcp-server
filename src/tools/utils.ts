@@ -7,7 +7,7 @@ import log from '@apify/log';
 
 import { ACTOR_ENUM_MAX_LENGTH, ACTOR_MAX_DESCRIPTION_LENGTH, RAG_WEB_BROWSER_WHITELISTED_FIELDS } from '../const.js';
 import { MAX_TOOL_NAME_LENGTH, TOOL_NAME_HASH_LENGTH } from '../mcp/const.js';
-import type { ActorInfo, ActorInputSchema, ActorInputSchemaProperties, SchemaProperties } from '../types.js';
+import type { ActorInfo, ActorInputSchema, SchemaProperties } from '../types.js';
 import {
     addGlobsProperties,
     addKeyValueProperties,
@@ -16,6 +16,8 @@ import {
     addRequestListSourcesProperties,
     addResourcePickerProperties as addArrayResourcePickerProperties,
 } from '../utils/apify_properties.js';
+
+type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 
 /*
  * Checks if the given ActorInfo represents an MCP server Actor.
