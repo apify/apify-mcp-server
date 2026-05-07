@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
-import { searchActorsByKeywords, searchAndFilterActors } from '../../src/utils/actor_search.js';
+import { searchActorsByKeywords, searchAgentSafeActors } from '../../src/utils/actor_search.js';
 
 const listMock = vi.fn();
 const paramsHolder: { params: Record<string, unknown> } = { params: {} };
@@ -82,7 +82,7 @@ describe('searchActorsByKeywords', () => {
     });
 });
 
-describe('searchAndFilterActors', () => {
+describe('searchAgentSafeActors', () => {
     beforeEach(() => {
         listMock.mockReset();
         paramsHolder.params = {};
@@ -90,7 +90,7 @@ describe('searchAndFilterActors', () => {
 
     it('always sets includeInputSchema=true (public limit is capped at the API max)', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor(), makeActor(), makeActor()] });
-        const result = await searchAndFilterActors({
+        const result = await searchAgentSafeActors({
             keywords: 'foo',
             apifyToken: 'tok',
             limit: 3,
@@ -103,7 +103,7 @@ describe('searchAndFilterActors', () => {
 
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
         listMock.mockResolvedValueOnce({ items: [makeActor()] });
-        await searchAndFilterActors({
+        await searchAgentSafeActors({
             keywords: 'foo',
             apifyToken: 'tok',
             limit: 1,

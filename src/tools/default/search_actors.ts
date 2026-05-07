@@ -2,7 +2,7 @@ import dedent from 'dedent';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { searchAndFilterActors } from '../../utils/actor_search.js';
+import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
@@ -24,7 +24,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         const [actors, { userPlanTier }] = await Promise.all([
-            searchAndFilterActors({
+            searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyToken,
                 limit: parsed.limit,

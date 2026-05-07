@@ -22,7 +22,7 @@ export type SearchActorsByKeywordsOptions = {
     includeInputSchema?: boolean;
 };
 
-export type SearchAndFilterActorsOptions = {
+export type SearchAgentSafeActorsOptions = {
     keywords: string;
     apifyToken: string;
     limit: number;
@@ -49,12 +49,13 @@ export async function searchActorsByKeywords(
 }
 
 /**
- * Search Actors by keywords with compact input-schema enrichment via
- * `includeInputSchema=true`. The public arg schema caps `limit` at
- * apify-core's hard cap (10), so every result includes `inputSchema`.
+ * Preset around `searchActorsByKeywords` for the agent-facing search tool:
+ * always sets `includeInputSchema=true` and forwards `allowsAgenticUsers`
+ * when a `paymentProvider` is in play. The public arg schema caps `limit`
+ * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
  */
-export async function searchAndFilterActors(
-    options: SearchAndFilterActorsOptions,
+export async function searchAgentSafeActors(
+    options: SearchAgentSafeActorsOptions,
 ): Promise<ActorStoreList[]> {
     const { keywords, apifyToken, limit, offset, paymentProvider } = options;
 
