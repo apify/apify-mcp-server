@@ -80,7 +80,7 @@ Usage:
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
 Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HelperTools.ACTOR_GET_DETAILS} round-trip.
 For complete Actor details (per-field descriptions, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
-The search is limited to publicly available Actors and may not include private, rental, or restricted Actors depending on the user's access level.
+The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
 **Title:** Markdown header linked to Store page
