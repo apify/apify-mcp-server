@@ -607,10 +607,10 @@ describe('formatActorToActorCard inputSchema rendering', () => {
         required: ['url'],
     };
 
-    it('renders input schema as a TypeScript-like inline list with required marker', () => {
+    it('renders input fields as a TypeScript-like inline list with required marker', () => {
         const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain('- **Input schema:** url: string, maxResults?: number');
+        expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
     });
 
     it('renders every property without truncation so structured output and text stay in sync', () => {
@@ -629,15 +629,15 @@ describe('formatActorToActorCard inputSchema rendering', () => {
             inputSchema: { type: 'object' as const, properties: { mixed: { type: ['string', 'integer'] } } },
         } as unknown as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain('- **Input schema:** mixed?: string|integer');
+        expect(result).toContain('- **Input fields:** mixed?: string|integer');
     });
 
-    it('omits the input schema line when inputSchema has no properties', () => {
+    it('omits the input fields line when inputSchema has no properties', () => {
         const actor = {
             ...mockActorStoreList,
             inputSchema: { type: 'object' as const, properties: {} },
         } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).not.toContain('Input schema');
+        expect(result).not.toContain('Input fields');
     });
 });

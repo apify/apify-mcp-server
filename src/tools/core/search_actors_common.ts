@@ -78,8 +78,8 @@ Usage:
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
 Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
-Each result includes a compact \`inputSchema\` (types only) so you can construct Actor input directly without a separate ${HelperTools.ACTOR_GET_DETAILS} call.
-For complete Actor details (descriptions per field, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HelperTools.ACTOR_GET_DETAILS} round-trip.
+For complete Actor details (per-field descriptions, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
 The search is limited to publicly available Actors and may not include private, rental, or restricted Actors depending on the user's access level.
 
 Returns list of Actor cards with the following info:
@@ -92,7 +92,7 @@ Returns list of Actor cards with the following info:
 - **Pricing:** Details with pricing link
 - **Stats:** Usage, success rate, bookmarks
 - **Rating:** Out of 5 (if available)
-- **Input schema:** Compact JSON Schema of input properties (types only)
+- **Input fields:** Inline list of input field names and types (e.g. \`url: string, maxResults?: number\`); \`?\` marks optional fields
 `;
 
 /**

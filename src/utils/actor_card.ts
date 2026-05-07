@@ -15,7 +15,7 @@ function getInputSchema(actor: Actor | ActorStoreList): ActorStoreInputSchema | 
     return 'inputSchema' in actor ? actor.inputSchema : undefined;
 }
 
-function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | null {
+function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null {
     const entries = Object.entries(inputSchema.properties);
     if (entries.length === 0) return null;
 
@@ -27,7 +27,7 @@ function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | 
     const overflow = entries.length - shown.length;
     const suffix = overflow > 0 ? ` ... (+${overflow} more)` : '';
 
-    return `- **Input schema:** ${fields}${suffix}`;
+    return `- **Input fields:** ${fields}${suffix}`;
 }
 
 // Helper function to format categories from uppercase with underscores to a proper case
@@ -238,7 +238,7 @@ export function formatActorToActorCard(
     }
     const inputSchema = getInputSchema(actor);
     if (inputSchema) {
-        const line = formatInputSchemaForText(inputSchema);
+        const line = inputFieldsToString(inputSchema);
         if (line) markdownLines.push(line);
     }
     return markdownLines.join('\n');
