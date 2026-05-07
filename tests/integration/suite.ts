@@ -9,6 +9,7 @@ import {
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     defaults,
     HelperTools,
+    MAX_LIMIT_WITH_INPUT_SCHEMA,
     RAG_WEB_BROWSER,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
     SKYFIRE_ENABLED_TOOLS,
@@ -754,28 +755,26 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes(ACTOR_PYTHON_EXAMPLE))).toBe(true);
         });
 
-        // It should filter out all rental Actors only if we run locally or as standby, where
-        // we cannot access MongoDB to get the user's rented Actors.
-        // In case of apify-mcp-server it should include user's rented Actors.
-        it('should filter out all rental Actors from store search', async () => {
+        // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
+        // (`GET /v2/store`) is what excludes rental Actors. If that contract ever
+        // drifts, this test catches the regression on the MCP side.
+        it('should not return rental Actors from store search', async () => {
             client = await createClientFn();
 
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
                     keywords: 'rental',
-                    limit: 100,
+                    limit: MAX_LIMIT_WITH_INPUT_SCHEMA,
                 },
             });
             const content = result.content as { text: string }[];
             expect(content.length).toBe(1);
             const outputText = content[0].text;
 
-            // Check to ensure that the output string format remains the same.
-            // If someone changes the output format, this test may stop working
-            // without actually failing.
+            // Sanity check that the output format hasn't drifted in a way that
+            // would make the negative assertion below silently meaningless.
             expect(outputText).toContain('This Actor');
-            // Check that no rental Actors are present
             expect(outputText).not.toContain('This Actor is rental');
         });
 
