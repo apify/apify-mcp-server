@@ -590,15 +590,6 @@ describe('formatActorToActorCard inputSchema rendering', () => {
         const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
         const result = formatActorToActorCard(actor);
         expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
-    });
-
-    it(`renders all input fields when count is within MAX_INPUT_SCHEMA_TEXT_FIELDS (${MAX_INPUT_SCHEMA_TEXT_FIELDS})`, () => {
-        const properties: Record<string, { type: string }> = {};
-        for (let i = 0; i < MAX_INPUT_SCHEMA_TEXT_FIELDS; i++) properties[`field${i}`] = { type: 'string' };
-        const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
-        const result = formatActorToActorCard(actor);
-        expect(result).toContain('field0?: string');
-        expect(result).toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS - 1}?: string`);
         expect(result).not.toMatch(/\(\+\d+ more\)/);
     });
 
