@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, STORE_INPUT_SCHEMA_PAGE_LIMIT } from '../../const.js';
+import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -20,9 +20,9 @@ export const searchActorsBaseArgsSchema = z.object({
     limit: z.number()
         .int()
         .min(1)
-        .max(STORE_INPUT_SCHEMA_PAGE_LIMIT)
+        .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
-        .describe(`The maximum number of Actors to return (1–${STORE_INPUT_SCHEMA_PAGE_LIMIT}, default = 5).`),
+        .describe(`The maximum number of Actors to return (1–${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
     offset: z.number()
         .int()
         .min(0)

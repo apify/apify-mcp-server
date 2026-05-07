@@ -1,4 +1,4 @@
-import { APIFY_STORE_URL, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT } from '../const.js';
+import { APIFY_STORE_URL, MAX_INPUT_SCHEMA_TEXT_FIELDS } from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import {
     getCurrentPricingInfo,
@@ -20,7 +20,7 @@ function formatInputSchemaForText(inputSchema: ActorStoreInputSchema): string | 
     if (entries.length === 0) return null;
 
     const requiredSet = new Set(inputSchema.required ?? []);
-    const shown = entries.slice(0, STORE_INPUT_SCHEMA_TEXT_FIELD_LIMIT);
+    const shown = entries.slice(0, MAX_INPUT_SCHEMA_TEXT_FIELDS);
     const fields = shown
         .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`)
         .join(', ');

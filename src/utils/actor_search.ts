@@ -17,7 +17,7 @@ export type SearchActorsByKeywordsOptions = {
     limit?: number;
     offset?: number;
     allowsAgenticUsers?: boolean;
-    /** Caller must keep `limit` within apify-core's `MAX_LIMIT_WITH_INPUT_SCHEMA` (10); apify-core 400s above the cap. */
+    /** Caller must keep `limit` within `MAX_LIMIT_WITH_INPUT_SCHEMA`; apify-core 400s above the cap. */
     includeInputSchema?: boolean;
 };
 
