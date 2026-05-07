@@ -1,8 +1,8 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SKYFIRE_README_CONTENT } from '../../src/const.js';
 import { isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
