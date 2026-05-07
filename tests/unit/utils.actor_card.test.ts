@@ -1,6 +1,7 @@
 import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
+import { MAX_INPUT_SCHEMA_TEXT_FIELDS } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
@@ -613,14 +614,26 @@ describe('formatActorToActorCard inputSchema rendering', () => {
         expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
     });
 
-    it('renders every property without truncation so structured output and text stay in sync', () => {
+    it(`renders all input fields when count is within MAX_INPUT_SCHEMA_TEXT_FIELDS (${MAX_INPUT_SCHEMA_TEXT_FIELDS})`, () => {
         const properties: Record<string, { type: string }> = {};
-        for (let i = 0; i < 15; i++) properties[`field${i}`] = { type: 'string' };
+        for (let i = 0; i < MAX_INPUT_SCHEMA_TEXT_FIELDS; i++) properties[`field${i}`] = { type: 'string' };
         const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
         const result = formatActorToActorCard(actor);
         expect(result).toContain('field0?: string');
-        expect(result).toContain('field14?: string');
-        expect(result).not.toMatch(/Input schema \(\d+ of \d+\)/);
+        expect(result).toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS - 1}?: string`);
+        expect(result).not.toMatch(/\(\+\d+ more\)/);
+    });
+
+    it(`truncates to MAX_INPUT_SCHEMA_TEXT_FIELDS and appends "... (+N more)" when count exceeds the cap`, () => {
+        const overflow = 5;
+        const total = MAX_INPUT_SCHEMA_TEXT_FIELDS + overflow;
+        const properties: Record<string, { type: string }> = {};
+        for (let i = 0; i < total; i++) properties[`field${i}`] = { type: 'string' };
+        const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS - 1}?: string`);
+        expect(result).not.toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS}?: string`);
+        expect(result).toContain(` ... (+${overflow} more)`);
     });
 
     it('joins mixed-type property arrays with `|`', () => {
