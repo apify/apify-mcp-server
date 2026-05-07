@@ -3,7 +3,8 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from '../apify_client.js';
 import { RELATED_TASK_META_KEY } from '../const.js';
 
-// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.`
+// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.
+// Exported for tests to keep fake-timer advances in sync with the production interval.
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
 
 const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
