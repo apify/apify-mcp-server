@@ -55,7 +55,7 @@ import type {
 
 import { ACTOR_PRICING_MODEL } from '../const.js';
 
-export type TieredEventPrice = {
+type TieredEventPrice = {
     tieredEventPriceUsd: number;
 };
 
