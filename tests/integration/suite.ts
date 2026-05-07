@@ -18,7 +18,7 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
-import { type ServerMode, type ToolCategory, type ToolEntry } from '../../src/types.js';
+import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';

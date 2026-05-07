@@ -17,7 +17,6 @@ export function parseServerMode(rawMode: string | null | undefined): ServerModeO
     if (!rawMode) return 'auto';
     if (rawMode === 'true' || rawMode === 'on' || rawMode === ServerMode.APPS || rawMode === 'openai') return ServerMode.APPS;
     if (rawMode === 'false' || rawMode === 'off' || rawMode === ServerMode.DEFAULT) return ServerMode.DEFAULT;
-    if (rawMode === 'auto') return 'auto';
     return 'auto';
 }
 
