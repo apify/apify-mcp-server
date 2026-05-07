@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseServerMode, ServerMode } from '../../src/types.js';
+import { ServerMode } from '../../src/types.js';
+import { parseServerMode } from '../../src/utils/server_mode.js';
 
 describe('parseServerMode', () => {
     it.each([

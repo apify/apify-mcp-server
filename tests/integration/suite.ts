@@ -5,7 +5,14 @@ import Ajv from 'ajv';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { ApifyClient } from '../../src/apify_client.js';
-import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG, defaults, HelperTools, RAG_WEB_BROWSER, SKYFIRE_ENABLED_TOOLS } from '../../src/const.js';
+import {
+    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    defaults,
+    HelperTools,
+    RAG_WEB_BROWSER,
+    SERVER_MODE_AUTO_DETECTION_ENABLED,
+    SKYFIRE_ENABLED_TOOLS,
+} from '../../src/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
@@ -2532,10 +2539,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        // TODO(#771): re-enable when auto-detect is re-enabled in resolveServerMode (src/types.ts).
-        // Currently 'auto' resolves to DEFAULT regardless of client UI capability, so these
-        // tests cannot exercise capability-driven mode resolution.
-        it.skip('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
+        it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)('auto mode: client advertising UI capability receives apps-mode tools with widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends UI capability → server resolves to 'apps'
             client = await createClientFn({
                 clientCapabilities: {
@@ -2549,7 +2553,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it.skip('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
+        it('auto mode: client without UI capability receives default-mode tools without widget metadata', async () => {
             // serverMode omitted → server defaults to 'auto'; client sends no UI capability → server resolves to 'default'
             client = await createClientFn();
             const tools = await client.listTools();

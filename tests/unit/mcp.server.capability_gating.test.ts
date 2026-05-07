@@ -3,7 +3,7 @@ import type { InitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { ApifyClient } from 'apify-client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { HelperTools } from '../../src/const.js';
+import { HelperTools, SERVER_MODE_AUTO_DETECTION_ENABLED } from '../../src/const.js';
 import { ActorsMcpServer } from '../../src/mcp/server.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { appsCallActor } from '../../src/tools/apps/call_actor.js';
@@ -72,8 +72,11 @@ describe('ActorsMcpServer initialize handler', () => {
             { option: ServerMode.APPS, supportsUi: false, expectedMode: ServerMode.APPS },
             { option: ServerMode.DEFAULT, supportsUi: true, expectedMode: ServerMode.DEFAULT },
             { option: ServerMode.DEFAULT, supportsUi: false, expectedMode: ServerMode.DEFAULT },
-            // TODO: re-enable APPS expectation when auto-detect is restored in resolveServerMode (src/types.ts).
-            { option: 'auto', supportsUi: true, expectedMode: ServerMode.DEFAULT },
+            {
+                option: 'auto',
+                supportsUi: true,
+                expectedMode: SERVER_MODE_AUTO_DETECTION_ENABLED ? ServerMode.APPS : ServerMode.DEFAULT,
+            },
             { option: 'auto', supportsUi: false, expectedMode: ServerMode.DEFAULT },
         ];
 
@@ -88,8 +91,7 @@ describe('ActorsMcpServer initialize handler', () => {
         }
     });
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
+    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
         const server = track(makeServer('auto'));
         const apifyClient = new ApifyClient({ token: 'test-token' });
 
@@ -134,36 +136,40 @@ describe('ActorsMcpServer initialize handler', () => {
         expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
     });
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps', async () => {
-        const server = track(makeServer('auto'));
-        const apifyClient = new ApifyClient({ token: 'test-token' });
+    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
+        'defers helper tools before initialize and recomposes them as apps variants after initialize resolves auto mode to apps',
+        async () => {
+            const server = track(makeServer('auto'));
+            const apifyClient = new ApifyClient({ token: 'test-token' });
 
-        await server.loadToolsByName([HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL], apifyClient);
+            await server.loadToolsByName([HelperTools.STORE_SEARCH, HelperTools.ACTOR_CALL], apifyClient);
 
-        expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
-        expect(server.tools.has(HelperTools.ACTOR_CALL)).toBe(false);
+            expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
+            expect(server.tools.has(HelperTools.ACTOR_CALL)).toBe(false);
 
-        await dispatchInitialize(server, makeInitializeRequest(true));
+            await dispatchInitialize(server, makeInitializeRequest(true));
 
-        expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
-        expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(appsCallActor);
-        expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
-    });
+            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
+            expect(server.tools.get(HelperTools.ACTOR_CALL)).toBe(appsCallActor);
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+        },
+    );
 
-    // TODO: re-enable when auto-detect is restored in resolveServerMode (src/types.ts).
-    it.skip('defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps', async () => {
-        const server = track(makeServer('auto'));
-        const apifyClient = new ApifyClient({ token: 'test-token' });
-        const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);
+    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
+        'defers apps-only tool names before initialize and registers them after initialize resolves auto mode to apps',
+        async () => {
+            const server = track(makeServer('auto'));
+            const apifyClient = new ApifyClient({ token: 'test-token' });
+            const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);
 
-        await server.loadToolsByName([HelperTools.STORE_SEARCH_WIDGET], apifyClient);
+            await server.loadToolsByName([HelperTools.STORE_SEARCH_WIDGET], apifyClient);
 
-        expect(loadActorsAsTools).not.toHaveBeenCalled();
-        expect(server.tools.has(HelperTools.STORE_SEARCH_WIDGET)).toBe(false);
+            expect(loadActorsAsTools).not.toHaveBeenCalled();
+            expect(server.tools.has(HelperTools.STORE_SEARCH_WIDGET)).toBe(false);
 
-        await dispatchInitialize(server, makeInitializeRequest(true));
+            await dispatchInitialize(server, makeInitializeRequest(true));
 
-        expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
-    });
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+        },
+    );
 });

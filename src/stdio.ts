@@ -36,9 +36,9 @@ import { processInput } from './input.js';
 import { ActorsMcpServer } from './mcp/server.js';
 import { getTelemetryEnv } from './telemetry.js';
 import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSelector } from './types.js';
-import { parseServerMode } from './types.js';
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
+import { parseServerMode } from './utils/server_mode.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
