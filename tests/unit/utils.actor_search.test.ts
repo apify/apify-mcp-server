@@ -17,14 +17,31 @@ vi.mock('../../src/apify_client.js', () => ({
     })),
 }));
 
-function makeActor(idSuffix: number): ActorStoreList {
-    return {
-        id: `id-${idSuffix}`,
-        name: `actor-${idSuffix}`,
-        username: 'user',
-        currentPricingInfo: { pricingModel: 'FREE' },
-        stats: {},
-    } as unknown as ActorStoreList;
+const baseStoreActor: ActorStoreList = {
+    id: 'id-default',
+    name: 'actor-default',
+    username: 'user',
+    url: 'https://apify.com/user/actor-default',
+    currentPricingInfo: {
+        pricingModel: 'FREE',
+        apifyMarginPercentage: 0,
+        createdAt: new Date(0),
+        startedAt: new Date(0),
+    },
+    stats: {
+        totalBuilds: 0,
+        totalRuns: 0,
+        totalUsers: 0,
+        totalUsers7Days: 0,
+        totalUsers30Days: 0,
+        totalUsers90Days: 0,
+        totalMetamorphs: 0,
+        lastRunStartedAt: new Date(0),
+    },
+};
+
+function makeActor(overrides: Partial<ActorStoreList> = {}): ActorStoreList {
+    return { ...baseStoreActor, ...overrides };
 }
 
 describe('searchActorsByKeywords', () => {
@@ -78,7 +95,7 @@ describe('searchAndFilterActors', () => {
     });
 
     it('always sets includeInputSchema=true (public limit is capped at the API max)', async () => {
-        listMock.mockResolvedValueOnce({ items: [makeActor(1), makeActor(2), makeActor(3)] });
+        listMock.mockResolvedValueOnce({ items: [makeActor(), makeActor(), makeActor()] });
         const result = await searchAndFilterActors({
             keywords: 'foo',
             apifyToken: 'tok',
@@ -91,7 +108,7 @@ describe('searchAndFilterActors', () => {
     });
 
     it('forwards allowsAgenticUsers when paymentProvider is set', async () => {
-        listMock.mockResolvedValueOnce({ items: [makeActor(1)] });
+        listMock.mockResolvedValueOnce({ items: [makeActor()] });
         await searchAndFilterActors({
             keywords: 'foo',
             apifyToken: 'tok',
