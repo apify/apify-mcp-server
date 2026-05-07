@@ -141,9 +141,31 @@ export const actorInfoSchema = {
         },
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
+        // Mirrors `ActorStoreInputSchema` in src/types.ts; only `type` is preserved per
+        // field by apify-core's `trimInputSchema`, so the per-field shape stays minimal.
         inputFields: {
-            type: 'object' as const,
-            description: 'Input fields with their types (e.g. `url: string, maxResults?: number`).',
+            type: 'object' as const, // Literal type required for MCP SDK type compatibility
+            description: 'Compact JSON-Schema-shaped descriptor of the Actor input; only `type` is preserved per field.',
+            properties: {
+                type: { type: 'string', description: 'Always `"object"`.' },
+                properties: {
+                    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+                    description: 'Map of input field name to its type descriptor.',
+                    additionalProperties: {
+                        type: 'object' as const, // Literal type required for MCP SDK type compatibility
+                        properties: {
+                            type: { description: 'JSON Schema field type — string or array of strings.' },
+                        },
+                        required: ['type'],
+                    },
+                },
+                required: {
+                    type: 'array' as const, // Literal type required for MCP SDK type compatibility
+                    items: { type: 'string' },
+                    description: 'Names of required input fields.',
+                },
+            },
+            required: ['type', 'properties'],
         },
     },
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
