@@ -83,7 +83,7 @@ cancelled task) but did nothing about the *compute-consumption* half.
 ## after pr #812
 
 ```mermaid
-sequencediagram
+sequenceDiagram
     autonumber
     participant client
     participant sdk as mcp sdk<br/>(tasks/cancel handler)
