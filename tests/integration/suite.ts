@@ -1965,6 +1965,18 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
+        it('rejects get-key-value-store-record when neither runId nor storeId is provided', async () => {
+            client = await createClientFn({ tools: ['storage'] });
+            const result = await client.callTool({
+                name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                arguments: { recordKey: 'INPUT' },
+            });
+            expect(result.isError).toBe(true);
+            const content = result.content as { text: string }[];
+            expect(content[0].text).toMatch(/exactly one of runId or storeId/);
+            await client.close();
+        });
+
         it('should auto-inject storage and abort tools after call-actor and mark get-actor-output DEPRECATED', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
@@ -2001,7 +2013,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should resolve runId to default dataset and KV store from a single rag-web-browser run', async () => {
+        it('resolves runId to default dataset and KV store from a single rag-web-browser run', async () => {
             client = await createClientFn({ tools: ['actors', 'storage'] });
 
             const callResult = await client.callTool({
@@ -2041,7 +2053,7 @@ export function createIntegrationTestsSuite(
                 expect(explicitItems[0]).not.toHaveProperty('metadata.url');
             }
 
-            // (c) default limit is 100 when omitted
+            // (c) default limit is 20 when omitted
             const defaultLimitResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
                 arguments: { runId },
@@ -2050,8 +2062,8 @@ export function createIntegrationTestsSuite(
             const defaultLimitStructured = (defaultLimitResult as {
                 structuredContent?: { items?: unknown[]; limit?: number };
             }).structuredContent;
-            expect(defaultLimitStructured?.limit).toBe(100);
-            expect((defaultLimitStructured?.items ?? []).length).toBeLessThanOrEqual(100);
+            expect(defaultLimitStructured?.limit).toBe(20);
+            expect((defaultLimitStructured?.items ?? []).length).toBeLessThanOrEqual(20);
 
             // (d) get-key-value-store-record via runId resolves to the run's default KV store
             const kvResult = await client.callTool({

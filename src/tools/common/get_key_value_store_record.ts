@@ -23,6 +23,12 @@ const getKeyValueStoreRecordArgs = z.object({
     { message: 'Provide exactly one of runId or storeId.' },
 );
 
+// `.refine()` is not encoded in z.toJSONSchema(); add `oneOf` so AJV and MCP clients enforce the XOR.
+const getKeyValueStoreRecordJSONSchema = {
+    ...z.toJSONSchema(getKeyValueStoreRecordArgs),
+    oneOf: [{ required: ['runId'] }, { required: ['storeId'] }],
+};
+
 /**
  * https://docs.apify.com/api/v2/key-value-store-record-get
  */
@@ -40,8 +46,8 @@ USAGE EXAMPLES:
 - user_input: Get the INPUT record from run y2h7sK3Wc
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
-    inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
+    inputSchema: getKeyValueStoreRecordJSONSchema as ToolInputSchema,
+    ajvValidate: compileSchema(getKeyValueStoreRecordJSONSchema),
     paymentRequired: true,
     annotations: {
         title: 'Get key-value store record',

@@ -9,7 +9,7 @@ import { buildInvalidInputResponse, buildMCPResponse } from '../../utils/mcp.js'
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { resolveRunDefaultStorage } from './run_storage.js';
 
-const DEFAULT_DATASET_ITEMS_LIMIT = 100;
+const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
 /** Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`. */
 export function deriveFlattenFromFields(fields: string[]): string[] {
@@ -36,7 +36,7 @@ const getDatasetItemsArgs = z.object({
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
     offset: z.number().optional()
         .describe('Number of items to skip at the start. Default is 0.'),
-    limit: z.number().default(DEFAULT_DATASET_ITEMS_LIMIT).optional()
+    limit: z.number().optional().default(DEFAULT_DATASET_ITEMS_LIMIT)
         .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
     fields: z.string().optional()
         .describe('Comma-separated list of fields to include in results. '
@@ -53,6 +53,12 @@ const getDatasetItemsArgs = z.object({
     (data) => (data.runId !== undefined) !== (data.datasetId !== undefined),
     { message: 'Provide exactly one of runId or datasetId.' },
 );
+
+// `.refine()` is not encoded in z.toJSONSchema(); add `oneOf` so AJV and MCP clients enforce the XOR.
+const getDatasetItemsJSONSchema = {
+    ...z.toJSONSchema(getDatasetItemsArgs),
+    oneOf: [{ required: ['runId'] }, { required: ['datasetId'] }],
+};
 
 /**
  * https://docs.apify.com/api/v2/dataset-items-get
@@ -73,11 +79,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         USAGE EXAMPLES:
         - user_input: Get items from run y2h7sK3Wc
-        - user_input: Get first 100 items from dataset abd123
+        - user_input: Get first 20 items from dataset abd123
         - user_input: Get only metadata.url and title from run y2h7sK3Wc`,
-    inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
+    inputSchema: getDatasetItemsJSONSchema as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
+    ajvValidate: compileSchema(getDatasetItemsJSONSchema),
     paymentRequired: true,
     annotations: {
         title: 'Get dataset items',

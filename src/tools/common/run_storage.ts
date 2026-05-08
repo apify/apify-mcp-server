@@ -11,7 +11,10 @@ const STORAGE_LABEL: Record<RunStorageKind, { field: 'defaultDatasetId' | 'defau
     keyValueStore: { field: 'defaultKeyValueStoreId', label: 'key-value store' },
 };
 
-/** Returns a soft-fail MCP response on failure rather than throwing. */
+/**
+ * Returns `{ error }` (soft-fail MCP response) when the run is not found or has no default storage.
+ * Other API errors (auth, network, 5xx) propagate from the underlying Apify client.
+ */
 export async function resolveRunDefaultStorage(
     client: ApifyClient,
     runId: string,
