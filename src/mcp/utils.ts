@@ -48,3 +48,47 @@ export async function isTaskCancelled(
     const task = await taskStore.getTask(taskId, mcpSessionId);
     return task?.status === 'cancelled';
 }
+
+/**
+ * Builds an `AbortSignal` that fires when either the parent signal aborts (transport disconnect)
+ * or the task store reports the task as `cancelled` (response to `tasks/cancel`).
+ *
+ * The transport signal alone is not enough: `tasks/cancel` updates the task store but does not
+ * close the originating request, so an in-flight tool handler would otherwise keep running.
+ * Caller MUST invoke `dispose()` once the tool finishes to stop the polling timer.
+ */
+export function chainTaskStoreCancellation(opts: {
+    parentSignal: AbortSignal;
+    taskId: string;
+    mcpSessionId: string | undefined;
+    taskStore: TaskStore;
+    pollIntervalMs?: number;
+}): { signal: AbortSignal; dispose: () => void } {
+    const { parentSignal, taskId, mcpSessionId, taskStore, pollIntervalMs = 500 } = opts;
+    const controller = new AbortController();
+
+    if (parentSignal.aborted) {
+        controller.abort(parentSignal.reason);
+        return { signal: controller.signal, dispose: () => { /* nothing to clean up */ } };
+    }
+
+    const onParentAbort = () => controller.abort(parentSignal.reason);
+    parentSignal.addEventListener('abort', onParentAbort, { once: true });
+
+    const interval = setInterval(() => {
+        void (async () => {
+            if (controller.signal.aborted) return;
+            if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
+                controller.abort(new Error(`Task ${taskId} cancelled by client`));
+            }
+        })();
+    }, pollIntervalMs);
+
+    return {
+        signal: controller.signal,
+        dispose: () => {
+            clearInterval(interval);
+            parentSignal.removeEventListener('abort', onParentAbort);
+        },
+    };
+}

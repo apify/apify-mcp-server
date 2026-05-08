@@ -94,7 +94,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import { chainTaskStoreCancellation, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
@@ -1287,6 +1287,17 @@ export class ActorsMcpServer {
             });
         };
 
+        // Chain the request signal to taskStore-cancel state so `tasks/cancel` actually aborts
+        // the in-flight handler (which then aborts the underlying Apify run). Without this the
+        // task is marked `cancelled` but the run keeps consuming compute until natural finish.
+        const cancelLink = chainTaskStoreCancellation({
+            parentSignal: extra.signal,
+            taskId,
+            mcpSessionId,
+            taskStore: this.taskStore,
+        });
+        const taskExtra = { ...extra, signal: cancelLink.signal };
+
         try {
             // Check if task was already cancelled before we start execution.
             // Critical: if a client cancels the task immediately after creation (race condition),
@@ -1338,7 +1349,7 @@ export class ActorsMcpServer {
                     log.info('Calling internal tool for task', { taskId, toolName: tool.name, mcpSessionId, input: logSafeArgs });
                     const res = await tool.call({
                         args: toolArgs,
-                        extra,
+                        extra: taskExtra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
                         apifyToken,
@@ -1371,7 +1382,7 @@ export class ActorsMcpServer {
                         apifyClient,
                         callOptions: { memory: tool.memoryMbytes },
                         progressTracker,
-                        abortSignal: extra.signal,
+                        abortSignal: cancelLink.signal,
                         mcpSessionId,
                     });
 
@@ -1434,7 +1445,7 @@ export class ActorsMcpServer {
                 return;
             }
 
-            toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+            toolStatus = getToolStatusFromError(error, Boolean(cancelLink.signal.aborted));
             const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
             callDiagnostics = {
                 failure_category: classifyFailureCategory(error),
@@ -1474,8 +1485,6 @@ export class ActorsMcpServer {
             const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
-            // TODO: In future, we should actually stop execution via AbortController,
-            // but coordinating cancellation across distributed nodes would be complex
             if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
                 log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
                     taskId,
@@ -1499,6 +1508,8 @@ export class ActorsMcpServer {
             }, mcpSessionId);
 
             finishTaskTracking(toolStatus, callDiagnostics);
+        } finally {
+            cancelLink.dispose();
         }
     }
 

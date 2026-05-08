@@ -2,7 +2,7 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/const.js';
-import { isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import { chainTaskStoreCancellation, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
@@ -93,6 +93,93 @@ describe('isTaskCancelled', () => {
         await isTaskCancelled('task-42', 'session-xyz', taskStore);
 
         expect(taskStore.getTask).toHaveBeenCalledWith('task-42', 'session-xyz');
+    });
+});
+
+describe('chainTaskStoreCancellation', () => {
+    const makeTaskStore = (statusBox: { status: string }) => ({
+        getTask: vi.fn().mockImplementation(async () => ({ status: statusBox.status })),
+    } as unknown as TaskStore);
+
+    it('aborts the derived signal once the task store reports cancelled', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+        const parent = new AbortController();
+
+        const link = chainTaskStoreCancellation({
+            parentSignal: parent.signal,
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 20,
+        });
+
+        try {
+            expect(link.signal.aborted).toBe(false);
+            statusBox.status = 'cancelled';
+            await vi.waitFor(() => {
+                expect(link.signal.aborted).toBe(true);
+            }, { timeout: 500, interval: 10 });
+        } finally {
+            link.dispose();
+        }
+    });
+
+    it('aborts the derived signal when the parent signal aborts', async () => {
+        const taskStore = makeTaskStore({ status: 'working' });
+        const parent = new AbortController();
+
+        const link = chainTaskStoreCancellation({
+            parentSignal: parent.signal,
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 1000,
+        });
+
+        try {
+            parent.abort(new Error('client disconnect'));
+            expect(link.signal.aborted).toBe(true);
+        } finally {
+            link.dispose();
+        }
+    });
+
+    it('starts already aborted when the parent is already aborted', () => {
+        const taskStore = makeTaskStore({ status: 'working' });
+        const parent = new AbortController();
+        parent.abort();
+
+        const link = chainTaskStoreCancellation({
+            parentSignal: parent.signal,
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 1000,
+        });
+
+        expect(link.signal.aborted).toBe(true);
+        link.dispose();
+    });
+
+    it('dispose stops polling the task store', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+        const parent = new AbortController();
+
+        const link = chainTaskStoreCancellation({
+            parentSignal: parent.signal,
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
+        });
+
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+        link.dispose();
+        const callsAtDispose = (taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAtDispose);
     });
 });
 
