@@ -94,7 +94,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { chainTaskStoreCancellation, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
@@ -1287,13 +1287,18 @@ export class ActorsMcpServer {
             });
         };
 
-        const cancelLink = chainTaskStoreCancellation({
-            parentSignal: extra.signal,
+        // Bridges MCP `tasks/cancel` to the running handler: when the client
+        // explicitly cancels the task, this signal aborts so the underlying
+        // Actor run stops instead of consuming compute until natural completion.
+        // Per MCP tasks spec, request-level aborts (client disconnect,
+        // notifications/cancelled for the original request ID) MUST NOT cancel
+        // the task — `extra.signal` is intentionally not chained here.
+        const cancelWatcher = createTaskCancellationWatcher({
             taskId,
             mcpSessionId,
             taskStore: this.taskStore,
         });
-        const taskExtra = { ...extra, signal: cancelLink.signal };
+        const taskExtra = { ...extra, signal: cancelWatcher.signal };
 
         try {
             // Check if task was already cancelled before we start execution.
@@ -1379,7 +1384,7 @@ export class ActorsMcpServer {
                         apifyClient,
                         callOptions: { memory: tool.memoryMbytes },
                         progressTracker,
-                        abortSignal: cancelLink.signal,
+                        abortSignal: cancelWatcher.signal,
                         mcpSessionId,
                     });
 
@@ -1442,7 +1447,7 @@ export class ActorsMcpServer {
                 return;
             }
 
-            toolStatus = getToolStatusFromError(error, Boolean(cancelLink.signal.aborted));
+            toolStatus = getToolStatusFromError(error, Boolean(cancelWatcher.signal.aborted));
             const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
             callDiagnostics = {
                 failure_category: classifyFailureCategory(error),
@@ -1506,7 +1511,7 @@ export class ActorsMcpServer {
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } finally {
-            cancelLink.dispose();
+            cancelWatcher.dispose();
         }
     }
 

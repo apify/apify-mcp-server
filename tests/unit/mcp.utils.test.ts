@@ -2,7 +2,7 @@ import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/int
 import { describe, expect, it, vi } from 'vitest';
 
 import { SKYFIRE_README_CONTENT } from '../../src/const.js';
-import { chainTaskStoreCancellation, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
+import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import { createResourceService } from '../../src/resources/resource_service.js';
 import type { AvailableWidget } from '../../src/resources/widgets.js';
@@ -96,18 +96,18 @@ describe('isTaskCancelled', () => {
     });
 });
 
-describe('chainTaskStoreCancellation', () => {
+describe('createTaskCancellationWatcher', () => {
     const makeTaskStore = (statusBox: { status: string }) => ({
         getTask: vi.fn().mockImplementation(async () => ({ status: statusBox.status })),
     } as unknown as TaskStore);
 
+    // Core happy path: tasks/cancel writes 'cancelled' to the store; the
+    // watcher must observe it on the next poll and abort the signal.
     it('aborts the derived signal once the task store reports cancelled', async () => {
         const statusBox = { status: 'working' };
         const taskStore = makeTaskStore(statusBox);
-        const parent = new AbortController();
 
-        const link = chainTaskStoreCancellation({
-            parentSignal: parent.signal,
+        const watcher = createTaskCancellationWatcher({
             taskId: 't1',
             mcpSessionId: 's1',
             taskStore,
@@ -115,60 +115,53 @@ describe('chainTaskStoreCancellation', () => {
         });
 
         try {
-            expect(link.signal.aborted).toBe(false);
+            expect(watcher.signal.aborted).toBe(false);
             statusBox.status = 'cancelled';
             await vi.waitFor(() => {
-                expect(link.signal.aborted).toBe(true);
+                expect(watcher.signal.aborted).toBe(true);
             }, { timeout: 500, interval: 10 });
         } finally {
-            link.dispose();
+            watcher.dispose();
         }
     });
 
-    it('aborts the derived signal when the parent signal aborts', async () => {
-        const taskStore = makeTaskStore({ status: 'working' });
-        const parent = new AbortController();
+    // Spec contract: per MCP tasks spec, a task's lifetime is decoupled
+    // from the original request. Client disconnect, transport close, or
+    // `notifications/cancelled` for the original request ID MUST NOT
+    // cancel the task — only `tasks/cancel` (which writes to the store)
+    // is allowed to. A regression here would silently kill long-running
+    // Actor runs whenever a flaky client briefly disconnects.
+    it('does not abort when an unrelated AbortSignal fires (task survives client disconnect)', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+        // This signal models `extra.signal` from the original request:
+        // it MUST NOT be observable by the watcher.
+        const requestSignal = new AbortController();
 
-        const link = chainTaskStoreCancellation({
-            parentSignal: parent.signal,
+        const watcher = createTaskCancellationWatcher({
             taskId: 't1',
             mcpSessionId: 's1',
             taskStore,
-            pollIntervalMs: 1000,
+            pollIntervalMs: 10,
         });
 
         try {
-            parent.abort(new Error('client disconnect'));
-            expect(link.signal.aborted).toBe(true);
+            requestSignal.abort(new Error('client disconnect'));
+            // Give the watcher more than enough ticks to (incorrectly) react.
+            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            expect(watcher.signal.aborted).toBe(false);
         } finally {
-            link.dispose();
+            watcher.dispose();
         }
     });
 
-    it('starts already aborted when the parent is already aborted', () => {
-        const taskStore = makeTaskStore({ status: 'working' });
-        const parent = new AbortController();
-        parent.abort();
-
-        const link = chainTaskStoreCancellation({
-            parentSignal: parent.signal,
-            taskId: 't1',
-            mcpSessionId: 's1',
-            taskStore,
-            pollIntervalMs: 1000,
-        });
-
-        expect(link.signal.aborted).toBe(true);
-        link.dispose();
-    });
-
+    // setInterval keeps firing for the lifetime of the process; without
+    // dispose() the watcher leaks for every completed task.
     it('dispose stops polling the task store', async () => {
         const statusBox = { status: 'working' };
         const taskStore = makeTaskStore(statusBox);
-        const parent = new AbortController();
 
-        const link = chainTaskStoreCancellation({
-            parentSignal: parent.signal,
+        const watcher = createTaskCancellationWatcher({
             taskId: 't1',
             mcpSessionId: 's1',
             taskStore,
@@ -176,10 +169,75 @@ describe('chainTaskStoreCancellation', () => {
         });
 
         await new Promise((resolve) => { setTimeout(resolve, 30); });
-        link.dispose();
+        watcher.dispose();
         const callsAtDispose = (taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length;
         await new Promise((resolve) => { setTimeout(resolve, 50); });
         expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAtDispose);
+    });
+
+    // Production TaskStore is Redis-backed (RedisTaskStore in the internal
+    // repo). A transient HGET failure must NOT crash the pod via unhandled
+    // rejection — the watcher must swallow it and the next successful tick
+    // must still abort. Without this guarantee, a single Redis blip during
+    // any active long-running task takes down every session on the worker.
+    it('survives transient task store errors and aborts on the next successful tick', async () => {
+        let call = 0;
+        const taskStore = {
+            getTask: vi.fn().mockImplementation(async () => {
+                call += 1;
+                if (call === 1) throw new Error('redis ETIMEDOUT');
+                return { status: 'cancelled' };
+            }),
+        } as unknown as TaskStore;
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
+        });
+
+        try {
+            await vi.waitFor(() => {
+                expect(watcher.signal.aborted).toBe(true);
+            }, { timeout: 500, interval: 10 });
+            expect(call).toBeGreaterThanOrEqual(2);
+        } finally {
+            watcher.dispose();
+        }
+    });
+
+    // Under Redis tail latency a single getTask can outlast pollIntervalMs.
+    // Without overlap protection, ticks pile up and amplify load right when
+    // the backend is already struggling. The watcher must serialize ticks.
+    it('does not start a new poll while the previous one is still in flight', async () => {
+        let resolveFirst: ((task: { status: string }) => void) | undefined;
+        const firstCall = new Promise<{ status: string }>((resolve) => { resolveFirst = resolve; });
+        const taskStore = {
+            getTask: vi.fn()
+                .mockImplementationOnce(async () => firstCall)
+                .mockImplementation(async () => ({ status: 'working' })),
+        } as unknown as TaskStore;
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
+        });
+
+        try {
+            // Wait far longer than pollIntervalMs while the first call hangs.
+            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+
+            resolveFirst!({ status: 'working' });
+            await vi.waitFor(() => {
+                expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
+            }, { timeout: 500, interval: 10 });
+        } finally {
+            watcher.dispose();
+        }
     });
 });
 

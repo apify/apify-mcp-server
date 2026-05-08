@@ -3,6 +3,8 @@ import { parse } from 'node:querystring';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { ApifyClient } from 'apify-client';
 
+import log from '@apify/log';
+
 import { processInput } from '../input.js';
 import type { ActorStore, Input } from '../types.js';
 import { ServerMode } from '../types.js';
@@ -50,42 +52,75 @@ export async function isTaskCancelled(
 }
 
 /**
- * Returns a signal that aborts when either the parent signal aborts or the task store
- * reports the task as `cancelled`. Caller must invoke `dispose()` to stop polling.
- * Without this, the transport signal would not fire on `tasks/cancel` and the in-flight
- * tool handler would keep running until natural completion.
+ * Creates an AbortSignal that fires only when an MCP task is cancelled
+ * via the TaskStore — i.e. the client explicitly called `tasks/cancel`.
+ *
+ * Why this exists. The SDK's `tasks/cancel` handler only writes
+ * `status='cancelled'` to the TaskStore (see @modelcontextprotocol/sdk
+ * shared/protocol.js — CancelTaskRequestSchema handler). It does NOT abort
+ * the in-flight request's AbortController. Without this watcher, calling
+ * `tasks/cancel` would flip the task status but the tool handler would
+ * keep running and the underlying Apify Actor run would keep consuming
+ * compute until natural completion.
+ *
+ * Why the request's `extra.signal` is intentionally NOT chained. Per the
+ * MCP tasks spec, a task's lifetime is decoupled from the original
+ * request: once `{ task }` is returned, the request is complete and the
+ * task continues independently. Client disconnect, `notifications/cancelled`
+ * for the original request ID, or any other request-level abort MUST
+ * NOT cancel the task — the only valid cancel path is `tasks/cancel`,
+ * which goes through the TaskStore. Chaining `extra.signal` here would
+ * silently violate that contract.
+ *
+ * Why polling, not a callback. In multi-node deployments (the hosted Apify
+ * MCP server runs on multiple pods sharing one Redis-backed TaskStore),
+ * `tasks/cancel` may arrive on a different node than the one running the
+ * handler. The shared TaskStore is the only signal the executing node can
+ * observe — so it must poll. 500 ms is a deliberate compromise between
+ * cancellation latency and Redis load.
+ *
+ * Returns `{ signal, dispose }`. Callers MUST call `dispose()` to stop the
+ * polling interval; otherwise it leaks for the lifetime of the process.
  */
-export function chainTaskStoreCancellation(opts: {
-    parentSignal: AbortSignal;
+export function createTaskCancellationWatcher(opts: {
     taskId: string;
     mcpSessionId: string | undefined;
     taskStore: TaskStore;
     pollIntervalMs?: number;
 }): { signal: AbortSignal; dispose: () => void } {
-    const { parentSignal, taskId, mcpSessionId, taskStore, pollIntervalMs = 500 } = opts;
+    const { taskId, mcpSessionId, taskStore, pollIntervalMs = 500 } = opts;
     const controller = new AbortController();
-    const onParentAbort = () => controller.abort(parentSignal.reason);
 
-    if (parentSignal.aborted) {
-        controller.abort(parentSignal.reason);
-    } else {
-        parentSignal.addEventListener('abort', onParentAbort, { once: true });
-    }
-
+    // `tickInFlight` prevents tick overlap when `getTask` is slower than the
+    // poll interval (Redis tail latency, cluster reslot). Without it, ticks
+    // pile up and amplify backend load right when the backend is struggling.
+    let tickInFlight = false;
     const interval = setInterval(() => {
+        if (tickInFlight || controller.signal.aborted) return;
+        tickInFlight = true;
         void (async () => {
-            if (controller.signal.aborted) return;
-            if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
-                controller.abort(new Error(`Task ${taskId} cancelled by client`));
+            try {
+                if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
+                    controller.abort(new Error(`Task ${taskId} cancelled by client`));
+                }
+            } catch (err) {
+                // In production, `taskStore.getTask` hits Redis (RedisTaskStore
+                // in the internal repo). Transient cluster errors must NOT
+                // crash the pod via unhandled rejection — log and keep polling
+                // so the handler still aborts on the next successful tick.
+                log.softFail('[createTaskCancellationWatcher] poll failed', {
+                    taskId,
+                    mcpSessionId,
+                    errMessage: err instanceof Error ? err.message : String(err),
+                });
+            } finally {
+                tickInFlight = false;
             }
         })();
     }, pollIntervalMs);
 
     return {
         signal: controller.signal,
-        dispose: () => {
-            clearInterval(interval);
-            parentSignal.removeEventListener('abort', onParentAbort);
-        },
+        dispose: () => clearInterval(interval),
     };
 }
