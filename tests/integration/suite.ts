@@ -1929,54 +1929,6 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should reject get-dataset-items when both runId and datasetId are provided', async () => {
-            client = await createClientFn({ tools: ['storage'] });
-            const result = await client.callTool({
-                name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { runId: 'someRunId', datasetId: 'someDatasetId' },
-            });
-            expect(result.isError).toBe(true);
-            const content = result.content as { text: string }[];
-            expect(content[0].text).toMatch(/exactly one of runId or datasetId/);
-            await client.close();
-        });
-
-        it('should reject get-dataset-items when neither runId nor datasetId is provided', async () => {
-            client = await createClientFn({ tools: ['storage'] });
-            const result = await client.callTool({
-                name: HelperTools.DATASET_GET_ITEMS,
-                arguments: {},
-            });
-            expect(result.isError).toBe(true);
-            const content = result.content as { text: string }[];
-            expect(content[0].text).toMatch(/exactly one of runId or datasetId/);
-            await client.close();
-        });
-
-        it('should reject get-key-value-store-record when both runId and storeId are provided', async () => {
-            client = await createClientFn({ tools: ['storage'] });
-            const result = await client.callTool({
-                name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                arguments: { runId: 'someRunId', storeId: 'someStoreId', recordKey: 'INPUT' },
-            });
-            expect(result.isError).toBe(true);
-            const content = result.content as { text: string }[];
-            expect(content[0].text).toMatch(/exactly one of runId or storeId/);
-            await client.close();
-        });
-
-        it('rejects get-key-value-store-record when neither runId nor storeId is provided', async () => {
-            client = await createClientFn({ tools: ['storage'] });
-            const result = await client.callTool({
-                name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                arguments: { recordKey: 'INPUT' },
-            });
-            expect(result.isError).toBe(true);
-            const content = result.content as { text: string }[];
-            expect(content[0].text).toMatch(/exactly one of runId or storeId/);
-            await client.close();
-        });
-
         it('should auto-inject storage and abort tools after call-actor and mark get-actor-output DEPRECATED', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
@@ -2013,7 +1965,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('resolves runId to default dataset and KV store from a single rag-web-browser run', async () => {
+        it('reads dataset items via get-dataset-items with auto-flatten and default limit from a rag-web-browser run', async () => {
             client = await createClientFn({ tools: ['actors', 'storage'] });
 
             const callResult = await client.callTool({
@@ -2023,14 +1975,14 @@ export function createIntegrationTestsSuite(
                     input: { query: 'https://apify.com', maxResults: 1 },
                 },
             });
-            const callStructured = callResult as { structuredContent?: { runId?: string; datasetId?: string } };
-            expect(callStructured.structuredContent?.runId).toBeDefined();
-            const { runId } = callStructured.structuredContent!;
+            const callStructured = callResult as { structuredContent?: { datasetId?: string } };
+            expect(callStructured.structuredContent?.datasetId).toBeDefined();
+            const { datasetId } = callStructured.structuredContent!;
 
-            // (a) get-dataset-items via runId, auto-flatten on dot-notation `fields`
+            // (a) auto-flatten on dot-notation `fields`
             const datasetResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { runId, fields: 'metadata.url,markdown' },
+                arguments: { datasetId, fields: 'metadata.url,markdown' },
             });
             expect(datasetResult.isError).not.toBe(true);
             const items = (datasetResult as { structuredContent?: { items?: Record<string, unknown>[] } })
@@ -2042,7 +1994,7 @@ export function createIntegrationTestsSuite(
             // (b) explicit flatten overrides auto-derivation
             const explicitResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { runId, fields: 'metadata.url', flatten: 'other' },
+                arguments: { datasetId, fields: 'metadata.url', flatten: 'other' },
             });
             expect(explicitResult.isError).not.toBe(true);
             const explicitItems = (explicitResult as { structuredContent?: { items?: Record<string, unknown>[] } })
@@ -2056,7 +2008,7 @@ export function createIntegrationTestsSuite(
             // (c) default limit is 20 when omitted
             const defaultLimitResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { runId },
+                arguments: { datasetId },
             });
             expect(defaultLimitResult.isError).not.toBe(true);
             const defaultLimitStructured = (defaultLimitResult as {
@@ -2064,15 +2016,6 @@ export function createIntegrationTestsSuite(
             }).structuredContent;
             expect(defaultLimitStructured?.limit).toBe(20);
             expect((defaultLimitStructured?.items ?? []).length).toBeLessThanOrEqual(20);
-
-            // (d) get-key-value-store-record via runId resolves to the run's default KV store
-            const kvResult = await client.callTool({
-                name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                arguments: { runId, recordKey: 'INPUT' },
-            });
-            expect(kvResult.isError).not.toBe(true);
-            const kvContent = kvResult.content as { text: string }[];
-            expect(kvContent[0].text).toContain('apify.com');
 
             await client.close();
         });

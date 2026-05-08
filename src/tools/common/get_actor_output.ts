@@ -69,7 +69,7 @@ export const getActorOutput: ToolEntry = Object.freeze({
     name: HelperTools.ACTOR_OUTPUT_GET,
     description: dedent`
         DEPRECATED: Use \`${HelperTools.DATASET_GET_ITEMS}\` instead.
-        \`${HelperTools.DATASET_GET_ITEMS}\` accepts \`runId\` directly, auto-flattens dot-notation \`fields\`, and defaults limit to 100.
+        \`${HelperTools.DATASET_GET_ITEMS}\` auto-flattens dot-notation \`fields\` and defaults limit to 20.
 
         Retrieve the output dataset items of a specific Actor run using its datasetId.
         You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.

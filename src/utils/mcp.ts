@@ -1,4 +1,3 @@
-import { FAILURE_CATEGORY, TOOL_STATUS } from '../const.js';
 import type { ToolTelemetryContext } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
@@ -48,15 +47,6 @@ export function buildMCPResponse(options: {
         ...(structuredContent !== undefined && { structuredContent }),
         ...(_meta !== undefined && { _meta }),
     };
-}
-
-/** Soft-fail response for invalid tool arguments. */
-export function buildInvalidInputResponse(toolName: string, reason: string) {
-    return buildMCPResponse({
-        texts: [`Invalid arguments for ${toolName}: ${reason}`],
-        isError: true,
-        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-    });
 }
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
