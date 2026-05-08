@@ -155,7 +155,7 @@ Returned by `call-actor` and `get-actor-run` once Apify has created a run. Pre-r
 }
 ```
 
-`_meta` continues to carry usage data (`usageTotalUsd`, `usageUsd`) per existing convention. It is not part of the canonical structured shape and is unaffected by this redesign.
+`_meta` continues to carry usage data under the namespaced key `com.apify/ActorRun` (i.e. `_meta["com.apify/ActorRun"] = { usageTotalUsd, usageUsd }`), per the MCP `_meta` rule that non-reserved keys be namespaced. This convention was introduced on master in #775 and is unaffected by this redesign.
 
 Field-population notes:
 
@@ -455,7 +455,7 @@ Verified against the live [tasks spec](https://modelcontextprotocol.io/specifica
 - **`CreateTaskResult` is nested:** `{ task: { taskId, status, createdAt, lastUpdatedAt, ttl, pollInterval? } }`. Flat shapes are non-compliant.
 - **`call-actor` declares `Tool.execution.taskSupport: "optional"`** (nested under `execution`). Other v4 tools omit it (default: `forbidden`).
 - **`notifications/tasks/status` payload** is the full `Task` object per `TaskStatusNotificationParams = NotificationParams & Task`. Heartbeats are not no-ops — each emission advances `lastUpdatedAt`, which is itself a state change. The notification is `MAY` per spec; clients must not rely on it.
-- **`io.modelcontextprotocol/related-task` `_meta` key** is a spec MUST on (a) the `CallToolResult` returned via `tasks/result` and (b) progress notifications. (b) is already wired (`src/utils/progress.ts`); (a) is an implementation item this PR adds. Omitted from `tasks/get` / `tasks/list` / `tasks/cancel` and from `notifications/tasks/status` (taskId is in the message structure).
+- **`io.modelcontextprotocol/related-task` `_meta` key** is a spec MUST on (a) the `CallToolResult` returned via `tasks/result` and (b) progress notifications. (b) is already wired (`src/utils/progress.ts`); (a) is an implementation item this PR adds. Omitted from `tasks/get` / `tasks/list` / `tasks/cancel` and from `notifications/tasks/status` (taskId is in the message structure). Coexists with the namespaced `com.apify/ActorRun` usage block under the same `_meta` record.
 - **`tasks/cancel` MUSTs:** reject terminal-status tasks with `-32602`; transition the task to `cancelled` before sending the response (Apify abort propagates async — see Cancellation above).
 
 ## What we will test
