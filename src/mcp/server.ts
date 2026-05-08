@@ -735,7 +735,7 @@ export class ActorsMcpServer {
             return {
                 ...result,
                 _meta: {
-                    ...(result._meta as Record<string, unknown> ?? {}),
+                    ...(result._meta as Record<string, unknown>),
                     [RELATED_TASK_META_KEY]: { taskId },
                 },
             };
@@ -1375,17 +1375,21 @@ export class ActorsMcpServer {
             // Heartbeat: re-emit notifications/tasks/status every ~30 s of silence so clients with
             // sub-minute tool-call timeouts do not drop the connection.
             heartbeat = setInterval(async () => {
-                if (Date.now() - lastEmissionAt < TASK_STATUS_HEARTBEAT_INTERVAL_MS) return;
-                const currentTask = await this.taskStore.getTask(taskId, mcpSessionId);
-                if (!currentTask || currentTask.status !== 'working') return;
-                lastEmissionAt = Date.now();
-                await this.taskStore.updateTaskStatus(
-                    taskId,
-                    'working',
-                    currentTask.statusMessage ?? undefined,
-                    mcpSessionId,
-                );
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                try {
+                    if (Date.now() - lastEmissionAt < TASK_STATUS_HEARTBEAT_INTERVAL_MS) return;
+                    const currentTask = await this.taskStore.getTask(taskId, mcpSessionId);
+                    if (!currentTask || currentTask.status !== 'working') return;
+                    lastEmissionAt = Date.now();
+                    await this.taskStore.updateTaskStatus(
+                        taskId,
+                        'working',
+                        currentTask.statusMessage ?? undefined,
+                        mcpSessionId,
+                    );
+                    await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                } catch {
+                    // Silent fail — heartbeat is advisory
+                }
             }, TASK_STATUS_HEARTBEAT_INTERVAL_MS);
 
             // Handle internal tool execution in task mode
