@@ -909,11 +909,7 @@ export class ActorsMcpServer {
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
                 if (request.params.task) {
-                    // Short, human-readable taskId: `<tool-name>-<12 base64url chars>` (~35 chars).
-                    // Both task stores (ApifyInMemoryTaskStore for stdio, RedisTaskStore for hosted)
-                    // use String(requestId) as the taskId, so this string surfaces unchanged.
-                    // 9 bytes → 12 base64url chars, 72 bits of entropy; combined with session scope
-                    // (mcpSessionId in taskStore) this is well above any practical collision risk.
+                    // 9 bytes → 12 base64url chars (72 bits of entropy), session-scoped in the task store.
                     const task = await this.taskStore.createTask(
                         {
                             ttl: request.params.task.ttl,
