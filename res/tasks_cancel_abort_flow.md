@@ -71,9 +71,9 @@ sequenceDiagram
         Note over Server,Apify: Handler never learns about the cancel.<br/>extra.signal does not fire for tasks/cancel.<br/>Run keeps consuming compute until natural finish.
     end
 
-    apify-->>exec: run finishes naturally
-    exec-->>server: result (discarded)
-    server->>store: post-run istaskcancelled check<br/>(skip result storage only)
+    Apify-->>Exec: run finishes naturally
+    Exec-->>Server: result (discarded)
+    Server->>Store: post-run istaskcancelled check<br/>(skip result storage only)
 ```
 
 the post-run `istaskcancelled` check at `src/mcp/server.ts:1485` mitigated
