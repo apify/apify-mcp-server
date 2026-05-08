@@ -1,17 +1,26 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getKeyValueStoreRecordArgs = z.object({
+    runId: z.string()
+        .min(1)
+        .optional()
+        .describe('Actor run ID. Server resolves the run\'s default key-value store. Provide exactly one of runId or storeId.'),
     storeId: z.string()
         .min(1)
-        .describe('Key-value store ID or username~store-name'),
+        .optional()
+        .describe('Key-value store ID or username~store-name. Provide exactly one of runId or storeId.'),
     recordKey: z.string()
         .min(1)
         .describe('Key of the record to retrieve.'),
-});
+}).refine(
+    (data) => (data.runId !== undefined) !== (data.storeId !== undefined),
+    { message: 'Provide exactly one of runId or storeId.' },
+);
 
 /**
  * https://docs.apify.com/api/v2/key-value-store-record-get
@@ -20,12 +29,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
     description: `Get a value stored in a key-value store under a specific key.
+Provide exactly one of runId or storeId; runId resolves to the run's default key-value store.
 The response preserves the original Content-Encoding; most clients handle decompression automatically.
 
 USAGE:
-- Use when you need to retrieve a specific record (JSON, text, or binary) from a store.
+- Use when you need to retrieve a specific record (JSON, text, or binary) from a store or an Actor run's key-value store.
 
 USAGE EXAMPLES:
+- user_input: Get the INPUT record from run y2h7sK3Wc
 - user_input: Get record INPUT from store abc123
 - user_input: Get record data.json from store username~my-store`,
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
@@ -40,8 +51,40 @@ USAGE EXAMPLES:
     },
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
-        const parsed = getKeyValueStoreRecordArgs.parse(args);
-        const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
+        const parseResult = getKeyValueStoreRecordArgs.safeParse(args);
+        if (!parseResult.success) {
+            const message = parseResult.error.issues.map((i) => i.message).join('; ');
+            return buildMCPResponse({
+                texts: [`Invalid arguments for get-key-value-store-record: ${message}`],
+                isError: true,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+            });
+        }
+        const parsed = parseResult.data;
+
+        let storeId: string;
+        if (parsed.runId) {
+            const run = await client.run(parsed.runId).get();
+            if (!run) {
+                return buildMCPResponse({
+                    texts: [`Run '${parsed.runId}' not found.`],
+                    isError: true,
+                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+                });
+            }
+            if (!run.defaultKeyValueStoreId) {
+                return buildMCPResponse({
+                    texts: [`Run '${parsed.runId}' has no default key-value store.`],
+                    isError: true,
+                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+                });
+            }
+            storeId = run.defaultKeyValueStoreId;
+        } else {
+            storeId = parsed.storeId as string;
+        }
+
+        const record = await client.keyValueStore(storeId).getRecord(parsed.recordKey);
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
     },
 } as const);

@@ -15,8 +15,11 @@ import {
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/categories.js';
+import { abortActorRun } from '../tools/common/abort_actor_run.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getActorOutput } from '../tools/common/get_actor_output.js';
+import { getDatasetItems } from '../tools/common/get_dataset_items.js';
+import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
 import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
@@ -242,9 +245,9 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     /**
-     * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
+     * Auto-inject run-status and storage tools when call-actor or actor tools are present.
      * Insert them right after call-actor to follow the logical workflow order:
-     * search → details → call → run status → output → docs → actor tools
+     * call → get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run → get-actor-output (deprecated, last)
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -258,6 +261,9 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
+        toolsToInject.push(getDatasetItems);
+        toolsToInject.push(getKeyValueStoreRecord);
+        toolsToInject.push(abortActorRun);
         toolsToInject.push(getActorOutput);
     }
 

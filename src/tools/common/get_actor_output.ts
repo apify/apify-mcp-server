@@ -68,16 +68,18 @@ export const getActorOutput: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_OUTPUT_GET,
     description: dedent`
+        DEPRECATED: Use \`${HelperTools.DATASET_GET_ITEMS}\` instead.
+        \`${HelperTools.DATASET_GET_ITEMS}\` accepts \`runId\` directly, auto-flattens dot-notation \`fields\`, and defaults limit to 100.
+
         Retrieve the output dataset items of a specific Actor run using its datasetId.
         You can select specific fields to return (supports dot notation like "crawl.statusCode") and paginate results with offset and limit.
-        This tool is a simplified version of the get-dataset-items tool, focused on Actor run outputs.
 
         The results will include the dataset items from the specified dataset. If you provide fields, only those fields will be included (nested fields supported via dot notation).
 
         You can obtain the datasetId from an Actor run (e.g., after calling an Actor with the call-actor tool) or from the Apify Console (Runs → Run details → Dataset ID).
 
         USAGE:
-        - Use when you need to read Actor output data (full items or selected fields), especially when preview does not include all fields.
+        - Prefer \`${HelperTools.DATASET_GET_ITEMS}\` (with runId or datasetId) for new code.
 
         USAGE EXAMPLES:
         - user_input: Get data of my last Actor run

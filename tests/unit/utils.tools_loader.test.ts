@@ -65,6 +65,55 @@ describe('toolNamesToInput', () => {
     });
 });
 
+describe('loadToolsFromInput auto-injection of storage tools', () => {
+    const apifyClient = new ApifyClient({ token: 'test-token' });
+
+    it('auto-injects storage and abort tools when call-actor is in the default tool set', async () => {
+        const tools = await loadToolsFromInput({}, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).toContain(HelperTools.ACTOR_CALL);
+        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+        expect(toolNames).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(toolNames).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_ABORT);
+        expect(toolNames).toContain(HelperTools.ACTOR_OUTPUT_GET);
+
+        // Order: get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run → get-actor-output
+        const callIndex = toolNames.indexOf(HelperTools.ACTOR_CALL);
+        const runIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_GET);
+        const datasetIndex = toolNames.indexOf(HelperTools.DATASET_GET_ITEMS);
+        const kvIndex = toolNames.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        const abortIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_ABORT);
+        const outputIndex = toolNames.indexOf(HelperTools.ACTOR_OUTPUT_GET);
+        expect(callIndex).toBeLessThan(runIndex);
+        expect(runIndex).toBeLessThan(datasetIndex);
+        expect(datasetIndex).toBeLessThan(kvIndex);
+        expect(kvIndex).toBeLessThan(abortIndex);
+        expect(abortIndex).toBeLessThan(outputIndex);
+    });
+
+    it('does not auto-inject storage or abort tools when no actor-touching tools are present', async () => {
+        const tools = await loadToolsFromInput({ tools: ['docs'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+        expect(toolNames).not.toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(toolNames).not.toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
+        expect(toolNames).not.toContain(HelperTools.ACTOR_OUTPUT_GET);
+    });
+
+    it('does not duplicate auto-injected tools when the storage category is also explicitly selected', async () => {
+        const tools = await loadToolsFromInput({ tools: ['actors', 'storage', 'runs'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+        expect(toolNames.filter((n) => n === HelperTools.DATASET_GET_ITEMS)).toHaveLength(1);
+        expect(toolNames.filter((n) => n === HelperTools.KEY_VALUE_STORE_RECORD_GET)).toHaveLength(1);
+        expect(toolNames.filter((n) => n === HelperTools.ACTOR_RUNS_ABORT)).toHaveLength(1);
+        expect(toolNames.filter((n) => n === HelperTools.ACTOR_OUTPUT_GET)).toHaveLength(1);
+    });
+});
+
 describe('loadToolsFromInput explicit widget selection', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
