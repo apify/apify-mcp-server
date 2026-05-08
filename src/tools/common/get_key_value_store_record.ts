@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildInvalidInputResponse } from '../../utils/mcp.js';
 import { resolveRunDefaultStorage } from './run_storage.js';
 
 const getKeyValueStoreRecordArgs = z.object({
@@ -54,12 +54,8 @@ USAGE EXAMPLES:
         const { args, apifyClient: client } = toolArgs;
         const parseResult = getKeyValueStoreRecordArgs.safeParse(args);
         if (!parseResult.success) {
-            const message = parseResult.error.issues.map((i) => i.message).join('; ');
-            return buildMCPResponse({
-                texts: [`Invalid arguments for get-key-value-store-record: ${message}`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            const reason = parseResult.error.issues.map((i) => i.message).join('; ');
+            return buildInvalidInputResponse(HelperTools.KEY_VALUE_STORE_RECORD_GET, reason);
         }
         const parsed = parseResult.data;
 
@@ -69,6 +65,7 @@ USAGE EXAMPLES:
             if ('error' in resolved) return resolved.error;
             storeId = resolved.id;
         } else {
+            // Refine guarantees storeId is set when runId is not.
             storeId = parsed.storeId as string;
         }
 

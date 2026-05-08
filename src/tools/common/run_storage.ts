@@ -4,20 +4,19 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 
 type RunStorageKind = 'dataset' | 'keyValueStore';
 
+type McpResponse = ReturnType<typeof buildMCPResponse>;
+
 const STORAGE_LABEL: Record<RunStorageKind, { field: 'defaultDatasetId' | 'defaultKeyValueStoreId'; label: string }> = {
     dataset: { field: 'defaultDatasetId', label: 'dataset' },
     keyValueStore: { field: 'defaultKeyValueStoreId', label: 'key-value store' },
 };
 
-/**
- * Resolve the default dataset or key-value store ID from a run.
- * On failure (run missing, storage missing) returns a soft-fail MCP error response.
- */
+/** Returns a soft-fail MCP response on failure rather than throwing. */
 export async function resolveRunDefaultStorage(
     client: ApifyClient,
     runId: string,
     kind: RunStorageKind,
-): Promise<{ id: string } | { error: ReturnType<typeof buildMCPResponse> }> {
+): Promise<{ id: string } | { error: McpResponse }> {
     const { field, label } = STORAGE_LABEL[kind];
     const run = await client.run(runId).get();
     if (!run) {

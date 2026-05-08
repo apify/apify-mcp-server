@@ -1,21 +1,17 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildInvalidInputResponse, buildMCPResponse } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { resolveRunDefaultStorage } from './run_storage.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 100;
 
-/**
- * Derive the `flatten` set from dot-notation `fields` entries.
- * Picks the unique top-level prefix for each dotted path.
- * Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`.
- */
+/** Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`. */
 export function deriveFlattenFromFields(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
@@ -94,12 +90,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parseResult = getDatasetItemsArgs.safeParse(args);
         if (!parseResult.success) {
-            const message = parseResult.error.issues.map((i) => i.message).join('; ');
-            return buildMCPResponse({
-                texts: [`Invalid arguments for get-dataset-items: ${message}`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            const reason = parseResult.error.issues.map((i) => i.message).join('; ');
+            return buildInvalidInputResponse(HelperTools.DATASET_GET_ITEMS, reason);
         }
         const parsed = parseResult.data;
 
@@ -113,10 +105,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             datasetId = parsed.datasetId as string;
         }
 
-        // Convert comma-separated strings to arrays
         const fields = parseCommaSeparatedList(parsed.fields);
         const omit = parseCommaSeparatedList(parsed.omit);
-        // Auto-derive flatten from dot-notation `fields` when caller did not pass `flatten`.
         const flatten = parsed.flatten !== undefined
             ? parseCommaSeparatedList(parsed.flatten)
             : deriveFlattenFromFields(fields);

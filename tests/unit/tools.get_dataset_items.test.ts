@@ -25,4 +25,12 @@ describe('deriveFlattenFromFields', () => {
     it('returns empty list for empty input', () => {
         expect(deriveFlattenFromFields([])).toEqual([]);
     });
+
+    it('skips fields with leading dot (no top-level prefix)', () => {
+        expect(deriveFlattenFromFields(['.a', '.b.c'])).toEqual([]);
+    });
+
+    it('extracts the prefix from fields with a trailing dot', () => {
+        expect(deriveFlattenFromFields(['a.', 'b.c'])).toEqual(['a', 'b']);
+    });
 });

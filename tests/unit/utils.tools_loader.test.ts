@@ -79,7 +79,6 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_ABORT);
         expect(toolNames).toContain(HelperTools.ACTOR_OUTPUT_GET);
 
-        // Order: get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run → get-actor-output
         const callIndex = toolNames.indexOf(HelperTools.ACTOR_CALL);
         const runIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_GET);
         const datasetIndex = toolNames.indexOf(HelperTools.DATASET_GET_ITEMS);
