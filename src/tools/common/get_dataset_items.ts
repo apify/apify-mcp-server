@@ -7,6 +7,7 @@ import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
+import { resolveRunDefaultStorage } from './run_storage.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 100;
 
@@ -102,25 +103,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         }
         const parsed = parseResult.data;
 
-        // Resolve dataset ID from runId when provided.
         let datasetId: string;
         if (parsed.runId) {
-            const run = await client.run(parsed.runId).get();
-            if (!run) {
-                return buildMCPResponse({
-                    texts: [`Run '${parsed.runId}' not found.`],
-                    isError: true,
-                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-                });
-            }
-            if (!run.defaultDatasetId) {
-                return buildMCPResponse({
-                    texts: [`Run '${parsed.runId}' has no default dataset.`],
-                    isError: true,
-                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-                });
-            }
-            datasetId = run.defaultDatasetId;
+            const resolved = await resolveRunDefaultStorage(client, parsed.runId, 'dataset');
+            if ('error' in resolved) return resolved.error;
+            datasetId = resolved.id;
         } else {
             // Refine guarantees datasetId is set when runId is not.
             datasetId = parsed.datasetId as string;

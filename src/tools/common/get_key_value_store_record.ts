@@ -4,6 +4,7 @@ import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { resolveRunDefaultStorage } from './run_storage.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     runId: z.string()
@@ -64,22 +65,9 @@ USAGE EXAMPLES:
 
         let storeId: string;
         if (parsed.runId) {
-            const run = await client.run(parsed.runId).get();
-            if (!run) {
-                return buildMCPResponse({
-                    texts: [`Run '${parsed.runId}' not found.`],
-                    isError: true,
-                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-                });
-            }
-            if (!run.defaultKeyValueStoreId) {
-                return buildMCPResponse({
-                    texts: [`Run '${parsed.runId}' has no default key-value store.`],
-                    isError: true,
-                    telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-                });
-            }
-            storeId = run.defaultKeyValueStoreId;
+            const resolved = await resolveRunDefaultStorage(client, parsed.runId, 'keyValueStore');
+            if ('error' in resolved) return resolved.error;
+            storeId = resolved.id;
         } else {
             storeId = parsed.storeId as string;
         }
