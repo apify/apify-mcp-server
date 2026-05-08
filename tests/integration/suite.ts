@@ -2303,7 +2303,7 @@ export function createIntegrationTestsSuite(
             for await (const message of stream) {
                 if (message.type === 'taskCreated') {
                     taskId = message.task.taskId;
-                    expect(taskId).toMatch(new RegExp(`^${actorNameToToolName(ACTOR_PYTHON_EXAMPLE)}-[A-Za-z0-9_-]{12}$`));
+                    expect(taskId).toMatch(new RegExp(`^${actorNameToToolName(ACTOR_PYTHON_EXAMPLE)}-[A-Za-z0-9]{8}$`));
 
                     // Now we can get the task status
                     const taskStatus = await client.experimental.tasks.getTask(taskId);

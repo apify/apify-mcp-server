@@ -909,12 +909,12 @@ export class ActorsMcpServer {
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
                 if (request.params.task) {
-                    // 9 bytes → 12 base64url chars (72 bits of entropy), session-scoped in the task store.
+                    // 12 bytes → 16 base64url chars → strip `-`/`_` → slice(0,8): always ≥14 alphanum available.
                     const task = await this.taskStore.createTask(
                         {
                             ttl: request.params.task.ttl,
                         },
-                        `${tool.name}-${randomBytes(9).toString('base64url')}`,
+                        `${tool.name}-${randomBytes(12).toString('base64url').replace(/[^A-Za-z0-9]/g, '').slice(0, 8)}`,
                         request,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
