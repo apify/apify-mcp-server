@@ -101,6 +101,10 @@ export function createTaskCancellationWatcher(opts: {
         void (async () => {
             try {
                 if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
+                    // Stop the timer immediately rather than relying on dispose() —
+                    // otherwise ticks keep firing as no-ops until the caller's
+                    // finally block runs.
+                    clearInterval(interval);
                     controller.abort(new Error(`Task ${taskId} cancelled by client`));
                 }
             } catch (err) {
