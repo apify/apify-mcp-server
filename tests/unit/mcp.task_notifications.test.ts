@@ -1,8 +1,9 @@
 import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
-import type { Notification } from '@modelcontextprotocol/sdk/types.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { RELATED_TASK_META_KEY, TASK_STATUS_HEARTBEAT_INTERVAL_MS } from '../../src/const.js';
+import { TASK_STATUS_HEARTBEAT_INTERVAL_MS } from '../../src/const.js';
 import { emitTaskStatusNotification } from '../../src/mcp/server.js';
 
 // Helper to create a minimal TaskStore mock
@@ -13,9 +14,13 @@ function makeTaskStore(task: Record<string, unknown> | undefined) {
     };
 }
 
+function makeServer() {
+    return { notification: vi.fn().mockResolvedValue(undefined) } as unknown as Server;
+}
+
 describe('emitTaskStatusNotification', () => {
     it('sends notifications/tasks/status with full Task shape', async () => {
-        const sendNotification = vi.fn<[Notification], Promise<void>>().mockResolvedValue(undefined);
+        const server = makeServer();
         const task = {
             taskId: 'task-1',
             status: 'working',
@@ -26,10 +31,10 @@ describe('emitTaskStatusNotification', () => {
         };
         const store = makeTaskStore(task);
 
-        await emitTaskStatusNotification('task-1', undefined, store as never, sendNotification);
+        await emitTaskStatusNotification('task-1', undefined, store as never, server);
 
-        expect(sendNotification).toHaveBeenCalledOnce();
-        const notification = sendNotification.mock.calls[0][0];
+        expect(server.notification).toHaveBeenCalledOnce();
+        const notification = (server.notification as ReturnType<typeof vi.fn>).mock.calls[0][0];
         expect(notification.method).toBe('notifications/tasks/status');
         expect(notification.params).toMatchObject({
             taskId: 'task-1',
@@ -42,7 +47,7 @@ describe('emitTaskStatusNotification', () => {
     });
 
     it('does NOT include _meta.related-task in notification (SHOULD NOT)', async () => {
-        const sendNotification = vi.fn<[Notification], Promise<void>>().mockResolvedValue(undefined);
+        const server = makeServer();
         const task = {
             taskId: 'task-1',
             status: 'working',
@@ -52,16 +57,16 @@ describe('emitTaskStatusNotification', () => {
         };
         const store = makeTaskStore(task);
 
-        await emitTaskStatusNotification('task-1', undefined, store as never, sendNotification);
+        await emitTaskStatusNotification('task-1', undefined, store as never, server);
 
-        const notification = sendNotification.mock.calls[0][0];
+        const notification = (server.notification as ReturnType<typeof vi.fn>).mock.calls[0][0];
         expect(notification).not.toHaveProperty('_meta');
         expect(notification.params).not.toHaveProperty('_meta');
         expect((notification.params as Record<string, unknown>)?.[RELATED_TASK_META_KEY]).toBeUndefined();
     });
 
     it('omits statusMessage when null', async () => {
-        const sendNotification = vi.fn<[Notification], Promise<void>>().mockResolvedValue(undefined);
+        const server = makeServer();
         const store = makeTaskStore({
             taskId: 'task-1',
             status: 'working',
@@ -71,23 +76,23 @@ describe('emitTaskStatusNotification', () => {
             statusMessage: null,
         });
 
-        await emitTaskStatusNotification('task-1', undefined, store as never, sendNotification);
+        await emitTaskStatusNotification('task-1', undefined, store as never, server);
 
-        const params = sendNotification.mock.calls[0][0].params as Record<string, unknown>;
+        const params = (server.notification as ReturnType<typeof vi.fn>).mock.calls[0][0].params as Record<string, unknown>;
         expect(params).not.toHaveProperty('statusMessage');
     });
 
     it('is silent when task is not found', async () => {
-        const sendNotification = vi.fn<[Notification], Promise<void>>().mockResolvedValue(undefined);
+        const server = makeServer();
         const store = makeTaskStore(undefined);
 
-        await emitTaskStatusNotification('missing', undefined, store as never, sendNotification);
+        await emitTaskStatusNotification('missing', undefined, store as never, server);
 
-        expect(sendNotification).not.toHaveBeenCalled();
+        expect(server.notification).not.toHaveBeenCalled();
     });
 
-    it('is silent when sendNotification throws', async () => {
-        const sendNotification = vi.fn<[Notification], Promise<void>>().mockRejectedValue(new Error('network'));
+    it('is silent when server.notification throws', async () => {
+        const server = { notification: vi.fn().mockRejectedValue(new Error('transport closed')) } as unknown as Server;
         const store = makeTaskStore({
             taskId: 'task-1',
             status: 'working',
@@ -97,7 +102,7 @@ describe('emitTaskStatusNotification', () => {
         });
 
         // Should not throw
-        await expect(emitTaskStatusNotification('task-1', undefined, store as never, sendNotification))
+        await expect(emitTaskStatusNotification('task-1', undefined, store as never, server))
             .resolves.toBeUndefined();
     });
 });

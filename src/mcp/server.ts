@@ -14,7 +14,13 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, InitializeResult, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    InitializeRequest,
+    InitializeResult,
+    Notification,
+    Request,
+    TaskStatusNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -31,6 +37,7 @@ import {
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
+    RELATED_TASK_META_KEY,
     ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -49,7 +56,6 @@ import {
     FAILURE_CATEGORY,
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
-    RELATED_TASK_META_KEY,
     SERVER_NAME,
     TASK_STATUS_HEARTBEAT_INTERVAL_MS,
     TOOL_STATUS,
@@ -119,18 +125,21 @@ function isUiSupportedByClient(request: InitializeRequest | undefined): boolean 
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
 
-/** Send notifications/tasks/status for taskId. Swallows errors — notifications are advisory. */
+/** Send notifications/tasks/status for taskId. Routes via session transport (no relatedRequestId).
+ *  Swallows errors — notifications are advisory. */
 export async function emitTaskStatusNotification(
     taskId: string,
     mcpSessionId: string | undefined,
     taskStore: TaskStore,
-    sendNotification: RequestHandlerExtra<Request, Notification>['sendNotification'],
+    server: Server,
 ): Promise<void> {
     try {
         const task = await taskStore.getTask(taskId, mcpSessionId);
         if (!task) return;
-        // Per spec: notifications/tasks/status MUST NOT carry _meta.related-task (task ID is in params)
-        await sendNotification({
+        // Per spec: notifications/tasks/status MUST NOT carry _meta.related-task (task ID is in params).
+        // Called without options so the notification routes through the session transport,
+        // not the request-scoped stream (which closes once the initial { task } response is flushed).
+        await server.notification({
             method: 'notifications/tasks/status',
             params: {
                 taskId: task.taskId,
@@ -141,7 +150,7 @@ export async function emitTaskStatusNotification(
                 ...(task.statusMessage != null && { statusMessage: task.statusMessage }),
                 ...(task.pollInterval != null && { pollInterval: task.pollInterval }),
             },
-        } as Notification);
+        } as TaskStatusNotification);
     } catch {
         // Silent fail — notifications are advisory
     }
@@ -742,7 +751,7 @@ export class ActorsMcpServer {
         });
 
         // Cancel task
-        this.server.setRequestHandler(CancelTaskRequestSchema, async (request, extra) => {
+        this.server.setRequestHandler(CancelTaskRequestSchema, async (request) => {
             // mcpSessionId is injected at transport layer for session isolation in task stores
             const params = (request.params || {}) as ApifyRequestParams & { taskId: string };
             const { taskId } = params;
@@ -774,7 +783,7 @@ export class ActorsMcpServer {
             await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
             const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
             log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             return updatedTask!;
         });
     }
@@ -954,12 +963,13 @@ export class ActorsMcpServer {
                         },
                         `call-tool-${name}-${randomUUID()}`,
                         request,
+                        mcpSessionId,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
 
                     // Execute the tool asynchronously and update task status
-                    setImmediate(async () => {
-                        await this.executeToolAndUpdateTask({
+                    setImmediate(() => {
+                        this.executeToolAndUpdateTask({
                             taskId: task.taskId,
                             tool,
                             toolArgs: toolArgs!,
@@ -973,7 +983,7 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                             userRentedActorIds,
-                        });
+                        }).catch((error) => log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }));
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1349,7 +1359,7 @@ export class ActorsMcpServer {
             });
             await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
             let lastEmissionAt = Date.now();
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
@@ -1369,7 +1379,7 @@ export class ActorsMcpServer {
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
                 lastEmissionAt = Date.now();
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
 
             // Heartbeat: re-emit notifications/tasks/status every ~30 s of silence so clients with
@@ -1380,13 +1390,7 @@ export class ActorsMcpServer {
                     const currentTask = await this.taskStore.getTask(taskId, mcpSessionId);
                     if (!currentTask || currentTask.status !== 'working') return;
                     lastEmissionAt = Date.now();
-                    await this.taskStore.updateTaskStatus(
-                        taskId,
-                        'working',
-                        currentTask.statusMessage ?? undefined,
-                        mcpSessionId,
-                    );
-                    await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                    await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 } catch {
                     // Silent fail — heartbeat is advisory
                 }
@@ -1469,7 +1473,7 @@ export class ActorsMcpServer {
             });
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } catch (error) {
@@ -1478,7 +1482,7 @@ export class ActorsMcpServer {
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1490,7 +1494,7 @@ export class ActorsMcpServer {
             if (isPermissionApprovalError(error)) {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
-                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                     failure_http_status: error.statusCode,
@@ -1562,7 +1566,7 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
-            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, extra.sendNotification);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } finally {

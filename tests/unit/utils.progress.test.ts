@@ -1,6 +1,7 @@
+import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../../src/const.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../../src/const.js';
 import { createProgressTracker, formatRunStatusMessage, ProgressTracker } from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {

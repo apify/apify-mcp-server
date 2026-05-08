@@ -262,11 +262,29 @@ export function createExpressApp(): express.Express {
         }
     });
 
-    // Handle GET requests for SSE streams according to spec
-    app.get(Routes.MCP, async (_req: Request, res: Response) => {
-        // We don't support GET requests for this server
-        // The spec requires returning 405 Method Not Allowed in this case
-        res.status(405).set('Allow', 'POST').send('Method Not Allowed');
+    // Handle GET requests for the standalone SSE stream.
+    // Clients open this to receive server-initiated notifications (e.g. notifications/tasks/status)
+    // that are not tied to a specific POST request.  Without this, session-level notifications
+    // are silently dropped by the transport.
+    app.get(Routes.MCP, async (req: Request, res: Response) => {
+        const sessionId = req.headers['mcp-session-id'] as string | undefined;
+        const transport = transports[sessionId || ''] as StreamableHTTPServerTransport | undefined;
+        if (!transport) {
+            log.softFail('Session not found for GET SSE stream', { mcpSessionId: sessionId, statusCode: 404 });
+            res.status(404).send('Not Found: Session not found').end();
+            return;
+        }
+        log.info('MCP API', {
+            mth: req.method,
+            rt: Routes.MCP,
+            tr: TransportType.HTTP,
+            mcpSessionId: sessionId,
+        });
+        try {
+            await transport.handleRequest(req, res);
+        } catch (error) {
+            respondWithError(res, error, 'Error handling GET SSE stream');
+        }
     });
 
     app.delete(Routes.MCP, async (req: Request, res: Response) => {

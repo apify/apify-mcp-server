@@ -1,7 +1,8 @@
 import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
+import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
-import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../const.js';
+import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
 
 const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 
