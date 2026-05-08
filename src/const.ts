@@ -222,3 +222,7 @@ export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as con
 // MCP _meta key for associating messages with a task.
 // TODO: replace with RELATED_TASK_META_KEY from @modelcontextprotocol/sdk once the installed SDK exports it.
 export const RELATED_TASK_META_KEY = 'io.modelcontextprotocol/related-task';
+
+// Heartbeat interval for notifications/tasks/status while a task is working.
+// Transport-layer mitigation to keep clients with sub-minute timeouts alive.
+export const TASK_STATUS_HEARTBEAT_INTERVAL_MS = 30_000;
