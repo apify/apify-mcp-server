@@ -462,4 +462,23 @@ End-to-end behavioral assertions, summarised:
 - **`keys` cap**: a KV store with >50 keys returns the first 50 names with `keyCount` reflecting the total.
 - **Apps widget**: reads the new shape and polls with `waitSecs: 0`.
 
-Per-change validation against the local stdio build is required (per repo convention). Integration tests against the live Apify API require a real token and are run by humans / CI, not by agents.
+### How we test
+
+End-to-end coverage uses **mcpc against the local stdio build**. mcpc drives the actual MCP server over stdio (no HTTP harness, no UI), so assertions on `responseVersion`, `storages.*`, status templates, and notification streams reflect what real clients receive.
+
+Workflow per code change:
+
+```bash
+npm run build
+mcpc @stdio restart
+mcpc @stdio tools-call call-actor actor:='"apify/rag-web-browser"' input:='{"query":"hello"}' --json | jq '.result.structuredContent'
+```
+
+Notes:
+
+- The mcpc bridge is established once per workspace; agents do not need to re-run `mcpc connect`.
+- Probes that actually hit the Apify API (everything except validation/auth-failure paths) require a real `APIFY_TOKEN` in the server env; agents must ask the user for one rather than committing or logging it.
+- Use `--json` piped through `jq` to assert on response shape. No inline Python.
+- Notification-stream tests (task heartbeats, `notifications/tasks/status`, progress events) use mcpc's notification capture; the suite-level harness can mirror those assertions for CI.
+
+The behavioural list above maps 1:1 onto mcpc-driven test cases. Programmatic equivalents land in `tests/integration/suite.ts` — the shared suite used by both stdio and streamable-HTTP transports — and run via `npm run test:integration` with a real token. New cases must go in `suite.ts`, not in standalone files. Integration runs are humans/CI only; agents drive mcpc instead.
