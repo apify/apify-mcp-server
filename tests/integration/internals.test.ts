@@ -33,11 +33,15 @@ describe('MCP server internals integration tests', () => {
 
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
-        // With enableAddingActors=true and no tools/actors, we should only have add-actor initially
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (dataset, kv, abort, output);
+        // then ACTOR_PYTHON_EXAMPLE is added on top.
         const expectedToolNames = [
             addTool.name,
-            ACTOR_PYTHON_EXAMPLE,
+            'get-dataset-items',
+            'get-key-value-store-record',
+            'abort-actor-run',
             'get-actor-output',
+            ACTOR_PYTHON_EXAMPLE,
         ];
         expectArrayWeakEquals(expectedToolNames, names);
 
@@ -54,8 +58,8 @@ describe('MCP server internals integration tests', () => {
 
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        // With enableAddingActors=true and no tools/actors, seeded set contains only add-actor
-        const numberOfTools = 2;
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (dataset, kv, abort, output)
+        const numberOfTools = 5;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -95,7 +99,8 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        const numberOfTools = 2;
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers
+        const numberOfTools = 5;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;

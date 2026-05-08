@@ -481,7 +481,8 @@ export function createIntegrationTestsSuite(
             });
             const names = getToolNames(await client.listTools());
 
-            expect(names).toHaveLength(5);
+            // docs (2) + fetch-actor-details + add-actor + 4 auto-injected (dataset, kv, abort, output)
+            expect(names).toHaveLength(8);
 
             // Should include: docs category + specific tools
             expect(names).toContain('search-apify-docs'); // from docs category
@@ -1965,58 +1966,99 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('reads dataset items via get-dataset-items with auto-flatten and default limit from a rag-web-browser run', async () => {
-            client = await createClientFn({ tools: ['actors', 'storage'] });
+        describe('rag-web-browser run reads via storage tools', () => {
+            let datasetId: string;
+            let runId: string;
 
-            const callResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: 'apify/rag-web-browser',
-                    input: { query: 'https://apify.com', maxResults: 1 },
-                },
+            beforeAll(async () => {
+                const setupClient = await createClientFn({ tools: ['actors', 'storage'] });
+                const callResult = await setupClient.callTool({
+                    name: HelperTools.ACTOR_CALL,
+                    arguments: {
+                        actor: RAG_WEB_BROWSER,
+                        input: { query: 'https://apify.com', maxResults: 1 },
+                    },
+                });
+                const callStructured = callResult as { structuredContent?: { datasetId?: string; runId?: string } };
+                expect(callStructured.structuredContent?.datasetId).toBeDefined();
+                expect(callStructured.structuredContent?.runId).toBeDefined();
+                datasetId = callStructured.structuredContent!.datasetId!;
+                runId = callStructured.structuredContent!.runId!;
+                await setupClient.close();
+            }, 60_000);
+
+            it('auto-flattens dot-notation `fields` on get-dataset-items', async () => {
+                client = await createClientFn({ tools: ['storage'] });
+                const result = await client.callTool({
+                    name: HelperTools.DATASET_GET_ITEMS,
+                    arguments: { datasetId, fields: 'metadata.url,markdown' },
+                });
+                expect(result.isError).not.toBe(true);
+                const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
+                    .structuredContent?.items;
+                expect(Array.isArray(items)).toBe(true);
+                expect(items?.length).toBeGreaterThan(0);
+                expect(items?.[0]).toHaveProperty('metadata.url');
+                await client.close();
             });
-            const callStructured = callResult as { structuredContent?: { datasetId?: string } };
-            expect(callStructured.structuredContent?.datasetId).toBeDefined();
-            const { datasetId } = callStructured.structuredContent!;
 
-            // (a) auto-flatten on dot-notation `fields`
-            const datasetResult = await client.callTool({
-                name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { datasetId, fields: 'metadata.url,markdown' },
+            it('honors explicit `flatten` override on get-dataset-items', async () => {
+                client = await createClientFn({ tools: ['storage'] });
+                const result = await client.callTool({
+                    name: HelperTools.DATASET_GET_ITEMS,
+                    arguments: { datasetId, fields: 'metadata.url', flatten: 'other' },
+                });
+                expect(result.isError).not.toBe(true);
+                const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
+                    .structuredContent?.items;
+                expect(Array.isArray(items)).toBe(true);
+                // No item should have a flat `metadata.url` key — flatten="other" did not flatten metadata.
+                const itemsWithFlatMetadataUrl = (items ?? []).filter((item) => 'metadata.url' in item);
+                expect(itemsWithFlatMetadataUrl).toHaveLength(0);
+                await client.close();
             });
-            expect(datasetResult.isError).not.toBe(true);
-            const items = (datasetResult as { structuredContent?: { items?: Record<string, unknown>[] } })
-                .structuredContent?.items;
-            expect(Array.isArray(items)).toBe(true);
-            expect(items?.length).toBeGreaterThan(0);
-            expect(items?.[0]).toHaveProperty('metadata.url');
 
-            // (b) explicit flatten overrides auto-derivation
-            const explicitResult = await client.callTool({
-                name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { datasetId, fields: 'metadata.url', flatten: 'other' },
+            it('applies the default `limit` of 20 when omitted on get-dataset-items', async () => {
+                client = await createClientFn({ tools: ['storage'] });
+                const result = await client.callTool({
+                    name: HelperTools.DATASET_GET_ITEMS,
+                    arguments: { datasetId },
+                });
+                expect(result.isError).not.toBe(true);
+                const structured = (result as { structuredContent?: { items?: unknown[]; limit?: number } })
+                    .structuredContent;
+                expect(structured?.limit).toBe(20);
+                expect((structured?.items ?? []).length).toBeLessThanOrEqual(20);
+                await client.close();
             });
-            expect(explicitResult.isError).not.toBe(true);
-            const explicitItems = (explicitResult as { structuredContent?: { items?: Record<string, unknown>[] } })
-                .structuredContent?.items;
-            // With flatten="other" instead of "metadata", "metadata.url" is NOT a flat key.
-            // The API returns no items when fields select a non-existent flat path; either case confirms the override.
-            if (explicitItems && explicitItems.length > 0) {
-                expect(explicitItems[0]).not.toHaveProperty('metadata.url');
-            }
 
-            // (c) default limit is 20 when omitted
-            const defaultLimitResult = await client.callTool({
-                name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { datasetId },
+            it('reads INPUT from the run\'s default KV store via get-actor-run + get-key-value-store-record', async () => {
+                client = await createClientFn({ tools: ['runs', 'storage'] });
+                const runResult = await client.callTool({
+                    name: HelperTools.ACTOR_RUNS_GET,
+                    arguments: { runId },
+                });
+                expect(runResult.isError).not.toBe(true);
+                const runText = (runResult.content as { text: string }[])[0].text;
+                const runData = extractJsonFromMarkdown(runText) as { defaultKeyValueStoreId?: string };
+                expect(runData.defaultKeyValueStoreId).toBeDefined();
+
+                const kvResult = await client.callTool({
+                    name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                    arguments: { storeId: runData.defaultKeyValueStoreId!, recordKey: 'INPUT' },
+                });
+                expect(kvResult.isError).not.toBe(true);
+                expect((kvResult.content as { text: string }[])[0].text).toContain('apify.com');
+                await client.close();
             });
-            expect(defaultLimitResult.isError).not.toBe(true);
-            const defaultLimitStructured = (defaultLimitResult as {
-                structuredContent?: { items?: unknown[]; limit?: number };
-            }).structuredContent;
-            expect(defaultLimitStructured?.limit).toBe(20);
-            expect((defaultLimitStructured?.items ?? []).length).toBeLessThanOrEqual(20);
+        });
 
+        it('rejects get-key-value-store-record when required storeId is missing', async () => {
+            client = await createClientFn({ tools: ['storage'] });
+            await expect(client.callTool({
+                name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
+                arguments: { recordKey: 'INPUT' },
+            })).rejects.toThrow(/must have required property 'storeId'/);
             await client.close();
         });
 
