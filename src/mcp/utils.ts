@@ -66,14 +66,13 @@ export function chainTaskStoreCancellation(opts: {
 }): { signal: AbortSignal; dispose: () => void } {
     const { parentSignal, taskId, mcpSessionId, taskStore, pollIntervalMs = 500 } = opts;
     const controller = new AbortController();
+    const onParentAbort = () => controller.abort(parentSignal.reason);
 
     if (parentSignal.aborted) {
         controller.abort(parentSignal.reason);
-        return { signal: controller.signal, dispose: () => { /* nothing to clean up */ } };
+    } else {
+        parentSignal.addEventListener('abort', onParentAbort, { once: true });
     }
-
-    const onParentAbort = () => controller.abort(parentSignal.reason);
-    parentSignal.addEventListener('abort', onParentAbort, { once: true });
 
     const interval = setInterval(() => {
         void (async () => {

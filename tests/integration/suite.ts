@@ -2357,9 +2357,8 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        // tasks/cancel must abort the in-flight Apify run for the direct-actor-tool path.
-        // Without the chained AbortController in executeToolAndUpdateTask the task flips to
-        // `cancelled` but the underlying run keeps consuming compute until natural finish.
+        // Without the chained AbortController, the task flips to `cancelled` but the underlying
+        // Apify run keeps consuming compute until natural finish.
         it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 1 }, async () => {
             client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
 
@@ -2391,7 +2390,6 @@ export function createIntegrationTestsSuite(
             await waitForActorRunAbortStatus(api, actor!.id);
         });
 
-        // Same as above but via the default `call-actor` internal-tool path.
         it('should abort the Apify run when tasks/cancel is sent (call-actor path)', { retry: 1 }, async () => {
             client = await createClientFn({ tools: ['actors'] });
 
@@ -2427,7 +2425,7 @@ export function createIntegrationTestsSuite(
         // MUST per https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks
         // - tasks/cancel on a terminal task returns JSON-RPC -32602 naming the current status
         // - the task has transitioned to `cancelled` before the response returns
-        it('returns -32602 when cancelling a task that is already cancelled', async () => {
+        it('should return -32602 when cancelling a task that is already cancelled', async () => {
             client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
 
             const stream = client.experimental.tasks.callToolStream(
