@@ -1320,6 +1320,11 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
+            // TODO(spec compliance, TC-3): TOCTOU window between the cancel check above and
+            // this call. If `tasks/cancel` lands here, this attempts cancelled → working,
+            // which the store rejects (terminal-state guard). The throw lands in the catch
+            // below and triggers another race. Proper fix: catch the terminal-state error
+            // and treat it as "already cancelled, skip" — or move to atomic compare-and-set.
             await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
 
             // Execute the tool and get the result
@@ -1339,6 +1344,11 @@ export class ActorsMcpServer {
             // Callback to propagate Actor run statusMessage into the task store.
             // Clients retrieve it via tasks/get and tasks/list polling.
             // TODO: Also send notifications/tasks/status so clients get real-time push updates
+            // TODO(spec compliance, TC-3): if the task is cancelled after this callback is
+            // scheduled but before it runs, this call attempts cancelled → working and the
+            // store throws. The throw is currently swallowed by progress.ts's tick try/catch
+            // (functionally compliant — status stays cancelled), but generates log noise.
+            // Add an isTaskCancelled guard or catch the terminal-state error explicitly.
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
             };
@@ -1427,6 +1437,13 @@ export class ActorsMcpServer {
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this 402.
+                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping 402 result storage', { taskId, mcpSessionId });
+                    finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
+                    return;
+                }
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1438,6 +1455,13 @@ export class ActorsMcpServer {
 
             if (isPermissionApprovalError(error)) {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this approval error.
+                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
+                    log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping permission-approval result storage', { taskId, mcpSessionId });
+                    finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
+                    return;
+                }
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
