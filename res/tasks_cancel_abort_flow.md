@@ -223,12 +223,14 @@ Two extra defenses live inside `createTaskCancellationWatcher`:
   awaiting `getTask`. Without this, Redis tail-latency spikes (cluster
   reslot, failover) cause ticks to pile up and amplify load right when
   the backend is struggling.
-- **`try/catch` with `log.softFail`.** `RedisTaskStore.getTask` is a
-  single Redis HGET that can throw on transient cluster errors. Without
-  the catch, a single Redis blip becomes an unhandled promise rejection
-  → with Node's default `--unhandled-rejections=throw` the worker pod
-  crashes, killing every other session it serves. The catch logs and
-  keeps polling so the next successful tick still aborts.
+- **Swallowing `try/catch`.** `RedisTaskStore.getTask` is a single Redis
+  HGET that can throw on transient cluster errors. Without the catch, a
+  single Redis blip becomes an unhandled promise rejection → with Node's
+  default `--unhandled-rejections=throw` the worker pod crashes, killing
+  every other session it serves. The catch swallows silently and keeps
+  polling so the next successful tick still aborts. No logging: the loop
+  fires every 500 ms per active task, so logging on each failure would
+  flood logs during a Redis outage that's already alerted at a lower layer.
 
 ## Files of interest
 

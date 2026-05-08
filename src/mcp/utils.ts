@@ -3,8 +3,6 @@ import { parse } from 'node:querystring';
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import type { ApifyClient } from 'apify-client';
 
-import log from '@apify/log';
-
 import { processInput } from '../input.js';
 import type { ActorStore, Input } from '../types.js';
 import { ServerMode } from '../types.js';
@@ -107,16 +105,10 @@ export function createTaskCancellationWatcher(opts: {
                     clearInterval(interval);
                     controller.abort(new Error(`Task ${taskId} cancelled by client`));
                 }
-            } catch (err) {
-                // In production, `taskStore.getTask` hits Redis (RedisTaskStore
-                // in the internal repo). Transient cluster errors must NOT
-                // crash the pod via unhandled rejection — log and keep polling
-                // so the handler still aborts on the next successful tick.
-                log.softFail('[createTaskCancellationWatcher] poll failed', {
-                    taskId,
-                    mcpSessionId,
-                    errMessage: err instanceof Error ? err.message : String(err),
-                });
+            } catch {
+                // In production `taskStore.getTask` hits Redis. Swallow transient failures so they don't crash the pod via
+                // unhandled rejection; the next successful tick will still detect cancellation. Not logged: under sustained Redis
+                // degradation this fires every pollIntervalMs per task and would flood logs.
             } finally {
                 tickInFlight = false;
             }
