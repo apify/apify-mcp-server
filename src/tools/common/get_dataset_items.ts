@@ -88,13 +88,20 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             });
         }
 
+        // Conditionally spread `limit` so the structured content matches the
+        // declared `datasetItemsOutputSchema`. The schema declares `limit` as
+        // `{ type: 'number' }` and does not list it as required, so omitting
+        // the key when the caller did not supply one keeps the response
+        // well-formed instead of carrying `limit: undefined` (which JSON
+        // serialization drops anyway, leaving a silent mismatch between
+        // schema and payload). See issue #731.
         const structuredContent = {
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset: parsed.offset ?? 0,
-            limit: parsed.limit,
+            ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
         };
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };
