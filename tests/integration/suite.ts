@@ -2374,8 +2374,7 @@ export function createIntegrationTestsSuite(
             let cancelled = false;
             for await (const message of stream) {
                 if (message.type === 'taskCreated') {
-                    // Wait for the run to actually start before cancelling so the test exercises the
-                    // mid-run path (not just the cancel-before-start short-circuit at line ~1295).
+                    // Cancel mid-run, not before the run starts.
                     await new Promise((resolve) => { setTimeout(resolve, 2000); });
                     await client.experimental.tasks.cancelTask(message.task.taskId);
                     cancelled = true;

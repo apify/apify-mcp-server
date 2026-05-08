@@ -50,12 +50,10 @@ export async function isTaskCancelled(
 }
 
 /**
- * Builds an `AbortSignal` that fires when either the parent signal aborts (transport disconnect)
- * or the task store reports the task as `cancelled` (response to `tasks/cancel`).
- *
- * The transport signal alone is not enough: `tasks/cancel` updates the task store but does not
- * close the originating request, so an in-flight tool handler would otherwise keep running.
- * Caller MUST invoke `dispose()` once the tool finishes to stop the polling timer.
+ * Returns a signal that aborts when either the parent signal aborts or the task store
+ * reports the task as `cancelled`. Caller must invoke `dispose()` to stop polling.
+ * Without this, the transport signal would not fire on `tasks/cancel` and the in-flight
+ * tool handler would keep running until natural completion.
  */
 export function chainTaskStoreCancellation(opts: {
     parentSignal: AbortSignal;

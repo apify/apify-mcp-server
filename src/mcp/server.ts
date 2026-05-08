@@ -1287,9 +1287,6 @@ export class ActorsMcpServer {
             });
         };
 
-        // Chain the request signal to taskStore-cancel state so `tasks/cancel` actually aborts
-        // the in-flight handler (which then aborts the underlying Apify run). Without this the
-        // task is marked `cancelled` but the run keeps consuming compute until natural finish.
         const cancelLink = chainTaskStoreCancellation({
             parentSignal: extra.signal,
             taskId,
