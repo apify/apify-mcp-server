@@ -178,7 +178,7 @@ Every status returns a concrete `summary` and one primary `nextStep`. Templates 
 | TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage \|\| 'Run-time limit reached; cleanup in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
 | ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage \|\| 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
 | SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items; ${fieldCount} fields available."` | `"Use get-dataset-items with runId=${runId} and limit=100 to fetch items. To preview, set limit=3."` |
-| SUCCEEDED, dataset empty + KV has keys | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCount} keys)."` | When `keys` includes `OUTPUT`: `"Use get-key-value-store-record with runId=${runId} and key=\"OUTPUT\" to read the main output."` Otherwise: `"Use get-key-value-store-record with runId=${runId} and one of the keys in storages.keyValueStore.keys."` |
+| SUCCEEDED, dataset empty + KV has keys | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCount} keys)."` | When `keys` includes `OUTPUT`: `"Use get-key-value-store-record with runId=${runId} and recordKey=\"OUTPUT\" to read the main output."` Otherwise: `"Use get-key-value-store-record with runId=${runId} and one of the keys in storages.keyValueStore.keys (passed as recordKey)."` |
 | SUCCEEDED, no dataset items, no KV keys | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found."` | `"Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run call-actor with adjusted input."` |
 | FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Diagnose using statusMessage and exitCode in this response; re-run call-actor with adjusted input if the cause is fixable."` |
 | ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use call-actor again if you want to rerun the actor."` |
@@ -199,6 +199,14 @@ A text-mode response (for clients that don't read structured content) carries `$
 - The 45 s ceiling stays under the 60 s tool-call timeout that several MCP clients impose; without it those clients would close the call before the server returns.
 - Long-running actors return non-terminal status with a polling `nextStep`. The server does not block indefinitely on the LLM's behalf.
 - Note: Apify's start endpoint caps API-side waiting at 60 s. Server uses `start` followed by `waitForFinish({ waitSecs })`, never `waitForFinish` inside `start` options.
+
+### Progress notifications during sync waits
+
+Whenever the server is actively waiting for a run to reach terminal state — inside `call-actor` with `waitSecs > 0` or inside `get-actor-run` with `waitSecs > 0` — and the caller passes `_meta.progressToken` on the request, the server emits `notifications/progress` with that token on each Apify `run.statusMessage` change observed during the wait window.
+
+This recovers the live-status feel for the async-then-poll flow: the LLM fires `call-actor` with `waitSecs: 0`, gets a `RUNNING` response with a polling `nextStep`, then calls `get-actor-run` with a real `waitSecs` and a `progressToken`, and receives push-style updates ("Crawling page 5/20" → "Crawling page 6/20" → ...) while the wait is in flight. Without `progressToken` the wait emits nothing — agents that don't want the notifications simply omit it.
+
+Implementation reuses the existing `ProgressTracker` (`src/utils/progress.ts`) that today only wires into `call-actor`. v4 wires the same tracker into the `get-actor-run` wait loop. Notification format is unchanged: same `progressToken` echoed back, same `_meta` shape, same `io.modelcontextprotocol/related-task` attachment when invoked under task augmentation. This is purely opt-in and does not affect tool-result content.
 
 ### Task mode
 
@@ -263,9 +271,9 @@ If the listKeys call fails or the run has no default key-value store, both field
 |---|---|---|
 | `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. Declares `execution.taskSupport: "optional"` per MCP spec. |
 | `run-actor` | Deferred | Not implemented in this PR. Plan as a separate rename migration. |
-| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. |
+| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
 | `get-dataset-items` | Promoted in actor workflows | Accepts `runId` OR `datasetId`. Defaults `limit` to 100. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
-| `get-key-value-store-record` | Promoted in actor workflows | Accepts `runId` OR `storeId` (with `key`). When `runId` is provided, server resolves the run's default key-value store. |
+| `get-key-value-store-record` | Promoted in actor workflows | Accepts `runId` OR `storeId`, plus `recordKey`. When `runId` is provided, server resolves the run's default key-value store. Parameter name `recordKey` matches the existing tool schema (kept for backward compatibility). |
 | `abort-actor-run` | Promoted in actor workflows | Auto-surfaced when actor-running tools are present. |
 | `get-actor-output` | Deprecated | Kept for one minor cycle. Description prefixed `DEPRECATED:`; points to `get-dataset-items` for dataset items and `get-key-value-store-record` for KV records. |
 
@@ -286,11 +294,11 @@ This is the change that lets us deprecate `get-actor-output`: once `get-dataset-
 
 The KV-only-actor case (and any actor that writes auxiliary records) needs a first-class fetch path now that the response no longer inlines record bodies.
 
-- Accepts `runId` OR `storeId` (exactly one required) plus `key` (required).
+- Accepts `runId` OR `storeId` (exactly one required) plus `recordKey` (required). The parameter is named `recordKey` to match the existing tool schema; v4 does not rename it.
 - When `runId` is provided, server resolves the run's default key-value store from the run record.
 - Auto-surfaced in actor workflows so the LLM can act on `nextStep` without the storage tool category being explicitly enabled.
 
-The agent's path for KV-only output is: `call-actor` returns `storages.keyValueStore.{keyCount,keys}` → `nextStep` points at `get-key-value-store-record(runId, key="OUTPUT")` → agent fetches the body when (and only when) it actually wants it.
+The agent's path for KV-only output is: `call-actor` returns `storages.keyValueStore.{keyCount,keys}` → `nextStep` points at `get-key-value-store-record(runId, recordKey="OUTPUT")` → agent fetches the body when (and only when) it actually wants it.
 
 ## `callOptions` allowlist
 
@@ -387,7 +395,7 @@ sequenceDiagram
 
 | Change | Impact |
 |---|---|
-| Response: `datasetId` → `storages.dataset.id` | Hard. Widgets and clients reading top-level `datasetId` must update. |
+| Response: dataset id moves to `storages.dataset.id` | Hard. `call-actor` data response had `datasetId` at top level; `get-actor-run-widget` had `dataset.datasetId` nested. Both move to `storages.dataset.id`. |
 | Response: `items` removed from `call-actor` / `get-actor-run` | Hard. Agent fetches via `get-dataset-items`. |
 | `previewItems` removed; no item samples in the response | Hard. Agent fetches a preview via `get-dataset-items` with `limit: 3`. |
 | `instructions` → `summary` + `nextStep` | Hard. Different semantics and names. |
@@ -401,6 +409,7 @@ sequenceDiagram
 | `get-key-value-store-record` auto-surfaced in actor workflows; accepts `runId` | Soft. Additive. Closes the KV-only-actor path now that record bodies are not inlined. |
 | `abort-actor-run` auto-surfaced in actor workflows | Soft. Additive. |
 | `get-actor-run` adds `waitSecs`, default 0, capped at 45 | Soft. Existing callers keep immediate-poll behavior. |
+| `get-actor-run` emits `notifications/progress` during the wait when `_meta.progressToken` is provided | Soft. Additive, opt-in. Reuses the same `ProgressTracker` pattern wired into `call-actor` today. |
 | `isError` unified | Soft for tool-call semantics, but clients using task `status: failed` to detect actor failure must read inner `status` instead. |
 | `storages.keyValueStore.{keys,keyCount}` added | Soft. Additive. Replaces the inline-OUTPUT path that earlier drafts considered. |
 | `responseVersion: "v4"` added | Soft. Additive. |
@@ -421,11 +430,11 @@ Breaking changes must be coordinated with `apify-mcp-server-internal` before mer
 
 ## Widget impact
 
-Three apps-mode tools share this canonical shape and must be updated together: the apps-mode `call-actor`, `call-actor-widget`, and `get-actor-run-widget`. The actor-run widget must:
+Three apps-mode tools share this canonical shape and must be updated together: the apps-mode `call-actor`, `call-actor-widget`, and `get-actor-run-widget`. Today's widget responses nest under `structuredContent.dataset.{datasetId, previewItems}` (per `src/tools/core/get_actor_run_common.ts`); v4 moves both fields into `structuredContent.storages.dataset.{id, ...}` with no `previewItems` at all. The actor-run widget must:
 
-- Read `storages.dataset.id` instead of top-level `datasetId`.
-- Drop any read of `previewItems`. Fetch a small preview (e.g. `limit: 3`) or a full table (`limit: 100`) via `get-dataset-items` with `runId`, depending on widget context.
-- Read `storages.keyValueStore.{keyCount,keys}` to render a key list; fetch individual records on demand via `get-key-value-store-record`.
+- Read `storages.dataset.id` (replaces `dataset.datasetId`).
+- Drop any read of `dataset.previewItems`. Fetch a small preview (e.g. `limit: 3`) or a full table (`limit: 100`) via `get-dataset-items` with `runId`, depending on widget context.
+- Read `storages.keyValueStore.{keyCount,keys}` to render a key list; fetch individual records on demand via `get-key-value-store-record` (parameter is `recordKey`, not `key`).
 - Read top-level `statusMessage` and `exitCode` directly instead of re-fetching.
 - Poll `get-actor-run` with `waitSecs: 0` so widget refreshes do not block.
 - Accept the old shape for one minor cycle only if cheap to do so. Do not add complex compatibility branches.
@@ -467,10 +476,11 @@ End-to-end behavioral assertions, summarised:
 - **`waitSecs` cap.** Both `call-actor` and `get-actor-run` reject `waitSecs > 45` with a validation error. `waitSecs: 45` is accepted and the call returns within roughly that bound.
 - **`get-dataset-items` with dot-notation `fields`** returns nested values without explicit `flatten` (auto-flatten works).
 - **`get-key-value-store-record` with `runId`** resolves the run's default KV store and returns the requested record body. Auto-injection: the tool is present in the active tool set whenever `call-actor` is, without explicitly enabling the storage category.
-- **KV-only actor**: `storages.keyValueStore.keys` lists the keys (including `OUTPUT`); the response carries no record body. The `nextStep` directs the agent at `get-key-value-store-record(runId, key="OUTPUT")`.
+- **KV-only actor**: `storages.keyValueStore.keys` lists the keys (including `OUTPUT`); the response carries no record body. The `nextStep` directs the agent at `get-key-value-store-record(runId, recordKey="OUTPUT")`.
 - **Task mode** lands in `completed` for an actor that finishes in any terminal state, including `FAILED`.
 - **Synthetic infra failure** (invalid actor, sandboxed revoked token) lands in task `failed` and populates `task.statusMessage`.
 - **Push notifications**: at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`. A heartbeat fires after ~45 s of `statusMessage` silence (test-mode override to keep the suite fast).
+- **Progress on `get-actor-run` waits**: when invoked with `waitSecs > 0` and `_meta.progressToken`, the server emits `notifications/progress` carrying that token on each `run.statusMessage` change observed during the wait. No emissions when `progressToken` is absent.
 - **Cancellation**: `tasks/cancel` mid-run results in the underlying Apify run reaching `ABORTED`; task transitions to `cancelled` **before** the cancel response is sent; a `tasks/status: cancelled` notification fires. Cancel-before-start results in an `ABORTED` run (no un-aborted orphan).
 - **Cancel of terminal task** is rejected with JSON-RPC error `-32602`, message naming the current status.
 - **`_meta.related-task` on `tasks/result`**: the `CallToolResult` returned through `tasks/result` includes `_meta: { "io.modelcontextprotocol/related-task": { taskId } }`. (Progress notifications already covered by existing tests.)
