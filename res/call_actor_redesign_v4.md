@@ -232,7 +232,12 @@ In task mode:
 
 Required behavior: `tasks/cancel` aborts the underlying Apify run, not just the task entry.
 
-Architectural shape: the server holds a per-task in-flight reference (an `AbortController` plus, once known, the `runId`). When `tasks/cancel` fires, the server aborts the controller and, as a safety net for any race where the run was created but the controller didn't reach it in time, also aborts the run by `runId`. The reference is cleared on terminal transition.
+Spec-MUST behaviors per the [MCP tasks specification](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks):
+
+- The task **MUST** transition to `cancelled` **before** the `tasks/cancel` response is sent. The Apify run abort is allowed to propagate asynchronously after; the response must not block on it.
+- `tasks/cancel` for a task already in a terminal status (`completed`, `failed`, `cancelled`) **MUST** return JSON-RPC error `-32602` (Invalid params) with a message naming the current status.
+
+Architectural shape: the server holds a per-task in-flight reference (an `AbortController` plus, once known, the `runId`). When `tasks/cancel` fires, the server transitions the task to `cancelled`, aborts the controller, sends the spec-required response, and — as a safety net for any race where the run was created but the controller didn't reach it in time — also aborts the run by `runId`. The reference is cleared on terminal transition.
 
 Two race conditions are explicitly accounted for:
 
@@ -256,7 +261,7 @@ If the listKeys call fails or the run has no default key-value store, both field
 
 | Tool | Status | Behavioral notes |
 |---|---|---|
-| `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. `taskSupport: "optional"`. |
+| `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. Declares `execution.taskSupport: "optional"` per MCP spec. |
 | `run-actor` | Deferred | Not implemented in this PR. Plan as a separate rename migration. |
 | `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. |
 | `get-dataset-items` | Promoted in actor workflows | Accepts `runId` OR `datasetId`. Defaults `limit` to 100. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
@@ -365,7 +370,7 @@ sequenceDiagram
   participant Apify
   LLM->>Client: call-actor(...)
   Client->>Server: tools/call + task:{ttl:600000} + _meta:{progressToken:"p1"}
-  Server-->>Client: CreateTaskResult{taskId, status:working, pollInterval:5000}
+  Server-->>Client: CreateTaskResult{task:{taskId,status:working,createdAt,lastUpdatedAt,ttl,pollInterval:5000}}
   Server-)Apify: start + waitForFinish
   Note over Server: state change OR ~45s silence -> emit task status
   Apify--)Server: statusMessage: "Crawling page 5/20"
@@ -442,6 +447,17 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 - `waitSecs` / heartbeat interval tuning — based on real telemetry; 45 s is the conservative starting point.
 - Convert MCP-server pass-through (`actor:tool`) to a uniform shape — orthogonal redesign.
 
+## MCP spec compliance
+
+Verified against the live [tasks spec](https://modelcontextprotocol.io/specification/2025-11-25/basic/utilities/tasks) (experimental in 2025-11-25). Server capabilities (`tasks: { list, cancel, requests: { tools: { call } } }`) and `_meta` usage attribution (`usageTotalUsd`, `usageUsd`) carry over unchanged. Constraints v4 must honor:
+
+- **Statuses:** v4 emits `working`, `completed`, `failed`, `cancelled`. `input_required` is intentionally unused (no elicitation). Any observed Apify terminal → task `completed` with `isError: false`; tool-side failure → task `failed` with `isError: true`.
+- **`CreateTaskResult` is nested:** `{ task: { taskId, status, createdAt, lastUpdatedAt, ttl, pollInterval? } }`. Flat shapes are non-compliant.
+- **`call-actor` declares `Tool.execution.taskSupport: "optional"`** (nested under `execution`). Other v4 tools omit it (default: `forbidden`).
+- **`notifications/tasks/status` payload** is the full `Task` object per `TaskStatusNotificationParams = NotificationParams & Task`. Heartbeats are not no-ops — each emission advances `lastUpdatedAt`, which is itself a state change. The notification is `MAY` per spec; clients must not rely on it.
+- **`io.modelcontextprotocol/related-task` `_meta` key** is a spec MUST on (a) the `CallToolResult` returned via `tasks/result` and (b) progress notifications. (b) is already wired (`src/utils/progress.ts`); (a) is an implementation item this PR adds. Omitted from `tasks/get` / `tasks/list` / `tasks/cancel` and from `notifications/tasks/status` (taskId is in the message structure).
+- **`tasks/cancel` MUSTs:** reject terminal-status tasks with `-32602`; transition the task to `cancelled` before sending the response (Apify abort propagates async — see Cancellation above).
+
 ## What we will test
 
 End-to-end behavioral assertions, summarised:
@@ -455,7 +471,12 @@ End-to-end behavioral assertions, summarised:
 - **Task mode** lands in `completed` for an actor that finishes in any terminal state, including `FAILED`.
 - **Synthetic infra failure** (invalid actor, sandboxed revoked token) lands in task `failed` and populates `task.statusMessage`.
 - **Push notifications**: at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`. A heartbeat fires after ~45 s of `statusMessage` silence (test-mode override to keep the suite fast).
-- **Cancellation**: `tasks/cancel` mid-run results in the underlying Apify run reaching `ABORTED`; task transitions to `cancelled`; a `tasks/status: cancelled` notification fires. Cancel-before-start results in an `ABORTED` run (no un-aborted orphan).
+- **Cancellation**: `tasks/cancel` mid-run results in the underlying Apify run reaching `ABORTED`; task transitions to `cancelled` **before** the cancel response is sent; a `tasks/status: cancelled` notification fires. Cancel-before-start results in an `ABORTED` run (no un-aborted orphan).
+- **Cancel of terminal task** is rejected with JSON-RPC error `-32602`, message naming the current status.
+- **`_meta.related-task` on `tasks/result`**: the `CallToolResult` returned through `tasks/result` includes `_meta: { "io.modelcontextprotocol/related-task": { taskId } }`. (Progress notifications already covered by existing tests.)
+- **`notifications/tasks/status` payload**: every emission contains the full `Task` object (taskId, status, createdAt, lastUpdatedAt, ttl, optional statusMessage/pollInterval). Heartbeats advance `lastUpdatedAt` rather than emitting with stale fields.
+- **`CreateTaskResult` shape**: `tools/call` with `task: { ttl }` returns `{ task: { taskId, status: "working", ... } }` — nested, not flat.
+- **`taskSupport` placement**: `tools/list` reports `call-actor.execution.taskSupport === "optional"`; other v4 tools either omit `execution` or set `taskSupport: "forbidden"`.
 - **Task mode override**: `task: {...}` plus deprecated `async: true` does not short-circuit the task; it waits until terminal.
 - **MCP-server pass-through**: `actor: "name:tool"` returns the remote MCP tool result, not the canonical shape; `responseVersion` is absent on this path.
 - **`callOptions` allowlist**: rejects `waitForFinish`, `webhooks`, `contentType`, `forcePermissionLevel`, `restartOnError`, `proxy`, and unknown keys.
