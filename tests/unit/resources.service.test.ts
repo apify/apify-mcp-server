@@ -20,9 +20,9 @@ const buildAvailableWidget = (uri: string, exists: boolean): AvailableWidget => 
     exists,
 });
 
-describe('createResourceService', () => {
-    describe('listResources', () => {
-        it('should list the Skyfire readme only when enabled', async () => {
+describe('createResourceService()', () => {
+    describe('listResources()', () => {
+        it('lists the Skyfire readme only when enabled', async () => {
             const skyfireService = createResourceService({
                 getMode: () => 'default',
                 paymentProvider: await resolvePaymentProvider('skyfire'),
@@ -41,7 +41,7 @@ describe('createResourceService', () => {
             expect(defaultResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
         });
 
-        it('should not list the readme when the provider returns no usage guide', async () => {
+        it('does not list the readme when the provider returns no usage guide', async () => {
             const provider = { getUsageGuide: () => null } as unknown as PaymentProvider;
             const service = createResourceService({
                 getMode: () => 'default',
@@ -54,7 +54,7 @@ describe('createResourceService', () => {
             expect(resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
         });
 
-        it('should list apps widgets only when their files exist', async () => {
+        it('lists apps widgets only when their files exist', async () => {
             const widgets = new Map<string, AvailableWidget>([
                 [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
                 [WIDGET_URIS.ACTOR_RUN, buildAvailableWidget(WIDGET_URIS.ACTOR_RUN, false)],
@@ -70,8 +70,8 @@ describe('createResourceService', () => {
         });
     });
 
-    describe('readResource', () => {
-        it('should return the Skyfire readme content', async () => {
+    describe('readResource()', () => {
+        it('returns the Skyfire readme content', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 paymentProvider: await resolvePaymentProvider('skyfire'),
@@ -84,7 +84,7 @@ describe('createResourceService', () => {
             expect(result.contents[0].mimeType).toBe('text/markdown');
         });
 
-        it('should return a plain-text fallback for an unknown URI', async () => {
+        it('returns a plain-text fallback for an unknown URI', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
@@ -96,7 +96,7 @@ describe('createResourceService', () => {
             expect(result.contents[0].mimeType).toBe('text/plain');
         });
 
-        it('should return widget HTML when the widget exists', async () => {
+        it('returns widget HTML when the widget exists', async () => {
             const fs = await import('node:fs');
             const readFileSync = vi.mocked(fs.readFileSync);
             readFileSync.mockReturnValue('console.log("widget");');
@@ -116,7 +116,7 @@ describe('createResourceService', () => {
             expect(result.contents[0].html).toContain('<script type="module">console.log("widget");</script>');
         });
 
-        it('should return a plain-text fallback for a widget URI not in the registry', async () => {
+        it('returns a plain-text fallback for a widget URI not in the registry', async () => {
             const service = createResourceService({
                 getMode: () => 'apps',
                 getAvailableWidgets: () => new Map(),
@@ -128,7 +128,7 @@ describe('createResourceService', () => {
             expect(result.contents[0].mimeType).toBe('text/plain');
         });
 
-        it('should return a plain-text fallback when the widget file is missing on disk', async () => {
+        it('returns a plain-text fallback when the widget file is missing on disk', async () => {
             const widgets = new Map<string, AvailableWidget>([
                 [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, false)],
             ]);
@@ -145,8 +145,8 @@ describe('createResourceService', () => {
         });
     });
 
-    describe('listResourceTemplates', () => {
-        it('should return an empty list', async () => {
+    describe('listResourceTemplates()', () => {
+        it('returns an empty list', async () => {
             const service = createResourceService({
                 getMode: () => 'default',
                 getAvailableWidgets: () => new Map(),
