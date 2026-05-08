@@ -5,7 +5,6 @@
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
-import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
@@ -17,6 +16,7 @@ import { parseBooleanOrNull } from '@apify/utilities';
 
 import { ApifyClient } from './apify_client.js';
 import { ActorsMcpServer } from './mcp/server.js';
+import { ApifyInMemoryTaskStore } from './mcp/task_store.js';
 import { resolvePaymentProvider } from './payments/index.js';
 import type { ApifyRequestParams } from './types.js';
 import { parseServerMode } from './utils/server_mode.js';
@@ -37,7 +37,7 @@ export function createExpressApp(): express.Express {
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
     const transportsSSE: { [sessionId: string]: SSEServerTransport } = {};
     const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
-    const taskStore = new InMemoryTaskStore();
+    const taskStore = new ApifyInMemoryTaskStore();
 
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
         if (statusCode >= 500) {
