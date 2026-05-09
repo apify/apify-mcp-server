@@ -12,7 +12,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 1. `get-dataset-items` becomes the canonical retrieval tool — auto-flattens dot-notation fields. Storage IDs the agent needs (`datasetId`, `storeId`) are surfaced in `storages.*.id` and embedded directly in the response's `nextStep` text, so the agent can act without parsing `structuredContent`.
 2. `abort-actor-run` is promoted into the actor workflow.
 3. `get-key-value-store-record` is promoted into the actor workflow; the response surfaces the list of KV store keys so the agent can fetch what it needs.
-4. Task mode gains real push notifications (`notifications/tasks/status` + heartbeat) and real cancellation (cancel actually aborts the Apify run).
+4. Task mode gains real push notifications (`notifications/tasks/status` on every state change) and real cancellation (cancel actually aborts the Apify run).
 
 **The public tool name stays `call-actor`.** The cleaner name `run-actor` is a separate, later migration — this PR already changes too much to add a name change on top.
 
@@ -40,7 +40,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 2. **The LLM is a first-class consumer.** `summary` (past) and `nextStep` (one primary action) are part of the contract. Templates per status are locked, not free-form.
 3. **Hide footguns from the LLM.** Server translates Apify slash-notation to dot-notation. `get-dataset-items` auto-flattens parents when fields contain dots. The LLM never sees the Apify-API edge cases that bit it before.
 4. **Run status is observation, not tool failure.** `isError: true` is reserved for tool-side failures (auth, network, Zod validation). `FAILED` / `ABORTED` / `TIMED-OUT` are observed run outcomes, returned with `isError: false`.
-5. **Push, don't poll.** Task mode emits `notifications/tasks/status` on every state change and heartbeats every ~45 s of silence so clients can verify liveness without tripping the common 60 s client-side tool-call timeout.
+5. **Push state changes, fall back to poll.** Task mode emits `notifications/tasks/status` on every state change. Per the MCP spec the notification is `MAY` (clients must not depend on it), so SDK clients also poll `tasks/get` at the task's `pollInterval` — the push is a UX win, not a transport-keepalive mechanism.
 6. **Cancellation is propagation, not bookkeeping.** `tasks/cancel` aborts the in-flight Apify run, not just the task store entry.
 7. **Server returns shape, agent fetches data.** No server-side previews of dataset items or KV record bodies. The response carries identifiers and key/field lists; the agent calls `get-dataset-items` or `get-key-value-store-record` when it needs values. Truncation of the metadata itself (e.g. capped key list) is observable through a count field.
 
@@ -50,7 +50,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 |---|---|
 | **T1** | `storages` is a subset of the Apify storage API: same field names as `apify-client.Dataset` and `KeyValueStore`, but timestamps are ISO 8601 strings, and fields that are required upstream are optional here when not yet known. We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus redundant `accessedAt`. We add two fields: `storages.keyValueStore.keys` (string array, capped at 50 names) and `storages.keyValueStore.keyCount` (total key count). The dataset block carries `fields` (dot notation) but no item samples. |
 | **T2** | `summary` describes the past. `nextStep` prescribes one primary action. Both camelCase to match the rest of the response. |
-| **R1** | Push notifications are required server work. Emit `notifications/tasks/status` on every task state change AND a heartbeat every ~45 s of silence while a task is still working. The interval stays under the common 60 s client-side tool-call timeout so heartbeats actually keep the connection live. `notifications/progress` already emits today on actor state change; only `tasks/status` is missing. |
+| **R1** | Emit `notifications/tasks/status` on every task state change (start → working, on `statusMessage` change, on terminal). No heartbeat: in task mode `tools/call` returns immediately with `CreateTaskResult`, so there is no held-open request to time out, and the SDK client falls back to `tasks/get` polling per spec. `notifications/progress` already emits today on actor state change; only `tasks/status` was missing. |
 | **R4** | Keep `call-actor`; defer the `run-actor` rename. The current name is referenced across the public repo, internal repo tests, UI constants, examples, docs, and the MCP Apps widget wiring; combining identity rename with this contract change would make regressions hard to isolate. Plan rename as a separate migration once this contract is stable. |
 | **Q2** | `get-actor-run` mirrors `call-actor`'s canonical shape, including `storages.dataset.fields` and `storages.keyValueStore.{keys,keyCount}` when available. |
 | **Q3** | `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run` become available in actor-running workflows through loader auto-injection. Default categories stay unchanged. `get-actor-output` remains available for one minor cycle, deprecated, ordered after `get-dataset-items`. |
@@ -213,7 +213,7 @@ Implementation reuses the existing `ProgressTracker` (`src/utils/progress.ts`) t
 Task mode is selected when the client passes `task: {...}` on `tools/call`. The server returns `CreateTaskResult` immediately and runs the underlying tool in the background until terminal or cancelled.
 
 - `waitSecs` and `async` from the args are **overridden** at the task boundary. The task always waits until terminal — honoring `async: true` would let the task complete the moment the actor started, which is wrong. If the caller sends both `task: {...}` and `async: true`, log a deprecation event but still wait until terminal.
-- Push notifications: `notifications/tasks/status` emits on every state change and heartbeats every ~45 s of silence. The 45 s interval stays under the 60 s tool-call/connection timeout that several MCP clients impose, so heartbeats actually keep the channel live.
+- Push notifications: `notifications/tasks/status` emits on every state change (start → working, on `statusMessage` change, on terminal). No heartbeat — `tools/call` in task mode returns immediately, and per spec `notifications/tasks/status` is `MAY` so clients must not depend on it; the SDK client polls `tasks/get` regardless.
 - `tasks/result` returns the canonical shape (same as sync mode).
 - See **Cancellation** below.
 
@@ -380,7 +380,7 @@ sequenceDiagram
   Client->>Server: tools/call + task:{ttl:600000} + _meta:{progressToken:"p1"}
   Server-->>Client: CreateTaskResult{task:{taskId,status:working,createdAt,lastUpdatedAt,ttl,pollInterval:5000}}
   Server-)Apify: start + waitForFinish
-  Note over Server: state change OR ~45s silence -> emit task status
+  Note over Server: emit task status on each state change
   Apify--)Server: statusMessage: "Crawling page 5/20"
   Server--)Client: notifications/progress{progressToken:p1, progress:N, message:"apify/x: Crawling page 5/20"}
   Server--)Client: notifications/tasks/status{taskId, status:working, statusMessage:"apify/x: Crawling page 5/20"}
@@ -417,7 +417,6 @@ sequenceDiagram
 | `actorId` added; `actorName` becomes optional | Soft (additive). `actorName` was never present on the shipped `call-actor` shape and was already optional on `get-actor-run`. |
 | `statusMessage` and `exitCode` added at top level | Soft. Additive. |
 | `tasks/cancel` now propagates to `run.abort()` | Soft (bug fix). The current behavior — orphaned runs continuing after cancel — is an oversight, not load-bearing semantics. |
-| Task heartbeat every ~45 s of silence | Soft. Additive. Interval picked to stay under the 60 s client-side connection/tool-call timeout. |
 | Task mode forces `waitSecs` to wait-until-terminal and ignores `async: true` | Soft. Additive defensive behavior. |
 | `actor: "name:tool"` MCP-server pass-through is excluded from the canonical shape | No new behavior; the doc just admits the carve-out exists. |
 
@@ -440,7 +439,7 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 
 ## Risks and open questions
 
-- **`waitSecs` and heartbeat at 45 s.** Chosen against the 60 s tool-call/connection timeout common to several MCP clients. Tune downward if a client surfaces a tighter ceiling; tune upward only with telemetry confirming everyone in scope is comfortably above the new value.
+- **`waitSecs` cap at 45 s.** Chosen against the 60 s tool-call timeout common to several MCP clients (this cap applies to sync mode where `tools/call` is held open; task mode is unaffected because `tools/call` returns immediately). Tune downward if a client surfaces a tighter ceiling; tune upward only with telemetry confirming everyone in scope is comfortably above the new value.
 - **Cancellation race window.** Cancel-before-start does create a brief Apify run that is then aborted. We accept this and assert "no un-aborted orphan." If accounting becomes a problem, the alternative is to delay run creation until after a debounce, which adds latency to the common case.
 - **`keys` cap at 50.** Picked as a safe ceiling. Actors that write hundreds of small KV records (rare) will see a truncated list with `keyCount` reflecting the total, and the agent fetches by name. Tune if telemetry shows real actors with 50+ semantically meaningful keys.
 - **Free-form `statusMessage`.** Actor authors set it. Some are useful ("Crawling page 5/20"), some are noise. Templates pass it through verbatim; we accept variability rather than try to normalize.
@@ -452,7 +451,7 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 - Convert direct actor tools (e.g. `apify--rag-web-browser`) to the canonical shape — separate PR.
 - Remove deprecated `async`, `previewOutput`, and `get-actor-output` — next minor cycle.
 - `taskSupport` on `get-actor-run` — revisit after task adoption is measured.
-- `waitSecs` / heartbeat interval tuning — based on real telemetry; 45 s is the conservative starting point.
+- `waitSecs` ceiling tuning — based on real telemetry; 45 s is the conservative starting point.
 - Convert MCP-server pass-through (`actor:tool`) to a uniform shape — orthogonal redesign.
 
 ## MCP spec compliance
@@ -462,7 +461,7 @@ Verified against the live [tasks spec](https://modelcontextprotocol.io/specifica
 - **Statuses:** v4 emits `working`, `completed`, `failed`, `cancelled`. `input_required` is intentionally unused (no elicitation). Any observed Apify terminal → task `completed` with `isError: false`; tool-side failure → task `failed` with `isError: true`.
 - **`CreateTaskResult` is nested:** `{ task: { taskId, status, createdAt, lastUpdatedAt, ttl, pollInterval? } }`. Flat shapes are non-compliant.
 - **`call-actor` declares `Tool.execution.taskSupport: "optional"`** (nested under `execution`). Other v4 tools omit it (default: `forbidden`).
-- **`notifications/tasks/status` payload** is the full `Task` object per `TaskStatusNotificationParams = NotificationParams & Task`. Heartbeats are not no-ops — each emission advances `lastUpdatedAt`, which is itself a state change. The notification is `MAY` per spec; clients must not rely on it.
+- **`notifications/tasks/status` payload** is the full `Task` object per `TaskStatusNotificationParams = NotificationParams & Task`. The notification is `MAY` per spec; clients must not rely on it (SDK clients fall back to `tasks/get` polling).
 - **`io.modelcontextprotocol/related-task` `_meta` key** is a spec MUST on (a) the `CallToolResult` returned via `tasks/result` and (b) progress notifications. (b) is already wired (`src/utils/progress.ts`); (a) is an implementation item this PR adds. Omitted from `tasks/get` / `tasks/list` / `tasks/cancel` and from `notifications/tasks/status` (taskId is in the message structure). Coexists with the namespaced `com.apify/ActorRun` usage block under the same `_meta` record.
 - **`tasks/cancel` MUSTs:** reject terminal-status tasks with `-32602`; transition the task to `cancelled` before sending the response (Apify abort propagates async — see Cancellation above).
 
@@ -478,12 +477,12 @@ End-to-end behavioral assertions, summarised:
 - **KV-only actor**: `storages.keyValueStore.{id,keys}` lists the store ID and keys (including `OUTPUT`); the response carries no record body. The `nextStep` directs the agent at `get-key-value-store-record(storeId, recordKey="OUTPUT")` with the store ID interpolated.
 - **Task mode** lands in `completed` for an actor that finishes in any terminal state, including `FAILED`.
 - **Synthetic infra failure** (invalid actor, sandboxed revoked token) lands in task `failed` and populates `task.statusMessage`.
-- **Push notifications**: at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`. A heartbeat fires after ~45 s of `statusMessage` silence (test-mode override to keep the suite fast).
+- **Push notifications**: at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`.
 - **Progress on `get-actor-run` waits**: when invoked with `waitSecs > 0` and `_meta.progressToken`, the server emits `notifications/progress` carrying that token on each `run.statusMessage` change observed during the wait. No emissions when `progressToken` is absent.
 - **Cancellation**: `tasks/cancel` mid-run results in the underlying Apify run reaching `ABORTED`; task transitions to `cancelled` **before** the cancel response is sent; a `tasks/status: cancelled` notification fires. Cancel-before-start results in an `ABORTED` run (no un-aborted orphan).
 - **Cancel of terminal task** is rejected with JSON-RPC error `-32602`, message naming the current status.
 - **`_meta.related-task` on `tasks/result`**: the `CallToolResult` returned through `tasks/result` includes `_meta: { "io.modelcontextprotocol/related-task": { taskId } }`. (Progress notifications already covered by existing tests.)
-- **`notifications/tasks/status` payload**: every emission contains the full `Task` object (taskId, status, createdAt, lastUpdatedAt, ttl, optional statusMessage/pollInterval). Heartbeats advance `lastUpdatedAt` rather than emitting with stale fields.
+- **`notifications/tasks/status` payload**: every emission contains the full `Task` object (taskId, status, createdAt, lastUpdatedAt, ttl, optional statusMessage/pollInterval).
 - **`CreateTaskResult` shape**: `tools/call` with `task: { ttl }` returns `{ task: { taskId, status: "working", ... } }` — nested, not flat.
 - **`taskSupport` placement**: `tools/list` reports `call-actor.execution.taskSupport === "optional"`; other v4 tools either omit `execution` or set `taskSupport: "forbidden"`.
 - **Task mode override**: `task: {...}` plus deprecated `async: true` does not short-circuit the task; it waits until terminal.
@@ -509,6 +508,6 @@ Notes:
 - The mcpc bridge is established once per workspace; agents do not need to re-run `mcpc connect`.
 - Probes that actually hit the Apify API (everything except validation/auth-failure paths) require a real `APIFY_TOKEN` in the server env; agents must ask the user for one rather than committing or logging it.
 - Use `--json` piped through `jq` to assert on response shape. No inline Python.
-- Notification-stream tests (task heartbeats, `notifications/tasks/status`, progress events) use mcpc's notification capture; the suite-level harness can mirror those assertions for CI.
+- Notification-stream tests (`notifications/tasks/status`, progress events) use mcpc's notification capture; the suite-level harness can mirror those assertions for CI.
 
 The behavioural list above maps 1:1 onto mcpc-driven test cases. Programmatic equivalents land in `tests/integration/suite.ts` — the shared suite used by both stdio and streamable-HTTP transports — and run via `npm run test:integration` with a real token. New cases must go in `suite.ts`, not in standalone files. Integration runs are humans/CI only; agents drive mcpc instead.
