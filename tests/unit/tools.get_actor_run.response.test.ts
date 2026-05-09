@@ -10,8 +10,8 @@ import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 /**
- * Default mode `get-actor-run` returns: responseVersion, runId, actorId, status, storages,
- * summary, nextStep — with no inlined dataset items or KV record bodies.
+ * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
+ * — with no inlined dataset items or KV record bodies.
  * Tests cover all 8 status templates plus shape invariants.
  */
 
@@ -96,7 +96,6 @@ describe('get-actor-run default response', () => {
             _meta?: Record<string, unknown>;
         };
 
-        expect(structuredContent.responseVersion).toBe('v4');
         expect(structuredContent.runId).toBe('run-1');
         expect(structuredContent.actorId).toBe('actor-id-1');
         expect(structuredContent.actorName).toBe('apify/rag-web-browser');

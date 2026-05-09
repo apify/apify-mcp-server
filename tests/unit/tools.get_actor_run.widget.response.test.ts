@@ -60,7 +60,6 @@ describe('get-actor-run-widget response', () => {
             _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
         };
 
-        expect(structuredContent.responseVersion).toBe('v4');
         expect(structuredContent.runId).toBe('run-widget-1');
         expect(structuredContent.actorId).toBe('actor-id-rag');
         expect(structuredContent.actorName).toBe('apify/rag-web-browser');

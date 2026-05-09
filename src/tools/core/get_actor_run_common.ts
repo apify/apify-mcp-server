@@ -13,9 +13,6 @@ import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
-/** Bumped on breaking shape changes; additive changes do not bump. */
-export const RESPONSE_VERSION = 'v4';
-
 /** Cap on `storages.keyValueStore.keys` array length. */
 export const KV_KEYS_LIMIT = 50;
 
@@ -123,7 +120,6 @@ export type RunKeyValueStore = {
 };
 
 export type RunResponse = {
-    responseVersion: typeof RESPONSE_VERSION;
     runId: string;
     actorId: string;
     actorName?: string;
@@ -164,7 +160,7 @@ function slashToDot(field: string): string {
  * an unnamed default dataset's `name`), and the response shape declares no nullable fields, so we
  * filter both to keep the response clean and pass `getActorRunOutputSchema` validation.
  */
-function compact<T extends Record<string, unknown>>(obj: T): T {
+function omitNullish<T extends Record<string, unknown>>(obj: T): T {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
         if (v !== undefined && v !== null) out[k] = v;
@@ -180,7 +176,7 @@ function toIsoString(value: Date | string | undefined | null): string | undefine
 function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     const stats = run.stats as ActorRun['stats'] | undefined;
     if (!stats) return undefined;
-    const out = compact({
+    const out = omitNullish({
         runTimeSecs: stats.runTimeSecs,
         computeUnits: stats.computeUnits,
         memMaxBytes: stats.memMaxBytes,
@@ -188,12 +184,12 @@ function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function buildDatasetBlock(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset | undefined {
+function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset | undefined {
     if (!run.defaultDatasetId) return undefined;
     if (!datasetMeta) {
         return { id: run.defaultDatasetId };
     }
-    return compact({
+    return omitNullish({
         id: datasetMeta.id,
         name: datasetMeta.name,
         title: datasetMeta.title,
@@ -202,11 +198,11 @@ function buildDatasetBlock(run: ActorRun, datasetMeta: Dataset | null, resolvedI
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
         fields: datasetMeta.fields?.map(slashToDot),
-        stats: datasetMeta.stats ? compact({ ...datasetMeta.stats }) : undefined,
+        stats: datasetMeta.stats ? omitNullish({ ...datasetMeta.stats }) : undefined,
     });
 }
 
-function buildKeyValueStoreBlock(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore | undefined {
+function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore | undefined {
     if (!run.defaultKeyValueStoreId) return undefined;
     if (!listKeysResult) {
         return { id: run.defaultKeyValueStoreId };
@@ -216,7 +212,7 @@ function buildKeyValueStoreBlock(run: ActorRun, listKeysResult: KeyValueClientLi
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
     const keyCount = listKeysResult.isTruncated ? undefined : keys.length;
-    return compact({
+    return omitNullish({
         id: run.defaultKeyValueStoreId,
         keys,
         keyCount,
@@ -321,7 +317,7 @@ export function buildStatusTemplate(params: {
     const datasetId = dataset?.id;
     const kvId = keyValueStore?.id;
     const keys = keyValueStore?.keys ?? [];
-    // `buildKeyValueStoreBlock` omits `keyCount` on truncation so callers can detect partial pages.
+    // `buildRunKeyValueStore` omits `keyCount` on truncation so callers can detect partial pages.
     // Surface the truncation in the summary instead of silently substituting `keys.length`.
     const reportedKeyCount = keyValueStore?.keyCount;
     const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
@@ -503,27 +499,26 @@ export async function fetchActorRunData(params: {
     }
 
     const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetRead.value, mcpSessionId);
-    const dataset = buildDatasetBlock(run, datasetRead.value, resolvedItemCount);
-    const keyValueStore = buildKeyValueStoreBlock(run, kvRead.value);
+    const dataset = buildRunDataset(run, datasetRead.value, resolvedItemCount);
+    const keyValueStore = buildRunKeyValueStore(run, kvRead.value);
     const storageReadFailed = datasetRead.failed || kvRead.failed;
     const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore, storageReadFailed });
     const actorName = await actorNamePromise;
 
-    const structuredContent: RunResponse = compact({
-        responseVersion: RESPONSE_VERSION,
+    const structuredContent: RunResponse = {
         runId: run.id,
         actorId: run.actId,
         actorName,
         status: run.status,
-        statusMessage: run.statusMessage,
-        exitCode: run.exitCode,
+        statusMessage: run.statusMessage ?? undefined,
+        exitCode: run.exitCode ?? undefined,
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
-        storages: compact({ dataset, keyValueStore }),
+        storages: { dataset, keyValueStore },
         summary,
         nextStep,
-    });
+    };
 
     return { result: { run, structuredContent } };
 }

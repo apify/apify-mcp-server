@@ -299,7 +299,6 @@ const runStorageStats = {
 export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
-        responseVersion: { type: 'string', description: 'Run-response version (e.g. "v4")' },
         runId: { type: 'string', description: 'Actor run ID' },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
         actorName: { type: 'string', description: '"username/actor-name"; may be omitted if actor record fetch fails' },
@@ -363,7 +362,7 @@ export const getActorRunOutputSchema = {
         summary: { type: 'string', description: 'Past-tense summary of the run state' },
         nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
     },
-    required: ['responseVersion', 'runId', 'actorId', 'status', 'storages', 'summary', 'nextStep'],
+    required: ['runId', 'actorId', 'status', 'storages', 'summary', 'nextStep'],
 };
 
 /**
