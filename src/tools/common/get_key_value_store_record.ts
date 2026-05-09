@@ -5,7 +5,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    storeId: z.string()
+    keyValueStoreId: z.string()
         .min(1)
         .describe('Key-value store ID or username~store-name'),
     recordKey: z.string()
@@ -41,7 +41,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
-        const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
+        const record = await client.keyValueStore(parsed.keyValueStoreId).getRecord(parsed.recordKey);
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
     },
 } as const);

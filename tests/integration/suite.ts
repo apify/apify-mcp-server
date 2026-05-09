@@ -2045,7 +2045,7 @@ export function createIntegrationTestsSuite(
 
                 const kvResult = await client.callTool({
                     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                    arguments: { storeId: runData.defaultKeyValueStoreId!, recordKey: 'INPUT' },
+                    arguments: { keyValueStoreId: runData.defaultKeyValueStoreId!, recordKey: 'INPUT' },
                 });
                 expect(kvResult.isError).not.toBe(true);
                 expect((kvResult.content as { text: string }[])[0].text).toContain('apify.com');
@@ -2053,12 +2053,12 @@ export function createIntegrationTestsSuite(
             });
         });
 
-        it('rejects get-key-value-store-record when required storeId is missing', async () => {
+        it('rejects get-key-value-store-record when required keyValueStoreId is missing', async () => {
             client = await createClientFn({ tools: ['storage'] });
             await expect(client.callTool({
                 name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
                 arguments: { recordKey: 'INPUT' },
-            })).rejects.toThrow(/must have required property 'storeId'/);
+            })).rejects.toThrow(/must have required property 'keyValueStoreId'/);
             await client.close();
         });
 
