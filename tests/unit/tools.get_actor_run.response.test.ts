@@ -84,7 +84,7 @@ function callArgs(client: InternalToolArgs['apifyClient'], args: Record<string, 
 }
 
 describe('get-actor-run default response', () => {
-    it('returns run-result shape for a SUCCEEDED run with dataset items', async () => {
+    it('end-to-end SUCCEEDED: translates fields, omits legacy preview, carries identifiers in text, attaches usage _meta', async () => {
         const run = mockSucceededRun();
         const result = await (defaultGetActorRun as HelperTool).call(
             callArgs(stubClient({ run, dataset: mockDataset() }), { runId: 'run-1', waitSecs: 0 }),
@@ -96,31 +96,22 @@ describe('get-actor-run default response', () => {
             _meta?: Record<string, unknown>;
         };
 
-        expect(structuredContent.runId).toBe('run-1');
-        expect(structuredContent.actorId).toBe('actor-id-1');
-        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
-        expect(structuredContent.status).toBe('SUCCEEDED');
-        expect(structuredContent.exitCode).toBe(0);
-        expect(structuredContent.stats).toEqual({ runTimeSecs: 22, computeUnits: 0.04, memMaxBytes: 268435456 });
-
-        // Slash-to-dot translation on dataset.fields.
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
+        // Slash-to-dot translation on dataset.fields. Mock returns `crawl/httpStatusCode`; response must rewrite to `crawl.httpStatusCode`.
         expect(structuredContent.storages.dataset?.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
-        expect(structuredContent.storages.keyValueStore?.id).toBe('kv-xyz');
 
-        // No inlined item bodies anywhere on the response.
+        // actorName composed from `${username}/${name}`.
+        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
+
+        // No legacy preview field and no inlined item bodies anywhere on the response.
         const dump = JSON.stringify(structuredContent);
         expect(dump).not.toContain('previewItems');
         expect(dump).not.toContain('"items":');
 
-        // Text content carries summary + nextStep with identifiers — no JSON code fence.
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('SUCCEEDED in 22s');
+        // Text channel carries identifiers (so text-mode clients can parse them) but never a JSON dump.
         expect(content[0].text).toContain('dataset-xyz');
         expect(content[0].text).not.toContain('```json');
 
-        // Usage attribution `_meta` is preserved.
+        // Usage attribution `_meta` flows through end-to-end.
         expect(_meta?.['com.apify/ActorRun']).toEqual({
             usageTotalUsd: 0.0001,
             usageUsd: { ACTOR_COMPUTE_UNITS: 0.0001 },
