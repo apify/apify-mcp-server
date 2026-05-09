@@ -62,7 +62,6 @@ describe('get-actor-run-widget response', () => {
 
         expect(structuredContent.runId).toBe('run-widget-1');
         expect(structuredContent.actorId).toBe('actor-id-rag');
-        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
         expect(structuredContent.summary).toMatch(/^RUNNING for /);

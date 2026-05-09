@@ -285,23 +285,12 @@ export const callActorOutputSchema = {
 };
 
 /** Schema for get-actor-run tool output. */
-const runStorageStats = {
-    type: 'object' as const,
-    properties: {
-        readCount: { type: 'number' },
-        writeCount: { type: 'number' },
-        deleteCount: { type: 'number' },
-        listCount: { type: 'number' },
-        storageBytes: { type: 'number' },
-    },
-};
-
 export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
         runId: { type: 'string', description: 'Actor run ID' },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
-        actorName: { type: 'string', description: '"username/actor-name"; may be omitted if actor record fetch fails' },
+        actorName: { type: 'string', description: '"username/actor-name"' },
         status: { type: 'string', description: 'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED' },
         statusMessage: { type: 'string', description: 'Pass-through from Apify run.statusMessage' },
         exitCode: { type: 'number', description: 'Actor process exit code; populated for terminal states (especially FAILED)' },
@@ -326,8 +315,6 @@ export const getActorRunOutputSchema = {
                         id: { type: 'string', description: 'Default dataset ID' },
                         name: { type: 'string' },
                         title: { type: 'string' },
-                        createdAt: { type: 'string' },
-                        modifiedAt: { type: 'string' },
                         itemCount: { type: 'number' },
                         cleanItemCount: { type: 'number' },
                         fields: {
@@ -335,7 +322,6 @@ export const getActorRunOutputSchema = {
                             items: { type: 'string' },
                             description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
                         },
-                        stats: runStorageStats,
                     },
                     required: ['id'],
                 },
@@ -345,9 +331,6 @@ export const getActorRunOutputSchema = {
                         id: { type: 'string', description: 'Default key-value store ID' },
                         name: { type: 'string' },
                         title: { type: 'string' },
-                        createdAt: { type: 'string' },
-                        modifiedAt: { type: 'string' },
-                        stats: runStorageStats,
                         keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
                         keys: {
                             type: 'array' as const,

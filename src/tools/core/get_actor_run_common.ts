@@ -88,33 +88,19 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
 // Response types
 // -----------------------------------------------------------------------------
 
-export type RunStorageStats = {
-    readCount?: number;
-    writeCount?: number;
-    deleteCount?: number;
-    listCount?: number;
-    storageBytes?: number;
-};
-
 export type RunDataset = {
     id: string;
     name?: string;
     title?: string;
-    createdAt?: string;
-    modifiedAt?: string;
     itemCount?: number;
     cleanItemCount?: number;
     fields?: string[];
-    stats?: RunStorageStats;
 };
 
 export type RunKeyValueStore = {
     id: string;
     name?: string;
     title?: string;
-    createdAt?: string;
-    modifiedAt?: string;
-    stats?: RunStorageStats;
     keyCount?: number;
     keys?: string[];
 };
@@ -193,12 +179,9 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
         id: datasetMeta.id,
         name: datasetMeta.name,
         title: datasetMeta.title,
-        createdAt: toIsoString(datasetMeta.createdAt),
-        modifiedAt: toIsoString(datasetMeta.modifiedAt),
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
         fields: datasetMeta.fields?.map(slashToDot),
-        stats: datasetMeta.stats ? omitNullish({ ...datasetMeta.stats }) : undefined,
     });
 }
 
@@ -212,11 +195,7 @@ function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientList
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
     const keyCount = listKeysResult.isTruncated ? undefined : keys.length;
-    return omitNullish({
-        id: run.defaultKeyValueStoreId,
-        keys,
-        keyCount,
-    });
+    return omitNullish({ id: run.defaultKeyValueStoreId, keys, keyCount });
 }
 
 function errMessage(error: unknown): string {
@@ -247,13 +226,13 @@ async function resolveItemCountWithLagFallback(
     }
 }
 
-async function resolveActorName(client: ApifyClient, actId: string | undefined, mcpSessionId?: string): Promise<string | undefined> {
-    if (!actId) return undefined;
+async function actorNameForActorId(client: ApifyClient, actorId: string | undefined, mcpSessionId?: string): Promise<string | undefined> {
+    if (!actorId) return undefined;
     try {
-        const actor = await client.actor(actId).get();
+        const actor = await client.actor(actorId).get();
         return actor ? `${actor.username}/${actor.name}` : undefined;
     } catch (error) {
-        log.warning('Failed to fetch actor name', { actId, mcpSessionId, errMessage: errMessage(error) });
+        log.warning('Failed to fetch actor name', { actId: actorId, mcpSessionId, errMessage: errMessage(error) });
         return undefined;
     }
 }
@@ -377,52 +356,45 @@ export function buildStatusTemplate(params: {
 // Wait + progress
 // -----------------------------------------------------------------------------
 
-/**
- * If the run isn't already terminal and `waitSecs > 0`, polls Apify up to `waitSecs` seconds and
- * (when a `progressTracker` is provided) emits `notifications/progress` on each statusMessage change.
- * Returns the final ActorRun snapshot.
- *
- * `actorNamePromise` is awaited only when needed for progress emission, so the actor-name fetch
- * runs in parallel with `waitForFinish` (saves a round-trip on the polling hot path).
- */
 async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
     waitSecs: number;
     progressTracker?: ProgressTracker | null;
-    actorNamePromise: Promise<string | undefined>;
-    initial: ActorRun;
-}): Promise<ActorRun> {
-    const { client, runId, waitSecs, progressTracker, actorNamePromise, initial } = opts;
+    mcpSessionId?: string;
+}): Promise<{ run: ActorRun; actorName: string | undefined } | null> {
+    const { client, runId, waitSecs, progressTracker, mcpSessionId } = opts;
 
-    if (waitSecs <= 0 || TERMINAL_RUN_STATUSES.has(initial.status)) {
-        return initial;
-    }
+    let run = await client.run(runId).get();
+    if (!run) return null;
 
-    if (progressTracker) {
-        const trackerLabel = (await actorNamePromise) ?? 'actor';
-        await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, initial));
-        progressTracker.startActorRunUpdates(runId, client, trackerLabel, initial);
-    }
+    const actorName = await actorNameForActorId(client, run.actId, mcpSessionId);
 
-    let waited: ActorRun;
-    try {
-        waited = await client.run(runId).waitForFinish({ waitSecs });
-    } finally {
-        progressTracker?.stop();
-    }
-
-    // The platform may write the final statusMessage just after the status flips; re-fetch on
-    // terminal so the response (and any final progress emission) sees the freshest snapshot.
-    if (TERMINAL_RUN_STATUSES.has(waited.status)) {
-        const finalRun = (await client.run(runId).get().catch(() => undefined)) ?? waited;
+    if (waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
-            const trackerLabel = (await actorNamePromise) ?? 'actor';
-            await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, finalRun));
+            const trackerLabel = actorName ?? 'actor';
+            await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, run));
+            progressTracker.startActorRunUpdates(runId, client, trackerLabel, run);
         }
-        return finalRun;
+
+        try {
+            run = await client.run(runId).waitForFinish({ waitSecs });
+        } finally {
+            progressTracker?.stop();
+        }
+
+        // The platform may write the final statusMessage just after the status flips; re-fetch on
+        // terminal so the response (and any final progress emission) sees the freshest snapshot.
+        if (TERMINAL_RUN_STATUSES.has(run.status)) {
+            const finalRun = (await client.run(runId).get().catch(() => undefined)) ?? run;
+            if (progressTracker) {
+                await progressTracker.updateProgress(formatRunStatusMessage(actorName ?? 'actor', finalRun));
+            }
+            run = finalRun;
+        }
     }
-    return waited;
+
+    return { run, actorName };
 }
 
 // -----------------------------------------------------------------------------
@@ -438,8 +410,8 @@ export async function fetchActorRunData(params: {
 }): Promise<{ error: object } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, mcpSessionId } = params;
 
-    const initialRun = await client.run(runId).get();
-    if (!initialRun) {
+    const result = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, mcpSessionId });
+    if (!result) {
         return {
             error: buildMCPResponse({
                 texts: [`Run with ID '${runId}' not found.`],
@@ -448,31 +420,26 @@ export async function fetchActorRunData(params: {
             }),
         };
     }
+    const { run, actorName } = result;
 
-    // Run the actor-name lookup in parallel with the wait — only awaited inside the wait helper
-    // when a progress tracker needs the label, and once at the end for the response field.
-    const actorNamePromise = resolveActorName(client, initialRun.actId, mcpSessionId);
-    const run = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, actorNamePromise, initial: initialRun });
+    log.debug('Get Actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
-    log.debug('Get actor run', { runId, status: run.status, mcpSessionId, waitSecs });
-
-    let datasetMeta: Dataset | null = null;
+    let datasetInfo: Dataset | null = null;
     let kvListResult: KeyValueClientListKeysResult | null = null;
 
     if (TERMINAL_RUN_STATUSES.has(run.status)) {
         if (run.defaultDatasetId) {
-            datasetMeta = (await client.dataset(run.defaultDatasetId).get()) ?? null;
+            datasetInfo = (await client.dataset(run.defaultDatasetId).get()) ?? null;
         }
         if (run.defaultKeyValueStoreId) {
             kvListResult = await client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT });
         }
     }
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetMeta, mcpSessionId);
-    const dataset = buildRunDataset(run, datasetMeta, resolvedItemCount);
+    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, mcpSessionId);
+    const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
     const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore });
-    const actorName = await actorNamePromise;
 
     const structuredContent: RunResponse = {
         runId: run.id,
