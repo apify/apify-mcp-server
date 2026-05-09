@@ -65,7 +65,6 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 
 ```json
 {
-  "responseVersion": "v4",
   "runId": "ABCD1234",
   "actorId": "abc...",
   "actorName": "apify/rag-web-browser",
@@ -99,7 +98,6 @@ Returned by `call-actor` and `get-actor-run` once Apify has created a run. Pre-r
 
 ```ts
 {
-  responseVersion: "v4",
   runId: string,
   actorId: string,                 // stable Apify actor ID from the run record; always present
   actorName?: string,              // canonical "username/actor-name" when resolvable; falls back to caller-provided name on call-actor; may be omitted on get-actor-run if actor record fetch fails
@@ -403,7 +401,6 @@ sequenceDiagram
 | `get-actor-run` emits `notifications/progress` during the wait when `_meta.progressToken` is provided | Soft. Additive, opt-in. Reuses the same `ProgressTracker` pattern wired into `call-actor` today. |
 | `isError` unified | Soft for tool-call semantics, but clients using task `status: failed` to detect actor failure must read inner `status` instead. |
 | `storages.keyValueStore.{keys,keyCount}` added | Soft. Additive. Replaces the inline-OUTPUT path that earlier drafts considered. |
-| `responseVersion: "v4"` added | Soft. Additive. |
 | `callOptions` accepts three new keys (`build`, `maxItems`, `maxTotalChargeUsd`) | Soft. Additive. Unknown keys keep being silently dropped. |
 | Status enum widened to all 8 Apify states | Soft. Additive. |
 | `actorId` added; `actorName` becomes optional | Soft (additive). `actorName` was never present on the shipped `call-actor` shape and was already optional on `get-actor-run`. |
@@ -437,7 +434,6 @@ The `get-actor-run-widget` tool itself takes only `runId` and always returns imm
 - **Cancellation race window.** Cancel-before-start does create a brief Apify run that is then aborted. We accept this and assert "no un-aborted orphan." If accounting becomes a problem, the alternative is to delay run creation until after a debounce, which adds latency to the common case.
 - **`keys` cap at 50.** Picked as a safe ceiling. Actors that write hundreds of small KV records (rare) will see a truncated list with `keyCount` reflecting the total, and the agent fetches by name. Tune if telemetry shows real actors with 50+ semantically meaningful keys.
 - **Free-form `statusMessage`.** Actor authors set it. Some are useful ("Crawling page 5/20"), some are noise. Templates pass it through verbatim; we accept variability rather than try to normalize.
-- **`responseVersion` versioning policy.** We bump to `v4`. Future breaking shape changes bump again; additive changes do not. Clients can feature-detect.
 - **`abort-actor-run` is intentionally not surfaced as a recovery hint for memory-quota errors.** Nudging the LLM toward "free capacity" risks aborting unrelated in-flight runs the user cares about. The recovery hint points at `callOptions.memory` and "wait for current runs to finish" only.
 
 ## Out of scope (deliberate deferrals)
@@ -481,14 +477,14 @@ End-to-end behavioral assertions, summarised:
 - **`CreateTaskResult` shape**: `tools/call` with `task: { ttl }` returns `{ task: { taskId, status: "working", ... } }` — nested, not flat.
 - **`taskSupport` placement**: `tools/list` reports `call-actor.execution.taskSupport === "optional"`; other v4 tools either omit `execution` or set `taskSupport: "forbidden"`.
 - **Task mode override**: `task: {...}` plus deprecated `async: true` does not short-circuit the task; it waits until terminal.
-- **MCP-server pass-through**: `actor: "name:tool"` returns the remote MCP tool result, not the canonical shape; `responseVersion` is absent on this path.
+- **MCP-server pass-through**: `actor: "name:tool"` returns the remote MCP tool result, not the canonical shape.
 - **`callOptions` accept-path**: each of `memory`, `timeout`, `build`, `maxItems`, `maxTotalChargeUsd` passes Zod parsing; `maxItems` is forwarded to `apifyClient.actor(...).start()` end-to-end against `apify/rag-web-browser`.
 - **`keys` cap**: a KV store with >50 keys returns the first 50 names with `keyCount` reflecting the total.
 - **Apps widget**: reads the new shape and polls with `waitSecs: 0`.
 
 ### How we test
 
-End-to-end coverage uses **mcpc against the local stdio build**. mcpc drives the actual MCP server over stdio (no HTTP harness, no UI), so assertions on `responseVersion`, `storages.*`, status templates, and notification streams reflect what real clients receive.
+End-to-end coverage uses **mcpc against the local stdio build**. mcpc drives the actual MCP server over stdio (no HTTP harness, no UI), so assertions on `storages.*`, status templates, and notification streams reflect what real clients receive.
 
 Workflow per code change:
 

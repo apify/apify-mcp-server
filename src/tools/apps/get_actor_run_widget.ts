@@ -67,9 +67,10 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
                 mcpSessionId,
             });
 
-            if ('error' in fetchResult) {
-                return fetchResult.error;
-            }
+            // Widget always passes waitSecs=0 with no abort signal, so 'aborted' is unreachable
+            // here — the discriminator just keeps the type-checker happy.
+            if ('aborted' in fetchResult) return {};
+            if ('error' in fetchResult) return fetchResult.error;
 
             return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: true });
         } catch (error) {

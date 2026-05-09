@@ -172,7 +172,7 @@ describe('get-actor-run default response', () => {
         expect(tool.ajvValidate({ runId: 'run-1', waitSecs: -1 })).toBe(false);
     });
 
-    it('reports unavailable storage instead of "no output" when dataset metadata fetch fails', async () => {
+    it('degrades gracefully when dataset metadata fetch fails: keeps SUCCEEDED, points at dataset', async () => {
         const run = mockSucceededRun();
         const client = {
             run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
@@ -187,9 +187,114 @@ describe('get-actor-run default response', () => {
         } as unknown as InternalToolArgs['apifyClient'];
 
         const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
-        const { content } = result as { content: { text: string }[] };
+        const { content, structuredContent, isError } = result as {
+            content: { text: string }[];
+            structuredContent: RunResponse;
+            isError?: boolean;
+        };
+
+        // The whole call must NOT hard-fail just because one metadata fetch errored.
+        expect(isError).not.toBe(true);
+        expect(structuredContent.status).toBe('SUCCEEDED');
+
+        // Dataset id is still surfaced (the agent can fetch items directly even without metadata).
+        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
+        expect(structuredContent.storages.dataset?.itemCount).toBeUndefined();
+        expect(structuredContent.storages.dataset?.fields).toBeUndefined();
+
+        // nextStep points at get-dataset-items, not the "no output / re-run" branch.
+        expect(structuredContent.nextStep).toContain('get-dataset-items');
+        expect(structuredContent.nextStep).toContain('datasetId=dataset-xyz');
         expect(content[0].text).not.toContain('No dataset items and no key-value records were found');
         expect(content[0].text).not.toMatch(/re-run/i);
+    });
+
+    it('degrades gracefully when KV listKeys fails: keeps dataset, omits KV', async () => {
+        const run = mockSucceededRun();
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => { throw new Error('transient KV error'); },
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        const { structuredContent, isError } = result as { structuredContent: RunResponse; isError?: boolean };
+
+        expect(isError).not.toBe(true);
+        expect(structuredContent.status).toBe('SUCCEEDED');
+        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        // KV id is still surfaced from the run record; the failed listKeys just leaves keys unknown.
+        expect(structuredContent.storages.keyValueStore?.id).toBe('kv-xyz');
+        expect(structuredContent.storages.keyValueStore?.keys).toBeUndefined();
+        expect(structuredContent.storages.keyValueStore?.keyCount).toBeUndefined();
+    });
+
+    it('emits progress with formatted status messages on wait + terminal flip', async () => {
+        // RUNNING with a non-terminal statusMessage at start; SUCCEEDED with a terminal statusMessage
+        // at end. formatRunStatusMessage suppresses non-terminal-marked statusMessages on terminal
+        // states, so the second emission must keep the terminal one.
+        const initialRun = {
+            ...mockSucceededRun({
+                status: 'RUNNING',
+                finishedAt: undefined,
+                statusMessage: 'Crawling 1/10',
+            }),
+            exitCode: undefined,
+        };
+        const finalRun = mockSucceededRun({
+            statusMessage: 'Done',
+            isStatusMessageTerminal: true,
+        });
+
+        let runFetchCount = 0;
+        const client = {
+            // First .get() returns RUNNING; the post-waitForFinish re-fetch returns the terminal run.
+            run: (_id: string) => ({
+                get: async () => {
+                    runFetchCount += 1;
+                    return runFetchCount === 1 ? initialRun : finalRun;
+                },
+                waitForFinish: async () => finalRun,
+            }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => mockDataset(),
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const updateProgressCalls: string[] = [];
+        const startActorRunUpdatesCalls: string[] = [];
+        let stopCount = 0;
+        const tracker = {
+            updateProgress: async (msg: string) => { updateProgressCalls.push(msg); },
+            startActorRunUpdates: (runId: string) => { startActorRunUpdatesCalls.push(runId); },
+            stop: () => { stopCount += 1; },
+        };
+
+        const baseArgs = callArgs(client, { runId: 'run-1', waitSecs: 5 });
+        await (defaultGetActorRun as HelperTool).call({
+            ...baseArgs,
+            progressTracker: tracker as unknown as InternalToolArgs['progressTracker'],
+        });
+
+        // Two emissions: pre-wait (initial RUNNING + non-terminal statusMessage) and post-wait
+        // (terminal SUCCEEDED + terminal-marked statusMessage). Format is `${actorName}: ${status}[ — ${msg}]`.
+        expect(updateProgressCalls).toEqual([
+            'apify/rag-web-browser: RUNNING — Crawling 1/10',
+            'apify/rag-web-browser: SUCCEEDED — Done',
+        ]);
+        expect(startActorRunUpdatesCalls).toEqual(['run-1']);
+        expect(stopCount).toBe(1);
     });
 
     it('returns isError on a missing run', async () => {

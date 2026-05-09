@@ -14,7 +14,7 @@ import {
 export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, progressTracker, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, progressTracker, mcpSessionId, extra } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
@@ -23,12 +23,14 @@ export const defaultGetActorRun: ToolEntry = Object.freeze({
                 waitSecs: parsed.waitSecs,
                 client,
                 progressTracker,
+                abortSignal: extra?.signal,
                 mcpSessionId,
             });
 
-            if ('error' in fetchResult) {
-                return fetchResult.error;
-            }
+            // Per MCP spec, receivers SHOULD NOT send a response for a cancelled request:
+            // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation
+            if ('aborted' in fetchResult) return {};
+            if ('error' in fetchResult) return fetchResult.error;
 
             return buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false });
         } catch (error) {

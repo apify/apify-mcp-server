@@ -22,6 +22,12 @@ export const WAIT_SECS_MAX = 45;
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */
 export const WAIT_SECS_DEFAULT = 30;
 
+/**
+ * `waitSecs` value advertised in `nextStep` poll hints. Lower than `WAIT_SECS_DEFAULT` because the agent
+ * is already known to be polling a non-terminal run — short cadence keeps it responsive without hammering.
+ */
+export const POLL_HINT_WAIT_SECS = 10;
+
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
@@ -190,6 +196,10 @@ function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientList
         return { id: run.defaultKeyValueStoreId };
     }
     const keys = listKeysResult.items.map((k) => k.key);
+    // Empty KV: surface only the id (matches non-terminal shape) instead of `keys: [], keyCount: 0`.
+    if (keys.length === 0 && !listKeysResult.isTruncated) {
+        return { id: run.defaultKeyValueStoreId };
+    }
     // The Apify listKeys endpoint does not report a true total. When the page is not truncated,
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
@@ -247,10 +257,10 @@ function elapsedSecs(run: ActorRun): number {
 }
 
 function pollHint(runId: string): string {
-    return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${WAIT_SECS_DEFAULT} to`;
+    return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${POLL_HINT_WAIT_SECS} to`;
 }
 
-    type KvSummary =
+type KvSummary =
     | { hasKv: true; kvId: string; keys: string[]; keyCountLabel: string; summarySuffix: string }
     | { hasKv: false; summarySuffix: '' };
 
@@ -280,17 +290,26 @@ function buildSucceededSummaryNextStep(
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
 ): { summary: string; nextStep: string } {
-    const itemCount = dataset?.itemCount ?? 0;
+    const itemCount = dataset?.itemCount;
     const datasetId = dataset?.id;
     const kv = summarizeKv(keyValueStore);
 
     // Dataset is primary. nextStep stays dataset-only (one primary action) but the summary mentions
     // KV when both exist so the caller can see the run also produced key-value records.
-    if (itemCount > 0 && datasetId) {
+    if (itemCount !== undefined && itemCount > 0 && datasetId) {
         const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project. Preview with limit=3.`,
+        };
+    }
+
+    // datasetId known but metadata unavailable (transient fetch failure on a terminal run). Don't
+    // claim "no output found" — point the agent at dataset items so they can verify directly.
+    if (itemCount === undefined && datasetId) {
+        return {
+            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${kv.summarySuffix}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to inspect output.`,
         };
     }
 
@@ -401,17 +420,25 @@ export function buildStatusSummaryNextStep(params: {
 // Wait + progress
 // -----------------------------------------------------------------------------
 
+type WaitResult =
+    | { kind: 'ok'; run: ActorRun; actorName: string | undefined }
+    | { kind: 'not-found' }
+    | { kind: 'aborted' };
+
 async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
     waitSecs: number;
     progressTracker?: ProgressTracker | null;
+    abortSignal?: AbortSignal;
     mcpSessionId?: string;
-}): Promise<{ run: ActorRun; actorName: string | undefined } | null> {
-    const { client, runId, waitSecs, progressTracker, mcpSessionId } = opts;
+}): Promise<WaitResult> {
+    const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId } = opts;
+
+    if (abortSignal?.aborted) return { kind: 'aborted' };
 
     let run = await client.run(runId).get();
-    if (!run) return null;
+    if (!run) return { kind: 'not-found' };
 
     const actorName = await actorNameForActorId(client, run.actId, mcpSessionId);
 
@@ -422,11 +449,29 @@ async function waitForRunWithProgress(opts: {
             progressTracker.startActorRunUpdates(runId, client, trackerLabel, run);
         }
 
+        // Race waitForFinish against the client's abort signal so a cancelled request returns
+        // promptly instead of blocking up to `waitSecs`. Unlike call-actor we do not abort the
+        // underlying run — get-actor-run is read-only.
+        const CLIENT_ABORT = Symbol('CLIENT_ABORT');
+        let abortListener: (() => void) | undefined;
+        const abortPromise = new Promise<typeof CLIENT_ABORT>((resolve) => {
+            abortListener = () => resolve(CLIENT_ABORT);
+            abortSignal?.addEventListener('abort', abortListener, { once: true });
+        });
+
+        let raced: ActorRun | typeof CLIENT_ABORT;
         try {
-            run = await client.run(runId).waitForFinish({ waitSecs });
+            raced = await Promise.race([
+                client.run(runId).waitForFinish({ waitSecs }),
+                ...(abortSignal ? [abortPromise] : []),
+            ]);
         } finally {
+            if (abortListener) abortSignal?.removeEventListener('abort', abortListener);
             progressTracker?.stop();
         }
+
+        if (raced === CLIENT_ABORT) return { kind: 'aborted' };
+        run = raced;
 
         // The platform may write the final statusMessage just after the status flips; re-fetch on
         // terminal so the response (and any final progress emission) sees the freshest snapshot.
@@ -439,7 +484,7 @@ async function waitForRunWithProgress(opts: {
         }
     }
 
-    return { run, actorName };
+    return { kind: 'ok', run, actorName };
 }
 
 // -----------------------------------------------------------------------------
@@ -451,12 +496,14 @@ export async function fetchActorRunData(params: {
     waitSecs: number;
     client: ApifyClient;
     progressTracker?: ProgressTracker | null;
+    abortSignal?: AbortSignal;
     mcpSessionId?: string;
-}): Promise<{ error: object } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, mcpSessionId } = params;
+}): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
+    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId } = params;
 
-    const result = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, mcpSessionId });
-    if (!result) {
+    const waitResult = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId });
+    if (waitResult.kind === 'aborted') return { aborted: true };
+    if (waitResult.kind === 'not-found') {
         return {
             error: buildMCPResponse({
                 texts: [`Run with ID '${runId}' not found.`],
@@ -465,7 +512,7 @@ export async function fetchActorRunData(params: {
             }),
         };
     }
-    const { run, actorName } = result;
+    const { run, actorName } = waitResult;
 
     log.debug('Get Actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
@@ -473,10 +520,25 @@ export async function fetchActorRunData(params: {
     let kvListResult: KeyValueClientListKeysResult | null = null;
 
     if (TERMINAL_RUN_STATUSES.has(run.status)) {
+        // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
+        // whole call. The response still carries the storage id, which is enough for the agent
+        // to fetch items / records directly.
         const [datasetFetched, kvFetched] = await Promise.all([
-            run.defaultDatasetId ? client.dataset(run.defaultDatasetId).get() : Promise.resolve(null),
+            run.defaultDatasetId
+                ? client.dataset(run.defaultDatasetId).get().catch((error) => {
+                    log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
+                    return null;
+                })
+                : Promise.resolve(null),
             run.defaultKeyValueStoreId
-                ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT })
+                ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
+                    log.warning('Failed to list KV store keys', {
+                        keyValueStoreId: run.defaultKeyValueStoreId,
+                        mcpSessionId,
+                        errMessage: errMessage(error),
+                    });
+                    return null;
+                })
                 : Promise.resolve(null),
         ]);
         datasetInfo = datasetFetched ?? null;
