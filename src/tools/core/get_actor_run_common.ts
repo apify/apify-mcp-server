@@ -231,7 +231,7 @@ function errMessage(error: unknown): string {
  *  `buildStatusTemplate` would mistake a transient read error for genuinely empty output. */
 type StorageRead<T> = { value: T | null; failed: boolean };
 
-async function tryGetDatasetMeta(client: ApifyClient, datasetId: string | undefined, mcpSessionId?: string): Promise<StorageRead<Dataset>> {
+async function getDataset(client: ApifyClient, datasetId: string | undefined, mcpSessionId?: string): Promise<StorageRead<Dataset>> {
     if (!datasetId) return { value: null, failed: false };
     try {
         return { value: (await client.dataset(datasetId).get()) ?? null, failed: false };
@@ -241,7 +241,7 @@ async function tryGetDatasetMeta(client: ApifyClient, datasetId: string | undefi
     }
 }
 
-async function tryListKvKeys(client: ApifyClient, kvStoreId: string | undefined, mcpSessionId?: string): Promise<StorageRead<KeyValueClientListKeysResult>> {
+async function listKvKeys(client: ApifyClient, kvStoreId: string | undefined, mcpSessionId?: string): Promise<StorageRead<KeyValueClientListKeysResult>> {
     if (!kvStoreId) return { value: null, failed: false };
     try {
         return { value: await client.keyValueStore(kvStoreId).listKeys({ limit: KV_KEYS_LIMIT }), failed: false };
@@ -497,8 +497,8 @@ export async function fetchActorRunData(params: {
     let kvRead: StorageRead<KeyValueClientListKeysResult> = { value: null, failed: false };
     if (TERMINAL_RUN_STATUSES.has(run.status)) {
         [datasetRead, kvRead] = await Promise.all([
-            tryGetDatasetMeta(client, run.defaultDatasetId, mcpSessionId),
-            tryListKvKeys(client, run.defaultKeyValueStoreId, mcpSessionId),
+            getDataset(client, run.defaultDatasetId, mcpSessionId),
+            listKvKeys(client, run.defaultKeyValueStoreId, mcpSessionId),
         ]);
     }
 
