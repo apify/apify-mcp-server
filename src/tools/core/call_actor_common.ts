@@ -302,6 +302,21 @@ export const callActorArgs = z.object({
                 Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
                 Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
             `),
+        build: z.string()
+            .optional()
+            .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
+        maxItems: z.number()
+            .int()
+            .positive()
+            .optional()
+            .describe(dedent`
+                Charge cap for pay-per-result Actors. Caps the number of dataset items billed for this run.
+                Does not limit how many items the Actor returns.
+            `),
+        maxTotalChargeUsd: z.number()
+            .positive()
+            .optional()
+            .describe('Charge cap in USD for pay-per-event Actors. Caps the total amount billed for this run.'),
     }).optional()
         .describe('Optional call options for the Actor run configuration.'),
 });

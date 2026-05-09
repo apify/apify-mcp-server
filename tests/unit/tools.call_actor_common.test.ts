@@ -8,6 +8,7 @@ import {
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
     buildStartAsyncResponse,
+    callActorArgs,
 } from '../../src/tools/core/call_actor_common.js';
 
 describe('call_actor_common', () => {
@@ -146,6 +147,33 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 403,
                 actorId: 'actor-456',
             }));
+        });
+    });
+
+    describe('callActorArgs.callOptions', () => {
+        const baseArgs = { actor: 'apify/rag-web-browser', input: { query: 'hello' } };
+
+        it.each([
+            ['memory', { memory: 1024 }],
+            ['timeout', { timeout: 60 }],
+            ['build', { build: 'latest' }],
+            ['maxItems', { maxItems: 3 }],
+            ['maxTotalChargeUsd', { maxTotalChargeUsd: 1.5 }],
+            ['memory + build', { memory: 1024, build: 'latest' }],
+        ])('accepts %s', (_name, callOptions) => {
+            const result = callActorArgs.safeParse({ ...baseArgs, callOptions });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.callOptions).toEqual(callOptions);
+            }
+        });
+
+        it('rejects negative maxItems', () => {
+            const result = callActorArgs.safeParse({
+                ...baseArgs,
+                callOptions: { maxItems: -1 },
+            });
+            expect(result.success).toBe(false);
         });
     });
 

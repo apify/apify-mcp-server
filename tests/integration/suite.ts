@@ -713,6 +713,24 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items).toEqual([]);
         });
 
+        it('should accept callOptions.maxItems on call-actor and run successfully', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: RAG_WEB_BROWSER,
+                    input: { query: 'hello', maxResults: 3 },
+                    callOptions: { maxItems: 3 },
+                },
+            });
+
+            expect(callResult.isError).not.toBe(true);
+            const content = callResult.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('completed successfully'))).toBe(true);
+            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+        });
+
         it('should return preview items by default in call-actor (previewOutput: true)', async () => {
             client = await createClientFn({ tools: ['actors'] });
 

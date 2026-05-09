@@ -425,8 +425,14 @@ export type ActorExecutionParams = {
     input: Record<string, unknown>;
     /** Apify client (may include payment headers) */
     apifyClient: ApifyClient;
-    /** Call options (memory, timeout) */
-    callOptions: { memory?: number; timeout?: number };
+    /** Call options forwarded to apifyClient.actor(...).start(input, callOptions) */
+    callOptions: {
+        memory?: number;
+        timeout?: number;
+        build?: string;
+        maxItems?: number;
+        maxTotalChargeUsd?: number;
+    };
     /** Progress tracker for sending progress notifications */
     progressTracker?: ProgressTracker | null;
     /** Signal for aborting the execution */
