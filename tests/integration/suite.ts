@@ -2692,7 +2692,7 @@ export function createIntegrationTestsSuite(
             },
         );
 
-        it('should return required structuredContent fields for get-actor-run', async () => {
+        it('returns canonical v4 structuredContent for get-actor-run', async () => {
             client = await createClientFn({ tools: ['actors', 'runs'] });
 
             // First, start an async actor run to get a runId
@@ -2708,36 +2708,50 @@ export function createIntegrationTestsSuite(
             const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
             const runId = resultWithStructured.structuredContent!.runId!;
 
-            // Now test get-actor-run
+            // Now test get-actor-run with waitSecs to drive it to terminal state.
             const runResult = await client.callTool({
                 name: HelperTools.ACTOR_RUNS_GET,
-                arguments: { runId },
+                arguments: { runId, waitSecs: 30 },
             });
 
             const runContent = runResult as { structuredContent?: {
+                responseVersion: string;
                 runId: string;
-                actorName: string;
+                actorId: string;
+                actorName?: string;
                 status: string;
-                startedAt: string;
-                dataset?: {
-                    datasetId: string;
-                    totalItemCount: number;
+                summary: string;
+                nextStep: string;
+                storages: {
+                    dataset?: { id: string; itemCount?: number; fields?: string[] };
+                    keyValueStore?: { id: string };
                 };
             } };
 
             expect(runContent.structuredContent).toBeDefined();
-            expect(runContent.structuredContent?.runId).toBeDefined();
-            expect(runContent.structuredContent?.actorName).toBeDefined();
+            expect(runContent.structuredContent?.responseVersion).toBe('v4');
+            expect(runContent.structuredContent?.runId).toBe(runId);
+            expect(runContent.structuredContent?.actorId).toBeDefined();
             expect(runContent.structuredContent?.status).toBeDefined();
-            expect(runContent.structuredContent?.startedAt).toBeDefined();
+            expect(runContent.structuredContent?.summary).toBeDefined();
+            expect(runContent.structuredContent?.nextStep).toBeDefined();
+            expect(runContent.structuredContent?.storages).toBeDefined();
 
-            // Wait for run to succeed to check dataset fields (might need polling in real scenario,
-            // but for integration test on python-example it might be fast enough or we check basic fields)
+            // No inlined dataset items or KV record bodies anywhere on the response.
+            const dump = JSON.stringify(runContent.structuredContent);
+            expect(dump).not.toContain('previewItems');
+
             if (runContent.structuredContent?.status === 'SUCCEEDED') {
-                expect(runContent.structuredContent?.dataset).toBeDefined();
-                expect(runContent.structuredContent?.dataset?.datasetId).toBeDefined();
-                expect(runContent.structuredContent?.dataset?.totalItemCount).toBeDefined();
+                expect(runContent.structuredContent?.storages.dataset?.id).toBeDefined();
             }
+        });
+
+        it('rejects get-actor-run waitSecs above 45', async () => {
+            client = await createClientFn({ tools: ['actors', 'runs'] });
+            await expect(client.callTool({
+                name: HelperTools.ACTOR_RUNS_GET,
+                arguments: { runId: 'unused', waitSecs: 46 },
+            })).rejects.toThrow();
         });
 
         it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {

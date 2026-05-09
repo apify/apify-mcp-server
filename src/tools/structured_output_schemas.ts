@@ -285,39 +285,88 @@ export const callActorOutputSchema = {
 };
 
 /**
- * Schema for get-actor-run tool output.
- * Contains full run information including status, timestamps, stats, and dataset preview.
+ * Schema for get-actor-run tool output (v4 canonical shape).
+ * See res/call_actor_redesign_v4.md § Canonical response shape.
  */
+const canonicalRunStorageStats = {
+    type: 'object' as const,
+    properties: {
+        readCount: { type: 'number' },
+        writeCount: { type: 'number' },
+        deleteCount: { type: 'number' },
+        listCount: { type: 'number' },
+        storageBytes: { type: 'number' },
+    },
+};
+
 export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
+        responseVersion: { type: 'string', description: 'Canonical run-response version (e.g. "v4")' },
         runId: { type: 'string', description: 'Actor run ID' },
-        actorName: { type: 'string', description: 'Name of the Actor' },
-        status: { type: 'string', description: 'Run status (READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT)' },
+        actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
+        actorName: { type: 'string', description: 'Canonical "username/actor-name"; may be omitted if actor record fetch fails' },
+        status: { type: 'string', description: 'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED' },
+        statusMessage: { type: 'string', description: 'Pass-through from Apify run.statusMessage' },
+        exitCode: { type: 'number', description: 'Actor process exit code; populated for terminal states (especially FAILED)' },
         startedAt: { type: 'string', description: 'ISO timestamp when the run started' },
-        finishedAt: { type: 'string', description: 'ISO timestamp when the run finished (only for completed runs)' },
+        finishedAt: { type: 'string', description: 'ISO timestamp when the run finished (terminal states only)' },
         stats: {
             type: 'object' as const,
-            description: 'Run statistics (compute units, memory, duration, etc.)',
-        },
-        dataset: {
-            type: 'object' as const,
-            description: 'Dataset information (only for completed runs with results)',
+            description: 'Run statistics',
             properties: {
-                datasetId: { type: 'string', description: 'Default dataset ID' },
-                totalItemCount: { type: 'number', description: 'Total number of items in dataset' },
-                previewItemCount: { type: 'number', description: 'Number of preview items returned' },
-                schema: { type: 'object' as const, description: 'Auto-generated JSON schema from dataset items' },
-                previewItems: {
-                    type: 'array' as const,
-                    items: { type: 'object' as const },
-                    description: 'Preview of first 5 dataset items',
+                runTimeSecs: { type: 'number' },
+                computeUnits: { type: 'number' },
+                memMaxBytes: { type: 'number' },
+            },
+        },
+        storages: {
+            type: 'object' as const,
+            description: 'Default dataset and key-value store identifiers and metadata',
+            properties: {
+                dataset: {
+                    type: 'object' as const,
+                    properties: {
+                        id: { type: 'string', description: 'Default dataset ID' },
+                        name: { type: 'string' },
+                        title: { type: 'string' },
+                        createdAt: { type: 'string' },
+                        modifiedAt: { type: 'string' },
+                        itemCount: { type: 'number' },
+                        cleanItemCount: { type: 'number' },
+                        fields: {
+                            type: 'array' as const,
+                            items: { type: 'string' },
+                            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+                        },
+                        stats: canonicalRunStorageStats,
+                    },
+                    required: ['id'],
+                },
+                keyValueStore: {
+                    type: 'object' as const,
+                    properties: {
+                        id: { type: 'string', description: 'Default key-value store ID' },
+                        name: { type: 'string' },
+                        title: { type: 'string' },
+                        createdAt: { type: 'string' },
+                        modifiedAt: { type: 'string' },
+                        stats: canonicalRunStorageStats,
+                        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+                        keys: {
+                            type: 'array' as const,
+                            items: { type: 'string' },
+                            description: 'Up to 50 key names',
+                        },
+                    },
+                    required: ['id'],
                 },
             },
-            required: ['datasetId', 'totalItemCount', 'previewItemCount', 'schema', 'previewItems'],
         },
+        summary: { type: 'string', description: 'Past-tense summary of the run state' },
+        nextStep: { type: 'string', description: 'One primary follow-up action with identifiers interpolated' },
     },
-    required: ['runId', 'status', 'startedAt'],
+    required: ['responseVersion', 'runId', 'actorId', 'status', 'storages', 'summary', 'nextStep'],
 };
 
 /**

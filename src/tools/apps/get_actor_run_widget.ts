@@ -10,18 +10,25 @@ import {
     buildGetActorRunError,
     buildGetActorRunSuccessResponse,
     fetchActorRunData,
+    WAIT_SECS_MAX,
 } from '../core/get_actor_run_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Widget-only input: `runId` only. In the normal tool path, AJV validation
- * runs first and strips unknown keys at the boundary; `.strict()` mainly
- * protects any bypass paths by rejecting stray keys before use here.
+ * Widget args. Default `waitSecs = 0` so the initial widget render is immediate; the widget UI
+ * polls with `waitSecs: 0` for the same reason. Strict so stray keys are rejected on bypass paths.
  */
 const getActorRunWidgetArgsSchema = z.object({
     runId: z.string()
         .min(1)
         .describe('The ID of the Actor run.'),
+    waitSecs: z.number()
+        .int()
+        .min(0)
+        .max(WAIT_SECS_MAX)
+        .optional()
+        .default(0)
+        .describe(`Maximum seconds to wait for the run to reach a terminal state. Default 0 — the widget UI polls; the tool itself does not block.`),
 }).strict();
 
 const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
@@ -33,14 +40,14 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
     For silent data lookups (run status, dataset IDs, stats, resource IDs), use
     ${HelperTools.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
 
-    Input: the run ID only.
+    Inputs: runId (required), waitSecs (optional; default 0 — the widget self-polls).
 `;
 
 export const getActorRunWidgetTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
-    inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
+    inputSchema: { ...(z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema) },
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),
     paymentRequired: true,
@@ -55,13 +62,15 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, progressTracker, mcpSessionId } = toolArgs;
         const parsed = getActorRunWidgetArgsSchema.parse(args);
 
         try {
             const fetchResult = await fetchActorRunData({
                 runId: parsed.runId,
+                waitSecs: parsed.waitSecs,
                 client,
+                progressTracker,
                 mcpSessionId,
             });
 

@@ -9,19 +9,20 @@ import {
 } from '../core/get_actor_run_common.js';
 
 /**
- * Default mode get-actor-run tool.
- * Returns full JSON dump of the run without widget metadata.
+ * Default mode `get-actor-run` — returns the canonical v4 shape with no widget metadata.
  */
 export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, progressTracker, mcpSessionId } = toolArgs;
         const parsed = getActorRunArgs.parse(args);
 
         try {
             const fetchResult = await fetchActorRunData({
                 runId: parsed.runId,
+                waitSecs: parsed.waitSecs,
                 client,
+                progressTracker,
                 mcpSessionId,
             });
 

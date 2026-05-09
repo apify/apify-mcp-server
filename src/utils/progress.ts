@@ -3,7 +3,7 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 import type { ApifyClient } from '../apify_client.js';
 import { PROGRESS_NOTIFICATION_INTERVAL_MS, RELATED_TASK_META_KEY } from '../const.js';
 
-const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
+export const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 
 /**
  * Leads with the run status so clients can see lifecycle transitions
