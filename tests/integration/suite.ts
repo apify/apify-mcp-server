@@ -713,7 +713,7 @@ export function createIntegrationTestsSuite(
             expect(resultWithStructured.structuredContent?.items).toEqual([]);
         });
 
-        it('should accept callOptions.maxItems on call-actor and run successfully', async () => {
+        it('accepts callOptions.maxItems on call-actor and runs successfully', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({

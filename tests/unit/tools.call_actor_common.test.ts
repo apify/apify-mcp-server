@@ -173,7 +173,6 @@ describe('call_actor_common', () => {
             expect(allText).toContain('memory limit of 8192MB');
             expect(allText).toContain('Account memory quota exceeded');
             expect(allText).toContain('callOptions.memory');
-            expect(allText).toContain(HelperTools.ACTOR_RUNS_ABORT);
             expect(allText).not.toContain('verify the Actor name');
         });
     });

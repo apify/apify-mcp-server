@@ -260,8 +260,8 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     if (isMemoryQuotaError(error)) {
         return buildMCPResponse({
             texts: [
-                `Failed to call Actor '${actorName}': ${errMsg}.`,
-                `Account memory quota exceeded. Retry with a smaller callOptions.memory, or free capacity.`,
+                `Failed to call Actor '${actorName}': ${errMsg}`,
+                `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
             ],
             isError: true,
             telemetry,
@@ -270,7 +270,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
 
     return buildMCPResponse({
         texts: [
-            `Failed to call Actor '${actorName}': ${errMsg}.`,
+            `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
             `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
