@@ -209,6 +209,7 @@ export const FAILURE_CATEGORY = {
 
 // Apify API error types
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
+export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';
 
 // HTTP status codes
 export const HTTP_UNAUTHORIZED = 401;

@@ -148,6 +148,34 @@ describe('call_actor_common', () => {
                 actorId: 'actor-456',
             }));
         });
+
+        it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
+            const error = new ApifyApiError({
+                data: {
+                    error: {
+                        type: 'memory-limit-exceeded',
+                        message: 'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
+                    },
+                },
+                status: 402,
+            } as AxiosResponse, 1);
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'compass/crawler-google-places',
+                error,
+                actorId: 'actor-789',
+                isAsync: true,
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain('memory limit of 8192MB');
+            expect(allText).toContain('Account memory quota exceeded');
+            expect(allText).toContain('callOptions.memory');
+            expect(allText).toContain(HelperTools.ACTOR_RUNS_ABORT);
+            expect(allText).not.toContain('verify the Actor name');
+        });
     });
 
     describe('callActorArgs.callOptions', () => {

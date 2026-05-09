@@ -8,6 +8,7 @@ import log from '@apify/log';
 import { ApifyClient } from '../../apify_client.js';
 import {
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
+    APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     FAILURE_CATEGORY,
     HelperTools,
@@ -186,6 +187,10 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
 }
 
+export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
+}
+
 /** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
 export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
     const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
@@ -244,13 +249,21 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         failureCategory,
     });
 
-    return buildMCPResponse({
-        texts: [
-            `Failed to call Actor '${actorName}': ${errMsg}.`,
+    const header = `Failed to call Actor '${actorName}': ${errMsg}.`;
+    const texts = isMemoryQuotaError(error)
+        ? [
+            header,
+            `Account memory quota exceeded. Retry with a smaller callOptions.memory, or free capacity via ${HelperTools.ACTOR_RUNS_ABORT}.`,
+        ]
+        : [
+            header,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
             `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
-        ],
+        ];
+
+    return buildMCPResponse({
+        texts,
         isError: true,
         telemetry: {
             toolStatus: getToolStatusFromError(error, false),
@@ -292,8 +305,8 @@ export const callActorArgs = z.object({
             .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
             .optional()
             .describe(dedent`
-                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
-                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
+                Memory per run in MB. Power of 2 from 128 to 32768.
+                Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
             `),
         timeout: z.number()
             .min(0, 'Timeout must be 0 or greater')
