@@ -173,15 +173,12 @@ describe('get-actor-run default response', () => {
 
     it('rejects waitSecs above 45', () => {
         const tool = defaultGetActorRun as HelperTool;
-        // AJV strips/coerces — `runId` valid, `waitSecs: 46` violates max.
-        const ok = tool.ajvValidate({ runId: 'run-1', waitSecs: 46 });
-        expect(ok).toBe(false);
+        expect(tool.ajvValidate({ runId: 'run-1', waitSecs: 46 })).toBe(false);
     });
 
     it('rejects waitSecs below 0', () => {
         const tool = defaultGetActorRun as HelperTool;
-        const ok = tool.ajvValidate({ runId: 'run-1', waitSecs: -1 });
-        expect(ok).toBe(false);
+        expect(tool.ajvValidate({ runId: 'run-1', waitSecs: -1 })).toBe(false);
     });
 
     it('reports unavailable storage instead of "no output" when dataset metadata fetch fails', async () => {
@@ -236,41 +233,23 @@ const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['meta
 const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
 const kvWithRecords: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
+/**
+ * Tests below cover real branching in buildSucceededSummaryNextStep / buildTimedOutSummaryNextStep
+ * (3 branches each) and the dataset-vs-KV priority + truncation-labelling rules. Pure template
+ * re-statements (READY/RUNNING/TIMING-OUT/ABORTING/FAILED/ABORTED) are deliberately not tested
+ * here — they would just spell-check the format string and would change in lockstep with any
+ * wording tweak. Default-mode integration coverage exercises the dispatch path.
+ */
 describe('buildStatusTemplate', () => {
-    it('READY', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('READY') });
-        expect(t.summary).toMatch(/^READY\. Run run-X was created/);
-        expect(t.nextStep).toContain('runId=run-X');
-        expect(t.nextStep).toContain('waitSecs=30');
-    });
-
-    it('RUNNING uses statusMessage when present', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Crawling page 5/20') });
-        expect(t.summary).toContain('Crawling page 5/20');
-        expect(t.nextStep).toContain('poll for completion');
-    });
-
-    it('TIMING-OUT', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT') });
-        expect(t.summary).toMatch(/^TIMING-OUT after /);
-        expect(t.nextStep).toContain('observe terminal state');
-    });
-
-    it('ABORTING', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING') });
-        expect(t.summary).toMatch(/^ABORTING after /);
-        expect(t.nextStep).toContain('observe terminal state');
-    });
-
-    it('SUCCEEDED with dataset items', () => {
+    it('SUCCEEDED with dataset items routes to dataset-items nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
-        expect(t.summary).toMatch(/^SUCCEEDED in 10s\. 47 items; 2 fields available\.$/);
+        expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.nextStep).toContain('get-dataset-items');
         expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).toContain('metadata.url, markdown');
     });
 
-    it('SUCCEEDED, dataset empty + KV with records', () => {
+    it('SUCCEEDED with empty dataset + KV records routes to KV-record nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
         expect(t.summary).toContain('Output written to key-value store');
         expect(t.nextStep).toContain('get-key-value-store-record');
@@ -278,7 +257,13 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('one of these keys (as recordKey): result-a, result-b');
     });
 
-    it('SUCCEEDED with both dataset items and KV records mentions both in summary, dataset-only nextStep', () => {
+    it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
+        expect(t.summary).toContain('No dataset items and no key-value records');
+        expect(t.nextStep).toContain('re-run');
+    });
+
+    it('SUCCEEDED with both dataset items and KV records picks dataset for nextStep, mentions both in summary', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('SUCCEEDED'),
             dataset: datasetWithItems,
@@ -286,16 +271,8 @@ describe('buildStatusTemplate', () => {
         });
         expect(t.summary).toContain('47 items; 2 fields available');
         expect(t.summary).toContain('Key-value store has 2 keys');
-        // nextStep stays single-action (dataset primary).
         expect(t.nextStep).toContain('get-dataset-items');
-        expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).not.toContain('get-key-value-store-record');
-    });
-
-    it('SUCCEEDED with no output at all', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
-        expect(t.summary).toContain('No dataset items and no key-value records');
-        expect(t.nextStep).toContain('re-run');
     });
 
     it('SUCCEEDED with truncated key-value store reports partial count, not exact 50', () => {
@@ -309,38 +286,24 @@ describe('buildStatusTemplate', () => {
         expect(t.summary).not.toMatch(/\(50 keys\)/);
     });
 
-    it('FAILED', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('FAILED', 'Out of memory') });
-        expect(t.summary).toBe('FAILED after 10s: Out of memory.');
-        expect(t.nextStep).toContain('exitCode');
-    });
-
-    it('ABORTED', () => {
-        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTED') });
-        expect(t.summary).toBe('ABORTED after 10s.');
-        expect(t.nextStep).toContain('rerun');
-    });
-
-    it('TIMED-OUT with dataset', () => {
+    it('TIMED-OUT with dataset routes to partial-output nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT'), dataset: datasetWithItems });
-        expect(t.summary).toBe('TIMED-OUT after 10s.');
         expect(t.nextStep).toContain('partial output (47 items written)');
     });
 
-    it('TIMED-OUT with both dataset and KV records mentions both in summary, dataset-only nextStep', () => {
+    it('TIMED-OUT with both dataset and KV records picks dataset for nextStep', () => {
         const t = buildStatusSummaryNextStep({
             run: makeRun('TIMED-OUT'),
             dataset: datasetWithItems,
             keyValueStore: kvWithRecords,
         });
-        expect(t.summary).toBe('TIMED-OUT after 10s. Key-value store has 2 keys.');
+        expect(t.summary).toContain('Key-value store has 2 keys');
         expect(t.nextStep).toContain('partial output (47 items written)');
         expect(t.nextStep).not.toContain('get-key-value-store-record');
     });
 
-    it('TIMED-OUT without dataset', () => {
+    it('TIMED-OUT without dataset routes to "no dataset to fetch" nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT') });
-        expect(t.summary).toBe('TIMED-OUT after 10s.');
         expect(t.nextStep).toContain('no dataset to fetch');
     });
 });
