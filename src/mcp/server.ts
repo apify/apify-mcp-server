@@ -958,8 +958,7 @@ export class ActorsMcpServer {
                     // Tools that may emit notifications/progress during a sync wait must be opted in here.
                     // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
                     const progressTrackerOptIn = tool.name === HelperTools.ACTOR_CALL
-                        || tool.name === HelperTools.ACTOR_RUNS_GET
-                        || tool.name === HelperTools.ACTOR_RUNS_GET_WIDGET;
+                        || tool.name === HelperTools.ACTOR_RUNS_GET;
                     const progressTracker = progressTrackerOptIn
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;

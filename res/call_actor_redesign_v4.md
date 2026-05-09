@@ -272,6 +272,7 @@ If the listKeys call fails or the run has no default key-value store, both field
 | `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. Declares `execution.taskSupport: "optional"` per MCP spec. |
 | `run-actor` | Deferred | Not implemented in this PR. Plan as a separate rename migration. |
 | `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
+| `get-actor-run-widget` | Modified | Apps mode only. Accepts `runId` only — no `waitSecs`. Always returns immediately so the widget renders without delay; the widget UI then polls `get-actor-run` with `waitSecs: 0` for live updates. |
 | `get-dataset-items` | Promoted in actor workflows | Requires `datasetId`. Defaults `limit` to 20. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
 | `get-key-value-store-record` | Promoted in actor workflows | Requires `keyValueStoreId` and `recordKey`. Parameter name `recordKey` matches the existing tool schema (kept for backward compatibility). |
 | `abort-actor-run` | Promoted in actor workflows | Auto-surfaced when actor-running tools are present. |
@@ -427,6 +428,8 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 - Read top-level `statusMessage` and `exitCode` directly instead of re-fetching.
 - Poll `get-actor-run` with `waitSecs: 0` so widget refreshes do not block.
 - Accept the old shape for one minor cycle only if cheap to do so. Do not add complex compatibility branches.
+
+The `get-actor-run-widget` tool itself takes only `runId` and always returns immediately — there is no `waitSecs` on the widget tool. Server-side blocking before render would defeat the purpose of a *progress* widget; the widget UI handles all live updates by polling `get-actor-run` (the data variant) with `waitSecs: 0`.
 
 ## Risks and open questions
 

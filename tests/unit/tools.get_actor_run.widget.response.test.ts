@@ -28,8 +28,10 @@ function stubApifyClient(run: unknown): InternalToolArgs['apifyClient'] {
     return {
         run: (_id: string) => ({
             get: async () => run,
-            // Honored only when waitSecs > 0; tests below pass waitSecs: 0 to short-circuit.
-            waitForFinish: async () => run,
+            // The widget tool always passes waitSecs: 0, so this should never be invoked.
+            waitForFinish: async () => {
+                throw new Error('waitForFinish must not be called by get-actor-run-widget');
+            },
         }),
         actor: (_id: string) => ({
             get: async () => MOCK_ACTOR,
@@ -51,7 +53,7 @@ function stubArgs(args: Record<string, unknown>, run: unknown = MOCK_RUN_RUNNING
 describe('get-actor-run-widget response', () => {
     it('returns structured content and widget _meta on the response', async () => {
         const result = await (getActorRunWidgetTool as HelperTool).call(
-            stubArgs({ runId: 'run-widget-1', waitSecs: 0 }),
+            stubArgs({ runId: 'run-widget-1' }),
         );
 
         const { structuredContent, content, _meta } = result as {
@@ -86,29 +88,20 @@ describe('get-actor-run-widget response', () => {
         expect(meta.ui?.csp).toBeDefined();
     });
 
-    it('declares a strict input schema accepting runId and optional waitSecs', () => {
+    it('declares a strict input schema accepting runId only', () => {
         const tool = getActorRunWidgetTool as HelperTool;
 
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
         expect(schema.additionalProperties).toBe(false);
-        expect(Object.keys(schema.properties ?? {}).sort()).toEqual(['runId', 'waitSecs']);
-        // `fixZodSchemaRequired` (applied to the exposed `inputSchema`) drops fields with a real
-        // Zod `.default()` from `required`, so MCP clients see `waitSecs` as optional — matching
-        // the runtime behavior shown by "accepts a minimal runId payload" below.
+        expect(Object.keys(schema.properties ?? {})).toEqual(['runId']);
         expect(schema.required).toEqual(['runId']);
 
         // Runtime: AJV is configured with `removeAdditional: true`, so stray keys are silently
         // stripped from the input object in place.
-        const input: Record<string, unknown> = { runId: 'run-widget-1', output: true };
+        const input: Record<string, unknown> = { runId: 'run-widget-1', waitSecs: 30 };
         const ok = tool.ajvValidate(input);
         expect(ok).toBe(true);
-        expect('output' in input).toBe(false);
-    });
-
-    it('rejects waitSecs above the cap', () => {
-        const tool = getActorRunWidgetTool as HelperTool;
-        const ok = tool.ajvValidate({ runId: 'run-widget-1', waitSecs: 46 });
-        expect(ok).toBe(false);
+        expect('waitSecs' in input).toBe(false);
     });
 
     it('accepts a minimal runId payload', () => {

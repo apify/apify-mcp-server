@@ -4,52 +4,44 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
+import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
     buildGetActorRunError,
     buildGetActorRunSuccessResponse,
     fetchActorRunData,
-    WAIT_SECS_MAX,
 } from '../core/get_actor_run_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Widget args. Default `waitSecs = 0` so the initial widget render is immediate; the widget UI
- * polls with `waitSecs: 0` for the same reason. Strict so stray keys are rejected on bypass paths.
+ * Widget input is `runId` only. The tool always returns immediately so the widget can render
+ * without delay; live status updates are driven by the widget UI itself, which polls
+ * `get-actor-run` with `waitSecs: 0`. Strict so stray keys are rejected on bypass paths.
  */
 const getActorRunWidgetArgsSchema = z.object({
     runId: z.string()
         .min(1)
         .describe('The ID of the Actor run.'),
-    waitSecs: z.number()
-        .int()
-        .min(0)
-        .max(WAIT_SECS_MAX)
-        .optional()
-        .default(0)
-        .describe(`Maximum seconds to wait for the run to reach a terminal state. Default 0 — the widget UI polls; the tool itself does not block.`),
 }).strict();
 
 const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
-    Render an interactive UI element (widget) showing live progress and status of an Actor run.
+    Render an interactive UI element (widget) that displays live progress and status of an Actor run.
+
+    The tool returns immediately after rendering the widget — it never blocks waiting for the run.
+    The widget itself polls run status and updates in place until the run reaches a terminal state.
 
     Use this tool ONLY when the user explicitly wants to see run progress visually
     (e.g., "show progress for run y2h7sK3Wc", "display the status of that run").
 
     For silent data lookups (run status, dataset IDs, stats, resource IDs), use
     ${HelperTools.ACTOR_RUNS_GET} instead — it returns the same data without rendering a widget.
-
-    Inputs: runId (required), waitSecs (optional; default 0 — the widget self-polls).
 `;
 
 export const getActorRunWidgetTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
-    // `fixZodSchemaRequired` keeps `waitSecs` (which has a Zod `.default(0)`) out of `required`
-    // so MCP clients reading `tools/list` see it as optional, matching its runtime behavior.
-    inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunWidgetArgsSchema)) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),
     paymentRequired: true,
@@ -64,15 +56,14 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyClient: client, progressTracker, mcpSessionId } = toolArgs;
+        const { args, apifyClient: client, mcpSessionId } = toolArgs;
         const parsed = getActorRunWidgetArgsSchema.parse(args);
 
         try {
             const fetchResult = await fetchActorRunData({
                 runId: parsed.runId,
-                waitSecs: parsed.waitSecs,
+                waitSecs: 0,
                 client,
-                progressTracker,
                 mcpSessionId,
             });
 
