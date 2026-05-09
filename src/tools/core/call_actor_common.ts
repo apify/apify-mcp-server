@@ -249,29 +249,34 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         failureCategory,
     });
 
-    const header = `Failed to call Actor '${actorName}': ${errMsg}.`;
-    const texts = isMemoryQuotaError(error)
-        ? [
-            header,
-            `Account memory quota exceeded. Retry with a smaller callOptions.memory, or free capacity via ${HelperTools.ACTOR_RUNS_ABORT}.`,
-        ]
-        : [
-            header,
+    const telemetry = {
+        toolStatus: getToolStatusFromError(error, false),
+        failureCategory,
+        failureHttpStatus: getHttpStatusCode(error),
+        failureDetail: errMsg.slice(0, 200),
+        actorId,
+    };
+
+    if (isMemoryQuotaError(error)) {
+        return buildMCPResponse({
+            texts: [
+                `Failed to call Actor '${actorName}': ${errMsg}.`,
+                `Account memory quota exceeded. Retry with a smaller callOptions.memory, or free capacity.`,
+            ],
+            isError: true,
+            telemetry,
+        });
+    }
+
+    return buildMCPResponse({
+        texts: [
+            `Failed to call Actor '${actorName}': ${errMsg}.`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
             `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
-        ];
-
-    return buildMCPResponse({
-        texts,
+        ],
         isError: true,
-        telemetry: {
-            toolStatus: getToolStatusFromError(error, false),
-            failureCategory,
-            failureHttpStatus: getHttpStatusCode(error),
-            failureDetail: errMsg.slice(0, 200),
-            actorId,
-        },
+        telemetry,
     });
 }
 
@@ -323,13 +328,18 @@ export const callActorArgs = z.object({
             .positive()
             .optional()
             .describe(dedent`
-                Charge cap for pay-per-result Actors. Caps the number of dataset items billed for this run.
-                Does not limit how many items the Actor returns.
+                Pay-per-result Actors ONLY — has no effect on any other pricing model (pay-per-event, pay-per-usage, rental, free).
+                Caps the number of dataset items billed for this run; does NOT limit how many items the Actor produces.
+                Most Actors also expose their own input field (e.g. "maxResults", "maxPages", "maxItems") to bound how much work they do — prefer those when limiting actual output, since this option only caps billing.
             `),
         maxTotalChargeUsd: z.number()
             .positive()
             .optional()
-            .describe('Charge cap in USD for pay-per-event Actors. Caps the total amount billed for this run.'),
+            .describe(dedent`
+                Pay-per-event Actors ONLY — has no effect on any other pricing model (pay-per-result, pay-per-usage, rental, free).
+                Caps the total USD billed for this run; does NOT limit how much work the Actor does.
+                Most Actors also expose their own input field to bound work — prefer those when limiting actual output, since this option only caps billing.
+            `),
     }).optional()
         .describe('Optional call options for the Actor run configuration.'),
 });
