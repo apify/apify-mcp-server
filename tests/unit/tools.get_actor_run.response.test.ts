@@ -291,15 +291,6 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('re-run');
     });
 
-    it('SUCCEEDED with storage read failure does not advise rerun', () => {
-        const t = buildStatusTemplate({ run: makeRun('SUCCEEDED'), storageReadFailed: true });
-        expect(t.summary).not.toContain('No dataset items and no key-value records');
-        expect(t.summary).toContain('Storage metadata');
-        // Must NOT advise rerunning the actor — the run may already have produced output.
-        expect(t.nextStep).not.toMatch(/re-run/i);
-        expect(t.nextStep).toContain('runId=run-X');
-    });
-
     it('SUCCEEDED with truncated key-value store reports partial count, not exact 50', () => {
         const truncatedKv: RunKeyValueStore = {
             id: 'kv-1',

@@ -223,30 +223,6 @@ function errMessage(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
 }
 
-/** `failed: true` distinguishes a fetch error from a successful "not present" read — without it,
- *  `buildStatusTemplate` would mistake a transient read error for genuinely empty output. */
-type StorageRead<T> = { value: T | null; failed: boolean };
-
-async function getDataset(client: ApifyClient, datasetId: string | undefined, mcpSessionId?: string): Promise<StorageRead<Dataset>> {
-    if (!datasetId) return { value: null, failed: false };
-    try {
-        return { value: (await client.dataset(datasetId).get()) ?? null, failed: false };
-    } catch (error) {
-        log.warning('Failed to fetch dataset metadata', { datasetId, mcpSessionId, errMessage: errMessage(error) });
-        return { value: null, failed: true };
-    }
-}
-
-async function listKvKeys(client: ApifyClient, kvStoreId: string | undefined, mcpSessionId?: string): Promise<StorageRead<KeyValueClientListKeysResult>> {
-    if (!kvStoreId) return { value: null, failed: false };
-    try {
-        return { value: await client.keyValueStore(kvStoreId).listKeys({ limit: KV_KEYS_LIMIT }), failed: false };
-    } catch (error) {
-        log.warning('Failed to list key-value store keys', { kvStoreId, mcpSessionId, errMessage: errMessage(error) });
-        return { value: null, failed: true };
-    }
-}
-
 /**
  * Apify's pagination counter is eventually consistent (~5s post-terminal). Probe with `listItems({ limit: 1 })`
  * when `itemCount === 0` on a SUCCEEDED run — if the probe returns items, surface the larger count.
@@ -303,9 +279,8 @@ export function buildStatusTemplate(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
-    storageReadFailed?: boolean;
 }): { summary: string; nextStep: string } {
-    const { run, dataset, keyValueStore, storageReadFailed } = params;
+    const { run, dataset, keyValueStore } = params;
     const { id: runId, status, statusMessage } = run;
     // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
@@ -362,14 +337,6 @@ export function buildStatusTemplate(params: {
                 return {
                     summary: `SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCountLabel}).`,
                     nextStep: `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${kvId} and one of these keys (as recordKey): ${keys.join(', ')}.`,
-                };
-            }
-            // No positive output signal. If a metadata read failed, that's a transient-failure
-            // path — never claim "no output" or advise rerunning a paid actor on a read error.
-            if (storageReadFailed) {
-                return {
-                    summary: `SUCCEEDED in ${runTimeSecs}s. Storage metadata could not be read (transient failure).`,
-                    nextStep: `${pollHint(runId)} retry the metadata read; do not call ${HelperTools.ACTOR_CALL} again — the run may already have produced output.`,
                 };
             }
             return {
@@ -489,20 +456,22 @@ export async function fetchActorRunData(params: {
 
     log.debug('Get actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
-    let datasetRead: StorageRead<Dataset> = { value: null, failed: false };
-    let kvRead: StorageRead<KeyValueClientListKeysResult> = { value: null, failed: false };
+    let datasetMeta: Dataset | null = null;
+    let kvListResult: KeyValueClientListKeysResult | null = null;
+
     if (TERMINAL_RUN_STATUSES.has(run.status)) {
-        [datasetRead, kvRead] = await Promise.all([
-            getDataset(client, run.defaultDatasetId, mcpSessionId),
-            listKvKeys(client, run.defaultKeyValueStoreId, mcpSessionId),
-        ]);
+        if (run.defaultDatasetId) {
+            datasetMeta = (await client.dataset(run.defaultDatasetId).get()) ?? null;
+        }
+        if (run.defaultKeyValueStoreId) {
+            kvListResult = await client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT });
+        }
     }
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetRead.value, mcpSessionId);
-    const dataset = buildRunDataset(run, datasetRead.value, resolvedItemCount);
-    const keyValueStore = buildRunKeyValueStore(run, kvRead.value);
-    const storageReadFailed = datasetRead.failed || kvRead.failed;
-    const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore, storageReadFailed });
+    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetMeta, mcpSessionId);
+    const dataset = buildRunDataset(run, datasetMeta, resolvedItemCount);
+    const keyValueStore = buildRunKeyValueStore(run, kvListResult);
+    const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore });
     const actorName = await actorNamePromise;
 
     const structuredContent: RunResponse = {
