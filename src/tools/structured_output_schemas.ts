@@ -284,11 +284,8 @@ export const callActorOutputSchema = {
     required: ['runId'],
 };
 
-/**
- * Schema for get-actor-run tool output (v4 canonical shape).
- * See res/call_actor_redesign_v4.md § Canonical response shape.
- */
-const canonicalRunStorageStats = {
+/** Schema for get-actor-run tool output. */
+const runStorageStats = {
     type: 'object' as const,
     properties: {
         readCount: { type: 'number' },
@@ -302,10 +299,10 @@ const canonicalRunStorageStats = {
 export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
-        responseVersion: { type: 'string', description: 'Canonical run-response version (e.g. "v4")' },
+        responseVersion: { type: 'string', description: 'Run-response version (e.g. "v4")' },
         runId: { type: 'string', description: 'Actor run ID' },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
-        actorName: { type: 'string', description: 'Canonical "username/actor-name"; may be omitted if actor record fetch fails' },
+        actorName: { type: 'string', description: '"username/actor-name"; may be omitted if actor record fetch fails' },
         status: { type: 'string', description: 'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED' },
         statusMessage: { type: 'string', description: 'Pass-through from Apify run.statusMessage' },
         exitCode: { type: 'number', description: 'Actor process exit code; populated for terminal states (especially FAILED)' },
@@ -339,7 +336,7 @@ export const getActorRunOutputSchema = {
                             items: { type: 'string' },
                             description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
                         },
-                        stats: canonicalRunStorageStats,
+                        stats: runStorageStats,
                     },
                     required: ['id'],
                 },
@@ -351,7 +348,7 @@ export const getActorRunOutputSchema = {
                         title: { type: 'string' },
                         createdAt: { type: 'string' },
                         modifiedAt: { type: 'string' },
-                        stats: canonicalRunStorageStats,
+                        stats: runStorageStats,
                         keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
                         keys: {
                             type: 'array' as const,

@@ -50,7 +50,7 @@ export const getActorRunArgs = z.object({
 
 const GET_ACTOR_RUN_DESCRIPTION = `Get detailed information about a specific Actor run.
 
-Returns the canonical run-result shape: status, storages (dataset / key-value store), stats, summary, nextStep.
+Returns run result: status, storages (dataset / key-value store), stats, summary, nextStep.
 - summary describes the past (e.g. "SUCCEEDED in 22s. 47 items; 3 fields available.").
 - nextStep prescribes one primary follow-up action with identifiers interpolated (e.g. "Use get-dataset-items with datasetId=...").
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
@@ -88,10 +88,10 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
 };
 
 // -----------------------------------------------------------------------------
-// Canonical response shape (v4)
+// Response types
 // -----------------------------------------------------------------------------
 
-export type CanonicalRunStorageStats = {
+export type RunStorageStats = {
     readCount?: number;
     writeCount?: number;
     deleteCount?: number;
@@ -99,7 +99,7 @@ export type CanonicalRunStorageStats = {
     storageBytes?: number;
 };
 
-export type CanonicalRunDataset = {
+export type RunDataset = {
     id: string;
     name?: string;
     title?: string;
@@ -108,21 +108,21 @@ export type CanonicalRunDataset = {
     itemCount?: number;
     cleanItemCount?: number;
     fields?: string[];
-    stats?: CanonicalRunStorageStats;
+    stats?: RunStorageStats;
 };
 
-export type CanonicalRunKeyValueStore = {
+export type RunKeyValueStore = {
     id: string;
     name?: string;
     title?: string;
     createdAt?: string;
     modifiedAt?: string;
-    stats?: CanonicalRunStorageStats;
+    stats?: RunStorageStats;
     keyCount?: number;
     keys?: string[];
 };
 
-export type CanonicalRunResponse = {
+export type RunResponse = {
     responseVersion: typeof RESPONSE_VERSION;
     runId: string;
     actorId: string;
@@ -138,8 +138,8 @@ export type CanonicalRunResponse = {
         memMaxBytes?: number;
     };
     storages: {
-        dataset?: CanonicalRunDataset;
-        keyValueStore?: CanonicalRunKeyValueStore;
+        dataset?: RunDataset;
+        keyValueStore?: RunKeyValueStore;
     };
     summary: string;
     nextStep: string;
@@ -147,7 +147,7 @@ export type CanonicalRunResponse = {
 
 export type FetchActorRunResult = {
     run: ActorRun;
-    structuredContent: CanonicalRunResponse;
+    structuredContent: RunResponse;
 };
 
 // -----------------------------------------------------------------------------
@@ -161,7 +161,7 @@ function slashToDot(field: string): string {
 
 /**
  * Drop undefined and null keys. Apify's SDK returns null for fields it doesn't have (e.g.
- * an unnamed default dataset's `name`), and the v4 shape declares no nullable fields, so we
+ * an unnamed default dataset's `name`), and the response shape declares no nullable fields, so we
  * filter both to keep the response clean and pass `getActorRunOutputSchema` validation.
  */
 function compact<T extends Record<string, unknown>>(obj: T): T {
@@ -177,7 +177,7 @@ function toIsoString(value: Date | string | undefined | null): string | undefine
     return value instanceof Date ? value.toISOString() : value;
 }
 
-function buildStats(run: ActorRun): CanonicalRunResponse['stats'] | undefined {
+function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     const stats = run.stats as ActorRun['stats'] | undefined;
     if (!stats) return undefined;
     const out = compact({
@@ -188,7 +188,7 @@ function buildStats(run: ActorRun): CanonicalRunResponse['stats'] | undefined {
     return Object.keys(out).length > 0 ? out : undefined;
 }
 
-function buildDatasetBlock(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): CanonicalRunDataset | undefined {
+function buildDatasetBlock(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset | undefined {
     if (!run.defaultDatasetId) return undefined;
     if (!datasetMeta) {
         return { id: run.defaultDatasetId };
@@ -206,7 +206,7 @@ function buildDatasetBlock(run: ActorRun, datasetMeta: Dataset | null, resolvedI
     });
 }
 
-function buildKeyValueStoreBlock(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): CanonicalRunKeyValueStore | undefined {
+function buildKeyValueStoreBlock(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore | undefined {
     if (!run.defaultKeyValueStoreId) return undefined;
     if (!listKeysResult) {
         return { id: run.defaultKeyValueStoreId };
@@ -301,12 +301,12 @@ function pollHint(runId: string): string {
 }
 
 /**
- * Build {summary, nextStep} per the v4 status templates table. Returns one primary action — never two.
+ * Build {summary, nextStep} per status. Returns one primary action — never two.
  */
 export function buildStatusTemplate(params: {
     run: ActorRun;
-    dataset?: CanonicalRunDataset;
-    keyValueStore?: CanonicalRunKeyValueStore;
+    dataset?: RunDataset;
+    keyValueStore?: RunKeyValueStore;
     storageReadFailed?: boolean;
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore, storageReadFailed } = params;
@@ -509,7 +509,7 @@ export async function fetchActorRunData(params: {
     const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore, storageReadFailed });
     const actorName = await actorNamePromise;
 
-    const structuredContent: CanonicalRunResponse = compact({
+    const structuredContent: RunResponse = compact({
         responseVersion: RESPONSE_VERSION,
         runId: run.id,
         actorId: run.actId,

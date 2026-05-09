@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
-import type { CanonicalRunResponse } from '../../src/tools/core/get_actor_run_common.js';
+import type { RunResponse } from '../../src/tools/core/get_actor_run_common.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 /**
  * Apps / UI mode: get-actor-run-widget renders an interactive UI element (widget)
  * showing live Actor run progress. Carries widget `_meta` on both the tool definition
- * and the response. Returns the v4 canonical run-response shape.
+ * and the response.
  */
 
 const MOCK_RUN_RUNNING = {
@@ -55,7 +55,7 @@ describe('get-actor-run-widget response', () => {
         );
 
         const { structuredContent, content, _meta } = result as {
-            structuredContent: CanonicalRunResponse;
+            structuredContent: RunResponse;
             content: { type: string; text: string }[];
             _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
         };

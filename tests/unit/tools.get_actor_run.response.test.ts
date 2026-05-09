@@ -2,17 +2,17 @@ import { describe, expect, it } from 'vitest';
 
 import {
     buildStatusTemplate,
-    type CanonicalRunDataset,
-    type CanonicalRunKeyValueStore,
-    type CanonicalRunResponse,
+    type RunDataset,
+    type RunKeyValueStore,
+    type RunResponse,
 } from '../../src/tools/core/get_actor_run_common.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 /**
- * Default mode `get-actor-run` returns the v4 canonical shape:
- * responseVersion, runId, actorId, status, storages, summary, nextStep — with no inlined
- * dataset items or KV record bodies. Tests cover all 8 status templates plus shape invariants.
+ * Default mode `get-actor-run` returns: responseVersion, runId, actorId, status, storages,
+ * summary, nextStep — with no inlined dataset items or KV record bodies.
+ * Tests cover all 8 status templates plus shape invariants.
  */
 
 const ACTOR = { username: 'apify', name: 'rag-web-browser' };
@@ -84,14 +84,14 @@ function callArgs(client: InternalToolArgs['apifyClient'], args: Record<string, 
 }
 
 describe('get-actor-run default response', () => {
-    it('returns canonical v4 shape for a SUCCEEDED run with dataset items', async () => {
+    it('returns run-result shape for a SUCCEEDED run with dataset items', async () => {
         const run = mockSucceededRun();
         const result = await (defaultGetActorRun as HelperTool).call(
             callArgs(stubClient({ run, dataset: mockDataset() }), { runId: 'run-1', waitSecs: 0 }),
         );
 
         const { structuredContent, content, _meta } = result as {
-            structuredContent: CanonicalRunResponse;
+            structuredContent: RunResponse;
             content: { type: string; text: string }[];
             _meta?: Record<string, unknown>;
         };
@@ -146,7 +146,7 @@ describe('get-actor-run default response', () => {
         } as unknown as InternalToolArgs['apifyClient'];
 
         const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
-        const { structuredContent } = result as { structuredContent: CanonicalRunResponse };
+        const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
@@ -168,7 +168,7 @@ describe('get-actor-run default response', () => {
                 { runId: 'run-1', waitSecs: 0 },
             ),
         );
-        const { structuredContent } = result as { structuredContent: CanonicalRunResponse };
+        const { structuredContent } = result as { structuredContent: RunResponse };
         expect(structuredContent.storages.dataset?.itemCount).toBe(47);
     });
 
@@ -233,10 +233,10 @@ function makeRun(status: string, statusMessage?: string, runTimeSecs = 10) {
     } as Parameters<typeof buildStatusTemplate>[0]['run'];
 }
 
-const datasetWithItems: CanonicalRunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
-const datasetEmpty: CanonicalRunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
-const kvWithOutput: CanonicalRunKeyValueStore = { id: 'kv-1', keys: ['OUTPUT', 'log.txt'], keyCount: 2 };
-const kvWithoutOutput: CanonicalRunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
+const datasetWithItems: RunDataset = { id: 'ds-1', itemCount: 47, fields: ['metadata.url', 'markdown'] };
+const datasetEmpty: RunDataset = { id: 'ds-1', itemCount: 0, fields: [] };
+const kvWithOutput: RunKeyValueStore = { id: 'kv-1', keys: ['OUTPUT', 'log.txt'], keyCount: 2 };
+const kvWithoutOutput: RunKeyValueStore = { id: 'kv-1', keys: ['result-a', 'result-b'], keyCount: 2 };
 
 describe('buildStatusTemplate', () => {
     it('READY', () => {
@@ -302,7 +302,7 @@ describe('buildStatusTemplate', () => {
     });
 
     it('SUCCEEDED with truncated key-value store reports partial count, not exact 50', () => {
-        const truncatedKv: CanonicalRunKeyValueStore = {
+        const truncatedKv: RunKeyValueStore = {
             id: 'kv-1',
             keys: Array.from({ length: 50 }, (_, i) => `k-${i}`),
             // keyCount intentionally omitted — buildKeyValueStoreBlock omits it on truncation.

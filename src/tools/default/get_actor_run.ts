@@ -9,7 +9,7 @@ import {
 } from '../core/get_actor_run_common.js';
 
 /**
- * Default mode `get-actor-run` — returns the canonical v4 shape with no widget metadata.
+ * Default mode `get-actor-run` — returns without any widget metadata.
  */
 export const defaultGetActorRun: ToolEntry = Object.freeze({
     ...getActorRunMetadata,
