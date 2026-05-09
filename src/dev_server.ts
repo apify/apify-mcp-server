@@ -262,7 +262,7 @@ export function createExpressApp(): express.Express {
         }
     });
 
-    // Handle GET requests for the standalone SSE stream.
+    // Handle GET requests
     // Clients open this to receive server-initiated notifications (e.g. notifications/tasks/status)
     // that are not tied to a specific POST request.  Without this, session-level notifications
     // are silently dropped by the transport.

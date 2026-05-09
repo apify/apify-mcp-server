@@ -57,7 +57,6 @@ import {
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
     SERVER_NAME,
-    TASK_STATUS_HEARTBEAT_INTERVAL_MS,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -1312,7 +1311,6 @@ export class ActorsMcpServer {
         // Always populate actor fields so they're tracked on both success and failure paths.
         let callDiagnostics: CallDiagnostics = { ...buildActorFields(actorName, actorId) };
         const startTime = Date.now();
-        let heartbeat: ReturnType<typeof setInterval> | undefined;
 
         log.debug('[executeToolAndUpdateTask] Starting task execution', {
             taskId,
@@ -1358,7 +1356,6 @@ export class ActorsMcpServer {
                 mcpSessionId,
             });
             await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
-            let lastEmissionAt = Date.now();
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             // Execute the tool and get the result
@@ -1378,23 +1375,8 @@ export class ActorsMcpServer {
             // Callback to propagate Actor run statusMessage into the task store and emit a push notification.
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
-                lastEmissionAt = Date.now();
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
-
-            // Heartbeat: re-emit notifications/tasks/status every ~30 s of silence so clients with
-            // sub-minute tool-call timeouts do not drop the connection.
-            heartbeat = setInterval(async () => {
-                try {
-                    if (Date.now() - lastEmissionAt < TASK_STATUS_HEARTBEAT_INTERVAL_MS) return;
-                    const currentTask = await this.taskStore.getTask(taskId, mcpSessionId);
-                    if (!currentTask || currentTask.status !== 'working') return;
-                    lastEmissionAt = Date.now();
-                    await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                } catch {
-                    // Silent fail — heartbeat is advisory
-                }
-            }, TASK_STATUS_HEARTBEAT_INTERVAL_MS);
 
             // Handle internal tool execution in task mode
             if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
@@ -1569,8 +1551,6 @@ export class ActorsMcpServer {
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
-        } finally {
-            clearInterval(heartbeat);
         }
     }
 

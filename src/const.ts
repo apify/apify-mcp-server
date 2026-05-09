@@ -218,7 +218,3 @@ export const HTTP_NOT_FOUND = 404;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;
-
-// Heartbeat interval for notifications/tasks/status while a task is working.
-// Transport-layer mitigation to keep clients with sub-minute timeouts alive.
-export const TASK_STATUS_HEARTBEAT_INTERVAL_MS = 30_000;

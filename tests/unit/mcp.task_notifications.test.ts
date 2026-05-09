@@ -3,7 +3,6 @@ import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TASK_STATUS_HEARTBEAT_INTERVAL_MS } from '../../src/const.js';
 import { emitTaskStatusNotification } from '../../src/mcp/server.js';
 
 // Helper to create a minimal TaskStore mock
@@ -165,11 +164,5 @@ describe('tasks/result _meta.related-task injection', () => {
         expect(meta['com.apify/ActorRun']).toEqual({ runId: 'run-abc' });
 
         await server.close();
-    });
-});
-
-describe('heartbeat constant', () => {
-    it('TASK_STATUS_HEARTBEAT_INTERVAL_MS is 30 seconds', () => {
-        expect(TASK_STATUS_HEARTBEAT_INTERVAL_MS).toBe(30_000);
     });
 });
