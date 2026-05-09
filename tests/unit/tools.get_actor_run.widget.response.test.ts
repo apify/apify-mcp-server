@@ -49,7 +49,7 @@ function stubArgs(args: Record<string, unknown>, run: unknown = MOCK_RUN_RUNNING
 }
 
 describe('get-actor-run-widget response', () => {
-    it('returns canonical v4 structured content and widget _meta on the response', async () => {
+    it('returns structured content and widget _meta on the response', async () => {
         const result = await (getActorRunWidgetTool as HelperTool).call(
             stubArgs({ runId: 'run-widget-1', waitSecs: 0 }),
         );

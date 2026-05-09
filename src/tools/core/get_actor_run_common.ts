@@ -38,11 +38,10 @@ export const getActorRunArgs = z.object({
         .max(WAIT_SECS_MAX)
         .optional()
         .default(WAIT_SECS_DEFAULT)
-        .describe(
-            `Maximum seconds to wait for the run to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT). `
-            + `0 returns immediately with the current status. Cap: ${WAIT_SECS_MAX}. Default: ${WAIT_SECS_DEFAULT}. `
-            + `When the caller passes _meta.progressToken and waitSecs > 0, the server emits notifications/progress on each statusMessage change observed during the wait.`,
-        ),
+        .describe(dedent`
+            Maximum seconds to wait for the run to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT).
+            0 returns immediately with the current status. Cap: ${WAIT_SECS_MAX}. Default: ${WAIT_SECS_DEFAULT}.
+        `),
 });
 
 const GET_ACTOR_RUN_DESCRIPTION = `Get detailed information about a specific Actor run.
@@ -248,13 +247,101 @@ function elapsedSecs(run: ActorRun): number {
 }
 
 function pollHint(runId: string): string {
-    return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=10 to`;
+    return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${WAIT_SECS_DEFAULT} to`;
+}
+
+    type KvSummary =
+    | { hasKv: true; kvId: string; keys: string[]; keyCountLabel: string; summarySuffix: string }
+    | { hasKv: false; summarySuffix: '' };
+
+/**
+ * `buildRunKeyValueStore` omits `keyCount` on truncation; surface that as "at least N keys"
+ * instead of silently substituting `keys.length`.
+ */
+function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
+    const kvId = keyValueStore?.id;
+    const keys = keyValueStore?.keys ?? [];
+    if (!kvId || keys.length === 0) {
+        return { hasKv: false, summarySuffix: '' };
+    }
+    const reportedKeyCount = keyValueStore.keyCount;
+    const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
+    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${reportedKeyCount ?? keys.length} keys`;
+    return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
+}
+
+function buildKvOnlyNextStep(kvId: string, keys: string[]): string {
+    return `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${kvId} and one of these keys (as recordKey): ${keys.join(', ')}.`;
+}
+
+function buildSucceededSummaryNextStep(
+    runTimeSecs: number,
+    dataset?: RunDataset,
+    keyValueStore?: RunKeyValueStore,
+): { summary: string; nextStep: string } {
+    const itemCount = dataset?.itemCount ?? 0;
+    const datasetId = dataset?.id;
+    const kv = summarizeKv(keyValueStore);
+
+    // Dataset is primary. nextStep stays dataset-only (one primary action) but the summary mentions
+    // KV when both exist so the caller can see the run also produced key-value records.
+    if (itemCount > 0 && datasetId) {
+        const fields = dataset?.fields ?? [];
+        return {
+            summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project. Preview with limit=3.`,
+        };
+    }
+
+    if (kv.hasKv) {
+        return {
+            summary: `SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${kv.keyCountLabel}).`,
+            nextStep: buildKvOnlyNextStep(kv.kvId, kv.keys),
+        };
+    }
+
+    return {
+        summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found.`,
+        nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
+    };
+}
+
+function buildTimedOutSummaryNextStep(
+    runTimeSecs: number,
+    dataset?: RunDataset,
+    keyValueStore?: RunKeyValueStore,
+): { summary: string; nextStep: string } {
+    const datasetId = dataset?.id;
+    const kv = summarizeKv(keyValueStore);
+
+    // TIMED-OUT branches on `datasetId` (not `itemCount > 0`) so an empty partial dataset is still
+    // surfaced as the primary follow-up — partial output is the diagnostic signal here.
+    if (datasetId) {
+        const itemCount = dataset?.itemCount ?? 0;
+        const fields = dataset?.fields ?? [];
+        return {
+            summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
+        };
+    }
+
+    if (kv.hasKv) {
+        return {
+            summary: `TIMED-OUT after ${runTimeSecs}s. Output written to key-value store (${kv.keyCountLabel}).`,
+            nextStep: buildKvOnlyNextStep(kv.kvId, kv.keys),
+        };
+    }
+
+    return {
+        summary: `TIMED-OUT after ${runTimeSecs}s.`,
+        nextStep: `Inspect statusMessage and stats in this response; the run produced no dataset to fetch.`,
+    };
 }
 
 /**
  * Build {summary, nextStep} per status. Returns one primary action — never two.
  */
-export function buildStatusTemplate(params: {
+export function buildStatusSummaryNextStep(params: {
     run: ActorRun;
     dataset?: RunDataset;
     keyValueStore?: RunKeyValueStore;
@@ -265,17 +352,6 @@ export function buildStatusTemplate(params: {
     // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
     // as literal "undefined".
     const runTimeSecs = run.stats?.runTimeSecs ?? elapsedSecs(run);
-    const itemCount = dataset?.itemCount ?? 0;
-    const fields = dataset?.fields ?? [];
-    const fieldCount = fields.length;
-    const datasetId = dataset?.id;
-    const kvId = keyValueStore?.id;
-    const keys = keyValueStore?.keys ?? [];
-    // `buildRunKeyValueStore` omits `keyCount` on truncation so callers can detect partial pages.
-    // Surface the truncation in the summary instead of silently substituting `keys.length`.
-    const reportedKeyCount = keyValueStore?.keyCount;
-    const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
-    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${reportedKeyCount ?? keys.length} keys`;
 
     switch (status) {
         case 'READY':
@@ -298,31 +374,8 @@ export function buildStatusTemplate(params: {
                 summary: `ABORTING after ${elapsedSecs(run)}s. ${statusMessage || 'Cancellation in progress'}.`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
-        case 'SUCCEEDED': {
-            if (itemCount > 0 && datasetId) {
-                return {
-                    summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fieldCount} fields available.`,
-                    nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project. Preview with limit=3.`,
-                };
-            }
-            if (keys.length > 0 && kvId) {
-                const others = keys.filter((k) => k !== 'OUTPUT');
-                if (keys.includes('OUTPUT')) {
-                    return {
-                        summary: `SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCountLabel}).`,
-                        nextStep: `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${kvId} and recordKey="OUTPUT" to read the main output. Other keys: ${others.join(', ') || 'none'}.`,
-                    };
-                }
-                return {
-                    summary: `SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCountLabel}).`,
-                    nextStep: `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${kvId} and one of these keys (as recordKey): ${keys.join(', ')}.`,
-                };
-            }
-            return {
-                summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found.`,
-                nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
-            };
-        }
+        case 'SUCCEEDED':
+            return buildSucceededSummaryNextStep(runTimeSecs, dataset, keyValueStore);
         case 'FAILED':
             return {
                 summary: `FAILED after ${runTimeSecs}s${statusMessage ? `: ${statusMessage}` : ''}.`,
@@ -331,19 +384,10 @@ export function buildStatusTemplate(params: {
         case 'ABORTED':
             return {
                 summary: `ABORTED after ${runTimeSecs}s${statusMessage ? `: ${statusMessage}` : ''}.`,
-                nextStep: `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the actor.`,
+                nextStep: `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`,
             };
         case 'TIMED-OUT':
-            if (datasetId) {
-                return {
-                    summary: `TIMED-OUT after ${runTimeSecs}s.`,
-                    nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
-                };
-            }
-            return {
-                summary: `TIMED-OUT after ${runTimeSecs}s.`,
-                nextStep: `Inspect statusMessage and stats in this response; the run produced no dataset to fetch.`,
-            };
+            return buildTimedOutSummaryNextStep(runTimeSecs, dataset, keyValueStore);
         default:
             return {
                 summary: `${status}. Run ${runId}.`,
@@ -428,18 +472,20 @@ export async function fetchActorRunData(params: {
     let kvListResult: KeyValueClientListKeysResult | null = null;
 
     if (TERMINAL_RUN_STATUSES.has(run.status)) {
-        if (run.defaultDatasetId) {
-            datasetInfo = (await client.dataset(run.defaultDatasetId).get()) ?? null;
-        }
-        if (run.defaultKeyValueStoreId) {
-            kvListResult = await client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT });
-        }
+        const [datasetFetched, kvFetched] = await Promise.all([
+            run.defaultDatasetId ? client.dataset(run.defaultDatasetId).get() : Promise.resolve(null),
+            run.defaultKeyValueStoreId
+                ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT })
+                : Promise.resolve(null),
+        ]);
+        datasetInfo = datasetFetched ?? null;
+        kvListResult = kvFetched ?? null;
     }
 
     const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, mcpSessionId);
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
-    const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore });
+    const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
 
     const structuredContent: RunResponse = {
         runId: run.id,
