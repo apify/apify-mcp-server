@@ -542,10 +542,12 @@ export const ActorRun: React.FC = () => {
     }
 
     const statusUpper = runData.status.toUpperCase();
-    // Extract table columns from first item (preview is fetched separately via get-dataset-items).
     const columns = previewItems && previewItems.length > 0
         ? Object.keys(previewItems[0])
         : [];
+    // Show the skeleton while running OR while the preview fetch is in flight on a fresh SUCCEEDED.
+    const showSkeleton = statusUpper === 'RUNNING'
+        || (statusUpper === 'SUCCEEDED' && (runData.dataset?.itemCount ?? 0) > 0 && previewItems === null);
 
 
     const handleOpenRun = () => {
@@ -601,40 +603,37 @@ export const ActorRun: React.FC = () => {
                 </ActorHeader>
 
                 {previewItems && previewItems.length > 0 ? (
-                    <>
-                        <TableContainer>
-                            <Table>
-                                <TableHeader>
-                                    <tr>
-                                        {columns.map((column) => (
-                                            <TableHeaderCell key={column}>
-                                                {column.charAt(0).toUpperCase() + column.slice(1)}
-                                            </TableHeaderCell>
-                                        ))}
-                                    </tr>
-                                </TableHeader>
-                                <TableBody>
-                                    {previewItems.map((item, index) => (
-                                        <TableRow key={index}>
-                                            {columns.map((column) => (
-                                                <TableCell key={column}>
-                                                    {item[column] == null
-                                                        ? "—"
-                                                        // If the value is an object, show number of fields instead of [object Object]
-                                                        : typeof item[column] === 'object'
-                                                            ? `${Object.keys(item[column]).length} fields`
-                                                            : String(item[column]) || "—"}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
+                    <TableContainer>
+                        <Table>
+                            <TableHeader>
+                                <tr>
+                                    {columns.map((column) => (
+                                        <TableHeaderCell key={column}>
+                                            {column.charAt(0).toUpperCase() + column.slice(1)}
+                                        </TableHeaderCell>
                                     ))}
-                                </TableBody>
-                            </Table>
-                            {previewItems.length > 3 && <TableGradientOverlay />}
-                        </TableContainer>
-                    </>
-                ) : (statusUpper === 'RUNNING' || (statusUpper === 'SUCCEEDED' && runData.dataset?.itemCount && previewItems === null)) ? (
-                    // Show the skeleton while running OR while the preview fetch is in flight on a fresh SUCCEEDED.
+                                </tr>
+                            </TableHeader>
+                            <TableBody>
+                                {previewItems.map((item, index) => (
+                                    <TableRow key={index}>
+                                        {columns.map((column) => (
+                                            <TableCell key={column}>
+                                                {item[column] == null
+                                                    ? "—"
+                                                    // If the value is an object, show number of fields instead of [object Object]
+                                                    : typeof item[column] === 'object'
+                                                        ? `${Object.keys(item[column]).length} fields`
+                                                        : String(item[column]) || "—"}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        {previewItems.length > 3 && <TableGradientOverlay />}
+                    </TableContainer>
+                ) : showSkeleton ? (
                     <TableSkeleton />
                 ) : (
                     <EmptyStateContainer>

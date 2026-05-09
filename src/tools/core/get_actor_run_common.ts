@@ -401,23 +401,26 @@ export function buildStatusTemplate(params: {
  * If the run isn't already terminal and `waitSecs > 0`, polls Apify up to `waitSecs` seconds and
  * (when a `progressTracker` is provided) emits `notifications/progress` on each statusMessage change.
  * Returns the final ActorRun snapshot.
+ *
+ * `actorNamePromise` is awaited only when needed for progress emission, so the actor-name fetch
+ * runs in parallel with `waitForFinish` (saves a round-trip on the polling hot path).
  */
 async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
     waitSecs: number;
     progressTracker?: ProgressTracker | null;
-    actorName?: string;
+    actorNamePromise: Promise<string | undefined>;
     initial: ActorRun;
 }): Promise<ActorRun> {
-    const { client, runId, waitSecs, progressTracker, actorName, initial } = opts;
+    const { client, runId, waitSecs, progressTracker, actorNamePromise, initial } = opts;
 
     if (waitSecs <= 0 || TERMINAL_RUN_STATUSES.has(initial.status)) {
         return initial;
     }
 
-    const trackerLabel = actorName ?? 'actor';
     if (progressTracker) {
+        const trackerLabel = (await actorNamePromise) ?? 'actor';
         await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, initial));
         progressTracker.startActorRunUpdates(runId, client, trackerLabel, initial);
     }
@@ -429,11 +432,14 @@ async function waitForRunWithProgress(opts: {
         progressTracker?.stop();
     }
 
-    // The platform may write the final statusMessage just after the status flips; re-fetch so the
-    // response and the final progress emission see the same terminal snapshot.
-    if (progressTracker && TERMINAL_RUN_STATUSES.has(waited.status)) {
+    // The platform may write the final statusMessage just after the status flips; re-fetch on
+    // terminal so the response (and any final progress emission) sees the freshest snapshot.
+    if (TERMINAL_RUN_STATUSES.has(waited.status)) {
         const finalRun = (await client.run(runId).get().catch(() => undefined)) ?? waited;
-        await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, finalRun));
+        if (progressTracker) {
+            const trackerLabel = (await actorNamePromise) ?? 'actor';
+            await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, finalRun));
+        }
         return finalRun;
     }
     return waited;
@@ -463,10 +469,10 @@ export async function fetchActorRunData(params: {
         };
     }
 
-    // Resolve actor name first so progress notifications during the wait can use it instead of
-    // falling back to "actor". The actor lookup is one round-trip, dwarfed by the wait itself.
-    const actorName = await resolveActorName(client, initialRun.actId, mcpSessionId);
-    const run = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, actorName, initial: initialRun });
+    // Run the actor-name lookup in parallel with the wait — only awaited inside the wait helper
+    // when a progress tracker needs the label, and once at the end for the response field.
+    const actorNamePromise = resolveActorName(client, initialRun.actId, mcpSessionId);
+    const run = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, actorNamePromise, initial: initialRun });
 
     log.debug('Get actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 
@@ -483,6 +489,7 @@ export async function fetchActorRunData(params: {
     const dataset = buildDatasetBlock(run, datasetMeta, resolvedItemCount);
     const keyValueStore = buildKeyValueStoreBlock(run, kvKeys);
     const { summary, nextStep } = buildStatusTemplate({ run, dataset, keyValueStore });
+    const actorName = await actorNamePromise;
 
     const structuredContent: CanonicalRunResponse = compact({
         responseVersion: RESPONSE_VERSION,
