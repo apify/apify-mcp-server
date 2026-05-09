@@ -8,7 +8,7 @@ import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
@@ -72,7 +72,9 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_GET,
     description: GET_ACTOR_RUN_DESCRIPTION,
-    inputSchema: z.toJSONSchema(getActorRunArgs) as ToolInputSchema,
+    // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
+    // that read `tools/list` see `waitSecs` as optional (matching its runtime behavior).
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunArgs)) as ToolInputSchema,
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunArgs)),
     paymentRequired: true,
@@ -260,7 +262,9 @@ async function resolveItemCountWithLagFallback(
     if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
     try {
         const probe = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
-        return Math.max(datasetMeta.itemCount, probe.items.length);
+        // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
+        // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
+        return Math.max(datasetMeta.itemCount, probe.total ?? 0);
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
         return datasetMeta.itemCount;
@@ -302,7 +306,10 @@ export function buildStatusTemplate(params: {
 }): { summary: string; nextStep: string } {
     const { run, dataset, keyValueStore } = params;
     const { id: runId, status, statusMessage } = run;
-    const runTimeSecs = run.stats?.runTimeSecs;
+    // The platform usually populates stats.runTimeSecs on terminal runs, but not always (e.g.
+    // ABORTED before stats flushed). Fall back to `elapsedSecs(run)` so summaries don't render
+    // as literal "undefined".
+    const runTimeSecs = run.stats?.runTimeSecs ?? elapsedSecs(run);
     const itemCount = dataset?.itemCount ?? 0;
     const fields = dataset?.fields ?? [];
     const fieldCount = fields.length;
@@ -456,13 +463,10 @@ export async function fetchActorRunData(params: {
         };
     }
 
-    // Resolve actor name in parallel with the wait. Lost cosmetic: progress notification
-    // labels during the wait fall back to "actor" instead of "username/name", but the response
-    // still carries the resolved name once both promises settle.
-    const [actorName, run] = await Promise.all([
-        resolveActorName(client, initialRun.actId, mcpSessionId),
-        waitForRunWithProgress({ client, runId, waitSecs, progressTracker, initial: initialRun }),
-    ]);
+    // Resolve actor name first so progress notifications during the wait can use it instead of
+    // falling back to "actor". The actor lookup is one round-trip, dwarfed by the wait itself.
+    const actorName = await resolveActorName(client, initialRun.actId, mcpSessionId);
+    const run = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, actorName, initial: initialRun });
 
     log.debug('Get actor run', { runId, status: run.status, mcpSessionId, waitSecs });
 

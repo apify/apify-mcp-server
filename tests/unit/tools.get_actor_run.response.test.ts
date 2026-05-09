@@ -53,7 +53,7 @@ function stubClient(opts: {
     run: unknown;
     dataset?: unknown;
     listKeys?: { items: { key: string }[]; isTruncated: boolean; count?: number };
-    listItemsProbe?: { items: unknown[] };
+    listItemsProbe?: { items: unknown[]; total?: number };
 }): InternalToolArgs['apifyClient'] {
     const { run, dataset, listKeys, listItemsProbe } = opts;
     return {
@@ -160,14 +160,16 @@ describe('get-actor-run default response', () => {
     it('triggers the itemCount=0 lag-fallback probe on terminal SUCCEEDED', async () => {
         const run = mockSucceededRun();
         const dataset = mockDataset({ itemCount: 0 });
+        // Probe runs with `limit: 1`, so `items.length === 1` even when the dataset has more.
+        // The recovered count must come from `total`, otherwise the lag fallback caps at 1.
         const result = await (defaultGetActorRun as HelperTool).call(
             callArgs(
-                stubClient({ run, dataset, listItemsProbe: { items: [{ a: 1 }, { a: 2 }, { a: 3 }] } }),
+                stubClient({ run, dataset, listItemsProbe: { items: [{ a: 1 }], total: 47 } }),
                 { runId: 'run-1', waitSecs: 0 },
             ),
         );
         const { structuredContent } = result as { structuredContent: CanonicalRunResponse };
-        expect(structuredContent.storages.dataset?.itemCount).toBe(3);
+        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
     });
 
     it('rejects waitSecs above 45', () => {

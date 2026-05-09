@@ -22,8 +22,6 @@ interface ActorRunData {
     finishedAt?: string;
     stats?: {
         computeUnits?: number;
-        memoryAvgBytes?: number;
-        memoryMaxBytes?: number;
     };
     /** v4 shape: identifier + count only. Item bodies are fetched separately via get-dataset-items. */
     dataset?: {

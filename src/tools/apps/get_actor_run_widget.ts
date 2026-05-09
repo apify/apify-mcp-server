@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { compileSchema } from '../../utils/ajv.js';
+import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import {
     buildGetActorRunError,
@@ -47,7 +47,9 @@ export const getActorRunWidgetTool: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
-    inputSchema: { ...(z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema) },
+    // `fixZodSchemaRequired` keeps `waitSecs` (which has a Zod `.default(0)`) out of `required`
+    // so MCP clients reading `tools/list` see it as optional, matching its runtime behavior.
+    inputSchema: fixZodSchemaRequired(z.toJSONSchema(getActorRunWidgetArgsSchema)) as ToolInputSchema,
     outputSchema: getActorRunOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getActorRunWidgetArgsSchema)),
     paymentRequired: true,

@@ -94,10 +94,10 @@ describe('get-actor-run-widget response', () => {
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
         expect(schema.additionalProperties).toBe(false);
         expect(Object.keys(schema.properties ?? {}).sort()).toEqual(['runId', 'waitSecs']);
-        // Widget args have a Zod `.default(0)` on `waitSecs`, so JSON Schema lists it as required.
-        // AJV (with `useDefaults: true`) injects the default before required-check, so callers
-        // can still omit it — see "accepts a minimal runId payload" below.
-        expect(schema.required).toEqual(['runId', 'waitSecs']);
+        // `fixZodSchemaRequired` (applied to the exposed `inputSchema`) drops fields with a real
+        // Zod `.default()` from `required`, so MCP clients see `waitSecs` as optional — matching
+        // the runtime behavior shown by "accepts a minimal runId payload" below.
+        expect(schema.required).toEqual(['runId']);
 
         // Runtime: AJV is configured with `removeAdditional: true`, so stray keys are silently
         // stripped from the input object in place.
