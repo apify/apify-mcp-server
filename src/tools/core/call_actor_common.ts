@@ -258,6 +258,8 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     };
 
     if (isMemoryQuotaError(error)) {
+        // Deliberately do NOT mention actor-runs-abort as a recovery path — nudging the LLM
+        // toward "free capacity" risks aborting unrelated in-flight runs the user cares about.
         return buildMCPResponse({
             texts: [
                 `Failed to call Actor '${actorName}': ${errMsg}`,

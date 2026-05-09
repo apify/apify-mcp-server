@@ -173,6 +173,8 @@ describe('call_actor_common', () => {
             expect(allText).toContain('memory limit of 8192MB');
             expect(allText).toContain('Account memory quota exceeded');
             expect(allText).toContain('callOptions.memory');
+            // Regression: must not nudge the LLM toward aborting unrelated runs to free capacity.
+            expect(allText).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
             expect(allText).not.toContain('verify the Actor name');
         });
     });
