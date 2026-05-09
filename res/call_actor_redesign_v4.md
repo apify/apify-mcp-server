@@ -435,6 +435,7 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 - **`keys` cap at 50.** Picked as a safe ceiling. Actors that write hundreds of small KV records (rare) will see a truncated list with `keyCount` reflecting the total, and the agent fetches by name. Tune if telemetry shows real actors with 50+ semantically meaningful keys.
 - **Free-form `statusMessage`.** Actor authors set it. Some are useful ("Crawling page 5/20"), some are noise. Templates pass it through verbatim; we accept variability rather than try to normalize.
 - **`responseVersion` versioning policy.** We bump to `v4`. Future breaking shape changes bump again; additive changes do not. Clients can feature-detect.
+- **`abort-actor-run` is intentionally not surfaced as a recovery hint for memory-quota errors.** Nudging the LLM toward "free capacity" risks aborting unrelated in-flight runs the user cares about. The recovery hint points at `callOptions.memory` and "wait for current runs to finish" only.
 
 ## Out of scope (deliberate deferrals)
 
