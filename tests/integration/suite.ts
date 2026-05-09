@@ -546,7 +546,7 @@ export function createIntegrationTestsSuite(
             // Add Actor dynamically
             await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
-            // Check if tools was added; initial 5 (add-actor + 4 auto-injected) + new actor = 6
+            // Check the actor tool was added; initial 5 (add-actor + 4 auto-injected) + new actor = 6
             const namesAfterAdd = getToolNames(await client.listTools());
             expect(namesAfterAdd.length).toEqual(6);
             expect(namesAfterAdd).toContain(selectedToolName);

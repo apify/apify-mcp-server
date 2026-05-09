@@ -245,8 +245,8 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     /**
-     * Auto-inject run-status and storage tools when call-actor or actor tools are present.
-     * Insert them right after call-actor to follow the logical workflow order:
+     * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
+     * Insert them right after call-actor (or appended at the end when call-actor is absent) to follow the logical workflow order:
      * call → get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run → get-actor-output (deprecated, last)
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);

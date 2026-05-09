@@ -79,7 +79,7 @@ export const getActorOutput: ToolEntry = Object.freeze({
         You can obtain the datasetId from an Actor run (e.g., after calling an Actor with the call-actor tool) or from the Apify Console (Runs → Run details → Dataset ID).
 
         USAGE:
-        - Prefer \`${HelperTools.DATASET_GET_ITEMS}\` (with runId or datasetId) for new code.
+        - Prefer \`${HelperTools.DATASET_GET_ITEMS}\` for new code.
 
         USAGE EXAMPLES:
         - user_input: Get data of my last Actor run
