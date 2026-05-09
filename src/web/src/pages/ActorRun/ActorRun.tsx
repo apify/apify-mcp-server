@@ -18,7 +18,7 @@ interface ActorRunData {
     cost?: number;
     timestamp: string;
     duration: string;
-    startedAt: string;
+    startedAt?: string;
     finishedAt?: string;
     stats?: {
         computeUnits?: number;
@@ -302,9 +302,12 @@ function toolOutputToRunData(
     toolOutput: ToolOutput,
     meta?: ActorRunMeta
 ): ActorRunData {
-    const startedAt = toolOutput.startedAt as string;
+    // READY runs have no `startedAt`. Feeding `undefined` into formatDuration/formatTimestamp
+    // yields "NaN-NaN-NaN NaN:NaN" / "NaNs"; render an em-dash placeholder instead.
+    const startedAt = toolOutput.startedAt;
     const finishedAt = toolOutput.finishedAt;
-    const duration = formatDuration(startedAt, finishedAt);
+    const duration = startedAt ? formatDuration(startedAt, finishedAt) : "—";
+    const timestamp = startedAt ? formatTimestamp(startedAt) : "—";
     const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
     const actorNameOnly = extractActorName(fullActorName);
     const humanizedName = humanizeActorName(actorNameOnly);
@@ -318,7 +321,7 @@ function toolOutputToRunData(
         status: (toolOutput.status as string) || "RUNNING",
         startedAt,
         finishedAt,
-        timestamp: formatTimestamp(startedAt),
+        timestamp,
         duration,
         cost: usageTotalUsd,
         stats: toolOutput.stats,

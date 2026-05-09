@@ -185,6 +185,26 @@ describe('get-actor-run default response', () => {
         expect(ok).toBe(false);
     });
 
+    it('reports unavailable storage instead of "no output" when dataset metadata fetch fails', async () => {
+        const run = mockSucceededRun();
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => { throw new Error('transient network error'); },
+                listItems: async () => ({ items: [], total: 0 }),
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        const { content } = result as { content: { text: string }[] };
+        expect(content[0].text).not.toContain('No dataset items and no key-value records were found');
+        expect(content[0].text).not.toMatch(/re-run/i);
+    });
+
     it('returns isError on a missing run', async () => {
         const client = {
             run: (_id: string) => ({ get: async () => undefined }),
@@ -270,6 +290,26 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusTemplate({ run: makeRun('SUCCEEDED') });
         expect(t.summary).toContain('No dataset items and no key-value records');
         expect(t.nextStep).toContain('re-run');
+    });
+
+    it('SUCCEEDED with storage read failure does not advise rerun', () => {
+        const t = buildStatusTemplate({ run: makeRun('SUCCEEDED'), storageReadFailed: true });
+        expect(t.summary).not.toContain('No dataset items and no key-value records');
+        expect(t.summary).toContain('Storage metadata');
+        // Must NOT advise rerunning the actor — the run may already have produced output.
+        expect(t.nextStep).not.toMatch(/re-run/i);
+        expect(t.nextStep).toContain('runId=run-X');
+    });
+
+    it('SUCCEEDED with truncated key-value store reports partial count, not exact 50', () => {
+        const truncatedKv: CanonicalRunKeyValueStore = {
+            id: 'kv-1',
+            keys: Array.from({ length: 50 }, (_, i) => `k-${i}`),
+            // keyCount intentionally omitted — buildKeyValueStoreBlock omits it on truncation.
+        };
+        const t = buildStatusTemplate({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: truncatedKv });
+        expect(t.summary).toContain('at least 50 keys');
+        expect(t.summary).not.toMatch(/\(50 keys\)/);
     });
 
     it('FAILED', () => {
