@@ -2,7 +2,7 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import { APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -153,7 +153,7 @@ describe('call_actor_common', () => {
             const error = new ApifyApiError({
                 data: {
                     error: {
-                        type: 'memory-limit-exceeded',
+                        type: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
                         message: 'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
                     },
                 },

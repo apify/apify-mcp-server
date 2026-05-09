@@ -187,7 +187,7 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
 }
 
-export function isMemoryQuotaError(error: unknown): error is ApifyApiError {
+function isMemoryQuotaError(error: unknown): error is ApifyApiError {
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
 }
 
@@ -264,7 +264,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
                 `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
             ],
             isError: true,
-            telemetry,
+            telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED },
         });
     }
 
