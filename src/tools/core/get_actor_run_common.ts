@@ -266,7 +266,8 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     }
     const reportedKeyCount = keyValueStore.keyCount;
     const kvTruncated = reportedKeyCount === undefined && keys.length === KV_KEYS_LIMIT;
-    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${reportedKeyCount ?? keys.length} keys`;
+    const n = reportedKeyCount ?? keys.length;
+    const keyCountLabel = kvTruncated ? `at least ${KV_KEYS_LIMIT} keys` : `${n} ${n === 1 ? 'key' : 'keys'}`;
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
