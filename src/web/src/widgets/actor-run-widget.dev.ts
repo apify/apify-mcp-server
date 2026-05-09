@@ -193,7 +193,6 @@ export function setupActorRunWidgetDev(): void {
                         [ACTOR_RUN_META_KEY]: { usageTotalUsd: isComplete ? 0.0456 : 0.0123 },
                     },
                     structuredContent: {
-                        responseVersion: "v4",
                         runId: (args.runId as string) || "test_run_123",
                         actorId: "test_actor_id",
                         actorName: "apify/rag-web-browser",

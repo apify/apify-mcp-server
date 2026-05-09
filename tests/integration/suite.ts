@@ -2692,7 +2692,7 @@ export function createIntegrationTestsSuite(
             },
         );
 
-        it('returns canonical v4 structuredContent for get-actor-run', async () => {
+        it('returns structuredContent for get-actor-run', async () => {
             client = await createClientFn({ tools: ['actors', 'runs'] });
 
             // First, start an async actor run to get a runId

@@ -24,14 +24,10 @@ const MOCK_ACTOR = {
     name: 'rag-web-browser',
 };
 
-function stubApifyClient(run: unknown): InternalToolArgs['apifyClient'] {
+function stubApifyClient(): InternalToolArgs['apifyClient'] {
     return {
         run: (_id: string) => ({
-            get: async () => run,
-            // The widget tool always passes waitSecs: 0, so this should never be invoked.
-            waitForFinish: async () => {
-                throw new Error('waitForFinish must not be called by get-actor-run-widget');
-            },
+            get: async () => MOCK_RUN_RUNNING,
         }),
         actor: (_id: string) => ({
             get: async () => MOCK_ACTOR,
@@ -39,11 +35,11 @@ function stubApifyClient(run: unknown): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, run: unknown = MOCK_RUN_RUNNING): InternalToolArgs {
+function stubArgs(args: Record<string, unknown>): InternalToolArgs {
     return {
         args,
         apifyToken: 'test-token',
-        apifyClient: stubApifyClient(run),
+        apifyClient: stubApifyClient(),
         extra: {} as InternalToolArgs['extra'],
         mcpServer: {} as InternalToolArgs['mcpServer'],
         apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
