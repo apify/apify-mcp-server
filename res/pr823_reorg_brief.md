@@ -4,10 +4,11 @@ Handoff for a local agent picking this up.
 
 ## Context
 
-- PR #823 (draft, in review): `feat: Modify get-actor-run - add waitSec and progress`. Closes #822 (Wave 2 of `res/call_actor_redesign_v4.md`).
+- PR #823 (draft, in review): `feat: Modify get-actor-run - add waitSec and progress`. Closes #822 (Wave 2 / E of `res/call_actor_redesign_v4.md`).
 - Branch: `feat/get-actor-run-wait-sec`. Local working branch: `claude/refactor-for-reusability-PC18Q`.
-- Follow-up wave (no issue yet): **F = `call-actor` canonical shape**. Same canonical `RunResponse`, same status templates, same wait-with-progress logic.
-- Issue #822 explicitly states: *"`src/tools/core/get_actor_run_common.ts` — shape construction shared with F."* So sharing is by design, not speculative.
+- Follow-up: **issue #824 — F = `call-actor` canonical shape + apps widgets + `taskSupport`**. Touches `src/tools/core/call_actor_common.ts` and the apps widgets. Same canonical `RunResponse`, same status templates, same wait-with-progress logic as get-actor-run.
+- Both issues #822 and #824 explicitly call out the share: #822 says *"`src/tools/core/get_actor_run_common.ts` — shape construction shared with F."* and #824 says *"E — issue #822: shares the canonical response builder. If E lands first, F reuses it; if F lands first, E reuses it. Either order works — coordinate at PR time."* So sharing is by design, not speculative.
+- The future consumer file already exists: `src/tools/core/call_actor_common.ts`. After the split, it imports from `actor_run_response.ts` — no awkward "call_actor depends on a file named `get_actor_run_*`" dep.
 
 ## Decision
 
@@ -75,7 +76,7 @@ Invoke it inside the `if (raced === CLIENT_ABORT)` branch before returning `{ ki
    - `tests/unit/tools.get_actor_run.widget.response.test.ts`
 4. Run `npm run type-check`, `npm run lint`, `npm run test:unit`. Zero tolerance for errors.
 5. Commit on `claude/refactor-for-reusability-PC18Q` with a Conventional Commits message, e.g. `refactor: Split actor_run_response from get_actor_run_common`. (Note: this commit when merged into PR #823's branch is part of the feature, not a standalone "refactor" PR — the message describes what the diff does.)
-6. Update PR #823's description with one sentence: *"Canonical-shape building blocks live in `actor_run_response.ts` for reuse by the upcoming call-actor PR (per issue #822 scope: 'shape construction shared with F')."*
+6. Update PR #823's description with one sentence: *"Canonical-shape building blocks live in `actor_run_response.ts` for reuse by issue #824 (call-actor canonical shape) — per issue #822 scope: 'shape construction shared with F'."*
 
 ## Verification
 
