@@ -272,7 +272,7 @@ If the listKeys call fails or the run has no default key-value store, both field
 | `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
 | `get-actor-run-widget` | Modified | Apps mode only. Accepts `runId` only — no `waitSecs`. Always returns immediately so the widget renders without delay; the widget UI then polls `get-actor-run` with `waitSecs: 0` for live updates. |
 | `get-dataset-items` | Promoted in actor workflows | Requires `datasetId`. Defaults `limit` to 20. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
-| `get-key-value-store-record` | Promoted in actor workflows | Requires `keyValueStoreId` and `recordKey`. Parameter name `recordKey` matches the existing tool schema (kept for backward compatibility). |
+| `get-key-value-store-record` | Promoted in actor workflows | Requires `keyValueStoreId` and `recordKey`. Parameter `keyValueStoreId` is renamed from the prior `storeId` to align with `datasetId`; `recordKey` is kept as-is to match the existing tool schema. |
 | `abort-actor-run` | Promoted in actor workflows | Auto-surfaced when actor-running tools are present. |
 | `get-actor-output` | Deprecated | Kept for one minor cycle. Description prefixed `DEPRECATED:`; points to `get-dataset-items` for dataset items and `get-key-value-store-record` for KV records. |
 
@@ -293,7 +293,7 @@ This is the change that lets us deprecate `get-actor-output`: once `get-dataset-
 
 The KV-only-actor case (and any actor that writes auxiliary records) needs a first-class fetch path now that the response no longer inlines record bodies.
 
-- Requires `keyValueStoreId` and `recordKey`. The parameter is named `recordKey` to match the existing tool schema; v4 does not rename it.
+- Requires `keyValueStoreId` and `recordKey`. v4 renames the prior `storeId` to `keyValueStoreId` for consistency with `datasetId`; `recordKey` is kept as-is to match the existing tool schema.
 - The agent gets `keyValueStoreId` from `storages.keyValueStore.id` on the canonical response, or interpolated directly into `nextStep` for text-mode clients.
 - Auto-surfaced in actor workflows so the LLM can act on `nextStep` without the storage tool category being explicitly enabled.
 
@@ -408,6 +408,7 @@ sequenceDiagram
 | `tasks/cancel` now propagates to `run.abort()` | Soft (bug fix). The current behavior — orphaned runs continuing after cancel — is an oversight, not load-bearing semantics. |
 | Task mode forces `waitSecs` to wait-until-terminal and ignores `async: true` | Soft. Additive defensive behavior. |
 | `actor: "name:tool"` MCP-server pass-through is excluded from the canonical shape | No new behavior; the doc just admits the carve-out exists. |
+| KV tools rename `storeId` → `keyValueStoreId` | Hard. Affects `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`. Aligns with `datasetId` and the canonical `storages.keyValueStore.id`. |
 
 Breaking changes must be coordinated with `apify-mcp-server-internal` before merge. The internal repo is spared the tool-name migration (no rename), but **not** the contract migration:
 
