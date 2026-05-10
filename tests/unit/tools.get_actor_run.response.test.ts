@@ -5,7 +5,7 @@ import {
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
-} from '../../src/tools/core/get_actor_run_common.js';
+} from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 

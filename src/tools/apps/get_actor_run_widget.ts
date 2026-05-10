@@ -6,10 +6,10 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
+import { fetchActorRunData } from '../core/actor_run_response.js';
 import {
     buildGetActorRunError,
     buildGetActorRunSuccessResponse,
-    fetchActorRunData,
 } from '../core/get_actor_run_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 

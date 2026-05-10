@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
-import type { RunResponse } from '../../src/tools/core/get_actor_run_common.js';
+import type { RunResponse } from '../../src/tools/core/actor_run_response.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 /**
