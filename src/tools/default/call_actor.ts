@@ -4,18 +4,17 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { buildUsageMeta } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
-import { callActorGetDataset } from '../core/actor_execution.js';
-import { buildActorResponseContent } from '../core/actor_response.js';
+import { fetchActorRunData } from '../core/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
-    buildStartAsyncResponse,
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
+    resolveWaitSecs,
 } from '../core/call_actor_common.js';
-import { callActorOutputSchema } from '../structured_output_schemas.js';
+import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_DEFAULT_DESCRIPTION = buildCallActorDescription({
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
@@ -24,15 +23,14 @@ const CALL_ACTOR_DEFAULT_DESCRIPTION = buildCallActorDescription({
 
 /**
  * Default mode call-actor tool.
- * Supports both sync (default) and async execution.
- * Does not include widget metadata in responses.
+ * Waits up to waitSecs (default 30) for completion and returns the run response.
  */
 export const defaultCallActor: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_DEFAULT_DESCRIPTION,
     inputSchema: callActorInputSchema,
-    outputSchema: callActorOutputSchema,
+    outputSchema: getActorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     annotations: {
@@ -53,7 +51,8 @@ export const defaultCallActor: ToolEntry = Object.freeze({
         }
 
         const { parsed, baseActorName } = preResult;
-        const { input, async: isAsync = false, previewOutput = true, callOptions } = parsed;
+        const { input, callOptions } = parsed;
+        const waitSecs = resolveWaitSecs(parsed);
 
         let resolvedActorId: string | undefined;
         try {
@@ -68,47 +67,39 @@ export const defaultCallActor: ToolEntry = Object.freeze({
 
             resolvedActorId = extractActorId(resolution.actor);
             const { apifyClient } = toolArgs;
+            const abortSignal = toolArgs.extra.signal;
 
-            // Async mode: start run and return immediately with runId
-            if (isAsync) {
-                const actorClient = apifyClient.actor(baseActorName);
-                const actorRun = await actorClient.start(input, callOptions);
-                log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-                const response = buildStartAsyncResponse({
-                    actorName: baseActorName,
-                    actorRun,
-                    input,
-                    widget: false,
-                });
+            if (abortSignal?.aborted) return {};
 
-                return {
-                    ...response,
-                    toolTelemetry: { actorId: resolvedActorId },
-                };
-            }
+            const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
+            log.debug('Started Actor run', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId, waitSecs });
 
-            // Sync mode: wait for completion and return results
-            const callResult = await callActorGetDataset({
-                actorName: baseActorName,
-                input,
-                apifyClient,
-                callOptions,
-                progressTracker: toolArgs.progressTracker,
-                abortSignal: toolArgs.extra.signal,
-                previewOutput,
-                mcpSessionId: toolArgs.mcpSessionId,
-            });
-
-            if (!callResult) {
-                // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
-                // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
+            // Abort can arrive while start() was in flight — abort the newly created run.
+            if (abortSignal?.aborted) {
+                await apifyClient.run(actorRun.id).abort({ gracefully: false }).catch(() => undefined);
                 return {};
             }
 
-            const { content, structuredContent } = buildActorResponseContent(baseActorName, callResult, previewOutput);
-            const _meta = buildUsageMeta(callResult);
+            const fetchResult = await fetchActorRunData({
+                runId: actorRun.id,
+                waitSecs,
+                actorName: baseActorName,
+                client: apifyClient,
+                progressTracker: toolArgs.progressTracker,
+                abortSignal,
+                mcpSessionId: toolArgs.mcpSessionId,
+                onAbort: async (runId, client) => {
+                    await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
+                },
+            });
+
+            if ('aborted' in fetchResult) return {};
+            if ('error' in fetchResult) return fetchResult.error;
+
+            const { run, structuredContent } = fetchResult.result;
+            const _meta = buildUsageMeta(run);
             return {
-                content,
+                content: [{ type: 'text', text: `${structuredContent.summary}\n\n${structuredContent.nextStep}` }],
                 structuredContent,
                 ...(_meta && { _meta }),
                 toolTelemetry: { actorId: resolvedActorId },
@@ -118,7 +109,6 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 actorName: baseActorName,
                 error,
                 actorId: resolvedActorId,
-                isAsync,
                 mcpSessionId: toolArgs.mcpSessionId,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
             });

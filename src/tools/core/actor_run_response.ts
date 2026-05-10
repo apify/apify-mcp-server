@@ -374,6 +374,7 @@ async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
     waitSecs: number;
+    actorName?: string;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
@@ -386,7 +387,7 @@ async function waitForRunWithProgress(opts: {
     let run = await client.run(runId).get();
     if (!run) return { kind: 'not-found' };
 
-    const actorName = await actorNameForActorId(client, run.actId, mcpSessionId);
+    const actorName = opts.actorName ?? await actorNameForActorId(client, run.actId, mcpSessionId);
 
     if (waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
@@ -436,12 +437,54 @@ async function waitForRunWithProgress(opts: {
 }
 
 // -----------------------------------------------------------------------------
+// Immediate start response — for apps-mode variants that return without waiting
+// -----------------------------------------------------------------------------
+
+/**
+ * Build a RunResponse from an already-started ActorRun without waiting.
+ * Used by apps-mode and widget variants that return immediately.
+ * Storage metadata contains IDs only; the widget polls get-actor-run for updates.
+ */
+export function buildStartRunResponse(params: {
+    actorName: string;
+    actorRun: ActorRun;
+}): { content: { type: 'text'; text: string }[]; structuredContent: RunResponse } {
+    const { actorName, actorRun } = params;
+
+    const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
+    const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
+
+    const { summary, nextStep } = buildStatusSummaryNextStep({
+        run: actorRun,
+        dataset,
+        keyValueStore,
+    });
+
+    const structuredContent: RunResponse = {
+        runId: actorRun.id,
+        actorId: actorRun.actId,
+        actorName,
+        status: actorRun.status,
+        startedAt: toIsoString(actorRun.startedAt),
+        storages: { dataset, keyValueStore },
+        summary,
+        nextStep,
+    };
+
+    return {
+        content: [{ type: 'text', text: `${summary}\n\n${nextStep}` }],
+        structuredContent,
+    };
+}
+
+// -----------------------------------------------------------------------------
 // Main fetch — used by both default and widget variants
 // -----------------------------------------------------------------------------
 
 export async function fetchActorRunData(params: {
     runId: string;
     waitSecs: number;
+    actorName?: string;
     client: ApifyClient;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
@@ -450,7 +493,9 @@ export async function fetchActorRunData(params: {
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
-    const waitResult = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort });
+    const waitResult = await waitForRunWithProgress({
+        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort,
+    });
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {
         return {

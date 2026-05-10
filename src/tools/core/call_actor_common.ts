@@ -76,7 +76,6 @@ type CallActorErrorResponseParams = {
     actorName: string;
     error: unknown;
     actorId?: string;
-    isAsync: boolean;
     mcpSessionId?: string;
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
 };
@@ -101,18 +100,18 @@ export function buildCallActorDescription(params: CallActorDescriptionParams): s
     if (alwaysAsync) {
         sections.push(dedent`
             IMPORTANT:
-            - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. It renders no UI.
+            - This tool always runs asynchronously — it starts the Actor and returns immediately with run status and storage IDs. It renders no UI.
             - For a live progress widget the user can watch, call ${HelperTools.ACTOR_CALL_WIDGET} instead.
             - To check status or wait for completion, poll ${HelperTools.ACTOR_RUNS_GET} with the runId.
-            - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
+            - Once the run completes, use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results, or ${HelperTools.KEY_VALUE_STORE_RECORD_GET} for key-value store output.
             - If the Actor name needs resolving first, use ${HelperTools.STORE_SEARCH} (silent). Do NOT use ${HelperTools.STORE_SEARCH_WIDGET} for name resolution.
             - Use dedicated Actor tools when available for better experience
         `);
     } else {
         sections.push(dedent`
             IMPORTANT:
-            - Typically returns a datasetId and preview of output items
-            - Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
+            - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
+            - Use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
         `);
     }
@@ -121,9 +120,7 @@ export function buildCallActorDescription(params: CallActorDescriptionParams): s
 
     if (!alwaysAsync) {
         sections.push(dedent`
-            - This tool supports async execution via the \`async\` parameter:
-              - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-              - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.
+            - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
         `);
     }
 
@@ -202,11 +199,11 @@ function buildPermissionApprovalErrorResponse(
     actorName: string,
     error: ApifyApiError,
     actorId: string | undefined,
-    logContext: { async: boolean; mcpSessionId: string | undefined },
+    mcpSessionId: string | undefined,
 ): ReturnType<typeof buildMCPResponse> {
     logHttpError(error, 'Failed to call Actor — permission approval required', {
         actorName,
-        ...logContext,
+        mcpSessionId,
         failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     });
     return {
@@ -226,20 +223,18 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         actorName,
         error,
         actorId,
-        isAsync,
         mcpSessionId,
         actorGetDetailsTool,
     } = params;
 
     if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
-        return buildPermissionApprovalErrorResponse(actorName, error, actorId, { async: isAsync, mcpSessionId });
+        return buildPermissionApprovalErrorResponse(actorName, error, actorId, mcpSessionId);
     }
 
     const errMsg = error instanceof Error ? error.message : String(error);
     const failureCategory = classifyFailureCategory(error);
     logHttpError(error, 'Failed to call Actor', {
         actorName,
-        async: isAsync,
         mcpSessionId,
         failureCategory,
     });
@@ -262,9 +257,28 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 }
 
-/**
- * Zod schema for call-actor arguments — shared between default and apps variants.
- */
+/** Default seconds to wait for completion on `call-actor`. `get-actor-run` uses 0. */
+export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
+
+export const callOptionsSchema = z.object({
+    memory: z.number()
+        .min(128, 'Memory must be at least 128 MB')
+        .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
+        .optional()
+        .describe(dedent`
+            Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
+            Minimum: 128 MB, Maximum: 32768 MB (32 GB).
+        `),
+    timeout: z.number()
+        .min(0, 'Timeout must be 0 or greater')
+        .optional()
+        .describe(dedent`
+            Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
+            Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
+        `),
+});
+
+/** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
     actor: z.string()
         .describe(dedent`
@@ -274,35 +288,15 @@ export const callActorArgs = z.object({
         `),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
-    async: z.boolean()
+    waitSecs: z.number()
+        .min(0, 'waitSecs must be 0 or greater')
+        .max(45, 'waitSecs cannot exceed 45')
         .optional()
-        .describe(dedent`
-            When true, starts the run and returns immediately with runId.
-            When false or omitted, behavior depends on the active server mode/tool variant.
-            IMPORTANT: use async=true only when the user explicitly asks to run in the background or does not need immediate results.
-        `),
+        .describe('Seconds to wait for completion (0–45, default 30). Returns with current run status if not terminal within waitSecs.'),
     previewOutput: z.boolean()
         .optional()
-        .describe(dedent`
-            When true (default): includes preview items. When false: metadata only (reduces context).
-            Use when fetching fields via get-actor-output.`),
-    callOptions: z.object({
-        memory: z.number()
-            .min(128, 'Memory must be at least 128 MB')
-            .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
-            .optional()
-            .describe(dedent`
-                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
-                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
-            `),
-        timeout: z.number()
-            .min(0, 'Timeout must be 0 or greater')
-            .optional()
-            .describe(dedent`
-                Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
-                Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
-            `),
-    }).optional()
+        .describe('Deprecated: ignored. Output preview is now agent-driven via get-dataset-items.'),
+    callOptions: callOptionsSchema.optional()
         .describe('Optional call options for the Actor run configuration.'),
 });
 
@@ -313,6 +307,10 @@ export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSc
 
 // Allow additional properties for dynamic Actor input fields passed via the `input` object
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
+
+export function resolveWaitSecs(parsed: CallActorParsedArgs): number {
+    return parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT;
+}
 
 /**
  * Parsed call-actor arguments.

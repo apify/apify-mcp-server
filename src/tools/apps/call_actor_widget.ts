@@ -9,13 +9,14 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
+import { buildStartRunResponse } from '../core/actor_run_response.js';
 import {
     buildCallActorErrorResponse,
-    buildStartAsyncResponse,
     callActorPreExecute,
+    callOptionsSchema,
     resolveAndValidateActor,
 } from '../core/call_actor_common.js';
-import { callActorOutputSchema } from '../structured_output_schemas.js';
+import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
  * Widget-only input: `actor` + `input` + optional `callOptions`.
@@ -32,23 +33,7 @@ const callActorWidgetArgsSchema = z.object({
         .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
-    callOptions: z.object({
-        memory: z.number()
-            .min(128, 'Memory must be at least 128 MB')
-            .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
-            .optional()
-            .describe(dedent`
-                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
-                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
-            `),
-        timeout: z.number()
-            .min(0, 'Timeout must be 0 or greater')
-            .optional()
-            .describe(dedent`
-                Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
-                Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
-            `),
-    }).optional()
+    callOptions: callOptionsSchema.optional()
         .describe('Optional call options for the Actor run configuration.'),
 }).strict();
 
@@ -73,18 +58,19 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     Input: actor name and input JSON; callOptions (memory, timeout) are optional.
 `;
 
+const ACTOR_RUN_WIDGET_META = getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta;
+
 export const appsCallActorWidget: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL_WIDGET,
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
-    outputSchema: callActorOutputSchema,
+    outputSchema: getActorRunOutputSchema,
     // Allow arbitrary keys inside `input` (dynamic Actor input) while keeping the outer shape strict.
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
-    // Tool-level widget meta; only registered in apps mode so stripWidgetMeta is a no-op here.
     _meta: {
-        ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
+        ...ACTOR_RUN_WIDGET_META,
     },
     annotations: {
         title: 'Call Actor (widget)',
@@ -130,14 +116,14 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
             const actorClient = apifyClient.actor(baseActorName);
             const actorRun = await actorClient.start(input, callOptions);
             log.debug('Started Actor run (widget)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-            const response = buildStartAsyncResponse({
-                actorName: baseActorName,
-                actorRun,
-                input,
-                widget: true,
-            });
+            const { content, structuredContent } = buildStartRunResponse({ actorName: baseActorName, actorRun });
             return {
-                ...response,
+                content,
+                structuredContent,
+                _meta: {
+                    ...ACTOR_RUN_WIDGET_META,
+                    'openai/widgetDescription': `Actor run progress for ${baseActorName}`,
+                },
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {
@@ -145,7 +131,6 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
                 actorName: baseActorName,
                 error,
                 actorId: resolvedActorId,
-                isAsync: true,
                 mcpSessionId: toolArgs.mcpSessionId,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
             });

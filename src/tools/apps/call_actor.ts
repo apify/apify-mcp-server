@@ -3,16 +3,16 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { extractActorId } from '../../utils/tools.js';
+import { buildStartRunResponse } from '../core/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
-    buildStartAsyncResponse,
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
 } from '../core/call_actor_common.js';
-import { callActorOutputSchema } from '../structured_output_schemas.js';
+import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorDescription({
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
@@ -21,7 +21,7 @@ const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorDescription({
 
 /**
  * Apps mode call-actor tool.
- * Always runs asynchronously — starts the run and returns immediately with runId.
+ * Always runs asynchronously — starts the run and returns immediately with the run response.
  * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
 export const appsCallActor: ToolEntry = Object.freeze({
@@ -29,7 +29,7 @@ export const appsCallActor: ToolEntry = Object.freeze({
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_APPS_DESCRIPTION,
     inputSchema: callActorInputSchema,
-    outputSchema: callActorOutputSchema,
+    outputSchema: getActorRunOutputSchema,
     ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     annotations: {
@@ -63,15 +63,9 @@ export const appsCallActor: ToolEntry = Object.freeze({
             const { apifyClient } = toolArgs;
 
             // Apps mode always runs asynchronously
-            const actorClient = apifyClient.actor(baseActorName);
-            const actorRun = await actorClient.start(input, callOptions);
+            const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
             log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-            const response = buildStartAsyncResponse({
-                actorName: baseActorName,
-                actorRun,
-                input,
-                widget: false,
-            });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
             return {
                 ...response,
                 toolTelemetry: { actorId: resolvedActorId },
@@ -81,7 +75,6 @@ export const appsCallActor: ToolEntry = Object.freeze({
                 actorName: baseActorName,
                 error,
                 actorId: resolvedActorId,
-                isAsync: true,
                 mcpSessionId: toolArgs.mcpSessionId,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
             });

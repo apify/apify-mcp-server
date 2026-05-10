@@ -20,7 +20,8 @@ describe('call_actor_common', () => {
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
             expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
-            expect(description).toContain('When `async: false` or not provided');
+            expect(description).toContain('waitSecs');
+            expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
         });
 
@@ -97,7 +98,6 @@ describe('call_actor_common', () => {
                 actorName: 'apify/rag-web-browser',
                 error,
                 actorId: 'actor-123',
-                isAsync: false,
                 mcpSessionId: 'session-123',
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
             });
@@ -132,7 +132,6 @@ describe('call_actor_common', () => {
                 actorName: 'apify/some-actor',
                 error,
                 actorId: 'actor-456',
-                isAsync: false,
                 actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
             });
 
@@ -145,6 +144,23 @@ describe('call_actor_common', () => {
                 failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                 failureHttpStatus: 403,
                 actorId: 'actor-456',
+            }));
+        });
+
+        it('uses public search helper name for generic errors', () => {
+            const response = buildCallActorErrorResponse({
+                actorName: 'apify/rag-web-browser',
+                error: new Error('boom'),
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            });
+
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
+            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
+            expect(response.toolTelemetry).toEqual(expect.objectContaining({
+                toolStatus: TOOL_STATUS.FAILED,
+                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                failureDetail: 'boom',
             }));
         });
     });
@@ -177,26 +193,6 @@ describe('call_actor_common', () => {
             expect(response.isError).toBe(true);
             expect(response.content).toHaveLength(1);
             expect(response.content[0]?.text).toContain('This Actor requires full access to your account');
-        });
-    });
-
-    describe('buildCallActorErrorResponse', () => {
-        it('uses public search helper name in apps mode', () => {
-            const response = buildCallActorErrorResponse({
-                actorName: 'apify/rag-web-browser',
-                error: new Error('boom'),
-                isAsync: true,
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-            });
-
-            const allText = response.content.map((c) => c.text).join('\n');
-            expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
-            expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
-            expect(response.toolTelemetry).toEqual(expect.objectContaining({
-                toolStatus: TOOL_STATUS.FAILED,
-                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
-                failureDetail: 'boom',
-            }));
         });
     });
 });
