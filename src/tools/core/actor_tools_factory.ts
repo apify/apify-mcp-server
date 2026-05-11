@@ -25,7 +25,7 @@ import type {
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { getActorDefinition } from '../build.js';
-import { buildEnrichedDirectActorOutputSchema, directActorOutputSchema } from '../structured_output_schemas.js';
+import { buildDirectActorOutputSchemaWithItems, directActorOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
 
 /**
@@ -40,7 +40,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
                 const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
                 if (itemProperties && Object.keys(itemProperties).length > 0) {
                     // eslint-disable-next-line no-param-reassign
-                    tool.outputSchema = buildEnrichedDirectActorOutputSchema(itemProperties);
+                    tool.outputSchema = buildDirectActorOutputSchemaWithItems(itemProperties);
                 }
             } catch (error) {
                 log.debug('Failed to enrich output schema for Actor', {

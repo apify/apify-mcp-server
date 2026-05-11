@@ -388,14 +388,13 @@ export const datasetItemsOutputSchema = {
 };
 
 /**
- * Creates an enriched version of directActorOutputSchema where the `items` field
- * contains actual property definitions inferred from Actor run history.
+ * Returns a copy of `directActorOutputSchema` with the `items[]` shape specialized to
+ * the given per-row properties (typically inferred from the Actor's run history).
  *
- * @param itemProperties - JSON Schema properties object describing dataset item fields
- *   (e.g., `{ url: { type: 'string' }, price: { type: 'number' } }`)
- * @returns A copy of directActorOutputSchema with enriched items schema
+ * @param itemProperties - JSON Schema properties for dataset item fields
+ *   (e.g. `{ url: { type: 'string' }, price: { type: 'number' } }`)
  */
-export function buildEnrichedDirectActorOutputSchema(
+export function buildDirectActorOutputSchemaWithItems(
     itemProperties: Record<string, unknown>,
 ): typeof directActorOutputSchema {
     return {
