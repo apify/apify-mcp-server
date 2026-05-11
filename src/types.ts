@@ -312,7 +312,6 @@ export type PromptBase = Prompt & {
     render: (args: Record<string, string>) => string;
 };
 
-export type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.

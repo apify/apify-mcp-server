@@ -1,3 +1,5 @@
+export const MCP_STREAMABLE_ENDPOINT = '/mcp';
+
 export const MAX_TOOL_NAME_LENGTH = 64;
 export const TOOL_NAME_HASH_LENGTH = 4;
 export const SERVER_ID_LENGTH = 8;

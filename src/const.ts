@@ -22,9 +22,6 @@ export const SERVER_MODE_AUTO_DETECTION_ENABLED = false;
 
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
-// User agent headers
-export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
-
 export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
@@ -89,8 +86,6 @@ export const ACTOR_PRICING_MODEL = {
     PAY_PER_EVENT: 'PAY_PER_EVENT',
 } as const;
 
-export const MCP_STREAMABLE_ENDPOINT = '/mcp';
-
 export const DOCS_SOURCES = [
     {
         id: 'apify',
@@ -134,9 +129,6 @@ export const ALLOWED_DOC_DOMAINS = [
     'https://crawlee.dev',
 ] as const;
 
-// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.`
-export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
-
 export const APIFY_STORE_URL = 'https://apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
@@ -150,14 +142,6 @@ export const TELEMETRY_ENV = {
 
 export const DEFAULT_TELEMETRY_ENABLED = true;
 export const DEFAULT_TELEMETRY_ENV = TELEMETRY_ENV.PROD;
-
-// We are using the same values as apify-core for consistency (despite that we ship events of different types).
-// https://github.com/apify/apify-core/blob/2284766c122c6ac5bc4f27ec28051f4057d6f9c0/src/packages/analytics/src/server/segment.ts#L28
-// Reasoning from the apify-core:
-// Flush at 50 events to avoid sending too many small requests (default is 15)
-export const SEGMENT_FLUSH_AT_EVENTS = 50;
-// Flush interval in milliseconds (default is 10000)
-export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 // Tool status
 /**
