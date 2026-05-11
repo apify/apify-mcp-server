@@ -97,7 +97,7 @@ describe('get-actor-run default response', () => {
         };
 
         // Slash-to-dot translation on dataset.fields. Mock returns `crawl/httpStatusCode`; response must rewrite to `crawl.httpStatusCode`.
-        expect(structuredContent.storages.dataset?.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
 
         // actorName composed from `${username}/${name}`.
         expect(structuredContent.actorName).toBe('apify/rag-web-browser');
@@ -142,10 +142,10 @@ describe('get-actor-run default response', () => {
         const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.status).toBe('RUNNING');
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-xyz');
         // Non-terminal: only the id is populated, no fields/itemCount.
-        expect(structuredContent.storages.dataset?.fields).toBeUndefined();
-        expect(structuredContent.storages.dataset?.itemCount).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.fields).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.itemCount).toBeUndefined();
         expect(datasetCalls).toBe(0);
         expect(kvCalls).toBe(0);
     });
@@ -162,7 +162,7 @@ describe('get-actor-run default response', () => {
             ),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
     });
 
     it('rejects waitSecs above 45', () => {
@@ -201,9 +201,9 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.status).toBe('SUCCEEDED');
 
         // Dataset id is still surfaced (the agent can fetch items directly even without metadata).
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
-        expect(structuredContent.storages.dataset?.itemCount).toBeUndefined();
-        expect(structuredContent.storages.dataset?.fields).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-xyz');
+        expect(structuredContent.storages.datasets?.default.itemCount).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.fields).toBeUndefined();
 
         // nextStep points at get-dataset-items, not the "no output / re-run" branch.
         expect(structuredContent.nextStep).toContain('get-dataset-items');
@@ -232,11 +232,11 @@ describe('get-actor-run default response', () => {
 
         expect(isError).not.toBe(true);
         expect(structuredContent.status).toBe('SUCCEEDED');
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
         // KV id is still surfaced from the run record; the failed listKeys just leaves keys unknown.
-        expect(structuredContent.storages.keyValueStore?.id).toBe('kv-xyz');
-        expect(structuredContent.storages.keyValueStore?.keys).toBeUndefined();
-        expect(structuredContent.storages.keyValueStore?.keyCount).toBeUndefined();
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-xyz');
+        expect(structuredContent.storages.keyValueStores?.default.keys).toBeUndefined();
+        expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
     });
 
     it('emits progress with formatted status messages on wait + terminal flip', async () => {

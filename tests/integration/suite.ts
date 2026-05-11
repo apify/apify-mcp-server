@@ -16,7 +16,7 @@ import {
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
-import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { directActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
@@ -1969,8 +1969,8 @@ export function createIntegrationTestsSuite(
 
             // Validate structured output for direct actor tool call
             const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
-            // Use imported callActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
-            validateStructuredOutput(result, callActorOutputSchema, ragWebBrowserToolName);
+            // Use imported directActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
+            validateStructuredOutput(result, directActorOutputSchema, ragWebBrowserToolName);
 
             // Validate structured content has items with metadata and crawl
             const resultWithStructured = result as { structuredContent?: {
@@ -2029,8 +2029,8 @@ export function createIntegrationTestsSuite(
             expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
 
             // Validate structured output for direct actor tool
-            // Use imported callActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
-            validateStructuredOutput(result, callActorOutputSchema, selectedToolName);
+            // Use imported directActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
+            validateStructuredOutput(result, directActorOutputSchema, selectedToolName);
 
             // Validate structured content has actual actor results with sum
             expectPythonExampleStructuredContent(result, 5, 7);
@@ -2722,8 +2722,8 @@ export function createIntegrationTestsSuite(
                 summary: string;
                 nextStep: string;
                 storages: {
-                    dataset?: { id: string; itemCount?: number; fields?: string[] };
-                    keyValueStore?: { id: string };
+                    datasets?: { default: { id: string; itemCount?: number; fields?: string[] } };
+                    keyValueStores?: { default: { id: string } };
                 };
             } };
 
@@ -2740,7 +2740,7 @@ export function createIntegrationTestsSuite(
             expect(dump).not.toContain('previewItems');
 
             if (runContent.structuredContent?.status === 'SUCCEEDED') {
-                expect(runContent.structuredContent?.storages.dataset?.id).toBeDefined();
+                expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
             }
         });
 

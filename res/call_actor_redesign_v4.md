@@ -1,6 +1,6 @@
 # V4 — `call-actor` redesign (RFC)
 
-Status: locked contract, ready for product + tech review and implementation.
+Status: contract being implemented across PRs #823 (`get-actor-run` `waitSecs`) and #825 (`call-actor` `waitSecs` + storage reshape). Field names below reflect the final shipping shape, not the original draft.
 Audience: PM and tech lead. No prior reading required — this document is self-contained.
 
 ## Summary
@@ -36,7 +36,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 
 ## Design principles
 
-1. **Apify shape fidelity.** Field names in `storages.dataset` / `storages.keyValueStore` mirror `apify-client.Dataset` / `KeyValueStore`. Timestamps become ISO 8601 strings (the only type-level departure). This means anyone who's read Apify docs already knows the field semantics.
+1. **Apify shape fidelity.** `storages` mirrors `ActorRunStorageIds` from the Apify client — a plural alias-map (`datasets`, `keyValueStores`) where `default` is always the run's primary entry. Each value carries the bare Apify ID plus the metadata fields from `apify-client.Dataset` / `KeyValueStore`. Timestamps become ISO 8601 strings (the only type-level departure). The plural shape means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing new top-level field names.
 2. **The LLM is a first-class consumer.** `summary` (past) and `nextStep` (one primary action) are part of the contract. Templates per status are locked, not free-form.
 3. **Hide footguns from the LLM.** Server translates Apify slash-notation to dot-notation. `get-dataset-items` auto-flattens parents when fields contain dots. The LLM never sees the Apify-API edge cases that bit it before.
 4. **Run status is observation, not tool failure.** `isError: true` is reserved for tool-side failures (auth, network, Zod validation). `FAILED` / `ABORTED` / `TIMED-OUT` are observed run outcomes, returned with `isError: false`.
@@ -48,18 +48,18 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 
 | ID | Decision |
 |---|---|
-| **T1** | `storages` is a subset of the Apify storage API: same field names as `apify-client.Dataset` and `KeyValueStore`, but timestamps are ISO 8601 strings, and fields that are required upstream are optional here when not yet known. We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus redundant `accessedAt`. We add two fields: `storages.keyValueStore.keys` (string array, capped at 50 names) and `storages.keyValueStore.keyCount` (total key count). The dataset block carries `fields` (dot notation) but no item samples. |
+| **T1** | `storages` mirrors `ActorRunStorageIds` from the Apify client: `{ datasets: { default, [alias] }, keyValueStores: { default, [alias] } }`. Each value is a subset of the Apify storage API — same field names as `apify-client.Dataset` and `KeyValueStore`, but timestamps are ISO 8601 strings, and fields that are required upstream are optional here when not yet known. We omit security/identity fields (`userId`, `username`, `urlSigningSecretKey`, `generalAccess`, `*PublicUrl`, `actId`, `actRunId`) plus redundant `accessedAt`. We add two fields on the KV value: `keys` (string array, capped at 50 names) and `keyCount` (total key count). The dataset value carries `fields` (dot notation) but no item samples. Today only the `default` entry is populated; the alias-map shape leaves room for named Actor storages without a new field name. |
 | **T2** | `summary` describes the past. `nextStep` prescribes one primary action. Both camelCase to match the rest of the response. |
 | **R1** | Emit `notifications/tasks/status` on every task state change (start → working, on `statusMessage` change, on terminal). No heartbeat: in task mode `tools/call` returns immediately with `CreateTaskResult`, so there is no held-open request to time out, and the SDK client falls back to `tasks/get` polling per spec. `notifications/progress` already emits today on actor state change; only `tasks/status` was missing. |
 | **R4** | Keep `call-actor`; defer the `run-actor` rename. The current name is referenced across the public repo, internal repo tests, UI constants, examples, docs, and the MCP Apps widget wiring; combining identity rename with this contract change would make regressions hard to isolate. Plan rename as a separate migration once this contract is stable. |
-| **Q2** | `get-actor-run` mirrors `call-actor`'s canonical shape, including `storages.dataset.fields` and `storages.keyValueStore.{keys,keyCount}` when available. |
+| **Q2** | `get-actor-run` mirrors `call-actor`'s canonical shape, including `storages.datasets.default.fields` and `storages.keyValueStores.default.{keys,keyCount}` when available. |
 | **Q3** | `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run` become available in actor-running workflows through loader auto-injection. Default categories stay unchanged. `get-actor-output` remains available for one minor cycle, deprecated, ordered after `get-dataset-items`. |
-| **Q4** | Slash-to-dot translation is handled by the server for `storages.dataset.fields`. `get-dataset-items` auto-flattens any parent referenced in dot-notation `fields`. Explicit `flatten` arg remains as a diagnostic override. The LLM never sees slashes and never has to compute a flatten set. |
+| **Q4** | Slash-to-dot translation is handled by the server for `storages.datasets.default.fields`. `get-dataset-items` auto-flattens any parent referenced in dot-notation `fields`. Explicit `flatten` arg remains as a diagnostic override. The LLM never sees slashes and never has to compute a flatten set. |
 | **Q5** | `isError` is `false` whenever we observe any terminal actor status (`SUCCEEDED`, `FAILED`, `ABORTED`, `TIMED-OUT`). Task mode lands in `status: completed` for observed actor terminal states. Task `status: failed` is reserved for tool-side failures (auth, validation, network, server). |
-| **Q6** | Storage tools stay single-purpose: `get-dataset-items` requires `datasetId`, `get-key-value-store-record` requires `keyValueStoreId`. The canonical response surfaces both IDs under `storages.*.id` and `nextStep` interpolates them verbatim, so text-mode clients still see one self-contained instruction. (Earlier draft accepted `runId` as an alternative; dropped to avoid a two-mode tool surface and a hidden run-fetch round-trip.) |
-| **Q7** | The response does not inline KV record bodies. Instead `storages.keyValueStore.keys` lists up to 50 key names with `keyCount` reflecting the total. The agent fetches any record it wants via `get-key-value-store-record`. |
+| **Q6** | Storage tools stay single-purpose: `get-dataset-items` requires `datasetId`, `get-key-value-store-record` requires `keyValueStoreId`. The canonical response surfaces both IDs under `storages.datasets.default.id` / `storages.keyValueStores.default.id` and `nextStep` interpolates them verbatim, so text-mode clients still see one self-contained instruction. (Earlier draft accepted `runId` as an alternative; dropped to avoid a two-mode tool surface and a hidden run-fetch round-trip.) |
+| **Q7** | The response does not inline KV record bodies. Instead `storages.keyValueStores.default.keys` lists up to 50 key names with `keyCount` reflecting the total. The agent fetches any record it wants via `get-key-value-store-record`. |
 | **Q8** | Status enum is the full Apify set: `READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED`. `ABORTING` and `TIMING-OUT` pass through with their own `summary` and `nextStep` templates. |
-| **Q9** | `waitSecs` is capped at 0–45 on both `call-actor` and `get-actor-run`. Default 30 on `call-actor`, 0 on `get-actor-run`. The 45 s ceiling stays safely under the 60 s tool-call timeout that several MCP clients impose; longer waits are agent-driven via repeated `get-actor-run` polls. |
+| **Q9** | `waitSecs` is capped at 0–45 on both `call-actor` and `get-actor-run`, default 30 on both. (The spec originally proposed 0 on `get-actor-run` to preserve immediate-poll behavior; bumped to 30 in #822 so a single tool call observes a fast actor's terminal state without a follow-up poll. Pass `waitSecs: 0` for the original fire-and-return semantics.) The 45 s ceiling stays safely under the 60 s tool-call timeout that several MCP clients impose; longer waits are agent-driven via repeated `get-actor-run` polls. |
 
 ## What an LLM sees on a successful call
 
@@ -73,16 +73,20 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
   "finishedAt": "2026-04-29T14:00:22.000Z",
   "stats": { "runTimeSecs": 22, "computeUnits": 0.04, "memMaxBytes": 268435456 },
   "storages": {
-    "dataset": {
-      "id": "dataset-xyz",
-      "itemCount": 47,
-      "fields": ["crawl.httpStatusCode", "metadata.url", "markdown"],
-      "stats": { "writeCount": 47, "storageBytes": 152340 }
+    "datasets": {
+      "default": {
+        "id": "dataset-xyz",
+        "itemCount": 47,
+        "fields": ["crawl.httpStatusCode", "metadata.url", "markdown"],
+        "stats": { "writeCount": 47, "storageBytes": 152340 }
+      }
     },
-    "keyValueStore": {
-      "id": "kv-xyz",
-      "keyCount": 1,
-      "keys": ["INPUT"]
+    "keyValueStores": {
+      "default": {
+        "id": "kv-xyz",
+        "keyCount": 1,
+        "keys": ["INPUT"]
+      }
     }
   },
   "summary": "SUCCEEDED in 22s. 47 items; 3 fields available.",
@@ -113,45 +117,55 @@ Returned by `call-actor` and `get-actor-run` once Apify has created a run. Pre-r
     memMaxBytes?: number,
   },
 
-  storages: {
-    dataset: {
-      id: string,
-      name?: string,
-      title?: string,
-      createdAt?: string,
-      modifiedAt?: string,
-      itemCount?: number,
-      cleanItemCount?: number,
-      fields?: string[],           // dot notation, e.g. ["crawl.httpStatusCode", "searchResult.title"]
-      stats?: {
-        readCount?: number,
-        writeCount?: number,
-        deleteCount?: number,
-        storageBytes?: number,
-      },
-    },
-    keyValueStore: {
-      id: string,
-      name?: string,
-      title?: string,
-      createdAt?: string,
-      modifiedAt?: string,
-      stats?: {
-        readCount?: number,
-        writeCount?: number,
-        deleteCount?: number,
-        listCount?: number,
-        storageBytes?: number,
-      },
-      keyCount?: number,           // total number of keys in the store
-      keys?: string[],              // up to 50 key names; if keys.length < keyCount the list is truncated
-    },
-  },
+  storages: RunStorages,
 
   summary: string,
   nextStep: string,
 }
 ```
+
+### `storages` types
+
+Our `RunStorages` extends the Apify client's `ActorRunStorageIds` (the alias-map shape) by replacing bare ID strings with metadata-bearing value objects:
+
+```ts
+// Apify client (apify-client/src/resource_clients/actor_run.ts) — bare IDs only.
+interface ActorRunStorageIds {
+  datasets: { default: string; [alias: string]: string };
+  keyValueStores: { default: string; [alias: string]: string };
+  requestQueues: { default: string; [alias: string]: string };
+}
+
+// Our MCP shape — same alias-map structure, values carry fetched metadata.
+export type RunDataset = {
+  id: string;
+  name?: string;
+  title?: string;
+  itemCount?: number;
+  cleanItemCount?: number;
+  fields?: string[];              // dot notation, server rewrites Apify's `/` to `.`
+};
+
+export type RunKeyValueStore = {
+  id: string;
+  name?: string;
+  title?: string;
+  keyCount?: number;              // total number of keys in the store
+  keys?: string[];                // up to 50 names; truncated when keys.length < keyCount
+};
+
+export type RunStorages = {
+  datasets?:       { default: RunDataset;       [alias: string]: RunDataset };
+  keyValueStores?: { default: RunKeyValueStore; [alias: string]: RunKeyValueStore };
+};
+```
+
+Differences from `ActorRunStorageIds`:
+
+- **Values are metadata objects, not bare strings.** The Apify ID lives at `.id`. Everything else (`itemCount`, `fields`, `keys`, `keyCount`) is fetched once at terminal and surfaced inline so the agent decides whether to call `get-dataset-items` / `get-key-value-store-record`.
+- **Top-level fields are optional** (`datasets?`, `keyValueStores?`). Pre-run failures and non-terminal responses may carry an empty `storages: {}`. Apify's type requires both because it describes a fully-created run record.
+- **`requestQueues` is omitted.** No tool surface today consumes request-queue metadata; we can add `requestQueues?: { default: RunRequestQueue; [alias: string]: RunRequestQueue }` later without breaking the existing shape.
+- **Only `default` is populated today.** The `[alias: string]` index signature is forward-compat: when named Actor storages (`storages.datasets.results`) become a feature, they slot in under additional alias keys with no schema rename.
 
 `_meta` continues to carry usage data under the namespaced key `com.apify/ActorRun` (i.e. `_meta["com.apify/ActorRun"] = { usageTotalUsd, usageUsd }`), per the MCP `_meta` rule that non-reserved keys be namespaced. This convention was introduced on master in #775 and is unaffected by this redesign.
 
@@ -163,7 +177,7 @@ Field-population notes:
 - `statusMessage` mirrors `run.statusMessage` verbatim; surfacing it at the top level lets clients render it without re-fetching.
 - `exitCode` is most useful for `FAILED`. `SUCCEEDED` runs typically have `0`; aborts may not populate it.
 - `fields` is in dot notation. Server reads Apify's slash form and rewrites `/` to `.` before returning.
-- `keys` and `keyCount` are populated for terminal states by listing the run's default key-value store. The server caps `keys` at 50 entries; when `keyCount > keys.length`, the list is truncated and the agent should ask for specific keys directly via `get-key-value-store-record`. Both fields may be omitted on non-terminal states or if the listKeys call fails.
+- `keys` and `keyCount` on `keyValueStores.default` are populated for terminal states by listing the run's default key-value store. The server caps `keys` at 50 entries; when `keyCount > keys.length`, the list is truncated and the agent should ask for specific keys directly via `get-key-value-store-record`. Both fields may be omitted on non-terminal states or if the listKeys call fails.
 
 ## Status templates
 
@@ -175,14 +189,14 @@ Every status returns a concrete `summary` and one primary `nextStep`. Templates 
 | RUNNING | `"RUNNING for ${elapsedSecs}s. ${statusMessage \|\| 'In progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to poll for completion."` |
 | TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage \|\| 'Run-time limit reached; cleanup in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
 | ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage \|\| 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
-| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items; ${fieldCount} fields available."` | `"Use get-dataset-items with datasetId=${storages.dataset.id} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${storages.dataset.fields.join(', ')} — pass via fields=\"...\" to project. Preview with limit=3."` |
-| SUCCEEDED, dataset empty + KV has keys | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCount} keys)."` | When `keys` includes `OUTPUT`: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStore.id} and recordKey=\"OUTPUT\" to read the main output. Other keys: ${keys.filter(k=>k!=='OUTPUT').join(', ') \|\| 'none'}."` Otherwise: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStore.id} and one of these keys (as recordKey): ${storages.keyValueStore.keys.join(', ')}."` |
+| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items; ${fieldCount} fields available."` | `"Use get-dataset-items with datasetId=${storages.datasets.default.id} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${storages.datasets.default.fields.join(', ')} — pass via fields=\"...\" to project. Preview with limit=3."` |
+| SUCCEEDED, dataset empty + KV has keys | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCount} keys)."` | When `keys` includes `OUTPUT`: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStores.default.id} and recordKey=\"OUTPUT\" to read the main output. Other keys: ${keys.filter(k=>k!=='OUTPUT').join(', ') \|\| 'none'}."` Otherwise: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStores.default.id} and one of these keys (as recordKey): ${storages.keyValueStores.default.keys.join(', ')}."` |
 | SUCCEEDED, no dataset items, no KV keys | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found."` | `"Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run call-actor with adjusted input."` |
 | FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Diagnose using statusMessage and exitCode in this response; re-run call-actor with adjusted input if the cause is fixable."` |
 | ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use call-actor again if you want to rerun the actor."` |
-| TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Use get-dataset-items with datasetId=${storages.dataset.id} and limit=20 to fetch any partial output (${itemCount ?? 0} items written). Available fields: ${storages.dataset.fields?.join(', ') \|\| 'none'}."` |
+| TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Use get-dataset-items with datasetId=${storages.datasets.default.id} and limit=20 to fetch any partial output (${itemCount ?? 0} items written). Available fields: ${storages.datasets.default.fields?.join(', ') \|\| 'none'}."` |
 
-`elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is `storages.dataset.fields?.length ?? 0`.
+`elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is `storages.datasets.default.fields?.length ?? 0`.
 
 ### `content[]` shape (MCP spec conformance)
 
@@ -233,7 +247,7 @@ Implementation reuses the existing `ProgressTracker` (`src/utils/progress.ts`) t
 
 Task mode is selected when the client passes `task: {...}` on `tools/call`. The server returns `CreateTaskResult` immediately and runs the underlying tool in the background until terminal or cancelled.
 
-- `waitSecs` and `async` from the args are **overridden** at the task boundary. The task always waits until terminal — honoring `async: true` would let the task complete the moment the actor started, which is wrong. If the caller sends both `task: {...}` and `async: true`, log a deprecation event but still wait until terminal.
+- `waitSecs` from the args is **overridden** at the task boundary. The task always waits until terminal — honoring `waitSecs: 0` would let the task complete the moment the actor started, which is wrong.
 - Push notifications: `notifications/tasks/status` emits on every state change (start → working, on `statusMessage` change, on terminal). No heartbeat — `tools/call` in task mode returns immediately, and per spec `notifications/tasks/status` is `MAY` so clients must not depend on it; the SDK client polls `tasks/get` regardless.
 - `tasks/result` returns the canonical shape (same as sync mode).
 - See **Cancellation** below.
@@ -275,9 +289,9 @@ Two race conditions are explicitly accounted for:
 
 ## Truncation policies
 
-### `keyValueStore.keys`
+### `keyValueStores.default.keys`
 
-For terminal states, the server lists the run's default key-value store via Apify's `listKeys` endpoint and includes the result in `storages.keyValueStore`:
+For terminal states, the server lists the run's default key-value store via Apify's `listKeys` endpoint and includes the result in `storages.keyValueStores.default`:
 
 - `keyCount` — total number of keys reported by Apify.
 - `keys` — first 50 key names in the order Apify returns them.
@@ -292,7 +306,7 @@ If the listKeys call fails or the run has no default key-value store, both field
 |---|---|---|
 | `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. Declares `execution.taskSupport: "optional"` per MCP spec. |
 | `run-actor` | Deferred | Not implemented in this PR. Plan as a separate rename migration. |
-| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
+| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 30 per #822). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
 | `get-actor-run-widget` | Modified | Apps mode only. Accepts `runId` only — no `waitSecs`. Always returns immediately so the widget renders without delay; the widget UI then polls `get-actor-run` with `waitSecs: 0` for live updates. |
 | `get-dataset-items` | Promoted in actor workflows | Requires `datasetId`. Defaults `limit` to 20. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
 | `get-key-value-store-record` | Promoted in actor workflows | Requires `keyValueStoreId` and `recordKey`. Parameter `keyValueStoreId` is renamed from the prior `storeId` to align with `datasetId`; `recordKey` is kept as-is to match the existing tool schema. |
@@ -305,7 +319,7 @@ Auto-injection policy: when `call-actor`, a direct actor tool, or `add-actor` is
 
 The behavioral change that actually closes the silent-failure gap:
 
-- Requires `datasetId` (single mode). The agent gets `datasetId` from `storages.dataset.id` on the canonical response, or interpolated directly into `nextStep` for text-mode clients.
+- Requires `datasetId` (single mode). The agent gets `datasetId` from `storages.datasets.default.id` on the canonical response, or interpolated directly into `nextStep` for text-mode clients.
 - When `fields` contains dot-notation paths (e.g. `"metadata.url"`), the server derives the unique top-level parent prefixes and passes them as `flatten` to Apify automatically. The LLM never has to know about Apify's `flatten` parameter.
 - If the caller provides explicit `flatten`, it overrides the auto-derivation (diagnostic escape hatch).
 - Default `limit: 20` when omitted, to prevent inadvertent large reads. The agent can opt for more by passing an explicit `limit`.
@@ -317,10 +331,10 @@ This is the change that lets us deprecate `get-actor-output`: once `get-dataset-
 The KV-only-actor case (and any actor that writes auxiliary records) needs a first-class fetch path now that the response no longer inlines record bodies.
 
 - Requires `keyValueStoreId` and `recordKey`. v4 renames the prior `storeId` to `keyValueStoreId` for consistency with `datasetId`; `recordKey` is kept as-is to match the existing tool schema.
-- The agent gets `keyValueStoreId` from `storages.keyValueStore.id` on the canonical response, or interpolated directly into `nextStep` for text-mode clients.
+- The agent gets `keyValueStoreId` from `storages.keyValueStores.default.id` on the canonical response, or interpolated directly into `nextStep` for text-mode clients.
 - Auto-surfaced in actor workflows so the LLM can act on `nextStep` without the storage tool category being explicitly enabled.
 
-The agent's path for KV-only output is: `call-actor` returns `storages.keyValueStore.{id,keyCount,keys}` → `nextStep` points at `get-key-value-store-record(keyValueStoreId=${storages.keyValueStore.id}, recordKey="OUTPUT")` → agent fetches the body when (and only when) it actually wants it.
+The agent's path for KV-only output is: `call-actor` returns `storages.keyValueStores.default.{id,keyCount,keys}` → `nextStep` points at `get-key-value-store-record(keyValueStoreId=${storages.keyValueStores.default.id}, recordKey="OUTPUT")` → agent fetches the body when (and only when) it actually wants it.
 
 ## `callOptions` accepted keys
 
@@ -351,14 +365,8 @@ Canonical input:
 
 `input` stays required, matching today's behavior.
 
-Deprecated fields accepted for one minor cycle so old hardcoded callers do not fail immediately:
-
-- `async: true` maps to `waitSecs: 0`.
-- `async: false` maps to the default `waitSecs`.
-- Both `async` and `waitSecs` together: rejected as ambiguous.
-- `previewOutput` accepted but ignored. The response no longer inlines item or record samples, so the original token-risk reason for disabling previews no longer applies — previews are agent-driven via `get-dataset-items` (`limit: 3`) or `get-key-value-store-record`.
-
-Deprecated fields are not promoted in the tool description.
+- `async` has been **removed**. Callers control blocking via `waitSecs` directly (0 = fire-and-forget, >0 = wait). The earlier deprecated `async` → `waitSecs` mapping was dropped during implementation to keep the input schema flat.
+- `previewOutput` is accepted but ignored. The response no longer inlines item or record samples, so the original token-risk reason for disabling previews no longer applies — previews are agent-driven via `get-dataset-items` (`limit: 3`) or `get-key-value-store-record`. Not promoted in the tool description; slated for removal in the next minor cycle.
 
 ## End-to-end flows
 
@@ -375,7 +383,7 @@ sequenceDiagram
   Apify-->>Server: SUCCEEDED at 10s
   Server->>Apify: dataset.get (fields, itemCount) + keyValueStore.listKeys (keys, keyCount)
   Note over Server: server translates fields slash->dot;<br/>caps keys at 50
-  Server-->>LLM: status:SUCCEEDED, storages.dataset:{id,itemCount,fields}, storages.keyValueStore:{id,keyCount,keys}, summary, nextStep
+  Server-->>LLM: status:SUCCEEDED, storages.datasets.default:{id,itemCount,fields}, storages.keyValueStores.default:{id,keyCount,keys}, summary, nextStep
   LLM->>Server: get-dataset-items(datasetId, fields:"metadata.url,markdown", limit:20)
   Note over Server: auto-flatten parent "metadata"<br/>before calling Apify
   Server-->>LLM: items:[...]
@@ -408,31 +416,31 @@ sequenceDiagram
 
 | Change | Impact |
 |---|---|
-| Response: dataset id moves to `storages.dataset.id` | Hard. `call-actor` data response had `datasetId` at top level; `get-actor-run-widget` had `dataset.datasetId` nested. Both move to `storages.dataset.id`. |
+| Response: dataset id moves to `storages.datasets.default.id` | Hard. `call-actor` data response had `datasetId` at top level; `get-actor-run-widget` had `dataset.datasetId` nested. Both move to `storages.datasets.default.id`. The plural alias-map mirrors Apify's `ActorRunStorageIds`, leaving room for named storages under additional alias keys. |
 | Response: `items` removed from `call-actor` / `get-actor-run` | Hard. Agent fetches via `get-dataset-items`. |
 | `previewItems` removed; no item samples in the response | Hard. Agent fetches a preview via `get-dataset-items` with `limit: 3`. |
 | `instructions` → `summary` + `nextStep` | Hard. Different semantics and names. |
 | `content[0]` is JSON-stringified `structuredContent`; narrative (`summary` + `nextStep`) moved to `content[1]` | Hard for text-mode clients. Per MCP spec backwards-compat recommendation, block 0 mirrors structuredContent; narrative still available in block 1 and inside structuredContent. |
 | `schema` field dropped; `fields` returned in dot notation | Hard. JSON Schema generation is removed from this path. |
 | `call-actor` default wait changes to 30 s; `waitSecs` capped at 45 | Hard for long-running actors. They now return non-terminal with a polling `nextStep` instead of blocking indefinitely. The 45 s ceiling stays under the 60 s tool-call timeout common to several MCP clients. |
-| `async` parameter deprecated but accepted | Soft. `async: true` maps to `waitSecs: 0`; remove next minor cycle. |
+| `async` parameter removed | Hard. Callers pass `waitSecs` directly (0 = fire-and-forget, >0 = wait). No mapping shim. |
 | `previewOutput` deprecated but accepted | Soft. Ignored — previews are agent-driven now. Remove next minor cycle. |
 | `get-actor-output` deprecated | Soft for one cycle. Still callable; description points to `get-dataset-items` (dataset items) and `get-key-value-store-record` (KV records). |
 | `get-dataset-items` auto-flattens dot-notation `fields` | Soft. Explicit `flatten` still works as override. |
 | `get-key-value-store-record` auto-surfaced in actor workflows | Soft. Additive. Closes the KV-only-actor path now that record bodies are not inlined. |
 | `abort-actor-run` auto-surfaced in actor workflows | Soft. Additive. |
-| `get-actor-run` adds `waitSecs`, default 0, capped at 45 | Soft. Existing callers keep immediate-poll behavior. |
+| `get-actor-run` adds `waitSecs`, default 30, capped at 45 | Hard for callers that depended on immediate return. Pass `waitSecs: 0` for the old behavior; the new default is a single tool call that observes a fast actor's terminal state. |
 | `get-actor-run` emits `notifications/progress` during the wait when `_meta.progressToken` is provided | Soft. Additive, opt-in. Reuses the same `ProgressTracker` pattern wired into `call-actor` today. |
 | `isError` unified | Soft for tool-call semantics, but clients using task `status: failed` to detect actor failure must read inner `status` instead. |
-| `storages.keyValueStore.{keys,keyCount}` added | Soft. Additive. Replaces the inline-OUTPUT path that earlier drafts considered. |
+| `storages.keyValueStores.default.{keys,keyCount}` added | Soft. Additive. Replaces the inline-OUTPUT path that earlier drafts considered. |
 | `callOptions` accepts three new keys (`build`, `maxItems`, `maxTotalChargeUsd`) | Soft. Additive. Unknown keys keep being silently dropped. |
 | Status enum widened to all 8 Apify states | Soft. Additive. |
 | `actorId` added; `actorName` becomes optional | Soft (additive). `actorName` was never present on the shipped `call-actor` shape and was already optional on `get-actor-run`. |
 | `statusMessage` and `exitCode` added at top level | Soft. Additive. |
 | `tasks/cancel` now propagates to `run.abort()` | Soft (bug fix). The current behavior — orphaned runs continuing after cancel — is an oversight, not load-bearing semantics. |
-| Task mode forces `waitSecs` to wait-until-terminal and ignores `async: true` | Soft. Additive defensive behavior. |
+| Task mode forces `waitSecs` to wait-until-terminal | Soft. Additive defensive behavior. |
 | `actor: "name:tool"` MCP-server pass-through is excluded from the canonical shape | No new behavior; the doc just admits the carve-out exists. |
-| KV tools rename `storeId` → `keyValueStoreId` | Hard. Affects `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`. Aligns with `datasetId` and the canonical `storages.keyValueStore.id`. |
+| KV tools rename `storeId` → `keyValueStoreId` | Hard. Affects `get-key-value-store`, `get-key-value-store-keys`, `get-key-value-store-record`. Aligns with `datasetId` and the canonical `storages.keyValueStores.default.id`. |
 
 Breaking changes must be coordinated with `apify-mcp-server-internal` before merge. The internal repo is spared the tool-name migration (no rename), but **not** the contract migration:
 
@@ -442,11 +450,11 @@ Breaking changes must be coordinated with `apify-mcp-server-internal` before mer
 
 ## Widget impact
 
-Three apps-mode tools share this canonical shape and must be updated together: the apps-mode `call-actor`, `call-actor-widget`, and `get-actor-run-widget`. Today's widget responses nest under `structuredContent.dataset.{datasetId, previewItems}` (per `src/tools/core/get_actor_run_common.ts`); v4 moves both fields into `structuredContent.storages.dataset.{id, ...}` with no `previewItems` at all. The actor-run widget must:
+Three apps-mode tools share this canonical shape and must be updated together: the apps-mode `call-actor`, `call-actor-widget`, and `get-actor-run-widget`. Today's widget responses nest under `structuredContent.dataset.{datasetId, previewItems}` (per `src/tools/core/get_actor_run_common.ts`); v4 moves both fields into `structuredContent.storages.datasets.default.{id, ...}` with no `previewItems` at all. The actor-run widget must:
 
-- Read `storages.dataset.id` (replaces `dataset.datasetId`).
-- Drop any read of `dataset.previewItems`. Fetch a small preview (e.g. `limit: 3`) or a full table (`limit: 100`) via `get-dataset-items` with `datasetId` (read from `storages.dataset.id`), depending on widget context.
-- Read `storages.keyValueStore.{keyCount,keys}` to render a key list; fetch individual records on demand via `get-key-value-store-record` (parameter is `recordKey`, not `key`).
+- Read `storages.datasets.default.id` (replaces `dataset.datasetId`).
+- Drop any read of `dataset.previewItems`. Fetch a small preview (e.g. `limit: 3`) or a full table (`limit: 100`) via `get-dataset-items` with `datasetId` (read from `storages.datasets.default.id`), depending on widget context.
+- Read `storages.keyValueStores.default.{keyCount,keys}` to render a key list; fetch individual records on demand via `get-key-value-store-record` (parameter is `recordKey`, not `key`).
 - Read top-level `statusMessage` and `exitCode` directly instead of re-fetching.
 - Poll `get-actor-run` with `waitSecs: 0` so widget refreshes do not block.
 - Accept the old shape for one minor cycle only if cheap to do so. Do not add complex compatibility branches.
@@ -465,7 +473,7 @@ The `get-actor-run-widget` tool itself takes only `runId` and always returns imm
 
 - Rename `call-actor` to `run-actor` — separate migration after this contract stabilizes.
 - Convert direct actor tools (e.g. `apify--rag-web-browser`) to the canonical shape — separate PR.
-- Remove deprecated `async`, `previewOutput`, and `get-actor-output` — next minor cycle.
+- Remove deprecated `previewOutput` and `get-actor-output` — next minor cycle. (`async` already removed in #825.)
 - `taskSupport` on `get-actor-run` — revisit after task adoption is measured.
 - `waitSecs` ceiling tuning — based on real telemetry; 45 s is the conservative starting point.
 - Convert MCP-server pass-through (`actor:tool`) to a uniform shape — orthogonal redesign.
@@ -486,11 +494,11 @@ Verified against the live [tasks spec](https://modelcontextprotocol.io/specifica
 End-to-end behavioral assertions, summarised:
 
 - **Canonical shape** is returned for sync `call-actor` and `get-actor-run` against a representative actor (rag-web-browser).
-- **No item or record bodies in the response.** `storages.dataset.fields` and `storages.keyValueStore.{keys,keyCount}` are populated; no `sampleItems` and no inlined record bodies appear under any path.
+- **No item or record bodies in the response.** `storages.datasets.default.fields` and `storages.keyValueStores.default.{keys,keyCount}` are populated; no `sampleItems` and no inlined record bodies appear under any path.
 - **`waitSecs` cap.** Both `call-actor` and `get-actor-run` reject `waitSecs > 45` with a validation error. `waitSecs: 45` is accepted and the call returns within roughly that bound.
 - **`get-dataset-items` with dot-notation `fields`** returns nested values without explicit `flatten` (auto-flatten works).
-- **`get-key-value-store-record` with `keyValueStoreId`** (read from `storages.keyValueStore.id`) returns the requested record body. Auto-injection: the tool is present in the active tool set whenever `call-actor` is, without explicitly enabling the storage category.
-- **KV-only actor**: `storages.keyValueStore.{id,keys}` lists the store ID and keys (including `OUTPUT`); the response carries no record body. The `nextStep` directs the agent at `get-key-value-store-record(keyValueStoreId, recordKey="OUTPUT")` with the store ID interpolated.
+- **`get-key-value-store-record` with `keyValueStoreId`** (read from `storages.keyValueStores.default.id`) returns the requested record body. Auto-injection: the tool is present in the active tool set whenever `call-actor` is, without explicitly enabling the storage category.
+- **KV-only actor**: `storages.keyValueStores.default.{id,keys}` lists the store ID and keys (including `OUTPUT`); the response carries no record body. The `nextStep` directs the agent at `get-key-value-store-record(keyValueStoreId, recordKey="OUTPUT")` with the store ID interpolated.
 - **Task mode** lands in `completed` for an actor that finishes in any terminal state, including `FAILED`.
 - **Synthetic infra failure** (invalid actor, sandboxed revoked token) lands in task `failed` and populates `task.statusMessage`.
 - **Push notifications**: at least one `notifications/tasks/status` arrives between `tasks/created` and `completed`.
@@ -501,7 +509,7 @@ End-to-end behavioral assertions, summarised:
 - **`notifications/tasks/status` payload**: every emission contains the full `Task` object (taskId, status, createdAt, lastUpdatedAt, ttl, optional statusMessage/pollInterval).
 - **`CreateTaskResult` shape**: `tools/call` with `task: { ttl }` returns `{ task: { taskId, status: "working", ... } }` — nested, not flat.
 - **`taskSupport` placement**: `tools/list` reports `call-actor.execution.taskSupport === "optional"`; other v4 tools either omit `execution` or set `taskSupport: "forbidden"`.
-- **Task mode override**: `task: {...}` plus deprecated `async: true` does not short-circuit the task; it waits until terminal.
+- **Task mode override**: `task: {...}` plus `waitSecs: 0` does not short-circuit the task; it waits until terminal.
 - **MCP-server pass-through**: `actor: "name:tool"` returns the remote MCP tool result, not the canonical shape.
 - **`callOptions` accept-path**: each of `memory`, `timeout`, `build`, `maxItems`, `maxTotalChargeUsd` passes Zod parsing; `maxItems` is forwarded to `apifyClient.actor(...).start()` end-to-end against `apify/rag-web-browser`.
 - **`keys` cap**: a KV store with >50 keys returns the first 50 names with `keyCount` reflecting the total.

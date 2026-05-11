@@ -33,7 +33,7 @@ export const getActorRunArgs = z.object({
 
 const GET_ACTOR_RUN_DESCRIPTION = `Get detailed information about a specific Actor run.
 
-Returns run result: status, storages (dataset / key-value store), stats, summary, nextStep.
+Returns run result: status, storages (datasets/keyValueStores alias map), stats, summary, nextStep.
 - summary describes the past (e.g. "SUCCEEDED in 22s. 47 items; 3 fields available.").
 - nextStep prescribes one primary follow-up action with identifiers interpolated (e.g. "Use get-dataset-items with datasetId=...").
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.

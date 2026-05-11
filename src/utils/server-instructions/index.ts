@@ -59,9 +59,9 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   - Then call with proper input to execute the Actor.
   - For MCP server Actors, use format "actorName:toolName" to call specific tools.${isApps ? `
   - In this mode \`${HelperTools.ACTOR_CALL}\` always runs asynchronously — it starts the run and returns immediately with a runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and \`${HelperTools.ACTOR_OUTPUT_GET}\` to fetch output once the run completes.` : `
-  - Supports async execution via the \`async\` parameter:
-    - \`async: false\` or unset: waits for completion and returns results immediately.
-    - \`async: true\`: starts the run and returns immediately with a runId.`}
+  - Supports a \`waitSecs\` parameter (default 30, max 45):
+    - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
+    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.`}
 
 ### Tool disambiguation
 - **\`${HelperTools.ACTOR_OUTPUT_GET}\` vs \`${HelperTools.DATASET_GET_ITEMS}\`:**

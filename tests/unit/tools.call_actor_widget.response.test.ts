@@ -88,7 +88,7 @@ describe('call-actor-widget response', () => {
                 actorName: string;
                 status: string;
                 startedAt: string;
-                storages: { dataset?: { id: string }; keyValueStore?: { id: string } };
+                storages: { datasets?: { default: { id: string } }; keyValueStores?: { default: { id: string } } };
                 summary: string;
                 nextStep: string;
             };
@@ -103,8 +103,8 @@ describe('call-actor-widget response', () => {
         expect(structuredContent.actorName).toBe('apify/rag-web-browser');
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-id-1');
-        expect(structuredContent.storages.keyValueStore?.id).toBe('kv-id-1');
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-id-1');
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-id-1');
         expect(structuredContent.summary).toContain('RUNNING');
         expect(structuredContent.nextStep).toContain('run-widget-1');
 

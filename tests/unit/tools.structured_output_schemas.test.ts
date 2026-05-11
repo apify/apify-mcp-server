@@ -4,8 +4,8 @@ import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory
 import {
     actorDetailsOutputSchema,
     actorInfoSchema,
-    buildEnrichedCallActorOutputSchema,
-    callActorOutputSchema,
+    buildEnrichedDirectActorOutputSchema,
+    directActorOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -76,10 +76,10 @@ function createMockActorStore(schemas: Record<string, Record<string, unknown> | 
 }
 
 describe('Structured Output Schemas', () => {
-    describe('buildEnrichedCallActorOutputSchema', () => {
+    describe('buildEnrichedDirectActorOutputSchema', () => {
         it('should enrich schema with simple properties', () => {
             const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const enrichedSchema = buildEnrichedDirectActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
 
             const { items } = enrichedSchema.properties;
             expect(items.type).toBe('array');
@@ -88,12 +88,12 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toEqual(itemProperties);
         });
 
-        it('should NOT mutate original callActorOutputSchema', () => {
+        it('should NOT mutate original directActorOutputSchema', () => {
             const itemProperties = { url: { type: 'string' } };
-            buildEnrichedCallActorOutputSchema(itemProperties);
+            buildEnrichedDirectActorOutputSchema(itemProperties);
 
             // Cast to EnrichedSchema to access the nested properties easily
-            const originalSchema = callActorOutputSchema as unknown as EnrichedSchema;
+            const originalSchema = directActorOutputSchema as unknown as EnrichedSchema;
             const originalItems = originalSchema.properties.items.items;
 
             expect(originalItems).toEqual({ type: 'object' });
@@ -105,7 +105,7 @@ describe('Structured Output Schemas', () => {
                 user: { type: 'object', properties: { name: { type: 'string' } } },
                 tags: { type: 'array', items: { type: 'string' } },
             };
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const enrichedSchema = buildEnrichedDirectActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
 
             const itemsSchema = enrichedSchema.properties.items.items;
             expect(itemsSchema.properties).toEqual(itemProperties);
@@ -113,7 +113,7 @@ describe('Structured Output Schemas', () => {
 
         it('should handle empty properties object', () => {
             const itemProperties = {};
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const enrichedSchema = buildEnrichedDirectActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
 
             const itemsSchema = enrichedSchema.properties.items.items;
             expect(itemsSchema.properties).toEqual({});

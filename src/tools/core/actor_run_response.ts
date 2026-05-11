@@ -7,7 +7,7 @@ import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
-/** Cap on `storages.keyValueStore.keys` array length. */
+/** Cap on `storages.keyValueStores.default.keys` array length. */
 export const KV_KEYS_LIMIT = 50;
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
@@ -44,6 +44,17 @@ export type RunKeyValueStore = {
 };
 
 /**
+ * Storage shape mirrors `ActorRunStorageIds` from the Apify client — a map of alias → storage
+ * object where `default` is always the primary entry. Using the same plural alias-map structure
+ * means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing
+ * new field names. Each value extends the bare Apify ID string with fetched metadata.
+ */
+export type RunStorages = {
+    datasets?: { default: RunDataset; [alias: string]: RunDataset };
+    keyValueStores?: { default: RunKeyValueStore; [alias: string]: RunKeyValueStore };
+};
+
+/**
  * Canonical run response shape returned by `call-actor` and `get-actor-run`.
  * Wire shape for `content[]`: `[JSON.stringify(structuredContent), `${summary}\n${nextStep}`]`
  * — see `res/call_actor_redesign_v4.md` § content[] shape for the load-bearing rationale.
@@ -62,10 +73,7 @@ export type RunResponse = {
         computeUnits?: number;
         memMaxBytes?: number;
     };
-    storages: {
-        dataset?: RunDataset;
-        keyValueStore?: RunKeyValueStore;
-    };
+    storages: RunStorages;
     summary: string;
     nextStep: string;
 };
@@ -466,7 +474,10 @@ export function buildStartRunResponse(params: {
         actorName,
         status: actorRun.status,
         startedAt: toIsoString(actorRun.startedAt),
-        storages: { dataset, keyValueStore },
+        storages: {
+            ...(dataset && { datasets: { default: dataset } }),
+            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+        },
         summary,
         nextStep,
     };
@@ -554,7 +565,10 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
-        storages: { dataset, keyValueStore },
+        storages: {
+            ...(dataset && { datasets: { default: dataset } }),
+            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+        },
         summary,
         nextStep,
     };
