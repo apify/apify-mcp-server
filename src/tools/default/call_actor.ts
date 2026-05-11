@@ -2,7 +2,7 @@ import log from '@apify/log';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { buildUsageMeta } from '../../utils/mcp.js';
+import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
 import {
@@ -97,16 +97,12 @@ export const defaultCallActor: ToolEntry = Object.freeze({
             if ('error' in fetchResult) return fetchResult.error;
 
             const { run, structuredContent } = fetchResult.result;
-            const _meta = buildUsageMeta(run);
-            return {
-                content: [
-                    { type: 'text', text: JSON.stringify(structuredContent) },
-                    { type: 'text', text: `${structuredContent.summary}\n\n${structuredContent.nextStep}` },
-                ],
+            return buildMCPResponse({
+                texts: [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
                 structuredContent,
-                ...(_meta && { _meta }),
-                toolTelemetry: { actorId: resolvedActorId },
-            };
+                _meta: buildUsageMeta(run),
+                telemetry: { actorId: resolvedActorId },
+            });
         } catch (error) {
             return buildCallActorErrorResponse({
                 actorName: baseActorName,

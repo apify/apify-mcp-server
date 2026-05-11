@@ -456,7 +456,7 @@ async function waitForRunWithProgress(opts: {
 export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
-}): { content: { type: 'text'; text: string }[]; structuredContent: RunResponse } {
+}): ReturnType<typeof buildMCPResponse> {
     const { actorName, actorRun } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
@@ -482,13 +482,10 @@ export function buildStartRunResponse(params: {
         nextStep,
     };
 
-    return {
-        content: [
-            { type: 'text', text: JSON.stringify(structuredContent) },
-            { type: 'text', text: `${summary}\n\n${nextStep}` },
-        ],
+    return buildMCPResponse({
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
         structuredContent,
-    };
+    });
 }
 
 // -----------------------------------------------------------------------------
