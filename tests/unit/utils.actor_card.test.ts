@@ -1,7 +1,7 @@
 import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { MAX_INPUT_SCHEMA_TEXT_FIELDS } from '../../src/const.js';
+import { MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
@@ -593,15 +593,15 @@ describe('formatActorToActorCard inputSchema rendering', () => {
         expect(result).not.toMatch(/\(\+\d+ more\)/);
     });
 
-    it(`truncates to MAX_INPUT_SCHEMA_TEXT_FIELDS and appends "... (+N more)" when count exceeds the cap`, () => {
+    it(`truncates to MAX_INPUT_FIELDS_IN_TEXT_CARD and appends "... (+N more)" when count exceeds the cap`, () => {
         const overflow = 5;
-        const total = MAX_INPUT_SCHEMA_TEXT_FIELDS + overflow;
+        const total = MAX_INPUT_FIELDS_IN_TEXT_CARD + overflow;
         const properties: Record<string, { type: string }> = {};
         for (let i = 0; i < total; i++) properties[`field${i}`] = { type: 'string' };
         const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
         const result = formatActorToActorCard(actor);
-        expect(result).toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS - 1}?: string`);
-        expect(result).not.toContain(`field${MAX_INPUT_SCHEMA_TEXT_FIELDS}?: string`);
+        expect(result).toContain(`field${MAX_INPUT_FIELDS_IN_TEXT_CARD - 1}?: string`);
+        expect(result).not.toContain(`field${MAX_INPUT_FIELDS_IN_TEXT_CARD}?: string`);
         expect(result).toContain(` ... (+${overflow} more)`);
     });
 

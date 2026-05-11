@@ -66,7 +66,7 @@ describe('searchActorsByKeywords', () => {
 
     it('omits both flags when not provided', async () => {
         listMock.mockResolvedValueOnce({ items: [] });
-        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok' });
+        await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 5 });
         expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
     });

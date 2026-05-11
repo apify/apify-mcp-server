@@ -15,7 +15,7 @@ import type { ActorStoreList } from '../types.js';
 export type SearchActorsByKeywordsOptions = {
     search: string;
     apifyToken: string;
-    limit?: number;
+    limit: number;
     offset?: number;
     allowsAgenticUsers?: boolean;
     /** Throws when set with `limit > MAX_LIMIT_WITH_INPUT_SCHEMA` (apify-core 400s above the cap). */
@@ -34,7 +34,7 @@ export async function searchActorsByKeywords(
     options: SearchActorsByKeywordsOptions,
 ): Promise<ActorStoreList[]> {
     const { search, apifyToken, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
-    if (includeInputSchema === true && limit !== undefined && limit > MAX_LIMIT_WITH_INPUT_SCHEMA) {
+    if (includeInputSchema === true && limit > MAX_LIMIT_WITH_INPUT_SCHEMA) {
         throw new Error(
             `searchActorsByKeywords: limit (${limit}) exceeds API cap of ${MAX_LIMIT_WITH_INPUT_SCHEMA} when includeInputSchema=true.`,
         );
