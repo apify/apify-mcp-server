@@ -17,13 +17,23 @@ import {
 } from '../tools/categories.js';
 import { abortActorRun } from '../tools/common/abort_actor_run.js';
 import { addTool } from '../tools/common/add_actor.js';
-import { getActorOutput } from '../tools/common/get_actor_output.js';
 import { getDatasetItems } from '../tools/common/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
 import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
+
+/**
+ * Storage and abort tools auto-injected alongside any actor-running tool
+ * (call-actor / direct actor tools / add-actor). Order matches the workflow:
+ * fetch items → fetch KV record → abort.
+ */
+export const AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS: readonly ToolEntry[] = [
+    getDatasetItems,
+    getKeyValueStoreRecord,
+    abortActorRun,
+] as const;
 
 // All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
 let ALL_INTERNAL_TOOL_NAMES_CACHE: Set<string> | null = null;
@@ -247,7 +257,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     /**
      * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
      * Insert them right after call-actor (or appended at the end when call-actor is absent) to follow the logical workflow order:
-     * call → get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run → get-actor-output (deprecated, last)
+     * call → get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -261,10 +271,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
-        toolsToInject.push(getDatasetItems);
-        toolsToInject.push(getKeyValueStoreRecord);
-        toolsToInject.push(abortActorRun);
-        toolsToInject.push(getActorOutput);
+        toolsToInject.push(...AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS);
     }
 
     if (toolsToInject.length > 0) {

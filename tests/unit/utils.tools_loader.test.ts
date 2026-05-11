@@ -2,7 +2,13 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import {
+    AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS,
+    loadToolsFromInput,
+    toolNamesToInput,
+} from '../../src/utils/tools_loader.js';
+
+const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.map((t) => t.name);
 
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
@@ -74,22 +80,18 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
 
         expect(toolNames).toContain(HelperTools.ACTOR_CALL);
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
-        expect(toolNames).toContain(HelperTools.DATASET_GET_ITEMS);
-        expect(toolNames).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_ABORT);
-        expect(toolNames).toContain(HelperTools.ACTOR_OUTPUT_GET);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
 
+        // Order: call → get-actor-run → AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.
         const callIndex = toolNames.indexOf(HelperTools.ACTOR_CALL);
         const runIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_GET);
-        const datasetIndex = toolNames.indexOf(HelperTools.DATASET_GET_ITEMS);
-        const kvIndex = toolNames.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-        const abortIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_ABORT);
-        const outputIndex = toolNames.indexOf(HelperTools.ACTOR_OUTPUT_GET);
         expect(callIndex).toBeLessThan(runIndex);
-        expect(runIndex).toBeLessThan(datasetIndex);
-        expect(datasetIndex).toBeLessThan(kvIndex);
-        expect(kvIndex).toBeLessThan(abortIndex);
-        expect(abortIndex).toBeLessThan(outputIndex);
+        let prev = runIndex;
+        for (const name of AUTO_INJECTED_TOOL_NAMES) {
+            const index = toolNames.indexOf(name);
+            expect(prev).toBeLessThan(index);
+            prev = index;
+        }
     });
 
     it('does not auto-inject storage or abort tools when no actor-touching tools are present', async () => {
@@ -97,19 +99,15 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
         const toolNames = tools.map((t) => t.name);
 
         expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
-        expect(toolNames).not.toContain(HelperTools.DATASET_GET_ITEMS);
-        expect(toolNames).not.toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-        expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
-        expect(toolNames).not.toContain(HelperTools.ACTOR_OUTPUT_GET);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).not.toContain(name);
     });
 
     it('does not duplicate auto-injected tools when the storage category is also explicitly selected', async () => {
         const tools = await loadToolsFromInput({ tools: ['actors', 'storage', 'runs'] }, apifyClient);
         const toolNames = tools.map((t) => t.name);
-        expect(toolNames.filter((n) => n === HelperTools.DATASET_GET_ITEMS)).toHaveLength(1);
-        expect(toolNames.filter((n) => n === HelperTools.KEY_VALUE_STORE_RECORD_GET)).toHaveLength(1);
-        expect(toolNames.filter((n) => n === HelperTools.ACTOR_RUNS_ABORT)).toHaveLength(1);
-        expect(toolNames.filter((n) => n === HelperTools.ACTOR_OUTPUT_GET)).toHaveLength(1);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) {
+            expect(toolNames.filter((n) => n === name)).toHaveLength(1);
+        }
     });
 });
 

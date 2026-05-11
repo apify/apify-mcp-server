@@ -20,9 +20,12 @@ import { callActorOutputSchema } from '../../src/tools/structured_output_schemas
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
+import { AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 import { assertStatusMessagePropagated, waitForActorRunAbortStatus } from './utils/task_waits.js';
+
+const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.map((t) => t.name);
 
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
@@ -249,17 +252,14 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
-            expect(tools.tools.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 5);
+            expect(tools.tools.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
 
             const names = getToolNames(tools);
             expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
-            // get-actor-run should be automatically included when call-actor is present
+            // get-actor-run + storage/abort helpers are auto-injected alongside call-actor.
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             await client.close();
         });
 
@@ -279,12 +279,12 @@ export function createIntegrationTestsSuite(
             const expectedActors = [actorNameToToolName('apify/rag-web-browser')];
 
             const expectedTotal = expectedActorsTools.concat(expectedDocsTools, expectedActors);
-            expect(names).toHaveLength(expectedTotal.length + 5);
+            expect(names).toHaveLength(expectedTotal.length + 4);
 
             expectToolNamesToContain(names, expectedActorsTools);
             expectToolNamesToContain(names, expectedDocsTools);
             expectToolNamesToContain(names, expectedActors);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // get-actor-run should be automatically included when call-actor is present
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
@@ -294,13 +294,10 @@ export function createIntegrationTestsSuite(
         it('should auto-inject storage and abort tools when enableAddingActors is true', async () => {
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            // add-actor triggers storage/abort/output but NOT get-actor-run (no call-actor; not apps mode).
-            expect(names.length).toEqual(5);
+            // add-actor triggers storage/abort helpers but NOT get-actor-run (no call-actor; not apps mode).
+            expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('add-actor');
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             await client.close();
         });
 
@@ -323,11 +320,11 @@ export function createIntegrationTestsSuite(
         it('should list all default tools and Actors when enableAddingActors is false', async () => {
             client = await createClientFn({ enableAddingActors: false });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 5);
+            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
 
             expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // get-actor-run should be automatically included when call-actor is present
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
@@ -339,12 +336,9 @@ export function createIntegrationTestsSuite(
 
             const names = getToolNames(await client.listTools());
             // experimental category provides add-actor; no call-actor → no get-actor-run.
-            expect(names).toHaveLength(5);
+            expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('add-actor');
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
@@ -353,13 +347,10 @@ export function createIntegrationTestsSuite(
             const actors = ['apify/python-example', 'apify/rag-web-browser'];
             client = await createClientFn({ actors, enableAddingActors: false, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
-            // Actor tools trigger storage/abort/output; default mode skips get-actor-run for actor tools.
-            expect(names.length).toEqual(actors.length + 4);
+            // Actor tools trigger storage/abort helpers; default mode skips get-actor-run for actor tools.
+            expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
@@ -369,13 +360,10 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
 
-            // Should only load the specified actor plus auto-injected storage/abort/output tools
-            expect(names.length).toEqual(actors.length + 4);
+            // Should only load the specified actor plus auto-injected storage/abort helpers
+            expect(names.length).toEqual(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain(actorNameToToolName(actors[0]));
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             // Should NOT include any default category tools
             expect(names).not.toContain('search-actors');
@@ -428,13 +416,10 @@ export function createIntegrationTestsSuite(
             const actors = ['apify/python-example'];
             client = await createClientFn({ tools: actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
-            // The Actor plus auto-injected storage/abort/output tools
-            expect(names).toHaveLength(actors.length + 4);
+            // The Actor plus auto-injected storage/abort helpers.
+            expect(names).toHaveLength(actors.length + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain(actorNameToToolName(actors[0]));
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
@@ -462,15 +447,12 @@ export function createIntegrationTestsSuite(
             const names = getToolNames(await client.listTools());
             const docsToolNames = getExpectedToolNamesByCategories(categories);
             const expected = [...docsToolNames, actorNameToToolName(actors[0])];
-            // Actor tool triggers auto-injection of storage/abort/output tools.
-            expect(names).toHaveLength(expected.length + 4);
+            // Actor tool triggers auto-injection of storage/abort helpers.
+            expect(names).toHaveLength(expected.length + AUTO_INJECTED_TOOL_NAMES.length);
 
             const containsExpected = expected.every((n) => names.includes(n));
             expect(containsExpected).toBe(true);
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
@@ -481,15 +463,14 @@ export function createIntegrationTestsSuite(
             });
             const names = getToolNames(await client.listTools());
 
-            // docs (2) + fetch-actor-details + add-actor + 4 auto-injected (dataset, kv, abort, output)
-            expect(names).toHaveLength(8);
+            // docs (2) + fetch-actor-details + add-actor + auto-injected helpers
+            expect(names).toHaveLength(4 + AUTO_INJECTED_TOOL_NAMES.length);
 
             // Should include: docs category + specific tools
             expect(names).toContain('search-apify-docs'); // from docs category
             expect(names).toContain('fetch-apify-docs'); // from docs category
             expect(names).toContain('fetch-actor-details'); // specific tool
             expect(names).toContain('add-actor'); // specific tool
-            expect(names).toContain('get-actor-output');
 
             // Should NOT include other actors category tools
             expect(names).not.toContain('search-actors');
@@ -521,13 +502,10 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
 
             const names = getToolNames(await client.listTools());
-            // Actor tool triggers storage/abort/output; default mode skips get-actor-run for actor tools.
-            expect(names.length).toEqual(5);
+            // Actor tool triggers storage/abort helpers; default mode skips get-actor-run for actor tools.
+            expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain(actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
@@ -536,24 +514,18 @@ export function createIntegrationTestsSuite(
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
-            expect(names).toHaveLength(5);
+            expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(names).toContain('add-actor');
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
             await addActor(client, ACTOR_PYTHON_EXAMPLE);
 
-            // Check the actor tool was added; initial 5 (add-actor + 4 auto-injected) + new actor = 6
+            // add-actor + auto-injected + newly added actor
             const namesAfterAdd = getToolNames(await client.listTools());
-            expect(namesAfterAdd.length).toEqual(6);
+            expect(namesAfterAdd.length).toEqual(2 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(namesAfterAdd).toContain(selectedToolName);
-            expect(namesAfterAdd).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(namesAfterAdd).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(namesAfterAdd).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(namesAfterAdd).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(namesAfterAdd, AUTO_INJECTED_TOOL_NAMES);
             await callPythonExampleActor(client, selectedToolName);
         });
 
@@ -561,15 +533,12 @@ export function createIntegrationTestsSuite(
             const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
-            // actors category + add-actor + get-actor-run + 4 auto-injected storage/abort/output tools
-            const numberOfTools = getCategoryTools('default').actors.length + 6;
+            // actors category + add-actor + get-actor-run + auto-injected storage/abort helpers
+            const numberOfTools = getCategoryTools('default').actors.length + 2 + AUTO_INJECTED_TOOL_NAMES.length;
             expect(names).toHaveLength(numberOfTools);
             // get-actor-run should be automatically included when call-actor is present
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
-            expect(names).toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).toContain(HelperTools.ACTOR_RUNS_ABORT);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // Check that the Actor is not in the tools list
             expect(names).not.toContain(selectedToolName);
 
@@ -1882,11 +1851,11 @@ export function createIntegrationTestsSuite(
             // Test with enableAddingActors = false via env var
             client = await createClientFn({ enableAddingActors: false, useEnv: true });
             const names = getToolNames(await client.listTools());
-            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 5);
+            expect(names.length).toEqual(getDefaultTools('default').length + defaults.actors.length + 4);
 
             expectToolNamesToContain(names, getDefaultToolNames());
             expectToolNamesToContain(names, DEFAULT_ACTOR_NAMES);
-            expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
+            expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             // get-actor-run should be automatically included when call-actor is present
             expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
 
@@ -1898,13 +1867,7 @@ export function createIntegrationTestsSuite(
             async () => {
                 client = await createClientFn({ enableAddingActors: true, useEnv: true });
                 const names = getToolNames(await client.listTools());
-                expectToolNamesToContain(names, [
-                    'add-actor',
-                    HelperTools.DATASET_GET_ITEMS,
-                    HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                    HelperTools.ACTOR_RUNS_ABORT,
-                    HelperTools.ACTOR_OUTPUT_GET,
-                ]);
+                expectToolNamesToContain(names, ['add-actor', ...AUTO_INJECTED_TOOL_NAMES]);
 
                 await client.close();
             },
@@ -1930,25 +1893,29 @@ export function createIntegrationTestsSuite(
             }
         });
 
-        it('should auto-inject storage and abort tools after call-actor and mark get-actor-output DEPRECATED', async () => {
+        it('should auto-inject storage and abort tools after call-actor in expected order', async () => {
             client = await createClientFn();
             const tools = await client.listTools();
             const names = tools.tools.map((t) => t.name);
 
+            // Order: call-actor → get-actor-run → AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.
             const callIndex = names.indexOf(HelperTools.ACTOR_CALL);
             const runIndex = names.indexOf(HelperTools.ACTOR_RUNS_GET);
-            const datasetIndex = names.indexOf(HelperTools.DATASET_GET_ITEMS);
-            const kvIndex = names.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            const abortIndex = names.indexOf(HelperTools.ACTOR_RUNS_ABORT);
-            const outputIndex = names.indexOf(HelperTools.ACTOR_OUTPUT_GET);
-
             expect(callIndex).toBeGreaterThanOrEqual(0);
             expect(callIndex).toBeLessThan(runIndex);
-            expect(runIndex).toBeLessThan(datasetIndex);
-            expect(datasetIndex).toBeLessThan(kvIndex);
-            expect(kvIndex).toBeLessThan(abortIndex);
-            expect(abortIndex).toBeLessThan(outputIndex);
+            let prev = runIndex;
+            for (const name of AUTO_INJECTED_TOOL_NAMES) {
+                const index = names.indexOf(name);
+                expect(prev).toBeLessThan(index);
+                prev = index;
+            }
 
+            await client.close();
+        });
+
+        it('should mark get-actor-output description with DEPRECATED prefix when storage category is loaded', async () => {
+            client = await createClientFn({ tools: ['storage'] });
+            const tools = await client.listTools();
             const outputTool = tools.tools.find((t) => t.name === HelperTools.ACTOR_OUTPUT_GET);
             expect(outputTool?.description?.startsWith('DEPRECATED:')).toBe(true);
 
@@ -1958,9 +1925,7 @@ export function createIntegrationTestsSuite(
         it('should not auto-inject storage and abort tools when no actor-touching tools are present', async () => {
             client = await createClientFn({ tools: ['docs'] });
             const names = getToolNames(await client.listTools());
-            expect(names).not.toContain(HelperTools.DATASET_GET_ITEMS);
-            expect(names).not.toContain(HelperTools.KEY_VALUE_STORE_RECORD_GET);
-            expect(names).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
+            for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
             expect(names).not.toContain(HelperTools.ACTOR_OUTPUT_GET);
             expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET);
             await client.close();
@@ -2109,7 +2074,8 @@ export function createIntegrationTestsSuite(
         });
 
         it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
-            client = await createClientFn({ actors: ['apify/rag-web-browser'] });
+            // Storage category included so the deprecated get-actor-output tool is reachable.
+            client = await createClientFn({ tools: ['storage'], actors: ['apify/rag-web-browser'] });
 
             // Call the dedicated apify--rag-web-browser tool
             const result = await client.callTool({
@@ -2171,7 +2137,8 @@ export function createIntegrationTestsSuite(
         });
 
         it('should call apify/python-example and retrieve the full dataset using get-actor-output tool', async () => {
-            client = await createClientFn({ actors: ['apify/python-example'] });
+            // Storage category included so the deprecated get-actor-output tool is reachable.
+            client = await createClientFn({ tools: ['storage'], actors: ['apify/python-example'] });
             const selectedToolName = actorNameToToolName('apify/python-example');
             const input = { first_number: 5, second_number: 7 };
 
