@@ -1287,6 +1287,20 @@ export class ActorsMcpServer {
             });
         };
 
+        // Once a task is cancelled the spec forbids writing a result; every storage path
+        // must short-circuit here. `logSuffix` is concatenated after "Task was cancelled"
+        // so we keep the existing log format and the existing telemetry status per path.
+        const skipIfTaskCancelled = async (
+            logSuffix: string,
+            status: ToolStatus,
+            diagnostics?: CallDiagnostics,
+        ): Promise<boolean> => {
+            if (!(await isTaskCancelled(taskId, mcpSessionId, this.taskStore))) return false;
+            log.debug(`[executeToolAndUpdateTask] Task was cancelled${logSuffix}`, { taskId, mcpSessionId });
+            finishTaskTracking(status, diagnostics);
+            return true;
+        };
+
         // Bridges MCP `tasks/cancel` to the running handler: when the client
         // explicitly cancels the task, this signal aborts so the underlying
         // Actor run stops instead of consuming compute until natural completion.
@@ -1305,16 +1319,11 @@ export class ActorsMcpServer {
             // Critical: if a client cancels the task immediately after creation (race condition),
             // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
             // because terminal states cannot transition to other states. We must check before calling updateTaskStatus.
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled before execution started, skipping', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(TOOL_STATUS.ABORTED, {
-                    ...buildActorFields(actorName, actorId),
-                });
-                return;
-            }
+            if (await skipIfTaskCancelled(
+                ' before execution started, skipping',
+                TOOL_STATUS.ABORTED,
+                { ...buildActorFields(actorName, actorId) },
+            )) return;
 
             log.debug('[executeToolAndUpdateTask] Updating task status to working', {
                 taskId,
@@ -1408,14 +1417,7 @@ export class ActorsMcpServer {
             }
 
             // Check if task was cancelled before storing result
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(toolStatus);
-                return;
-            }
+            if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
@@ -1433,11 +1435,11 @@ export class ActorsMcpServer {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
-                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                    log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping 402 result storage', { taskId, mcpSessionId });
-                    finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
-                    return;
-                }
+                if (await skipIfTaskCancelled(
+                    ', skipping 402 result storage',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
@@ -1451,11 +1453,11 @@ export class ActorsMcpServer {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this approval error.
-                if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                    log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping permission-approval result storage', { taskId, mcpSessionId });
-                    finishTaskTracking(TOOL_STATUS.ABORTED, { ...buildActorFields(actorName, actorId) });
-                    return;
-                }
+                if (await skipIfTaskCancelled(
+                    ', skipping permission-approval result storage',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
@@ -1505,14 +1507,7 @@ export class ActorsMcpServer {
             const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(toolStatus, callDiagnostics);
-                return;
-            }
+            if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
             log.debug('[executeToolAndUpdateTask] Storing failed result', {
                 taskId,
