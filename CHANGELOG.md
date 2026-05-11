@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.2 - **not yet released**
+## [0.10.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.2) (2026-05-11)
 
 ### 🚀 Features
 
 - Add switch to enable&#x2F;disable auto-mode ([#800](https://github.com/apify/apify-mcp-server/pull/800)) ([97675dc](https://github.com/apify/apify-mcp-server/commit/97675dc622dde2af846b3793786566b7afef75c1)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.1) (2026-05-06)
 
 ### 🐛 Bug Fixes
