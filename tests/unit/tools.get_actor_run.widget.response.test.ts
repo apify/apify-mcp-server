@@ -64,10 +64,12 @@ describe('get-actor-run-widget response', () => {
         expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
         expect(structuredContent.summary).toMatch(/^RUNNING for /);
         expect(structuredContent.nextStep).toContain('run-widget-1');
-        // Widget text remains a short pointer, not a JSON dump.
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('A run widget has been rendered');
-        expect(content[0].text).toContain('run-widget-1');
+        // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
+        // the short widget-pointer text.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('A run widget has been rendered');
+        expect(content[1].text).toContain('run-widget-1');
 
         // Response-level widget _meta.
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);

@@ -87,8 +87,9 @@ export function buildGetActorRunError(runId: string, error: unknown): ReturnType
 }
 
 /**
- * Build the success response. Default mode emits text = `summary\nnextStep` (carries identifiers via interpolation).
- * Widget mode emits a short pointer text and adds widget `_meta` keys.
+ * Build the success response. `content[0]` is the JSON-stringified `structuredContent`
+ * mirror (per MCP spec); `content[1]` carries an LLM-readable narrative — `summary` +
+ * `nextStep` in default mode, a short pointer in widget mode.
  */
 export function buildGetActorRunSuccessResponse(
     params: FetchActorRunResult & { widget: boolean },
@@ -97,14 +98,20 @@ export function buildGetActorRunSuccessResponse(
 
     if (!widget) {
         return buildMCPResponse({
-            texts: [`${structuredContent.summary}\n${structuredContent.nextStep}`],
+            texts: [
+                JSON.stringify(structuredContent),
+                `${structuredContent.summary}\n${structuredContent.nextStep}`,
+            ],
             structuredContent,
             _meta: buildUsageMeta(run),
         });
     }
 
     return buildMCPResponse({
-        texts: [`Actor run ${structuredContent.runId} status: ${structuredContent.status}. A run widget has been rendered.`],
+        texts: [
+            JSON.stringify(structuredContent),
+            `Actor run ${structuredContent.runId} status: ${structuredContent.status}. A run widget has been rendered.`,
+        ],
         structuredContent,
         _meta: {
             ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),

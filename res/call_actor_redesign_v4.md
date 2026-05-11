@@ -184,7 +184,30 @@ Every status returns a concrete `summary` and one primary `nextStep`. Templates 
 
 `elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is `storages.dataset.fields?.length ?? 0`.
 
-A text-mode response (for clients that don't read structured content) carries `${summary}`, `${nextStep}`, and the run identifiers — verbatim, no inlined item or record bodies. The agent fetches data via `get-dataset-items` or `get-key-value-store-record` exactly as in structured mode.
+### `content[]` shape (MCP spec conformance)
+
+The `content` array carries two text blocks per MCP spec 2025-11-25 recommendation that "a tool that returns structured content SHOULD also return the serialized JSON in a TextContent block":
+
+```ts
+content: [
+    { type: 'text', text: JSON.stringify(structuredContent) },   // block 0 — spec mirror
+    { type: 'text', text: `${summary}\n${nextStep}` },           // block 1 — narrative
+]
+```
+
+- **Block 0** is the canonical JSON mirror. Clients that don't read `structuredContent` (the spec's `SHOULD` exists for backwards compatibility) still get the full shape.
+- **Block 1** is the LLM-readable narrative — `summary` + `nextStep` for default mode, a short pointer text for widget mode. The same strings live inside `structuredContent.summary` / `structuredContent.nextStep`.
+
+#### Why both blocks, given `summary` and `nextStep` already live inside `structuredContent`
+
+The duplication is intentional and load-bearing — do not collapse to one block.
+
+- **LLM ergonomics.** A short plaintext action is faster for the LLM to act on than scanning a serialized JSON object for specific fields. Block 1 is the call-to-action; block 0 is the full payload.
+- **Client UI variance.** Different MCP clients render content blocks differently — some highlight short narrative text; some collapse JSON as raw data; some show only the first block. Surfacing the action in both places means it reaches the LLM regardless of UI quirks.
+- **Defense in depth.** Three paths to the same info: structured-aware clients read `structuredContent.nextStep`; structured-blind clients read `content[1]`; clients that look only at `content[0]` still find the action inside the JSON.
+- **Cost is trivial.** ~250 extra bytes (~60 tokens) per response, negligible inside any real MCP session.
+
+Error responses (run not found, validation failure, etc.) carry no `structuredContent` and therefore keep a single text block — the JSON mirror only applies when there is structured content to mirror.
 
 ## Behavior contracts
 
@@ -389,6 +412,7 @@ sequenceDiagram
 | Response: `items` removed from `call-actor` / `get-actor-run` | Hard. Agent fetches via `get-dataset-items`. |
 | `previewItems` removed; no item samples in the response | Hard. Agent fetches a preview via `get-dataset-items` with `limit: 3`. |
 | `instructions` → `summary` + `nextStep` | Hard. Different semantics and names. |
+| `content[0]` is JSON-stringified `structuredContent`; narrative (`summary` + `nextStep`) moved to `content[1]` | Hard for text-mode clients. Per MCP spec backwards-compat recommendation, block 0 mirrors structuredContent; narrative still available in block 1 and inside structuredContent. |
 | `schema` field dropped; `fields` returned in dot notation | Hard. JSON Schema generation is removed from this path. |
 | `call-actor` default wait changes to 30 s; `waitSecs` capped at 45 | Hard for long-running actors. They now return non-terminal with a polling `nextStep` instead of blocking indefinitely. The 45 s ceiling stays under the 60 s tool-call timeout common to several MCP clients. |
 | `async` parameter deprecated but accepted | Soft. `async: true` maps to `waitSecs: 0`; remove next minor cycle. |

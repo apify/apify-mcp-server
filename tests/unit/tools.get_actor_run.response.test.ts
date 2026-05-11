@@ -107,9 +107,12 @@ describe('get-actor-run default response', () => {
         expect(dump).not.toContain('previewItems');
         expect(dump).not.toContain('"items":');
 
-        // Text channel carries identifiers (so text-mode clients can parse them) but never a JSON dump.
-        expect(content[0].text).toContain('dataset-xyz');
-        expect(content[0].text).not.toContain('```json');
+        // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
+        // the LLM-readable narrative with identifiers interpolated.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('dataset-xyz');
+        expect(content[1].text).not.toContain('```json');
 
         // Usage attribution `_meta` flows through end-to-end.
         expect(_meta?.['com.apify/ActorRun']).toEqual({
@@ -205,8 +208,9 @@ describe('get-actor-run default response', () => {
         // nextStep points at get-dataset-items, not the "no output / re-run" branch.
         expect(structuredContent.nextStep).toContain('get-dataset-items');
         expect(structuredContent.nextStep).toContain('datasetId=dataset-xyz');
-        expect(content[0].text).not.toContain('No dataset items and no key-value records were found');
-        expect(content[0].text).not.toMatch(/re-run/i);
+        // Narrative (content[1]) avoids the "re-run" branch wording.
+        expect(content[1].text).not.toContain('No dataset items and no key-value records were found');
+        expect(content[1].text).not.toMatch(/re-run/i);
     });
 
     it('degrades gracefully when KV listKeys fails: keeps dataset, omits KV', async () => {

@@ -43,6 +43,11 @@ export type RunKeyValueStore = {
     keys?: string[];
 };
 
+/**
+ * Canonical run response shape returned by `call-actor` and `get-actor-run`.
+ * Wire shape for `content[]`: `[JSON.stringify(structuredContent), `${summary}\n${nextStep}`]`
+ * — see `res/call_actor_redesign_v4.md` § content[] shape for the load-bearing rationale.
+ */
 export type RunResponse = {
     runId: string;
     actorId: string;
