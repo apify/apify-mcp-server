@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.3 - **not yet released**
 
+### 🚀 Features
+
+- Add &quot;Add to Kiro&quot; MCP badge to README ([#759](https://github.com/apify/apify-mcp-server/pull/759)) ([dc14792](https://github.com/apify/apify-mcp-server/commit/dc14792caf40eb94f927db2eacd991cc54ec5856)) by [@chrisbonifacio](https://github.com/chrisbonifacio)
+
 ### 🐛 Bug Fixes
 
 - **tools:** Omit undefined limit from get-dataset-items output ([#811](https://github.com/apify/apify-mcp-server/pull/811)) ([f8f84d0](https://github.com/apify/apify-mcp-server/commit/f8f84d06b9dd977c9517bb18d131258af4ae857b)) by [@mvanhorn](https://github.com/mvanhorn), closes [#731](https://github.com/apify/apify-mcp-server/issues/731)
