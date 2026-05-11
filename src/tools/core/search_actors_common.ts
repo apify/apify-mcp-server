@@ -22,7 +22,7 @@ export const searchActorsBaseArgsSchema = z.object({
         .min(1)
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
-        .describe(`The maximum number of Actors to return (1–${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
+        .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
     offset: z.number()
         .int()
         .min(0)
