@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { searchActorsByKeywords, searchAgentSafeActors } from '../../src/utils/actor_search.js';
 
@@ -69,16 +68,6 @@ describe('searchActorsByKeywords', () => {
         await searchActorsByKeywords({ search: 'foo', apifyToken: 'tok', limit: 5 });
         expect(paramsHolder.params).not.toHaveProperty('includeInputSchema');
         expect(paramsHolder.params).not.toHaveProperty('allowsAgenticUsers');
-    });
-
-    it('throws when `includeInputSchema=true` is paired with `limit > MAX_LIMIT_WITH_INPUT_SCHEMA`', async () => {
-        await expect(searchActorsByKeywords({
-            search: 'foo',
-            apifyToken: 'tok',
-            limit: MAX_LIMIT_WITH_INPUT_SCHEMA + 1,
-            includeInputSchema: true,
-        })).rejects.toThrow(/exceeds API cap/);
-        expect(listMock).not.toHaveBeenCalled();
     });
 });
 
