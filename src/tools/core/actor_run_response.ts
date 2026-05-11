@@ -483,7 +483,10 @@ export function buildStartRunResponse(params: {
     };
 
     return {
-        content: [{ type: 'text', text: `${summary}\n\n${nextStep}` }],
+        content: [
+            { type: 'text', text: JSON.stringify(structuredContent) },
+            { type: 'text', text: `${summary}\n\n${nextStep}` },
+        ],
         structuredContent,
     };
 }

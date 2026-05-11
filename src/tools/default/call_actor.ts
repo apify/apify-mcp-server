@@ -99,7 +99,10 @@ export const defaultCallActor: ToolEntry = Object.freeze({
             const { run, structuredContent } = fetchResult.result;
             const _meta = buildUsageMeta(run);
             return {
-                content: [{ type: 'text', text: `${structuredContent.summary}\n\n${structuredContent.nextStep}` }],
+                content: [
+                    { type: 'text', text: JSON.stringify(structuredContent) },
+                    { type: 'text', text: `${structuredContent.summary}\n\n${structuredContent.nextStep}` },
+                ],
                 structuredContent,
                 ...(_meta && { _meta }),
                 toolTelemetry: { actorId: resolvedActorId },
