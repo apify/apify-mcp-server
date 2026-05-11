@@ -6,14 +6,14 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { ApifyClient } from '../../src/apify_client.js';
 import {
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     defaults,
     HelperTools,
     RAG_WEB_BROWSER,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
-    SKYFIRE_ENABLED_TOOLS,
 } from '../../src/const.js';
+import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';

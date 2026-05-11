@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { SKYFIRE_README_CONTENT } from '../../src/const.js';
+import { SKYFIRE_README_CONTENT } from '../../src/payments/const.js';
 import { resolvePaymentProvider } from '../../src/payments/index.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import { createResourceService } from '../../src/resources/resource_service.js';

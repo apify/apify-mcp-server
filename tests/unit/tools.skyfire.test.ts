@@ -10,12 +10,12 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import {
-    HelperTools,
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
-} from '../../src/const.js';
+} from '../../src/payments/const.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../../src/types.js';
 import { applySkyfireAugmentation, cloneToolEntry } from '../../src/utils/tools.js';
 
