@@ -1,0 +1,33 @@
+name: Integration tests
+
+on:
+    workflow_call:
+        secrets:
+            APIFY_TOKEN:
+                required: true
+
+jobs:
+    integration_tests:
+        name: Integration tests
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v6
+            -   name: Use Node.js
+                uses: actions/setup-node@v6
+                with:
+                    node-version-file: '.nvmrc'
+                    cache: 'npm'
+                    cache-dependency-path: 'package-lock.json'
+            -   name: Install Dependencies
+                run: npm ci --force
+            # Re-mask in case the token shows up transformed (base64/url-encoded/etc.) in
+            # any downstream log output. Literal value is already masked by GitHub.
+            -   name: Mask token
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: echo "::add-mask::$APIFY_TOKEN"
+            -   name: Integration tests
+                env:
+                    APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+                run: npm run test:integration

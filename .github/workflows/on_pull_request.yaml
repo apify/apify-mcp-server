@@ -8,6 +8,14 @@ jobs:
         name: Code checks
         uses: ./.github/workflows/_check_code.yaml
 
+    integration_tests:
+        # Fork PRs don't have access to repo secrets — skip rather than fail.
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        name: Integration tests
+        uses: ./.github/workflows/_integration_tests.yaml
+        secrets:
+            APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+
     pr_title_check:
         name: PR title check
         runs-on: ubuntu-latest
