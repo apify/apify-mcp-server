@@ -2,15 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.2 - **not yet released**
+## [0.10.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.3) (2026-05-12)
+
+### 🚀 Features
+
+- Add &quot;Add to Kiro&quot; MCP badge to README ([#759](https://github.com/apify/apify-mcp-server/pull/759)) ([dc14792](https://github.com/apify/apify-mcp-server/commit/dc14792caf40eb94f927db2eacd991cc54ec5856)) by [@chrisbonifacio](https://github.com/chrisbonifacio)
+- Surface compact input schema on search-actors results ([#737](https://github.com/apify/apify-mcp-server/pull/737)) ([3033222](https://github.com/apify/apify-mcp-server/commit/3033222f384b4c6aca38da22ad8e5cb95da814d0)) by [@MQ37](https://github.com/MQ37), closes [#791](https://github.com/apify/apify-mcp-server/issues/791)
+- Enable MCP Apps auto-detection from client capabilities ([#827](https://github.com/apify/apify-mcp-server/pull/827)) ([87a4d02](https://github.com/apify/apify-mcp-server/commit/87a4d020fe51da1489befc88a7da012a4365b96e)) by [@jirispilka](https://github.com/jirispilka), closes [#771](https://github.com/apify/apify-mcp-server/issues/771)
+
+### 🐛 Bug Fixes
+
+- **tools:** Omit undefined limit from get-dataset-items output ([#811](https://github.com/apify/apify-mcp-server/pull/811)) ([f8f84d0](https://github.com/apify/apify-mcp-server/commit/f8f84d06b9dd977c9517bb18d131258af4ae857b)) by [@mvanhorn](https://github.com/mvanhorn), closes [#731](https://github.com/apify/apify-mcp-server/issues/731)
+
+
+## [0.10.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.2) (2026-05-11)
 
 ### 🚀 Features
 
 - Add switch to enable&#x2F;disable auto-mode ([#800](https://github.com/apify/apify-mcp-server/pull/800)) ([97675dc](https://github.com/apify/apify-mcp-server/commit/97675dc622dde2af846b3793786566b7afef75c1)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.1](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.1) (2026-05-06)
 
 ### 🐛 Bug Fixes

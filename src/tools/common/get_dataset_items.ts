@@ -88,13 +88,14 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             });
         }
 
+        // omit limit when unset; undefined silently drops from JSON (#731)
         const structuredContent = {
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset: parsed.offset ?? 0,
-            limit: parsed.limit,
+            ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
         };
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };

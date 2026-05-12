@@ -1,8 +1,8 @@
 import type { ActorDefinition } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { MCP_STREAMABLE_ENDPOINT } from '../../src/const.js';
 import { getActorMCPServerPath } from '../../src/mcp/actors.js';
+import { MCP_STREAMABLE_ENDPOINT } from '../../src/mcp/const.js';
 
 // Helper to create a valid ActorDefinition and allow webServerMcpPath for testing
 function makeActorDefinitionWithPath(webServerMcpPath?: unknown): ActorDefinition {

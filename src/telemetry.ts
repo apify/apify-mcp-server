@@ -6,14 +6,20 @@ import log from '@apify/log';
 
 import {
     DEFAULT_TELEMETRY_ENV,
-    SEGMENT_FLUSH_AT_EVENTS,
-    SEGMENT_FLUSH_INTERVAL_MS,
     TELEMETRY_ENV,
 } from './const.js';
 import type { TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
 const PROD_WRITE_KEY = 'cOkp5EIJaN69gYaN8bcp7KtaD0fGABwJ';
+
+// We are using the same values as apify-core for consistency (despite that we ship events of different types).
+// https://github.com/apify/apify-core/blob/2284766c122c6ac5bc4f27ec28051f4057d6f9c0/src/packages/analytics/src/server/segment.ts#L28
+// Reasoning from the apify-core:
+// Flush at 50 events to avoid sending too many small requests (default is 15)
+const SEGMENT_FLUSH_AT_EVENTS = 50;
+// Flush interval in milliseconds (default is 10000)
+const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 // Event names following apify-core naming convention (Title Case)
 const SEGMENT_EVENTS = {
