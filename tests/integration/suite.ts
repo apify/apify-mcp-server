@@ -1766,6 +1766,7 @@ export function createIntegrationTestsSuite(
             // Build request and cancel immediately via AbortController
             const controller = new AbortController();
 
+            const startedAfter = new Date();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1789,7 +1790,7 @@ export function createIntegrationTestsSuite(
             const actId = actor!.id as string;
 
             // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId);
+            await waitForActorRunAbortStatus(api, actId, startedAfter);
         });
 
         // Cancellation test using call-actor tool: start a long-running actor via call-actor and cancel immediately, then verify it was aborted
@@ -1800,6 +1801,7 @@ export function createIntegrationTestsSuite(
             // Build request and cancel immediately via AbortController
             const controller = new AbortController();
 
+            const startedAfter = new Date();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1827,7 +1829,7 @@ export function createIntegrationTestsSuite(
             const actId = actor!.id as string;
 
             // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId);
+            await waitForActorRunAbortStatus(api, actId, startedAfter);
         });
 
         // Environment variable tests - only applicable to stdio transport
@@ -2354,6 +2356,39 @@ export function createIntegrationTestsSuite(
                     throw new Error('Task should have been cancelled before completion');
                 }
             }
+        });
+
+        // Without the chained AbortController, the task flips to `cancelled` but the underlying
+        // Apify run keeps consuming compute until natural finish.
+        it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 1 }, async () => {
+            client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
+
+            const startedAfter = new Date();
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(RAG_WEB_BROWSER),
+                    arguments: { query: 'restaurants in San Francisco', maxResults: 10 },
+                },
+                CallToolResultSchema,
+                { task: { ttl: 60000 } },
+            );
+
+            let cancelled = false;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    // Cancel mid-run, not before the run starts.
+                    await new Promise((resolve) => { setTimeout(resolve, 2000); });
+                    await client.experimental.tasks.cancelTask(message.task.taskId);
+                    cancelled = true;
+                } else if (message.type === 'result') {
+                    throw new Error('Task should have been cancelled before completion');
+                }
+            }
+            expect(cancelled).toBe(true);
+
+            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await api.actor(RAG_WEB_BROWSER).get();
+            await waitForActorRunAbortStatus(api, actor!.id, startedAfter);
         });
 
         it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {
