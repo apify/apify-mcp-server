@@ -45,6 +45,10 @@ export const DEFAULT_CARD_OPTIONS: ActorCardOptions = {
     includeMetadata: true,
 };
 
+function normalizeBlankSpaces(value?: string | null): string {
+    return value?.replaceAll(/\s+/g, ' ').trim() ?? '';
+}
+
 /**
  * Private intermediate representation holding all extracted actor data.
  * Preserves raw PricingInfo so both markdown (pricingInfoToString) and
@@ -87,14 +91,16 @@ function extractActorData(
 ): ExtractedActorData {
     const actorFullName = `${actor.username}/${actor.name}`;
     const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
+    const normalizedTitle = normalizeBlankSpaces(actor.title);
+    const normalizedDescription = normalizeBlankSpaces(actor.description);
 
     const data: ExtractedActorData = {
         actorFullName,
         actorUrl,
-        title: actor.title,
+        title: normalizedTitle || undefined,
         pictureUrl: actor.pictureUrl || undefined,
         description: options.includeDescription
-            ? (actor.description || 'No description provided.')
+            ? (normalizedDescription || 'No description provided.')
             : '',
         pricingInfo: options.includePricing ? getActorPricingInfo(actor) : null,
         developer: { username: '', isOfficialApify: false, url: '' },
@@ -285,13 +291,15 @@ export function formatActorForWidget(
     userTier: PricingTier,
 ): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
+    const normalizedTitle = normalizeBlankSpaces(actor.title);
+    const normalizedDescription = normalizeBlankSpaces(actor.description);
     return {
         id: actor.id,
         name: actor.name,
         username: actor.username,
         fullName,
-        title: actor.title || actor.name,
-        description: actor.description || 'No description available',
+        title: normalizedTitle || actor.name,
+        description: normalizedDescription || 'No description available',
         pictureUrl: actor.pictureUrl || '',
         stats: {
             actorReviewRating: ('actorReviewRating' in actor && actor.actorReviewRating)

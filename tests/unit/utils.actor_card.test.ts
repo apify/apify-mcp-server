@@ -2,7 +2,7 @@ import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import type { ActorStoreList } from '../../src/types.js';
-import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
+import { formatActorForWidget, formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
 // Mock Actor data for testing (based on real apify/rag-web-browser Actor)
 const mockActor: Actor = {
@@ -83,6 +83,13 @@ const mockDeprecatedActor: Actor = {
     isDeprecated: true,
 } as unknown as Actor;
 
+const mockActorWithIrregularSpaces: ActorStoreList = {
+    ...mockActorStoreList,
+    id: 'actor-spaces',
+    title: '  Store   Actor \n Deluxe  ',
+    description: 'A   store listing actor\nfor\t testing  ',
+} as unknown as ActorStoreList;
+
 describe('formatActorToActorCard', () => {
     describe('backwards compatibility (no options)', () => {
         it('should include all sections when no options are provided', () => {
@@ -125,6 +132,15 @@ describe('formatActorToActorCard', () => {
         it('should include categories for ActorStoreList', () => {
             const result = formatActorToActorCard(mockActorStoreList);
             expect(result).toContain('- **Categories:** Web Scraping, AI');
+        });
+
+        it('should normalize irregular whitespace in titles and descriptions', () => {
+            const result = formatActorToActorCard(mockActorWithIrregularSpaces);
+
+            expect(result).toContain('## [Store Actor Deluxe](https://apify.com/community/store-actor)');
+            expect(result).toContain('- **Description:** A store listing actor for testing');
+            expect(result).not.toContain('  ');
+            expect(result).not.toContain('\t');
         });
     });
 
@@ -375,6 +391,13 @@ describe('formatActorToStructuredCard', () => {
             const result = formatActorToStructuredCard(mockActorStoreList);
             expect(result.rating).toBeDefined();
         });
+
+        it('should normalize irregular whitespace in structured output', () => {
+            const result = formatActorToStructuredCard(mockActorWithIrregularSpaces);
+
+            expect(result.title).toBe('Store Actor Deluxe');
+            expect(result.description).toBe('A store listing actor for testing');
+        });
     });
 
     describe('granular options - includeDescription', () => {
@@ -572,5 +595,14 @@ describe('formatActorToStructuredCard', () => {
             expect(result.developer.username).toBe('');
             expect(result.modifiedAt).toBeUndefined();
         });
+    });
+});
+
+describe('formatActorForWidget', () => {
+    it('should normalize irregular whitespace in widget output', () => {
+        const result = formatActorForWidget(mockActorWithIrregularSpaces, 'FREE');
+
+        expect(result.title).toBe('Store Actor Deluxe');
+        expect(result.description).toBe('A store listing actor for testing');
     });
 });
