@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Add &quot;Add to Kiro&quot; MCP badge to README ([#759](https://github.com/apify/apify-mcp-server/pull/759)) ([dc14792](https://github.com/apify/apify-mcp-server/commit/dc14792caf40eb94f927db2eacd991cc54ec5856)) by [@chrisbonifacio](https://github.com/chrisbonifacio)
+- Surface compact input schema on search-actors results ([#737](https://github.com/apify/apify-mcp-server/pull/737)) ([3033222](https://github.com/apify/apify-mcp-server/commit/3033222f384b4c6aca38da22ad8e5cb95da814d0)) by [@MQ37](https://github.com/MQ37), closes [#791](https://github.com/apify/apify-mcp-server/issues/791)
 
 ### 🐛 Bug Fixes
 
