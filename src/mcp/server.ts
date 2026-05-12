@@ -1324,6 +1324,7 @@ export class ActorsMcpServer {
             // with us (between handler dispatch and the first watcher tick at ~500 ms),
             // updateTaskStatus throws — re-check the store to tell a clean cancel-race
             // apart from a genuine store error.
+            // noinspection ExceptionCaughtLocallyJS
             try {
                 await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
             } catch (err) {
