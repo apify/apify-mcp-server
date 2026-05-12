@@ -1315,23 +1315,24 @@ export class ActorsMcpServer {
         const taskExtra = { ...extra, signal: cancelWatcher.signal };
 
         try {
-            // Check if task was already cancelled before we start execution.
-            // Critical: if a client cancels the task immediately after creation (race condition),
-            // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
-            // because terminal states cannot transition to other states. We must check before calling updateTaskStatus.
-            if (await skipIfTaskCancelled(
-                ' before execution started, skipping',
-                TOOL_STATUS.ABORTED,
-                { ...buildActorFields(actorName, actorId) },
-            )) return;
-
             log.debug('[executeToolAndUpdateTask] Updating task status to working', {
                 taskId,
                 mcpSessionId,
             });
-            // TODO(TC-3): TOCTOU with the check above — cancel arriving here attempts
-            // cancelled → working, which the store rejects. Catch the terminal-state error.
-            await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+            // The store rejects terminal → 'working' transitions. If `tasks/cancel` raced
+            // with us (between handler dispatch and the first watcher tick at ~500 ms),
+            // updateTaskStatus throws — re-check the store to tell a clean cancel-race
+            // apart from a genuine store error.
+            try {
+                await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+            } catch (err) {
+                if (await skipIfTaskCancelled(
+                    ' before execution started, skipping',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
+                throw err;
+            }
 
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};

@@ -73,55 +73,55 @@ sequenceDiagram
 
     Apify-->>Exec: run finishes naturally
     Exec-->>Server: result (discarded)
-    Server->>Store: post-run istaskcancelled check<br/>(skip result storage only)
+    Server->>Store: post-run isTaskCancelled check<br/>(skip result storage only)
 ```
 
-the post-run `istaskcancelled` check at `src/mcp/server.ts:1485` mitigated
+The post-run `isTaskCancelled` check at `src/mcp/server.ts:1485` mitigated
 the *result-storage* half of the problem (we don't return data for a
 cancelled task) but did nothing about the *compute-consumption* half.
 
-## after pr #812
+## After PR #812
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant client
-    participant sdk as mcp sdk<br/>(tasks/cancel handler)
-    participant store as taskstore
-    participant watcher as createtaskcancellationwatcher<br/>(polls every 500 ms)
-    participant server as actorsmcpserver<br/>executetoolandupdatetask
-    participant exec as callactorgetdataset
-    participant apify as apify platform
+    participant Client
+    participant SDK as MCP SDK<br/>(tasks/cancel handler)
+    participant Store as TaskStore
+    participant Watcher as createTaskCancellationWatcher<br/>(polls every 500 ms)
+    participant Server as ActorsMcpServer<br/>executeToolAndUpdateTask
+    participant Exec as callActorGetDataset
+    participant Apify as Apify platform
 
-    client->>server: tools/call (task mode)
-    server->>watcher: create watcher<br/>(taskid, mcpsessionid, taskstore)
-    server->>exec: actor execution<br/>abortsignal = cancelwatcher.signal
-    exec->>apify: actorclient.start(input)
-    apify-->>exec: { runid }
-    exec->>apify: run(runid).waitforfinish()
+    Client->>Server: tools/call (task mode)
+    Server->>Watcher: create watcher<br/>(taskId, mcpSessionId, taskStore)
+    Server->>Exec: actor execution<br/>abortSignal = cancelWatcher.signal
+    Exec->>Apify: actorClient.start(input)
+    Apify-->>Exec: { runId }
+    Exec->>Apify: run(runId).waitForFinish()
 
     loop every 500 ms
-        watcher->>store: gettask(taskid)
-        store-->>watcher: status: 'working'
+        Watcher->>Store: getTask(taskId)
+        Store-->>Watcher: status: 'working'
     end
 
-    client->>sdk: tasks/cancel { taskid }
-    sdk->>store: updatetaskstatus(taskid, 'cancelled')
-    sdk-->>client: { task: { status: 'cancelled' } }
+    Client->>SDK: tasks/cancel { taskId }
+    SDK->>Store: updateTaskStatus(taskId, 'cancelled')
+    SDK-->>Client: { task: { status: 'cancelled' } }
 
-    watcher->>store: gettask(taskid)
-    store-->>watcher: status: 'cancelled'
+    Watcher->>Store: getTask(taskId)
+    Store-->>Watcher: status: 'cancelled'
 
     rect rgba(0, 180, 0, 0.15)
-        watcher->>watcher: controller.abort(...)<br/>cancelwatcher.signal fires
-        watcher-->>exec: abortsignal 'abort' event
-        exec->>apify: run(runid).abort({ gracefully: false })
-        apify-->>exec: aborted
+        Watcher->>Watcher: controller.abort()<br/>cancelWatcher.signal fires
+        Watcher-->>Exec: abortSignal 'abort' event
+        Exec->>Apify: run(runId).abort({ gracefully: false })
+        Apify-->>Exec: aborted
     end
 
-    exec-->>server: returns null (aborted)
-    server->>watcher: dispose() in finally
-    server->>store: skip result storage<br/>finishtasktracking(aborted)
+    Exec-->>Server: returns null (aborted)
+    Server->>Watcher: dispose() in finally
+    Server->>Store: skip result storage<br/>finishTaskTracking(aborted)
 ```
 
 `cancelWatcher.signal` replaces `extra.signal` at the two places where
@@ -219,7 +219,7 @@ chain robust:
 
 Two extra defenses live inside `createTaskCancellationWatcher`:
 
-- **`tickInFlight` guard.** Skips a tick if the previous one is still
+- **`tickInProgress` guard.** Skips a tick if the previous one is still
   awaiting `getTask`. Without this, Redis tail-latency spikes (cluster
   reslot, failover) cause ticks to pile up and amplify load right when
   the backend is struggling.

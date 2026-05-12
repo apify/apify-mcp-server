@@ -70,10 +70,10 @@ export function createTaskCancellationWatcher(opts: {
     // Prevents tick overlap when `getTask` is slower than the poll interval (Redis tail
     // latency, cluster reslot). Without it, ticks pile up and amplify backend load right
     // when the backend is struggling.
-    let tickInFlight = false;
+    let tickInProgress = false;
     const interval = setInterval(() => {
-        if (tickInFlight || controller.signal.aborted) return;
-        tickInFlight = true;
+        if (tickInProgress || controller.signal.aborted) return;
+        tickInProgress = true;
         void (async () => {
             try {
                 if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
@@ -88,7 +88,7 @@ export function createTaskCancellationWatcher(opts: {
                 // unhandled rejection; the next successful tick will still detect cancellation. Not logged: under sustained Redis
                 // degradation this fires every pollIntervalMs per task and would flood logs.
             } finally {
-                tickInFlight = false;
+                tickInProgress = false;
             }
         })();
     }, pollIntervalMs);

@@ -81,7 +81,7 @@ Checklist and notes for ChatGPT MCP Apps store submission (verify line reference
 - **Use case**: Submission prep and audits
 
 ### [tasks_cancel_abort_flow.md](./tasks_cancel_abort_flow.md)
-How `tasks/cancel` propagates from the SDK through the polling watcher to `apifyClient.run(runId).abort()`. Mermaid sequence diagrams for before/after PR #812 (issue #763), end-to-end signal path, multi-node rationale, hardening notes (tickInFlight, transient-error swallowing).
+How `tasks/cancel` propagates from the SDK through the polling watcher to `apifyClient.run(runId).abort()`. Mermaid sequence diagrams for before/after PR #812 (issue #763), end-to-end signal path, multi-node rationale, hardening notes (tickInProgress, transient-error swallowing).
 - **Use case**: Reference when touching `createTaskCancellationWatcher`, `executeToolAndUpdateTask`, or `callActorGetDataset` cancellation paths.
 
 ---
