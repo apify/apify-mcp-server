@@ -25,11 +25,11 @@ import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
 
 /**
- * Storage and abort tools auto-injected alongside any actor-running tool
- * (call-actor / direct actor tools / add-actor). Order matches the workflow:
- * fetch items → fetch KV record → abort.
+ * Tools auto-injected alongside any actor-running tool (call-actor / direct
+ * actor tools / add-actor). Order matches the workflow: fetch items → fetch
+ * KV record → abort.
  */
-export const AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS: readonly ToolEntry[] = [
+export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
     getDatasetItems,
     getKeyValueStoreRecord,
     abortActorRun,
@@ -271,7 +271,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
-        toolsToInject.push(...AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS);
+        toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 
     if (toolsToInject.length > 0) {

@@ -20,12 +20,12 @@ import { callActorOutputSchema } from '../../src/tools/structured_output_schemas
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
-import { AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 import { assertStatusMessagePropagated, waitForActorRunAbortStatus } from './utils/task_waits.js';
 
-const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.map((t) => t.name);
+const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
 // Helper to find tool by name, resolving categories for the given mode on each call.
 // This ensures we always validate against the correct mode-specific tool definition
@@ -1898,26 +1898,17 @@ export function createIntegrationTestsSuite(
             const tools = await client.listTools();
             const names = tools.tools.map((t) => t.name);
 
-            // Order: call-actor → get-actor-run → AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.
             const callIndex = names.indexOf(HelperTools.ACTOR_CALL);
             const runIndex = names.indexOf(HelperTools.ACTOR_RUNS_GET);
+            const datasetIndex = names.indexOf(HelperTools.DATASET_GET_ITEMS);
+            const kvIndex = names.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+            const abortIndex = names.indexOf(HelperTools.ACTOR_RUNS_ABORT);
+
             expect(callIndex).toBeGreaterThanOrEqual(0);
             expect(callIndex).toBeLessThan(runIndex);
-            let prev = runIndex;
-            for (const name of AUTO_INJECTED_TOOL_NAMES) {
-                const index = names.indexOf(name);
-                expect(prev).toBeLessThan(index);
-                prev = index;
-            }
-
-            await client.close();
-        });
-
-        it('should mark get-actor-output description with DEPRECATED prefix when storage category is loaded', async () => {
-            client = await createClientFn({ tools: ['storage'] });
-            const tools = await client.listTools();
-            const outputTool = tools.tools.find((t) => t.name === HelperTools.ACTOR_OUTPUT_GET);
-            expect(outputTool?.description?.startsWith('DEPRECATED:')).toBe(true);
+            expect(runIndex).toBeLessThan(datasetIndex);
+            expect(datasetIndex).toBeLessThan(kvIndex);
+            expect(kvIndex).toBeLessThan(abortIndex);
 
             await client.close();
         });
@@ -2074,7 +2065,6 @@ export function createIntegrationTestsSuite(
         });
 
         it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
-            // Storage category included so the deprecated get-actor-output tool is reachable.
             client = await createClientFn({ tools: ['storage'], actors: ['apify/rag-web-browser'] });
 
             // Call the dedicated apify--rag-web-browser tool
@@ -2137,7 +2127,6 @@ export function createIntegrationTestsSuite(
         });
 
         it('should call apify/python-example and retrieve the full dataset using get-actor-output tool', async () => {
-            // Storage category included so the deprecated get-actor-output tool is reachable.
             client = await createClientFn({ tools: ['storage'], actors: ['apify/python-example'] });
             const selectedToolName = actorNameToToolName('apify/python-example');
             const input = { first_number: 5, second_number: 7 };

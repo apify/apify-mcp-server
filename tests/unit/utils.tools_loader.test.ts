@@ -2,13 +2,9 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import {
-    AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS,
-    loadToolsFromInput,
-    toolNamesToInput,
-} from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
-const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.map((t) => t.name);
+const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
@@ -82,16 +78,15 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
         for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
 
-        // Order: call → get-actor-run → AUTO_INJECTED_STORAGE_AND_ABORT_TOOLS.
         const callIndex = toolNames.indexOf(HelperTools.ACTOR_CALL);
         const runIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_GET);
+        const datasetIndex = toolNames.indexOf(HelperTools.DATASET_GET_ITEMS);
+        const kvIndex = toolNames.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        const abortIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_ABORT);
         expect(callIndex).toBeLessThan(runIndex);
-        let prev = runIndex;
-        for (const name of AUTO_INJECTED_TOOL_NAMES) {
-            const index = toolNames.indexOf(name);
-            expect(prev).toBeLessThan(index);
-            prev = index;
-        }
+        expect(runIndex).toBeLessThan(datasetIndex);
+        expect(datasetIndex).toBeLessThan(kvIndex);
+        expect(kvIndex).toBeLessThan(abortIndex);
     });
 
     it('does not auto-inject storage or abort tools when no actor-touching tools are present', async () => {
