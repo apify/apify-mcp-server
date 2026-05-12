@@ -293,10 +293,11 @@ export class ActorsMcpServer {
 
             (this.options as Record<string, unknown>).initializeRequestData = request;
 
-            log.info('Resolved server mode for connection', {
+            log.info('Resolved server mode for client capabilities', {
                 serverMode: this.serverMode,
                 serverModeOption: this.serverModeOption,
                 clientSupportsUi: this.clientSupportsUi,
+                capabilities: request?.params?.capabilities,
             });
 
             this.updateToolsAfterServerModeResolved();
