@@ -4,8 +4,9 @@ import type { AxiosRequestConfig } from 'axios';
 
 import type { PaymentHeaders } from './payments/types.js';
 
-// User agent headers
 const USER_AGENT_ORIGIN = 'Origin/mcp-server';
+const REQUEST_ORIGIN_HEADER = 'X-Apify-Request-Origin';
+const REQUEST_ORIGIN_VALUE = 'MCP';
 
 type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     token?: string | null | undefined;
@@ -13,15 +14,17 @@ type ExtendedApifyClientOptions = Omit<ApifyClientOptions, 'token'> & {
     paymentHeaders?: PaymentHeaders;
 };
 
-/**
- * Adds a User-Agent header to the request config.
- * @param config
- * @private
- */
 function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
     const updatedConfig = { ...config };
     updatedConfig.headers = updatedConfig.headers ?? {};
     updatedConfig.headers['User-Agent'] = `${updatedConfig.headers['User-Agent'] ?? ''}; ${USER_AGENT_ORIGIN}`;
+    return updatedConfig;
+}
+
+function addRequestOrigin(config: AxiosRequestConfig): AxiosRequestConfig {
+    const updatedConfig = { ...config };
+    updatedConfig.headers = updatedConfig.headers ?? {};
+    updatedConfig.headers[REQUEST_ORIGIN_HEADER] = REQUEST_ORIGIN_VALUE;
     return updatedConfig;
 }
 
@@ -45,7 +48,7 @@ export class ApifyClient extends _ApifyClient {
         }
 
         const { paymentHeaders, ...clientOptions } = options;
-        const requestInterceptors = [addUserAgent];
+        const requestInterceptors = [addUserAgent, addRequestOrigin];
         /**
          * Add payment headers if provided by a PaymentProvider.
          */
