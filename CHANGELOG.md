@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.3 - **not yet released**
+## [0.10.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.3) (2026-05-12)
 
 ### 🚀 Features
 
@@ -16,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - **tools:** Omit undefined limit from get-dataset-items output ([#811](https://github.com/apify/apify-mcp-server/pull/811)) ([f8f84d0](https://github.com/apify/apify-mcp-server/commit/f8f84d06b9dd977c9517bb18d131258af4ae857b)) by [@mvanhorn](https://github.com/mvanhorn), closes [#731](https://github.com/apify/apify-mcp-server/issues/731)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.2](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.2) (2026-05-11)
 
 ### 🚀 Features
