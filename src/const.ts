@@ -75,6 +75,10 @@ export const MCP_SERVER_CACHE_MAX_SIZE = 500;
 export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const USER_CACHE_MAX_SIZE = 200;
 export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
+/** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
+export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
+/** Max input fields shown inline in the text Actor card; structured output keeps the full schema. */
+export const MAX_INPUT_FIELDS_IN_TEXT_CARD = 20;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */

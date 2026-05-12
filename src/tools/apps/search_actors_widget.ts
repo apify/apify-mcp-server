@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { formatActorForWidget } from '../../utils/actor_card.js';
-import { searchAndFilterActors } from '../../utils/actor_search.js';
+import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
@@ -56,18 +56,17 @@ export const searchActorsWidgetTool: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken, apifyClient, userRentedActorIds, apifyMcpServer } = toolArgs;
+        const { args, apifyToken, apifyClient, apifyMcpServer } = toolArgs;
         const parsed = searchActorsWidgetArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         const [actors, { userPlanTier }] = await Promise.all([
-            searchAndFilterActors({
+            searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyToken,
                 limit: parsed.limit,
                 offset: parsed.offset,
                 paymentProvider: apifyMcpServer.options.paymentProvider,
-                userRentedActorIds,
             }),
             getUserInfoCached(apifyToken, apifyClient),
         ]);
