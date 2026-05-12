@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.10.4 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Abort in-flight tool handler on tasks&#x2F;cancel (#763) ([#812](https://github.com/apify/apify-mcp-server/pull/812)) ([49af512](https://github.com/apify/apify-mcp-server/commit/49af512a384f25ade5945d9af9a0e6efcd03dc0e)) by [@jirispilka](https://github.com/jirispilka), closes [#763](https://github.com/apify/apify-mcp-server/issues/763)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.10.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.3) (2026-05-12)
 
 ### 🚀 Features
