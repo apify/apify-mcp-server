@@ -14,7 +14,7 @@ jobs:
         name: Integration tests
         uses: ./.github/workflows/_integration_tests.yaml
         secrets:
-            APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
 
     pr_title_check:
         name: PR title check
