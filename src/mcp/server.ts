@@ -14,7 +14,13 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, InitializeResult, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    InitializeRequest,
+    InitializeResult,
+    Notification,
+    Request,
+    TaskStatusNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -31,6 +37,7 @@ import {
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
+    RELATED_TASK_META_KEY,
     ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -116,6 +123,37 @@ function isUiSupportedByClient(request: InitializeRequest | undefined): boolean 
 }
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
+
+/** Send notifications/tasks/status for taskId. Routes via session transport (no relatedRequestId).
+ *  Swallows errors — notifications are advisory. */
+export async function emitTaskStatusNotification(
+    taskId: string,
+    mcpSessionId: string | undefined,
+    taskStore: TaskStore,
+    server: Server,
+): Promise<void> {
+    try {
+        const task = await taskStore.getTask(taskId, mcpSessionId);
+        if (!task) return;
+        // Per spec: notifications/tasks/status MUST NOT carry _meta.related-task (task ID is in params).
+        // Called without options so the notification routes through the session transport,
+        // not the request-scoped stream (which closes once the initial { task } response is flushed).
+        await server.notification({
+            method: 'notifications/tasks/status',
+            params: {
+                taskId: task.taskId,
+                status: task.status,
+                createdAt: task.createdAt,
+                lastUpdatedAt: task.lastUpdatedAt,
+                ttl: task.ttl,
+                ...(task.statusMessage != null && { statusMessage: task.statusMessage }),
+                ...(task.pollInterval != null && { pollInterval: task.pollInterval }),
+            },
+        } as TaskStatusNotification);
+    } catch {
+        // Silent fail — notifications are advisory
+    }
+}
 
 /**
  * Create Apify MCP server
@@ -712,7 +750,15 @@ export class ActorsMcpServer {
                     `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
                 );
             }
-            return await this.taskStore.getTaskResult(taskId, mcpSessionId);
+            const result = await this.taskStore.getTaskResult(taskId, mcpSessionId);
+            // taskId is not in the result body — _meta.related-task lets clients correlate them
+            return {
+                ...result,
+                _meta: {
+                    ...(result._meta as Record<string, unknown>),
+                    [RELATED_TASK_META_KEY]: { taskId },
+                },
+            };
         });
 
         // Cancel task
@@ -748,6 +794,7 @@ export class ActorsMcpServer {
             await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
             const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
             log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             return updatedTask!;
         });
     }
@@ -927,12 +974,13 @@ export class ActorsMcpServer {
                         },
                         `call-tool-${name}-${randomUUID()}`,
                         request,
+                        mcpSessionId,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
 
                     // Execute the tool asynchronously and update task status
-                    setImmediate(async () => {
-                        await this.executeToolAndUpdateTask({
+                    setImmediate(() => {
+                        this.executeToolAndUpdateTask({
                             taskId: task.taskId,
                             tool,
                             toolArgs: toolArgs!,
@@ -946,7 +994,7 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                             userRentedActorIds,
-                        });
+                        }).catch((error) => log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }));
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1346,6 +1394,7 @@ export class ActorsMcpServer {
                 )) return;
                 throw err;
             }
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
@@ -1361,13 +1410,12 @@ export class ActorsMcpServer {
                 result = paymentRequiredResult;
             }
 
-            // Callback to propagate Actor run statusMessage into the task store.
-            // Clients retrieve it via tasks/get and tasks/list polling.
-            // TODO: Also send notifications/tasks/status so clients get real-time push updates
+            // Callback to propagate Actor run statusMessage into the task store and emit a push notification.
             // TODO(TC-3): cancel arriving while this is scheduled throws cancelled → working;
             // currently swallowed by progress.ts's tick catch — guard or catch explicitly.
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
 
             // Handle internal tool execution in task mode
@@ -1440,6 +1488,7 @@ export class ActorsMcpServer {
             });
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } catch (error) {
@@ -1455,6 +1504,7 @@ export class ActorsMcpServer {
                     { ...buildActorFields(actorName, actorId) },
                 )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1473,6 +1523,7 @@ export class ActorsMcpServer {
                     { ...buildActorFields(actorName, actorId) },
                 )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                     failure_http_status: error.statusCode,
@@ -1535,6 +1586,7 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } finally {

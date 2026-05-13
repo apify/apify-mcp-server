@@ -177,7 +177,3 @@ export const HTTP_NOT_FOUND = 404;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;
-
-// MCP _meta key for associating messages with a task.
-// TODO: replace with RELATED_TASK_META_KEY from @modelcontextprotocol/sdk once the installed SDK exports it.
-export const RELATED_TASK_META_KEY = 'io.modelcontextprotocol/related-task';

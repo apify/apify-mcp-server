@@ -2387,6 +2387,7 @@ export function createIntegrationTestsSuite(
             );
 
             let lastStatus = '';
+            let taskStatusCount = 0;
             let resultReceived = false;
             for await (const message of stream) {
                 switch (message.type) {
@@ -2394,9 +2395,7 @@ export function createIntegrationTestsSuite(
                         // Task created successfully with ID: message.task.taskId
                         break;
                     case 'taskStatus':
-                        if (lastStatus !== message.task.status) {
-                            // Task status: message.task.status with optional message.task.statusMessage
-                        }
+                        taskStatusCount++;
                         lastStatus = message.task.status;
                         break;
                     case 'result':
@@ -2414,6 +2413,11 @@ export function createIntegrationTestsSuite(
                 }
             }
             expect(resultReceived).toBe(true);
+            // Regression guard: notifications/tasks/status must reach the client over the
+            // session-level transport (standalone SSE on streamable HTTP). If notifications
+            // are dropped, callToolStream emits no taskStatus events.
+            expect(taskStatusCount).toBeGreaterThan(0);
+            expect(lastStatus).not.toBe('');
         });
 
         it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
