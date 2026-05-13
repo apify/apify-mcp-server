@@ -8,6 +8,20 @@ import { parseCommaSeparatedList } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 
+const DEFAULT_DATASET_ITEMS_LIMIT = 20;
+
+/** Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`. */
+export function deriveFlattenFromFields(fields: string[]): string[] {
+    const prefixes = new Set<string>();
+    for (const field of fields) {
+        const dotIndex = field.indexOf('.');
+        if (dotIndex > 0) {
+            prefixes.add(field.slice(0, dotIndex));
+        }
+    }
+    return [...prefixes];
+}
+
 const getDatasetItemsArgs = z.object({
     datasetId: z.string()
         .min(1)
@@ -16,20 +30,19 @@ const getDatasetItemsArgs = z.object({
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
     offset: z.number().optional()
         .describe('Number of items to skip at the start. Default is 0.'),
-    limit: z.number().optional()
-        .describe('Maximum number of items to return. No limit by default.'),
+    limit: z.number().int().min(1).optional()
+        .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
     fields: z.string().optional()
         .describe('Comma-separated list of fields to include in results. '
             + 'Fields in output are sorted as specified. '
-            + 'For nested objects, use dot notation (e.g. "metadata.url") after flattening.'),
+            + 'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.'),
     omit: z.string().optional()
         .describe('Comma-separated list of fields to exclude from results.'),
     desc: z.boolean().optional()
         .describe('If true, results are returned in reverse order (newest to oldest).'),
     flatten: z.string().optional()
-        .describe('Comma-separated list of fields which should transform nested objects into flat structures. '
-            + 'For example, with flatten="metadata" the object {"metadata":{"url":"hello"}} becomes {"metadata.url":"hello"}. '
-            + 'This is required before accessing nested fields with the fields parameter.'),
+        .describe('Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). '
+            + 'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.'),
 });
 
 /**
@@ -40,8 +53,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
     name: HelperTools.DATASET_GET_ITEMS,
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.
-        Use clean=true to skip empty items and hidden fields. Include or omit fields using comma-separated lists.
-        For nested objects, first flatten them (e.g., flatten="metadata"), then reference nested fields via dot notation (e.g., fields="metadata.url").
+        For nested fields use dot notation (e.g., fields="metadata.url") — the server auto-flattens parent prefixes.
+        Defaults limit to ${DEFAULT_DATASET_ITEMS_LIMIT}. Use clean=true to skip empty items and hidden fields.
 
         The results will include items along with pagination info (limit, offset) and total count.
 
@@ -49,8 +62,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         - Use when you need to read data from a dataset (all items or only selected fields).
 
         USAGE EXAMPLES:
-        - user_input: Get first 100 items from dataset abd123
-        - user_input: Get only metadata.url and title from dataset username~my-dataset (flatten metadata)`,
+        - user_input: Get first 20 items from dataset abd123
+        - user_input: Get only metadata.url and title from dataset username~my-dataset`,
     inputSchema: z.toJSONSchema(getDatasetItemsArgs) as ToolInputSchema,
     outputSchema: datasetItemsOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetItemsArgs)),
@@ -66,15 +79,17 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetItemsArgs.parse(args);
 
-        // Convert comma-separated strings to arrays
         const fields = parseCommaSeparatedList(parsed.fields);
         const omit = parseCommaSeparatedList(parsed.omit);
-        const flatten = parseCommaSeparatedList(parsed.flatten);
+        const flatten = parsed.flatten !== undefined
+            ? parseCommaSeparatedList(parsed.flatten)
+            : deriveFlattenFromFields(fields);
 
+        const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const v = await client.dataset(parsed.datasetId).listItems({
             clean: parsed.clean,
             offset: parsed.offset,
-            limit: parsed.limit,
+            limit: effectiveLimit,
             fields,
             omit,
             desc: parsed.desc,
@@ -88,14 +103,13 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             });
         }
 
-        // omit limit when unset; undefined silently drops from JSON (#731)
         const structuredContent = {
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset: parsed.offset ?? 0,
-            ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
+            limit: effectiveLimit,
         };
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };

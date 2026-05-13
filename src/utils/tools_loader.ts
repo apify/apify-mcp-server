@@ -15,12 +15,25 @@ import {
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/categories.js';
+import { abortActorRun } from '../tools/common/abort_actor_run.js';
 import { addTool } from '../tools/common/add_actor.js';
-import { getActorOutput } from '../tools/common/get_actor_output.js';
+import { getDatasetItems } from '../tools/common/get_dataset_items.js';
+import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
 import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
+
+/**
+ * Tools auto-injected alongside any actor-running tool (call-actor / direct
+ * actor tools / add-actor). Order matches the workflow: fetch items → fetch
+ * KV record → abort.
+ */
+export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
+    getDatasetItems,
+    getKeyValueStoreRecord,
+    abortActorRun,
+] as const;
 
 // All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
 // Built eagerly at module load; inputs (SERVER_MODES, getCategoryTools, CATEGORY_NAMES,
@@ -236,9 +249,11 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     /**
-     * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
-     * Insert them right after call-actor to follow the logical workflow order:
-     * search → details → call → run status → output → docs → actor tools
+     * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
+     * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
+     * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
+     * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
+     * via category before `actors`, the de-dup pass below preserves their selector order.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -252,7 +267,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
-        toolsToInject.push(getActorOutput);
+        toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 
     if (toolsToInject.length > 0) {

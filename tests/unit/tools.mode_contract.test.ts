@@ -241,7 +241,6 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
         expect(names).toContain(HelperTools.ACTOR_CALL_WIDGET);
         expect(names).toContain(HelperTools.ACTOR_RUNS_GET);
         expect(names).toContain(HelperTools.ACTOR_RUNS_GET_WIDGET);
-        expect(names).toContain(HelperTools.ACTOR_OUTPUT_GET);
         expect(names).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
         expect(names).not.toContain(HelperTools.ACTOR_GET_DETAILS_WIDGET);
     });
