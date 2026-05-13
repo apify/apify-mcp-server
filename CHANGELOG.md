@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🚀 Features
 
 - Auto-inject storage and abort tools alongside actor tools ([#814](https://github.com/apify/apify-mcp-server/pull/814)) ([a553999](https://github.com/apify/apify-mcp-server/commit/a5539996b5ad450c780c139084f8ec927897fc39)) by [@jirispilka](https://github.com/jirispilka), closes [#813](https://github.com/apify/apify-mcp-server/issues/813)
+- Add task status notifications for long-running tools ([#818](https://github.com/apify/apify-mcp-server/pull/818)) ([7b984bc](https://github.com/apify/apify-mcp-server/commit/7b984bc5be961a6f6c1645c5d784336fdd7e55d2)) by [@jirispilka](https://github.com/jirispilka), closes [#816](https://github.com/apify/apify-mcp-server/issues/816)
 
 
 <!-- git-cliff-unreleased-end -->
