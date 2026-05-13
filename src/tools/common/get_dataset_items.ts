@@ -30,7 +30,7 @@ const getDatasetItemsArgs = z.object({
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
     offset: z.number().optional()
         .describe('Number of items to skip at the start. Default is 0.'),
-    limit: z.number().optional()
+    limit: z.number().int().min(1).optional()
         .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
     fields: z.string().optional()
         .describe('Comma-separated list of fields to include in results. '
