@@ -38,8 +38,8 @@ const callActorWidgetArgsSchema = z.object({
             .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
             .optional()
             .describe(dedent`
-                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
-                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
+                Memory per run in MB. Power of 2 from 128 to 32768.
+                Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
             `),
         timeout: z.number()
             .min(0, 'Timeout must be 0 or greater')
@@ -47,6 +47,26 @@ const callActorWidgetArgsSchema = z.object({
             .describe(dedent`
                 Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
                 Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
+            `),
+        build: z.string()
+            .optional()
+            .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
+        maxItems: z.number()
+            .int()
+            .positive()
+            .optional()
+            .describe(dedent`
+                Pay-per-result Actors ONLY — has no effect on any other pricing model (pay-per-event, pay-per-usage, rental, free).
+                Caps the number of dataset items billed for this run; does NOT limit how many items the Actor produces.
+                Most Actors also expose their own input field (e.g. "maxResults", "maxPages", "maxItems") to bound how much work they do — prefer those when limiting actual output, since this option only caps billing.
+            `),
+        maxTotalChargeUsd: z.number()
+            .positive()
+            .optional()
+            .describe(dedent`
+                Pay-per-event Actors ONLY — has no effect on any other pricing model (pay-per-result, pay-per-usage, rental, free).
+                Caps the total USD billed for this run; does NOT limit how much work the Actor does.
+                Most Actors also expose their own input field to bound work — prefer those when limiting actual output, since this option only caps billing.
             `),
     }).optional()
         .describe('Optional call options for the Actor run configuration.'),
