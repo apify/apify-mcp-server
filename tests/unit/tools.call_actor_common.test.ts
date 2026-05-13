@@ -2,12 +2,13 @@ import { ApifyApiError } from 'apify-client';
 import type { AxiosResponse } from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
+import { APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
     buildStartAsyncResponse,
+    callActorArgs,
 } from '../../src/tools/core/call_actor_common.js';
 
 describe('call_actor_common', () => {
@@ -146,6 +147,62 @@ describe('call_actor_common', () => {
                 failureHttpStatus: 403,
                 actorId: 'actor-456',
             }));
+        });
+
+        it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
+            const error = new ApifyApiError({
+                data: {
+                    error: {
+                        type: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+                        message: 'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
+                    },
+                },
+                status: 402,
+            } as AxiosResponse, 1);
+
+            const response = buildCallActorErrorResponse({
+                actorName: 'compass/crawler-google-places',
+                error,
+                actorId: 'actor-789',
+                isAsync: true,
+                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+            });
+
+            expect(response.isError).toBe(true);
+            const allText = response.content.map((c) => c.text).join('\n');
+            expect(allText).toContain('memory limit of 8192MB');
+            expect(allText).toContain('Account memory quota exceeded');
+            expect(allText).toContain('callOptions.memory');
+            // Regression: must not nudge the LLM toward aborting unrelated runs to free capacity.
+            expect(allText).not.toContain(HelperTools.ACTOR_RUNS_ABORT);
+            expect(allText).not.toContain('verify the Actor name');
+        });
+    });
+
+    describe('callActorArgs.callOptions', () => {
+        const baseArgs = { actor: 'apify/rag-web-browser', input: { query: 'hello' } };
+
+        it.each([
+            ['memory', { memory: 1024 }],
+            ['timeout', { timeout: 60 }],
+            ['build', { build: 'latest' }],
+            ['maxItems', { maxItems: 3 }],
+            ['maxTotalChargeUsd', { maxTotalChargeUsd: 1.5 }],
+            ['memory + build', { memory: 1024, build: 'latest' }],
+        ])('accepts %s', (_name, callOptions) => {
+            const result = callActorArgs.safeParse({ ...baseArgs, callOptions });
+            expect(result.success).toBe(true);
+            if (result.success) {
+                expect(result.data.callOptions).toEqual(callOptions);
+            }
+        });
+
+        it('rejects negative maxItems', () => {
+            const result = callActorArgs.safeParse({
+                ...baseArgs,
+                callOptions: { maxItems: -1 },
+            });
+            expect(result.success).toBe(false);
         });
     });
 

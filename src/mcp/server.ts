@@ -14,7 +14,13 @@ import { InMemoryTaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import type { InitializeRequest, InitializeResult, Notification, Request } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    InitializeRequest,
+    InitializeResult,
+    Notification,
+    Request,
+    TaskStatusNotification,
+} from '@modelcontextprotocol/sdk/types.js';
 import {
     CallToolRequestSchema,
     CallToolResultSchema,
@@ -31,6 +37,7 @@ import {
     ListToolsRequestSchema,
     McpError,
     ReadResourceRequestSchema,
+    RELATED_TASK_META_KEY,
     ServerNotificationSchema,
     SetLevelRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -94,7 +101,7 @@ import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
-import { isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
+import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
 
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
@@ -116,6 +123,37 @@ function isUiSupportedByClient(request: InitializeRequest | undefined): boolean 
 }
 
 type ToolsChangedHandler = (toolNames: string[]) => void;
+
+/** Send notifications/tasks/status for taskId. Routes via session transport (no relatedRequestId).
+ *  Swallows errors — notifications are advisory. */
+export async function emitTaskStatusNotification(
+    taskId: string,
+    mcpSessionId: string | undefined,
+    taskStore: TaskStore,
+    server: Server,
+): Promise<void> {
+    try {
+        const task = await taskStore.getTask(taskId, mcpSessionId);
+        if (!task) return;
+        // Per spec: notifications/tasks/status MUST NOT carry _meta.related-task (task ID is in params).
+        // Called without options so the notification routes through the session transport,
+        // not the request-scoped stream (which closes once the initial { task } response is flushed).
+        await server.notification({
+            method: 'notifications/tasks/status',
+            params: {
+                taskId: task.taskId,
+                status: task.status,
+                createdAt: task.createdAt,
+                lastUpdatedAt: task.lastUpdatedAt,
+                ttl: task.ttl,
+                ...(task.statusMessage != null && { statusMessage: task.statusMessage }),
+                ...(task.pollInterval != null && { pollInterval: task.pollInterval }),
+            },
+        } as TaskStatusNotification);
+    } catch {
+        // Silent fail — notifications are advisory
+    }
+}
 
 /**
  * Create Apify MCP server
@@ -293,10 +331,11 @@ export class ActorsMcpServer {
 
             (this.options as Record<string, unknown>).initializeRequestData = request;
 
-            log.info('Resolved server mode for connection', {
+            log.info('Resolved server mode for client capabilities', {
                 serverMode: this.serverMode,
                 serverModeOption: this.serverModeOption,
                 clientSupportsUi: this.clientSupportsUi,
+                capabilities: request?.params?.capabilities,
             });
 
             this.updateToolsAfterServerModeResolved();
@@ -539,8 +578,19 @@ export class ActorsMcpServer {
             //   - "Invalid state: Controller is already closed" (ERR_INVALID_STATE from
             //     WebStandardStreamableHTTPServerTransport.writeSSEEvent when the SSE ReadableStream
             //     controller was closed by client cancellation before a queued event was flushed)
+            //   - "Not Acceptable: Client must accept [both application/json and] text/event-stream"
+            //     (thrown from WebStandardStreamableHTTPServerTransport.handlePost/GetRequest when
+            //     the client sends an Accept header missing one of the required MIME types — pure
+            //     client misconfiguration, not a server fault; HTTP 406 is already returned to caller)
             // All are expected; log as softFail so they don't flood Mezmo error alerts.
-            if (/Not connected|No connection established|Only one SSE stream|Controller is already closed/i.test(error.message ?? '')) {
+            const clientDisconnectPattern = new RegExp([
+                'Not connected',
+                'No connection established',
+                'Only one SSE stream',
+                'Controller is already closed',
+                'Not Acceptable: Client must accept',
+            ].join('|'), 'i');
+            if (clientDisconnectPattern.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
                 const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
@@ -700,7 +750,15 @@ export class ActorsMcpServer {
                     `Task "${taskId}" is not completed yet. Current status: ${task.status}`,
                 );
             }
-            return await this.taskStore.getTaskResult(taskId, mcpSessionId);
+            const result = await this.taskStore.getTaskResult(taskId, mcpSessionId);
+            // taskId is not in the result body — _meta.related-task lets clients correlate them
+            return {
+                ...result,
+                _meta: {
+                    ...(result._meta as Record<string, unknown>),
+                    [RELATED_TASK_META_KEY]: { taskId },
+                },
+            };
         });
 
         // Cancel task
@@ -736,6 +794,7 @@ export class ActorsMcpServer {
             await this.taskStore.updateTaskStatus(taskId, 'cancelled', 'Cancelled by client', mcpSessionId);
             const updatedTask = await this.taskStore.getTask(taskId, mcpSessionId);
             log.debug('[CancelTaskRequestSchema] Task cancelled successfully', { taskId, mcpSessionId });
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             return updatedTask!;
         });
     }
@@ -915,12 +974,13 @@ export class ActorsMcpServer {
                         },
                         `call-tool-${name}-${randomUUID()}`,
                         request,
+                        mcpSessionId,
                     );
                     log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
 
                     // Execute the tool asynchronously and update task status
-                    setImmediate(async () => {
-                        await this.executeToolAndUpdateTask({
+                    setImmediate(() => {
+                        this.executeToolAndUpdateTask({
                             taskId: task.taskId,
                             tool,
                             toolArgs: toolArgs!,
@@ -934,7 +994,7 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                             userRentedActorIds,
-                        });
+                        }).catch((error) => log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }));
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1290,27 +1350,54 @@ export class ActorsMcpServer {
             });
         };
 
-        try {
-            // Check if task was already cancelled before we start execution.
-            // Critical: if a client cancels the task immediately after creation (race condition),
-            // attempting to transition from 'cancelled' (terminal state) to 'working' will fail in the SDK
-            // because terminal states cannot transition to other states. We must check before calling updateTaskStatus.
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled before execution started, skipping', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(TOOL_STATUS.ABORTED, {
-                    ...buildActorFields(actorName, actorId),
-                });
-                return;
-            }
+        // Once a task is cancelled the spec forbids writing a result; every storage path
+        // must short-circuit here. `logSuffix` is concatenated after "Task was cancelled"
+        // so we keep the existing log format and the existing telemetry status per path.
+        const skipIfTaskCancelled = async (
+            logSuffix: string,
+            status: ToolStatus,
+            diagnostics?: CallDiagnostics,
+        ): Promise<boolean> => {
+            if (!(await isTaskCancelled(taskId, mcpSessionId, this.taskStore))) return false;
+            log.debug(`[executeToolAndUpdateTask] Task was cancelled${logSuffix}`, { taskId, mcpSessionId });
+            finishTaskTracking(status, diagnostics);
+            return true;
+        };
 
+        // Bridges MCP `tasks/cancel` to the running handler: when the client
+        // explicitly cancels the task, this signal aborts so the underlying
+        // Actor run stops instead of consuming compute until natural completion.
+        // Per MCP tasks spec, request-level aborts (client disconnect,
+        // notifications/cancelled for the original request ID) MUST NOT cancel
+        // the task — `extra.signal` is intentionally not chained here.
+        const cancelWatcher = createTaskCancellationWatcher({
+            taskId,
+            mcpSessionId,
+            taskStore: this.taskStore,
+        });
+        const taskExtra = { ...extra, signal: cancelWatcher.signal };
+
+        try {
             log.debug('[executeToolAndUpdateTask] Updating task status to working', {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+            // The store rejects terminal → 'working' transitions. If `tasks/cancel` raced
+            // with us (between handler dispatch and the first watcher tick at ~500 ms),
+            // updateTaskStatus throws — re-check the store to tell a clean cancel-race
+            // apart from a genuine store error.
+            // noinspection ExceptionCaughtLocallyJS
+            try {
+                await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
+            } catch (err) {
+                if (await skipIfTaskCancelled(
+                    ' before execution started, skipping',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
+                throw err;
+            }
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
@@ -1326,11 +1413,12 @@ export class ActorsMcpServer {
                 result = paymentRequiredResult;
             }
 
-            // Callback to propagate Actor run statusMessage into the task store.
-            // Clients retrieve it via tasks/get and tasks/list polling.
-            // TODO: Also send notifications/tasks/status so clients get real-time push updates
+            // Callback to propagate Actor run statusMessage into the task store and emit a push notification.
+            // TODO(TC-3): cancel arriving while this is scheduled throws cancelled → working;
+            // currently swallowed by progress.ts's tick catch — guard or catch explicitly.
             const onStatusMessage = async (message: string) => {
                 await this.taskStore.updateTaskStatus(taskId, 'working', message, mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
             };
 
             // Handle internal tool execution in task mode
@@ -1341,7 +1429,7 @@ export class ActorsMcpServer {
                     log.info('Calling internal tool for task', { taskId, toolName: tool.name, mcpSessionId, input: logSafeArgs });
                     const res = await tool.call({
                         args: toolArgs,
-                        extra,
+                        extra: taskExtra,
                         apifyMcpServer: this,
                         mcpServer: this.server,
                         apifyToken,
@@ -1374,7 +1462,7 @@ export class ActorsMcpServer {
                         apifyClient,
                         callOptions: { memory: tool.memoryMbytes },
                         progressTracker,
-                        abortSignal: extra.signal,
+                        abortSignal: cancelWatcher.signal,
                         mcpSessionId,
                     });
 
@@ -1394,14 +1482,7 @@ export class ActorsMcpServer {
             }
 
             // Check if task was cancelled before storing result
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(toolStatus);
-                return;
-            }
+            if (await skipIfTaskCancelled(', skipping result storage', toolStatus)) return;
 
             // Store the result in the task store
             log.debug('[executeToolAndUpdateTask] Storing completed result', {
@@ -1410,6 +1491,7 @@ export class ActorsMcpServer {
             });
             await this.taskStore.storeTaskResult(taskId, 'completed', result, mcpSessionId);
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
         } catch (error) {
@@ -1417,7 +1499,15 @@ export class ActorsMcpServer {
             const httpStatus = getHttpStatusCode(error);
             if (httpStatus === HTTP_PAYMENT_REQUIRED) {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this 402.
+                if (await skipIfTaskCancelled(
+                    ', skipping 402 result storage',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
@@ -1428,7 +1518,15 @@ export class ActorsMcpServer {
 
             if (isPermissionApprovalError(error)) {
                 logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
+                // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
+                // so guard storeTaskResult against a cancel that raced with this approval error.
+                if (await skipIfTaskCancelled(
+                    ', skipping permission-approval result storage',
+                    TOOL_STATUS.ABORTED,
+                    { ...buildActorFields(actorName, actorId) },
+                )) return;
                 await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
+                await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                     failure_http_status: error.statusCode,
@@ -1437,7 +1535,7 @@ export class ActorsMcpServer {
                 return;
             }
 
-            toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
+            toolStatus = getToolStatusFromError(error, Boolean(cancelWatcher.signal.aborted));
             const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
             callDiagnostics = {
                 failure_category: classifyFailureCategory(error),
@@ -1477,16 +1575,7 @@ export class ActorsMcpServer {
             const userText = getToolCallErrorUserText(tool.name, error);
 
             // Check if task was cancelled before storing result
-            // TODO: In future, we should actually stop execution via AbortController,
-            // but coordinating cancellation across distributed nodes would be complex
-            if (await isTaskCancelled(taskId, mcpSessionId, this.taskStore)) {
-                log.debug('[executeToolAndUpdateTask] Task was cancelled, skipping result storage', {
-                    taskId,
-                    mcpSessionId,
-                });
-                finishTaskTracking(toolStatus, callDiagnostics);
-                return;
-            }
+            if (await skipIfTaskCancelled(', skipping result storage', toolStatus, callDiagnostics)) return;
 
             log.debug('[executeToolAndUpdateTask] Storing failed result', {
                 taskId,
@@ -1500,8 +1589,11 @@ export class ActorsMcpServer {
                 isError: true,
                 internalToolStatus: toolStatus,
             }, mcpSessionId);
+            await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
             finishTaskTracking(toolStatus, callDiagnostics);
+        } finally {
+            cancelWatcher.dispose();
         }
     }
 

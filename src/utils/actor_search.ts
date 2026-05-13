@@ -1,87 +1,64 @@
 /**
- * Shared utility for searching and filtering actors.
- * Combines searchActorsByKeywords with filterRentalActors to prevent accidental omission
- * of the filtering step and reduce code duplication.
+ * Shared utility for searching Actors via `GET /v2/store`.
+ *
+ * `GET /v2/store` returns only `[FREE, PAY_PER_EVENT]` Actors by default
+ * (apify-core's `AGENT_SAFE_PRICING_MODELS`) and additionally drops Actors
+ * that fail safety checks (KYC, full-permission low-usage, etc.) — so no
+ * MCP-side rental over-fetch / filter is needed.
  */
 
 import { ApifyClient } from '../apify_client.js';
-import { ACTOR_PRICING_MODEL } from '../const.js';
 import type { PaymentProvider } from '../payments/types.js';
 import type { ActorStoreList } from '../types.js';
 
-/**
- * Used in search Actors tool to search above the input supplied limit,
- * so we can safely filter out rental Actors from the search and ensure we return some results.
- */
-const ACTOR_SEARCH_ABOVE_LIMIT = 50;
-type ActorPricingModel = (typeof ACTOR_PRICING_MODEL)[keyof typeof ACTOR_PRICING_MODEL];
+export type SearchActorsByKeywordsOptions = {
+    search: string;
+    apifyToken: string;
+    limit: number;
+    offset?: number;
+    allowsAgenticUsers?: boolean;
+    /** API rejects values above `MAX_LIMIT_WITH_INPUT_SCHEMA` (apify-core cap). */
+    includeInputSchema?: boolean;
+};
 
-export type SearchAndFilterActorsOptions = {
+export type SearchAgentSafeActorsOptions = {
     keywords: string;
     apifyToken: string;
     limit: number;
     offset: number;
     paymentProvider?: PaymentProvider;
-    userRentedActorIds?: string[];
 };
 
 export async function searchActorsByKeywords(
-    search: string,
-    apifyToken: string,
-    limit: number | undefined = undefined,
-    offset: number | undefined = undefined,
-    allowsAgenticUsers: boolean | undefined = undefined,
+    options: SearchActorsByKeywordsOptions,
 ): Promise<ActorStoreList[]> {
+    const { search, apifyToken, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
     const client = new ApifyClient({ token: apifyToken });
     const storeClient = client.store();
     if (allowsAgenticUsers !== undefined) storeClient.params = { ...storeClient.params, allowsAgenticUsers };
+    if (includeInputSchema !== undefined) storeClient.params = { ...storeClient.params, includeInputSchema };
 
     const results = await storeClient.list({ search, limit, offset });
     return results.items as ActorStoreList[];
 }
 
 /**
- * Search actors by keywords and filter rental actors.
- * This combines two operations that should always happen together to ensure consistency.
- *
- * @param options Search and filter options
- * @returns Array of filtered actors, limited to the specified limit
+ * Preset around `searchActorsByKeywords` for the agent-facing search tool:
+ * always sets `includeInputSchema=true` and forwards `allowsAgenticUsers`
+ * when a `paymentProvider` is in play. The public arg schema caps `limit`
+ * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
  */
-export async function searchAndFilterActors(
-    options: SearchAndFilterActorsOptions,
+export async function searchAgentSafeActors(
+    options: SearchAgentSafeActorsOptions,
 ): Promise<ActorStoreList[]> {
-    const { keywords, apifyToken, limit, offset, paymentProvider, userRentedActorIds } = options;
+    const { keywords, apifyToken, limit, offset, paymentProvider } = options;
 
-    const actors = await searchActorsByKeywords(
-        keywords,
+    return searchActorsByKeywords({
+        search: keywords,
         apifyToken,
-        limit + ACTOR_SEARCH_ABOVE_LIMIT,
+        limit,
         offset,
-        paymentProvider ? true : undefined,
-    );
-
-    return filterRentalActors(actors || [], userRentedActorIds || []).slice(0, limit) as ActorStoreList[];
-}
-
-/**
- * Filters out actors with the 'FLAT_PRICE_PER_MONTH' pricing model (rental actors),
- * unless the actor's ID is present in the user's rented actor IDs list.
- *
- * This is necessary because the Store list API does not support filtering by multiple pricing models at once.
- *
- * @param actors - Array of ActorStorePruned objects to filter.
- * @param userRentedActorIds - Array of Actor IDs that the user has rented.
- * @returns Array of Actors excluding those with 'FLAT_PRICE_PER_MONTH' pricing model (= rental Actors),
- *  except for Actors that the user has rented (whose IDs are in userRentedActorIds).
- */
-export function filterRentalActors(
-    actors: ActorStoreList[],
-    userRentedActorIds: string[],
-): ActorStoreList[] {
-    // Store list API does not support filtering by two pricing models at once,
-    // so we filter the results manually after fetching them.
-    return actors.filter((actor) => (
-        actor.currentPricingInfo.pricingModel as ActorPricingModel) !== ACTOR_PRICING_MODEL.FLAT_PRICE_PER_MONTH
-        || userRentedActorIds.includes(actor.id),
-    );
+        allowsAgenticUsers: paymentProvider ? true : undefined,
+        includeInputSchema: true,
+    });
 }

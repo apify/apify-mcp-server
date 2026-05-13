@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -20,9 +20,9 @@ export const searchActorsBaseArgsSchema = z.object({
     limit: z.number()
         .int()
         .min(1)
-        .max(100)
+        .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
-        .describe('The maximum number of Actors to return (default = 5)'),
+        .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
     offset: z.number()
         .int()
         .min(0)
@@ -77,9 +77,10 @@ Usage:
 - Prefer broad, generic keywords - use just the platform name (e.g. "Instagram" instead of "Instagram scraper").
 - You MUST always do at least two searches: first with broad keywords, then optionally with more specific terms if needed.
 
-Important limitations: This tool does not return full Actor documentation, input schemas, or detailed usage instructions - only summary information.
-For complete Actor details, use the ${HelperTools.ACTOR_GET_DETAILS} tool.
-The search is limited to publicly available Actors and may not include private, rental, or restricted Actors depending on the user's access level.
+Important limitations: This tool does not return full Actor documentation or detailed usage instructions - only summary information.
+Each result lists the Actor's input fields with their types (e.g. \`url: string, maxResults?: number\`) so you can construct an Actor call directly without a separate ${HelperTools.ACTOR_GET_DETAILS} round-trip.
+For complete Actor details (per-field descriptions, defaults, README), use the ${HelperTools.ACTOR_GET_DETAILS} tool.
+The search is limited to publicly available Actors and excludes rental and restricted Actors.
 
 Returns list of Actor cards with the following info:
 **Title:** Markdown header linked to Store page
@@ -91,6 +92,7 @@ Returns list of Actor cards with the following info:
 - **Pricing:** Details with pricing link
 - **Stats:** Usage, success rate, bookmarks
 - **Rating:** Out of 5 (if available)
+- **Input fields:** Inline list of input field names and types (e.g. \`url: string, maxResults?: number\`); \`?\` marks optional fields
 `;
 
 /**

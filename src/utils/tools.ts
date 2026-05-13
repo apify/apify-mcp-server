@@ -1,9 +1,9 @@
+import { type HelperTools } from '../const.js';
 import {
-    type HelperTools,
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
-} from '../const.js';
+} from '../payments/const.js';
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { ServerMode } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';

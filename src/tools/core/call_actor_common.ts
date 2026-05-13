@@ -8,7 +8,7 @@ import log from '@apify/log';
 import { ApifyClient } from '../../apify_client.js';
 import {
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
+    APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
     FAILURE_CATEGORY,
     HelperTools,
     TOOL_STATUS,
@@ -30,6 +30,8 @@ import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory
 // ---------------------------------------------------------------------------
 
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName('apify/rag-web-browser');
+
+export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
 
 /** Shared MCP server instructions — identical in both modes. */
 export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:
@@ -186,6 +188,10 @@ export function isPermissionApprovalError(error: unknown): error is ApifyApiErro
     return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED;
 }
 
+function isMemoryQuotaError(error: unknown): error is ApifyApiError {
+    return error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED;
+}
+
 /** Exported for native actor tool error handling in server.ts — no logging, no telemetry. */
 export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
     const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
@@ -244,21 +250,36 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         failureCategory,
     });
 
+    const telemetry = {
+        toolStatus: getToolStatusFromError(error, false),
+        failureCategory,
+        failureHttpStatus: getHttpStatusCode(error),
+        failureDetail: errMsg.slice(0, 200),
+        actorId,
+    };
+
+    if (isMemoryQuotaError(error)) {
+        // Deliberately do NOT mention actor-runs-abort as a recovery path — nudging the LLM
+        // toward "free capacity" risks aborting unrelated in-flight runs the user cares about.
+        return buildMCPResponse({
+            texts: [
+                `Failed to call Actor '${actorName}': ${errMsg}`,
+                `Account memory quota exceeded for your plan. Retry with a smaller callOptions.memory, or wait for current runs to finish before retrying.`,
+            ],
+            isError: true,
+            telemetry: { ...telemetry, failureDetail: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED },
+        });
+    }
+
     return buildMCPResponse({
         texts: [
-            `Failed to call Actor '${actorName}': ${errMsg}.`,
+            `Failed to call Actor '${actorName}': ${errMsg}`,
             `Please verify the Actor name, input parameters, and ensure the Actor exists.`,
             // "if available" — search-actors may not be loaded in apps-mode partial tool selections.
             `If ${HelperTools.STORE_SEARCH} is available in this session, you can use it to search for available Actors, or get Actor details using: ${actorGetDetailsTool}.`,
         ],
         isError: true,
-        telemetry: {
-            toolStatus: getToolStatusFromError(error, false),
-            failureCategory,
-            failureHttpStatus: getHttpStatusCode(error),
-            failureDetail: errMsg.slice(0, 200),
-            actorId,
-        },
+        telemetry,
     });
 }
 
@@ -292,8 +313,8 @@ export const callActorArgs = z.object({
             .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
             .optional()
             .describe(dedent`
-                Memory allocation for the Actor in MB. Must be a power of 2 (e.g., 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768).
-                Minimum: 128 MB, Maximum: 32768 MB (32 GB).
+                Memory per run in MB. Power of 2 from 128 to 32768.
+                Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
             `),
         timeout: z.number()
             .min(0, 'Timeout must be 0 or greater')
@@ -301,6 +322,26 @@ export const callActorArgs = z.object({
             .describe(dedent`
                 Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
                 Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
+            `),
+        build: z.string()
+            .optional()
+            .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
+        maxItems: z.number()
+            .int()
+            .positive()
+            .optional()
+            .describe(dedent`
+                Pay-per-result Actors ONLY — has no effect on any other pricing model (pay-per-event, pay-per-usage, rental, free).
+                Caps the number of dataset items billed for this run; does NOT limit how many items the Actor produces.
+                Most Actors also expose their own input field (e.g. "maxResults", "maxPages", "maxItems") to bound how much work they do — prefer those when limiting actual output, since this option only caps billing.
+            `),
+        maxTotalChargeUsd: z.number()
+            .positive()
+            .optional()
+            .describe(dedent`
+                Pay-per-event Actors ONLY — has no effect on any other pricing model (pay-per-result, pay-per-usage, rental, free).
+                Caps the total USD billed for this run; does NOT limit how much work the Actor does.
+                Most Actors also expose their own input field to bound work — prefer those when limiting actual output, since this option only caps billing.
             `),
     }).optional()
         .describe('Optional call options for the Actor run configuration.'),

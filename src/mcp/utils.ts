@@ -48,3 +48,53 @@ export async function isTaskCancelled(
     const task = await taskStore.getTask(taskId, mcpSessionId);
     return task?.status === 'cancelled';
 }
+
+/**
+ * Polls the TaskStore and returns a signal that aborts only when an MCP task
+ * is cancelled via `tasks/cancel`. Caller MUST invoke `dispose()` once the
+ * tool handler returns or the polling interval leaks.
+ *
+ * See {@link ../../res/tasks_cancel_abort_flow.md} for the full design:
+ * why the request's `extra.signal` is intentionally NOT chained, why polling
+ * (not a callback), and how it composes with the existing handler-side abort.
+ */
+export function createTaskCancellationWatcher(opts: {
+    taskId: string;
+    mcpSessionId: string | undefined;
+    taskStore: TaskStore;
+    pollIntervalMs?: number;
+}): { signal: AbortSignal; dispose: () => void } {
+    const { taskId, mcpSessionId, taskStore, pollIntervalMs = 500 } = opts;
+    const controller = new AbortController();
+
+    // Prevents tick overlap when `getTask` is slower than the poll interval (Redis tail
+    // latency, cluster reslot). Without it, ticks pile up and amplify backend load right
+    // when the backend is struggling.
+    let tickInProgress = false;
+    const interval = setInterval(() => {
+        if (tickInProgress || controller.signal.aborted) return;
+        tickInProgress = true;
+        void (async () => {
+            try {
+                if (await isTaskCancelled(taskId, mcpSessionId, taskStore)) {
+                    // Stop the timer immediately rather than relying on dispose() —
+                    // otherwise ticks keep firing as no-ops until the caller's
+                    // finally block runs.
+                    clearInterval(interval);
+                    controller.abort();
+                }
+            } catch {
+                // In production `taskStore.getTask` hits Redis. Swallow transient failures so they don't crash the pod via
+                // unhandled rejection; the next successful tick will still detect cancellation. Not logged: under sustained Redis
+                // degradation this fires every pollIntervalMs per task and would flood logs.
+            } finally {
+                tickInProgress = false;
+            }
+        })();
+    }, pollIntervalMs);
+
+    return {
+        signal: controller.signal,
+        dispose: () => clearInterval(interval),
+    };
+}
