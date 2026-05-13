@@ -61,18 +61,18 @@ function stubArgs(args: Record<string, unknown>): InternalToolArgs {
 }
 
 describe('get-dataset-items structuredContent', () => {
-    it('omits `limit` from structuredContent when caller did not provide one', async () => {
+    it('echoes the default `limit` of 20 when caller did not provide one', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
-        expect(structuredContent).not.toHaveProperty('limit');
+        expect(structuredContent).toHaveProperty('limit', 20);
         expect(structuredContent.datasetId).toBe('ds-1');
         expect(structuredContent.itemCount).toBe(MOCK_ITEMS.length);
     });
 
-    it('includes `limit` in structuredContent when caller provided one', async () => {
+    it('echoes the caller-provided `limit` in structuredContent', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubArgs({ datasetId: 'ds-1', limit: 10 }),
         );

@@ -85,10 +85,11 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             ? parseCommaSeparatedList(parsed.flatten)
             : deriveFlattenFromFields(fields);
 
+        const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const v = await client.dataset(parsed.datasetId).listItems({
             clean: parsed.clean,
             offset: parsed.offset,
-            limit: parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT,
+            limit: effectiveLimit,
             fields,
             omit,
             desc: parsed.desc,
@@ -102,14 +103,13 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             });
         }
 
-        // omit limit when unset; undefined silently drops from JSON (#731)
         const structuredContent = {
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset: parsed.offset ?? 0,
-            ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
+            limit: effectiveLimit,
         };
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };
