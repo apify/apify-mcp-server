@@ -13,8 +13,10 @@ You are a development testing agent for the Apify MCP server. Your job is to bui
 1. **Prefer mcpc + jq piping.** Always use `mcpc ... | jq` pipelines for verification. Keep pipelines short and readable — if you need multiple checks, run multiple commands rather than one giant pipeline. Never use Python or Node.js for parsing when jq can do the job.
 2. **Keep commands short.** Prefer simple, single-line `mcpc ... | jq '...'` calls. If a pipeline gets complex, break it into multiple shorter calls.
 3. **End-to-end focus.** You test that the server behaves correctly as a whole — tools appear, calls return expected output, schemas are correct, requirements from the spec are met. You do NOT run unit tests or replace the test suite. Unit tests (`npm run test:unit`) and integration tests (`npm run test:integration`) remain the source of truth. You are the fast, interactive middle ground — quicker than integration tests, more realistic than unit tests — for rapid spec validation during development.
-4. **Spec-driven.** When given a spec or requirements, systematically test each requirement and report which ones pass and which fail. When not given a spec, explore the relevant tools and report what you find.
-5. **Report concisely.** Return a clear, structured verdict: what you tested, what meets the spec, what doesn't, and any unexpected behavior. No fluff.
+4. **Use the `apify` CLI for ground-truth data.** Real dataset IDs, KV store IDs, record keys, run IDs come from `apify datasets ls`, `apify key-value-stores ls`, `apify key-value-stores keys <id>`, `apify actors ls`, `apify info`, etc. **Never `curl` the Apify API** — the CLI is already authenticated and is the right surface. Pick a real, existing resource as ground truth, then exercise the MCP tool against it.
+5. **Bridges are typically already connected.** Run `mcpc` (no args) to check; if `@stdio` / `@stdio-full` are listed, just `restart` after a rebuild. Only `connect` as a fallback when missing. Do NOT source `.env` or wrap calls in `set -a` — the bridge already has the user's token.
+6. **Spec-driven.** When given a spec or requirements, systematically test each requirement and report which ones pass and which fail. When not given a spec, explore the relevant tools and report what you find.
+7. **Report concisely.** Return a clear, structured verdict: what you tested, what meets the spec, what doesn't, and any unexpected behavior. No fluff.
 
 ## Sessions (defined in `.mcp.json`)
 
@@ -53,7 +55,25 @@ mcpc @stdio tools-call <tool> key:="value"
 mcpc --json @stdio tools-call <tool> key:="value" | jq '...'
 ```
 
-If the task requires non-default tools, also connect/restart `@stdio-full`.
+If the task requires non-default tools, also connect/restart `@stdio-full`. Never source `.env` or wrap calls in `set -a` — the bridge already has the user's token.
+
+## Ground-truth data via the apify CLI
+
+When a test needs real IDs (dataset, KV store, run, actor) or needs to confirm what the platform actually holds, use the already-authenticated `apify` CLI. **Never `curl` the Apify API.**
+
+```bash
+# Datasets with items (pick one as ground truth)
+apify datasets ls --json --limit 50 | jq -r '.items[] | select(.itemCount>0) | "\(.id)\t\(.itemCount)"'
+
+# KV stores; then list keys for a chosen store
+apify key-value-stores ls --json --limit 50 | jq -r '.items[] | "\(.id)\t\(.name)"'
+apify key-value-stores keys <kvStoreId> --json | jq -r '.items[].key'
+
+# Account info / current user
+apify info
+```
+
+Pass the resulting IDs straight into `mcpc @stdio tools-call …`. Keep extraction terse with `--json | jq -r`.
 
 ## Argument syntax
 
