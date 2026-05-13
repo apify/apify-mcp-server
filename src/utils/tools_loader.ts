@@ -256,8 +256,10 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     /**
      * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
-     * Insert them right after call-actor (or appended at the end when call-actor is absent) to follow the logical workflow order:
-     * call → get-actor-run → get-dataset-items → get-key-value-store-record → abort-actor-run
+     * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
+     * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
+     * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
+     * via category before `actors`, the de-dup pass below preserves their selector order.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
