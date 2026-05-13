@@ -8,6 +8,40 @@ jobs:
         name: Code checks
         uses: ./.github/workflows/_check_code.yaml
 
+    # Whitelist of paths whose changes can affect integration-test behavior.
+    # Anything outside this list (docs, evals, notebooks, research, scripts, ...)
+    # skips the integration suite to save CI time.
+    changes:
+        name: Detect relevant changes
+        runs-on: ubuntu-latest
+        outputs:
+            run_integration: ${{ steps.filter.outputs.code }}
+        steps:
+            -   uses: dorny/paths-filter@v3
+                id: filter
+                with:
+                    filters: |
+                        code:
+                            - 'src/**'
+                            - 'tests/integration/**'
+                            - 'package.json'
+                            - 'package-lock.json'
+                            - 'tsconfig.json'
+                            - '.nvmrc'
+                            - '.github/workflows/_integration_tests.yaml'
+                            - '.github/workflows/on_pull_request.yaml'
+
+    integration_tests:
+        needs: changes
+        # Fork PRs don't have access to repo secrets — skip rather than fail.
+        if: |
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            needs.changes.outputs.run_integration == 'true'
+        name: Integration tests
+        uses: ./.github/workflows/_integration_tests.yaml
+        secrets:
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+
     pr_title_check:
         name: PR title check
         runs-on: ubuntu-latest

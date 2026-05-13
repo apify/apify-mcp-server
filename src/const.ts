@@ -18,13 +18,10 @@ export const TOOL_MAX_OUTPUT_CHARS = 50000;
 
 // MCP Server
 /** When `false`, `resolveServerMode('auto', ...)` forces {@link ServerMode.DEFAULT} regardless of client capabilities. */
-export const SERVER_MODE_AUTO_DETECTION_ENABLED = false;
+export const SERVER_MODE_AUTO_DETECTION_ENABLED = true;
 
 export const SERVER_NAME = 'apify-mcp-server';
 export const SERVER_TITLE = 'Apify MCP Server';
-// User agent headers
-export const USER_AGENT_ORIGIN = 'Origin/mcp-server';
-
 export enum HelperTools {
     ACTOR_ADD = 'add-actor',
     ACTOR_CALL = 'call-actor',
@@ -69,35 +66,6 @@ export const defaults = {
     ],
 };
 
-const SKYFIRE_MIN_CHARGE_USD = 5.0;
-const SKYFIRE_SELLER_ID = process.env.SKYFIRE_SELLER_SERVICE_ID;
-
-export const SKYFIRE_TOOL_INSTRUCTIONS = `To run the Actor, you need to provide a Skyfire PAY JWT token in the \`skyfire-pay-id\` input property. You first need to create the Skyfire PAY token by calling the \`create-pay-token\` tool from the Skyfire MCP server and then provide the created JWT token in the \`skyfire-pay-id\` input property when calling Actor tool. IMPORTANT: The value you pass to \`skyfire-pay-id\` must be the JWT token string itself (it starts with "ey"), NOT an ID or UUID. The Skyfire PAY token is used for billing purposes and needs to be charged with at least ${SKYFIRE_MIN_CHARGE_USD} USD.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When retrieving Actor output using the \`get-actor-output\` tool, you also need to provide the same Skyfire PAY JWT token (starting with "ey") in the \`skyfire-pay-id\` input property.`;
-
-export const SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION = `Skyfire PAY JWT token used for billing purposes. This must be the JWT token string returned by the create-pay-token tool (starts with "ey"), NOT a token ID or UUID.`;
-
-export const SKYFIRE_README_CONTENT = `The Apify MCP Server allows clients to interact with Apify Actors, storage, and documentation. Before running any Apify Actor, you need to set up a Skyfire PAY token for billing purposes. To set up the PAY token you need to use the create-pay-token tool from the Skyfire MCP server. The PAY token must be charged with a minimum of ${SKYFIRE_MIN_CHARGE_USD} USD to be valid.${SKYFIRE_SELLER_ID ? ` The Skyfire seller ID for Apify MCP server is "${SKYFIRE_SELLER_ID}".` : ''} When running an Actor using the call-actor tool, you must provide the Skyfire PAY JWT token in the \`skyfire-pay-id\` input property. IMPORTANT: The value for \`skyfire-pay-id\` must be the actual JWT token string (starting with "ey") returned by the create-pay-token tool, NOT a token ID or UUID. Similarly, when retrieving Actor output using the get-actor-output tool, you must also provide the same Skyfire PAY JWT token (starting with "ey") in the \`skyfire-pay-id\` input property.`;
-
-/**
- * Set of internal tool names that require Skyfire PAY token ID in Skyfire mode.
- * These tools interact with Actor runs, datasets, or key-value stores and need billing support.
- */
-export const SKYFIRE_ENABLED_TOOLS = new Set([
-    HelperTools.ACTOR_CALL,
-    HelperTools.ACTOR_OUTPUT_GET,
-    HelperTools.ACTOR_RUNS_GET,
-    HelperTools.ACTOR_RUNS_LOG,
-    HelperTools.ACTOR_RUNS_ABORT,
-    HelperTools.DATASET_GET,
-    HelperTools.DATASET_GET_ITEMS,
-    HelperTools.DATASET_SCHEMA_GET,
-    HelperTools.KEY_VALUE_STORE_GET,
-    HelperTools.KEY_VALUE_STORE_KEYS_GET,
-    HelperTools.KEY_VALUE_STORE_RECORD_GET,
-]);
-
-export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
-
 // Cache
 export const ACTOR_CACHE_MAX_SIZE = 500;
 export const ACTOR_CACHE_TTL_SECS = 30 * 60; // 30 minutes
@@ -107,6 +75,10 @@ export const MCP_SERVER_CACHE_MAX_SIZE = 500;
 export const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 export const USER_CACHE_MAX_SIZE = 200;
 export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
+/** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
+export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
+/** Max input fields shown inline in the text Actor card; structured output keeps the full schema. */
+export const MAX_INPUT_FIELDS_IN_TEXT_CARD = 20;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */
@@ -117,8 +89,6 @@ export const ACTOR_PRICING_MODEL = {
     /** Pay per event (PPE) Actors */
     PAY_PER_EVENT: 'PAY_PER_EVENT',
 } as const;
-
-export const MCP_STREAMABLE_ENDPOINT = '/mcp';
 
 export const DOCS_SOURCES = [
     {
@@ -163,9 +133,6 @@ export const ALLOWED_DOC_DOMAINS = [
     'https://crawlee.dev',
 ] as const;
 
-// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.`
-export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
-
 export const APIFY_STORE_URL = 'https://apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;
 export const APIFY_MCP_URL = 'https://mcp.apify.com';
@@ -179,14 +146,6 @@ export const TELEMETRY_ENV = {
 
 export const DEFAULT_TELEMETRY_ENABLED = true;
 export const DEFAULT_TELEMETRY_ENV = TELEMETRY_ENV.PROD;
-
-// We are using the same values as apify-core for consistency (despite that we ship events of different types).
-// https://github.com/apify/apify-core/blob/2284766c122c6ac5bc4f27ec28051f4057d6f9c0/src/packages/analytics/src/server/segment.ts#L28
-// Reasoning from the apify-core:
-// Flush at 50 events to avoid sending too many small requests (default is 15)
-export const SEGMENT_FLUSH_AT_EVENTS = 50;
-// Flush interval in milliseconds (default is 10000)
-export const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 
 // Tool status
 /**
@@ -219,7 +178,3 @@ export const HTTP_NOT_FOUND = 404;
 
 // Modes that allow long running task tool executions
 export const ALLOWED_TASK_TOOL_EXECUTION_MODES = ['optional', 'required'] as const;
-
-// MCP _meta key for associating messages with a task.
-// TODO: replace with RELATED_TASK_META_KEY from @modelcontextprotocol/sdk once the installed SDK exports it.
-export const RELATED_TASK_META_KEY = 'io.modelcontextprotocol/related-task';

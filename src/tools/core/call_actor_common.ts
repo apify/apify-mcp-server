@@ -9,7 +9,6 @@ import { ApifyClient } from '../../apify_client.js';
 import {
     APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED,
     APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     FAILURE_CATEGORY,
     HelperTools,
     TOOL_STATUS,
@@ -31,6 +30,8 @@ import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory
 // ---------------------------------------------------------------------------
 
 const RAG_WEB_BROWSER_TOOL = actorNameToToolName('apify/rag-web-browser');
+
+export const CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG = `When calling an MCP server Actor, you must specify the tool name in the actor parameter as "{actorName}:{toolName}" in the "actor" input property.`;
 
 /** Shared MCP server instructions — identical in both modes. */
 export const CALL_ACTOR_MCP_SERVER_SECTION = `For MCP server Actors:

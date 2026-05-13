@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    storeId: z.string()
+    keyValueStoreId: z.string()
         .min(1)
         .describe('Key-value store ID or username~store-name'),
     recordKey: z.string()
@@ -41,7 +42,20 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
-        const record = await client.keyValueStore(parsed.storeId).getRecord(parsed.recordKey);
+        const store = client.keyValueStore(parsed.keyValueStoreId);
+        const record = await store.getRecord(parsed.recordKey);
+        if (record === undefined) {
+            // getRecord returns undefined for both missing-store and missing-key; disambiguate.
+            const storeInfo = await store.get();
+            const text = storeInfo
+                ? `Record '${parsed.recordKey}' not found in key-value store '${parsed.keyValueStoreId}'.`
+                : `Key-value store '${parsed.keyValueStoreId}' not found.`;
+            return buildMCPResponse({
+                texts: [text],
+                isError: true,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
+            });
+        }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(record)}\n\`\`\`` }] };
     },
 } as const);

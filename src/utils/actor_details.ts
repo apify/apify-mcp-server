@@ -75,7 +75,11 @@ export async function fetchActorDetails(
         const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] = await Promise.all([
             actor.get(),
             actor.defaultBuild().then(async (build) => build.get()),
-            searchActorsByKeywords(actorSlug, apifyClient.token || '', ACTOR_DETAILS_PICTURE_SEARCH_LIMIT).catch(() => []),
+            searchActorsByKeywords({
+                search: actorSlug,
+                apifyToken: apifyClient.token || '',
+                limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
+            }).catch(() => []),
         ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
