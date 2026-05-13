@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Abort in-flight tool handler on tasks&#x2F;cancel (#763) ([#812](https://github.com/apify/apify-mcp-server/pull/812)) ([49af512](https://github.com/apify/apify-mcp-server/commit/49af512a384f25ade5945d9af9a0e6efcd03dc0e)) by [@jirispilka](https://github.com/jirispilka), closes [#763](https://github.com/apify/apify-mcp-server/issues/763)
+- SoftFail noisy &#x27;Not Acceptable&#x27; Accept-header errors from SDK ([#837](https://github.com/apify/apify-mcp-server/pull/837)) ([8e00778](https://github.com/apify/apify-mcp-server/commit/8e0077846af81d1c0859e82ff89167168803341a)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
