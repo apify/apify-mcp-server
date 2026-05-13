@@ -540,8 +540,19 @@ export class ActorsMcpServer {
             //   - "Invalid state: Controller is already closed" (ERR_INVALID_STATE from
             //     WebStandardStreamableHTTPServerTransport.writeSSEEvent when the SSE ReadableStream
             //     controller was closed by client cancellation before a queued event was flushed)
+            //   - "Not Acceptable: Client must accept [both application/json and] text/event-stream"
+            //     (thrown from WebStandardStreamableHTTPServerTransport.handlePost/GetRequest when
+            //     the client sends an Accept header missing one of the required MIME types — pure
+            //     client misconfiguration, not a server fault; HTTP 406 is already returned to caller)
             // All are expected; log as softFail so they don't flood Mezmo error alerts.
-            if (/Not connected|No connection established|Only one SSE stream|Controller is already closed/i.test(error.message ?? '')) {
+            const clientDisconnectPattern = new RegExp([
+                'Not connected',
+                'No connection established',
+                'Only one SSE stream',
+                'Controller is already closed',
+                'Not Acceptable: Client must accept',
+            ].join('|'), 'i');
+            if (clientDisconnectPattern.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
                 const errMessage = (error.message ?? '').replace(/ error:/gi, ' failure:');
