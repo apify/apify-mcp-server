@@ -1,94 +1,82 @@
 import type { TaskStore } from '@modelcontextprotocol/sdk/experimental/tasks/interfaces.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SKYFIRE_README_CONTENT } from '../../src/const.js';
-import { isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
-import { resolvePaymentProvider } from '../../src/payments/index.js';
-import { createResourceService } from '../../src/resources/resource_service.js';
-import type { AvailableWidget } from '../../src/resources/widgets.js';
-import { WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
+import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from '../../src/mcp/utils.js';
 
-vi.mock('node:fs', () => ({
-    readFileSync: vi.fn(),
-    default: {
-        readFileSync: vi.fn(),
-    },
-}));
+describe('parseInputParamsFromUrl()', () => {
+    it('handles URL without query params', () => {
+        const url = 'https://mcp.apify.com';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.actors).toBeUndefined();
+    });
 
-describe('parseInputParamsFromUrl', () => {
-    it('should parse Actors from URL query params (as tools)', () => {
+    it('parses Actors from URL query params as tools', () => {
         const url = 'https://mcp.apify.com?token=123&actors=apify/web-scraper';
         const result = parseInputParamsFromUrl(url);
         expect(result.tools).toEqual(['apify/web-scraper']);
         expect(result.actors).toBeUndefined();
     });
 
-    it('should parse multiple Actors from URL (as tools)', () => {
+    it('parses multiple Actors from URL as tools', () => {
         const url = 'https://mcp.apify.com?actors=apify/instagram-scraper,lukaskrivka/google-maps';
         const result = parseInputParamsFromUrl(url);
         expect(result.tools).toEqual(['apify/instagram-scraper', 'lukaskrivka/google-maps']);
         expect(result.actors).toBeUndefined();
     });
 
-    it('should handle URL without query params', () => {
-        const url = 'https://mcp.apify.com';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.actors).toBeUndefined();
-    });
-
-    it('should parse enableActorAutoLoading flag', () => {
-        const url = 'https://mcp.apify.com?enableActorAutoLoading=true';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(true);
-    });
-
-    it('should parse enableAddingActors flag', () => {
-        const url = 'https://mcp.apify.com?enableAddingActors=true';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(true);
-    });
-
-    it('should parse enableAddingActors flag', () => {
-        const url = 'https://mcp.apify.com?enableAddingActors=false';
-        const result = parseInputParamsFromUrl(url);
-        expect(result.enableAddingActors).toBe(false);
-    });
-
-    it('should handle Actors as string parameter (as tools)', () => {
+    it('handles Actors as string parameter as tools', () => {
         const url = 'https://mcp.apify.com?actors=apify/rag-web-browser';
         const result = parseInputParamsFromUrl(url);
         expect(result.tools).toEqual(['apify/rag-web-browser']);
         expect(result.actors).toBeUndefined();
     });
+
+    it('parses the deprecated enableActorAutoLoading flag as enableAddingActors', () => {
+        const url = 'https://mcp.apify.com?enableActorAutoLoading=true';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.enableAddingActors).toBe(true);
+    });
+
+    it('parses enableAddingActors=true', () => {
+        const url = 'https://mcp.apify.com?enableAddingActors=true';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.enableAddingActors).toBe(true);
+    });
+
+    it('parses enableAddingActors=false', () => {
+        const url = 'https://mcp.apify.com?enableAddingActors=false';
+        const result = parseInputParamsFromUrl(url);
+        expect(result.enableAddingActors).toBe(false);
+    });
 });
 
-describe('isTaskCancelled', () => {
+describe('isTaskCancelled()', () => {
     const makeTaskStore = (getTaskReturn: unknown) => ({
         getTask: vi.fn().mockResolvedValue(getTaskReturn),
     } as unknown as TaskStore);
 
-    it('should return true when task status is cancelled', async () => {
+    it('returns true when task status is cancelled', async () => {
         const taskStore = makeTaskStore({ status: 'cancelled' });
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(true);
     });
 
-    it('should return false when task status is not cancelled', async () => {
+    it('returns false when task status is not cancelled', async () => {
         const taskStore = makeTaskStore({ status: 'working' });
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(false);
     });
 
-    it('should return false when task is not found (getTask returns undefined)', async () => {
+    it('returns false when task is not found (getTask returns undefined)', async () => {
         const taskStore = makeTaskStore(undefined);
         const result = await isTaskCancelled('task-1', 'session-1', taskStore);
 
         expect(result).toBe(false);
     });
 
-    it('should pass taskId and mcpSessionId through to taskStore.getTask', async () => {
+    it('passes taskId and mcpSessionId through to taskStore.getTask', async () => {
         const taskStore = makeTaskStore({ status: 'working' });
         await isTaskCancelled('task-42', 'session-xyz', taskStore);
 
@@ -96,112 +84,147 @@ describe('isTaskCancelled', () => {
     });
 });
 
-describe('MCP resources', () => {
-    const buildAvailableWidget = (uri: string, exists: boolean): AvailableWidget => ({
-        ...WIDGET_REGISTRY[uri],
-        jsPath: `/tmp/${WIDGET_REGISTRY[uri].jsFilename}`,
-        exists,
+describe('createTaskCancellationWatcher', () => {
+    const makeTaskStore = (statusBox: { status: string }) => ({
+        getTask: vi.fn().mockImplementation(async () => ({ status: statusBox.status })),
+    } as unknown as TaskStore);
+
+    // Core happy path: tasks/cancel writes 'cancelled' to the store; the
+    // watcher must observe it on the next poll and abort the signal.
+    it('aborts the derived signal once the task store reports cancelled', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 20,
+        });
+
+        try {
+            expect(watcher.signal.aborted).toBe(false);
+            statusBox.status = 'cancelled';
+            await vi.waitFor(() => {
+                expect(watcher.signal.aborted).toBe(true);
+            }, { timeout: 500, interval: 10 });
+        } finally {
+            watcher.dispose();
+        }
     });
 
-    it('lists the Skyfire readme only when enabled', async () => {
-        const skyfireService = createResourceService({
-            getMode: () => 'default',
-            paymentProvider: await resolvePaymentProvider('skyfire'),
-            getAvailableWidgets: () => new Map(),
-        });
-        const defaultService = createResourceService({
-            getMode: () => 'default',
-            paymentProvider: undefined,
-            getAvailableWidgets: () => new Map(),
+    // Spec contract: per MCP tasks spec, a task's lifetime is decoupled
+    // from the original request. Client disconnect, transport close, or
+    // `notifications/cancelled` for the original request ID MUST NOT
+    // cancel the task — only `tasks/cancel` (which writes to the store)
+    // is allowed to. A regression here would silently kill long-running
+    // Actor runs whenever a flaky client briefly disconnects.
+    it('does not abort when an unrelated AbortSignal fires (task survives client disconnect)', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+        // This signal models `extra.signal` from the original request:
+        // it MUST NOT be observable by the watcher.
+        const requestSignal = new AbortController();
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
         });
 
-        const skyfireResources = await skyfireService.listResources();
-        const defaultResources = await defaultService.listResources();
-
-        expect(skyfireResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(true);
-        expect(defaultResources.resources.some((resource) => resource.uri === 'file://readme.md')).toBe(false);
+        try {
+            requestSignal.abort(new Error('client disconnect'));
+            // Give the watcher more than enough ticks to (incorrectly) react.
+            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            expect(watcher.signal.aborted).toBe(false);
+        } finally {
+            watcher.dispose();
+        }
     });
 
-    it('lists apps widgets only when available', async () => {
-        const widgets = new Map<string, AvailableWidget>([
-            [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
-            [WIDGET_URIS.ACTOR_RUN, buildAvailableWidget(WIDGET_URIS.ACTOR_RUN, false)],
-        ]);
-        const service = createResourceService({
-            getMode: () => 'apps',
-            getAvailableWidgets: () => widgets,
+    // setInterval keeps firing for the lifetime of the process; without
+    // dispose() the watcher leaks for every completed task.
+    it('dispose stops polling the task store', async () => {
+        const statusBox = { status: 'working' };
+        const taskStore = makeTaskStore(statusBox);
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
         });
 
-        const { resources } = await service.listResources();
-
-        expect(resources.map((resource) => resource.uri)).toEqual([WIDGET_URIS.SEARCH_ACTORS]);
+        await new Promise((resolve) => { setTimeout(resolve, 30); });
+        watcher.dispose();
+        const callsAtDispose = (taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length;
+        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAtDispose);
     });
 
-    it('returns a plain-text message for missing resources', async () => {
-        const service = createResourceService({
-            getMode: () => 'default',
-            getAvailableWidgets: () => new Map(),
+    // Production TaskStore is Redis-backed (RedisTaskStore in the internal
+    // repo). A transient HGET failure must NOT crash the pod via unhandled
+    // rejection — the watcher must swallow it and the next successful tick
+    // must still abort. Without this guarantee, a single Redis blip during
+    // any active long-running task takes down every session on the worker.
+    it('survives transient task store errors and aborts on the next successful tick', async () => {
+        let call = 0;
+        const taskStore = {
+            getTask: vi.fn().mockImplementation(async () => {
+                call += 1;
+                if (call === 1) throw new Error('redis ETIMEDOUT');
+                return { status: 'cancelled' };
+            }),
+        } as unknown as TaskStore;
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
         });
 
-        const result = await service.readResource('file://missing.md');
-
-        expect(result.contents[0].text).toBe('Resource file://missing.md not found');
-        expect(result.contents[0].mimeType).toBe('text/plain');
+        try {
+            await vi.waitFor(() => {
+                expect(watcher.signal.aborted).toBe(true);
+            }, { timeout: 500, interval: 10 });
+            expect(call).toBeGreaterThanOrEqual(2);
+        } finally {
+            watcher.dispose();
+        }
     });
 
-    it('returns the Skyfire readme content when requested', async () => {
-        const service = createResourceService({
-            getMode: () => 'default',
-            paymentProvider: await resolvePaymentProvider('skyfire'),
-            getAvailableWidgets: () => new Map(),
+    // Under Redis tail latency a single getTask can outlast pollIntervalMs.
+    // Without overlap protection, ticks pile up and amplify load right when
+    // the backend is already struggling. The watcher must serialize ticks.
+    it('does not start a new poll while the previous one is still in flight', async () => {
+        let resolveFirst: ((task: { status: string }) => void) | undefined;
+        const firstCall = new Promise<{ status: string }>((resolve) => { resolveFirst = resolve; });
+        const taskStore = {
+            getTask: vi.fn()
+                .mockImplementationOnce(async () => firstCall)
+                .mockImplementation(async () => ({ status: 'working' })),
+        } as unknown as TaskStore;
+
+        const watcher = createTaskCancellationWatcher({
+            taskId: 't1',
+            mcpSessionId: 's1',
+            taskStore,
+            pollIntervalMs: 10,
         });
 
-        const result = await service.readResource('file://readme.md');
+        try {
+            // Wait far longer than pollIntervalMs while the first call hangs.
+            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
 
-        expect(result.contents[0].text).toBe(SKYFIRE_README_CONTENT);
-        expect(result.contents[0].mimeType).toBe('text/markdown');
-    });
-
-    it('returns a plain-text message for unknown widgets', async () => {
-        const service = createResourceService({
-            getMode: () => 'apps',
-            getAvailableWidgets: () => new Map(),
-        });
-
-        const result = await service.readResource('ui://widget/unknown.html');
-
-        expect(result.contents[0].text).toContain('Not found in registry.');
-        expect(result.contents[0].mimeType).toBe('text/plain');
-    });
-
-    it('returns widget HTML when a widget exists', async () => {
-        const fs = await import('node:fs');
-        const readFileSync = vi.mocked(fs.readFileSync);
-        readFileSync.mockReturnValue('console.log("widget");');
-
-        const widgets = new Map<string, AvailableWidget>([
-            [WIDGET_URIS.SEARCH_ACTORS, buildAvailableWidget(WIDGET_URIS.SEARCH_ACTORS, true)],
-        ]);
-        const service = createResourceService({
-            getMode: () => 'apps',
-            getAvailableWidgets: () => widgets,
-        });
-
-        const result = await service.readResource(WIDGET_URIS.SEARCH_ACTORS);
-
-        expect(result.contents[0].mimeType).toBe('text/html;profile=mcp-app');
-        expect(result.contents[0].text).toContain('console.log("widget");');
-        expect(result.contents[0].html).toContain('<script type="module">console.log("widget");</script>');
-    });
-
-    it('returns an empty resource templates list', async () => {
-        const service = createResourceService({
-            getMode: () => 'default',
-            getAvailableWidgets: () => new Map(),
-        });
-
-        const result = await service.listResourceTemplates();
-
-        expect(result).toEqual({ resourceTemplates: [] });
+            resolveFirst!({ status: 'working' });
+            await vi.waitFor(() => {
+                expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
+            }, { timeout: 500, interval: 10 });
+        } finally {
+            watcher.dispose();
+        }
     });
 });

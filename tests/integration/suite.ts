@@ -6,14 +6,15 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 
 import { ApifyClient } from '../../src/apify_client.js';
 import {
-    CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG,
     defaults,
     HelperTools,
+    MAX_LIMIT_WITH_INPUT_SCHEMA,
     RAG_WEB_BROWSER,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
-    SKYFIRE_ENABLED_TOOLS,
 } from '../../src/const.js';
+import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
 import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
+import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
 import { callActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
@@ -762,28 +763,26 @@ export function createIntegrationTestsSuite(
             expect(content.some((item) => item.text.includes(ACTOR_PYTHON_EXAMPLE))).toBe(true);
         });
 
-        // It should filter out all rental Actors only if we run locally or as standby, where
-        // we cannot access MongoDB to get the user's rented Actors.
-        // In case of apify-mcp-server it should include user's rented Actors.
-        it('should filter out all rental Actors from store search', async () => {
+        // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
+        // (`GET /v2/store`) is what excludes rental Actors. If that contract ever
+        // drifts, this test catches the regression on the MCP side.
+        it('should not return rental Actors from store search', async () => {
             client = await createClientFn();
 
             const result = await client.callTool({
                 name: HelperTools.STORE_SEARCH,
                 arguments: {
                     keywords: 'rental',
-                    limit: 100,
+                    limit: MAX_LIMIT_WITH_INPUT_SCHEMA,
                 },
             });
             const content = result.content as { text: string }[];
             expect(content.length).toBe(1);
             const outputText = content[0].text;
 
-            // Check to ensure that the output string format remains the same.
-            // If someone changes the output format, this test may stop working
-            // without actually failing.
+            // Sanity check that the output format hasn't drifted in a way that
+            // would make the negative assertion below silently meaningless.
             expect(outputText).toContain('This Actor');
-            // Check that no rental Actors are present
             expect(outputText).not.toContain('This Actor is rental');
         });
 
@@ -1775,6 +1774,7 @@ export function createIntegrationTestsSuite(
             // Build request and cancel immediately via AbortController
             const controller = new AbortController();
 
+            const startedAfter = new Date();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1798,7 +1798,7 @@ export function createIntegrationTestsSuite(
             const actId = actor!.id as string;
 
             // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId);
+            await waitForActorRunAbortStatus(api, actId, startedAfter);
         });
 
         // Cancellation test using call-actor tool: start a long-running actor via call-actor and cancel immediately, then verify it was aborted
@@ -1809,6 +1809,7 @@ export function createIntegrationTestsSuite(
             // Build request and cancel immediately via AbortController
             const controller = new AbortController();
 
+            const startedAfter = new Date();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1836,7 +1837,7 @@ export function createIntegrationTestsSuite(
             const actId = actor!.id as string;
 
             // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId);
+            await waitForActorRunAbortStatus(api, actId, startedAfter);
         });
 
         // Environment variable tests - only applicable to stdio transport
@@ -2490,6 +2491,39 @@ export function createIntegrationTestsSuite(
                     throw new Error('Task should have been cancelled before completion');
                 }
             }
+        });
+
+        // Without the chained AbortController, the task flips to `cancelled` but the underlying
+        // Apify run keeps consuming compute until natural finish.
+        it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 1 }, async () => {
+            client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
+
+            const startedAfter = new Date();
+            const stream = client.experimental.tasks.callToolStream(
+                {
+                    name: actorNameToToolName(RAG_WEB_BROWSER),
+                    arguments: { query: 'restaurants in San Francisco', maxResults: 10 },
+                },
+                CallToolResultSchema,
+                { task: { ttl: 60000 } },
+            );
+
+            let cancelled = false;
+            for await (const message of stream) {
+                if (message.type === 'taskCreated') {
+                    // Cancel mid-run, not before the run starts.
+                    await new Promise((resolve) => { setTimeout(resolve, 2000); });
+                    await client.experimental.tasks.cancelTask(message.task.taskId);
+                    cancelled = true;
+                } else if (message.type === 'result') {
+                    throw new Error('Task should have been cancelled before completion');
+                }
+            }
+            expect(cancelled).toBe(true);
+
+            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await api.actor(RAG_WEB_BROWSER).get();
+            await waitForActorRunAbortStatus(api, actor!.id, startedAfter);
         });
 
         it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {

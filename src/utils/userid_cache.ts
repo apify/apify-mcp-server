@@ -3,9 +3,11 @@ import { createHash } from 'node:crypto';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../apify_client.js';
-import { USER_CACHE_MAX_SIZE, USER_CACHE_TTL_SECS } from '../const.js';
 import { PRICING_TIERS, type PricingTier } from './pricing_info.js';
 import { TTLLRUCache } from './ttl_lru.js';
+
+const USER_CACHE_MAX_SIZE = 200;
+const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 
 export type CachedUserInfo = {
     userId: string | null;

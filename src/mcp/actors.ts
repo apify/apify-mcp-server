@@ -1,9 +1,9 @@
 import type { ActorDefinition } from 'apify-client';
 
 import { ApifyClient } from '../apify_client.js';
-import { MCP_STREAMABLE_ENDPOINT } from '../const.js';
 import type { ActorDefinitionPruned } from '../types.js';
 import { parseCommaSeparatedList } from '../utils/generic.js';
+import { MCP_STREAMABLE_ENDPOINT } from './const.js';
 
 /**
  * Returns the MCP server path for the given Actor ID.

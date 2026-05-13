@@ -30,7 +30,7 @@ const getDatasetItemsArgs = z.object({
         .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
     offset: z.number().optional()
         .describe('Number of items to skip at the start. Default is 0.'),
-    limit: z.number().optional().default(DEFAULT_DATASET_ITEMS_LIMIT)
+    limit: z.number().optional()
         .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
     fields: z.string().optional()
         .describe('Comma-separated list of fields to include in results. '
@@ -88,7 +88,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const v = await client.dataset(parsed.datasetId).listItems({
             clean: parsed.clean,
             offset: parsed.offset,
-            limit: parsed.limit,
+            limit: parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT,
             fields,
             omit,
             desc: parsed.desc,
@@ -102,13 +102,14 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             });
         }
 
+        // omit limit when unset; undefined silently drops from JSON (#731)
         const structuredContent = {
             datasetId: parsed.datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
             offset: parsed.offset ?? 0,
-            limit: parsed.limit,
+            ...(parsed.limit !== undefined ? { limit: parsed.limit } : {}),
         };
 
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };

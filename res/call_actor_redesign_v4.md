@@ -300,9 +300,9 @@ The KV-only-actor case (and any actor that writes auxiliary records) needs a fir
 
 The agent's path for KV-only output is: `call-actor` returns `storages.keyValueStore.{id,keyCount,keys}` → `nextStep` points at `get-key-value-store-record(keyValueStoreId=${storages.keyValueStore.id}, recordKey="OUTPUT")` → agent fetches the body when (and only when) it actually wants it.
 
-## `callOptions` allowlist
+## `callOptions` accepted keys
 
-`call-actor` validates `callOptions` strictly. Allowed:
+`call-actor` accepts these `callOptions`:
 
 | Key | Type | Why |
 |---|---|---|
@@ -312,16 +312,7 @@ The agent's path for KV-only output is: `call-actor` returns `storages.keyValueS
 | `maxItems` | number | Charge cap for pay-per-result actors |
 | `maxTotalChargeUsd` | number | Charge cap for pay-per-event actors |
 
-Rejected (with reason):
-
-- `waitForFinish` — use top-level `waitSecs`.
-- `webhooks` — redirects run events to caller-controlled URLs (security).
-- `contentType` — this tool sends JSON object input only.
-- `forcePermissionLevel` — permission escalation should not be exposed here.
-- `restartOnError` — can multiply cost without an explicit client workflow.
-- `proxy` and any other unknown key.
-
-The new behavior is strict rejection, not silent stripping.
+Unknown keys are silently dropped (Zod default object behavior). The earlier draft proposed strict rejection with per-key rationales for SDK-internal options like `waitForFinish` / `webhooks` / `forcePermissionLevel`; this was dropped because the only caller is an LLM, which has no schema for those keys and won't send them. If unknown keys ever surface in telemetry, revisit then.
 
 ## Input compatibility
 
@@ -412,7 +403,7 @@ sequenceDiagram
 | `isError` unified | Soft for tool-call semantics, but clients using task `status: failed` to detect actor failure must read inner `status` instead. |
 | `storages.keyValueStore.{keys,keyCount}` added | Soft. Additive. Replaces the inline-OUTPUT path that earlier drafts considered. |
 | `responseVersion: "v4"` added | Soft. Additive. |
-| `callOptions` strict allowlist | Potentially hard. Verify current unknown-key behavior first; reject unsafe keys explicitly. |
+| `callOptions` accepts three new keys (`build`, `maxItems`, `maxTotalChargeUsd`) | Soft. Additive. Unknown keys keep being silently dropped. |
 | Status enum widened to all 8 Apify states | Soft. Additive. |
 | `actorId` added; `actorName` becomes optional | Soft (additive). `actorName` was never present on the shipped `call-actor` shape and was already optional on `get-actor-run`. |
 | `statusMessage` and `exitCode` added at top level | Soft. Additive. |
@@ -444,6 +435,7 @@ Three apps-mode tools share this canonical shape and must be updated together: t
 - **`keys` cap at 50.** Picked as a safe ceiling. Actors that write hundreds of small KV records (rare) will see a truncated list with `keyCount` reflecting the total, and the agent fetches by name. Tune if telemetry shows real actors with 50+ semantically meaningful keys.
 - **Free-form `statusMessage`.** Actor authors set it. Some are useful ("Crawling page 5/20"), some are noise. Templates pass it through verbatim; we accept variability rather than try to normalize.
 - **`responseVersion` versioning policy.** We bump to `v4`. Future breaking shape changes bump again; additive changes do not. Clients can feature-detect.
+- **`abort-actor-run` is intentionally not surfaced as a recovery hint for memory-quota errors.** Nudging the LLM toward "free capacity" risks aborting unrelated in-flight runs the user cares about. The recovery hint points at `callOptions.memory` and "wait for current runs to finish" only.
 
 ## Out of scope (deliberate deferrals)
 
@@ -487,7 +479,7 @@ End-to-end behavioral assertions, summarised:
 - **`taskSupport` placement**: `tools/list` reports `call-actor.execution.taskSupport === "optional"`; other v4 tools either omit `execution` or set `taskSupport: "forbidden"`.
 - **Task mode override**: `task: {...}` plus deprecated `async: true` does not short-circuit the task; it waits until terminal.
 - **MCP-server pass-through**: `actor: "name:tool"` returns the remote MCP tool result, not the canonical shape; `responseVersion` is absent on this path.
-- **`callOptions` allowlist**: rejects `waitForFinish`, `webhooks`, `contentType`, `forcePermissionLevel`, `restartOnError`, `proxy`, and unknown keys.
+- **`callOptions` accept-path**: each of `memory`, `timeout`, `build`, `maxItems`, `maxTotalChargeUsd` passes Zod parsing; `maxItems` is forwarded to `apifyClient.actor(...).start()` end-to-end against `apify/rag-web-browser`.
 - **`keys` cap**: a KV store with >50 keys returns the first 50 names with `keyCount` reflecting the total.
 - **Apps widget**: reads the new shape and polls with `waitSecs: 0`.
 
