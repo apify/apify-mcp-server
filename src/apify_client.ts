@@ -30,7 +30,7 @@ function addUserAgent(config: AxiosRequestConfig): AxiosRequestConfig {
 }
 
 /**
- * Adds a MCP orgin header to the request config.
+ * Adds an MCP origin header to the request config.
  * @param config
  * @private
  */
