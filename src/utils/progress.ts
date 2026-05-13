@@ -2,7 +2,10 @@ import type { ProgressNotification } from '@modelcontextprotocol/sdk/types.js';
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 
 import type { ApifyClient } from '../apify_client.js';
-import { PROGRESS_NOTIFICATION_INTERVAL_MS } from '../const.js';
+
+// The console uses const MIN_OBSERVER_INTERVAL_MILLIS = 3000 so it should be fine.
+// Exported for tests to keep fake-timer advances in sync with the production interval.
+export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
 
 const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 
@@ -100,13 +103,13 @@ export class ProgressTracker {
         this.stopped = false;
         let lastStatus = initial?.status ?? '';
         let lastStatusMessage = initial?.statusMessage || '';
-        let tickInFlight = false;
+        let tickInProgress = false;
 
         this.intervalId = setInterval(async () => {
             // Skip if a previous tick is still awaiting run.get() / updateProgress() — otherwise
             // a slow tick can overlap with the next one and cause out-of-order emissions.
-            if (tickInFlight) return;
-            tickInFlight = true;
+            if (tickInProgress) return;
+            tickInProgress = true;
             try {
                 const run = await apifyClient.run(runId).get();
                 // stop() may have been called while run.get() was awaiting; clearInterval can't
@@ -131,7 +134,7 @@ export class ProgressTracker {
             } catch {
                 // Silent fail - continue polling
             } finally {
-                tickInFlight = false;
+                tickInProgress = false;
             }
         }, PROGRESS_NOTIFICATION_INTERVAL_MS);
     }

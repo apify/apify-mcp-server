@@ -1,11 +1,11 @@
+import type { ToolEntry } from '../types.js';
+import { redactSkyfirePayId } from '../utils/logging.js';
+import { cloneToolEntry } from '../utils/tools.js';
 import {
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_README_CONTENT,
     SKYFIRE_TOOL_INSTRUCTIONS,
-} from '../const.js';
-import type { ToolEntry } from '../types.js';
-import { redactSkyfirePayId } from '../utils/logging.js';
-import { cloneToolEntry } from '../utils/tools.js';
+} from './const.js';
 import type { PaymentHeaders, PaymentProvider } from './types.js';
 
 const SKYFIRE_PAY_ID_KEY = 'skyfire-pay-id';

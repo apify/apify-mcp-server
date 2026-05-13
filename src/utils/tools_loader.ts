@@ -15,35 +15,42 @@ import {
     toolCategoriesEnabledByDefault,
     WIDGET_BY_BASE_TOOL,
 } from '../tools/categories.js';
+import { abortActorRun } from '../tools/common/abort_actor_run.js';
 import { addTool } from '../tools/common/add_actor.js';
-import { getActorOutput } from '../tools/common/get_actor_output.js';
+import { getDatasetItems } from '../tools/common/get_dataset_items.js';
+import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
 import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
 import { SERVER_MODES, ServerMode } from '../types.js';
 
+/**
+ * Tools auto-injected alongside any actor-running tool (call-actor / direct
+ * actor tools / add-actor). Order matches the workflow: fetch items → fetch
+ * KV record → abort.
+ */
+export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
+    getDatasetItems,
+    getKeyValueStoreRecord,
+    abortActorRun,
+] as const;
+
 // All internal tool names across all modes. Selectors matching these are not treated as Actor IDs.
-let ALL_INTERNAL_TOOL_NAMES_CACHE: Set<string> | null = null;
-function getAllInternalToolNames(): Set<string> {
-    if (!ALL_INTERNAL_TOOL_NAMES_CACHE) {
-        const allNames = new Set<string>();
-        // Collect tool names from both modes to ensure complete classification
-        for (const mode of SERVER_MODES) {
-            const categories = getCategoryTools(mode);
-            for (const name of CATEGORY_NAMES) {
-                for (const tool of categories[name]) {
-                    allNames.add(tool.name);
-                }
-            }
+// Built eagerly at module load; inputs (SERVER_MODES, getCategoryTools, CATEGORY_NAMES,
+// WIDGET_BY_BASE_TOOL) are module-level constants available at import time.
+const ALL_INTERNAL_TOOL_NAMES: Set<string> = (() => {
+    const names = new Set<string>();
+    // Collect tool names from both modes to ensure complete classification
+    for (const mode of SERVER_MODES) {
+        const categories = getCategoryTools(mode);
+        for (const name of CATEGORY_NAMES) {
+            for (const tool of categories[name]) names.add(tool.name);
         }
-        // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
-        for (const widget of WIDGET_BY_BASE_TOOL.values()) {
-            allNames.add(widget.name);
-        }
-        ALL_INTERNAL_TOOL_NAMES_CACHE = allNames;
     }
-    return ALL_INTERNAL_TOOL_NAMES_CACHE;
-}
+    // Widgets live only in WIDGET_BY_BASE_TOOL, not in any category
+    for (const widget of WIDGET_BY_BASE_TOOL.values()) names.add(widget.name);
+    return names;
+})();
 
 type NormalizedInput = {
     /**
@@ -87,7 +94,7 @@ function normalizeInput(input: Input): NormalizedInput {
  * Selectors classified as "actor names":
  *   - NOT the deprecated `'preview'` pseudo-category
  *   - NOT a category name (from `CATEGORY_NAME_SET`)
- *   - NOT the name of an internal tool in any mode (from `getAllInternalToolNames`)
+ *   - NOT the name of an internal tool in any mode (from `ALL_INTERNAL_TOOL_NAMES`)
  *
  * If no selectors / no explicit actors: the defaults apply (or empty when
  * add-actor mode is on).
@@ -101,7 +108,7 @@ function resolveActorsToLoad(input: Input): string[] {
         for (const sel of selectors) {
             if (sel === 'preview') continue;
             if (CATEGORY_NAME_SET.has(sel)) continue;
-            if (getAllInternalToolNames().has(sel)) continue;
+            if (ALL_INTERNAL_TOOL_NAMES.has(sel)) continue;
             actorSelectorsFromTools.push(sel);
         }
     }
@@ -143,7 +150,7 @@ export function toolNamesToInput(toolNames: string[]): Input {
     const actorToolNames: string[] = [];
 
     for (const toolName of toolNames) {
-        if (getAllInternalToolNames().has(toolName)) {
+        if (ALL_INTERNAL_TOOL_NAMES.has(toolName)) {
             internalToolNames.push(toolName);
         } else {
             actorToolNames.push(toolName);
@@ -208,7 +215,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             }
             // Internal tool from another mode → skip silently (getActors already
             // routed it away from actor names).
-            if (getAllInternalToolNames().has(sel)) {
+            if (ALL_INTERNAL_TOOL_NAMES.has(sel)) {
                 log.debug(`Skipping selector "${sel}" — it is an internal tool from another mode (current: "${mode}")`);
             }
             // Else: selector was an Actor name; it's already in `actorTools`.
@@ -242,9 +249,11 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     /**
-     * Auto-inject get-actor-run and get-actor-output when call-actor or actor tools are present.
-     * Insert them right after call-actor to follow the logical workflow order:
-     * search → details → call → run status → output → docs → actor tools
+     * Auto-inject run-status and storage tools when call-actor, actor tools, or add-actor are present.
+     * Insert them right after call-actor (or appended at the end when call-actor is absent) so the
+     * default tool list reads in workflow order: call → get-actor-run → get-dataset-items →
+     * get-key-value-store-record → abort-actor-run. If the user explicitly selected these tools
+     * via category before `actors`, the de-dup pass below preserves their selector order.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
@@ -258,7 +267,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool) {
-        toolsToInject.push(getActorOutput);
+        toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 
     if (toolsToInject.length > 0) {

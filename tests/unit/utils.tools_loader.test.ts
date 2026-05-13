@@ -2,7 +2,9 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import { AUTO_INJECTED_TOOLS, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+
+const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
 describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
@@ -62,6 +64,45 @@ describe('toolNamesToInput', () => {
         expect(toolNamesToInput([HelperTools.STORE_SEARCH_WIDGET])).toEqual({
             tools: [HelperTools.STORE_SEARCH_WIDGET],
         });
+    });
+});
+
+describe('loadToolsFromInput auto-injection of storage tools', () => {
+    const apifyClient = new ApifyClient({ token: 'test-token' });
+
+    it('auto-injects storage and abort tools when call-actor is in the default tool set', async () => {
+        const tools = await loadToolsFromInput({}, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).toContain(HelperTools.ACTOR_CALL);
+        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+
+        const callIndex = toolNames.indexOf(HelperTools.ACTOR_CALL);
+        const runIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_GET);
+        const datasetIndex = toolNames.indexOf(HelperTools.DATASET_GET_ITEMS);
+        const kvIndex = toolNames.indexOf(HelperTools.KEY_VALUE_STORE_RECORD_GET);
+        const abortIndex = toolNames.indexOf(HelperTools.ACTOR_RUNS_ABORT);
+        expect(callIndex).toBeLessThan(runIndex);
+        expect(runIndex).toBeLessThan(datasetIndex);
+        expect(datasetIndex).toBeLessThan(kvIndex);
+        expect(kvIndex).toBeLessThan(abortIndex);
+    });
+
+    it('does not auto-inject storage or abort tools when no actor-touching tools are present', async () => {
+        const tools = await loadToolsFromInput({ tools: ['docs'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).not.toContain(name);
+    });
+
+    it('does not duplicate auto-injected tools when the storage category is also explicitly selected', async () => {
+        const tools = await loadToolsFromInput({ tools: ['actors', 'storage', 'runs'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) {
+            expect(toolNames.filter((n) => n === name)).toHaveLength(1);
+        }
     });
 });
 

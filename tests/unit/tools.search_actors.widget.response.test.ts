@@ -5,7 +5,7 @@ import { searchActorsWidgetTool } from '../../src/tools/apps/search_actors_widge
 import type { HelperTool } from '../../src/types.js';
 import type { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { formatActorForWidget } from '../../src/utils/actor_card.js';
-import { searchAndFilterActors } from '../../src/utils/actor_search.js';
+import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
@@ -15,7 +15,7 @@ import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools
  * on both the tool definition and the response.
  */
 vi.mock('../../src/utils/actor_search.js', () => ({
-    searchAndFilterActors: vi.fn(),
+    searchAgentSafeActors: vi.fn(),
 }));
 
 vi.mock('../../src/utils/userid_cache.js', () => ({
@@ -24,13 +24,13 @@ vi.mock('../../src/utils/userid_cache.js', () => ({
 
 describe('search-actors-widget response', () => {
     beforeEach(() => {
-        vi.mocked(searchAndFilterActors).mockReset();
+        vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
         vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
     });
 
     it('returns widgetActors plus widget _meta and short pointer text', async () => {
-        vi.mocked(searchAndFilterActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
         const result = await (searchActorsWidgetTool as HelperTool).call(stubInternalToolArgs({
             keywords: SEARCH_KEYWORDS,
@@ -69,7 +69,7 @@ describe('search-actors-widget response', () => {
     });
 
     it('returns empty widgetActors and omits widget _meta when there are no results', async () => {
-        vi.mocked(searchAndFilterActors).mockResolvedValue([]);
+        vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
         const result = await (searchActorsWidgetTool as HelperTool).call(stubInternalToolArgs({
             keywords: SEARCH_KEYWORDS,

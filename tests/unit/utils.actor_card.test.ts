@@ -1,6 +1,7 @@
 import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
+import { MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../../src/const.js';
 import type { ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
@@ -572,5 +573,53 @@ describe('formatActorToStructuredCard', () => {
             expect(result.developer.username).toBe('');
             expect(result.modifiedAt).toBeUndefined();
         });
+    });
+});
+
+describe('formatActorToActorCard inputSchema rendering', () => {
+    const inputSchema = {
+        type: 'object' as const,
+        properties: {
+            url: { type: 'string' },
+            maxResults: { type: 'number' },
+        },
+        required: ['url'],
+    };
+
+    it('renders input fields as a TypeScript-like inline list with required marker', () => {
+        const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain('- **Input fields:** url: string, maxResults?: number');
+        expect(result).not.toMatch(/\(\+\d+ more\)/);
+    });
+
+    it(`truncates to MAX_INPUT_FIELDS_IN_TEXT_CARD and appends "... (+N more)" when count exceeds the cap`, () => {
+        const overflow = 5;
+        const total = MAX_INPUT_FIELDS_IN_TEXT_CARD + overflow;
+        const properties: Record<string, { type: string }> = {};
+        for (let i = 0; i < total; i++) properties[`field${i}`] = { type: 'string' };
+        const actor = { ...mockActorStoreList, inputSchema: { type: 'object' as const, properties } } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain(`field${MAX_INPUT_FIELDS_IN_TEXT_CARD - 1}?: string`);
+        expect(result).not.toContain(`field${MAX_INPUT_FIELDS_IN_TEXT_CARD}?: string`);
+        expect(result).toContain(` ... (+${overflow} more)`);
+    });
+
+    it('joins mixed-type property arrays with `|`', () => {
+        const actor = {
+            ...mockActorStoreList,
+            inputSchema: { type: 'object' as const, properties: { mixed: { type: ['string', 'integer'] } } },
+        } as unknown as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).toContain('- **Input fields:** mixed?: string|integer');
+    });
+
+    it('omits the input fields line when inputSchema has no properties', () => {
+        const actor = {
+            ...mockActorStoreList,
+            inputSchema: { type: 'object' as const, properties: {} },
+        } as ActorStoreList;
+        const result = formatActorToActorCard(actor);
+        expect(result).not.toContain('Input fields');
     });
 });

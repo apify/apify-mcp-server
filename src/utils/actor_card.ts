@@ -1,5 +1,5 @@
-import { APIFY_STORE_URL } from '../const.js';
-import type { Actor, ActorCardOptions, ActorStoreList, StructuredActorCard } from '../types.js';
+import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../const.js';
+import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import {
     getCurrentPricingInfo,
     type PricingInfo,
@@ -10,6 +10,25 @@ import {
     type PricingTier,
     type StructuredPricingInfo,
 } from './pricing_info.js';
+
+function getInputSchema(actor: Actor | ActorStoreList): ActorStoreInputSchema | undefined {
+    return 'inputSchema' in actor ? actor.inputSchema : undefined;
+}
+
+function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null {
+    const entries = Object.entries(inputSchema.properties);
+    if (entries.length === 0) return null;
+
+    const requiredSet = new Set(inputSchema.required ?? []);
+    const shown = entries.slice(0, MAX_INPUT_FIELDS_IN_TEXT_CARD);
+    const fields = shown
+        .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`)
+        .join(', ');
+    const overflow = entries.length - shown.length;
+    const suffix = overflow > 0 ? ` ... (+${overflow} more)` : '';
+
+    return `- **Input fields:** ${fields}${suffix}`;
+}
 
 // Helper function to format categories from uppercase with underscores to a proper case
 function formatCategories(categories?: string[]): string[] {
@@ -217,6 +236,11 @@ export function formatActorToActorCard(
             markdownLines.push('\n>This Actor is deprecated and may not be maintained anymore.');
         }
     }
+    const inputSchema = getInputSchema(actor);
+    if (inputSchema) {
+        const line = inputFieldsToString(inputSchema);
+        if (line) markdownLines.push(line);
+    }
     return markdownLines.join('\n');
 }
 
@@ -249,6 +273,7 @@ export function formatActorToStructuredCard(
         rating: data.rating,
         modifiedAt: data.modifiedAt,
         isDeprecated: data.isDeprecated,
+        inputFields: getInputSchema(actor),
     };
 }
 
