@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.10.5 - **not yet released**
+
+### 🚀 Features
+
+- Auto-inject storage and abort tools alongside actor tools ([#814](https://github.com/apify/apify-mcp-server/pull/814)) ([a553999](https://github.com/apify/apify-mcp-server/commit/a5539996b5ad450c780c139084f8ec927897fc39)) by [@jirispilka](https://github.com/jirispilka), closes [#813](https://github.com/apify/apify-mcp-server/issues/813)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.10.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.4) (2026-05-13)
 
 ### 🐛 Bug Fixes
