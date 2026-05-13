@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.4 - **not yet released**
+## [0.10.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.4) (2026-05-13)
 
 ### 🐛 Bug Fixes
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - SoftFail noisy &#x27;Not Acceptable&#x27; Accept-header errors from SDK ([#837](https://github.com/apify/apify-mcp-server/pull/837)) ([8e00778](https://github.com/apify/apify-mcp-server/commit/8e0077846af81d1c0859e82ff89167168803341a)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.3](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.3) (2026-05-12)
 
 ### 🚀 Features
