@@ -165,6 +165,33 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.dataset?.itemCount).toBe(47);
     });
 
+    it('retries the itemCount=0 probe once when the first probe also returns 0', async () => {
+        const run = mockSucceededRun();
+        const dataset = mockDataset({ itemCount: 0 });
+        let probeCalls = 0;
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => dataset,
+                listItems: async () => {
+                    probeCalls += 1;
+                    return probeCalls === 1
+                        ? { items: [], total: 0 }
+                        : { items: [{ a: 1 }], total: 47 };
+                },
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        const { structuredContent } = result as { structuredContent: RunResponse };
+        expect(probeCalls).toBe(2);
+        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+    });
+
     it('rejects waitSecs above 45', () => {
         const tool = defaultGetActorRun as HelperTool;
         expect(tool.ajvValidate({ runId: 'run-1', waitSecs: 46 })).toBe(false);
@@ -349,17 +376,18 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('metadata.url, markdown');
     });
 
-    it('SUCCEEDED with empty dataset + KV records routes to KV-record nextStep', () => {
+    it('SUCCEEDED with empty dataset + KV records: nextStep stays generic; KV shows up only in summary', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
-        expect(t.summary).toContain('Output written to key-value store');
-        expect(t.nextStep).toContain('get-key-value-store-record');
-        expect(t.nextStep).toContain('keyValueStoreId=kv-1');
-        expect(t.nextStep).toContain('one of these keys (as recordKey): result-a, result-b');
+        expect(t.summary).toContain('No dataset items found');
+        expect(t.summary).toContain('Key-value store has 2 keys');
+        expect(t.nextStep).not.toContain('get-key-value-store-record');
+        expect(t.nextStep).toContain('re-run');
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
-        expect(t.summary).toContain('No dataset items and no key-value records');
+        expect(t.summary).toContain('No dataset items found');
+        expect(t.summary).not.toContain('Key-value store');
         expect(t.nextStep).toContain('re-run');
     });
 

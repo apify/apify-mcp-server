@@ -22,6 +22,13 @@ const POLL_HINT_WAIT_SECS = 10;
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
+/** Delay before the second `itemCount=0` probe — small budget to absorb stats propagation lag. */
+const ITEM_COUNT_RETRY_DELAY_MS = 500;
+
+async function sleep(ms: number): Promise<void> {
+    await new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+}
+
 // -----------------------------------------------------------------------------
 // Response types
 // -----------------------------------------------------------------------------
@@ -163,10 +170,14 @@ async function resolveItemCountWithLagFallback(
     if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
     if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
     try {
-        const probe = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
-        return Math.max(datasetMeta.itemCount, probe.total ?? 0);
+        const first = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
+        if ((first.total ?? 0) > 0) return Math.max(datasetMeta.itemCount, first.total ?? 0);
+        // One retry: stats can lag several seconds past terminal — give propagation a brief budget.
+        await sleep(ITEM_COUNT_RETRY_DELAY_MS);
+        const second = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
+        return Math.max(datasetMeta.itemCount, second.total ?? 0);
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
         return datasetMeta.itemCount;
@@ -219,10 +230,6 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-function buildKvOnlyNextStep(kvId: string, keys: string[]): string {
-    return `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=${kvId} and one of these keys (as recordKey): ${keys.join(', ')}.`;
-}
-
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     dataset?: RunDataset,
@@ -251,15 +258,11 @@ function buildSucceededSummaryNextStep(
         };
     }
 
-    if (kv.hasKv) {
-        return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${kv.keyCountLabel}).`,
-            nextStep: buildKvOnlyNextStep(kv.kvId, kv.keys),
-        };
-    }
-
+    // KV store is rarely the primary output for Apify actors (mostly SDK state / intermediate data),
+    // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
+    // when records exist, so callers can still discover them.
     return {
-        summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found.`,
+        summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${kv.summarySuffix}`,
         nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
     };
 }
@@ -283,15 +286,8 @@ function buildTimedOutSummaryNextStep(
         };
     }
 
-    if (kv.hasKv) {
-        return {
-            summary: `TIMED-OUT after ${runTimeSecs}s. Output written to key-value store (${kv.keyCountLabel}).`,
-            nextStep: buildKvOnlyNextStep(kv.kvId, kv.keys),
-        };
-    }
-
     return {
-        summary: `TIMED-OUT after ${runTimeSecs}s.`,
+        summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
         nextStep: `Inspect statusMessage and stats in this response; the run produced no dataset to fetch.`,
     };
 }
