@@ -2015,12 +2015,13 @@ export function createIntegrationTestsSuite(
                 });
                 expect(runResult.isError).not.toBe(true);
                 const runText = (runResult.content as { text: string }[])[0].text;
-                const runData = extractJsonFromMarkdown(runText) as { defaultKeyValueStoreId?: string };
-                expect(runData.defaultKeyValueStoreId).toBeDefined();
+                const runData = extractJsonFromMarkdown(runText) as { storages?: { keyValueStore?: { id?: string } } };
+                const kvId = runData.storages?.keyValueStore?.id;
+                expect(kvId).toBeDefined();
 
                 const kvResult = await client.callTool({
                     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
-                    arguments: { keyValueStoreId: runData.defaultKeyValueStoreId!, recordKey: 'INPUT' },
+                    arguments: { keyValueStoreId: kvId!, recordKey: 'INPUT' },
                 });
                 expect(kvResult.isError).not.toBe(true);
                 expect((kvResult.content as { text: string }[])[0].text).toContain('apify.com');
