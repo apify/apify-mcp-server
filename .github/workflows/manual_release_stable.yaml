@@ -153,21 +153,43 @@ jobs:
                     max_attempts: 3
                     retry_wait_seconds: 30
                     command: npm install --save-exact @apify/actors-mcp-server@${{ needs.release_metadata.outputs.version_number }}
-            -   name: Create pull request
-                uses: peter-evans/create-pull-request@v8
+            -   name: Stage dependency bump
+                id: stage
+                run: |
+                    git add -A
+                    if git diff --cached --quiet; then
+                      echo "has-changes=false" >> "$GITHUB_OUTPUT"
+                    else
+                      echo "has-changes=true" >> "$GITHUB_OUTPUT"
+                    fi
+
+            -   name: Commit dependency bump
+                if: steps.stage.outputs.has-changes == 'true'
+                uses: apify/workflows/commit@v0.44.0
                 with:
-                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
                     commit-message: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
+                    github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    repository: apify/apify-mcp-server-internal
                     branch: "release/${{ needs.release_metadata.outputs.tag_name }}"
-                    title: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
-                    body: |
+                    create-branch: 'true'
+
+            -   name: Create pull request
+                if: steps.stage.outputs.has-changes == 'true'
+                run: |
+                    gh pr create \
+                      --repo apify/apify-mcp-server-internal \
+                      --head "release/${{ needs.release_metadata.outputs.tag_name }}" \
+                      --title "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}" \
+                      --body "$BODY" \
+                      --reviewer "${{ github.actor }}"
+                env:
+                    GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    BODY: |
                         Automated PR to bump `@apify/actors-mcp-server` to `${{ needs.release_metadata.outputs.version_number }}`.
 
                         ## Release notes
 
                         ${{ needs.release_metadata.outputs.release_notes }}
-                    reviewers: ${{ github.actor }}
-                    author: Apify Release Bot <noreply@apify.com>
 
     publish_to_mcp_registry:
         name: Publish to MCP Registry
