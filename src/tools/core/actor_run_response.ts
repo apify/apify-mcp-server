@@ -22,11 +22,32 @@ const POLL_HINT_WAIT_SECS = 10;
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
-/** Delay before the second `itemCount=0` probe — small budget to absorb stats propagation lag. */
+/** Delay before the second `itemCount=0` probe — small budget to absorb listItems total propagation lag. */
 const ITEM_COUNT_RETRY_DELAY_MS = 500;
 
 async function sleep(ms: number): Promise<void> {
     await new Promise<void>((resolve) => { setTimeout(resolve, ms); });
+}
+
+/** Sentinel used by `raceAbort` to signal that the abort signal won the race. */
+const ABORT = Symbol('ABORT');
+
+/**
+ * Race a promise against an abort signal. Returns the resolved value, or {@link ABORT} if the
+ * signal fires first. Cleans up its abort listener on either branch so callers never leak.
+ */
+async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | undefined): Promise<T | typeof ABORT> {
+    if (!abortSignal) return promise;
+    let listener: (() => void) | undefined;
+    const abortPromise = new Promise<typeof ABORT>((resolve) => {
+        listener = () => resolve(ABORT);
+        abortSignal.addEventListener('abort', listener, { once: true });
+    });
+    try {
+        return await Promise.race([promise, abortPromise]);
+    } finally {
+        if (listener) abortSignal.removeEventListener('abort', listener);
+    }
 }
 
 // -----------------------------------------------------------------------------
@@ -173,11 +194,11 @@ async function resolveItemCountWithLagFallback(
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
         const first = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
-        if ((first.total ?? 0) > 0) return Math.max(datasetMeta.itemCount, first.total ?? 0);
-        // One retry: stats can lag several seconds past terminal — give propagation a brief budget.
+        if ((first.total ?? 0) > 0) return first.total;
+        // One retry: the listItems total can lag past terminal — give propagation a brief budget.
         await sleep(ITEM_COUNT_RETRY_DELAY_MS);
         const second = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
-        return Math.max(datasetMeta.itemCount, second.total ?? 0);
+        return second.total ?? 0;
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
         return datasetMeta.itemCount;
@@ -243,9 +264,12 @@ function buildSucceededSummaryNextStep(
     // KV when both exist so the caller can see the run also produced key-value records.
     if (itemCount !== undefined && itemCount > 0 && datasetId) {
         const fields = dataset?.fields ?? [];
+        const fieldsHint = fields.length > 0
+            ? ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`
+            : '';
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project. Preview with limit=3.`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsHint} Preview with limit=3.`,
         };
     }
 
@@ -379,39 +403,34 @@ async function waitForRunWithProgress(opts: {
 
     if (abortSignal?.aborted) return { kind: 'aborted' };
 
-    let run = await client.run(runId).get();
-    if (!run) return { kind: 'not-found' };
+    // Race the initial run.get() against the abort signal so a mid-call cancel returns promptly
+    // instead of blocking on the HTTP fetch (the SDK does not accept an AbortSignal directly).
+    const initial = await raceAbort(client.run(runId).get(), abortSignal);
+    if (initial === ABORT) return { kind: 'aborted' };
+    if (!initial) return { kind: 'not-found' };
+    let run = initial;
 
-    const actorName = await actorNameForActorId(client, run.actId, mcpSessionId);
+    // Kick off the actor-name fetch but don't await yet — it runs in parallel with the wait/progress
+    // branch below, and is only strictly needed for the progressTracker label and the response field.
+    const actorNamePromise = actorNameForActorId(client, run.actId, mcpSessionId);
 
     if (waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
-            const trackerLabel = actorName ?? 'actor';
+            const trackerLabel = (await actorNamePromise) ?? 'actor';
             await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, run));
             progressTracker.startActorRunUpdates(runId, client, trackerLabel, run);
         }
 
         // Race waitForFinish against the client's abort signal so a cancelled request returns
         // promptly instead of blocking up to `waitSecs`. Behavior on abort is delegated to `onAbort`.
-        const CLIENT_ABORT = Symbol('CLIENT_ABORT');
-        let abortListener: (() => void) | undefined;
-        const abortPromise = new Promise<typeof CLIENT_ABORT>((resolve) => {
-            abortListener = () => resolve(CLIENT_ABORT);
-            abortSignal?.addEventListener('abort', abortListener, { once: true });
-        });
-
-        let raced: ActorRun | typeof CLIENT_ABORT;
+        let raced: ActorRun | typeof ABORT;
         try {
-            raced = await Promise.race([
-                client.run(runId).waitForFinish({ waitSecs }),
-                ...(abortSignal ? [abortPromise] : []),
-            ]);
+            raced = await raceAbort(client.run(runId).waitForFinish({ waitSecs }), abortSignal);
         } finally {
-            if (abortListener) abortSignal?.removeEventListener('abort', abortListener);
             progressTracker?.stop();
         }
 
-        if (raced === CLIENT_ABORT) {
+        if (raced === ABORT) {
             await onAbort?.(runId, client);
             return { kind: 'aborted' };
         }
@@ -422,13 +441,13 @@ async function waitForRunWithProgress(opts: {
         if (TERMINAL_RUN_STATUSES.has(run.status)) {
             const finalRun = (await client.run(runId).get().catch(() => undefined)) ?? run;
             if (progressTracker) {
-                await progressTracker.updateProgress(formatRunStatusMessage(actorName ?? 'actor', finalRun));
+                await progressTracker.updateProgress(formatRunStatusMessage((await actorNamePromise) ?? 'actor', finalRun));
             }
             run = finalRun;
         }
     }
 
-    return { kind: 'ok', run, actorName };
+    return { kind: 'ok', run, actorName: await actorNamePromise };
 }
 
 // -----------------------------------------------------------------------------

@@ -35,7 +35,6 @@ interface ActorRunData {
  * Item bodies are not inlined — fetch via get-dataset-items.
  */
 interface ToolOutput extends Record<string, unknown> {
-    responseVersion?: string;
     runId?: string;
     actorId?: string;
     actorName?: string;
@@ -376,6 +375,9 @@ export const ActorRun: React.FC = () => {
             cancelled = true;
         };
     }, [toolOutput, runData, toolResponseMetadata, stableRunId, app]);
+
+    // Drop a stale preview when the dataset id changes (e.g. host swaps toolResult to a new run).
+    useEffect(() => { setPreviewItems(null); }, [runData?.dataset?.id]);
 
     // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
     // v4 doesn't inline items in the run response — the server returns shape + identifiers only.

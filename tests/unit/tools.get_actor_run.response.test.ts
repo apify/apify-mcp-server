@@ -376,6 +376,14 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('metadata.url, markdown');
     });
 
+    it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.nextStep).toContain('get-dataset-items');
+        expect(t.nextStep).not.toContain('Available fields');
+        expect(t.nextStep).not.toContain('—');
+    });
+
     it('SUCCEEDED with empty dataset + KV records: nextStep stays generic; KV shows up only in summary', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
         expect(t.summary).toContain('No dataset items found');
