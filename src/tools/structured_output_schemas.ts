@@ -1,13 +1,18 @@
 /**
  * Shared JSON schema definitions for structured output across tools.
  * These schemas define the format of structured data returned by various tools.
+ *
+ * Note: `type` fields use `'object' as const` / `'array' as const` literal annotations
+ * because the MCP SDK requires literal-typed JSON Schema, not widened `string`.
  */
+
+import { PRICING_TIERS } from '../utils/pricing_info.js';
 
 /**
  * Schema for developer information
  */
 const developerSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         username: { type: 'string', description: 'Developer username' },
         isOfficialApify: { type: 'boolean', description: 'Whether the actor is developed by Apify' },
@@ -20,9 +25,9 @@ const developerSchema = {
  * Schema for tiered pricing within an event
  */
 const eventTieredPricingSchema = {
-    type: 'array' as const, // Literal type required for MCP SDK type compatibility
+    type: 'array' as const,
     items: {
-        type: 'object' as const, // Literal type required for MCP SDK type compatibility
+        type: 'object' as const,
         properties: {
             tier: { type: 'string' },
             priceUsd: { type: 'number' },
@@ -34,9 +39,9 @@ const eventTieredPricingSchema = {
  * Schema for pricing events (PAY_PER_EVENT model)
  */
 const pricingEventsSchema = {
-    type: 'array' as const, // Literal type required for MCP SDK type compatibility
+    type: 'array' as const,
     items: {
-        type: 'object' as const, // Literal type required for MCP SDK type compatibility
+        type: 'object' as const,
         properties: {
             title: { type: 'string', description: 'Event title' },
             description: { type: 'string', description: 'Event description' },
@@ -51,9 +56,9 @@ const pricingEventsSchema = {
  * Schema for tiered pricing (general)
  */
 const tieredPricingSchema = {
-    type: 'array' as const, // Literal type required for MCP SDK type compatibility
+    type: 'array' as const,
     items: {
-        type: 'object' as const, // Literal type required for MCP SDK type compatibility
+        type: 'object' as const,
         properties: {
             tier: { type: 'string', description: 'Tier name' },
             pricePerUnit: { type: 'number', description: 'Price per unit for this tier' },
@@ -66,7 +71,7 @@ const tieredPricingSchema = {
  * Schema for pricing information
  */
 export const pricingSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         model: {
             type: 'string',
@@ -74,7 +79,7 @@ export const pricingSchema = {
         },
         userTier: {
             type: 'string',
-            enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
+            enum: [...PRICING_TIERS],
             description: "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
         },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
@@ -103,7 +108,7 @@ export const pricingSchema = {
  * Schema for Actor statistics
  */
 export const statsSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         totalUsers: { type: 'number', description: 'Total users' },
         monthlyUsers: { type: 'number', description: 'Monthly active users' },
@@ -113,11 +118,51 @@ export const statsSchema = {
 };
 
 /**
+ * Schema for Actor rating
+ */
+const ratingSchema = {
+    type: 'object' as const,
+    properties: {
+        average: { type: 'number', description: 'Average rating' },
+        count: { type: 'number', description: 'Number of ratings' },
+    },
+};
+
+/**
+ * Mirrors `ActorStoreInputSchema` in src/types.ts; only `type` is preserved per
+ * field by apify-core's `trimInputSchema`, so the per-field shape stays minimal.
+ */
+const inputFieldsSchema = {
+    type: 'object' as const,
+    description: 'Compact JSON-Schema-shaped descriptor of the Actor input; only `type` is preserved per field.',
+    properties: {
+        type: { type: 'string', description: 'Always `"object"`.' },
+        properties: {
+            type: 'object' as const,
+            description: 'Map of input field name to its type descriptor.',
+            additionalProperties: {
+                type: 'object' as const,
+                properties: {
+                    type: { description: 'JSON Schema field type — string or array of strings.' },
+                },
+                required: ['type'],
+            },
+        },
+        required: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Names of required input fields.',
+        },
+    },
+    required: ['type', 'properties'],
+};
+
+/**
  * Schema for Actor information (card)
  * Used in both search results and detailed Actor info
  */
 export const actorInfoSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         title: { type: 'string', description: 'Actor title' },
         url: { type: 'string', description: 'Actor URL' },
@@ -126,47 +171,16 @@ export const actorInfoSchema = {
         developer: developerSchema,
         description: { type: 'string', description: 'Actor description' },
         categories: {
-            type: 'array' as const, // Literal type required for MCP SDK type compatibility
+            type: 'array' as const,
             items: { type: 'string' },
             description: 'Actor categories',
         },
         pricing: pricingSchema,
         stats: statsSchema,
-        rating: {
-            type: 'object' as const, // Literal type required for MCP SDK type compatibility
-            properties: {
-                average: { type: 'number', description: 'Average rating' },
-                count: { type: 'number', description: 'Number of ratings' },
-            },
-        },
+        rating: ratingSchema,
         modifiedAt: { type: 'string', description: 'Last modification date' },
         isDeprecated: { type: 'boolean', description: 'Whether the Actor is deprecated' },
-        // Mirrors `ActorStoreInputSchema` in src/types.ts; only `type` is preserved per
-        // field by apify-core's `trimInputSchema`, so the per-field shape stays minimal.
-        inputFields: {
-            type: 'object' as const, // Literal type required for MCP SDK type compatibility
-            description: 'Compact JSON-Schema-shaped descriptor of the Actor input; only `type` is preserved per field.',
-            properties: {
-                type: { type: 'string', description: 'Always `"object"`.' },
-                properties: {
-                    type: 'object' as const, // Literal type required for MCP SDK type compatibility
-                    description: 'Map of input field name to its type descriptor.',
-                    additionalProperties: {
-                        type: 'object' as const, // Literal type required for MCP SDK type compatibility
-                        properties: {
-                            type: { description: 'JSON Schema field type — string or array of strings.' },
-                        },
-                        required: ['type'],
-                    },
-                },
-                required: {
-                    type: 'array' as const, // Literal type required for MCP SDK type compatibility
-                    items: { type: 'string' },
-                    description: 'Names of required input fields.',
-                },
-            },
-            required: ['type', 'properties'],
-        },
+        inputFields: inputFieldsSchema,
     },
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };
@@ -181,11 +195,11 @@ export const actorInfoSchema = {
  * so the full README fallback is only expected in niche cases.
  */
 export const actorDetailsOutputSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         actorInfo: actorInfoSchema,
         readme: { type: 'string', description: 'Actor README summary when available, otherwise the full README documentation.' },
-        inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
+        inputSchema: { type: 'object' as const, description: 'Actor input schema.' },
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
     },
 };
@@ -197,10 +211,10 @@ export const actorDetailsOutputSchema = {
  * object because it doesn't align with `actorInfoSchema` (adds `currentPricingInfo` etc.).
  */
 export const actorDetailsWidgetOutputSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         actorDetails: {
-            type: 'object' as const, // Literal type required for MCP SDK type compatibility
+            type: 'object' as const,
             properties: {
                 actorInfo: { type: 'object' as const, description: 'Widget-formatted Actor info (tier-aware pricing, widget display fields).' },
                 actorCard: { type: 'string', description: 'Rendered Actor card markdown for widget display.' },
@@ -215,18 +229,26 @@ export const actorDetailsWidgetOutputSchema = {
 };
 
 /**
+ * Properties shared between `actorSearchOutputSchema` and `actorSearchWidgetOutputSchema`.
+ * Extracted so both schemas stay in lock-step.
+ */
+const actorSearchBaseProperties = {
+    actors: {
+        type: 'array' as const,
+        items: actorInfoSchema,
+        description: 'List of Actor cards matching the search query',
+    },
+    query: { type: 'string', description: 'The search query used' },
+    count: { type: 'number', description: 'Number of Actors returned' },
+};
+
+/**
  * Schema for search results output (store-search tool)
  */
 export const actorSearchOutputSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
-        actors: {
-            type: 'array' as const, // Literal type required for MCP SDK type compatibility
-            items: actorInfoSchema,
-            description: 'List of Actor cards matching the search query',
-        },
-        query: { type: 'string', description: 'The search query used' },
-        count: { type: 'number', description: 'Number of Actors returned' },
+        ...actorSearchBaseProperties,
         instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
     },
     required: ['actors', 'query', 'count'],
@@ -241,13 +263,7 @@ export const actorSearchOutputSchema = {
 export const actorSearchWidgetOutputSchema = {
     type: 'object' as const,
     properties: {
-        actors: {
-            type: 'array' as const,
-            items: actorInfoSchema,
-            description: 'List of Actor cards matching the search query',
-        },
-        query: { type: 'string', description: 'The search query used' },
-        count: { type: 'number', description: 'Number of Actors returned' },
+        ...actorSearchBaseProperties,
         widgetActors: {
             type: 'array' as const,
             items: { type: 'object' as const, description: 'Widget-formatted Actor (tier-aware pricing, widget display fields).' },
@@ -257,13 +273,14 @@ export const actorSearchWidgetOutputSchema = {
     required: ['actors', 'query', 'count', 'widgetActors'],
 };
 
+/** Schema for search-apify-docs tool output. */
 export const searchApifyDocsToolOutputSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         results: {
-            type: 'array' as const, // Literal type required for MCP SDK type compatibility
+            type: 'array' as const,
             items: {
-                type: 'object' as const, // Literal type required for MCP SDK type compatibility
+                type: 'object' as const,
                 properties: {
                     url: { type: 'string', description: 'URL of the documentation page, may include anchor (e.g., #section-name).' },
                     content: { type: 'string', description: 'A limited piece of content that matches the search query.' },
@@ -276,13 +293,52 @@ export const searchApifyDocsToolOutputSchema = {
     required: ['results'],
 };
 
+/** Schema for fetch-apify-docs tool output. */
 export const fetchApifyDocsToolOutputSchema = {
-    type: 'object' as const, // Literal type required for MCP SDK type compatibility
+    type: 'object' as const,
     properties: {
         url: { type: 'string', description: 'The documentation URL that was fetched' },
         content: { type: 'string', description: 'The full markdown content of the documentation page' },
     },
     required: ['url', 'content'],
+};
+
+/** Shared `runId` property used by both `callActorOutputSchema` and `getActorRunOutputSchema`. */
+const runIdField = { type: 'string', description: 'Actor run ID' };
+
+/** Schema for the default dataset block inside `getActorRunOutputSchema.storages`. */
+const datasetStorageSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Default dataset ID' },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        itemCount: { type: 'number' },
+        cleanItemCount: { type: 'number' },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+        },
+    },
+    required: ['id'],
+};
+
+/** Schema for the default key-value store block inside `getActorRunOutputSchema.storages`. */
+const keyValueStoreStorageSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Default key-value store ID' },
+        name: { type: 'string' },
+        title: { type: 'string' },
+        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+        keys: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Up to 50 key names',
+        },
+    },
+    required: ['id'],
 };
 
 /**
@@ -293,7 +349,7 @@ export const fetchApifyDocsToolOutputSchema = {
 export const callActorOutputSchema = {
     type: 'object' as const,
     properties: {
-        runId: { type: 'string', description: 'Actor run ID' },
+        runId: runIdField,
         actorName: { type: 'string', description: 'Name of the Actor (only in async mode)' },
         status: { type: 'string', description: 'Run status (only in async mode) - READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT' },
         startedAt: { type: 'string', description: 'ISO timestamp when the run started (only in async mode)' },
@@ -314,7 +370,7 @@ export const callActorOutputSchema = {
 export const getActorRunOutputSchema = {
     type: 'object' as const,
     properties: {
-        runId: { type: 'string', description: 'Actor run ID' },
+        runId: runIdField,
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
         actorName: { type: 'string', description: '"username/actor-name"' },
         status: { type: 'string', description: 'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED' },
@@ -335,37 +391,8 @@ export const getActorRunOutputSchema = {
             type: 'object' as const,
             description: 'Default dataset and key-value store identifiers and metadata',
             properties: {
-                dataset: {
-                    type: 'object' as const,
-                    properties: {
-                        id: { type: 'string', description: 'Default dataset ID' },
-                        name: { type: 'string' },
-                        title: { type: 'string' },
-                        itemCount: { type: 'number' },
-                        cleanItemCount: { type: 'number' },
-                        fields: {
-                            type: 'array' as const,
-                            items: { type: 'string' },
-                            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
-                        },
-                    },
-                    required: ['id'],
-                },
-                keyValueStore: {
-                    type: 'object' as const,
-                    properties: {
-                        id: { type: 'string', description: 'Default key-value store ID' },
-                        name: { type: 'string' },
-                        title: { type: 'string' },
-                        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
-                        keys: {
-                            type: 'array' as const,
-                            items: { type: 'string' },
-                            description: 'Up to 50 key names',
-                        },
-                    },
-                    required: ['id'],
-                },
+                dataset: datasetStorageSchema,
+                keyValueStore: keyValueStoreStorageSchema,
             },
         },
         summary: { type: 'string', description: 'Past-tense summary of the run state' },

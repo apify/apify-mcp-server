@@ -3,9 +3,18 @@ import { describe, expect, it } from 'vitest';
 import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory.js';
 import {
     actorDetailsOutputSchema,
+    actorDetailsWidgetOutputSchema,
     actorInfoSchema,
+    actorSearchOutputSchema,
+    actorSearchWidgetOutputSchema,
     buildEnrichedCallActorOutputSchema,
     callActorOutputSchema,
+    datasetItemsOutputSchema,
+    fetchApifyDocsToolOutputSchema,
+    getActorRunOutputSchema,
+    pricingSchema,
+    searchApifyDocsToolOutputSchema,
+    statsSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
@@ -77,7 +86,7 @@ function createMockActorStore(schemas: Record<string, Record<string, unknown> | 
 
 describe('Structured Output Schemas', () => {
     describe('buildEnrichedCallActorOutputSchema', () => {
-        it('should enrich schema with simple properties', () => {
+        it('enriches schema with simple properties', () => {
             const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
             const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
 
@@ -88,7 +97,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toEqual(itemProperties);
         });
 
-        it('should NOT mutate original callActorOutputSchema', () => {
+        it('does not mutate original callActorOutputSchema', () => {
             const itemProperties = { url: { type: 'string' } };
             buildEnrichedCallActorOutputSchema(itemProperties);
 
@@ -100,7 +109,7 @@ describe('Structured Output Schemas', () => {
             expect(originalItems.properties).toBeUndefined();
         });
 
-        it('should handle complex nested properties', () => {
+        it('handles complex nested properties', () => {
             const itemProperties = {
                 user: { type: 'object', properties: { name: { type: 'string' } } },
                 tags: { type: 'array', items: { type: 'string' } },
@@ -111,7 +120,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toEqual(itemProperties);
         });
 
-        it('should handle empty properties object', () => {
+        it('handles empty properties object', () => {
             const itemProperties = {};
             const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
 
@@ -157,8 +166,42 @@ describe('Structured Output Schemas', () => {
         });
     });
 
+    describe('exported schemas', () => {
+        const exportedSchemas = {
+            actorDetailsOutputSchema,
+            actorDetailsWidgetOutputSchema,
+            actorInfoSchema,
+            actorSearchOutputSchema,
+            actorSearchWidgetOutputSchema,
+            callActorOutputSchema,
+            datasetItemsOutputSchema,
+            fetchApifyDocsToolOutputSchema,
+            getActorRunOutputSchema,
+            pricingSchema,
+            searchApifyDocsToolOutputSchema,
+            statsSchema,
+        };
+
+        it.each(Object.entries(exportedSchemas))('compiles %s with AJV', (_name, schema) => {
+            expect(() => compileSchema(schema as Record<string, unknown>)).not.toThrow();
+        });
+    });
+
+    describe('getActorRunOutputSchema', () => {
+        it('requires RunOutput fields', () => {
+            expect(getActorRunOutputSchema.required).toEqual([
+                'runId',
+                'actorId',
+                'status',
+                'storages',
+                'summary',
+                'nextStep',
+            ]);
+        });
+    });
+
     describe('getNormalActorsAsTools with actorStore', () => {
-        it('should return generic schema when no actorStore is provided', async () => {
+        it('returns generic schema when no actorStore is provided', async () => {
             const actorInfo = createMockActorInfo('apify/test-actor');
             const tools = await getNormalActorsAsTools([actorInfo]);
 
@@ -173,7 +216,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toBeUndefined();
         });
 
-        it('should enrich schema when actorStore returns properties', async () => {
+        it('enriches schema when actorStore returns properties', async () => {
             const actorName = 'apify/test-actor';
             const actorInfo = createMockActorInfo(actorName);
             const properties = { url: { type: 'string' }, title: { type: 'string' } };
@@ -190,7 +233,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toEqual(properties);
         });
 
-        it('should return generic schema when actorStore returns null', async () => {
+        it('returns generic schema when actorStore returns null', async () => {
             const actorName = 'apify/test-actor';
             const actorInfo = createMockActorInfo(actorName);
             const store = createMockActorStore({ [actorName]: null });
@@ -207,7 +250,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toBeUndefined();
         });
 
-        it('should return generic schema when actorStore returns empty object', async () => {
+        it('returns generic schema when actorStore returns empty object', async () => {
             const actorName = 'apify/test-actor';
             const actorInfo = createMockActorInfo(actorName);
             const store = createMockActorStore({ [actorName]: {} });
@@ -224,7 +267,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toBeUndefined();
         });
 
-        it('should gracefully degrade when actorStore throws', async () => {
+        it('gracefully degrades when actorStore throws', async () => {
             const actorName = 'apify/test-actor';
             const actorInfo = createMockActorInfo(actorName);
             const store: ActorStore = {
@@ -248,7 +291,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toBeUndefined();
         });
 
-        it('should handle multiple actors with mixed schemas', async () => {
+        it('handles multiple actors with mixed schemas', async () => {
             const actor1Name = 'apify/actor-with-schema';
             const actor2Name = 'apify/actor-no-schema';
 
