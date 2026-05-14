@@ -8,7 +8,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
 /** Cap on `storages.keyValueStore.keys` array length. */
-export const KV_KEYS_LIMIT = 50;
+const KV_KEYS_LIMIT = 50;
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
@@ -17,7 +17,7 @@ export const WAIT_SECS_MAX = 45;
  * `waitSecs` value advertised in `nextStep` poll hints. Lower than tool-level defaults because the agent
  * is already known to be polling a non-terminal run — short cadence keeps it responsive without hammering.
  */
-export const POLL_HINT_WAIT_SECS = 10;
+const POLL_HINT_WAIT_SECS = 10;
 
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
