@@ -69,9 +69,7 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
     // Allow arbitrary keys inside `input` (dynamic Actor input) while keeping the outer shape strict.
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
-    _meta: {
-        ...ACTOR_RUN_WIDGET_META,
-    },
+    _meta: ACTOR_RUN_WIDGET_META,
     annotations: {
         title: 'Call Actor (widget)',
         readOnlyHint: false,

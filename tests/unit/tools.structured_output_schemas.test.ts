@@ -88,7 +88,7 @@ describe('Structured Output Schemas', () => {
             expect(itemsSchema.properties).toEqual(itemProperties);
         });
 
-        it('should NOT mutate original directActorOutputSchema', () => {
+        it('does not mutate original directActorOutputSchema', () => {
             const itemProperties = { url: { type: 'string' } };
             buildDirectActorOutputSchemaWithItems(itemProperties);
 

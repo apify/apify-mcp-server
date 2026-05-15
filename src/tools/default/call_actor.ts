@@ -2,18 +2,18 @@ import log from '@apify/log';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
+    CALL_ACTOR_WAIT_SECS_DEFAULT,
     callActorAjvValidate,
     callActorInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
-    resolveWaitSecs,
 } from '../core/call_actor_common.js';
+import { buildGetActorRunSuccessResponse } from '../core/get_actor_run_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 const CALL_ACTOR_DEFAULT_DESCRIPTION = buildCallActorDescription({
@@ -52,7 +52,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
 
         const { parsed, baseActorName } = preResult;
         const { input, callOptions } = parsed;
-        const waitSecs = resolveWaitSecs(parsed);
+        const waitSecs = parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT;
 
         let resolvedActorId: string | undefined;
         try {
@@ -96,13 +96,10 @@ export const defaultCallActor: ToolEntry = Object.freeze({
             if ('aborted' in fetchResult) return {};
             if ('error' in fetchResult) return fetchResult.error;
 
-            const { run, structuredContent } = fetchResult.result;
-            return buildMCPResponse({
-                texts: [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
-                structuredContent,
-                _meta: buildUsageMeta(run),
-                telemetry: { actorId: resolvedActorId },
-            });
+            return {
+                ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+                toolTelemetry: { actorId: resolvedActorId },
+            };
         } catch (error) {
             return buildCallActorErrorResponse({
                 actorName: baseActorName,

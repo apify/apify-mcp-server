@@ -91,8 +91,8 @@ export type RunStorages = {
 
 /**
  * Canonical run response shape returned by `call-actor` and `get-actor-run`.
- * Wire shape for `content[]`: `[JSON.stringify(structuredContent), `${summary}\n${nextStep}`]`
- * — see `res/call_actor_redesign_v4.md` § content[] shape for the load-bearing rationale.
+ * content[0] mirrors structuredContent as JSON (spec compat); content[1] is the
+ * LLM-readable summary + nextStep narrative.
  */
 export type RunResponse = {
     runId: string;
@@ -203,6 +203,7 @@ async function resolveItemCountWithLagFallback(
     datasetMeta: Dataset | null,
     waitSecs: number,
     mcpSessionId?: string,
+    abortSignal?: AbortSignal,
 ): Promise<number | undefined> {
     if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
     if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
@@ -215,8 +216,15 @@ async function resolveItemCountWithLagFallback(
         const delays = waitSecs > 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
         let lastTotal = 0;
         for (const delay of delays) {
-            if (delay > 0) await sleep(delay);
-            const result = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
+            if (delay > 0) {
+                const sleepResult = await raceAbort(sleep(delay), abortSignal);
+                if (sleepResult === ABORT) return lastTotal;
+            }
+            const result = await raceAbort(
+                client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
+                abortSignal,
+            );
+            if (result === ABORT) return lastTotal;
             lastTotal = result.total ?? 0;
             if (lastTotal > 0) return lastTotal;
         }
@@ -597,7 +605,7 @@ export async function fetchActorRunData(params: {
         kvListResult = kvFetched ?? null;
     }
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId);
+    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId, abortSignal);
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
     const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });

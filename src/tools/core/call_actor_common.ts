@@ -349,10 +349,6 @@ export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSc
 // Allow additional properties for dynamic Actor input fields passed via the `input` object
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
-export function resolveWaitSecs(parsed: CallActorParsedArgs): number {
-    return parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT;
-}
-
 /**
  * Parsed call-actor arguments.
  */
