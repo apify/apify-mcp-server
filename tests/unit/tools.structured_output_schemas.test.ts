@@ -276,5 +276,18 @@ describe('Structured Output Schemas', () => {
             expect(schema2.properties.items.items).toEqual({ type: 'object' });
             expect(schema2.properties.items.items.properties).toBeUndefined();
         });
+
+        it('emits no widget meta on actor tools', async () => {
+            const actorInfo = createMockActorInfo('apify/test-actor');
+            const tools = await getNormalActorsAsTools([actorInfo]);
+
+            expect(tools).toHaveLength(1);
+            const meta = tools[0]._meta ?? {};
+            for (const key of Object.keys(meta)) {
+                expect(key).not.toMatch(/^openai\//);
+                expect(key).not.toBe('ui');
+                expect(key).not.toBe('ui/resourceUri');
+            }
+        });
     });
 });

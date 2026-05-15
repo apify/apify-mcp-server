@@ -12,7 +12,6 @@ import {
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import { actorDefinitionPrunedCache } from '../../state.js';
 import type {
     ActorInfo,
@@ -128,10 +127,6 @@ Actor description: ${definition.description}`;
             ajvValidate,
             paymentRequired: true,
             memoryMbytes,
-            // openai/* and ui keys are stripped in non-apps mode by stripWidgetMeta() in src/utils/tools.ts
-            _meta: {
-                ...getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
-            },
             icons: definition.pictureUrl
                 ? [{ src: definition.pictureUrl, mimeType: 'image/png' }]
                 : undefined,
