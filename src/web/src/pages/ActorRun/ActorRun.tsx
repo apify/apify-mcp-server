@@ -23,7 +23,7 @@ interface ActorRunData {
     stats?: {
         computeUnits?: number;
     };
-    /** v4 shape: identifier + count only. Item bodies are fetched separately via get-dataset-items. */
+    /** Identifier + count only. Item bodies are fetched separately via get-dataset-items. */
     dataset?: {
         id: string;
         itemCount?: number;
@@ -342,8 +342,8 @@ export const ActorRun: React.FC = () => {
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
     /**
-     * v4 doesn't inline preview items in the run response. We fetch a small preview separately
-     * via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
+     * Run response carries identifiers only; item bodies are fetched separately.
+     * We fetch a small preview via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
      */
     const [previewItems, setPreviewItems] = useState<Record<string, any>[] | null>(null);
 
@@ -384,7 +384,7 @@ export const ActorRun: React.FC = () => {
     useEffect(() => { setPreviewItems(null); }, [runData?.dataset?.id]);
 
     // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
-    // v4 doesn't inline items in the run response — the server returns shape + identifiers only.
+    // Run response carries shape + identifiers only; item bodies are fetched via get-dataset-items.
     useEffect(() => {
         if (!app || !runData) return;
         if (previewItems !== null) return;

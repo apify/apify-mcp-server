@@ -58,8 +58,6 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     Input: actor name and input JSON; callOptions (memory, timeout) are optional.
 `;
 
-const ACTOR_RUN_WIDGET_META = getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta;
-
 export const appsCallActorWidget: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL_WIDGET,
@@ -69,7 +67,7 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
     // Allow arbitrary keys inside `input` (dynamic Actor input) while keeping the outer shape strict.
     ajvValidate: compileSchema(z.toJSONSchema(callActorWidgetArgsSchema)),
     paymentRequired: true,
-    _meta: ACTOR_RUN_WIDGET_META,
+    _meta: getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta,
     annotations: {
         title: 'Call Actor (widget)',
         readOnlyHint: false,

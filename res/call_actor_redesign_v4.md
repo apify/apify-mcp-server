@@ -90,7 +90,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
     }
   },
   "summary": "SUCCEEDED in 22s. 47 items; 3 fields available.",
-  "nextStep": "Use get-dataset-items with datasetId=dataset-xyz and limit=20 to fetch items (47 total). Available fields (dot notation): crawl.httpStatusCode, metadata.url, markdown — pass via fields=\"...\" to project. Preview with limit=3."
+  "nextStep": "Use get-dataset-items with datasetId=dataset-xyz and limit=20 to fetch items (47 total). Available fields (dot notation): crawl.httpStatusCode, metadata.url, markdown — pass via fields=\"...\" to project."
 }
 ```
 
@@ -185,15 +185,14 @@ Every status returns a concrete `summary` and one primary `nextStep`. Templates 
 
 | Status | summary | nextStep |
 |---|---|---|
-| READY | `"READY. Run ${runId} was created but has not started."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to wait for progress."` |
-| RUNNING | `"RUNNING for ${elapsedSecs}s. ${statusMessage \|\| 'In progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to poll for completion."` |
-| TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage \|\| 'Run-time limit reached; cleanup in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
-| ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage \|\| 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=10 to observe terminal state."` |
-| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} items; ${fieldCount} fields available."` | `"Use get-dataset-items with datasetId=${storages.datasets.default.id} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${storages.datasets.default.fields.join(', ')} — pass via fields=\"...\" to project. Preview with limit=3."` |
-| SUCCEEDED, dataset empty + KV has keys | `"SUCCEEDED in ${runTimeSecs}s. Output written to key-value store (${keyCount} keys)."` | When `keys` includes `OUTPUT`: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStores.default.id} and recordKey=\"OUTPUT\" to read the main output. Other keys: ${keys.filter(k=>k!=='OUTPUT').join(', ') \|\| 'none'}."` Otherwise: `"Use get-key-value-store-record with keyValueStoreId=${storages.keyValueStores.default.id} and one of these keys (as recordKey): ${storages.keyValueStores.default.keys.join(', ')}."` |
-| SUCCEEDED, no dataset items, no KV keys | `"SUCCEEDED in ${runTimeSecs}s. No dataset items and no key-value records were found."` | `"Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run call-actor with adjusted input."` |
-| FAILED | `"FAILED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Diagnose using statusMessage and exitCode in this response; re-run call-actor with adjusted input if the cause is fixable."` |
-| ABORTED | `"ABORTED after ${runTimeSecs}s${statusMessage ? ': ' + statusMessage : ''}."` | `"Use call-actor again if you want to rerun the actor."` |
+| READY | `"READY. Run ${runId} was created but has not started."` | `"Use get-actor-run with runId=${runId} and waitSecs=30 to wait for progress."` |
+| RUNNING | `"RUNNING for ${elapsedSecs}s. ${statusMessage \|\| 'In progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=30 to poll for completion."` |
+| TIMING-OUT | `"TIMING-OUT after ${elapsedSecs}s. ${statusMessage \|\| 'Run-time limit reached; cleanup in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=30 to observe terminal state."` |
+| ABORTING | `"ABORTING after ${elapsedSecs}s. ${statusMessage \|\| 'Cancellation in progress'}."` | `"Use get-actor-run with runId=${runId} and waitSecs=30 to observe terminal state."` |
+| SUCCEEDED, dataset has items | `"SUCCEEDED in ${runTimeSecs}s. ${itemCount} item(s); ${fieldCount} fields available."` (appends `" Key-value store has ${keyCountLabel}."` when KV records also exist) | `"Use get-dataset-items with datasetId=${storages.datasets.default.id} and limit=20 to fetch items (${itemCount} total). Available fields (dot notation): ${storages.datasets.default.fields.join(', ')} — pass via fields=\"...\" to project."` |
+| SUCCEEDED, no dataset items | `"SUCCEEDED in ${runTimeSecs}s. No dataset items found."` (appends `" Actor status: \"${statusMessage}\"."` when set; appends `" Key-value store has ${keyCountLabel}."` when KV records exist) | `"Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run call-actor with adjusted input."` |
+| FAILED | `"FAILED after ${runTimeSecs}s."` (appends `" Actor status: \"${statusMessage}\"."` when set) | `"Diagnose using statusMessage and exitCode in this response; re-run call-actor with adjusted input if the cause is fixable."` |
+| ABORTED | `"ABORTED after ${runTimeSecs}s."` (appends `" Actor status: \"${statusMessage}\"."` when set) | `"Use call-actor again if you want to rerun the actor."` |
 | TIMED-OUT | `"TIMED-OUT after ${runTimeSecs}s."` | `"Use get-dataset-items with datasetId=${storages.datasets.default.id} and limit=20 to fetch any partial output (${itemCount ?? 0} items written). Available fields: ${storages.datasets.default.fields?.join(', ') \|\| 'none'}."` |
 
 `elapsedSecs` is `(now - startedAt)` for non-terminal states. `runTimeSecs` comes from `stats.runTimeSecs` for terminal states. `fieldCount` is `storages.datasets.default.fields?.length ?? 0`.

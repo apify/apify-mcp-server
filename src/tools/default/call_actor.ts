@@ -52,9 +52,8 @@ export const defaultCallActor: ToolEntry = Object.freeze({
 
         const { parsed, baseActorName } = preResult;
         const { input, callOptions } = parsed;
-        // Task mode loops until terminal regardless of caller waitSecs; CALL_ACTOR_WAIT_SECS_DEFAULT is the per-iteration poll window.
-        // Task mode: tools/call returns immediately so there is no MCP client timeout — pass undefined
-        // and let the SDK wait until terminal (its default is 999999s).
+        // Task mode waits until terminal (waitSecs=undefined uses SDK default ~999999s); caller's waitSecs is ignored.
+        // Non-task mode: pass waitSecs so the SDK blocks up to that many seconds before returning.
         const waitSecs = toolArgs.taskMode ? undefined : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
 
         let resolvedActorId: string | undefined;

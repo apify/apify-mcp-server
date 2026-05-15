@@ -2002,13 +2002,13 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('should call rag-web-browser actor and retrieve metadata.title and crawl object from dataset', async () => {
+        it('calls rag-web-browser, verifies canonical shape with dot-notation fields, and fetches via get-dataset-items', async () => {
             client = await createClientFn({ tools: ['actors', 'storage'] });
 
             const callResult = await client.callTool({
                 name: 'call-actor',
                 arguments: {
-                    actor: 'apify/rag-web-browser',
+                    actor: RAG_WEB_BROWSER,
                     input: { query: 'https://apify.com' },
                 },
             });
@@ -2032,88 +2032,69 @@ export function createIntegrationTestsSuite(
             expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
 
             const outputResult = await client.callTool({
-                name: HelperTools.ACTOR_OUTPUT_GET,
+                name: HelperTools.DATASET_GET_ITEMS,
                 arguments: {
                     datasetId: datasetId!,
                     fields: 'metadata.title,crawl',
                 },
             });
 
-            const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = extractJsonFromMarkdown(outputContent[0].text);
-            expect(Array.isArray(output)).toBe(true);
-            expect(output.length).toBeGreaterThan(0);
-            expect(output[0]).toHaveProperty('metadata.title');
-            expect(typeof output[0]['metadata.title']).toBe('string');
-            expect(output[0]).toHaveProperty('crawl');
-            expect(typeof output[0].crawl).toBe('object');
+            const items = (outputResult as { structuredContent?: { items?: Record<string, unknown>[] } })
+                .structuredContent?.items;
+            expect(Array.isArray(items)).toBe(true);
+            expect(items!.length).toBeGreaterThan(0);
+            expect(items![0]).toHaveProperty('metadata.title');
+            expect(typeof items![0]['metadata.title']).toBe('string');
+            expect(items![0]).toHaveProperty('crawl');
+            expect(typeof items![0].crawl).toBe('object');
 
             await client.close();
         });
 
-        it('should call apify/rag-web-browser tool directly and retrieve metadata.title from dataset', async () => {
+        it('calls apify/rag-web-browser tool directly and retrieves metadata.title via get-dataset-items', async () => {
             client = await createClientFn({ tools: ['storage'], actors: ['apify/rag-web-browser'] });
 
-            // Call the dedicated apify--rag-web-browser tool
             const result = await client.callTool({
                 name: actorNameToToolName('apify/rag-web-browser'),
                 arguments: { query: 'https://apify.com' },
             });
 
-            // Validate the response has 1 content item with text summary and embedded schema
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
-            const { text } = content[1];
+            expectEmbeddedSchemaWithMetadataAndCrawl(content[1].text);
 
-            // Extract datasetId from the response text
-            const runIdMatch = text.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
-            expect(runIdMatch).toBeTruthy();
-            const datasetId = runIdMatch![2];
-
-            expectEmbeddedSchemaWithMetadataAndCrawl(text);
-
-            // Call get-actor-output with fields: 'metadata.title'
-            const outputResult = await client.callTool({
-                name: HelperTools.ACTOR_OUTPUT_GET,
-                arguments: {
-                    datasetId,
-                    fields: 'metadata.title',
-                },
-            });
-
-            // Validate the output contains the expected structure with metadata.title
-            const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = extractJsonFromMarkdown(outputContent[0].text);
-            expect(Array.isArray(output)).toBe(true);
-            expect(output.length).toBeGreaterThan(0);
-            expect(output[0]).toHaveProperty('metadata.title');
-            expect(typeof output[0]['metadata.title']).toBe('string');
-
-            // Validate structured output for direct actor tool call
+            // Validate structured output and pre-v4 inline items shape for direct actor tools.
             const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
-            // Use imported directActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
             validateStructuredOutput(result, directActorOutputSchema, ragWebBrowserToolName);
-
-            // Validate structured content has items with metadata and crawl
             const resultWithStructured = result as { structuredContent?: {
-                 runId?: string;
-                 datasetId?: string;
-                 itemCount?: number;
-                 items?: { metadata?: { title?: string }; crawl?: object }[];
-                 instructions?: string;
-             } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
+                datasetId?: string;
+                items?: { metadata?: { title?: string }; crawl?: object }[];
+            } };
             expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('metadata');
             expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
 
-            // Validate structured output for get-actor-output
-            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET, 'default');
+            const datasetId = resultWithStructured.structuredContent?.datasetId;
+            expect(datasetId).toBeDefined();
+
+            const outputResult = await client.callTool({
+                name: HelperTools.DATASET_GET_ITEMS,
+                arguments: { datasetId: datasetId!, fields: 'metadata.title' },
+            });
+
+            const items = (outputResult as { structuredContent?: { items?: Record<string, unknown>[] } })
+                .structuredContent?.items;
+            expect(Array.isArray(items)).toBe(true);
+            expect(items!.length).toBeGreaterThan(0);
+            expect(items![0]).toHaveProperty('metadata.title');
+            expect(typeof items![0]['metadata.title']).toBe('string');
+
+            validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
 
             await client.close();
         });
 
-        it('should call apify/python-example and retrieve the full dataset using get-actor-output tool', async () => {
+        it('calls apify/python-example tool directly and retrieves full dataset via get-dataset-items', async () => {
             client = await createClientFn({ tools: ['storage'], actors: ['apify/python-example'] });
             const selectedToolName = actorNameToToolName('apify/python-example');
             const input = { first_number: 5, second_number: 7 };
@@ -2124,44 +2105,31 @@ export function createIntegrationTestsSuite(
             });
 
             const content = result.content as { text: string; type: string }[];
-            expect(content.length).toBe(2); // Call step returns text summary with embedded schema
+            expect(content.length).toBe(2);
 
-            // First content: text summary
-            const runText = content[1].text;
-
-            // Extract datasetId from the text
-            const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
-            expect(runIdMatch).toBeTruthy();
-            const datasetId = runIdMatch![2];
-
-            // Retrieve full dataset using get-actor-output tool
-            const outputResult = await client.callTool({
-                name: HelperTools.ACTOR_OUTPUT_GET,
-                arguments: {
-                    datasetId,
-                },
-            });
-
-            const outputContent = outputResult.content as { text: string; type: string }[];
-            const output = extractJsonFromMarkdown(outputContent[0].text);
-            expect(Array.isArray(output)).toBe(true);
-            expect(output.length).toBe(1);
-            expect(output[0]).toHaveProperty('first_number', input.first_number);
-            expect(output[0]).toHaveProperty('second_number', input.second_number);
-            expect(output[0]).toHaveProperty('sum', input.first_number + input.second_number);
-
-            // Validate structured output for direct actor tool
-            // Use imported directActorOutputSchema directly because direct Actor tools are dynamic and not in static toolCategories
+            // Validate structured output and pre-v4 inline items shape for direct actor tools.
             validateStructuredOutput(result, directActorOutputSchema, selectedToolName);
-
-            // Validate structured content has actual actor results with sum
             expectPythonExampleDirectToolContent(result, 5, 7);
-
-            // Validate _meta contains Apify usage cost information for direct actor tool calls
             expectUsageCostMeta(result);
 
-            // Validate structured output for get-actor-output
-            validateStructuredOutputForTool(outputResult, HelperTools.ACTOR_OUTPUT_GET, 'default');
+            const datasetId = (result as { structuredContent?: { datasetId?: string } })
+                .structuredContent?.datasetId;
+            expect(datasetId).toBeDefined();
+
+            const outputResult = await client.callTool({
+                name: HelperTools.DATASET_GET_ITEMS,
+                arguments: { datasetId: datasetId! },
+            });
+
+            const items = (outputResult as { structuredContent?: { items?: Record<string, unknown>[] } })
+                .structuredContent?.items;
+            expect(Array.isArray(items)).toBe(true);
+            expect(items!.length).toBe(1);
+            expect(items![0]).toHaveProperty('first_number', input.first_number);
+            expect(items![0]).toHaveProperty('second_number', input.second_number);
+            expect(items![0]).toHaveProperty('sum', input.first_number + input.second_number);
+
+            validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
         });
 
         it('should return structured output for get-actor-run matching outputSchema', async () => {

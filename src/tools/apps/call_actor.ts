@@ -62,7 +62,6 @@ export const appsCallActor: ToolEntry = Object.freeze({
             resolvedActorId = extractActorId(resolution.actor);
             const { apifyClient } = toolArgs;
 
-            // Apps mode always runs asynchronously
             const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
             log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
             const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
