@@ -153,21 +153,33 @@ jobs:
                     max_attempts: 3
                     retry_wait_seconds: 30
                     command: npm install --save-exact @apify/actors-mcp-server@${{ needs.release_metadata.outputs.version_number }}
-            -   name: Create pull request
-                uses: peter-evans/create-pull-request@v8
+            -   name: Commit dependency bump
+                id: commit
+                uses: apify/actions/signed-commit@v1.0.0
                 with:
-                    token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
-                    commit-message: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
+                    message: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
+                    github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    repository: apify/apify-mcp-server-internal
                     branch: "release/${{ needs.release_metadata.outputs.tag_name }}"
-                    title: "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}"
-                    body: |
+                    create-branch: 'true'
+
+            -   name: Create pull request
+                if: steps.commit.outputs.committed == 'true'
+                run: |
+                    gh pr create \
+                      --repo apify/apify-mcp-server-internal \
+                      --head "release/${{ needs.release_metadata.outputs.tag_name }}" \
+                      --title "chore: bump @apify/actors-mcp-server to ${{ needs.release_metadata.outputs.version_number }}" \
+                      --body "$BODY" \
+                      --reviewer "${{ github.actor }}"
+                env:
+                    GH_TOKEN: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
+                    BODY: |
                         Automated PR to bump `@apify/actors-mcp-server` to `${{ needs.release_metadata.outputs.version_number }}`.
 
                         ## Release notes
 
                         ${{ needs.release_metadata.outputs.release_notes }}
-                    reviewers: ${{ github.actor }}
-                    author: Apify Release Bot <noreply@apify.com>
 
     publish_to_mcp_registry:
         name: Publish to MCP Registry
