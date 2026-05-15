@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildStatusSummaryNextStep,
@@ -12,7 +12,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
  * — with no inlined dataset items or KV record bodies.
- * Tests cover all 8 status templates plus shape invariants.
+ * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
+ * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
+ * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
  */
 
 const ACTOR = { username: 'apify', name: 'rag-web-browser' };
@@ -163,6 +165,137 @@ describe('get-actor-run default response', () => {
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
         expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+    });
+
+    it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
+        // Delayed retries run only when waitSecs > 0 — they're skipped on the "return immediately"
+        // path. Drive the [0, 1000, ...]ms schedule with fake timers.
+        vi.useFakeTimers();
+        try {
+            const run = mockSucceededRun();
+            const dataset = mockDataset({ itemCount: 0 });
+            let probeCalls = 0;
+            const client = {
+                run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+                actor: (_id: string) => ({ get: async () => ACTOR }),
+                dataset: (_id: string) => ({
+                    get: async () => dataset,
+                    listItems: async () => {
+                        probeCalls += 1;
+                        return probeCalls === 1
+                            ? { items: [], total: 0 }
+                            : { items: [{ a: 1 }], total: 47 };
+                    },
+                }),
+                keyValueStore: (_id: string) => ({
+                    listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+                }),
+            } as unknown as InternalToolArgs['apifyClient'];
+
+            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
+            await vi.runAllTimersAsync();
+            const result = await callPromise;
+            const { structuredContent } = result as { structuredContent: RunResponse };
+            expect(probeCalls).toBe(2);
+            expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('exhausts the full lag-fallback schedule when every probe returns 0, then reports 0', async () => {
+        // Pin the full 4-probe schedule covering Apify's ~5s itemCount propagation lag window
+        // (see ITEM_COUNT_PROBE_DELAYS_MS). If a future change shortens or removes retries, this
+        // test fails — we don't want SUCCEEDED-but-empty races to silently regress.
+        vi.useFakeTimers();
+        try {
+            const run = mockSucceededRun();
+            const dataset = mockDataset({ itemCount: 0 });
+            let probeCalls = 0;
+            const client = {
+                run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+                actor: (_id: string) => ({ get: async () => ACTOR }),
+                dataset: (_id: string) => ({
+                    get: async () => dataset,
+                    listItems: async () => {
+                        probeCalls += 1;
+                        return { items: [], total: 0 };
+                    },
+                }),
+                keyValueStore: (_id: string) => ({
+                    listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+                }),
+            } as unknown as InternalToolArgs['apifyClient'];
+
+            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
+            // Drive the [0, 1000, 2000, 2000]ms schedule to completion without real wall time.
+            await vi.runAllTimersAsync();
+            const result = await callPromise;
+            const { structuredContent } = result as { structuredContent: RunResponse };
+
+            expect(probeCalls).toBe(4);
+            expect(structuredContent.storages.datasets?.default.itemCount).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('skips delayed lag-fallback retries when waitSecs=0 (immediate-poll contract)', async () => {
+        // Regression for the widget's initial render: the [0, 1000, 2000, 2000]ms retry schedule
+        // would block "return immediately" callers for ~5s on a SUCCEEDED-but-empty dataset.
+        const run = mockSucceededRun();
+        const dataset = mockDataset({ itemCount: 0 });
+        let probeCalls = 0;
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => dataset,
+                listItems: async () => {
+                    probeCalls += 1;
+                    return { items: [], total: 0 };
+                },
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        // Exactly one immediate probe — no delayed retries.
+        expect(probeCalls).toBe(1);
+    });
+
+    it('returns promptly when extra.signal is already aborted before raceAbort attaches its listener', async () => {
+        // Regression: without `raceAbort`'s pre-attach `aborted` check, an already-aborted signal
+        // would block forever — the abort event has already fired by the time the listener attaches.
+        const controller = new AbortController();
+        controller.abort();
+
+        let getCalls = 0;
+        const client = {
+            run: (_id: string) => ({
+                get: async () => {
+                    getCalls += 1;
+                    return new Promise(() => { /* never resolves — only the abort path can return */ });
+                },
+                waitForFinish: async () => new Promise(() => { /* never resolves */ }),
+            }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({ get: async () => null, listItems: async () => ({ items: [], total: 0 }) }),
+            keyValueStore: (_id: string) => ({ listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }) }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call({
+            ...callArgs(client, { runId: 'run-1', waitSecs: 0 }),
+            extra: { signal: controller.signal } as InternalToolArgs['extra'],
+        });
+
+        // Cancelled requests return no payload per MCP spec — see `defaultGetActorRun`.
+        expect(result).toEqual({});
+        // ≤1 because raceAbort may short-circuit before or after `run().get()` is invoked; what
+        // matters is that the call returns instead of hanging on the never-resolving promise.
+        expect(getCalls).toBeLessThanOrEqual(1);
     });
 
     it('rejects waitSecs above 45', () => {
@@ -349,17 +482,26 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('metadata.url, markdown');
     });
 
-    it('SUCCEEDED with empty dataset + KV records routes to KV-record nextStep', () => {
+    it('SUCCEEDED with items but no fields metadata omits the fields hint without a dangling em-dash', () => {
+        const dataset: RunDataset = { id: 'ds-1', itemCount: 5, fields: [] };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.nextStep).toContain('get-dataset-items');
+        expect(t.nextStep).not.toContain('Available fields');
+        expect(t.nextStep).not.toContain('—');
+    });
+
+    it('SUCCEEDED with empty dataset + KV records: nextStep stays generic; KV shows up only in summary', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
-        expect(t.summary).toContain('Output written to key-value store');
-        expect(t.nextStep).toContain('get-key-value-store-record');
-        expect(t.nextStep).toContain('keyValueStoreId=kv-1');
-        expect(t.nextStep).toContain('one of these keys (as recordKey): result-a, result-b');
+        expect(t.summary).toContain('No dataset items found');
+        expect(t.summary).toContain('Key-value store has 2 keys');
+        expect(t.nextStep).not.toContain('get-key-value-store-record');
+        expect(t.nextStep).toContain('re-run');
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED') });
-        expect(t.summary).toContain('No dataset items and no key-value records');
+        expect(t.summary).toContain('No dataset items found');
+        expect(t.summary).not.toContain('Key-value store');
         expect(t.nextStep).toContain('re-run');
     });
 
@@ -405,5 +547,39 @@ describe('buildStatusTemplate', () => {
     it('TIMED-OUT without dataset routes to "no dataset to fetch" nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT') });
         expect(t.nextStep).toContain('no dataset to fetch');
+    });
+
+    // ---- statusMessage attribution + double-period invariants ----
+    // The upstream statusMessage can be stale relative to elapsedSecs and often arrives with a
+    // trailing period. We always render it as ` Actor status: "..."` (no double period) so a
+    // naive reader doesn't mistake the actor's own message for our narrative.
+
+    it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Starting the crawler.') });
+        expect(t.summary).toContain('Actor status: "Starting the crawler"');
+        expect(t.summary).not.toMatch(/\.\./);
+    });
+
+    it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
+        expect(t.summary).toContain('In progress.');
+        expect(t.summary).not.toContain('Actor status:');
+    });
+
+    it('SUCCEEDED with 0 items surfaces the upstream statusMessage attributed in the summary', () => {
+        // The agent reading text-only must see the actor's diagnostic; we pass it through with
+        // attribution so it's clear the wording is upstream, not ours.
+        const run = makeRun('SUCCEEDED', 'Finished! Total 1 requests: 1 succeeded, 0 failed.');
+        const t = buildStatusSummaryNextStep({ run, dataset: datasetEmpty });
+        expect(t.summary).toContain('Actor status: "Finished! Total 1 requests: 1 succeeded, 0 failed"');
+        expect(t.summary).not.toMatch(/\.\./);
+    });
+
+    it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
+        // Pinned to prevent the `to project..` regression: the fields-hint template already
+        // terminates the sentence, so the outer nextStep template must not append its own `.`.
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        expect(t.nextStep).toMatch(/to project\.$/);
+        expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });

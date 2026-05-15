@@ -16,6 +16,12 @@ jobs:
         name: Code checks
         uses: ./.github/workflows/_check_code.yaml
 
+    integration_tests:
+        name: Integration tests
+        uses: ./.github/workflows/_integration_tests.yaml
+        secrets:
+            APIFY_TOKEN: ${{ secrets.APIFY_TEST_USER_API_TOKEN }}
+
     release_metadata:
         # Skip this for "ci", "docs" and "test" commits
         if: "!startsWith(github.event.head_commit.message, 'ci') && !startsWith(github.event.head_commit.message, 'docs') && !startsWith(github.event.head_commit.message, 'test')"

@@ -246,6 +246,8 @@ export type ActorStoreList = ActorStoreListOutdated & {
     isWhiteListedForAgenticPayments?: boolean;
     notice?: string | null;
     userFullName?: string;
+    /** Populated when the search call is made with `includeInputSchema=true`. */
+    inputSchema?: ActorStoreInputSchema;
     stats: ActorStats & {
         actorReviewCount?: number;
         actorReviewRating?: number;
@@ -312,7 +314,6 @@ export type PromptBase = Prompt & {
     render: (args: Record<string, string>) => string;
 };
 
-export type ActorInputSchemaProperties = Record<string, SchemaProperties>;
 export type DatasetItem = Record<number | string, unknown>;
 /**
  * Apify token type.
@@ -425,8 +426,14 @@ export type ActorExecutionParams = {
     input: Record<string, unknown>;
     /** Apify client (may include payment headers) */
     apifyClient: ApifyClient;
-    /** Call options (memory, timeout) */
-    callOptions: { memory?: number; timeout?: number };
+    /** Call options forwarded to apifyClient.actor(...).start(input, callOptions) */
+    callOptions: {
+        memory?: number;
+        timeout?: number;
+        build?: string;
+        maxItems?: number;
+        maxTotalChargeUsd?: number;
+    };
     /** Progress tracker for sending progress notifications */
     progressTracker?: ProgressTracker | null;
     /** Signal for aborting the execution */
@@ -564,6 +571,13 @@ export type ActorsMcpServerOptions = {
     uiMode?: string;
 }
 
+/** Compact schema returned by `GET /v2/store?includeInputSchema=true`; produced by apify-core `trimInputSchema`. */
+export type ActorStoreInputSchema = {
+    type: 'object';
+    properties: Record<string, { type: string | string[] }>;
+    required?: string[];
+};
+
 export type StructuredActorCard = {
     title?: string;
     url: string;
@@ -590,6 +604,7 @@ export type StructuredActorCard = {
     };
     modifiedAt?: string;
     isDeprecated: boolean;
+    inputFields?: ActorStoreInputSchema;
 }
 
 /**

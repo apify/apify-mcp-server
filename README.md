@@ -102,6 +102,7 @@ Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your pr
 - VS Code (Genie)
 - Cursor
 - OpenCode
+- [Kiro](https://kiro.dev)
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) — designed for testing Apify MCP servers
 
 

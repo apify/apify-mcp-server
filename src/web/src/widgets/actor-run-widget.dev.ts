@@ -244,7 +244,6 @@ export function setupActorRunWidgetDev(): void {
         updateMockOpenAiState({
             toolOutput: {
                 ...mockRunData,
-                responseVersion: "v4",
                 actorId: "test_actor_id",
                 status: "SUCCEEDED",
                 finishedAt: new Date().toISOString(),

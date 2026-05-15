@@ -37,7 +37,6 @@ interface ActorRunData {
  * Item bodies are not inlined — fetch via get-dataset-items.
  */
 interface ToolOutput extends Record<string, unknown> {
-    responseVersion?: string;
     runId?: string;
     actorId?: string;
     actorName?: string;
@@ -381,6 +380,9 @@ export const ActorRun: React.FC = () => {
         };
     }, [toolOutput, runData, toolResponseMetadata, stableRunId, app]);
 
+    // Drop a stale preview when the dataset id changes (e.g. host swaps toolResult to a new run).
+    useEffect(() => { setPreviewItems(null); }, [runData?.dataset?.id]);
+
     // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
     // v4 doesn't inline items in the run response — the server returns shape + identifiers only.
     useEffect(() => {
@@ -468,10 +470,15 @@ export const ActorRun: React.FC = () => {
                     if (response.structuredContent) {
                         const newData = response.structuredContent as unknown as ToolOutput;
                         const meta = response._meta as ActorRunMeta;
-                        const updatedRunData: ActorRunData = {
-                            ...toolOutputToRunData(newData, meta),
-                            // Preserve the previous full actor name when the response omits it.
-                            actorFullName: (newData.actorName as string) || runData.actorFullName,
+                        const computed = toolOutputToRunData(newData, meta);
+                        // Preserve all name-derived fields when the response omits actorName, so a
+                        // transient actor-name lookup miss doesn't flip the widget to "Unknown Actor"
+                        // when the previous run snapshot already had a known name.
+                        const updatedRunData: ActorRunData = newData.actorName ? computed : {
+                            ...computed,
+                            actorName: runData.actorName,
+                            actorFullName: runData.actorFullName,
+                            actorDeveloperUsername: runData.actorDeveloperUsername,
                         };
 
                         // Skip the state update when nothing visible changed; otherwise every poll
