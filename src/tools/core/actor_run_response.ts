@@ -294,6 +294,11 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
+function fieldsProjectionHint(fields: string[] | undefined): string {
+    if (!fields || fields.length === 0) return '';
+    return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
@@ -308,12 +313,9 @@ function buildSucceededSummaryNextStep(
     // KV when both exist so the caller can see the run also produced key-value records.
     if (itemCount !== undefined && itemCount > 0 && datasetId) {
         const fields = dataset?.fields ?? [];
-        const fieldsHint = fields.length > 0
-            ? ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`
-            : '';
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsHint}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
         };
     }
 
@@ -329,13 +331,9 @@ function buildSucceededSummaryNextStep(
     // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
     // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
     if (itemCount === 0 && datasetId) {
-        const fields = dataset?.fields ?? [];
-        const fieldsHint = fields.length > 0
-            ? ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`
-            : '';
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsHint}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
