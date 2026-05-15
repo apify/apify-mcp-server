@@ -55,7 +55,7 @@ mcpc @stdio tools-call <tool> key:="value"
 mcpc --json @stdio tools-call <tool> key:="value" | jq '...'
 ```
 
-If the task requires non-default tools, also connect/restart `@stdio-full`. Never source `.env` or wrap calls in `set -a` — the bridge already has the user's token.
+If the task requires non-default tools, also connect/restart `@stdio-full`.
 
 ## Ground-truth data via the apify CLI
 
