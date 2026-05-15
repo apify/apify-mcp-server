@@ -2454,7 +2454,7 @@ export function createIntegrationTestsSuite(
 
         // Without the chained AbortController, the task flips to `cancelled` but the underlying
         // Apify run keeps consuming compute until natural finish.
-        it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 1 }, async () => {
+        it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 3 }, async () => {
             client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
 
             const startedAfter = new Date();

@@ -547,12 +547,13 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).not.toContain('—');
     });
 
-    it('SUCCEEDED with empty dataset + KV records: nextStep stays generic; KV shows up only in summary', () => {
+    it('SUCCEEDED with empty dataset + KV records: nextStep points at dataset, not KV', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).toContain('Key-value store has 2 keys');
+        expect(t.nextStep).toContain('get-dataset-items');
+        expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).not.toContain('get-key-value-store-record');
-        expect(t.nextStep).toContain('re-run');
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {

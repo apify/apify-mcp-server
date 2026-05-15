@@ -326,6 +326,19 @@ function buildSucceededSummaryNextStep(
         };
     }
 
+    // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
+    // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
+    if (itemCount === 0 && datasetId) {
+        const fields = dataset?.fields ?? [];
+        const fieldsHint = fields.length > 0
+            ? ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`
+            : '';
+        return {
+            summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsHint}`,
+        };
+    }
+
     // KV store is rarely the primary output for Apify actors (mostly SDK state / intermediate data),
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
     // when records exist, so callers can still discover them. Surface the upstream statusMessage so
