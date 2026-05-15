@@ -167,8 +167,40 @@ function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<str
     }
 }
 
-/** Validates that the structured content contains expected python-example Actor results. */
-function expectPythonExampleStructuredContent(result: unknown, firstNumber: number, secondNumber: number): void {
+/**
+ * Validates the canonical run response from `call-actor` against the python-example Actor.
+ * The response does not inline dataset items. `itemCount` is not asserted because Apify's
+ * dataset metadata propagation can lag past the server's probe window; the dataset id plus a
+ * non-empty `fields` list is the reliable signal that items were written.
+ */
+function expectPythonExampleStructuredContent(result: unknown): void {
+    const resultWithStructured = result as { structuredContent?: {
+         runId?: string;
+         status?: string;
+         storages?: {
+             datasets?: { default?: { id?: string; fields?: string[] } };
+         };
+         summary?: string;
+         nextStep?: string;
+     } };
+    const sc = resultWithStructured.structuredContent;
+    expect(sc).toBeDefined();
+    expect(sc?.runId).toBeDefined();
+    expect(sc?.status).toBe('SUCCEEDED');
+    expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+    expect(sc?.storages?.datasets?.default?.fields ?? []).toEqual(
+        expect.arrayContaining(['first_number', 'second_number', 'sum']),
+    );
+    expect(sc?.summary).toBeDefined();
+    expect(sc?.nextStep).toBeDefined();
+}
+
+/**
+ * Validates the direct-actor-tool response shape (still served by `buildActorResponseContent`).
+ * Direct actor tools inline the dataset items in `structuredContent.items` — different from
+ * the canonical `call-actor` shape.
+ */
+function expectPythonExampleDirectToolContent(result: unknown, firstNumber: number, secondNumber: number): void {
     const resultWithStructured = result as { structuredContent?: {
          runId?: string;
          datasetId?: string;
@@ -547,7 +579,6 @@ export function createIntegrationTestsSuite(
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'call',
                     input: {
                         first_number: 1,
                         second_number: 2,
@@ -555,21 +586,15 @@ export function createIntegrationTestsSuite(
                 },
             });
 
-            const content = result.content as { text: string }[];
+            const content = result.content as { text: string; type: string }[];
+            // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
+            expect(content[0]?.type).toBe('text');
+            const mirrored = JSON.parse(content[0].text) as { runId?: string; status?: string };
+            expect(mirrored.runId).toBeDefined();
+            expect(mirrored.status).toBe('SUCCEEDED');
 
-            expect(content[0]).toEqual(
-                {
-                    text: JSON.stringify([{
-                        first_number: 1,
-                        second_number: 2,
-                        sum: 3,
-                    }]),
-                    type: 'text',
-                },
-            );
-
-            // Validate structured output has actual actor results
-            expectPythonExampleStructuredContent(result, 1, 2);
+            // Validate structured output has run-response metadata for the python-example Actor.
+            expectPythonExampleStructuredContent(result);
         });
 
         it('should call Actor directly with required input', async () => {
@@ -594,7 +619,7 @@ export function createIntegrationTestsSuite(
             expect(callResult.content).toBeDefined();
         });
 
-        it('should support sync mode in call-actor (default behavior)', async () => {
+        it('returns terminal RunResponse with usage cost meta when the run completes within waitSecs', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -602,26 +627,22 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
-                    async: false,
+                    // Max wait (45s) so the test does not flake on a slow run.
+                    waitSecs: 45,
                 },
             });
 
-            const content = callResult.content as { text: string }[];
-            // Sync mode should return dataset items directly
-            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
-
-            // Validate structured output matches schema
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+            expectPythonExampleStructuredContent(callResult);
 
-            // Validate structured content has actual actor results
-            expectPythonExampleStructuredContent(callResult, 1, 2);
+            const sc = (callResult as { structuredContent?: { status?: string; summary?: string } }).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            expect(sc?.summary).toMatch(/SUCCEEDED/);
 
-            // Validate _meta contains Apify usage cost information for completed sync runs
             expectUsageCostMeta(callResult);
         });
 
-        it('should support async mode in call-actor and return runId', async () => {
+        it('returns immediately with a non-terminal RunResponse when waitSecs=0', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -629,66 +650,19 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
-                    async: true,
+                    waitSecs: 0,
                 },
             });
 
-            const content = callResult.content as { text: string }[];
-            // Async mode should return runId immediately
-            expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
-
-            // Check for structured content with runId
-            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
-
-            // Validate structured output matches schema
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+
+            const sc = (callResult as { structuredContent?: { runId?: string; status?: string } }).structuredContent;
+            expect(sc?.runId).toBeDefined();
+            // Non-blocking: status is typically READY or RUNNING at this point (terminal also tolerated for very fast actors).
+            expect(['READY', 'RUNNING', 'SUCCEEDED']).toContain(sc?.status);
         });
 
-        it('should support sync mode in call-actor with step call (default behavior)', async () => {
-            client = await createClientFn({ tools: ['actors'] });
-
-            const callResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'call',
-                    input: { first_number: 1, second_number: 2 },
-                    async: false,
-                },
-            });
-
-            const content = callResult.content as { text: string }[];
-            // Sync mode should return dataset items directly
-            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
-        });
-
-        it('should support async mode in call-actor with step call and return runId', async () => {
-            client = await createClientFn({ tools: ['actors'] });
-
-            const callResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    step: 'call',
-                    input: { first_number: 1, second_number: 2 },
-                    async: true,
-                },
-            });
-
-            const content = callResult.content as { text: string }[];
-            // Async mode should return runId immediately
-            expect(content.some((item) => item.text.includes('Run ID'))).toBe(true);
-
-            // Check for structured content with runId
-            const resultWithStructured = callResult as { structuredContent?: { runId?: string } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(typeof resultWithStructured.structuredContent?.runId).toBe('string');
-        });
-
-        it('should support previewOutput: false in call-actor and return metadata without preview items', async () => {
+        it('accepts but ignores the deprecated previewOutput field', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -697,29 +671,14 @@ export function createIntegrationTestsSuite(
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
                     previewOutput: false,
+                    waitSecs: 45,
                 },
             });
 
-            const content = callResult.content as { text: string }[];
-
-            // Should still have completion message with metadata
-            expect(content.some((item) => item.text.includes('Actor') && item.text.includes('completed successfully'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Total items'))).toBe(true);
-
-            // Should indicate preview was skipped
-            expect(content.some((item) => item.text.includes('Preview skipped') || item.text.includes('previewOutput: false'))).toBe(true);
-
-            // Should NOT have actual preview items JSON (the sum result)
-            expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(false);
-
-            // Validate structured output matches schema
+            // previewOutput is deprecated and ignored; the response is the canonical RunResponse
+            // regardless of the flag. Validate the metadata is intact.
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
-
-            // Validate structured content has empty items (preview disabled)
-            const resultWithStructured = callResult as { structuredContent?: { items?: unknown[] } };
-            expect(resultWithStructured.structuredContent).toBeDefined();
-            expect(resultWithStructured.structuredContent?.items).toEqual([]);
+            expectPythonExampleStructuredContent(callResult);
         });
 
         it('accepts callOptions.maxItems on call-actor and runs successfully', async () => {
@@ -731,16 +690,20 @@ export function createIntegrationTestsSuite(
                     actor: RAG_WEB_BROWSER,
                     input: { query: 'hello', maxResults: 3 },
                     callOptions: { maxItems: 3 },
+                    waitSecs: 45,
                 },
             });
 
             expect(callResult.isError).not.toBe(true);
-            const content = callResult.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('completed successfully'))).toBe(true);
-            expect(content.some((item) => item.text.includes('Dataset ID'))).toBe(true);
+            const sc = (callResult as { structuredContent?: {
+                status?: string;
+                storages?: { datasets?: { default?: { id?: string } } };
+            } }).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            expect(sc?.storages?.datasets?.default?.id).toBeDefined();
         });
 
-        it('should return preview items by default in call-actor (previewOutput: true)', async () => {
+        it('surfaces dataset fields in the canonical response (no inline preview)', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             const callResult = await client.callTool({
@@ -748,20 +711,21 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
-                    // previewOutput not specified, should default to true
+                    waitSecs: 45,
                 },
             });
 
-            const content = callResult.content as { text: string }[];
-
-            // Should have actual preview items with the sum result
-            expect(content.some((item) => item.text.includes('"sum": 3') || item.text.includes('"sum":3'))).toBe(true);
-
-            // Validate structured output matches schema
+            // The canonical response doesn't inline preview items — agents fetch them via
+            // get-dataset-items using the dataset id and the fields list surfaced here.
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
+            expectPythonExampleStructuredContent(callResult);
 
-            // Validate structured content has actual actor results
-            expectPythonExampleStructuredContent(callResult, 1, 2);
+            const sc = (callResult as { structuredContent?: {
+                nextStep?: string;
+                storages?: { datasets?: { default?: { id?: string } } };
+            } }).structuredContent;
+            // nextStep should interpolate the datasetId so a text-only client can act without parsing storages.
+            expect(sc?.nextStep).toContain(sc?.storages?.datasets?.default?.id ?? '__unset__');
         });
 
         it('should find Actors in store search', async () => {
@@ -1947,11 +1911,15 @@ export function createIntegrationTestsSuite(
                         input: { query: 'https://apify.com', maxResults: 1 },
                     },
                 });
-                const callStructured = callResult as { structuredContent?: { datasetId?: string; runId?: string } };
-                expect(callStructured.structuredContent?.datasetId).toBeDefined();
-                expect(callStructured.structuredContent?.runId).toBeDefined();
-                datasetId = callStructured.structuredContent!.datasetId!;
-                runId = callStructured.structuredContent!.runId!;
+                const callStructured = callResult as { structuredContent?: {
+                    runId?: string;
+                    storages?: { datasets?: { default?: { id?: string } } };
+                } };
+                const sc = callStructured.structuredContent;
+                expect(sc?.runId).toBeDefined();
+                expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+                datasetId = sc!.storages!.datasets!.default!.id!;
+                runId = sc!.runId!;
                 await setupClient.close();
             }, 60_000);
 
@@ -2008,8 +1976,11 @@ export function createIntegrationTestsSuite(
                 });
                 expect(runResult.isError).not.toBe(true);
                 const runText = (runResult.content as { text: string }[])[0].text;
-                const runData = extractJsonFromMarkdown(runText) as { storages?: { keyValueStore?: { id?: string } } };
-                const kvId = runData.storages?.keyValueStore?.id;
+                // content[0] is JSON.stringify(structuredContent), not markdown-embedded JSON.
+                const runData = JSON.parse(runText) as {
+                    storages?: { keyValueStores?: { default?: { id?: string } } };
+                };
+                const kvId = runData.storages?.keyValueStores?.default?.id;
                 expect(kvId).toBeDefined();
 
                 const kvResult = await client.callTool({
@@ -2038,29 +2009,32 @@ export function createIntegrationTestsSuite(
                 name: 'call-actor',
                 arguments: {
                     actor: 'apify/rag-web-browser',
-                    step: 'call',
                     input: { query: 'https://apify.com' },
                 },
             });
 
+            // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
             const content = callResult.content as { text: string; type: string }[];
+            expect(content.length).toBe(2);
 
-            expect(content.length).toBe(2); // Call step returns text summary with embedded schema
+            const sc = (callResult as { structuredContent?: {
+                status?: string;
+                storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
+                nextStep?: string;
+            } }).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            const datasetId = sc?.storages?.datasets?.default?.id;
+            expect(datasetId).toBeDefined();
 
-            // First content: text summary
-            const runText = content[1].text;
-
-            // Extract datasetId from the text
-            const runIdMatch = runText.match(/Run ID: ([^\n]+)\n• Dataset ID: ([^\n]+)/);
-            expect(runIdMatch).toBeTruthy();
-            const datasetId = runIdMatch![2];
-
-            expectEmbeddedSchemaWithMetadataAndCrawl(runText);
+            // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
+            const fields = sc?.storages?.datasets?.default?.fields ?? [];
+            expect(fields.some((f) => f.startsWith('metadata.'))).toBe(true);
+            expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
 
             const outputResult = await client.callTool({
                 name: HelperTools.ACTOR_OUTPUT_GET,
                 arguments: {
-                    datasetId,
+                    datasetId: datasetId!,
                     fields: 'metadata.title,crawl',
                 },
             });
@@ -2181,7 +2155,7 @@ export function createIntegrationTestsSuite(
             validateStructuredOutput(result, directActorOutputSchema, selectedToolName);
 
             // Validate structured content has actual actor results with sum
-            expectPythonExampleStructuredContent(result, 5, 7);
+            expectPythonExampleDirectToolContent(result, 5, 7);
 
             // Validate _meta contains Apify usage cost information for direct actor tool calls
             expectUsageCostMeta(result);
@@ -2255,13 +2229,14 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 3, second_number: 4 },
-                    async: false,
                 },
             });
 
-            const resultWithStructured = callResult as { structuredContent?: { datasetId?: string } };
-            expect(resultWithStructured.structuredContent?.datasetId).toBeDefined();
-            const datasetId = resultWithStructured.structuredContent!.datasetId!;
+            const resultWithStructured = callResult as { structuredContent?: {
+                storages?: { datasets?: { default?: { id?: string } } };
+            } };
+            const datasetId = resultWithStructured.structuredContent?.storages?.datasets?.default?.id;
+            expect(datasetId).toBeDefined();
 
             // Now test get-dataset-items
             const datasetResult = await client.callTool({
