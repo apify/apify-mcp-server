@@ -58,7 +58,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.
   - Then call with proper input to execute the Actor.
   - For MCP server Actors, use format "actorName:toolName" to call specific tools.${isApps ? `
-  - In this mode \`${HelperTools.ACTOR_CALL}\` always runs asynchronously — it starts the run and returns immediately with a runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and \`${HelperTools.ACTOR_OUTPUT_GET}\` to fetch output once the run completes.` : `
+  - In this mode \`${HelperTools.ACTOR_CALL}\` always runs asynchronously — it starts the run and returns immediately with a runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and \`${HelperTools.DATASET_GET_ITEMS}\` / \`${HelperTools.KEY_VALUE_STORE_RECORD_GET}\` to fetch output once the run completes.` : `
   - Supports a \`waitSecs\` parameter (default 30, max 45):
     - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
     - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.`}
