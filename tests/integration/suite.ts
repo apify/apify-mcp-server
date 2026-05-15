@@ -1893,23 +1893,16 @@ export function createIntegrationTestsSuite(
         );
 
         it.runIf(options.transport === 'stdio')('should load tool categories from TOOLS environment variable', async () => {
-            const selectedCategories = ['docs', 'runs'] as ToolCategory[];
-            client = await createClientFn({ tools: selectedCategories, useEnv: true });
+            // Verifies env-var threading (`TOOLS=docs` → loader input) end-to-end via stdio.
+            // `docs` is chosen because it doesn't trigger auto-inject — the loader's union/dedup
+            // logic has its own unit coverage and isn't what this test should be asserting.
+            client = await createClientFn({ tools: ['docs'], useEnv: true });
+            const toolNames = getToolNames(await client.listTools());
 
-            const loadedTools = await client.listTools();
-            const toolNames = getToolNames(loadedTools);
-
-            const resolvedCategories = getCategoryTools('default');
-            const expectedTools = [
-                ...resolvedCategories.docs,
-                ...resolvedCategories.runs,
-            ];
-            const expectedToolNames = expectedTools.map((tool) => tool.name);
-
-            expect(toolNames).toHaveLength(expectedToolNames.length);
-            for (const expectedToolName of expectedToolNames) {
-                expect(toolNames).toContain(expectedToolName);
-            }
+            expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
+            expect(toolNames).toContain(HelperTools.DOCS_FETCH);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+            expect(toolNames).not.toContain(HelperTools.ACTOR_RUNS_GET);
         });
 
         it('should auto-inject storage and abort tools after call-actor in expected order', async () => {
