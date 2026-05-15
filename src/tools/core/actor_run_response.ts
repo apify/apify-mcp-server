@@ -22,8 +22,12 @@ const POLL_HINT_WAIT_SECS = 10;
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
 
-/** Delay before the second `itemCount=0` probe — small budget to absorb listItems total propagation lag. */
-const ITEM_COUNT_RETRY_DELAY_MS = 500;
+/**
+ * Delays before each `itemCount=0` lag-fallback probe. Apify docs state `itemCount` / `cleanItemCount`
+ * can lag up to ~5s after `pushItem`. We probe immediately, then again at +1s/+3s/+5s so a
+ * SUCCEEDED-but-empty dataset has the full propagation window to surface real items.
+ */
+const ITEM_COUNT_PROBE_DELAYS_MS = [0, 1000, 2000, 2000] as const;
 
 async function sleep(ms: number): Promise<void> {
     await new Promise<void>((resolve) => { setTimeout(resolve, ms); });
@@ -193,12 +197,14 @@ async function resolveItemCountWithLagFallback(
     try {
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
-        const first = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
-        if ((first.total ?? 0) > 0) return first.total;
-        // One retry: the listItems total can lag past terminal — give propagation a brief budget.
-        await sleep(ITEM_COUNT_RETRY_DELAY_MS);
-        const second = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
-        return second.total ?? 0;
+        let lastTotal = 0;
+        for (const delay of ITEM_COUNT_PROBE_DELAYS_MS) {
+            if (delay > 0) await sleep(delay);
+            const result = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
+            lastTotal = result.total ?? 0;
+            if (lastTotal > 0) return lastTotal;
+        }
+        return lastTotal;
     } catch (error) {
         log.warning('itemCount lag-fallback probe failed', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
         return datasetMeta.itemCount;
@@ -230,6 +236,19 @@ function pollHint(runId: string): string {
     return `Use ${HelperTools.ACTOR_RUNS_GET} with runId=${runId} and waitSecs=${POLL_HINT_WAIT_SECS} to`;
 }
 
+/**
+ * Render an upstream `statusMessage` as a clearly-attributed suffix (` Actor status: "..."`).
+ * Attribution prevents readers from mistaking the upstream message (which can be stale relative
+ * to elapsed time) for our own narrative; the trailing period is stripped so the surrounding
+ * template's period doesn't produce `..`.
+ */
+function statusMessageLine(statusMessage: string | null | undefined): string {
+    if (!statusMessage) return '';
+    const trimmed = statusMessage.trim().replace(/\.+$/, '');
+    if (!trimmed) return '';
+    return ` Actor status: "${trimmed}".`;
+}
+
 type KvSummary =
     | { hasKv: true; kvId: string; keys: string[]; keyCountLabel: string; summarySuffix: string }
     | { hasKv: false; summarySuffix: '' };
@@ -253,6 +272,7 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
 
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
+    statusMessage: string | null | undefined,
     dataset?: RunDataset,
     keyValueStore?: RunKeyValueStore,
 ): { summary: string; nextStep: string } {
@@ -269,7 +289,7 @@ function buildSucceededSummaryNextStep(
             : '';
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsHint} Preview with limit=3.`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsHint}`,
         };
     }
 
@@ -277,16 +297,17 @@ function buildSucceededSummaryNextStep(
     // claim "no output found" — point the agent at dataset items so they can verify directly.
     if (itemCount === undefined && datasetId) {
         return {
-            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${kv.summarySuffix}`,
+            summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to inspect output.`,
         };
     }
 
     // KV store is rarely the primary output for Apify actors (mostly SDK state / intermediate data),
     // so we don't recommend it as `nextStep` — but `kv.summarySuffix` keeps it visible in the summary
-    // when records exist, so callers can still discover them.
+    // when records exist, so callers can still discover them. Surface the upstream statusMessage so
+    // a text-only reader sees the actor's own diagnostic (often the only signal here).
     return {
-        summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${kv.summarySuffix}`,
+        summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
         nextStep: `Inspect statusMessage and stats in this response; if the missing output was unexpected, re-run ${HelperTools.ACTOR_CALL} with adjusted input.`,
     };
 }
@@ -339,29 +360,29 @@ export function buildStatusSummaryNextStep(params: {
             };
         case 'RUNNING':
             return {
-                summary: `RUNNING for ${elapsedSecs(run)}s. ${statusMessage || 'In progress'}.`,
+                summary: `RUNNING for ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' In progress.'}`,
                 nextStep: `${pollHint(runId)} poll for completion.`,
             };
         case 'TIMING-OUT':
             return {
-                summary: `TIMING-OUT after ${elapsedSecs(run)}s. ${statusMessage || 'Run-time limit reached; cleanup in progress'}.`,
+                summary: `TIMING-OUT after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Run-time limit reached; cleanup in progress.'}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'ABORTING':
             return {
-                summary: `ABORTING after ${elapsedSecs(run)}s. ${statusMessage || 'Cancellation in progress'}.`,
+                summary: `ABORTING after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Cancellation in progress.'}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
-            return buildSucceededSummaryNextStep(runTimeSecs, dataset, keyValueStore);
+            return buildSucceededSummaryNextStep(runTimeSecs, statusMessage, dataset, keyValueStore);
         case 'FAILED':
             return {
-                summary: `FAILED after ${runTimeSecs}s${statusMessage ? `: ${statusMessage}` : ''}.`,
+                summary: `FAILED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
                 nextStep: `Diagnose using statusMessage and exitCode in this response; re-run ${HelperTools.ACTOR_CALL} with adjusted input if the cause is fixable.`,
             };
         case 'ABORTED':
             return {
-                summary: `ABORTED after ${runTimeSecs}s${statusMessage ? `: ${statusMessage}` : ''}.`,
+                summary: `ABORTED after ${runTimeSecs}s.${statusMessageLine(statusMessage)}`,
                 nextStep: `Use ${HelperTools.ACTOR_CALL} again if you want to rerun the Actor.`,
             };
         case 'TIMED-OUT':

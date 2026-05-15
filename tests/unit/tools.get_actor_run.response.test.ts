@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
     buildStatusSummaryNextStep,
@@ -190,6 +190,43 @@ describe('get-actor-run default response', () => {
         const { structuredContent } = result as { structuredContent: RunResponse };
         expect(probeCalls).toBe(2);
         expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+    });
+
+    it('exhausts the full lag-fallback schedule when every probe returns 0, then reports 0', async () => {
+        // Pin the full 4-probe schedule covering Apify's ~5s itemCount propagation lag window
+        // (see ITEM_COUNT_PROBE_DELAYS_MS). If a future change shortens or removes retries, this
+        // test fails — we don't want SUCCEEDED-but-empty races to silently regress.
+        vi.useFakeTimers();
+        try {
+            const run = mockSucceededRun();
+            const dataset = mockDataset({ itemCount: 0 });
+            let probeCalls = 0;
+            const client = {
+                run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+                actor: (_id: string) => ({ get: async () => ACTOR }),
+                dataset: (_id: string) => ({
+                    get: async () => dataset,
+                    listItems: async () => {
+                        probeCalls += 1;
+                        return { items: [], total: 0 };
+                    },
+                }),
+                keyValueStore: (_id: string) => ({
+                    listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+                }),
+            } as unknown as InternalToolArgs['apifyClient'];
+
+            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+            // Drive the [0, 1000, 2000, 2000]ms schedule to completion without real wall time.
+            await vi.runAllTimersAsync();
+            const result = await callPromise;
+            const { structuredContent } = result as { structuredContent: RunResponse };
+
+            expect(probeCalls).toBe(4);
+            expect(structuredContent.storages.dataset?.itemCount).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('rejects waitSecs above 45', () => {
@@ -441,5 +478,39 @@ describe('buildStatusTemplate', () => {
     it('TIMED-OUT without dataset routes to "no dataset to fetch" nextStep', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('TIMED-OUT') });
         expect(t.nextStep).toContain('no dataset to fetch');
+    });
+
+    // ---- statusMessage attribution + double-period invariants ----
+    // The upstream statusMessage can be stale relative to elapsedSecs and often arrives with a
+    // trailing period. We always render it as ` Actor status: "..."` (no double period) so a
+    // naive reader doesn't mistake the actor's own message for our narrative.
+
+    it('RUNNING with upstream statusMessage attributes it as Actor status and drops trailing period', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING', 'Starting the crawler.') });
+        expect(t.summary).toContain('Actor status: "Starting the crawler"');
+        expect(t.summary).not.toMatch(/\.\./);
+    });
+
+    it('RUNNING without statusMessage falls back to In progress (no Actor status attribution)', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
+        expect(t.summary).toContain('In progress.');
+        expect(t.summary).not.toContain('Actor status:');
+    });
+
+    it('SUCCEEDED with 0 items surfaces the upstream statusMessage attributed in the summary', () => {
+        // The agent reading text-only must see the actor's diagnostic; we pass it through with
+        // attribution so it's clear the wording is upstream, not ours.
+        const run = makeRun('SUCCEEDED', 'Finished! Total 1 requests: 1 succeeded, 0 failed.');
+        const t = buildStatusSummaryNextStep({ run, dataset: datasetEmpty });
+        expect(t.summary).toContain('Actor status: "Finished! Total 1 requests: 1 succeeded, 0 failed"');
+        expect(t.summary).not.toMatch(/\.\./);
+    });
+
+    it('SUCCEEDED with items ends nextStep with a single period after the fields hint', () => {
+        // Pinned to prevent the `to project..` regression: the fields-hint template already
+        // terminates the sentence, so the outer nextStep template must not append its own `.`.
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
+        expect(t.nextStep).toMatch(/to project\.$/);
+        expect(t.nextStep).not.toMatch(/\.\.$/);
     });
 });
