@@ -205,7 +205,7 @@ async function resolveItemCountWithLagFallback(
     client: ApifyClient,
     run: ActorRun,
     datasetMeta: Dataset | null,
-    waitSecs: number,
+    waitSecs: number | undefined,
     mcpSessionId?: string,
     abortSignal?: AbortSignal,
 ): Promise<number | undefined> {
@@ -217,7 +217,7 @@ async function resolveItemCountWithLagFallback(
         // When `waitSecs === 0` the caller asked for an immediate response (e.g. the widget's initial
         // render), so we do a single immediate probe and skip the delayed retries — otherwise the
         // ~5s lag-recovery schedule would block "immediate" callers for the full window.
-        const delays = waitSecs > 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
+        const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
         let lastTotal = 0;
         for (const delay of delays) {
             if (delay > 0) {
@@ -442,15 +442,14 @@ type WaitResult =
 async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
-    waitSecs: number;
+    waitSecs?: number;
     actorName?: string;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
-    loopUntilTerminal?: boolean;
 }): Promise<WaitResult> {
-    const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal } = opts;
+    const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort } = opts;
 
     if (abortSignal?.aborted) {
         await onAbort?.(runId, client);
@@ -474,7 +473,7 @@ async function waitForRunWithProgress(opts: {
         ? Promise.resolve<string | undefined>(opts.actorName)
         : actorNameForActorId(client, run.actId, mcpSessionId);
 
-    if (waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(run.status)) {
+    if ((waitSecs === undefined || waitSecs > 0) && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
             const trackerLabel = (await actorNamePromise) ?? 'actor';
             await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, run));
@@ -495,20 +494,6 @@ async function waitForRunWithProgress(opts: {
             return { kind: 'aborted' };
         }
         run = raced;
-
-        // Task mode: loop until terminal, each iteration waits up to WAIT_SECS_MAX.
-        while (loopUntilTerminal && !TERMINAL_RUN_STATUSES.has(run.status)) {
-            if (abortSignal?.aborted) {
-                await onAbort?.(runId, client);
-                return { kind: 'aborted' };
-            }
-            const loopRaced = await raceAbort(client.run(runId).waitForFinish({ waitSecs: WAIT_SECS_MAX }), abortSignal);
-            if (loopRaced === ABORT) {
-                await onAbort?.(runId, client);
-                return { kind: 'aborted' };
-            }
-            run = loopRaced;
-        }
 
         // The platform may write the final statusMessage just after the status flips; re-fetch on
         // terminal so the response (and any final progress emission) sees the freshest snapshot.
@@ -588,19 +573,18 @@ export function buildStartRunResponse(params: {
 
 export async function fetchActorRunData(params: {
     runId: string;
-    waitSecs: number;
+    waitSecs?: number;
     actorName?: string;
     client: ApifyClient;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
-    loopUntilTerminal?: boolean;
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal } = params;
+    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
     const waitResult = await waitForRunWithProgress({
-        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal,
+        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort,
     });
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {

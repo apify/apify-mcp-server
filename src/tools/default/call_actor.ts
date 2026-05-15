@@ -53,7 +53,9 @@ export const defaultCallActor: ToolEntry = Object.freeze({
         const { parsed, baseActorName } = preResult;
         const { input, callOptions } = parsed;
         // Task mode loops until terminal regardless of caller waitSecs; CALL_ACTOR_WAIT_SECS_DEFAULT is the per-iteration poll window.
-        const waitSecs = toolArgs.taskMode ? CALL_ACTOR_WAIT_SECS_DEFAULT : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
+        // Task mode: tools/call returns immediately so there is no MCP client timeout — pass undefined
+        // and let the SDK wait until terminal (its default is 999999s).
+        const waitSecs = toolArgs.taskMode ? undefined : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
 
         let resolvedActorId: string | undefined;
         try {
@@ -98,7 +100,6 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 onAbort: async (runId, client) => {
                     await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
                 },
-                loopUntilTerminal: toolArgs.taskMode,
             });
 
             if ('aborted' in fetchResult) return {};
