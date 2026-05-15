@@ -42,6 +42,9 @@ const ABORT = Symbol('ABORT');
  */
 async function raceAbort<T>(promise: Promise<T>, abortSignal: AbortSignal | undefined): Promise<T | typeof ABORT> {
     if (!abortSignal) return promise;
+    // Already aborted: `addEventListener('abort', ...)` won't fire (the event has passed), so the
+    // listener would never resolve and the race would block on `promise`.
+    if (abortSignal.aborted) return ABORT;
     let listener: (() => void) | undefined;
     const abortPromise = new Promise<typeof ABORT>((resolve) => {
         listener = () => resolve(ABORT);
@@ -190,6 +193,7 @@ async function resolveItemCountWithLagFallback(
     client: ApifyClient,
     run: ActorRun,
     datasetMeta: Dataset | null,
+    waitSecs: number,
     mcpSessionId?: string,
 ): Promise<number | undefined> {
     if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
@@ -197,8 +201,12 @@ async function resolveItemCountWithLagFallback(
     try {
         // `total` is the dataset's true count from the SDK; `items.length` is capped by `limit` and
         // would undercount whenever lag has hidden more than `ITEM_COUNT_PROBE_LIMIT` items.
+        // When `waitSecs === 0` the caller asked for an immediate response (e.g. the widget's initial
+        // render), so we do a single immediate probe and skip the delayed retries — otherwise the
+        // ~5s lag-recovery schedule would block "immediate" callers for the full window.
+        const delays = waitSecs > 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
         let lastTotal = 0;
-        for (const delay of ITEM_COUNT_PROBE_DELAYS_MS) {
+        for (const delay of delays) {
             if (delay > 0) await sleep(delay);
             const result = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
             lastTotal = result.total ?? 0;
@@ -530,7 +538,7 @@ export async function fetchActorRunData(params: {
         kvListResult = kvFetched ?? null;
     }
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, mcpSessionId);
+    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId);
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
     const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });

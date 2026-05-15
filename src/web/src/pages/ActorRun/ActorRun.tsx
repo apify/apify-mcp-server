@@ -466,10 +466,15 @@ export const ActorRun: React.FC = () => {
                     if (response.structuredContent) {
                         const newData = response.structuredContent as unknown as ToolOutput;
                         const meta = response._meta as ActorRunMeta;
-                        const updatedRunData: ActorRunData = {
-                            ...toolOutputToRunData(newData, meta),
-                            // Preserve the previous full actor name when the response omits it.
-                            actorFullName: (newData.actorName as string) || runData.actorFullName,
+                        const computed = toolOutputToRunData(newData, meta);
+                        // Preserve all name-derived fields when the response omits actorName, so a
+                        // transient actor-name lookup miss doesn't flip the widget to "Unknown Actor"
+                        // when the previous run snapshot already had a known name.
+                        const updatedRunData: ActorRunData = newData.actorName ? computed : {
+                            ...computed,
+                            actorName: runData.actorName,
+                            actorFullName: runData.actorFullName,
+                            actorDeveloperUsername: runData.actorDeveloperUsername,
                         };
 
                         // Skip the state update when nothing visible changed; otherwise every poll

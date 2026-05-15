@@ -59,7 +59,7 @@ V4 defines a single canonical response shape returned by `call-actor` and `get-a
 | **Q6** | Storage tools stay single-purpose: `get-dataset-items` requires `datasetId`, `get-key-value-store-record` requires `keyValueStoreId`. The canonical response surfaces both IDs under `storages.*.id` and `nextStep` interpolates them verbatim, so text-mode clients still see one self-contained instruction. (Earlier draft accepted `runId` as an alternative; dropped to avoid a two-mode tool surface and a hidden run-fetch round-trip.) |
 | **Q7** | The response does not inline KV record bodies. Instead `storages.keyValueStore.keys` lists up to 50 key names with `keyCount` reflecting the total. The agent fetches any record it wants via `get-key-value-store-record`. |
 | **Q8** | Status enum is the full Apify set: `READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED`. `ABORTING` and `TIMING-OUT` pass through with their own `summary` and `nextStep` templates. |
-| **Q9** | `waitSecs` is capped at 0–45 on both `call-actor` and `get-actor-run`. Default 30 on `call-actor`, 0 on `get-actor-run`. The 45 s ceiling stays safely under the 60 s tool-call timeout that several MCP clients impose; longer waits are agent-driven via repeated `get-actor-run` polls. |
+| **Q9** | `waitSecs` is capped at 0–45 on both `call-actor` and `get-actor-run`. Default 30 on both (see #822). The 45 s ceiling stays safely under the 60 s tool-call timeout that several MCP clients impose; longer waits are agent-driven via repeated `get-actor-run` polls. |
 
 ## What an LLM sees on a successful call
 
@@ -292,7 +292,7 @@ If the listKeys call fails or the run has no default key-value store, both field
 |---|---|---|
 | `call-actor` | Canonical | Accepts `actor`, `input`, `waitSecs?` (0–45, default 30), `callOptions?`. Declares `execution.taskSupport: "optional"` per MCP spec. |
 | `run-actor` | Deferred | Not implemented in this PR. Plan as a separate rename migration. |
-| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 0 to preserve current immediate-poll behavior). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
+| `get-actor-run` | Modified | Adds `waitSecs` (0–45, default 30 — see #822). Returns the canonical shape. When `waitSecs > 0` and the caller passes `_meta.progressToken`, the server emits `notifications/progress` on each `run.statusMessage` change during the wait — see "Progress notifications during sync waits" below. |
 | `get-actor-run-widget` | Modified | Apps mode only. Accepts `runId` only — no `waitSecs`. Always returns immediately so the widget renders without delay; the widget UI then polls `get-actor-run` with `waitSecs: 0` for live updates. |
 | `get-dataset-items` | Promoted in actor workflows | Requires `datasetId`. Defaults `limit` to 20. Auto-flattens dot-notation `fields`. Explicit `flatten` remains as a diagnostic override. |
 | `get-key-value-store-record` | Promoted in actor workflows | Requires `keyValueStoreId` and `recordKey`. Parameter `keyValueStoreId` is renamed from the prior `storeId` to align with `datasetId`; `recordKey` is kept as-is to match the existing tool schema. |

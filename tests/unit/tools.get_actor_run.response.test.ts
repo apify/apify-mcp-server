@@ -12,7 +12,9 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
  * — with no inlined dataset items or KV record bodies.
- * Tests cover all 8 status templates plus shape invariants.
+ * Tests cover shape invariants and the branching status templates (SUCCEEDED, TIMED-OUT).
+ * Pure-template states (READY, RUNNING, TIMING-OUT, ABORTING, FAILED, ABORTED) are intentionally
+ * not asserted here — see the comment above `describe('buildStatusTemplate', ...)` below.
  */
 
 const ACTOR = { username: 'apify', name: 'rag-web-browser' };
@@ -165,31 +167,40 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.storages.dataset?.itemCount).toBe(47);
     });
 
-    it('retries the itemCount=0 probe once when the first probe also returns 0', async () => {
-        const run = mockSucceededRun();
-        const dataset = mockDataset({ itemCount: 0 });
-        let probeCalls = 0;
-        const client = {
-            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
-            actor: (_id: string) => ({ get: async () => ACTOR }),
-            dataset: (_id: string) => ({
-                get: async () => dataset,
-                listItems: async () => {
-                    probeCalls += 1;
-                    return probeCalls === 1
-                        ? { items: [], total: 0 }
-                        : { items: [{ a: 1 }], total: 47 };
-                },
-            }),
-            keyValueStore: (_id: string) => ({
-                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
-            }),
-        } as unknown as InternalToolArgs['apifyClient'];
+    it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
+        // Delayed retries run only when waitSecs > 0 — they're skipped on the "return immediately"
+        // path. Drive the [0, 1000, ...]ms schedule with fake timers.
+        vi.useFakeTimers();
+        try {
+            const run = mockSucceededRun();
+            const dataset = mockDataset({ itemCount: 0 });
+            let probeCalls = 0;
+            const client = {
+                run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+                actor: (_id: string) => ({ get: async () => ACTOR }),
+                dataset: (_id: string) => ({
+                    get: async () => dataset,
+                    listItems: async () => {
+                        probeCalls += 1;
+                        return probeCalls === 1
+                            ? { items: [], total: 0 }
+                            : { items: [{ a: 1 }], total: 47 };
+                    },
+                }),
+                keyValueStore: (_id: string) => ({
+                    listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+                }),
+            } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
-        const { structuredContent } = result as { structuredContent: RunResponse };
-        expect(probeCalls).toBe(2);
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
+            await vi.runAllTimersAsync();
+            const result = await callPromise;
+            const { structuredContent } = result as { structuredContent: RunResponse };
+            expect(probeCalls).toBe(2);
+            expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('exhausts the full lag-fallback schedule when every probe returns 0, then reports 0', async () => {
@@ -216,7 +227,7 @@ describe('get-actor-run default response', () => {
                 }),
             } as unknown as InternalToolArgs['apifyClient'];
 
-            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
             // Drive the [0, 1000, 2000, 2000]ms schedule to completion without real wall time.
             await vi.runAllTimersAsync();
             const result = await callPromise;
@@ -227,6 +238,64 @@ describe('get-actor-run default response', () => {
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it('skips delayed lag-fallback retries when waitSecs=0 (immediate-poll contract)', async () => {
+        // Regression for the widget's initial render: the [0, 1000, 2000, 2000]ms retry schedule
+        // would block "return immediately" callers for ~5s on a SUCCEEDED-but-empty dataset.
+        const run = mockSucceededRun();
+        const dataset = mockDataset({ itemCount: 0 });
+        let probeCalls = 0;
+        const client = {
+            run: (_id: string) => ({ get: async () => run, waitForFinish: async () => run }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({
+                get: async () => dataset,
+                listItems: async () => {
+                    probeCalls += 1;
+                    return { items: [], total: 0 };
+                },
+            }),
+            keyValueStore: (_id: string) => ({
+                listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }),
+            }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        // Exactly one immediate probe — no delayed retries.
+        expect(probeCalls).toBe(1);
+    });
+
+    it('returns promptly when extra.signal is already aborted before raceAbort attaches its listener', async () => {
+        // Regression: without `raceAbort`'s pre-attach `aborted` check, an already-aborted signal
+        // would block forever — the abort event has already fired by the time the listener attaches.
+        const controller = new AbortController();
+        controller.abort();
+
+        let getCalls = 0;
+        const client = {
+            run: (_id: string) => ({
+                get: async () => {
+                    getCalls += 1;
+                    return new Promise(() => { /* never resolves — only the abort path can return */ });
+                },
+                waitForFinish: async () => new Promise(() => { /* never resolves */ }),
+            }),
+            actor: (_id: string) => ({ get: async () => ACTOR }),
+            dataset: (_id: string) => ({ get: async () => null, listItems: async () => ({ items: [], total: 0 }) }),
+            keyValueStore: (_id: string) => ({ listKeys: async () => ({ items: [], count: 0, isTruncated: false, limit: 50 }) }),
+        } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (defaultGetActorRun as HelperTool).call({
+            ...callArgs(client, { runId: 'run-1', waitSecs: 0 }),
+            extra: { signal: controller.signal } as InternalToolArgs['extra'],
+        });
+
+        // Cancelled requests return no payload per MCP spec — see `defaultGetActorRun`.
+        expect(result).toEqual({});
+        // ≤1 because raceAbort may short-circuit before or after `run().get()` is invoked; what
+        // matters is that the call returns instead of hanging on the never-resolving promise.
+        expect(getCalls).toBeLessThanOrEqual(1);
     });
 
     it('rejects waitSecs above 45', () => {

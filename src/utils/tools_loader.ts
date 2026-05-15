@@ -258,6 +258,10 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
+    // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
+    // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
+    // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
+    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
 
     // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
@@ -266,7 +270,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
         toolsToInject.push(defaultGetActorRun);
     }
-    if (hasCallActor || hasActorTools || hasAddActorTool) {
+    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
         toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 

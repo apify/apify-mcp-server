@@ -104,6 +104,15 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
             expect(toolNames.filter((n) => n === name)).toHaveLength(1);
         }
     });
+
+    it('auto-injects storage tools when get-actor-run is present without call-actor (runs-only session)', async () => {
+        const tools = await loadToolsFromInput({ tools: ['runs'] }, apifyClient);
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+        expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+    });
 });
 
 describe('loadToolsFromInput explicit widget selection', () => {
