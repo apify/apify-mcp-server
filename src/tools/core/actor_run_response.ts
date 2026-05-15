@@ -4,11 +4,15 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
 /** Cap on `storages.keyValueStores.default.keys` array length. */
 const KV_KEYS_LIMIT = 50;
+
+/** nextStep text for widget-rendered responses: suppresses LLM polling. */
+export const WIDGET_NO_POLL_NEXT_STEP = 'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
@@ -444,15 +448,22 @@ async function waitForRunWithProgress(opts: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
+    loopUntilTerminal?: boolean;
 }): Promise<WaitResult> {
-    const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort } = opts;
+    const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal } = opts;
 
-    if (abortSignal?.aborted) return { kind: 'aborted' };
+    if (abortSignal?.aborted) {
+        await onAbort?.(runId, client);
+        return { kind: 'aborted' };
+    }
 
     // Race the initial run.get() against the abort signal so a mid-call cancel returns promptly
     // instead of blocking on the HTTP fetch (the SDK does not accept an AbortSignal directly).
     const initial = await raceAbort(client.run(runId).get(), abortSignal);
-    if (initial === ABORT) return { kind: 'aborted' };
+    if (initial === ABORT) {
+        await onAbort?.(runId, client);
+        return { kind: 'aborted' };
+    }
     if (!initial) return { kind: 'not-found' };
     let run = initial;
 
@@ -485,6 +496,20 @@ async function waitForRunWithProgress(opts: {
         }
         run = raced;
 
+        // Task mode: loop until terminal, each iteration waits up to WAIT_SECS_MAX.
+        while (loopUntilTerminal && !TERMINAL_RUN_STATUSES.has(run.status)) {
+            if (abortSignal?.aborted) {
+                await onAbort?.(runId, client);
+                return { kind: 'aborted' };
+            }
+            const loopRaced = await raceAbort(client.run(runId).waitForFinish({ waitSecs: WAIT_SECS_MAX }), abortSignal);
+            if (loopRaced === ABORT) {
+                await onAbort?.(runId, client);
+                return { kind: 'aborted' };
+            }
+            run = loopRaced;
+        }
+
         // The platform may write the final statusMessage just after the status flips; re-fetch on
         // terminal so the response (and any final progress emission) sees the freshest snapshot.
         if (TERMINAL_RUN_STATUSES.has(run.status)) {
@@ -507,21 +532,27 @@ async function waitForRunWithProgress(opts: {
  * Build a RunResponse from an already-started ActorRun without waiting.
  * Used by apps-mode and widget variants that return immediately.
  * Storage metadata contains IDs only; the widget polls get-actor-run for updates.
+ *
+ * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
+ * message and widget _meta is included so the UI renders automatically.
  */
 export function buildStartRunResponse(params: {
     actorName: string;
     actorRun: ActorRun;
+    widget?: boolean;
 }): ReturnType<typeof buildMCPResponse> {
-    const { actorName, actorRun } = params;
+    const { actorName, actorRun, widget } = params;
 
     const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
     const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
 
-    const { summary, nextStep } = buildStatusSummaryNextStep({
+    const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
         run: actorRun,
         dataset,
         keyValueStore,
     });
+
+    const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
 
     const structuredContent: RunResponse = {
         runId: actorRun.id,
@@ -537,9 +568,17 @@ export function buildStartRunResponse(params: {
         nextStep,
     };
 
+    const widgetMeta = widget
+        ? {
+            ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+            'openai/widgetDescription': `Actor run progress for ${actorName}`,
+        }
+        : undefined;
+
     return buildMCPResponse({
         texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
         structuredContent,
+        ...(widgetMeta && { _meta: widgetMeta }),
     });
 }
 
@@ -556,11 +595,12 @@ export async function fetchActorRunData(params: {
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
     onAbort?: (runId: string, client: ApifyClient) => Promise<void>;
+    loopUntilTerminal?: boolean;
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
-    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
+    const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal } = params;
 
     const waitResult = await waitForRunWithProgress({
-        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort,
+        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort, loopUntilTerminal,
     });
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {

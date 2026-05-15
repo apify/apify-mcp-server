@@ -146,6 +146,12 @@ export type InternalToolArgs = {
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
     mcpSessionId?: string;
+    /**
+     * Set to true when the tool is running as a background MCP task.
+     * Tools that support waiting (e.g. call-actor) should loop until the run
+     * reaches a terminal state instead of capping at waitSecs.
+     */
+    taskMode?: boolean;
 };
 
 /**

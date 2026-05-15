@@ -114,14 +114,9 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
             const actorClient = apifyClient.actor(baseActorName);
             const actorRun = await actorClient.start(input, callOptions);
             log.debug('Started Actor run (widget)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-            const { content, structuredContent } = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun, widget: true });
             return {
-                content,
-                structuredContent,
-                _meta: {
-                    ...ACTOR_RUN_WIDGET_META,
-                    'openai/widgetDescription': `Actor run progress for ${baseActorName}`,
-                },
+                ...response,
                 toolTelemetry: { actorId: resolvedActorId },
             };
         } catch (error) {

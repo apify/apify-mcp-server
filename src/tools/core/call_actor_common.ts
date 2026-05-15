@@ -14,7 +14,6 @@ import {
     TOOL_STATUS,
 } from '../../const.js';
 import { connectMCPClient } from '../../mcp/client.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolInputSchema } from '../../types.js';
 import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -54,24 +53,6 @@ export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 type CallActorDescriptionParams = {
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
     alwaysAsync: boolean;
-};
-
-type StartedActorRun = {
-    id: string;
-    status: string;
-    startedAt?: Date;
-};
-
-type StartAsyncResponseResult = {
-    content: { type: 'text'; text: string }[];
-    structuredContent: {
-        runId: string;
-        actorName: string;
-        status: string;
-        startedAt: string;
-        input: Record<string, unknown>;
-    };
-    _meta?: Record<string, unknown>;
 };
 
 type CallActorErrorResponseParams = {
@@ -129,56 +110,6 @@ export function buildCallActorDescription(params: CallActorDescriptionParams): s
     sections.push(CALL_ACTOR_EXAMPLES_SECTION);
 
     return sections.join('\n\n');
-}
-
-export function buildStartAsyncResponse(params: {
-    actorName: string;
-    actorRun: StartedActorRun;
-    input: Record<string, unknown>;
-    widget: boolean;
-}): StartAsyncResponseResult {
-    const { actorName, actorRun, input, widget } = params;
-
-    const structuredContent = {
-        runId: actorRun.id,
-        actorName,
-        status: actorRun.status,
-        startedAt: actorRun.startedAt?.toISOString() || '',
-        input,
-    };
-
-    if (!widget) {
-        return {
-            content: [{
-                type: 'text',
-                text: `Started Actor "${actorName}" (Run ID: ${actorRun.id}).`,
-            }],
-            structuredContent,
-        };
-    }
-
-    const responseText = dedent`
-        Started Actor "${actorName}" (Run ID: ${actorRun.id}).
-
-        A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
-
-        The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
-
-        Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.
-    `;
-
-    const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
-    return {
-        content: [{
-            type: 'text',
-            text: responseText,
-        }],
-        structuredContent,
-        _meta: {
-            ...widgetConfig?.meta,
-            'openai/widgetDescription': `Actor run progress for ${actorName}`,
-        },
-    };
 }
 
 export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
@@ -278,7 +209,7 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 }
 
-/** Default seconds to wait for completion on `call-actor`. `get-actor-run` uses 0. */
+/** Default seconds to wait for completion on `call-actor`. `get-actor-run` also defaults to 30. */
 export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
 
 export const callOptionsSchema = z.object({
@@ -330,6 +261,7 @@ export const callActorArgs = z.object({
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
     waitSecs: z.number()
+        .int()
         .min(0, 'waitSecs must be 0 or greater')
         .max(45, 'waitSecs cannot exceed 45')
         .optional()
@@ -341,13 +273,14 @@ export const callActorArgs = z.object({
         .describe('Optional call options for the Actor run configuration.'),
 });
 
-/**
- * Compiled AJV input schema — shared between both variants.
- */
+/** Default-mode schema (includes waitSecs). */
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
-
-// Allow additional properties for dynamic Actor input fields passed via the `input` object
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
+
+/** Apps-mode schema: always async, waitSecs has no effect so it is excluded from the surface. */
+const callActorAppsArgs = callActorArgs.omit({ waitSecs: true });
+export const callActorAppsInputSchema = z.toJSONSchema(callActorAppsArgs) as ToolInputSchema;
+export const callActorAppsAjvValidate = compileSchema({ ...z.toJSONSchema(callActorAppsArgs), additionalProperties: true });
 
 /**
  * Parsed call-actor arguments.

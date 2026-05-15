@@ -1,6 +1,8 @@
+import type { ActorRun } from 'apify-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+    buildStartRunResponse,
     buildStatusSummaryNextStep,
     type RunDataset,
     type RunKeyValueStore,
@@ -444,6 +446,61 @@ describe('get-actor-run default response', () => {
         ) as { isError?: boolean; content: { text: string }[] };
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('not found');
+    });
+});
+
+// -----------------------------------------------------------------------------
+// buildStartRunResponse — the "fire and forget" (waitSecs=0) response builder
+// -----------------------------------------------------------------------------
+
+describe('buildStartRunResponse()', () => {
+    const actorRun = {
+        id: 'run-abc',
+        actId: 'actor-xyz',
+        status: 'RUNNING',
+        startedAt: new Date('2026-01-02T03:04:05.000Z'),
+        defaultDatasetId: 'dataset-abc',
+        defaultKeyValueStoreId: 'kv-abc',
+    } as unknown as ActorRun;
+
+    it('builds correct RunResponse shape without widget metadata', () => {
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
+
+        const { structuredContent, content, _meta } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+            _meta?: Record<string, unknown>;
+        };
+
+        expect(structuredContent.runId).toBe('run-abc');
+        expect(structuredContent.actorId).toBe('actor-xyz');
+        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
+        expect(structuredContent.status).toBe('RUNNING');
+        expect(structuredContent.startedAt).toBe('2026-01-02T03:04:05.000Z');
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-abc');
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-abc');
+        expect(structuredContent.summary).toBeDefined();
+        expect(structuredContent.nextStep).toBeDefined();
+
+        // content[0] is JSON mirror; content[1] is LLM-readable narrative.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+
+        // Non-widget path: no widget _meta.
+        expect(_meta).toBeUndefined();
+    });
+
+    it('includes widget metadata and no-poll nextStep when widget=true', () => {
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, widget: true });
+
+        const { structuredContent, _meta } = result as {
+            structuredContent: RunResponse;
+            _meta?: Record<string, unknown>;
+        };
+
+        expect(_meta).toBeDefined();
+        expect(_meta?.['openai/widgetDescription']).toBe('Actor run progress for apify/rag-web-browser');
+        expect(structuredContent.nextStep).toContain('Do NOT poll');
     });
 });
 

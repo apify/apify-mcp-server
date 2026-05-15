@@ -106,14 +106,17 @@ describe('call-actor-widget response', () => {
         expect(structuredContent.storages.datasets?.default.id).toBe('dataset-id-1');
         expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-id-1');
         expect(structuredContent.summary).toContain('RUNNING');
-        expect(structuredContent.nextStep).toContain('run-widget-1');
+        // Widget nextStep must not instruct LLM to poll — widget self-updates.
+        expect(structuredContent.nextStep).toContain('Widget is rendering live progress');
+        expect(structuredContent.nextStep).not.toContain('actor-runs-get');
 
         // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
         // the LLM-readable narrative with identifiers interpolated.
         expect(content).toHaveLength(2);
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toContain('RUNNING');
-        expect(content[1].text).toContain('run-widget-1');
+        // Widget: no poll hint in the LLM-visible narrative either.
+        expect(content[1].text).not.toContain('actor-runs-get');
 
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);

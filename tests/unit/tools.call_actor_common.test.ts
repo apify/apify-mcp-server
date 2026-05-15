@@ -7,7 +7,6 @@ import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
-    buildStartAsyncResponse,
     callActorArgs,
 } from '../../src/tools/core/call_actor_common.js';
 
@@ -40,54 +39,6 @@ describe('call_actor_common', () => {
             expect(description).toContain(`poll ${HelperTools.ACTOR_RUNS_GET} with the runId`);
             expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
             expect(description).not.toContain('When `async: false` or not provided');
-        });
-    });
-
-    describe('buildStartAsyncResponse', () => {
-        const actorRun = {
-            id: 'run-123',
-            status: 'RUNNING',
-            startedAt: new Date('2026-01-02T03:04:05.000Z'),
-        };
-
-        it('builds the default async response without widget metadata', () => {
-            const response = buildStartAsyncResponse({
-                actorName: 'apify/rag-web-browser',
-                actorRun,
-                input: { query: 'latest AI news' },
-                widget: false,
-            });
-
-            expect(response.content).toEqual([{
-                type: 'text',
-                text: 'Started Actor "apify/rag-web-browser" (Run ID: run-123).',
-            }]);
-            expect(response.structuredContent).toEqual({
-                runId: 'run-123',
-                actorName: 'apify/rag-web-browser',
-                status: 'RUNNING',
-                startedAt: '2026-01-02T03:04:05.000Z',
-                input: { query: 'latest AI news' },
-            });
-            expect(response._meta).toBeUndefined();
-        });
-
-        it('builds the apps async response with widget metadata', () => {
-            const response = buildStartAsyncResponse({
-                actorName: 'apify/rag-web-browser',
-                actorRun,
-                input: { query: 'latest AI news' },
-                widget: true,
-            });
-
-            expect(response.content[0]?.text).toContain('A live progress widget has been rendered');
-            expect(response.content[0]?.text).toContain(`use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId`);
-            expect(response.content[0]?.text).toContain(`Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}`);
-            expect(response._meta).toBeDefined();
-            expect(response._meta?.ui).toEqual(expect.objectContaining({
-                resourceUri: 'ui://widget/actor-run.html',
-            }));
-            expect(response._meta?.['openai/widgetDescription']).toBe('Actor run progress for apify/rag-web-browser');
         });
     });
 

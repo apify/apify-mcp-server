@@ -1,7 +1,7 @@
 import log from '@apify/log';
 
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
-import { buildStartAsyncResponse } from '../core/call_actor_common.js';
+import { buildStartRunResponse } from '../core/actor_run_response.js';
 
 /**
  * Apps-mode actor executor.
@@ -23,11 +23,10 @@ export const appsActorExecutor: ActorExecutor = {
             mcpSessionId: params.mcpSessionId,
         });
 
-        return buildStartAsyncResponse({
+        return buildStartRunResponse({
             actorName: params.actorFullName,
             actorRun,
-            input: params.input,
             widget: true,
-        });
+        }) as ActorExecutionResult;
     },
 };

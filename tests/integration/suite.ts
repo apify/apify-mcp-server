@@ -2173,7 +2173,7 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
-                    async: true,
+                    waitSecs: 0,
                 },
             });
 
@@ -2861,7 +2861,7 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_PYTHON_EXAMPLE,
                     input: { first_number: 1, second_number: 2 },
-                    async: true,
+                    waitSecs: 0,
                 },
             });
 

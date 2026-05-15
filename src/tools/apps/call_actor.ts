@@ -7,8 +7,8 @@ import { buildStartRunResponse } from '../core/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
-    callActorAjvValidate,
-    callActorInputSchema,
+    callActorAppsAjvValidate,
+    callActorAppsInputSchema,
     callActorPreExecute,
     resolveAndValidateActor,
 } from '../core/call_actor_common.js';
@@ -28,9 +28,9 @@ export const appsCallActor: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_APPS_DESCRIPTION,
-    inputSchema: callActorInputSchema,
+    inputSchema: callActorAppsInputSchema,
     outputSchema: getActorRunOutputSchema,
-    ajvValidate: callActorAjvValidate,
+    ajvValidate: callActorAppsAjvValidate,
     paymentRequired: true,
     annotations: {
         title: 'Call Actor',

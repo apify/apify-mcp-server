@@ -1437,6 +1437,7 @@ export class ActorsMcpServer {
                         userRentedActorIds,
                         progressTracker,
                         mcpSessionId,
+                        taskMode: true,
                     }) as Record<string, unknown>;
 
                     const diag = extractToolTelemetry(res, actorName, actorId);

@@ -3,7 +3,7 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { extractActorId } from '../../utils/tools.js';
-import { fetchActorRunData } from '../core/actor_run_response.js';
+import { buildStartRunResponse, fetchActorRunData } from '../core/actor_run_response.js';
 import {
     buildCallActorDescription,
     buildCallActorErrorResponse,
@@ -52,7 +52,8 @@ export const defaultCallActor: ToolEntry = Object.freeze({
 
         const { parsed, baseActorName } = preResult;
         const { input, callOptions } = parsed;
-        const waitSecs = parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT;
+        // Task mode loops until terminal regardless of caller waitSecs; CALL_ACTOR_WAIT_SECS_DEFAULT is the per-iteration poll window.
+        const waitSecs = toolArgs.taskMode ? CALL_ACTOR_WAIT_SECS_DEFAULT : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
 
         let resolvedActorId: string | undefined;
         try {
@@ -80,6 +81,12 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 return {};
             }
 
+            // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
+            if (waitSecs === 0) {
+                const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+                return { ...response, toolTelemetry: { actorId: resolvedActorId } };
+            }
+
             const fetchResult = await fetchActorRunData({
                 runId: actorRun.id,
                 waitSecs,
@@ -91,6 +98,7 @@ export const defaultCallActor: ToolEntry = Object.freeze({
                 onAbort: async (runId, client) => {
                     await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
                 },
+                loopUntilTerminal: toolArgs.taskMode,
             });
 
             if ('aborted' in fetchResult) return {};
