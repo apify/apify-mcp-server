@@ -552,6 +552,9 @@ async function waitForRunWithProgress(opts: {
  *
  * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
  * message and widget _meta is included so the UI renders automatically.
+ *
+ * Invariant: `widget: true` is only valid from `*-widget` tools. Non-widget tools (call-actor,
+ * direct actor tools) must omit it or pass `false`.
  */
 export function buildStartRunResponse(params: {
     actorName: string;

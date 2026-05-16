@@ -1,7 +1,7 @@
 import type { ActorRun } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
-import { defaultActorExecutor } from '../../src/tools/default/actor_executor.js';
+import { actorExecutor } from '../../src/tools/actor_executor.js';
 import type { ActorExecutionParams } from '../../src/types.js';
 
 /**
@@ -109,12 +109,12 @@ function buildParams(
     };
 }
 
-describe('defaultActorExecutor', () => {
+describe('actorExecutor', () => {
     describe('waitSecs handling', () => {
         it('strips waitSecs from the input passed to actor.start()', async () => {
             const { params, spies } = buildParams({ query: 'foo', waitSecs: 5 });
 
-            await defaultActorExecutor.executeActorTool(params);
+            await actorExecutor.executeActorTool(params);
 
             expect(spies.startInput).toEqual({ query: 'foo' });
             expect((spies.startInput as Record<string, unknown>)?.waitSecs).toBeUndefined();
@@ -123,7 +123,7 @@ describe('defaultActorExecutor', () => {
         it('forwards waitSecs to waitForFinish when the LLM opts in', async () => {
             const { params, spies } = buildParams({ query: 'foo', waitSecs: 5 });
 
-            await defaultActorExecutor.executeActorTool(params);
+            await actorExecutor.executeActorTool(params);
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: 5 });
         });
@@ -131,7 +131,7 @@ describe('defaultActorExecutor', () => {
         it('preserves sync behavior (waitSecs=undefined) when the LLM omits it', async () => {
             const { params, spies } = buildParams({ query: 'foo' });
 
-            await defaultActorExecutor.executeActorTool(params);
+            await actorExecutor.executeActorTool(params);
 
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
             expect(spies.startInput).toEqual({ query: 'foo' });
@@ -142,7 +142,7 @@ describe('defaultActorExecutor', () => {
         it('returns the canonical RunResponse shape (no inline items, dataset id under storages)', async () => {
             const { params } = buildParams({ query: 'foo' });
 
-            const result = await defaultActorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
 
             const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
             expect(structuredContent).toBeDefined();
@@ -164,7 +164,7 @@ describe('defaultActorExecutor', () => {
             const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
             const { params } = buildParams({ query: 'foo' }, { datasetItemsSchema: itemProperties });
 
-            const result = await defaultActorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
 
             const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
             const storages = structuredContent?.storages as {
@@ -177,7 +177,7 @@ describe('defaultActorExecutor', () => {
         it('omits itemsSchema when datasetItemsSchema is not provided', async () => {
             const { params } = buildParams({ query: 'foo' });
 
-            const result = await defaultActorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
 
             const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
             const storages = structuredContent?.storages as {
@@ -193,7 +193,7 @@ describe('defaultActorExecutor', () => {
             controller.abort();
             const { params, spies } = buildParams({ query: 'foo' }, { abortSignal: controller.signal });
 
-            const result = await defaultActorExecutor.executeActorTool(params);
+            const result = await actorExecutor.executeActorTool(params);
 
             expect(result).toBeNull();
             expect(spies.startInput).toBeUndefined();

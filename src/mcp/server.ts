@@ -65,12 +65,11 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { actorExecutor } from '../tools/actor_executor.js';
 import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
-import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
-    ActorExecutor,
     ActorsMcpServerOptions,
     ActorStore,
     ApifyRequestParams,
@@ -101,12 +100,6 @@ import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
-
-/** Mode → actor executor. Add new modes here. */
-const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
-    [ServerMode.DEFAULT]: defaultActorExecutor,
-    [ServerMode.APPS]: defaultActorExecutor,
-};
 
 /**
  * Returns true when the initialize request advertises the MCP Apps UI extension
@@ -172,8 +165,6 @@ export class ActorsMcpServer {
      * client's capabilities are known. Effectively set-once per connection.
      */
     public serverMode: ServerMode;
-    /** Mode-specific executor for direct actor tools (`type: 'actor'`). Finalized with `serverMode`. */
-    private actorExecutor: ActorExecutor;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -226,7 +217,6 @@ export class ActorsMcpServer {
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
         this.serverModeResolved = this.serverModeOption !== 'auto';
-        this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -323,7 +313,6 @@ export class ActorsMcpServer {
                 const resolved = resolveServerMode('auto', this.clientSupportsUi);
                 if (resolved !== this.serverMode) {
                     this.serverMode = resolved;
-                    this.actorExecutor = actorExecutorsByMode[this.serverMode];
                 }
                 this.serverModeResolved = true;
             }
@@ -1132,7 +1121,7 @@ export class ActorsMcpServer {
 
                     try {
                         log.info('Calling Actor', { toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
-                        const executorResult = await this.actorExecutor.executeActorTool({
+                        const executorResult = await actorExecutor.executeActorTool({
                             actorFullName: tool.actorFullName,
                             input: toolArgs!,
                             apifyClient: apifyClient!,
@@ -1457,7 +1446,7 @@ export class ActorsMcpServer {
 
                 try {
                     log.info('Calling Actor for task', { taskId, toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
-                    const executorResult = await this.actorExecutor.executeActorTool({
+                    const executorResult = await actorExecutor.executeActorTool({
                         actorFullName: tool.actorFullName,
                         input: toolArgs,
                         apifyClient,

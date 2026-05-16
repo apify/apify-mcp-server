@@ -1,17 +1,18 @@
 import log from '@apify/log';
 
-import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../../types.js';
-import { redactSkyfirePayId } from '../../utils/logging.js';
-import { abortRunOnSignal, fetchActorRunData } from '../core/actor_run_response.js';
-import { buildGetActorRunSuccessResponse } from '../core/get_actor_run_common.js';
+import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../types.js';
+import { redactSkyfirePayId } from '../utils/logging.js';
+import { abortRunOnSignal, fetchActorRunData } from './core/actor_run_response.js';
+import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js';
 
 /**
- * Default direct-actor executor (non-UI mode). Returns the canonical `RunResponse` shape;
- * dataset items are not inlined — the LLM follows `nextStep` to `get-dataset-items`.
+ * Direct actor tool executor. Mode-agnostic — used in both default and apps modes.
+ * Returns the canonical `RunResponse` shape; dataset items are not inlined — the LLM
+ * follows `nextStep` to `get-dataset-items`.
  *
  * `waitSecs` is an MCP-only opt-in: omit to wait until terminal (default), set 0–45 to cap.
  */
-export const defaultActorExecutor: ActorExecutor = {
+export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
         const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker } = params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
