@@ -265,8 +265,9 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    // In default mode call-actor is synchronous, so get-actor-run is only needed when call-actor
-    // is present. In apps mode call-actor is always async, so actor tools also need get-actor-run.
+    // call-actor needs get-actor-run for the polling nextStep hint.
+    // In apps mode, dynamic actor tools render a live widget that polls run status,
+    // so get-actor-run must also be available when actor tools are present.
     if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
         toolsToInject.push(defaultGetActorRun);
     }
