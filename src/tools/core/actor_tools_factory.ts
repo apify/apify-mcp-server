@@ -26,27 +26,21 @@ import { logHttpError } from '../../utils/logging.js';
 import { getActorDefinition } from '../build.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
-import { WAIT_SECS_MAX } from './actor_run_response.js';
+import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**
- * MCP-only opt-in injected next to the Actor's own input fields. Recommended for long-running
- * Actors so the call doesn't block until terminal; omit only for fast Actors.
- *
- * Asymmetry with `call-actor`: `call-actor` declares `waitSecs.default(30)`; direct actor tools
- * declare no default. Rationale: `call-actor` is the canonical generic entry point and a 30 s
- * default keeps untrusted-actor invocations bounded under the typical MCP client tool-call
- * timeout. Direct actor tools are surfaced only when the host explicitly opts the Actor into
- * the tool list, so the safer default is to preserve the pre-migration "wait until terminal"
- * behavior unless the LLM opts in via `waitSecs`.
+ * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
+ * `waitSecs`: default 30, max 45. If the Actor's own input schema happens to declare `waitSecs`,
+ * this property overrides it — the field is reserved for the MCP server's wait control.
  */
 const WAIT_SECS_INPUT_PROPERTY = {
     type: 'integer',
     minimum: 0,
     maximum: WAIT_SECS_MAX,
-    description: 'RECOMMENDED. Max seconds (0–45) to cap the wait for the Actor run to reach terminal state. '
-        + 'Set waitSecs for long-running Actors to avoid blocking — the response returns at the cap with '
-        + `the current run status, then follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. `
-        + 'Omit only for fast Actors where waiting until terminal is acceptable.',
+    default: CALL_ACTOR_WAIT_SECS_DEFAULT,
+    description: `Max seconds (0–45, default ${CALL_ACTOR_WAIT_SECS_DEFAULT}) to cap the wait for the Actor run to reach terminal state. `
+        + 'For long-running Actors the response returns at the cap with the current run status; '
+        + `follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
 } as const;
 
 /**

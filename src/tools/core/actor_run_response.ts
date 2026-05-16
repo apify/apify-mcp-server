@@ -18,6 +18,9 @@ export const WIDGET_NO_POLL_NEXT_STEP = 'Widget is rendering live progress. Do N
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
 
+/** Default seconds to wait for completion on `call-actor` and direct actor tools. `get-actor-run` also defaults to 30. */
+export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
+
 const POLL_HINT_WAIT_SECS = 30;
 
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */

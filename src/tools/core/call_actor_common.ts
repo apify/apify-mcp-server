@@ -22,7 +22,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
-import { abortRunOnSignal, buildStartRunResponse, fetchActorRunData } from './actor_run_response.js';
+import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
@@ -199,9 +199,6 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         telemetry,
     });
 }
-
-/** Default seconds to wait for completion on `call-actor`. `get-actor-run` also defaults to 30. */
-export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
 
 export const callOptionsSchema = z.object({
     memory: z.number()

@@ -2,7 +2,7 @@ import log from '@apify/log';
 
 import type { ActorExecutionParams, ActorExecutionResult, ActorExecutor } from '../types.js';
 import { redactSkyfirePayId } from '../utils/logging.js';
-import { abortRunOnSignal, fetchActorRunData } from './core/actor_run_response.js';
+import { abortRunOnSignal, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './core/actor_run_response.js';
 import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js';
 
 /**
@@ -10,7 +10,7 @@ import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js'
  * Returns the canonical `RunResponse` shape; dataset items are not inlined — the LLM
  * follows `nextStep` to `get-dataset-items`.
  *
- * `waitSecs` is an MCP-only opt-in: omit to wait until terminal (default), set 0–45 to cap.
+ * Wait contract matches `call-actor`: default 30 s, max 45, task mode waits until terminal.
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
@@ -20,7 +20,8 @@ export const actorExecutor: ActorExecutor = {
         const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<string, unknown>;
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
-        const waitSecs = taskMode ? undefined : argsWaitSecs;
+        // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.
+        const waitSecs = taskMode ? undefined : (argsWaitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
         const redactedInput = redactSkyfirePayId(params.input);
 
         if (abortSignal?.aborted) {

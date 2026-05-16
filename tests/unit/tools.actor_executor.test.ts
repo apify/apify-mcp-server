@@ -8,8 +8,7 @@ import type { ActorExecutionParams } from '../../src/types.js';
  * The executor's three migration-specific responsibilities:
  *  - strip MCP-only `waitSecs` from the input before `actor.start()` (Actor must not see it);
  *  - forward `waitSecs` to `fetchActorRunData` when the LLM opts in;
- *  - leave `waitSecs` undefined (sync — wait indefinitely) when the LLM omits it, so direct
- *    actor tools keep their pre-migration wait contract.
+ *  - default `waitSecs` to 30 when the LLM omits it (same contract as `call-actor`).
  *
  * The downstream `fetchActorRunData` layer is covered exhaustively in
  * `tools.get_actor_run.response.test.ts`; here we only assert what the executor itself does.
@@ -128,12 +127,12 @@ describe('actorExecutor', () => {
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: 5 });
         });
 
-        it('preserves sync behavior (waitSecs=undefined) when the LLM omits it', async () => {
+        it('defaults waitSecs to 30 when the LLM omits it', async () => {
             const { params, spies } = buildParams({ query: 'foo' });
 
             await actorExecutor.executeActorTool(params);
 
-            expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: 30 });
             expect(spies.startInput).toEqual({ query: 'foo' });
         });
 
