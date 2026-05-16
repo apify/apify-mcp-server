@@ -58,17 +58,6 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractJsonFromMarkdown(text: string): any {
-    // Handle markdown code blocks like ```json
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-    }
-    // If no markdown formatting, assume it's raw JSON
-    return JSON.parse(text);
-}
-
 async function callPythonExampleActor(client: Client, selectedToolName: string) {
     const result = await client.callTool({
         name: selectedToolName,
@@ -78,21 +67,7 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
         },
     });
 
-    type ContentItem = { text: string; type: string };
-    const content = result.content as ContentItem[];
-    // The result is { content: [ ... ] }, and the last content is the sum
-    const expected = {
-        text: JSON.stringify([{
-            first_number: 1,
-            second_number: 2,
-            sum: 3,
-        }]),
-        type: 'text',
-    };
-    // Parse the JSON to compare objects regardless of property order
-    const actual = content[0];
-    expect(extractJsonFromMarkdown(actual.text)).toEqual(JSON.parse(expected.text));
-    expect(actual.type).toBe(expected.type);
+    expectPythonExampleStructuredContent(result);
 }
 
 function validateStructuredOutput(
