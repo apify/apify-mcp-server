@@ -454,6 +454,12 @@ export type ActorExecutionParams = {
      * by the request handler so the executor can inject `itemsSchema` into the response.
      */
     datasetItemsSchema?: Record<string, unknown>;
+    /**
+     * When true, the call is wrapped in an MCP task. The executor ignores the LLM-provided
+     * `waitSecs` and waits until the run reaches a terminal status — honoring `waitSecs` in
+     * task mode would let the task complete before the Actor has produced output.
+     */
+    taskMode?: boolean;
 };
 
 /**

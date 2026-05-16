@@ -31,6 +31,13 @@ import { WAIT_SECS_MAX } from './actor_run_response.js';
 /**
  * MCP-only opt-in injected next to the Actor's own input fields. Recommended for long-running
  * Actors so the call doesn't block until terminal; omit only for fast Actors.
+ *
+ * Asymmetry with `call-actor`: `call-actor` declares `waitSecs.default(30)`; direct actor tools
+ * declare no default. Rationale: `call-actor` is the canonical generic entry point and a 30 s
+ * default keeps untrusted-actor invocations bounded under the typical MCP client tool-call
+ * timeout. Direct actor tools are surfaced only when the host explicitly opts the Actor into
+ * the tool list, so the safer default is to preserve the pre-migration "wait until terminal"
+ * behavior unless the LLM opts in via `waitSecs`.
  */
 const WAIT_SECS_INPUT_PROPERTY = {
     type: 'integer',

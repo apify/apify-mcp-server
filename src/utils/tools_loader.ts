@@ -265,9 +265,10 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
 
     // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    // call-actor needs get-actor-run for the polling nextStep hint.
-    // In apps mode, dynamic actor tools render a live widget that polls run status,
-    // so get-actor-run must also be available when actor tools are present.
+    // `call-actor` and direct actor tools return a RunResponse whose `nextStep` may point at
+    // `get-actor-run` for polling (when the run is non-terminal at waitSecs cap), so the LLM
+    // needs that tool available. `call-actor-widget` returns immediately and the widget UI
+    // polls run status itself — that path doesn't drive the auto-inject decision here.
     if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
         toolsToInject.push(defaultGetActorRun);
     }

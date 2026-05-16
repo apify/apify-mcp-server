@@ -1455,6 +1455,7 @@ export class ActorsMcpServer {
                         abortSignal: cancelWatcher.signal,
                         mcpSessionId,
                         datasetItemsSchema: tool.datasetItemsSchema,
+                        taskMode: true,
                     });
 
                     if (!executorResult) {

@@ -136,6 +136,15 @@ describe('actorExecutor', () => {
             expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
             expect(spies.startInput).toEqual({ query: 'foo' });
         });
+
+        it('ignores waitSecs in task mode and waits until terminal', async () => {
+            const { params, spies } = buildParams({ query: 'foo', waitSecs: 5 }, { taskMode: true });
+
+            await actorExecutor.executeActorTool(params);
+
+            expect(spies.waitForFinishOpts).toEqual({ waitSecs: undefined });
+            expect(spies.startInput).toEqual({ query: 'foo' });
+        });
     });
 
     describe('success path', () => {

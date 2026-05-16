@@ -14,10 +14,13 @@ import { buildGetActorRunSuccessResponse } from './core/get_actor_run_common.js'
  */
 export const actorExecutor: ActorExecutor = {
     async executeActorTool(params: ActorExecutionParams): Promise<ActorExecutionResult> {
-        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker } = params;
+        const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode } = params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
-        const { waitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<string, unknown>;
+        const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<string, unknown>;
+        // Task mode waits until terminal; honoring waitSecs would let the task complete
+        // before the Actor produced output. Mirrors executeCallActor.
+        const waitSecs = taskMode ? undefined : argsWaitSecs;
         const redactedInput = redactSkyfirePayId(params.input);
 
         if (abortSignal?.aborted) {
