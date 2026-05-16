@@ -65,7 +65,6 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { appsActorExecutor } from '../tools/apps/actor_executor.js';
 import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
 import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools } from '../tools/index.js';
@@ -106,7 +105,7 @@ import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl
 /** Mode → actor executor. Add new modes here. */
 const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
     [ServerMode.DEFAULT]: defaultActorExecutor,
-    [ServerMode.APPS]: appsActorExecutor,
+    [ServerMode.APPS]: defaultActorExecutor,
 };
 
 /**

@@ -29,16 +29,17 @@ import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInf
 import { WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**
- * MCP-only opt-in injected next to the Actor's own input fields. Default is omitted so the
- * SDK waits until terminal; set 0–45 to cap and poll via `get-actor-run`.
+ * MCP-only opt-in injected next to the Actor's own input fields. Recommended for long-running
+ * Actors so the call doesn't block until terminal; omit only for fast Actors.
  */
 const WAIT_SECS_INPUT_PROPERTY = {
     type: 'integer',
     minimum: 0,
     maximum: WAIT_SECS_MAX,
-    description: 'Optional. Max seconds (0–45) to wait for the Actor run to reach terminal state. '
-        + 'Omit to wait indefinitely (default behavior). When set, the response returns at the cap '
-        + `with the current run status — follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}.`,
+    description: 'RECOMMENDED. Max seconds (0–45) to cap the wait for the Actor run to reach terminal state. '
+        + 'Set waitSecs for long-running Actors to avoid blocking — the response returns at the cap with '
+        + `the current run status, then follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. `
+        + 'Omit only for fast Actors where waiting until terminal is acceptable.',
 } as const;
 
 /**
