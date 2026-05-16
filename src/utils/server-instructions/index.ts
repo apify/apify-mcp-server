@@ -49,7 +49,7 @@ ${isApps ? `
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
 - **After \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`, never call \`${HelperTools.ACTOR_RUNS_GET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` for the same run.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
-- Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` (the silent async variant, no widget) is fine — that tool renders no UI, so polling is expected when you need the run status.
+- Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` is fine — that tool renders no UI, so polling is expected when the run is non-terminal and you need the latest status.
 ` : ''}
 ## Tool dependencies and disambiguation
 
@@ -57,11 +57,10 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 - \`${HelperTools.ACTOR_CALL}\`:
   - Use \`${HelperTools.ACTOR_GET_DETAILS}\` first to obtain the Actor's input schema.
   - Then call with proper input to execute the Actor.
-  - For MCP server Actors, use format "actorName:toolName" to call specific tools.${isApps ? `
-  - In this mode \`${HelperTools.ACTOR_CALL}\` always runs asynchronously — it starts the run and returns immediately with a runId. Use \`${HelperTools.ACTOR_RUNS_GET}\` to check status and \`${HelperTools.DATASET_GET_ITEMS}\` / \`${HelperTools.KEY_VALUE_STORE_RECORD_GET}\` to fetch output once the run completes.` : `
+  - For MCP server Actors, use format "actorName:toolName" to call specific tools.
   - Supports a \`waitSecs\` parameter (default 30, max 45):
     - \`waitSecs: 0\`: fire-and-forget — starts the run and returns immediately with a runId.
-    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.`}
+    - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.
 
 ### Tool disambiguation
 - **\`${HelperTools.ACTOR_OUTPUT_GET}\` vs \`${HelperTools.DATASET_GET_ITEMS}\`:**
@@ -71,7 +70,7 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
 ${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**
   - \`${HelperTools.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HelperTools.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
   - \`${HelperTools.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
-  - \`${HelperTools.ACTOR_CALL}\` is a silent async start (returns runId, no UI); \`${HelperTools.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
+  - \`${HelperTools.ACTOR_CALL}\` runs the Actor and returns its result (no UI); \`${HelperTools.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
   - \`${HelperTools.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.
   - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
 ` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**

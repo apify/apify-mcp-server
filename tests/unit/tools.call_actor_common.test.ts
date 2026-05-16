@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import { APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import {
+    buildCallActorAppsDescription,
     buildCallActorDescription,
     buildCallActorErrorResponse,
     buildPermissionApprovalResponse,
@@ -12,33 +13,26 @@ import {
 
 describe('call_actor_common', () => {
     describe('buildCallActorDescription', () => {
-        it('builds the default description with public helper tools and sync guidance', () => {
-            const description = buildCallActorDescription({
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                alwaysAsync: false,
-            });
+        it('builds the description with public helper tools and waitSecs guidance', () => {
+            const description = buildCallActorDescription();
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
             expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
             expect(description).toContain('waitSecs');
             expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
+            expect(description).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
         });
+    });
 
-        it('builds the apps description with public search helper and silent-async guidance pointing to the widget sibling', () => {
-            const description = buildCallActorDescription({
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-                alwaysAsync: true,
-            });
+    describe('buildCallActorAppsDescription', () => {
+        it('appends widget guidance to the shared description', () => {
+            const description = buildCallActorAppsDescription();
 
-            expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
-            expect(description).toContain('always runs asynchronously');
-            expect(description).toContain('It renders no UI');
-            expect(description).toContain(`call ${HelperTools.ACTOR_CALL_WIDGET} instead`);
-            expect(description).toContain(`poll ${HelperTools.ACTOR_RUNS_GET} with the runId`);
-            expect(description).not.toContain(`Do NOT use ${HelperTools.STORE_SEARCH} for name resolution`);
-            expect(description).not.toContain('When `async: false` or not provided');
+            expect(description).toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(description).toContain(HelperTools.STORE_SEARCH_WIDGET);
+            expect(description).toContain('waitSecs');
+            expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
         });
     });
 

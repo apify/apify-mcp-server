@@ -1,27 +1,17 @@
-import log from '@apify/log';
-
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { extractActorId } from '../../utils/tools.js';
-import { buildStartRunResponse } from '../core/actor_run_response.js';
 import {
-    buildCallActorDescription,
-    buildCallActorErrorResponse,
+    buildCallActorAppsDescription,
     callActorAppsAjvValidate,
     callActorAppsInputSchema,
-    callActorPreExecute,
-    resolveAndValidateActor,
+    executeCallActor,
 } from '../core/call_actor_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
-const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorDescription({
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-    alwaysAsync: true,
-});
+const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorAppsDescription();
 
 /**
  * Apps mode call-actor tool.
- * Always runs asynchronously — starts the run and returns immediately with the run response.
  * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
 export const appsCallActor: ToolEntry = Object.freeze({
@@ -39,44 +29,5 @@ export const appsCallActor: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
-    call: async (toolArgs: InternalToolArgs) => {
-        const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL });
-        if ('earlyResponse' in preResult) {
-            return preResult.earlyResponse;
-        }
-
-        const { parsed, baseActorName } = preResult;
-        const { input, callOptions } = parsed;
-
-        let resolvedActorId: string | undefined;
-        try {
-            const resolution = await resolveAndValidateActor({
-                actorName: baseActorName,
-                input: input as Record<string, unknown>,
-                toolArgs,
-            });
-            if ('error' in resolution) {
-                return resolution.error;
-            }
-
-            resolvedActorId = extractActorId(resolution.actor);
-            const { apifyClient } = toolArgs;
-
-            const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
-            log.debug('Started Actor run (async)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
-            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
-            return {
-                ...response,
-                toolTelemetry: { actorId: resolvedActorId },
-            };
-        } catch (error) {
-            return buildCallActorErrorResponse({
-                actorName: baseActorName,
-                error,
-                actorId: resolvedActorId,
-                mcpSessionId: toolArgs.mcpSessionId,
-                actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
-            });
-        }
-    },
+    call: async (toolArgs: InternalToolArgs) => executeCallActor(toolArgs),
 } as const);

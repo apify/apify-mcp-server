@@ -121,10 +121,10 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('inputSchema parity for mode-variant tools', () => {
-        // call-actor is intentionally excluded: apps mode omits waitSecs (always async, no wait)
         const modeVariantToolNames = [
             HelperTools.STORE_SEARCH,
             HelperTools.ACTOR_GET_DETAILS,
+            HelperTools.ACTOR_CALL,
             HelperTools.ACTOR_RUNS_GET,
         ];
 
@@ -141,17 +141,6 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
             });
         }
 
-        it('apps call-actor omits waitSecs — always async, no wait semantics', () => {
-            const defaultCallActor = defaultCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
-            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
-            expect(defaultCallActor).toBeDefined();
-            expect(appsCallActor).toBeDefined();
-            const defaultProps = (defaultCallActor!.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
-            const appsProps = (appsCallActor!.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
-            expect(Object.keys(defaultProps)).toContain('waitSecs');
-            expect(Object.keys(appsProps)).not.toContain('waitSecs');
-        });
-
         // Locks the invariant that search-actors-widget reuses the shared base schema
         // verbatim (see #700). Prevents silent drift on limit/offset/keywords.
         it('should use searchActorsBaseArgsSchema.strict() for search-actors-widget inputSchema', () => {
@@ -163,20 +152,25 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
-        it('should document that apps call-actor always runs asynchronously and points to the widget sibling for UI', () => {
-            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
-
-            expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.description).toContain('always runs asynchronously');
-            expect(appsCallActor!.description).toContain(HelperTools.ACTOR_CALL_WIDGET);
-            expect(appsCallActor!.description).toContain('It renders no UI');
-        });
-
         it('should not advertise long-running task support for apps call-actor', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
             expect(appsCallActor!.execution?.taskSupport).toBeUndefined();
+        });
+
+        it('apps call-actor description points to the widget sibling and warns against search-actors-widget for name resolution', () => {
+            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+            const defaultCallActor = defaultCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+
+            expect(appsCallActor).toBeDefined();
+            expect(appsCallActor!.description).toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(appsCallActor!.description).toContain(HelperTools.STORE_SEARCH_WIDGET);
+
+            // Widget guidance must not leak into default mode where those tools don't exist.
+            expect(defaultCallActor).toBeDefined();
+            expect(defaultCallActor!.description).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(defaultCallActor!.description).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
         });
     });
 

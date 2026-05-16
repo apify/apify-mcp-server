@@ -22,7 +22,9 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
+import { buildStartRunResponse, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -50,11 +52,6 @@ USAGE:
 export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;
 
-type CallActorDescriptionParams = {
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    alwaysAsync: boolean;
-};
-
 type CallActorErrorResponseParams = {
     actorName: string;
     error: unknown;
@@ -63,53 +60,47 @@ type CallActorErrorResponseParams = {
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
 };
 
-export function buildCallActorDescription(params: CallActorDescriptionParams): string {
-    const { actorGetDetailsTool, alwaysAsync } = params;
+const WIDGET_ADDENDUM = dedent`
+    WIDGET ALTERNATIVE (apps mode):
+    - If the user explicitly asks to see live progress, call ${HelperTools.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
+    - For silent name resolution before this call, use ${HelperTools.STORE_SEARCH} (not ${HelperTools.STORE_SEARCH_WIDGET}, which renders UI).
+`;
 
-    const sections: string[] = [];
+function buildCallActorDescriptionSections(includeWidget: boolean): string {
+    const sections: string[] = [
+        'Call any Actor from the Apify Store.',
+        dedent`
+            WORKFLOW:
+            1. Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema
+            2. Call this tool with the actor name and proper input based on the schema
 
-    sections.push('Call any Actor from the Apify Store.');
-
-    sections.push(dedent`
-        WORKFLOW:
-        1. Use ${actorGetDetailsTool} to get the Actor's input schema
-        2. Call this tool with the actor name and proper input based on the schema
-
-        If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
-    `);
-
-    sections.push(CALL_ACTOR_MCP_SERVER_SECTION);
-
-    if (alwaysAsync) {
-        sections.push(dedent`
-            IMPORTANT:
-            - This tool always runs asynchronously — it starts the Actor and returns immediately with run status and storage IDs. It renders no UI.
-            - For a live progress widget the user can watch, call ${HelperTools.ACTOR_CALL_WIDGET} instead.
-            - To check status or wait for completion, poll ${HelperTools.ACTOR_RUNS_GET} with the runId.
-            - Once the run completes, use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results, or ${HelperTools.KEY_VALUE_STORE_RECORD_GET} for key-value store output.
-            - If the Actor name needs resolving first, use ${HelperTools.STORE_SEARCH} (silent). Do NOT use ${HelperTools.STORE_SEARCH_WIDGET} for name resolution.
-            - Use dedicated Actor tools when available for better experience
-        `);
-    } else {
-        sections.push(dedent`
+            If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
+        `,
+        CALL_ACTOR_MCP_SERVER_SECTION,
+        dedent`
             IMPORTANT:
             - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
             - Use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
-        `);
-    }
-
-    sections.push(CALL_ACTOR_USAGE_SECTION);
-
-    if (!alwaysAsync) {
-        sections.push(dedent`
+        `,
+        CALL_ACTOR_USAGE_SECTION,
+        dedent`
             - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
-        `);
-    }
+        `,
+        CALL_ACTOR_EXAMPLES_SECTION,
+    ];
 
-    sections.push(CALL_ACTOR_EXAMPLES_SECTION);
+    if (includeWidget) sections.push(WIDGET_ADDENDUM);
 
     return sections.join('\n\n');
+}
+
+export function buildCallActorDescription(): string {
+    return buildCallActorDescriptionSections(false);
+}
+
+export function buildCallActorAppsDescription(): string {
+    return buildCallActorDescriptionSections(true);
 }
 
 export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
@@ -540,4 +531,83 @@ export async function callActorPreExecute(
     }
 
     return { parsed, baseActorName, mcpToolName };
+}
+
+/**
+ * Shared start-then-wait flow for call-actor variants (default + apps).
+ * `taskMode` is honored — when true, `waitSecs` is ignored and the SDK waits until terminal.
+ */
+export async function executeCallActor(toolArgs: InternalToolArgs): Promise<object> {
+    const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL });
+    if ('earlyResponse' in preResult) {
+        return preResult.earlyResponse;
+    }
+
+    const { parsed, baseActorName } = preResult;
+    const { input, callOptions } = parsed;
+    // Task mode waits until terminal (waitSecs=undefined uses SDK default ~999999s); caller's waitSecs is ignored.
+    // Non-task mode: pass waitSecs so the SDK blocks up to that many seconds before returning.
+    const waitSecs = toolArgs.taskMode ? undefined : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
+
+    let resolvedActorId: string | undefined;
+    try {
+        const resolution = await resolveAndValidateActor({
+            actorName: baseActorName,
+            input: input as Record<string, unknown>,
+            toolArgs,
+        });
+        if ('error' in resolution) {
+            return resolution.error;
+        }
+
+        resolvedActorId = extractActorId(resolution.actor);
+        const { apifyClient } = toolArgs;
+        const abortSignal = toolArgs.extra.signal;
+
+        if (abortSignal?.aborted) return {};
+
+        const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
+        log.debug('Started Actor run', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId, waitSecs });
+
+        // Abort can arrive while start() was in flight — abort the newly created run.
+        if (abortSignal?.aborted) {
+            await apifyClient.run(actorRun.id).abort({ gracefully: false }).catch(() => undefined);
+            return {};
+        }
+
+        // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
+        if (waitSecs === 0) {
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            return { ...response, toolTelemetry: { actorId: resolvedActorId } };
+        }
+
+        const fetchResult = await fetchActorRunData({
+            runId: actorRun.id,
+            waitSecs,
+            actorName: baseActorName,
+            client: apifyClient,
+            progressTracker: toolArgs.progressTracker,
+            abortSignal,
+            mcpSessionId: toolArgs.mcpSessionId,
+            onAbort: async (runId, client) => {
+                await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
+            },
+        });
+
+        if ('aborted' in fetchResult) return {};
+        if ('error' in fetchResult) return fetchResult.error;
+
+        return {
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+            toolTelemetry: { actorId: resolvedActorId },
+        };
+    } catch (error) {
+        return buildCallActorErrorResponse({
+            actorName: baseActorName,
+            error,
+            actorId: resolvedActorId,
+            mcpSessionId: toolArgs.mcpSessionId,
+            actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+        });
+    }
 }
