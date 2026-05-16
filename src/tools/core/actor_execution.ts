@@ -153,7 +153,6 @@ export async function callActorGetDataset(options: {
     // Generate schema using the shared utility
     const generatedSchema = generateSchemaFromItems(datasetItems.items, {
         clean: true,
-        arrayMode: 'all',
     });
     const schema = generatedSchema || { type: 'object', properties: {} };
 

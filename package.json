@@ -54,7 +54,6 @@
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
     "mcp-client-capabilities": "^0.0.14",
-    "to-json-schema": "^0.2.5",
     "yargs": "^17.7.2",
     "zod": "^4.1.13"
   },
@@ -67,7 +66,6 @@
     "@arizeai/phoenix-evals": "^1.0.2",
     "@sentry/cli": "^3.2.0",
     "@types/express": "^4.0.0",
-    "@types/to-json-schema": "^0.2.4",
     "@types/yargs": "^17.0.33",
     "@types/yargs-parser": "^21.0.3",
     "eslint": "^9.19.0",

@@ -183,7 +183,6 @@ export async function fetchActorRunData(params: {
 
         const generatedSchema = generateSchemaFromItems(datasetItems.items, {
             clean: true,
-            arrayMode: 'all',
         });
 
         structuredContent.dataset = {
