@@ -528,13 +528,13 @@ async function waitForRunWithProgress(opts: {
 }
 
 // -----------------------------------------------------------------------------
-// Immediate start response — for apps-mode variants that return without waiting
+// Immediate start response — for callers that return without waiting
 // -----------------------------------------------------------------------------
 
 /**
  * Build a RunResponse from an already-started ActorRun without waiting.
- * Used by apps-mode and widget variants that return immediately.
- * Storage metadata contains IDs only; the widget polls get-actor-run for updates.
+ * Used when waitSecs=0 (default and apps modes) and by widget variants that return immediately.
+ * Storage metadata contains IDs only; pollers/widgets fetch updates via get-actor-run.
  *
  * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
  * message and widget _meta is included so the UI renders automatically.

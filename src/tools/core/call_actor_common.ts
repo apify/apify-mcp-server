@@ -260,12 +260,8 @@ export const callActorArgs = z.object({
         .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
 });
 
-/** Default-mode schema (includes waitSecs). */
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
-
-export const callActorAppsInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
-export const callActorAppsAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
 /**
  * Parsed call-actor arguments.
@@ -545,7 +541,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
     const { input, callOptions } = parsed;
     // Task mode waits until terminal (waitSecs=undefined uses SDK default ~999999s); caller's waitSecs is ignored.
     // Non-task mode: pass waitSecs so the SDK blocks up to that many seconds before returning.
-    const waitSecs = toolArgs.taskMode ? undefined : (parsed.waitSecs ?? CALL_ACTOR_WAIT_SECS_DEFAULT);
+    const waitSecs = toolArgs.taskMode ? undefined : parsed.waitSecs;
 
     let resolvedActorId: string | undefined;
     try {

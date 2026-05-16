@@ -2,8 +2,8 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import {
     buildCallActorAppsDescription,
-    callActorAppsAjvValidate,
-    callActorAppsInputSchema,
+    callActorAjvValidate,
+    callActorInputSchema,
     executeCallActor,
 } from '../core/call_actor_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
@@ -18,9 +18,9 @@ export const appsCallActor: ToolEntry = Object.freeze({
     type: 'internal',
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_APPS_DESCRIPTION,
-    inputSchema: callActorAppsInputSchema,
+    inputSchema: callActorInputSchema,
     outputSchema: getActorRunOutputSchema,
-    ajvValidate: callActorAppsAjvValidate,
+    ajvValidate: callActorAjvValidate,
     paymentRequired: true,
     annotations: {
         title: 'Call Actor',

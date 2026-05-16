@@ -71,7 +71,7 @@ export const toolCategories = {
     actors: [
         defaultSearchActors,
         defaultFetchActorDetails,
-        // call-actor is different for default and apps mode (sync vs async call)
+        // call-actor is identical between modes; apps mode appends a widget addendum to the description.
         { default: defaultCallActor, apps: appsCallActor },
     ],
     docs: [
