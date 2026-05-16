@@ -34,7 +34,7 @@ const callActorWidgetArgsSchema = z.object({
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
     callOptions: callOptionsSchema.optional()
-        .describe('Optional call options for the Actor run configuration.'),
+        .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
 }).strict();
 
 const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`

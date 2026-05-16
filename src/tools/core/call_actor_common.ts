@@ -226,7 +226,7 @@ export const callOptionsSchema = z.object({
         .optional()
         .describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
-            Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
+            Use 0 for infinite timeout (no time limit).
         `),
     build: z.string()
         .optional()
@@ -264,23 +264,19 @@ export const callActorArgs = z.object({
         .int()
         .min(0, 'waitSecs must be 0 or greater')
         .max(45, 'waitSecs cannot exceed 45')
+        .default(CALL_ACTOR_WAIT_SECS_DEFAULT)
         .optional()
         .describe('Seconds to wait for completion (0–45, default 30). Returns with current run status if not terminal within waitSecs.'),
-    previewOutput: z.boolean()
-        .optional()
-        .describe('Deprecated: ignored. Output preview is now agent-driven via get-dataset-items.'),
     callOptions: callOptionsSchema.optional()
-        .describe('Optional call options for the Actor run configuration.'),
+        .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
 });
 
 /** Default-mode schema (includes waitSecs). */
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
-/** Apps-mode schema: always async, waitSecs has no effect so it is excluded from the surface. */
-const callActorAppsArgs = callActorArgs.omit({ waitSecs: true });
-export const callActorAppsInputSchema = z.toJSONSchema(callActorAppsArgs) as ToolInputSchema;
-export const callActorAppsAjvValidate = compileSchema({ ...z.toJSONSchema(callActorAppsArgs), additionalProperties: true });
+export const callActorAppsInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
+export const callActorAppsAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
 /**
  * Parsed call-actor arguments.
