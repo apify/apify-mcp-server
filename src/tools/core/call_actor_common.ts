@@ -227,17 +227,15 @@ export const callOptionsSchema = z.object({
         .positive()
         .optional()
         .describe(dedent`
-            Pay-per-result Actors ONLY — has no effect on any other pricing model (pay-per-event, pay-per-usage, rental, free).
-            Caps the number of dataset items billed for this run; does NOT limit how many items the Actor produces.
-            Most Actors also expose their own input field (e.g. "maxResults", "maxPages", "maxItems") to bound how much work they do — prefer those when limiting actual output, since this option only caps billing.
+            Pay-per-result Actors only — ignored otherwise.
+            Caps billed dataset items; does NOT limit production. Prefer the Actor's own input fields (e.g. maxResults) to bound work.
         `),
     maxTotalChargeUsd: z.number()
         .positive()
         .optional()
         .describe(dedent`
-            Pay-per-event Actors ONLY — has no effect on any other pricing model (pay-per-result, pay-per-usage, rental, free).
-            Caps the total USD billed for this run; does NOT limit how much work the Actor does.
-            Most Actors also expose their own input field to bound work — prefer those when limiting actual output, since this option only caps billing.
+            Pay-per-event Actors only — ignored otherwise.
+            Caps total USD billed; does NOT limit work. Prefer the Actor's own input fields to bound work.
         `),
 });
 
