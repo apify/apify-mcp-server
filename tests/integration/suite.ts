@@ -17,7 +17,7 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
-import { directActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
@@ -193,42 +193,6 @@ function expectPythonExampleStructuredContent(result: unknown): void {
     );
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
-}
-
-/**
- * Validates the direct-actor-tool response shape (still served by `buildActorResponseContent`).
- * Direct actor tools inline the dataset items in `structuredContent.items` — different from
- * the canonical `call-actor` shape.
- */
-function expectPythonExampleDirectToolContent(result: unknown, firstNumber: number, secondNumber: number): void {
-    const resultWithStructured = result as { structuredContent?: {
-         runId?: string;
-         datasetId?: string;
-         itemCount?: number;
-         items?: { first_number?: number; second_number?: number; sum?: number }[];
-         instructions?: string;
-     } };
-    expect(resultWithStructured.structuredContent).toBeDefined();
-    expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', firstNumber + secondNumber);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', firstNumber);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', secondNumber);
-}
-
-/** Validates that a markdown text contains a JSON schema code block with metadata and crawl properties. */
-function expectEmbeddedSchemaWithMetadataAndCrawl(text: string): void {
-    const schemaMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-    expect(schemaMatch).toBeTruthy();
-    if (schemaMatch) {
-        const schema = JSON.parse(schemaMatch[1]);
-        expect(schema).toHaveProperty('type');
-        expect(schema.type).toBe('object');
-        expect(schema).toHaveProperty('properties');
-        expect(schema.properties).toHaveProperty('metadata');
-        expect(schema.properties.metadata).toHaveProperty('type', 'object');
-        expect(schema.properties).toHaveProperty('crawl');
-        expect(schema.properties.crawl).toHaveProperty('type', 'object');
-    }
 }
 
 /** Validates that the result contains Apify usage cost metadata with expected structure. */
@@ -2059,23 +2023,31 @@ export function createIntegrationTestsSuite(
                 arguments: { query: 'https://apify.com' },
             });
 
+            // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
-            expectEmbeddedSchemaWithMetadataAndCrawl(content[1].text);
 
-            // Validate structured output and pre-v4 inline items shape for direct actor tools.
+            // Direct actor tools return the canonical RunResponse shape — same as call-actor.
             const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
-            validateStructuredOutput(result, directActorOutputSchema, ragWebBrowserToolName);
-            const resultWithStructured = result as { structuredContent?: {
-                datasetId?: string;
-                items?: { metadata?: { title?: string }; crawl?: object }[];
-            } };
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('metadata');
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
-
-            const datasetId = resultWithStructured.structuredContent?.datasetId;
+            validateStructuredOutput(result, getActorRunOutputSchema, ragWebBrowserToolName);
+            const sc = (result as { structuredContent?: {
+                status?: string;
+                storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
+                nextStep?: string;
+            } }).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
+
+            // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
+            // and the follow-up tool name so the LLM can act on the result.
+            expect(content[1].text).toContain(datasetId);
+            expect(content[1].text).toContain(HelperTools.DATASET_GET_ITEMS);
+
+            // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
+            const fields = sc?.storages?.datasets?.default?.fields ?? [];
+            expect(fields.some((f) => f.startsWith('metadata.'))).toBe(true);
+            expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
 
             const outputResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
@@ -2107,13 +2079,14 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
 
-            // Validate structured output and pre-v4 inline items shape for direct actor tools.
-            validateStructuredOutput(result, directActorOutputSchema, selectedToolName);
-            expectPythonExampleDirectToolContent(result, 5, 7);
+            // Direct actor tools return the canonical RunResponse shape — same as call-actor.
+            validateStructuredOutput(result, getActorRunOutputSchema, selectedToolName);
+            expectPythonExampleStructuredContent(result);
             expectUsageCostMeta(result);
 
-            const datasetId = (result as { structuredContent?: { datasetId?: string } })
-                .structuredContent?.datasetId;
+            const datasetId = (result as { structuredContent?: {
+                storages?: { datasets?: { default?: { id?: string } } };
+            } }).structuredContent?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
 
             const outputResult = await client.callTool({

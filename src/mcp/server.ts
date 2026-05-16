@@ -1141,6 +1141,7 @@ export class ActorsMcpServer {
                             progressTracker,
                             abortSignal: extra.signal,
                             mcpSessionId,
+                            datasetItemsSchema: tool.datasetItemsSchema,
                         });
 
                         if (!executorResult) {
@@ -1465,6 +1466,7 @@ export class ActorsMcpServer {
                         progressTracker,
                         abortSignal: cancelWatcher.signal,
                         mcpSessionId,
+                        datasetItemsSchema: tool.datasetItemsSchema,
                     });
 
                     if (!executorResult) {

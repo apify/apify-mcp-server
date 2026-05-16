@@ -22,7 +22,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
-import { buildStartRunResponse, fetchActorRunData } from './actor_run_response.js';
+import { abortRunOnSignal, buildStartRunResponse, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
@@ -565,7 +565,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
 
         // Abort can arrive while start() was in flight — abort the newly created run.
         if (abortSignal?.aborted) {
-            await apifyClient.run(actorRun.id).abort({ gracefully: false }).catch(() => undefined);
+            await abortRunOnSignal(actorRun.id, apifyClient);
             return {};
         }
 
@@ -583,9 +583,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             progressTracker: toolArgs.progressTracker,
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,
-            onAbort: async (runId, client) => {
-                await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
-            },
+            onAbort: abortRunOnSignal,
         });
 
         if ('aborted' in fetchResult) return {};

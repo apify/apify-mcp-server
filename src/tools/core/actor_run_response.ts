@@ -5,6 +5,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
@@ -68,6 +69,12 @@ export type RunDataset = {
     itemCount?: number;
     cleanItemCount?: number;
     fields?: string[];
+    /**
+     * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
+     * the target Actor is known at tools/list time, so historical row shape can be looked up
+     * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
+     */
+    itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
 };
 
 export type RunKeyValueStore = {
@@ -595,6 +602,17 @@ export function buildStartRunResponse(params: {
 // -----------------------------------------------------------------------------
 // Main fetch — used by both default and widget variants
 // -----------------------------------------------------------------------------
+
+/**
+ * Default `onAbort` for callers that want the run cancelled when the MCP request is cancelled.
+ * Logs and swallows abort failures so a transient API error doesn't override the original
+ * cancellation result.
+ */
+export const abortRunOnSignal = async (runId: string, client: ApifyClient): Promise<void> => {
+    await client.run(runId).abort({ gracefully: false }).catch((error) => {
+        logHttpError(error, 'Error aborting Actor run', { runId });
+    });
+};
 
 export async function fetchActorRunData(params: {
     runId: string;

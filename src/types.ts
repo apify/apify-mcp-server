@@ -114,6 +114,13 @@ export type ActorTool = ToolBase & {
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
+    /**
+     * Per-Actor dataset row properties (e.g. `{ url: { type: 'string' } }`) from the actorStore.
+     * Stashed at tools/list time and injected by the executor into
+     * `structuredContent.storages.datasets.default.itemsSchema` so the declared outputSchema
+     * matches the response. Stripped before the public tools/list wire output.
+     */
+    datasetItemsSchema?: Record<string, unknown>;
 };
 
 /**
@@ -442,6 +449,11 @@ export type ActorExecutionParams = {
     abortSignal?: AbortSignal;
     /** MCP session ID for logging */
     mcpSessionId?: string;
+    /**
+     * Per-Actor dataset row properties from {@link ActorTool.datasetItemsSchema}. Forwarded
+     * by the request handler so the executor can inject `itemsSchema` into the response.
+     */
+    datasetItemsSchema?: Record<string, unknown>;
 };
 
 /**
