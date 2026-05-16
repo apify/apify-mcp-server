@@ -305,6 +305,13 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
+// TODO: Apify's fields list expands array indices (e.g. `entities.hashtags.0.text`,
+// `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or array-heavy
+// schemas balloon into hundreds of paths and bloat nextStep. Real example: a Twitter dataset
+// returned 174 expanded paths for ~30 unique schema fields. Two viable fixes — collapse `.N`
+// segments to the array root (`entities.hashtags`) and dedupe (all paths stay projection-valid,
+// schema detail lost inside arrays), or collapse `.N.` to `[]` (preserves shape but produces
+// paths that aren't directly valid for `fields="..."`). Deferred pending a real-world choice.
 function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields || fields.length === 0) return '';
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
