@@ -125,7 +125,10 @@ describe('get-actor-run default response', () => {
         });
     });
 
-    it('returns shape with just IDs for a non-terminal RUNNING run (no extra metadata fetches)', async () => {
+    it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
+        // Dataset metadata is fetched on every poll so the summary can surface partial progress.
+        // KV listKeys stays terminal-only — non-terminal summaries don't reference KV records, so
+        // fetching them would be pure waste on the widget poll hot path.
         let datasetCalls = 0;
         let kvCalls = 0;
         const run = { ...mockSucceededRun({ status: 'RUNNING', finishedAt: undefined }), exitCode: undefined };
@@ -134,7 +137,7 @@ describe('get-actor-run default response', () => {
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => {
                 datasetCalls += 1;
-                return { get: async () => mockDataset(), listItems: async () => ({ items: [], total: 0 }) };
+                return { get: async () => mockDataset({ itemCount: 127 }), listItems: async () => ({ items: [], total: 0 }) };
             },
             keyValueStore: (_id: string) => {
                 kvCalls += 1;
@@ -147,10 +150,11 @@ describe('get-actor-run default response', () => {
 
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.storages.datasets?.default.id).toBe('dataset-xyz');
-        // Non-terminal: only the id is populated, no fields/itemCount.
-        expect(structuredContent.storages.datasets?.default.fields).toBeUndefined();
-        expect(structuredContent.storages.datasets?.default.itemCount).toBeUndefined();
-        expect(datasetCalls).toBe(0);
+        // Non-terminal now populates itemCount/fields too — needed for the progress suffix.
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(127);
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
+        expect(structuredContent.summary).toContain('127 results so far.');
+        expect(datasetCalls).toBe(1);
         expect(kvCalls).toBe(0);
     });
 
@@ -622,6 +626,36 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
         expect(t.summary).toContain('In progress.');
         expect(t.summary).not.toContain('Actor status:');
+    });
+
+    it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
+        // Progress is summary-only; nextStep stays poll-only — partial reads mid-run are noise.
+        expect(t.nextStep).toContain('poll for completion');
+        expect(t.nextStep).not.toContain('get-dataset-items');
+    });
+
+    it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetEmpty });
+        expect(t.summary).not.toMatch(/results so far/);
+        expect(t.summary).not.toContain('0 results');
+    });
+
+    it('RUNNING with exactly 1 item uses singular "result"', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: { id: 'ds-1', itemCount: 1 } });
+        expect(t.summary).toContain('1 result so far.');
+        expect(t.summary).not.toContain('results');
+    });
+
+    it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
+    });
+
+    it('ABORTING with dataset items surfaces progress in the summary', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
     });
 
     it('SUCCEEDED with 0 items surfaces the upstream statusMessage attributed in the summary', () => {

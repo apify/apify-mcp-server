@@ -273,6 +273,17 @@ function statusMessageLine(statusMessage: string | null | undefined): string {
     return ` Actor status: "${trimmed}".`;
 }
 
+/**
+ * Suffix surfacing partial dataset progress on non-terminal runs (e.g. " 127 results so far.").
+ * Empty when the count is unknown or zero so callers don't see "0 results so far" on early polls.
+ * Worded generically — Actors aren't always scraping; "results" reads naturally for any output.
+ */
+function progressSuffix(dataset?: RunDataset): string {
+    const n = dataset?.itemCount;
+    if (n === undefined || n === 0) return '';
+    return ` ${n} ${n === 1 ? 'result' : 'results'} so far.`;
+}
+
 type KvSummary =
     | { hasKv: true; kvId: string; keys: string[]; keyCountLabel: string; summarySuffix: string }
     | { hasKv: false; summarySuffix: '' };
@@ -395,17 +406,17 @@ export function buildStatusSummaryNextStep(params: {
             };
         case 'RUNNING':
             return {
-                summary: `RUNNING for ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' In progress.'}`,
+                summary: `RUNNING for ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' In progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} poll for completion.`,
             };
         case 'TIMING-OUT':
             return {
-                summary: `TIMING-OUT after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Run-time limit reached; cleanup in progress.'}`,
+                summary: `TIMING-OUT after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Run-time limit reached; cleanup in progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'ABORTING':
             return {
-                summary: `ABORTING after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Cancellation in progress.'}`,
+                summary: `ABORTING after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Cancellation in progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
@@ -610,31 +621,35 @@ export async function fetchActorRunData(params: {
     let datasetInfo: Dataset | null = null;
     let kvListResult: KeyValueClientListKeysResult | null = null;
 
-    if (TERMINAL_RUN_STATUSES.has(run.status)) {
-        // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
-        // whole call. The response still carries the storage id, which is enough for the agent
-        // to fetch items / records directly.
-        const [datasetFetched, kvFetched] = await Promise.all([
-            run.defaultDatasetId
-                ? client.dataset(run.defaultDatasetId).get().catch((error) => {
-                    log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
-                    return null;
-                })
-                : Promise.resolve(null),
-            run.defaultKeyValueStoreId
-                ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
-                    log.warning('Failed to list KV store keys', {
-                        keyValueStoreId: run.defaultKeyValueStoreId,
-                        mcpSessionId,
-                        errMessage: errMessage(error),
-                    });
-                    return null;
-                })
-                : Promise.resolve(null),
-        ]);
-        datasetInfo = datasetFetched ?? null;
-        kvListResult = kvFetched ?? null;
-    }
+    // Dataset metadata is fetched on every poll (not just terminal) so the summary can surface
+    // partial progress on long-running scrapes (e.g. "127 results so far"), giving polling agents
+    // real movement instead of the same "In progress." each cycle. The extra round-trip is the
+    // accepted UX tradeoff. KV listKeys stays terminal-only — non-terminal summaries don't
+    // reference KV records, so fetching them on every poll would be pure waste on the hot path.
+    // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
+    // whole call. The response still carries the storage id, which is enough for the agent
+    // to fetch items / records directly.
+    const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
+    const [datasetFetched, kvFetched] = await Promise.all([
+        run.defaultDatasetId
+            ? client.dataset(run.defaultDatasetId).get().catch((error) => {
+                log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
+                return null;
+            })
+            : Promise.resolve(null),
+        run.defaultKeyValueStoreId && isTerminal
+            ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
+                log.warning('Failed to list KV store keys', {
+                    keyValueStoreId: run.defaultKeyValueStoreId,
+                    mcpSessionId,
+                    errMessage: errMessage(error),
+                });
+                return null;
+            })
+            : Promise.resolve(null),
+    ]);
+    datasetInfo = datasetFetched ?? null;
+    kvListResult = kvFetched ?? null;
 
     const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId, abortSignal);
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
