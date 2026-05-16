@@ -29,5 +29,9 @@ export const appsCallActor: ToolEntry = Object.freeze({
         idempotentHint: false,
         openWorldHint: true,
     },
+    execution: {
+        // Support long-running tasks
+        taskSupport: 'optional',
+    },
     call: async (toolArgs: InternalToolArgs) => executeCallActor(toolArgs),
 } as const);
