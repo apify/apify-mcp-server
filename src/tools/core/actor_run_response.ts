@@ -390,7 +390,7 @@ export function buildStatusSummaryNextStep(params: {
     switch (status) {
         case 'READY':
             return {
-                summary: `READY. Run ${runId} was created but has not started.`,
+                summary: `READY. Run ${runId} was created and is gooing to start.`,
                 nextStep: `${pollHint(runId)} wait for progress.`,
             };
         case 'RUNNING':
