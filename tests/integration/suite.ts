@@ -2037,7 +2037,8 @@ export function createIntegrationTestsSuite(
 
             const result = await client.callTool({
                 name: actorNameToToolName('apify/rag-web-browser'),
-                arguments: { query: 'https://apify.com' },
+                // Max wait (45s) so the test does not flake on a slow run.
+                arguments: { query: 'https://apify.com', waitSecs: 45 },
             });
 
             // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
