@@ -327,7 +327,25 @@ export async function handleMcpToolCall(params: {
             arguments: input,
         });
 
-        return { content: result.content };
+        // `call-actor` declares `getActorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+        // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
+        // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
+        // the remote tool's payload still flows through `content`. Also forward `isError` so a
+        // failing remote tool surfaces as a failure here.
+        const isErrorFromRemote = result.isError === true;
+        return {
+            content: result.content,
+            isError: isErrorFromRemote,
+            structuredContent: {
+                runId: 'mcp-passthrough',
+                actorId: baseActorName,
+                actorName: baseActorName,
+                status: isErrorFromRemote ? 'FAILED' : 'SUCCEEDED',
+                storages: {},
+                summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
+                nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
+            },
+        };
     } catch (error) {
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
             actorName: baseActorName,

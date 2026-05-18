@@ -804,6 +804,48 @@ export function createIntegrationTestsSuite(
             expect(callContent.some((item) => item.text.includes(`Fetched content from ${DOCS_URL}`))).toBe(true);
         });
 
+        // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
+        // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
+        // throws -32600 "has an output schema but did not return structured content" once it has cached
+        // the tool validators (which happens on `listTools()` — every real client does this on connect).
+        // The happy-path test above never calls `listTools()`, so the SDK skips validation and the bug stays
+        // invisible at the integration layer. This test surfaces it.
+        it('MCP server actor:tool pass-through returns structuredContent satisfying outputSchema', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            // Populates the SDK's `_cachedToolOutputValidators` map so callTool runs schema validation.
+            await client.listTools();
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
+                    input: { url: 'https://docs.apify.com' },
+                },
+            });
+
+            // structuredContent must be present and carry the keys declared `required` on
+            // `getActorRunOutputSchema`. The pass-through path has no Apify run, so the fix is expected to
+            // synthesize sentinel values (e.g. `runId: 'mcp-passthrough'`) rather than real run identifiers.
+            const sc = (callResult as { structuredContent?: Record<string, unknown> }).structuredContent;
+            expect(sc).toBeDefined();
+            expect(sc).toHaveProperty('runId');
+            expect(sc).toHaveProperty('actorId');
+            expect(sc).toHaveProperty('status');
+            expect(sc).toHaveProperty('storages');
+            expect(sc).toHaveProperty('summary');
+            expect(sc).toHaveProperty('nextStep');
+
+            // The remote MCP tool's actual result must still flow through `content` — the fix must not
+            // lose the payload while satisfying the schema.
+            const content = callResult.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('Fetched content from'))).toBe(true);
+
+            // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
+            // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
+            expect(callResult.isError ?? false).toBe(false);
+        });
+
         it('should search Apify documentation', async () => {
             client = await createClientFn({
                 tools: ['docs'],
