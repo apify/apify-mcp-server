@@ -209,7 +209,7 @@ export function buildActorDetailsTextResponse(options: {
         readme: resolvedReadme?.content,
         inputSchema: output.inputSchema ? details.inputSchema : undefined,
         outputSchema: output.outputSchema ? (actorOutputSchema ?? {}) : undefined,
-        mcpTools: output.mcpTools ? (mcpToolsMessage ?? '') : undefined,
+        mcpTools: output.mcpTools && mcpToolsMessage ? mcpToolsMessage : undefined,
     };
 
     return { texts, structuredContent };

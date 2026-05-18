@@ -69,4 +69,25 @@ describe('buildActorDetailsTextResponse()', () => {
 
         expect(structuredContent.mcpTools).toBeUndefined();
     });
+
+    it('omits structuredContent.mcpTools when output.mcpTools is requested but no message is available', () => {
+        const { texts, structuredContent } = buildActorDetailsTextResponse({
+            details: MOCK_DETAILS,
+            output: {
+                ...actorDetailsOutputDefaults,
+                description: false,
+                stats: false,
+                pricing: false,
+                rating: false,
+                metadata: false,
+                inputSchema: false,
+                readme: false,
+                outputSchema: false,
+                mcpTools: true,
+            },
+        });
+
+        expect(texts).toEqual([]);
+        expect(structuredContent.mcpTools).toBeUndefined();
+    });
 });
