@@ -35,18 +35,9 @@ Zero tolerance for errors — fix before proceeding, don't defer.
 
 ## Testing the MCP server end-to-end
 
-After code changes, verify the server works — not just that it compiles.
+When the user says "test with mcpc", **use mcpc** — do not invent a substitute (no curl, no ad-hoc Node/Python scripts, no unit tests in place of an e2e probe). Use the **apify CLI** (`apify datasets`, `apify key-value-stores`, `apify actors`, …) for ground-truth data — never curl the Apify API.
 
-**mcpc** (scripted): needs `npm run build` first (runs `dist/stdio.js`) and `APIFY_TOKEN` in env.
-```bash
-npm run build
-mcpc connect .mcp.json:stdio @stdio   # first time only
-mcpc @stdio restart                    # after code changes
-mcpc @stdio tools-call search-actors keywords:="web scraper"
-```
-Default tools to cover: `search-actors`, `fetch-actor-details`, `call-actor`, `get-actor-run`, `get-actor-output`, `search-apify-docs`, `fetch-apify-docs`.
-
-**Native client** (Claude Code, Cursor): server is already connected — call tools directly. Ask the user if unsure which approach to use.
+After `npm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (default) / `@stdio-full` (non-default tools) is listed, `mcpc @stdio restart`; otherwise `mcpc --config .mcp.json stdio connect @stdio`. Use the `mcpc-tester` subagent for systematic spec/edge-case coverage; call mcpc directly for quick checks.
 
 ## Testing
 

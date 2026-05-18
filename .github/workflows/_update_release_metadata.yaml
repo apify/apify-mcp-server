@@ -56,7 +56,7 @@ jobs:
         name: Update changelog
         runs-on: ubuntu-latest
         outputs:
-            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha || github.sha }}
+            changelog_commitish: ${{ steps.commit.outputs.commit_long_sha }}
 
         steps:
             -   name: Checkout repository
@@ -87,8 +87,7 @@ jobs:
 
             -   name: Commit changes
                 id: commit
-                uses: EndBug/add-and-commit@v9
+                uses: apify/actions/signed-commit@v1.0.0
                 with:
-                    author_name: Apify Release Bot
-                    author_email: noreply@apify.com
                     message: "chore(release): Update changelog, package.json, manifest.json and server.json versions [skip ci]"
+                    github-token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}

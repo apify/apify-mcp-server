@@ -10,6 +10,12 @@ All notable changes to this project will be documented in this file.
 - Auto-inject storage and abort tools alongside actor tools ([#814](https://github.com/apify/apify-mcp-server/pull/814)) ([a553999](https://github.com/apify/apify-mcp-server/commit/a5539996b5ad450c780c139084f8ec927897fc39)) by [@jirispilka](https://github.com/jirispilka), closes [#813](https://github.com/apify/apify-mcp-server/issues/813)
 - Add task status notifications for long-running tools ([#818](https://github.com/apify/apify-mcp-server/pull/818)) ([7b984bc](https://github.com/apify/apify-mcp-server/commit/7b984bc5be961a6f6c1645c5d784336fdd7e55d2)) by [@jirispilka](https://github.com/jirispilka), closes [#816](https://github.com/apify/apify-mcp-server/issues/816)
 - Accept build, maxItems, maxTotalChargeUsd in callOptions ([#820](https://github.com/apify/apify-mcp-server/pull/820)) ([f772433](https://github.com/apify/apify-mcp-server/commit/f77243308422120015373838e0969e0563167ce1)) by [@jirispilka](https://github.com/jirispilka), closes [#815](https://github.com/apify/apify-mcp-server/issues/815)
+- Add X-Apify-Request-Origin: MCP header to API requests ([#835](https://github.com/apify/apify-mcp-server/pull/835)) ([3068106](https://github.com/apify/apify-mcp-server/commit/30681066bb6b849790d01b74d7baa1e0bb28034f)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#832](https://github.com/apify/apify-mcp-server/issues/832)
+- Remove widget meta from actor tools and add corresponding test ([#845](https://github.com/apify/apify-mcp-server/pull/845)) ([a40befa](https://github.com/apify/apify-mcp-server/commit/a40befa858995d1dfbf0c7be76a1794b1ea8f43d)) by [@jirispilka](https://github.com/jirispilka)
+
+### 🐛 Bug Fixes
+
+- Use long commit SHA in release workflow [internal] ([#850](https://github.com/apify/apify-mcp-server/pull/850)) ([1c8388e](https://github.com/apify/apify-mcp-server/commit/1c8388e4f2756d825598401135e3dc3c8e858735)) by [@fnesveda](https://github.com/fnesveda)
 
 
 <!-- git-cliff-unreleased-end -->

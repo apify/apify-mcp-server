@@ -3,7 +3,7 @@ import { useWidgetProps } from "../../hooks/use-widget-props";
 import { ActorSearchDetail } from "./ActorSearchDetail";
 import { WidgetLayout } from "../../components/layout/WidgetLayout";
 import { Message, Box } from "@apify/ui-library";
-import { ActorDetails, Actor } from "../../types";
+import type { ActorDetails, Actor } from "../../types";
 import { ActorCard } from "../../components/actor/ActorCard";
 import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
 import styled from "styled-components";

@@ -58,7 +58,7 @@ interface ToolOutput extends Record<string, unknown> {
 
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay =  async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getStatusVariant = (status: string): BadgeVariant => {
     switch (status.toUpperCase()) {
@@ -307,8 +307,7 @@ function toolOutputToRunData(
 ): ActorRunData {
     // READY runs have no `startedAt`. Feeding `undefined` into formatDuration/formatTimestamp
     // yields "NaN-NaN-NaN NaN:NaN" / "NaNs"; render an em-dash placeholder instead.
-    const startedAt = toolOutput.startedAt;
-    const finishedAt = toolOutput.finishedAt;
+    const { startedAt, finishedAt } = toolOutput;
     const duration = startedAt ? formatDuration(startedAt, finishedAt) : "—";
     const timestamp = startedAt ? formatTimestamp(startedAt) : "—";
     const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";

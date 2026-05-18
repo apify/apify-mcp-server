@@ -24,7 +24,7 @@ export function extractActorRunErrorMessage(toolResult: CallToolResult | null | 
             continue;
         }
 
-        const text = item.text;
+        const { text } = item;
         if (typeof text === "string" && text.trim()) {
             const cleaned = cleanErrorText(text);
             return cleaned || text.trim();
