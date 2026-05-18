@@ -2,20 +2,21 @@ import { describe, expect, it } from 'vitest';
 
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
+import type { RunResponse } from '../../src/tools/core/actor_run_response.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 /**
  * Apps / UI mode: get-actor-run-widget renders an interactive UI element (widget)
  * showing live Actor run progress. Carries widget `_meta` on both the tool definition
- * and the response. Input is strict: only `runId` is accepted.
+ * and the response.
  */
 
-const MOCK_RUN = {
+const MOCK_RUN_RUNNING = {
     id: 'run-widget-1',
     actId: 'actor-id-rag',
     status: 'RUNNING',
     startedAt: new Date('2026-04-20T12:00:00.000Z'),
-    stats: {},
+    stats: { runTimeSecs: 5, computeUnits: 0.01, memMaxBytes: 1024 },
 };
 
 const MOCK_ACTOR = {
@@ -26,7 +27,7 @@ const MOCK_ACTOR = {
 function stubApifyClient(): InternalToolArgs['apifyClient'] {
     return {
         run: (_id: string) => ({
-            get: async () => MOCK_RUN,
+            get: async () => MOCK_RUN_RUNNING,
         }),
         actor: (_id: string) => ({
             get: async () => MOCK_ACTOR,
@@ -46,31 +47,31 @@ function stubArgs(args: Record<string, unknown>): InternalToolArgs {
 }
 
 describe('get-actor-run-widget response', () => {
-    it('returns structured run status and widget _meta on the response', async () => {
+    it('returns structured content and widget _meta on the response', async () => {
         const result = await (getActorRunWidgetTool as HelperTool).call(
             stubArgs({ runId: 'run-widget-1' }),
         );
 
         const { structuredContent, content, _meta } = result as {
-            structuredContent: {
-                runId: string;
-                actorName?: string;
-                status: string;
-                startedAt: string;
-            };
+            structuredContent: RunResponse;
             content: { type: string; text: string }[];
             _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
         };
 
         expect(structuredContent.runId).toBe('run-widget-1');
-        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
+        expect(structuredContent.actorId).toBe('actor-id-rag');
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
-
-        // Short pointer text, not a JSON dump.
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('A progress widget has been rendered');
-        expect(content[0].text).toContain('run-widget-1');
+        expect(structuredContent.summary).toMatch(/^RUNNING for /);
+        // Widget nextStep must not instruct LLM to poll — widget self-updates.
+        expect(structuredContent.nextStep).toContain('Widget is rendering live progress');
+        expect(structuredContent.nextStep).not.toContain('actor-runs-get');
+        // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
+        // the short widget-pointer text.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('A run widget has been rendered');
+        expect(content[1].text).toContain('run-widget-1');
 
         // Response-level widget _meta.
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
@@ -87,7 +88,7 @@ describe('get-actor-run-widget response', () => {
         expect(meta.ui?.csp).toBeDefined();
     });
 
-    it('declares a strict input schema accepting only runId', () => {
+    it('declares a strict input schema accepting runId only', () => {
         const tool = getActorRunWidgetTool as HelperTool;
 
         const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
@@ -97,10 +98,10 @@ describe('get-actor-run-widget response', () => {
 
         // Runtime: AJV is configured with `removeAdditional: true`, so stray keys are silently
         // stripped from the input object in place.
-        const input: Record<string, unknown> = { runId: 'run-widget-1', output: true };
+        const input: Record<string, unknown> = { runId: 'run-widget-1', waitSecs: 30 };
         const ok = tool.ajvValidate(input);
         expect(ok).toBe(true);
-        expect('output' in input).toBe(false);
+        expect('waitSecs' in input).toBe(false);
     });
 
     it('accepts a minimal runId payload', () => {

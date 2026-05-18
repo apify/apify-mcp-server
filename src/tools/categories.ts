@@ -12,6 +12,12 @@
  * - A plain ToolEntry — mode-independent, always included
  * - A mode map (e.g. { default: ToolEntry, apps: ToolEntry }) — resolver picks entry[mode]
  * - A partial mode map (e.g. { apps: ToolEntry }) — included only for listed modes
+ *
+ * Apps vs default mode invariant:
+ * Only `*-widget` tools differ between modes — they live in `tools/apps/` and render an
+ * interactive UI element. All non-widget tools (`call-actor`, `get-actor-run`, direct actor
+ * tools, `search-actors`, `fetch-actor-details`) share a single implementation across modes.
+ * Do NOT add per-mode runtime variants for non-widget tools.
  */
 import { HelperTools } from '../const.js';
 import type { ToolEntry } from '../types.js';
@@ -71,7 +77,7 @@ export const toolCategories = {
     actors: [
         defaultSearchActors,
         defaultFetchActorDetails,
-        // call-actor is different for default and apps mode (sync vs async call)
+        // call-actor is identical between modes; apps mode appends a widget addendum to the description.
         { default: defaultCallActor, apps: appsCallActor },
     ],
     docs: [

@@ -258,15 +258,21 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
     const hasActorTools = result.some((entry) => entry.type === 'actor');
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
+    // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
+    // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session
+    // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
+    const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
 
     // No presence guards here — the de-dup pass at the end drops any duplicates.
     const toolsToInject: ToolEntry[] = [];
-    // In default mode call-actor is synchronous, so get-actor-run is only needed when call-actor
-    // is present. In apps mode call-actor is always async, so actor tools also need get-actor-run.
+    // `call-actor` and direct actor tools return a RunResponse whose `nextStep` may point at
+    // `get-actor-run` for polling (when the run is non-terminal at waitSecs cap), so the LLM
+    // needs that tool available. `call-actor-widget` returns immediately and the widget UI
+    // polls run status itself — that path doesn't drive the auto-inject decision here.
     if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
         toolsToInject.push(defaultGetActorRun);
     }
-    if (hasCallActor || hasActorTools || hasAddActorTool) {
+    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
         toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
 
