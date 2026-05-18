@@ -33,7 +33,7 @@ const MOCK_DETAILS = {
 
 describe('buildActorDetailsTextResponse()', () => {
     it('mirrors mcpToolsMessage into structuredContent.mcpTools when output.mcpTools is requested', () => {
-        const mcpToolsMessage = '# Available MCP Tools\nThis Actor is an MCP server with 1 tools.';
+        const mcpToolsMessage = '# Available MCP Tools\nThis Actor is an MCP server with 1 tool.';
 
         const { texts, structuredContent } = buildActorDetailsTextResponse({
             details: MOCK_DETAILS,
