@@ -7,6 +7,7 @@ import {
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { ServerMode } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
+import { injectReasonProperty } from './tool_call_reason.js';
 
 /**
  * Returns the canonical full name for a tool.
@@ -101,7 +102,7 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
         name: tool.name,
         title: tool.title,
         description: tool.description,
-        inputSchema: fixZodInputSchemaRequired(tool.inputSchema),
+        inputSchema: injectReasonProperty(fixZodInputSchemaRequired(tool.inputSchema)),
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
         icons: tool.icons,

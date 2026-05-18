@@ -992,7 +992,7 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
         const schema = pub.inputSchema as { required?: string[]; properties?: Record<string, { description?: string }> };
 
-        expect(schema.required).toEqual(['query']);
+        expect(schema.required).toEqual(['query', 'reason']);
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
     });

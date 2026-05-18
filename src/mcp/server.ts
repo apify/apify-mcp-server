@@ -89,6 +89,7 @@ import { createProgressTracker } from '../utils/progress.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
 import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
+import { extractAndStripReason } from '../utils/tool_call_reason.js';
 import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
 import {
     getActors,
@@ -913,6 +914,13 @@ export class ActorsMcpServer {
                 // since validation expects the original, non-encoded property names.
                 args = decodeDotPropertyNames(args as Record<string, unknown>) as Record<string, unknown>;
 
+                // Extract and strip the LLM-provided `reason` for telemetry. Must run before payment
+                // processing and AJV validation so downstream code never observes the field.
+                const reason = extractAndStripReason(args as Record<string, unknown>);
+                if (telemetryData && reason) {
+                    telemetryData.reason = reason;
+                }
+
                 // Centralize all payment processing: validate, strip payment fields, create client.
                 // Must run before AJV validation so toolArgsWithoutPayment doesn't contain provider-specific fields.
                 const { toolArgsWithoutPayment: toolArgs, toolArgsRedacted: logSafeArgs, apifyClient, paymentRequiredResult } = prepareToolCallContext({
@@ -982,6 +990,7 @@ export class ActorsMcpServer {
                             actorName,
                             actorId,
                             userRentedActorIds,
+                            reason,
                         }).catch((error) => log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }));
                     });
 
@@ -1306,10 +1315,11 @@ export class ActorsMcpServer {
         actorName?: string;
         actorId?: string;
         userRentedActorIds?: string[];
+        reason?: string;
     }): Promise<void> {
         const {
             taskId, tool, toolArgs, logSafeArgs, paymentRequiredResult,
-            apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds,
+            apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds, reason,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         // Always populate actor fields so they're tracked on both success and failure paths.
@@ -1325,6 +1335,9 @@ export class ActorsMcpServer {
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
         const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
+        if (telemetryData && reason) {
+            telemetryData.reason = reason;
+        }
 
         const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics) => {
             this.logToolCallAndTelemetry({

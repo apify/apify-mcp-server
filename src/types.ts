@@ -353,6 +353,8 @@ export type ToolCallTelemetryProperties = {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
+    /** LLM-provided one-liner explaining why this tool call was made (use-case only, no other context). */
+    reason?: string;
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;

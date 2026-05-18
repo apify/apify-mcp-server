@@ -357,7 +357,7 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         const { inputSchema } = getToolPublicFieldOnly(searchApifyDocsTool, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[]; properties?: Record<string, { default?: unknown }> };
 
-        expect(schema.required).toEqual(['query']);
+        expect(schema.required).toEqual(['query', 'reason']);
         expect(schema.properties?.docSource).toMatchObject({ default: 'apify' });
         expect(schema.properties?.limit).toMatchObject({ default: 5 });
         expect(schema.properties?.offset).toMatchObject({ default: 0 });
@@ -381,7 +381,7 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         const { inputSchema } = getToolPublicFieldOnly(actorShapeTool, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[] };
 
-        expect(schema.required).toEqual(['query']);
+        expect(schema.required).toEqual(['query', 'reason']);
     });
 
     // Regression: #637 — phantom `default: undefined` from filterSchemaProperties must not clear required.
@@ -402,6 +402,6 @@ describe('getToolPublicFieldOnly inputSchema normalization', () => {
         const { inputSchema } = getToolPublicFieldOnly(toolWithPhantomDefaults, { filterWidgetMeta: false });
         const schema = inputSchema as { required?: string[] };
 
-        expect(schema.required).toEqual(['query']);
+        expect(schema.required).toEqual(['query', 'reason']);
     });
 });
