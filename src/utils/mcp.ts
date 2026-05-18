@@ -49,6 +49,33 @@ export function buildMCPResponse(options: {
     };
 }
 
+/**
+ * Computes the byte size of a tool response — sums UTF-8 byte length of every
+ * text item in `content[]` plus JSON-stringified `structuredContent` (if present).
+ * Other fields (`isError`, `_meta`, etc.) are not counted.
+ */
+export function computeToolResponseSizeBytes(result: unknown): number {
+    if (!result || typeof result !== 'object') return 0;
+    const res = result as { content?: unknown; structuredContent?: unknown };
+    let bytes = 0;
+    if (Array.isArray(res.content)) {
+        for (const item of res.content) {
+            const text = (item as { text?: unknown })?.text;
+            if (typeof text === 'string') {
+                bytes += Buffer.byteLength(text, 'utf8');
+            }
+        }
+    }
+    if (res.structuredContent !== undefined) {
+        try {
+            bytes += Buffer.byteLength(JSON.stringify(res.structuredContent) ?? '', 'utf8');
+        } catch {
+            // Non-serialisable structured content (e.g. circular) — skip.
+        }
+    }
+    return bytes;
+}
+
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
 export function getToolCallErrorUserText(toolName: string, error: unknown): string {
     const msg = error instanceof Error ? error.message : String(error);
