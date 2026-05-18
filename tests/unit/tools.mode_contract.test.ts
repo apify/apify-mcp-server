@@ -152,20 +152,18 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
     });
 
     describe('mode-specific call-actor behavior guidance', () => {
-        it('should document that apps call-actor always runs asynchronously and points to the widget sibling for UI', () => {
+        it('apps call-actor description points to the widget sibling and warns against search-actors-widget for name resolution', () => {
             const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
+            const defaultCallActor = defaultCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
 
             expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.description).toContain('always runs asynchronously');
             expect(appsCallActor!.description).toContain(HelperTools.ACTOR_CALL_WIDGET);
-            expect(appsCallActor!.description).toContain('It renders no UI');
-        });
+            expect(appsCallActor!.description).toContain(HelperTools.STORE_SEARCH_WIDGET);
 
-        it('should not advertise long-running task support for apps call-actor', () => {
-            const appsCallActor = appsCategories.actors.find((t) => t.name === HelperTools.ACTOR_CALL);
-
-            expect(appsCallActor).toBeDefined();
-            expect(appsCallActor!.execution?.taskSupport).toBeUndefined();
+            // Widget guidance must not leak into default mode where those tools don't exist.
+            expect(defaultCallActor).toBeDefined();
+            expect(defaultCallActor!.description).not.toContain(HelperTools.ACTOR_CALL_WIDGET);
+            expect(defaultCallActor!.description).not.toContain(HelperTools.STORE_SEARCH_WIDGET);
         });
     });
 
@@ -263,37 +261,38 @@ describe('apps-mode widget pairing in getToolsForServerMode', () => {
 });
 
 describe('taskSupport contract across tool categories', () => {
-    it('should declare taskSupport only on call-actor in default mode, with an allowed value', () => {
-        const defaultCategories = getCategoryTools('default');
-        const toolsWithTaskSupport: { name: string; value: unknown }[] = [];
+    for (const mode of SERVER_MODES) {
+        it(`declares taskSupport only on call-actor in ${mode} mode, with an allowed value`, () => {
+            const categories = getCategoryTools(mode);
+            const toolsWithTaskSupport: { name: string; value: unknown }[] = [];
 
-        for (const categoryName of CATEGORY_NAMES) {
-            for (const tool of defaultCategories[categoryName]) {
-                if (tool.execution?.taskSupport !== undefined) {
-                    toolsWithTaskSupport.push({ name: tool.name, value: tool.execution.taskSupport });
+            for (const categoryName of CATEGORY_NAMES) {
+                for (const tool of categories[categoryName]) {
+                    if (tool.execution?.taskSupport !== undefined) {
+                        toolsWithTaskSupport.push({ name: tool.name, value: tool.execution.taskSupport });
+                    }
                 }
             }
-        }
 
-        // Only default-mode call-actor is expected to declare taskSupport among static internal tools.
-        // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those are not
-        // returned by getCategoryTools.)
-        expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HelperTools.ACTOR_CALL]);
+            // Only call-actor is expected to declare taskSupport among static internal tools.
+            // (Dynamically-created Actor tools from actor_tools_factory also declare it, but those
+            // are not returned by getCategoryTools.)
+            expect(toolsWithTaskSupport.map((t) => t.name)).toEqual([HelperTools.ACTOR_CALL]);
 
-        for (const { value } of toolsWithTaskSupport) {
-            expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);
-        }
-    });
-
-    it('should not declare taskSupport on any tool in apps mode', () => {
-        const appsCategories = getCategoryTools('apps');
-
-        for (const categoryName of CATEGORY_NAMES) {
-            for (const tool of appsCategories[categoryName]) {
-                expect(tool.execution?.taskSupport).toBeUndefined();
+            for (const { value } of toolsWithTaskSupport) {
+                expect(ALLOWED_TASK_TOOL_EXECUTION_MODES).toContain(value);
             }
-        }
-    });
+        });
+    }
+
+    // Widgets render their own progress UI; they MUST NOT participate in the MCP task lifecycle,
+    // otherwise a `request.params.task` call would be accepted and would duplicate the widget's
+    // live-progress channel.
+    for (const widget of WIDGET_BY_BASE_TOOL.values()) {
+        it(`${widget.name} widget must not declare taskSupport`, () => {
+            expect(widget.execution?.taskSupport).toBeUndefined();
+        });
+    }
 });
 
 describe('getToolPublicFieldOnly _meta filtering', () => {

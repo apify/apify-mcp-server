@@ -36,6 +36,9 @@ createIntegrationTestsSuite({
         });
     },
     afterAllFn: async () => {
+        // closeAllConnections first — lingering long-poll requests (default waitSecs=30) keep
+        // the keep-alive sockets open and block server.close() past vitest's 10s hookTimeout.
+        httpServer.closeAllConnections?.();
         await new Promise<void>((resolve) => {
             httpServer.close(() => resolve());
         });

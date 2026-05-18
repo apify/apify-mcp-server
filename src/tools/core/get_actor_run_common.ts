@@ -7,7 +7,7 @@ import type { HelperTool, ToolInputSchema } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
-import { type FetchActorRunResult, WAIT_SECS_MAX } from './actor_run_response.js';
+import { type FetchActorRunResult, WAIT_SECS_MAX, WIDGET_NO_POLL_NEXT_STEP } from './actor_run_response.js';
 
 /** Default `waitSecs` for `get-actor-run`. Intentionally non-zero so polling callers wait briefly by default. */
 export const WAIT_SECS_DEFAULT = 30;
@@ -33,7 +33,7 @@ export const getActorRunArgs = z.object({
 
 const GET_ACTOR_RUN_DESCRIPTION = `Get detailed information about a specific Actor run.
 
-Returns run result: status, storages (dataset / key-value store), stats, summary, nextStep.
+Returns run result: status, storages (datasets/keyValueStores alias map), stats, summary, nextStep.
 - summary describes the past (e.g. "SUCCEEDED in 22s. 47 items; 3 fields available.").
 - nextStep prescribes one primary follow-up action with identifiers interpolated (e.g. "Use get-dataset-items with datasetId=...").
 - waitSecs (0–${WAIT_SECS_MAX}, default ${WAIT_SECS_DEFAULT}) waits up to that many seconds for terminal status before returning.
@@ -107,12 +107,14 @@ export function buildGetActorRunSuccessResponse(
         });
     }
 
+    // Override nextStep so the model reading structuredContent (content[0]) also sees no-poll guidance.
+    const widgetContent = { ...structuredContent, nextStep: WIDGET_NO_POLL_NEXT_STEP };
     return buildMCPResponse({
         texts: [
-            JSON.stringify(structuredContent),
+            JSON.stringify(widgetContent),
             `Actor run ${structuredContent.runId} status: ${structuredContent.status}. A run widget has been rendered.`,
         ],
-        structuredContent,
+        structuredContent: widgetContent,
         _meta: {
             ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
             ...(buildUsageMeta(run) ?? {}),

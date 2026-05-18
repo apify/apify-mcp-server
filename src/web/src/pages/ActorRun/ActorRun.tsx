@@ -23,7 +23,7 @@ interface ActorRunData {
     stats?: {
         computeUnits?: number;
     };
-    /** v4 shape: identifier + count only. Item bodies are fetched separately via get-dataset-items. */
+    /** Identifier + count only. Item bodies are fetched separately via get-dataset-items. */
     dataset?: {
         id: string;
         itemCount?: number;
@@ -31,7 +31,9 @@ interface ActorRunData {
 }
 
 /**
- * v4 canonical shape from get-actor-run / get-actor-run-widget.
+ * Shape from get-actor-run / get-actor-run-widget.
+ * storages mirrors ActorRunStorageIds: alias-map where "default" is always the primary entry,
+ * extended with fetched metadata. Named Actor storages occupy additional alias keys.
  * Item bodies are not inlined — fetch via get-dataset-items.
  */
 interface ToolOutput extends Record<string, unknown> {
@@ -43,12 +45,14 @@ interface ToolOutput extends Record<string, unknown> {
     finishedAt?: string;
     stats?: any;
     storages?: {
-        dataset?: {
-            id: string;
-            itemCount?: number;
-            fields?: string[];
+        datasets?: {
+            default: { id: string; itemCount?: number; fields?: string[] };
+            [alias: string]: { id: string; itemCount?: number; fields?: string[] };
         };
-        keyValueStore?: { id: string; keys?: string[]; keyCount?: number };
+        keyValueStores?: {
+            default: { id: string; keys?: string[]; keyCount?: number };
+            [alias: string]: { id: string; keys?: string[]; keyCount?: number };
+        };
     };
 }
 
@@ -292,7 +296,7 @@ function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
 }
 
 function extractDatasetSummary(toolOutput: ToolOutput): ActorRunData["dataset"] {
-    const ds = toolOutput.storages?.dataset;
+    const ds = toolOutput.storages?.datasets?.default;
     if (!ds?.id) return undefined;
     return { id: ds.id, itemCount: ds.itemCount };
 }
@@ -338,8 +342,8 @@ export const ActorRun: React.FC = () => {
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
     /**
-     * v4 doesn't inline preview items in the run response. We fetch a small preview separately
-     * via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
+     * Run response carries identifiers only; item bodies are fetched separately.
+     * We fetch a small preview via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
      */
     const [previewItems, setPreviewItems] = useState<Record<string, any>[] | null>(null);
 
@@ -380,7 +384,7 @@ export const ActorRun: React.FC = () => {
     useEffect(() => { setPreviewItems(null); }, [runData?.dataset?.id]);
 
     // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
-    // v4 doesn't inline items in the run response — the server returns shape + identifiers only.
+    // Run response carries shape + identifiers only; item bodies are fetched via get-dataset-items.
     useEffect(() => {
         if (!app || !runData) return;
         if (previewItems !== null) return;

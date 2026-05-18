@@ -1,6 +1,8 @@
+import type { ActorRun } from 'apify-client';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+    buildStartRunResponse,
     buildStatusSummaryNextStep,
     type RunDataset,
     type RunKeyValueStore,
@@ -99,7 +101,7 @@ describe('get-actor-run default response', () => {
         };
 
         // Slash-to-dot translation on dataset.fields. Mock returns `crawl/httpStatusCode`; response must rewrite to `crawl.httpStatusCode`.
-        expect(structuredContent.storages.dataset?.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
 
         // actorName composed from `${username}/${name}`.
         expect(structuredContent.actorName).toBe('apify/rag-web-browser');
@@ -123,7 +125,10 @@ describe('get-actor-run default response', () => {
         });
     });
 
-    it('returns shape with just IDs for a non-terminal RUNNING run (no extra metadata fetches)', async () => {
+    it('fetches dataset metadata for a non-terminal RUNNING run and surfaces progress in the summary', async () => {
+        // Dataset metadata is fetched on every poll so the summary can surface partial progress.
+        // KV listKeys stays terminal-only — non-terminal summaries don't reference KV records, so
+        // fetching them would be pure waste on the widget poll hot path.
         let datasetCalls = 0;
         let kvCalls = 0;
         const run = { ...mockSucceededRun({ status: 'RUNNING', finishedAt: undefined }), exitCode: undefined };
@@ -132,7 +137,7 @@ describe('get-actor-run default response', () => {
             actor: (_id: string) => ({ get: async () => ACTOR }),
             dataset: (_id: string) => {
                 datasetCalls += 1;
-                return { get: async () => mockDataset(), listItems: async () => ({ items: [], total: 0 }) };
+                return { get: async () => mockDataset({ itemCount: 127 }), listItems: async () => ({ items: [], total: 0 }) };
             },
             keyValueStore: (_id: string) => {
                 kvCalls += 1;
@@ -144,11 +149,12 @@ describe('get-actor-run default response', () => {
         const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.status).toBe('RUNNING');
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
-        // Non-terminal: only the id is populated, no fields/itemCount.
-        expect(structuredContent.storages.dataset?.fields).toBeUndefined();
-        expect(structuredContent.storages.dataset?.itemCount).toBeUndefined();
-        expect(datasetCalls).toBe(0);
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-xyz');
+        // Non-terminal now populates itemCount/fields too — needed for the progress suffix.
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(127);
+        expect(structuredContent.storages.datasets?.default.fields).toEqual(['crawl.httpStatusCode', 'metadata.url', 'markdown']);
+        expect(structuredContent.summary).toContain('127 results so far.');
+        expect(datasetCalls).toBe(1);
         expect(kvCalls).toBe(0);
     });
 
@@ -164,7 +170,7 @@ describe('get-actor-run default response', () => {
             ),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
     });
 
     it('retries the itemCount=0 probe once when the first probe also returns 0 (waitSecs > 0)', async () => {
@@ -197,7 +203,7 @@ describe('get-actor-run default response', () => {
             const result = await callPromise;
             const { structuredContent } = result as { structuredContent: RunResponse };
             expect(probeCalls).toBe(2);
-            expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+            expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
         } finally {
             vi.useRealTimers();
         }
@@ -234,7 +240,7 @@ describe('get-actor-run default response', () => {
             const { structuredContent } = result as { structuredContent: RunResponse };
 
             expect(probeCalls).toBe(4);
-            expect(structuredContent.storages.dataset?.itemCount).toBe(0);
+            expect(structuredContent.storages.datasets?.default.itemCount).toBe(0);
         } finally {
             vi.useRealTimers();
         }
@@ -334,9 +340,9 @@ describe('get-actor-run default response', () => {
         expect(structuredContent.status).toBe('SUCCEEDED');
 
         // Dataset id is still surfaced (the agent can fetch items directly even without metadata).
-        expect(structuredContent.storages.dataset?.id).toBe('dataset-xyz');
-        expect(structuredContent.storages.dataset?.itemCount).toBeUndefined();
-        expect(structuredContent.storages.dataset?.fields).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-xyz');
+        expect(structuredContent.storages.datasets?.default.itemCount).toBeUndefined();
+        expect(structuredContent.storages.datasets?.default.fields).toBeUndefined();
 
         // nextStep points at get-dataset-items, not the "no output / re-run" branch.
         expect(structuredContent.nextStep).toContain('get-dataset-items');
@@ -365,11 +371,11 @@ describe('get-actor-run default response', () => {
 
         expect(isError).not.toBe(true);
         expect(structuredContent.status).toBe('SUCCEEDED');
-        expect(structuredContent.storages.dataset?.itemCount).toBe(47);
+        expect(structuredContent.storages.datasets?.default.itemCount).toBe(47);
         // KV id is still surfaced from the run record; the failed listKeys just leaves keys unknown.
-        expect(structuredContent.storages.keyValueStore?.id).toBe('kv-xyz');
-        expect(structuredContent.storages.keyValueStore?.keys).toBeUndefined();
-        expect(structuredContent.storages.keyValueStore?.keyCount).toBeUndefined();
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-xyz');
+        expect(structuredContent.storages.keyValueStores?.default.keys).toBeUndefined();
+        expect(structuredContent.storages.keyValueStores?.default.keyCount).toBeUndefined();
     });
 
     it('emits progress with formatted status messages on wait + terminal flip', async () => {
@@ -448,6 +454,61 @@ describe('get-actor-run default response', () => {
 });
 
 // -----------------------------------------------------------------------------
+// buildStartRunResponse — the "fire and forget" (waitSecs=0) response builder
+// -----------------------------------------------------------------------------
+
+describe('buildStartRunResponse()', () => {
+    const actorRun = {
+        id: 'run-abc',
+        actId: 'actor-xyz',
+        status: 'RUNNING',
+        startedAt: new Date('2026-01-02T03:04:05.000Z'),
+        defaultDatasetId: 'dataset-abc',
+        defaultKeyValueStoreId: 'kv-abc',
+    } as unknown as ActorRun;
+
+    it('builds correct RunResponse shape without widget metadata', () => {
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun });
+
+        const { structuredContent, content, _meta } = result as {
+            structuredContent: RunResponse;
+            content: { type: string; text: string }[];
+            _meta?: Record<string, unknown>;
+        };
+
+        expect(structuredContent.runId).toBe('run-abc');
+        expect(structuredContent.actorId).toBe('actor-xyz');
+        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
+        expect(structuredContent.status).toBe('RUNNING');
+        expect(structuredContent.startedAt).toBe('2026-01-02T03:04:05.000Z');
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-abc');
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-abc');
+        expect(structuredContent.summary).toBeDefined();
+        expect(structuredContent.nextStep).toBeDefined();
+
+        // content[0] is JSON mirror; content[1] is LLM-readable narrative.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+
+        // Non-widget path: no widget _meta.
+        expect(_meta).toBeUndefined();
+    });
+
+    it('includes widget metadata and no-poll nextStep when widget=true', () => {
+        const result = buildStartRunResponse({ actorName: 'apify/rag-web-browser', actorRun, widget: true });
+
+        const { structuredContent, _meta } = result as {
+            structuredContent: RunResponse;
+            _meta?: Record<string, unknown>;
+        };
+
+        expect(_meta).toBeDefined();
+        expect(_meta?.['openai/widgetDescription']).toBe('Actor run progress for apify/rag-web-browser');
+        expect(structuredContent.nextStep).toContain('Do NOT poll');
+    });
+});
+
+// -----------------------------------------------------------------------------
 // Status templates — one assertion per state (covers all 8 Apify statuses).
 // -----------------------------------------------------------------------------
 
@@ -490,12 +551,13 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).not.toContain('—');
     });
 
-    it('SUCCEEDED with empty dataset + KV records: nextStep stays generic; KV shows up only in summary', () => {
+    it('SUCCEEDED with empty dataset + KV records: nextStep points at dataset, not KV', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetEmpty, keyValueStore: kvWithRecords });
         expect(t.summary).toContain('No dataset items found');
         expect(t.summary).toContain('Key-value store has 2 keys');
+        expect(t.nextStep).toContain('get-dataset-items');
+        expect(t.nextStep).toContain('datasetId=ds-1');
         expect(t.nextStep).not.toContain('get-key-value-store-record');
-        expect(t.nextStep).toContain('re-run');
     });
 
     it('SUCCEEDED with neither dataset items nor KV records routes to "no output" nextStep', () => {
@@ -564,6 +626,36 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING') });
         expect(t.summary).toContain('In progress.');
         expect(t.summary).not.toContain('Actor status:');
+    });
+
+    it('RUNNING with dataset items appends "N results so far" so polling agents see real progress', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
+        // Progress is summary-only; nextStep stays poll-only — partial reads mid-run are noise.
+        expect(t.nextStep).toContain('poll for completion');
+        expect(t.nextStep).not.toContain('get-dataset-items');
+    });
+
+    it('RUNNING with empty dataset omits the progress suffix (no "0 results so far")', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: datasetEmpty });
+        expect(t.summary).not.toMatch(/results so far/);
+        expect(t.summary).not.toContain('0 results');
+    });
+
+    it('RUNNING with exactly 1 item uses singular "result"', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('RUNNING'), dataset: { id: 'ds-1', itemCount: 1 } });
+        expect(t.summary).toContain('1 result so far.');
+        expect(t.summary).not.toContain('results');
+    });
+
+    it('TIMING-OUT with dataset items surfaces progress in the summary', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('TIMING-OUT'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
+    });
+
+    it('ABORTING with dataset items surfaces progress in the summary', () => {
+        const t = buildStatusSummaryNextStep({ run: makeRun('ABORTING'), dataset: datasetWithItems });
+        expect(t.summary).toContain('47 results so far.');
     });
 
     it('SUCCEEDED with 0 items surfaces the upstream statusMessage attributed in the summary', () => {

@@ -63,7 +63,9 @@ describe('get-actor-run-widget response', () => {
         expect(structuredContent.status).toBe('RUNNING');
         expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
         expect(structuredContent.summary).toMatch(/^RUNNING for /);
-        expect(structuredContent.nextStep).toContain('run-widget-1');
+        // Widget nextStep must not instruct LLM to poll — widget self-updates.
+        expect(structuredContent.nextStep).toContain('Widget is rendering live progress');
+        expect(structuredContent.nextStep).not.toContain('actor-runs-get');
         // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
         // the short widget-pointer text.
         expect(content).toHaveLength(2);

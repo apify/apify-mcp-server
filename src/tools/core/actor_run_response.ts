@@ -4,20 +4,24 @@ import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
-/** Cap on `storages.keyValueStore.keys` array length. */
+/** Cap on `storages.keyValueStores.default.keys` array length. */
 const KV_KEYS_LIMIT = 50;
+
+/** nextStep text for widget-rendered responses: suppresses LLM polling. */
+export const WIDGET_NO_POLL_NEXT_STEP = 'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
 
-/**
- * `waitSecs` value advertised in `nextStep` poll hints. Lower than tool-level defaults because the agent
- * is already known to be polling a non-terminal run — short cadence keeps it responsive without hammering.
- */
-const POLL_HINT_WAIT_SECS = 10;
+/** Default seconds to wait for completion on `call-actor` and direct actor tools. `get-actor-run` also defaults to 30. */
+export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
+
+const POLL_HINT_WAIT_SECS = 30;
 
 /** Limit for the dataset metadata `itemCount=0` lag-fallback probe. */
 const ITEM_COUNT_PROBE_LIMIT = 1;
@@ -68,6 +72,12 @@ export type RunDataset = {
     itemCount?: number;
     cleanItemCount?: number;
     fields?: string[];
+    /**
+     * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
+     * the target Actor is known at tools/list time, so historical row shape can be looked up
+     * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
+     */
+    itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
 };
 
 export type RunKeyValueStore = {
@@ -79,9 +89,20 @@ export type RunKeyValueStore = {
 };
 
 /**
+ * Storage shape mirrors `ActorRunStorageIds` from the Apify client — a map of alias → storage
+ * object where `default` is always the primary entry. Using the same plural alias-map structure
+ * means named Actor storages (e.g. `storages.datasets.results`) can be added without introducing
+ * new field names. Each value extends the bare Apify ID string with fetched metadata.
+ */
+export type RunStorages = {
+    datasets?: { default: RunDataset; [alias: string]: RunDataset };
+    keyValueStores?: { default: RunKeyValueStore; [alias: string]: RunKeyValueStore };
+};
+
+/**
  * Canonical run response shape returned by `call-actor` and `get-actor-run`.
- * Wire shape for `content[]`: `[JSON.stringify(structuredContent), `${summary}\n${nextStep}`]`
- * — see `res/call_actor_redesign_v4.md` § content[] shape for the load-bearing rationale.
+ * content[0] mirrors structuredContent as JSON (spec compat); content[1] is the
+ * LLM-readable summary + nextStep narrative.
  */
 export type RunResponse = {
     runId: string;
@@ -97,10 +118,7 @@ export type RunResponse = {
         computeUnits?: number;
         memMaxBytes?: number;
     };
-    storages: {
-        dataset?: RunDataset;
-        keyValueStore?: RunKeyValueStore;
-    };
+    storages: RunStorages;
     summary: string;
     nextStep: string;
 };
@@ -193,8 +211,9 @@ async function resolveItemCountWithLagFallback(
     client: ApifyClient,
     run: ActorRun,
     datasetMeta: Dataset | null,
-    waitSecs: number,
+    waitSecs: number | undefined,
     mcpSessionId?: string,
+    abortSignal?: AbortSignal,
 ): Promise<number | undefined> {
     if (run.status !== 'SUCCEEDED' || !datasetMeta || !run.defaultDatasetId) return datasetMeta?.itemCount;
     if (datasetMeta.itemCount > 0) return datasetMeta.itemCount;
@@ -204,11 +223,18 @@ async function resolveItemCountWithLagFallback(
         // When `waitSecs === 0` the caller asked for an immediate response (e.g. the widget's initial
         // render), so we do a single immediate probe and skip the delayed retries — otherwise the
         // ~5s lag-recovery schedule would block "immediate" callers for the full window.
-        const delays = waitSecs > 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
+        const delays = waitSecs !== 0 ? ITEM_COUNT_PROBE_DELAYS_MS : [0];
         let lastTotal = 0;
         for (const delay of delays) {
-            if (delay > 0) await sleep(delay);
-            const result = await client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT });
+            if (delay > 0) {
+                const sleepResult = await raceAbort(sleep(delay), abortSignal);
+                if (sleepResult === ABORT) return lastTotal;
+            }
+            const result = await raceAbort(
+                client.dataset(run.defaultDatasetId).listItems({ limit: ITEM_COUNT_PROBE_LIMIT }),
+                abortSignal,
+            );
+            if (result === ABORT) return lastTotal;
             lastTotal = result.total ?? 0;
             if (lastTotal > 0) return lastTotal;
         }
@@ -257,6 +283,17 @@ function statusMessageLine(statusMessage: string | null | undefined): string {
     return ` Actor status: "${trimmed}".`;
 }
 
+/**
+ * Suffix surfacing partial dataset progress on non-terminal runs (e.g. " 127 results so far.").
+ * Empty when the count is unknown or zero so callers don't see "0 results so far" on early polls.
+ * Worded generically — Actors aren't always scraping; "results" reads naturally for any output.
+ */
+function progressSuffix(dataset?: RunDataset): string {
+    const n = dataset?.itemCount;
+    if (n === undefined || n === 0) return '';
+    return ` ${n} ${n === 1 ? 'result' : 'results'} so far.`;
+}
+
 type KvSummary =
     | { hasKv: true; kvId: string; keys: string[]; keyCountLabel: string; summarySuffix: string }
     | { hasKv: false; summarySuffix: '' };
@@ -278,6 +315,18 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
+// TODO: Apify's fields list expands array indices (e.g. `entities.hashtags.0.text`,
+// `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or array-heavy
+// schemas balloon into hundreds of paths and bloat nextStep. Real example: a Twitter dataset
+// returned 174 expanded paths for ~30 unique schema fields. Two viable fixes — collapse `.N`
+// segments to the array root (`entities.hashtags`) and dedupe (all paths stay projection-valid,
+// schema detail lost inside arrays), or collapse `.N.` to `[]` (preserves shape but produces
+// paths that aren't directly valid for `fields="..."`). Deferred pending a real-world choice.
+function fieldsProjectionHint(fields: string[] | undefined): string {
+    if (!fields || fields.length === 0) return '';
+    return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
+}
+
 function buildSucceededSummaryNextStep(
     runTimeSecs: number,
     statusMessage: string | null | undefined,
@@ -292,12 +341,9 @@ function buildSucceededSummaryNextStep(
     // KV when both exist so the caller can see the run also produced key-value records.
     if (itemCount !== undefined && itemCount > 0 && datasetId) {
         const fields = dataset?.fields ?? [];
-        const fieldsHint = fields.length > 0
-            ? ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`
-            : '';
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsHint}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
         };
     }
 
@@ -307,6 +353,15 @@ function buildSucceededSummaryNextStep(
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. Dataset metadata unavailable.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to inspect output.`,
+        };
+    }
+
+    // Metadata can report itemCount === 0 briefly after SUCCEEDED (eventual consistency). Surface the
+    // same fetch-first guidance as TIMED-OUT with an empty partial dataset — never imply "re-run only".
+    if (itemCount === 0 && datasetId) {
+        return {
+            summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -363,22 +418,22 @@ export function buildStatusSummaryNextStep(params: {
     switch (status) {
         case 'READY':
             return {
-                summary: `READY. Run ${runId} was created but has not started.`,
+                summary: `READY. Run ${runId} was created and is about to start.`,
                 nextStep: `${pollHint(runId)} wait for progress.`,
             };
         case 'RUNNING':
             return {
-                summary: `RUNNING for ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' In progress.'}`,
+                summary: `RUNNING for ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' In progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} poll for completion.`,
             };
         case 'TIMING-OUT':
             return {
-                summary: `TIMING-OUT after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Run-time limit reached; cleanup in progress.'}`,
+                summary: `TIMING-OUT after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Run-time limit reached; cleanup in progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'ABORTING':
             return {
-                summary: `ABORTING after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Cancellation in progress.'}`,
+                summary: `ABORTING after ${elapsedSecs(run)}s.${statusMessageLine(statusMessage) || ' Cancellation in progress.'}${progressSuffix(dataset)}`,
                 nextStep: `${pollHint(runId)} observe terminal state.`,
             };
         case 'SUCCEEDED':
@@ -422,7 +477,8 @@ type WaitResult =
 async function waitForRunWithProgress(opts: {
     client: ApifyClient;
     runId: string;
-    waitSecs: number;
+    waitSecs?: number;
+    actorName?: string;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
     mcpSessionId?: string;
@@ -430,20 +486,29 @@ async function waitForRunWithProgress(opts: {
 }): Promise<WaitResult> {
     const { client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort } = opts;
 
-    if (abortSignal?.aborted) return { kind: 'aborted' };
+    if (abortSignal?.aborted) {
+        await onAbort?.(runId, client);
+        return { kind: 'aborted' };
+    }
 
     // Race the initial run.get() against the abort signal so a mid-call cancel returns promptly
     // instead of blocking on the HTTP fetch (the SDK does not accept an AbortSignal directly).
     const initial = await raceAbort(client.run(runId).get(), abortSignal);
-    if (initial === ABORT) return { kind: 'aborted' };
+    if (initial === ABORT) {
+        await onAbort?.(runId, client);
+        return { kind: 'aborted' };
+    }
     if (!initial) return { kind: 'not-found' };
     let run = initial;
 
-    // Kick off the actor-name fetch but don't await yet — it runs in parallel with the wait/progress
-    // branch below, and is only strictly needed for the progressTracker label and the response field.
-    const actorNamePromise = actorNameForActorId(client, run.actId, mcpSessionId);
+    // Callers that already know the actor name (e.g. `call-actor` just started the run) supply it to
+    // skip the lookup entirely. Otherwise kick off the fetch in parallel with the wait/progress branch
+    // below — it's only strictly needed for the progressTracker label and the response field.
+    const actorNamePromise = opts.actorName !== undefined
+        ? Promise.resolve<string | undefined>(opts.actorName)
+        : actorNameForActorId(client, run.actId, mcpSessionId);
 
-    if (waitSecs > 0 && !TERMINAL_RUN_STATUSES.has(run.status)) {
+    if ((waitSecs === undefined || waitSecs > 0) && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
             const trackerLabel = (await actorNamePromise) ?? 'actor';
             await progressTracker.updateProgress(formatRunStatusMessage(trackerLabel, run));
@@ -480,12 +545,85 @@ async function waitForRunWithProgress(opts: {
 }
 
 // -----------------------------------------------------------------------------
+// Immediate start response — for callers that return without waiting
+// -----------------------------------------------------------------------------
+
+/**
+ * Build a RunResponse from an already-started ActorRun without waiting.
+ * Used when waitSecs=0 (default and apps modes) and by widget variants that return immediately.
+ * Storage metadata contains IDs only; pollers/widgets fetch updates via get-actor-run.
+ *
+ * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
+ * message and widget _meta is included so the UI renders automatically.
+ *
+ * Invariant: `widget: true` is only valid from `*-widget` tools. Non-widget tools (call-actor,
+ * direct actor tools) must omit it or pass `false`.
+ */
+export function buildStartRunResponse(params: {
+    actorName: string;
+    actorRun: ActorRun;
+    widget?: boolean;
+}): ReturnType<typeof buildMCPResponse> {
+    const { actorName, actorRun, widget } = params;
+
+    const dataset = actorRun.defaultDatasetId ? { id: actorRun.defaultDatasetId } : undefined;
+    const keyValueStore = actorRun.defaultKeyValueStoreId ? { id: actorRun.defaultKeyValueStoreId } : undefined;
+
+    const { summary, nextStep: computedNextStep } = buildStatusSummaryNextStep({
+        run: actorRun,
+        dataset,
+        keyValueStore,
+    });
+
+    const nextStep = widget ? WIDGET_NO_POLL_NEXT_STEP : computedNextStep;
+
+    const structuredContent: RunResponse = {
+        runId: actorRun.id,
+        actorId: actorRun.actId,
+        actorName,
+        status: actorRun.status,
+        startedAt: toIsoString(actorRun.startedAt),
+        storages: {
+            ...(dataset && { datasets: { default: dataset } }),
+            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+        },
+        summary,
+        nextStep,
+    };
+
+    const widgetMeta = widget
+        ? {
+            ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+            'openai/widgetDescription': `Actor run progress for ${actorName}`,
+        }
+        : undefined;
+
+    return buildMCPResponse({
+        texts: [JSON.stringify(structuredContent), `${summary}\n${nextStep}`],
+        structuredContent,
+        ...(widgetMeta && { _meta: widgetMeta }),
+    });
+}
+
+// -----------------------------------------------------------------------------
 // Main fetch — used by both default and widget variants
 // -----------------------------------------------------------------------------
 
+/**
+ * Default `onAbort` for callers that want the run cancelled when the MCP request is cancelled.
+ * Logs and swallows abort failures so a transient API error doesn't override the original
+ * cancellation result.
+ */
+export const abortRunOnSignal = async (runId: string, client: ApifyClient): Promise<void> => {
+    await client.run(runId).abort({ gracefully: false }).catch((error) => {
+        logHttpError(error, 'Error aborting Actor run', { runId });
+    });
+};
+
 export async function fetchActorRunData(params: {
     runId: string;
-    waitSecs: number;
+    waitSecs?: number;
+    actorName?: string;
     client: ApifyClient;
     progressTracker?: ProgressTracker | null;
     abortSignal?: AbortSignal;
@@ -494,7 +632,9 @@ export async function fetchActorRunData(params: {
 }): Promise<{ error: object } | { aborted: true } | { result: FetchActorRunResult }> {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
-    const waitResult = await waitForRunWithProgress({ client, runId, waitSecs, progressTracker, abortSignal, mcpSessionId, onAbort });
+    const waitResult = await waitForRunWithProgress({
+        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort,
+    });
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {
         return {
@@ -512,33 +652,37 @@ export async function fetchActorRunData(params: {
     let datasetInfo: Dataset | null = null;
     let kvListResult: KeyValueClientListKeysResult | null = null;
 
-    if (TERMINAL_RUN_STATUSES.has(run.status)) {
-        // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
-        // whole call. The response still carries the storage id, which is enough for the agent
-        // to fetch items / records directly.
-        const [datasetFetched, kvFetched] = await Promise.all([
-            run.defaultDatasetId
-                ? client.dataset(run.defaultDatasetId).get().catch((error) => {
-                    log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
-                    return null;
-                })
-                : Promise.resolve(null),
-            run.defaultKeyValueStoreId
-                ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
-                    log.warning('Failed to list KV store keys', {
-                        keyValueStoreId: run.defaultKeyValueStoreId,
-                        mcpSessionId,
-                        errMessage: errMessage(error),
-                    });
-                    return null;
-                })
-                : Promise.resolve(null),
-        ]);
-        datasetInfo = datasetFetched ?? null;
-        kvListResult = kvFetched ?? null;
-    }
+    // Dataset metadata is fetched on every poll (not just terminal) so the summary can surface
+    // partial progress on long-running scrapes (e.g. "127 results so far"), giving polling agents
+    // real movement instead of the same "In progress." each cycle. The extra round-trip is the
+    // accepted UX tradeoff. KV listKeys stays terminal-only — non-terminal summaries don't
+    // reference KV records, so fetching them on every poll would be pure waste on the hot path.
+    // Per-promise catches: a single transient metadata fetch failure must not hard-fail the
+    // whole call. The response still carries the storage id, which is enough for the agent
+    // to fetch items / records directly.
+    const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
+    const [datasetFetched, kvFetched] = await Promise.all([
+        run.defaultDatasetId
+            ? client.dataset(run.defaultDatasetId).get().catch((error) => {
+                log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
+                return null;
+            })
+            : Promise.resolve(null),
+        run.defaultKeyValueStoreId && isTerminal
+            ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
+                log.warning('Failed to list KV store keys', {
+                    keyValueStoreId: run.defaultKeyValueStoreId,
+                    mcpSessionId,
+                    errMessage: errMessage(error),
+                });
+                return null;
+            })
+            : Promise.resolve(null),
+    ]);
+    datasetInfo = datasetFetched ?? null;
+    kvListResult = kvFetched ?? null;
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId);
+    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId, abortSignal);
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
     const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });
@@ -553,7 +697,10 @@ export async function fetchActorRunData(params: {
         startedAt: toIsoString(run.startedAt),
         finishedAt: toIsoString(run.finishedAt),
         stats: buildStats(run),
-        storages: { dataset, keyValueStore },
+        storages: {
+            ...(dataset && { datasets: { default: dataset } }),
+            ...(keyValueStore && { keyValueStores: { default: keyValueStore } }),
+        },
         summary,
         nextStep,
     };

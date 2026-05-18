@@ -285,31 +285,6 @@ export const fetchApifyDocsToolOutputSchema = {
     required: ['url', 'content'],
 };
 
-/**
- * Schema for call-actor and direct actor tool outputs.
- * Contains Actor run metadata and dataset items (sync mode only).
- * In async mode, only runId is present.
- */
-export const callActorOutputSchema = {
-    type: 'object' as const,
-    properties: {
-        runId: { type: 'string', description: 'Actor run ID' },
-        actorName: { type: 'string', description: 'Name of the Actor (only in async mode)' },
-        status: { type: 'string', description: 'Run status (only in async mode) - READY, RUNNING, SUCCEEDED, FAILED, ABORTING, ABORTED, TIMED-OUT' },
-        startedAt: { type: 'string', description: 'ISO timestamp when the run started (only in async mode)' },
-        input: { type: 'object' as const, description: 'Input parameters passed to the Actor (only in async mode)' },
-        datasetId: { type: 'string', description: 'Dataset ID containing the full results (sync mode only)' },
-        totalItemCount: { type: 'number', description: 'Total number of items in the dataset (sync mode only)' },
-        items: {
-            type: 'array' as const,
-            items: { type: 'object' as const },
-            description: 'Dataset items from the Actor run (sync mode only, may be truncated due to size limits)',
-        },
-        instructions: { type: 'string', description: 'Instructions for the LLM on how to process or retrieve additional data' },
-    },
-    required: ['runId'],
-};
-
 /** Schema for get-actor-run tool output. */
 export const getActorRunOutputSchema = {
     type: 'object' as const,
@@ -333,38 +308,63 @@ export const getActorRunOutputSchema = {
         },
         storages: {
             type: 'object' as const,
-            description: 'Default dataset and key-value store identifiers and metadata',
+            // Alias-map shape mirrors ActorRunStorageIds from the Apify client.
+            // `datasets.default` / `keyValueStores.default` are the primary entries;
+            // named Actor storages (e.g. datasets.results) occupy additional alias keys.
+            description: 'Dataset and key-value store metadata, keyed by alias. "default" is always the primary entry.',
             properties: {
-                dataset: {
+                datasets: {
                     type: 'object' as const,
+                    description: 'Map of dataset alias → metadata. Key "default" is always the run\'s primary dataset.',
                     properties: {
-                        id: { type: 'string', description: 'Default dataset ID' },
-                        name: { type: 'string' },
-                        title: { type: 'string' },
-                        itemCount: { type: 'number' },
-                        cleanItemCount: { type: 'number' },
-                        fields: {
-                            type: 'array' as const,
-                            items: { type: 'string' },
-                            description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+                        default: {
+                            type: 'object' as const,
+                            properties: {
+                                id: { type: 'string', description: 'Dataset ID' },
+                                name: { type: 'string' },
+                                title: { type: 'string' },
+                                itemCount: { type: 'number' },
+                                cleanItemCount: { type: 'number' },
+                                fields: {
+                                    type: 'array' as const,
+                                    items: { type: 'string' },
+                                    description: 'Dataset field paths in dot notation (e.g. ["metadata.url"])',
+                                },
+                            },
+                            required: ['id'],
                         },
                     },
-                    required: ['id'],
+                    additionalProperties: {
+                        type: 'object' as const,
+                        properties: { id: { type: 'string' } },
+                        required: ['id'],
+                    },
                 },
-                keyValueStore: {
+                keyValueStores: {
                     type: 'object' as const,
+                    description: 'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
-                        id: { type: 'string', description: 'Default key-value store ID' },
-                        name: { type: 'string' },
-                        title: { type: 'string' },
-                        keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
-                        keys: {
-                            type: 'array' as const,
-                            items: { type: 'string' },
-                            description: 'Up to 50 key names',
+                        default: {
+                            type: 'object' as const,
+                            properties: {
+                                id: { type: 'string', description: 'Key-value store ID' },
+                                name: { type: 'string' },
+                                title: { type: 'string' },
+                                keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+                                keys: {
+                                    type: 'array' as const,
+                                    items: { type: 'string' },
+                                    description: 'Up to 50 key names',
+                                },
+                            },
+                            required: ['id'],
                         },
                     },
-                    required: ['id'],
+                    additionalProperties: {
+                        type: 'object' as const,
+                        properties: { id: { type: 'string' } },
+                        required: ['id'],
+                    },
                 },
             },
         },
@@ -373,6 +373,58 @@ export const getActorRunOutputSchema = {
     },
     required: ['runId', 'actorId', 'status', 'storages', 'summary', 'nextStep'],
 };
+
+/**
+ * Returns a per-tool clone of {@link getActorRunOutputSchema} with `storages.datasets.default.itemsSchema`
+ * declared as a JSON Schema describing each dataset row, inferred from historical successful runs.
+ *
+ * Used for direct actor tools (e.g. `apify--rag-web-browser`) where the target Actor is known
+ * at `tools/list` time, so the LLM can plan field projection before calling the tool. The same
+ * shape is injected into `structuredContent.storages.datasets.default.itemsSchema` by the direct
+ * actor executors so the declared schema matches the runtime response.
+ *
+ * `call-actor` and `get-actor-run` cannot use this because their target Actor is dynamic.
+ *
+ * @param itemProperties - JSON Schema properties for dataset item fields
+ *   (e.g. `{ url: { type: 'string' }, price: { type: 'number' } }`).
+ */
+export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<string, unknown>) {
+    const { datasets } = getActorRunOutputSchema.properties.storages.properties;
+    const { default: defaultDataset } = datasets.properties;
+    const itemsSchema = {
+        type: 'object' as const,
+        description: 'JSON Schema for rows in the dataset at `storages.datasets.default.id` — describes row '
+            + 'shape only; the rows themselves are NOT returned inline in this response. Inferred from this '
+            + 'Actor\'s historical successful runs. To fetch actual rows, call `get-dataset-items` with the '
+            + 'dataset id and a `fields` projection drawn from this schema.',
+        properties: itemProperties,
+    };
+    return {
+        ...getActorRunOutputSchema,
+        properties: {
+            ...getActorRunOutputSchema.properties,
+            storages: {
+                ...getActorRunOutputSchema.properties.storages,
+                properties: {
+                    ...getActorRunOutputSchema.properties.storages.properties,
+                    datasets: {
+                        ...datasets,
+                        properties: {
+                            ...datasets.properties,
+                            default: {
+                                ...defaultDataset,
+                                properties: {
+                                    ...defaultDataset.properties,
+                                    itemsSchema,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    };
+}
 
 /**
  * Schema for dataset items retrieval tools (get-actor-output, get-dataset-items).
@@ -392,30 +444,3 @@ export const datasetItemsOutputSchema = {
     },
     required: ['datasetId', 'items', 'itemCount'],
 };
-
-/**
- * Creates an enriched version of callActorOutputSchema where the `items` field
- * contains actual property definitions inferred from Actor run history.
- *
- * @param itemProperties - JSON Schema properties object describing dataset item fields
- *   (e.g., `{ url: { type: 'string' }, price: { type: 'number' } }`)
- * @returns A copy of callActorOutputSchema with enriched items schema
- */
-export function buildEnrichedCallActorOutputSchema(
-    itemProperties: Record<string, unknown>,
-): typeof callActorOutputSchema {
-    return {
-        ...callActorOutputSchema,
-        properties: {
-            ...callActorOutputSchema.properties,
-            items: {
-                type: 'array' as const,
-                items: {
-                    type: 'object' as const,
-                    properties: itemProperties,
-                } as unknown as { type: 'object' },
-                description: callActorOutputSchema.properties.items.description,
-            },
-        },
-    };
-}

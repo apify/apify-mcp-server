@@ -206,13 +206,15 @@ export function setupActorRunWidgetDev(): void {
                         },
                         storages: isComplete
                             ? {
-                                  dataset: {
-                                      id: "test_dataset_456",
-                                      itemCount: mockPreviewItems.length,
-                                      fields: ["title", "url", "description"],
+                                  datasets: {
+                                      default: {
+                                          id: "test_dataset_456",
+                                          itemCount: mockPreviewItems.length,
+                                          fields: ["title", "url", "description"],
+                                      },
                                   },
                               }
-                            : { dataset: { id: "test_dataset_456" } },
+                            : { datasets: { default: { id: "test_dataset_456" } } },
                         summary: isComplete
                             ? `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`
                             : "RUNNING for 5s. In progress.",
@@ -246,10 +248,12 @@ export function setupActorRunWidgetDev(): void {
                 status: "SUCCEEDED",
                 finishedAt: new Date().toISOString(),
                 storages: {
-                    dataset: {
-                        id: "test_dataset_456",
-                        itemCount: mockPreviewItems.length,
-                        fields: ["title", "url", "description"],
+                    datasets: {
+                        default: {
+                            id: "test_dataset_456",
+                            itemCount: mockPreviewItems.length,
+                            fields: ["title", "url", "description"],
+                        },
                     },
                 },
                 summary: `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`,
