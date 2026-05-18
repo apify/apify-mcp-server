@@ -14,7 +14,7 @@ import { loadToolsFromInput } from '../utils/tools_loader.js';
  * @param url The URL to process
  * @param apifyClient The Apify client instance
  * @param mode Server mode for tool variant resolution
- * @param actorStore
+ * @param actorStore Optional store used to enrich direct actor tools' outputSchema with per-Actor itemsSchema.
  */
 export async function processParamsGetTools(
     url: string,

@@ -22,7 +22,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
-import { buildStartRunResponse, fetchActorRunData } from './actor_run_response.js';
+import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
@@ -200,9 +200,6 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 }
 
-/** Default seconds to wait for completion on `call-actor`. `get-actor-run` also defaults to 30. */
-export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
-
 export const callOptionsSchema = z.object({
     memory: z.number()
         .min(128, 'Memory must be at least 128 MB')
@@ -330,7 +327,25 @@ export async function handleMcpToolCall(params: {
             arguments: input,
         });
 
-        return { content: result.content };
+        // `call-actor` declares `getActorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+        // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
+        // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
+        // the remote tool's payload still flows through `content`. Also forward `isError` so a
+        // failing remote tool surfaces as a failure here.
+        const isErrorFromRemote = result.isError === true;
+        return {
+            content: result.content,
+            isError: isErrorFromRemote,
+            structuredContent: {
+                runId: 'mcp-passthrough',
+                actorId: baseActorName,
+                actorName: baseActorName,
+                status: isErrorFromRemote ? 'FAILED' : 'SUCCEEDED',
+                storages: {},
+                summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
+                nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
+            },
+        };
     } catch (error) {
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
             actorName: baseActorName,
@@ -565,7 +580,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
 
         // Abort can arrive while start() was in flight — abort the newly created run.
         if (abortSignal?.aborted) {
-            await apifyClient.run(actorRun.id).abort({ gracefully: false }).catch(() => undefined);
+            await abortRunOnSignal(actorRun.id, apifyClient);
             return {};
         }
 
@@ -583,9 +598,7 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
             progressTracker: toolArgs.progressTracker,
             abortSignal,
             mcpSessionId: toolArgs.mcpSessionId,
-            onAbort: async (runId, client) => {
-                await client.run(runId).abort({ gracefully: false }).catch(() => undefined);
-            },
+            onAbort: abortRunOnSignal,
         });
 
         if ('aborted' in fetchResult) return {};

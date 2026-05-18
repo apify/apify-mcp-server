@@ -5,6 +5,7 @@ import log from '@apify/log';
 import type { ApifyClient } from '../../apify_client.js';
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
+import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
 
@@ -16,6 +17,9 @@ export const WIDGET_NO_POLL_NEXT_STEP = 'Widget is rendering live progress. Do N
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
+
+/** Default seconds to wait for completion on `call-actor` and direct actor tools. `get-actor-run` also defaults to 30. */
+export const CALL_ACTOR_WAIT_SECS_DEFAULT = 30;
 
 const POLL_HINT_WAIT_SECS = 30;
 
@@ -68,6 +72,12 @@ export type RunDataset = {
     itemCount?: number;
     cleanItemCount?: number;
     fields?: string[];
+    /**
+     * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
+     * the target Actor is known at tools/list time, so historical row shape can be looked up
+     * via `actorStore`). Absent for `call-actor` / `get-actor-run` (dynamic target).
+     */
+    itemsSchema?: { type: 'object'; properties: Record<string, unknown> };
 };
 
 export type RunKeyValueStore = {
@@ -545,6 +555,9 @@ async function waitForRunWithProgress(opts: {
  *
  * Pass `widget: true` for widget-rendered responses: nextStep is replaced with a no-poll
  * message and widget _meta is included so the UI renders automatically.
+ *
+ * Invariant: `widget: true` is only valid from `*-widget` tools. Non-widget tools (call-actor,
+ * direct actor tools) must omit it or pass `false`.
  */
 export function buildStartRunResponse(params: {
     actorName: string;
@@ -595,6 +608,17 @@ export function buildStartRunResponse(params: {
 // -----------------------------------------------------------------------------
 // Main fetch — used by both default and widget variants
 // -----------------------------------------------------------------------------
+
+/**
+ * Default `onAbort` for callers that want the run cancelled when the MCP request is cancelled.
+ * Logs and swallows abort failures so a transient API error doesn't override the original
+ * cancellation result.
+ */
+export const abortRunOnSignal = async (runId: string, client: ApifyClient): Promise<void> => {
+    await client.run(runId).abort({ gracefully: false }).catch((error) => {
+        logHttpError(error, 'Error aborting Actor run', { runId });
+    });
+};
 
 export async function fetchActorRunData(params: {
     runId: string;

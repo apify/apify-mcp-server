@@ -17,7 +17,7 @@ import { RESOURCE_MIME_TYPE } from '../../src/resources/widgets.js';
 import { CALL_ACTOR_MCP_MISSING_TOOL_NAME_MSG } from '../../src/tools/core/call_actor_common.js';
 // Import tools from getCategoryTools instead of directly to avoid circular dependency during module initialization
 import { getCategoryTools, getDefaultTools } from '../../src/tools/index.js';
-import { directActorOutputSchema } from '../../src/tools/structured_output_schemas.js';
+import { getActorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
@@ -58,17 +58,6 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function extractJsonFromMarkdown(text: string): any {
-    // Handle markdown code blocks like ```json
-    const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
-    if (jsonMatch) {
-        return JSON.parse(jsonMatch[1]);
-    }
-    // If no markdown formatting, assume it's raw JSON
-    return JSON.parse(text);
-}
-
 async function callPythonExampleActor(client: Client, selectedToolName: string) {
     const result = await client.callTool({
         name: selectedToolName,
@@ -78,21 +67,7 @@ async function callPythonExampleActor(client: Client, selectedToolName: string) 
         },
     });
 
-    type ContentItem = { text: string; type: string };
-    const content = result.content as ContentItem[];
-    // The result is { content: [ ... ] }, and the last content is the sum
-    const expected = {
-        text: JSON.stringify([{
-            first_number: 1,
-            second_number: 2,
-            sum: 3,
-        }]),
-        type: 'text',
-    };
-    // Parse the JSON to compare objects regardless of property order
-    const actual = content[0];
-    expect(extractJsonFromMarkdown(actual.text)).toEqual(JSON.parse(expected.text));
-    expect(actual.type).toBe(expected.type);
+    expectPythonExampleStructuredContent(result);
 }
 
 function validateStructuredOutput(
@@ -193,42 +168,6 @@ function expectPythonExampleStructuredContent(result: unknown): void {
     );
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
-}
-
-/**
- * Validates the direct-actor-tool response shape (still served by `buildActorResponseContent`).
- * Direct actor tools inline the dataset items in `structuredContent.items` — different from
- * the canonical `call-actor` shape.
- */
-function expectPythonExampleDirectToolContent(result: unknown, firstNumber: number, secondNumber: number): void {
-    const resultWithStructured = result as { structuredContent?: {
-         runId?: string;
-         datasetId?: string;
-         itemCount?: number;
-         items?: { first_number?: number; second_number?: number; sum?: number }[];
-         instructions?: string;
-     } };
-    expect(resultWithStructured.structuredContent).toBeDefined();
-    expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', firstNumber + secondNumber);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', firstNumber);
-    expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', secondNumber);
-}
-
-/** Validates that a markdown text contains a JSON schema code block with metadata and crawl properties. */
-function expectEmbeddedSchemaWithMetadataAndCrawl(text: string): void {
-    const schemaMatch = text.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-    expect(schemaMatch).toBeTruthy();
-    if (schemaMatch) {
-        const schema = JSON.parse(schemaMatch[1]);
-        expect(schema).toHaveProperty('type');
-        expect(schema.type).toBe('object');
-        expect(schema).toHaveProperty('properties');
-        expect(schema.properties).toHaveProperty('metadata');
-        expect(schema.properties.metadata).toHaveProperty('type', 'object');
-        expect(schema.properties).toHaveProperty('crawl');
-        expect(schema.properties.crawl).toHaveProperty('type', 'object');
-    }
 }
 
 /** Validates that the result contains Apify usage cost metadata with expected structure. */
@@ -863,6 +802,48 @@ export function createIntegrationTestsSuite(
 
             const callContent = callResult.content as { text: string }[];
             expect(callContent.some((item) => item.text.includes(`Fetched content from ${DOCS_URL}`))).toBe(true);
+        });
+
+        // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
+        // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
+        // throws -32600 "has an output schema but did not return structured content" once it has cached
+        // the tool validators (which happens on `listTools()` — every real client does this on connect).
+        // The happy-path test above never calls `listTools()`, so the SDK skips validation and the bug stays
+        // invisible at the integration layer. This test surfaces it.
+        it('MCP server actor:tool pass-through returns structuredContent satisfying outputSchema', async () => {
+            client = await createClientFn({ tools: ['actors'] });
+
+            // Populates the SDK's `_cachedToolOutputValidators` map so callTool runs schema validation.
+            await client.listTools();
+
+            const callResult = await client.callTool({
+                name: HelperTools.ACTOR_CALL,
+                arguments: {
+                    actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
+                    input: { url: 'https://docs.apify.com' },
+                },
+            });
+
+            // structuredContent must be present and carry the keys declared `required` on
+            // `getActorRunOutputSchema`. The pass-through path has no Apify run, so the fix is expected to
+            // synthesize sentinel values (e.g. `runId: 'mcp-passthrough'`) rather than real run identifiers.
+            const sc = (callResult as { structuredContent?: Record<string, unknown> }).structuredContent;
+            expect(sc).toBeDefined();
+            expect(sc).toHaveProperty('runId');
+            expect(sc).toHaveProperty('actorId');
+            expect(sc).toHaveProperty('status');
+            expect(sc).toHaveProperty('storages');
+            expect(sc).toHaveProperty('summary');
+            expect(sc).toHaveProperty('nextStep');
+
+            // The remote MCP tool's actual result must still flow through `content` — the fix must not
+            // lose the payload while satisfying the schema.
+            const content = callResult.content as { text: string }[];
+            expect(content.some((item) => item.text.includes('Fetched content from'))).toBe(true);
+
+            // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
+            // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
+            expect(callResult.isError ?? false).toBe(false);
         });
 
         it('should search Apify documentation', async () => {
@@ -2059,23 +2040,31 @@ export function createIntegrationTestsSuite(
                 arguments: { query: 'https://apify.com' },
             });
 
+            // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
-            expectEmbeddedSchemaWithMetadataAndCrawl(content[1].text);
 
-            // Validate structured output and pre-v4 inline items shape for direct actor tools.
+            // Direct actor tools return the canonical RunResponse shape — same as call-actor.
             const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
-            validateStructuredOutput(result, directActorOutputSchema, ragWebBrowserToolName);
-            const resultWithStructured = result as { structuredContent?: {
-                datasetId?: string;
-                items?: { metadata?: { title?: string }; crawl?: object }[];
-            } };
-            expect(resultWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('metadata');
-            expect(resultWithStructured.structuredContent?.items?.[0]).toHaveProperty('crawl');
-
-            const datasetId = resultWithStructured.structuredContent?.datasetId;
+            validateStructuredOutput(result, getActorRunOutputSchema, ragWebBrowserToolName);
+            const sc = (result as { structuredContent?: {
+                status?: string;
+                storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
+                nextStep?: string;
+            } }).structuredContent;
+            expect(sc?.status).toBe('SUCCEEDED');
+            const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
+
+            // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
+            // and the follow-up tool name so the LLM can act on the result.
+            expect(content[1].text).toContain(datasetId);
+            expect(content[1].text).toContain(HelperTools.DATASET_GET_ITEMS);
+
+            // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
+            const fields = sc?.storages?.datasets?.default?.fields ?? [];
+            expect(fields.some((f) => f.startsWith('metadata.'))).toBe(true);
+            expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
 
             const outputResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
@@ -2107,13 +2096,14 @@ export function createIntegrationTestsSuite(
             const content = result.content as { text: string; type: string }[];
             expect(content.length).toBe(2);
 
-            // Validate structured output and pre-v4 inline items shape for direct actor tools.
-            validateStructuredOutput(result, directActorOutputSchema, selectedToolName);
-            expectPythonExampleDirectToolContent(result, 5, 7);
+            // Direct actor tools return the canonical RunResponse shape — same as call-actor.
+            validateStructuredOutput(result, getActorRunOutputSchema, selectedToolName);
+            expectPythonExampleStructuredContent(result);
             expectUsageCostMeta(result);
 
-            const datasetId = (result as { structuredContent?: { datasetId?: string } })
-                .structuredContent?.datasetId;
+            const datasetId = (result as { structuredContent?: {
+                storages?: { datasets?: { default?: { id?: string } } };
+            } }).structuredContent?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
 
             const outputResult = await client.callTool({
