@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Use long commit SHA in release workflow [internal] ([#850](https://github.com/apify/apify-mcp-server/pull/850)) ([1c8388e](https://github.com/apify/apify-mcp-server/commit/1c8388e4f2756d825598401135e3dc3c8e858735)) by [@fnesveda](https://github.com/fnesveda)
+- Stabilise flaky rag-web-browser integration tests ([#863](https://github.com/apify/apify-mcp-server/pull/863)) ([291b0e5](https://github.com/apify/apify-mcp-server/commit/291b0e5782853198962ee2b4df4760a6d60676fb)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
