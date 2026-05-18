@@ -24,7 +24,7 @@ import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categorie
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
-import { assertStatusMessagePropagated, waitForActorRunAbortStatus } from './utils/task_waits.js';
+import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -1724,20 +1724,23 @@ export function createIntegrationTestsSuite(
             await (client.transport as StreamableHTTPClientTransport).terminateSession();
         });
 
-        // Cancellation test: start a long-running actor and cancel immediately, then verify it was aborted
-        // Is not possible to run this test in parallel
+        // Cancel an in-flight `tools/call` via `notifications/cancelled` and verify the
+        // underlying Apify run is aborted. The runId isn't reachable through the client (no
+        // response after cancel, no runId in progress notifications), so we race the Apify API
+        // for the just-started run while the call is in flight, then trigger the cancel.
         it.runIf(options.transport === 'streamable-http')('should abort actor run on notifications/cancelled', { retry: 1 }, async () => {
             const ACTOR_NAME = 'apify/rag-web-browser';
             const selectedToolName = actorNameToToolName(ACTOR_NAME);
             client = await createClientFn({ enableAddingActors: true });
-
-            // Add actor as tool
             await addActor(client, ACTOR_NAME);
 
-            // Build request and cancel immediately via AbortController
-            const controller = new AbortController();
+            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await api.actor(ACTOR_NAME).get();
+            expect(actor).toBeDefined();
+            const actId = actor!.id as string;
 
-            const startedAfter = new Date();
+            const capturingSince = new Date();
+            const controller = new AbortController();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1745,34 +1748,27 @@ export function createIntegrationTestsSuite(
                     arguments: { query: 'restaurants in San Francisco', maxResults: 10 },
                 },
             }, CallToolResultSchema, { signal: controller.signal })
-                // Ignores error "AbortError: This operation was aborted"
+                // Swallow "AbortError: This operation was aborted" — expected after cancel.
                 .catch(() => undefined);
 
-            // Abort right away
-            setTimeout(() => controller.abort(), 3000);
-
-            // Ensure the request completes/cancels before proceeding
+            const runId = await captureInflightActorRunId(api, actId, capturingSince);
+            controller.abort();
             await requestPromise;
 
-            // Verify via Apify API that a recent run for this actor was aborted
+            await waitForRunAborted(api, runId);
+        });
+
+        it.runIf(options.transport === 'streamable-http')('should abort call-actor tool on notifications/cancelled', { retry: 1 }, async () => {
+            const ACTOR_NAME = 'apify/rag-web-browser';
+            client = await createClientFn({ tools: ['actors'] });
+
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
             const actor = await api.actor(ACTOR_NAME).get();
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
-            // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId, startedAfter);
-        });
-
-        // Cancellation test using call-actor tool: start a long-running actor via call-actor and cancel immediately, then verify it was aborted
-        it.runIf(options.transport === 'streamable-http')('should abort call-actor tool on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = 'apify/rag-web-browser';
-            client = await createClientFn({ tools: ['actors'] });
-
-            // Build request and cancel immediately via AbortController
+            const capturingSince = new Date();
             const controller = new AbortController();
-
-            const startedAfter = new Date();
             const requestPromise = client.request({
                 method: 'tools/call' as const,
                 params: {
@@ -1784,23 +1780,13 @@ export function createIntegrationTestsSuite(
                     },
                 },
             }, CallToolResultSchema, { signal: controller.signal })
-                // Ignores error "AbortError: This operation was aborted"
                 .catch(() => undefined);
 
-            // Abort right away
-            setTimeout(() => controller.abort(), 3000);
-
-            // Ensure the request completes/cancels before proceeding
+            const runId = await captureInflightActorRunId(api, actId, capturingSince);
+            controller.abort();
             await requestPromise;
 
-            // Verify via Apify API that a recent run for this actor was aborted
-            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(ACTOR_NAME).get();
-            expect(actor).toBeDefined();
-            const actId = actor!.id as string;
-
-            // Poll for the latest run for this actor to reach ABORTED/ABORTING
-            await waitForActorRunAbortStatus(api, actId, startedAfter);
+            await waitForRunAborted(api, runId);
         });
 
         // Environment variable tests - only applicable to stdio transport
@@ -2448,7 +2434,14 @@ export function createIntegrationTestsSuite(
         it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 3 }, async () => {
             client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
 
-            const startedAfter = new Date();
+            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+            const actor = await api.actor(RAG_WEB_BROWSER).get();
+            expect(actor).toBeDefined();
+            const actId = actor!.id as string;
+
+            // Discover runId in parallel with the stream so it's ready by the time we verify.
+            const runIdPromise = captureInflightActorRunId(api, actId, new Date());
+
             const stream = client.experimental.tasks.callToolStream(
                 {
                     name: actorNameToToolName(RAG_WEB_BROWSER),
@@ -2471,9 +2464,8 @@ export function createIntegrationTestsSuite(
             }
             expect(cancelled).toBe(true);
 
-            const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(RAG_WEB_BROWSER).get();
-            await waitForActorRunAbortStatus(api, actor!.id, startedAfter);
+            const runId = await runIdPromise;
+            await waitForRunAborted(api, runId);
         });
 
         it('should support call-actor tool in task mode (internal tool with taskSupport)', async () => {
