@@ -44,7 +44,7 @@ interface ToolOutput extends Record<string, unknown> {
 
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay =  async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getStatusVariant = (status: string): BadgeVariant => {
     switch (status.toUpperCase()) {
@@ -286,7 +286,7 @@ function toolOutputToRunData(
     meta?: ActorRunMeta
 ): ActorRunData {
     const startedAt = toolOutput.startedAt as string;
-    const finishedAt = toolOutput.finishedAt;
+    const { finishedAt } = toolOutput;
     const duration = formatDuration(startedAt, finishedAt);
     const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
     const actorNameOnly = extractActorName(fullActorName);
@@ -403,7 +403,7 @@ export const ActorRun: React.FC = () => {
                     if (response.structuredContent) {
                         const newData = response.structuredContent as unknown as ToolOutput;
                         const startedAt = newData.startedAt as string;
-                        const finishedAt = newData.finishedAt;
+                        const { finishedAt } = newData;
                         const duration = formatDuration(startedAt, finishedAt);
 
                         const fullActorName = (newData.actorName as string) || runData.actorFullName;
