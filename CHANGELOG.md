@@ -13,6 +13,7 @@ All notable changes to this project will be documented in this file.
 - Add X-Apify-Request-Origin: MCP header to API requests ([#835](https://github.com/apify/apify-mcp-server/pull/835)) ([3068106](https://github.com/apify/apify-mcp-server/commit/30681066bb6b849790d01b74d7baa1e0bb28034f)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#832](https://github.com/apify/apify-mcp-server/issues/832)
 - Remove widget meta from actor tools and add corresponding test ([#845](https://github.com/apify/apify-mcp-server/pull/845)) ([a40befa](https://github.com/apify/apify-mcp-server/commit/a40befa858995d1dfbf0c7be76a1794b1ea8f43d)) by [@jirispilka](https://github.com/jirispilka)
 - Modify get-actor-run - add waitSec and progress ([#823](https://github.com/apify/apify-mcp-server/pull/823)) ([54881ba](https://github.com/apify/apify-mcp-server/commit/54881bafaebf1a4ee956c3ce6c210fcedaeb43a2)) by [@jirispilka](https://github.com/jirispilka), closes [#822](https://github.com/apify/apify-mcp-server/issues/822)
+- Track tool response size in telemetry ([#864](https://github.com/apify/apify-mcp-server/pull/864)) ([78a9654](https://github.com/apify/apify-mcp-server/commit/78a9654f04a2393a5d92d6a60436971db20ee379)) by [@MQ37](https://github.com/MQ37), closes [#838](https://github.com/apify/apify-mcp-server/issues/838)
 
 ### 🐛 Bug Fixes
 
