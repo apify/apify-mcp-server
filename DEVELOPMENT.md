@@ -77,7 +77,7 @@ corepack enable     # one-off, makes pnpm available
 pnpm install        # installs root + src/web (workspace package) in one pass
 ```
 
-A `preinstall` guard rejects `npm install` / `yarn install` to keep the lockfile single-source.
+`devEngines.packageManager` is pinned with `onFail: "error"`, so `npm install` / `yarn install` refuse to run inside the checkout — keeps the lockfile single-source.
 
 ### Working on the MCP Apps (ChatGPT Apps) UI widgets
 

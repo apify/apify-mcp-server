@@ -89,7 +89,6 @@
     "vitest": "^3.0.8"
   },
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
     "start": "tsx src/dev_server.ts",
     "dev": "node scripts/dev_standby.js",
     "build": "pnpm run build:core && pnpm run build:web",

@@ -43,7 +43,7 @@ After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (def
 
 - **Unit tests**: `pnpm run test:unit`.
 - **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
-- **Package manager**: this repo uses **pnpm 11+**. The `preinstall` guard blocks `npm install` / `yarn install` — use `pnpm install` only.
+- **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
 - `tests/integration/suite.ts` is the main suite, reused by stdio/streamable-http transports. Add new integration cases there, NOT in separate files.
 - Follow existing test patterns (names, structure) — check neighboring files.
 - **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.
