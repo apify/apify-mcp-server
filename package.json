@@ -82,7 +82,7 @@
   "scripts": {
     "start": "npm run start:standby",
     "dev": "node scripts/dev_standby.js",
-    "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" tsx src/main.ts",
+    "start:standby": "APIFY_META_ORIGIN=\"STANDBY\" node dist/main.js",
     "build": "npm run build:core",
     "build:core": "tsc -b src",
     "build:watch": "tsc -b src -w",
