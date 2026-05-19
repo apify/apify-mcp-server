@@ -18,7 +18,7 @@ jobs:
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
-                uses: apify/workflows/pnpm-install@v0.44.0
+                uses: apify/actions/pnpm-install@v1.1.2
             # Re-mask in case the token shows up transformed (base64/url-encoded/etc.) in
             # any downstream log output. Literal value is already masked by GitHub.
             -   name: Mask token

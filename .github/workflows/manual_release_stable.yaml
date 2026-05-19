@@ -52,7 +52,7 @@ jobs:
                 with:
                     node-version-file: '.nvmrc'
             -   name: Install pnpm and dependencies
-                uses: apify/workflows/pnpm-install@v0.44.0
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Build module
                 run: pnpm run build
             -   name: Prepare MCPB package

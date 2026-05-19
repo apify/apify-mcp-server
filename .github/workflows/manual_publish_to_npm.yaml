@@ -34,7 +34,7 @@ jobs:
                     node-version-file: .nvmrc
                     registry-url: 'https://registry.npmjs.org'
             -   name: Install pnpm and dependencies
-                uses: apify/workflows/pnpm-install@v0.44.0
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Check version consistency and bump pre-release version (beta only)
                 if: ${{ inputs.tag == 'beta' }}
                 run: node ./.github/scripts/before-beta-release.js
