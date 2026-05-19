@@ -66,9 +66,10 @@ export function computeToolResponseSizeBytes(result: unknown): number {
             }
         }
     }
-    if (res.structuredContent !== undefined) {
+    if (res.structuredContent != null) {
         try {
-            bytes += Buffer.byteLength(JSON.stringify(res.structuredContent) ?? '', 'utf8');
+            const json = JSON.stringify(res.structuredContent);
+            if (json) bytes += Buffer.byteLength(json, 'utf8');
         } catch {
             // Non-serialisable structured content (e.g. circular) — skip.
         }
