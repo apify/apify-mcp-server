@@ -4,9 +4,13 @@ import { expect, vi } from 'vitest';
 
 import { TERMINAL_RUN_STATUSES } from '../../../src/utils/progress.js';
 
-const RUN_DISCOVERY_TIMEOUT_MS = 8_000;
+// Generous timeouts: container-scheduling lag on the Apify Platform can push
+// "first time the run shows up in the API" or "ABORTED status propagates" past
+// the tight bounds the original values assumed, surfacing as `Timed out in
+// waitUntil` flakes on otherwise-correct test logic.
+const RUN_DISCOVERY_TIMEOUT_MS = 20_000;
 const RUN_DISCOVERY_INTERVAL_MS = 250;
-const RUN_ABORT_WAIT_TIMEOUT_MS = 30_000;
+const RUN_ABORT_WAIT_TIMEOUT_MS = 60_000;
 const RUN_ABORT_WAIT_INTERVAL_MS = 500;
 // `startedAt` is server-stamped; `capturingSince` is client-stamped — buffer absorbs skew.
 const CLOCK_SKEW_BUFFER_MS = 2_000;
@@ -91,4 +95,20 @@ export async function waitForRunAborted(apiClient: ApifyClient, runId: string): 
         const run = await apiClient.run(runId).get();
         return run?.status === 'ABORTED' || run?.status === 'ABORTING';
     }, { timeout: RUN_ABORT_WAIT_TIMEOUT_MS, interval: RUN_ABORT_WAIT_INTERVAL_MS });
+}
+
+const RUN_TERMINAL_WAIT_TIMEOUT_MS = 90_000;
+const RUN_TERMINAL_WAIT_INTERVAL_MS = 1_000;
+
+/**
+ * Poll a specific run by ID until it reaches a terminal status (SUCCEEDED / FAILED /
+ * ABORTED / TIMED-OUT). Useful when a test needs to read the run's dataset items
+ * but the `call-actor` / direct-actor-tool call returned with status RUNNING because
+ * `waitSecs` (capped at 45) elapsed before the actor finished.
+ */
+export async function waitForRunTerminal(apiClient: ApifyClient, runId: string): Promise<void> {
+    await vi.waitUntil(async () => {
+        const run = await apiClient.run(runId).get();
+        return run && TERMINAL_RUN_STATUSES.has(run.status);
+    }, { timeout: RUN_TERMINAL_WAIT_TIMEOUT_MS, interval: RUN_TERMINAL_WAIT_INTERVAL_MS });
 }

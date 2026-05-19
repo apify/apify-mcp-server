@@ -24,7 +24,7 @@ import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categorie
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
 import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
-import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
+import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted, waitForRunTerminal } from './utils/task_waits.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -1985,7 +1985,10 @@ export function createIntegrationTestsSuite(
                 name: 'call-actor',
                 arguments: {
                     actor: RAG_WEB_BROWSER,
+                    // Max wait (45s) — see neighbouring rag-web-browser tests; the follow-up
+                    // dataset read needs items, which require the run to reach SUCCEEDED.
                     input: { query: 'https://apify.com' },
+                    waitSecs: 45,
                 },
             });
 
@@ -1994,13 +1997,22 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2);
 
             const sc = (callResult as { structuredContent?: {
+                runId?: string;
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
                 nextStep?: string;
             } }).structuredContent;
-            expect(sc?.status).toBe('SUCCEEDED');
+            // `waitSecs: 45` is the `WAIT_SECS_MAX` server-side cap; accept RUNNING and
+            // wait for terminal via the Apify API before reading items.
+            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
             const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
+            expect(sc?.runId).toBeDefined();
+
+            if (sc?.status !== 'SUCCEEDED') {
+                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                await waitForRunTerminal(api, sc!.runId!);
+            }
 
             // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
@@ -2032,7 +2044,9 @@ export function createIntegrationTestsSuite(
 
             const result = await client.callTool({
                 name: actorNameToToolName('apify/rag-web-browser'),
-                // Max wait (45s) so the test does not flake on a slow run.
+                // Max wait (45s) — the server-side cap. If the actor hasn't terminated
+                // by then, we follow up with `waitForRunTerminal` below so the dataset
+                // read sees the populated items.
                 arguments: { query: 'https://apify.com', waitSecs: 45 },
             });
 
@@ -2044,13 +2058,22 @@ export function createIntegrationTestsSuite(
             const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
             validateStructuredOutput(result, getActorRunOutputSchema, ragWebBrowserToolName);
             const sc = (result as { structuredContent?: {
+                runId?: string;
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
                 nextStep?: string;
             } }).structuredContent;
-            expect(sc?.status).toBe('SUCCEEDED');
+            // `waitSecs: 45` is the `WAIT_SECS_MAX` server-side cap. Accept RUNNING too —
+            // we wait for terminal status via the Apify API below before reading items.
+            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
             const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
+            expect(sc?.runId).toBeDefined();
+
+            if (sc?.status !== 'SUCCEEDED') {
+                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
+                await waitForRunTerminal(api, sc!.runId!);
+            }
 
             // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
             // and the follow-up tool name so the LLM can act on the result.
