@@ -2,15 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.6 - **not yet released**
+## [0.10.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.6) (2026-05-19)
 
 ### 🐛 Bug Fixes
 
 - **ci:** Migrate bump_dependency_in_internal_repo job to pnpm ([#867](https://github.com/apify/apify-mcp-server/pull/867)) ([bae8fa7](https://github.com/apify/apify-mcp-server/commit/bae8fa7050ad875b27782db2bd22e9e54dbef9cf)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.5) (2026-05-19)
 
 ### 🚀 Features
