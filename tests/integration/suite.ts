@@ -638,7 +638,11 @@ export function createIntegrationTestsSuite(
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string } } };
             } }).structuredContent;
-            expect(sc?.status).toBe('SUCCEEDED');
+            // `waitSecs: 45` is the `WAIT_SECS_MAX` cap; rag-web-browser occasionally
+            // doesn't reach a terminal status within that window. This test is about
+            // `callOptions.maxItems` being accepted by the API — not about the actor
+            // finishing fast — so accept RUNNING as well.
+            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
             expect(sc?.storages?.datasets?.default?.id).toBeDefined();
         });
 
@@ -1876,6 +1880,11 @@ export function createIntegrationTestsSuite(
                     arguments: {
                         actor: RAG_WEB_BROWSER,
                         input: { query: 'https://apify.com', maxResults: 1 },
+                        // `WAIT_SECS_MAX = 45` — same pattern as the other rag-web-browser tests
+                        // in this file (PR #863 fix). Without it the call defaults to 30s,
+                        // which is not always enough for the actor to write its first item
+                        // before the dataset-read tests in this describe block start.
+                        waitSecs: 45,
                     },
                 });
                 const callStructured = callResult as { structuredContent?: {
