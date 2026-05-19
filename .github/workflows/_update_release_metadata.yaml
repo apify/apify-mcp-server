@@ -64,13 +64,10 @@ jobs:
                 with:
                     token: ${{ secrets.APIFY_SERVICE_ACCOUNT_GITHUB_TOKEN }}
 
-            -   name: Use Node.js
-                uses: actions/setup-node@v6
-                with:
-                    node-version-file: '.nvmrc'
-
+            # No Node/pnpm setup needed here — we only edit JSON files with jq,
+            # which is preinstalled on GitHub-hosted runners.
             -   name: Update package version in package.json
-                run: npm version --no-git-tag-version --allow-same-version ${{ needs.release_metadata.outputs.version_number }}
+                run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' package.json > package.json.tmp && mv package.json.tmp package.json
 
             -   name: Update manifest.json version
                 run: jq '.version = "${{ needs.release_metadata.outputs.version_number }}"' manifest.json > manifest.json.tmp && mv manifest.json.tmp manifest.json

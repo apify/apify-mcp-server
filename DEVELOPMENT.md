@@ -30,7 +30,7 @@ Key entry points:
 - `src/index.ts` - Main library export (`ActorsMcpServer` class)
 - `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
-- `src/dev_server.ts` - Express HTTP server for local development (`npm start`)
+- `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
 - `src/input.ts` - Input processing and validation
 
 ## Tool loading phases
@@ -69,10 +69,15 @@ Refer to the [CONTRIBUTING.md](./CONTRIBUTING.md) file.
 
 ### Installation
 
+This repo uses **pnpm 11+** as the package manager. corepack (bundled with Node 16+) reads
+`package.json#packageManager` and pins the exact version for you — no manual install needed.
+
 ```bash
-npm install
-cd src/web && npm install
+corepack enable     # one-off, makes pnpm available
+pnpm install        # installs root + src/web (workspace package) in one pass
 ```
+
+A `preinstall` guard rejects `npm install` / `yarn install` to keep the lockfile single-source.
 
 ### Working on the MCP Apps (ChatGPT Apps) UI widgets
 
@@ -85,7 +90,7 @@ See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) 
 ### Production build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Builds the core TypeScript project and `src/web/` widgets, then copies widgets into `dist/web/`. Required before running integration tests or the compiled server.
@@ -93,7 +98,7 @@ Builds the core TypeScript project and `src/web/` widgets, then copies widgets i
 ### Hot-reload development
 
 ```bash
-APIFY_TOKEN='your-apify-token' npm run dev
+APIFY_TOKEN='your-apify-token' pnpm run dev
 ```
 
 Starts the web widgets builder in watch mode and the MCP server in standby mode on port `3001`. Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
@@ -121,8 +126,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 | Layer | Command | What it covers |
 |---|---|---|
-| **Unit tests** | `npm run test:unit` | Individual modules in isolation — no credentials needed |
-| **Integration tests** | `npm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `npm run build`) |
+| **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
+| **Integration tests** | `pnpm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
 | **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
 
@@ -146,8 +151,8 @@ It also runs automatically on every merge to the `master` branch.
 #### Setup
 
 ```bash
-npm install -g @apify/mcpc
-npm run build
+pnpm add -g @apify/mcpc
+pnpm run build
 mcpc --config .mcp.json stdio connect @stdio
 mcpc @stdio tools-list   # verify
 ```

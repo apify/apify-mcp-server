@@ -21,19 +21,11 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
 
-            -   name: Install dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/workflows/pnpm-install@v0.44.0
 
-            -   name: Build web widgets
-                working-directory: src/web
-                run: |
-                    npm ci --force
-                    npm run build
-                
             -   name: Build
-                run: npm run build
+                run: pnpm run build
 
             -   run: npx -y pkg-pr-new publish
