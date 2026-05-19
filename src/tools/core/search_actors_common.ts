@@ -16,7 +16,32 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 export const searchActorsBaseArgsSchema = z.object({
     keywords: z.string()
         .default('')
-        .describe('Keywords used to search for Actors in the Apify Store.'),
+        .describe(dedent`
+            Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
+            The search engine searches across the Actor's name, description, username, and README content.
+
+            Pass empty string ("") whenever the user has NOT named a specific platform
+            (Instagram, Amazon, Google Maps) or a specific data type (posts, products,
+            weather, news). Empty keywords return Actors in the Apify Store's default
+            sort order, which is popularity in practice (most-used Actors first). Do NOT
+            use ranking words ("top", "best", "popular") or bare task words ("scraper",
+            "crawler", "extractor") as keyword values — they are not Actor names and
+            produce noisy matches against README content.
+
+            Otherwise, follow these rules:
+            - Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")
+            - Actors are named using platform or service name together with the type of data or task they perform
+            - The most effective keywords are specific platform names (Instagram, Twitter, TikTok) and specific data types (posts, products, profiles, weather, news, reviews, comments)
+            - If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords
+            - The goal is to find Actors that specifically handle the platform and data type the user mentioned
+
+            Examples:
+            ✅ "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
+            ✅ "" (empty) — returns the most popular Actors store-wide
+            ❌ "Instagram posts profiles comments hashtags reels stories followers..." (too long)
+            ❌ "top popular actors", "best scrapers", "trending" — ranking words aren't Actor keywords; pass "" instead
+            ❌ "scraper", "extractor", "web crawler" — bare task words aren't Actor keywords; pass "" instead
+        `),
     limit: z.number()
         .int()
         .min(1)
@@ -31,30 +56,12 @@ export const searchActorsBaseArgsSchema = z.object({
 });
 
 /**
- * Zod schema for the base search-actors tool arguments. Not used by the widget
- * variant (which reuses the shorter-description base schema via `.strict()`).
+ * Zod schema for the search-actors tool arguments. Equivalent to the base
+ * schema; the widget variant uses the same base schema via `.strict()` — both
+ * variants share the `keywords` description that lives on
+ * `searchActorsBaseArgsSchema`.
  */
-export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({
-    keywords: z.string()
-        .default('')
-        .describe(dedent`
-            Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
-            The search engine searches across Actor's name, description, username, and readme content.
-
-            Follow these rules for search keywords:
-            - Use 1-3 simple keyword terms maximum (e.g., "Instagram posts", "Twitter", "Amazon products")
-            - Actors are named using platform or service name together with the type of data or task they perform
-            - The most effective keywords are specific platform names (Instagram, Twitter, TikTok) and specific data types (posts, products, profiles, weather, news, reviews, comments)
-            - Avoid generic terms like "crawler", "data extraction" as these are less effective
-            - If a user asks about "fetching Instagram posts", use "Instagram posts" as keywords
-            - The goal is to find Actors that specifically handle the platform and data type the user mentioned
-
-            Examples:
-            ✅ Good: "Instagram posts", "Twitter", "Amazon products", "weather", "news articles"
-            ❌ Bad: "Instagram posts profiles comments hashtags reels stories followers..." (too long, too many terms)
-            ❌ Bad: "data extraction scraping tools" (too generic)
-        `),
-});
+export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({});
 
 const SEARCH_ACTORS_DESCRIPTION = `
 Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
