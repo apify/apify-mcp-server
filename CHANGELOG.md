@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.5 - **not yet released**
+## [0.10.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.5) (2026-05-19)
 
 ### 🚀 Features
 
@@ -22,7 +21,6 @@ All notable changes to this project will be documented in this file.
 - Include mcpTools in fetch-actor-details structured content ([#858](https://github.com/apify/apify-mcp-server/pull/858)) ([fdb4a6b](https://github.com/apify/apify-mcp-server/commit/fdb4a6baefa40e2db9e2a3d4c7303b16ad817769)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.4) (2026-05-13)
 
 ### 🐛 Bug Fixes
