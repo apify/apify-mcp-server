@@ -61,7 +61,6 @@ The minimum supported Node.js version is **22** (`engines.node >= 22.0.0` in `pa
 
 - pnpm 11 (the pinned package manager) requires Node 22.13+, so the dev workflow needs Node 22+ regardless.
 - The CI test matrix runs on `[22, 24, 26]` — Node 20 is not validated pre-publish.
-- The only pre-publish static gate that could catch Node-22-only API usage on the source was `eslint-plugin-n`. We migrated lint to oxlint, which has no equivalent rule, so reintroducing ESLint just for that rule would be a regression.
 - A matrix tarball smoke test on Node 20 at release time would close the gap, but the CI complexity isn't worth it given Sentry data shows Node 20 is a small user segment.
 - Setting `engines >= 22` matches what CI actually validates and what dev tooling already requires. It's the honest floor.
 
