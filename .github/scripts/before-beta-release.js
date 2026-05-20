@@ -18,7 +18,12 @@ pkgJson.version = nextVersion;
 writeFileSync(PKG_JSON_PATH, `${JSON.stringify(pkgJson, null, 2)}\n`);
 
 function addBetaSuffixToVersion(version) {
-    const versionString = execSync(`npm show ${PACKAGE_NAME} versions --json`, { encoding: 'utf8' });
+    // `pnpm view` instead of `npm show` because devEngines.packageManager is
+    // pinned to pnpm with onFail: error, and npm enforces that check for every
+    // subcommand (including read-only registry queries), so `npm show` fails
+    // with EBADDEVENGINES at the repo root. `pnpm view` returns the same JSON
+    // shape and skips the npm devEngines validation.
+    const versionString = execSync(`pnpm view ${PACKAGE_NAME} versions --json`, { encoding: 'utf8' });
     const versions = JSON.parse(versionString);
 
     if (versions.some((v) => v === version)) {
