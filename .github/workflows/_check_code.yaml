@@ -77,3 +77,44 @@ jobs:
                 uses: apify/actions/pnpm-install@v1.1.2
             -   name: Type checks
                 run: pnpm run type-check
+
+    docker_build_smoke_test:
+        # The Dockerfile is consumed by the external Docker Hub auto-build integration
+        # (see README) but no other CI job builds it, so breakage — like the pnpm v10+
+        # `pnpm deploy` regression — only surfaces post-merge. This job builds the image
+        # on every PR / master push and exercises the entrypoint to keep that surface honest.
+        name: Docker build & smoke test
+        runs-on: ubuntu-latest
+
+        steps:
+            -   uses: actions/checkout@v6
+
+            -   name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+
+            -   name: Build image
+                uses: docker/build-push-action@v6
+                with:
+                    context: .
+                    load: true
+                    tags: apify-mcp-server:ci
+                    cache-from: type=gha
+                    cache-to: type=gha,mode=max
+
+            -   name: Smoke test — CLI help output
+                # Confirms the entrypoint starts and yargs renders the usage block.
+                run: |
+                    docker run --rm apify-mcp-server:ci --help | grep -F 'Usage: stdio.js'
+
+            -   name: Smoke test — MCP initialize handshake over stdio
+                # Validates the server boots in the runtime image and speaks MCP.
+                # APIFY_TOKEN can be any non-empty string — the initialize handshake
+                # does not hit the Apify API, so no secret is required.
+                run: |
+                    request='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"1.0"}}}'
+                    response=$(printf '%s\n' "$request" | docker run --rm -i -e APIFY_TOKEN=apify_api_dummy_for_smoke apify-mcp-server:ci)
+                    echo "--- raw response ---"
+                    echo "$response"
+                    echo "--- assertions ---"
+                    echo "$response" | grep -m1 '"id":1' | jq -e '.result.serverInfo.name == "apify-mcp-server"'
+                    echo "$response" | grep -m1 '"id":1' | jq -e '.result.protocolVersion != null'
