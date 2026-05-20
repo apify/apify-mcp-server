@@ -5,8 +5,16 @@
   "description": "Apify MCP Server",
   "mcpName": "com.apify/apify-mcp-server",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "11.1.3",
+      "onFail": "error"
+    }
+  },
+  "packageManager": "pnpm@11.1.3",
   "main": "dist/index.js",
   "exports": {
     ".": "./dist/index.js",
@@ -50,6 +58,7 @@
     "ajv": "^8.17.1",
     "algoliasearch": "^5.31.0",
     "apify-client": "^2.22.1",
+    "axios": "^1.16.0",
     "dedent": "^1.7.2",
     "dotenv": "^17.4.1",
     "express": "^4.21.2",
@@ -82,32 +91,29 @@
   "scripts": {
     "start": "tsx src/dev_server.ts",
     "dev": "node scripts/dev_standby.js",
-    "build": "npm run build:core && npm run build:web",
+    "build": "pnpm run build:core && pnpm run build:web",
     "build:core": "tsc -b src",
     "build:watch": "tsc -b src -w",
-    "build:web": "npm --prefix src/web install && npm --prefix src/web run build",
+    "build:web": "pnpm --filter @apify/mcp-web-widget run build",
     "postbuild": "mkdir -p dist/web && (cp -r src/web/dist dist/web/ 2>/dev/null || :)",
     "clean": "tsc -b src --clean && rm -rf dist/web",
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "type-check": "tsc -p tsconfig.json --noEmit",
-    "typecheck": "npm run type-check",
-    "check": "npm run type-check && npm run lint",
+    "typecheck": "pnpm run type-check",
+    "check": "pnpm run type-check && pnpm run lint",
     "check:widgets": "tsx scripts/check_widgets.ts",
-    "test": "npm run test:unit",
+    "test": "pnpm run test:unit",
     "test:unit": "vitest run tests/unit",
-    "test:integration": "npm run build && vitest run tests/integration",
-    "test:integration:stdio": "npm run build && vitest run tests/integration/stdio.test.ts",
-    "test:integration:sse": "npm run build && vitest run tests/integration/actor.server_sse.test.ts",
-    "test:integration:streamable": "npm run build && vitest run tests/integration/actor.server_streamable.test.ts",
+    "test:integration": "pnpm run build && vitest run tests/integration",
+    "test:integration:stdio": "pnpm run build && vitest run tests/integration/stdio.test.ts",
+    "test:integration:sse": "pnpm run build && vitest run tests/integration/actor.server_sse.test.ts",
+    "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create_dataset.ts",
     "evals:run": "tsx evals/run_evaluation.ts",
-    "evals:workflow": "npm run build && tsx evals/workflows/run_workflow_evals.ts"
+    "evals:workflow": "pnpm run build && tsx evals/workflows/run_workflow_evals.ts"
   },
   "author": "Apify",
-  "license": "MIT",
-  "overrides": {
-    "@modelcontextprotocol/sdk": "1.29.0"
-  }
+  "license": "MIT"
 }

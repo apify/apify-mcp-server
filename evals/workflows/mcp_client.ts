@@ -41,7 +41,7 @@ export class McpClient {
         if (!fs.existsSync(stdioBinPath)) {
             throw new Error(
                 'MCP server binary not found at dist/stdio.js. '
-                + 'Please run "npm run build" first.',
+                + 'Please run "pnpm run build" first.',
             );
         }
 

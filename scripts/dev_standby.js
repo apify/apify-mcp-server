@@ -26,12 +26,13 @@ function run(cmd, args, opts = {}) {
     return child;
 }
 
-// 1) Start web build in watch mode (produces src/web/dist)
-const webDir = resolve(repoRoot, 'src/web');
-const web = run('npm', ['run', 'dev', '--silent'], { cwd: webDir });
+// 1) Start web build in watch mode (produces src/web/dist).
+// `pnpm --filter` runs the workspace package's script from the repo root, so
+// we don't need to switch cwd — keeps both children inheriting the same env.
+const web = run('pnpm', ['--silent', '--filter', '@apify/mcp-web-widget', 'run', 'dev']);
 
 // 2) Start server (reads src/web/dist via resolveAvailableWidgets)
-const server = run('npm', ['run', 'start']);
+const server = run('pnpm', ['--silent', 'run', 'start']);
 
 // Forward signals so both children terminate cleanly
 function shutdown() {

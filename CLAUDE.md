@@ -25,24 +25,25 @@ Use `git mv` (not `mv` + `rm`) when renaming files so git records a rename rathe
 
 ## Verification (mandatory)
 
-After every code change, run `npm run type-check`, `npm run lint`, and `npm run test:unit`.
+After every code change, run `pnpm run type-check`, `pnpm run lint`, and `pnpm run test:unit`.
 Zero tolerance for errors — fix before proceeding, don't defer.
 
 ## Agent constraints
 
-- **Do NOT use `npm run build` for type-checking.** Use `npm run type-check` — it is faster and skips JavaScript output generation. Only use `npm run build` when compiled output is explicitly needed (e.g., before mcpc probing).
+- **Do NOT use `pnpm run build` for type-checking.** Use `pnpm run type-check` — it is faster and skips JavaScript output generation. Only use `pnpm run build` when compiled output is explicitly needed (e.g., before mcpc probing).
 - **Do NOT run integration tests as an agent.** They require a valid `APIFY_TOKEN` and are slow.
 
 ## Testing the MCP server end-to-end
 
 When the user says "test with mcpc", **use mcpc** — do not invent a substitute (no curl, no ad-hoc Node/Python scripts, no unit tests in place of an e2e probe). Use the **apify CLI** (`apify datasets`, `apify key-value-stores`, `apify actors`, …) for ground-truth data — never curl the Apify API.
 
-After `npm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (default) / `@stdio-full` (non-default tools) is listed, `mcpc @stdio restart`; otherwise `mcpc --config .mcp.json stdio connect @stdio`. Use the `mcpc-tester` subagent for systematic spec/edge-case coverage; call mcpc directly for quick checks.
+After `pnpm run build`, run `mcpc` (no args) to check sessions: if `@stdio` (default) / `@stdio-full` (non-default tools) is listed, `mcpc @stdio restart`; otherwise `mcpc --config .mcp.json stdio connect @stdio`. Use the `mcpc-tester` subagent for systematic spec/edge-case coverage; call mcpc directly for quick checks.
 
 ## Testing
 
-- **Unit tests**: `npm run test:unit`.
-- **Integration tests**: `npm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
+- **Unit tests**: `pnpm run test:unit`.
+- **Integration tests**: `pnpm run test:integration` (needs build + `APIFY_TOKEN`, humans only).
+- **Package manager**: this repo uses **pnpm 11+**. `devEngines.packageManager` is pinned with `onFail: "error"`, so npm / yarn refuse to run inside the checkout — use `pnpm install` only.
 - `tests/integration/suite.ts` is the main suite, reused by stdio/streamable-http transports. Add new integration cases there, NOT in separate files.
 - Follow existing test patterns (names, structure) — check neighboring files.
 - **Test naming**: `describe('fnName()')`, plain-verb `it()` names (no `should` prefix). Group with nested `describe()` per method when a factory/class exposes several.

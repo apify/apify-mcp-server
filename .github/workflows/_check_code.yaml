@@ -24,12 +24,10 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install Dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Lint
-                run: npm run lint
+                run: pnpm run lint
 
     build:
         name: Build
@@ -41,18 +39,16 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install Dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Build
-                run: npm run build
+                run: pnpm run build
 
     test:
         name: Test (Node.js ${{ matrix.node-version }})
         strategy:
             matrix:
-                node-version: [20, 22, 24]
+                node-version: [22, 24, 26]
             fail-fast: false
         runs-on: ubuntu-latest
 
@@ -62,12 +58,10 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version: ${{ matrix.node-version }}
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install Dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Test
-                run: npm run test
+                run: pnpm run test
 
     type_check:
         name: Type check
@@ -79,9 +73,7 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install Dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Type checks
-                run: npm run type-check
+                run: pnpm run type-check

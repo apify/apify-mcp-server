@@ -481,7 +481,7 @@ APIFY_TOKEN="your-apify-token"
 Build the `actors-mcp-server` package:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ## Start HTTP streamable MCP server

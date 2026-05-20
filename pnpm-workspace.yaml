@@ -1,0 +1,34 @@
+packages:
+  - "src/web"
+
+# 24-hour quarantine on newly published versions to blunt supply-chain attacks
+# (compromised packages typically get yanked within hours of discovery).
+# Excludes are scopes we publish ourselves and trust on the same release cadence.
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - "@apify/*"
+  - "@apify-packages/*"
+
+# Postinstall protection — pnpm only runs build scripts for packages with `: true` here.
+# `: false` is an explicit-deny marker; without it, pnpm re-injects a `"set this to true or false"`
+# placeholder on every install. New transitives with build scripts surface as placeholders the first
+# time they appear — review them, then change to `true` or `false`.
+allowBuilds:
+  # Postinstall generates the SVG sprite the widget code imports — needed for web build.
+  "@apify/ui-icons": true
+  # Downloads the sentry-cli binary used by `sentry-cli sourcemaps upload` in CI.
+  "@sentry/cli": true
+  # Native binary install per platform — esbuild won't run without it.
+  esbuild: true
+  # Pulled transitively (algoliasearch → ...). Postinstall just patches a long-deprecated
+  # `node ./scripts/postinstall` helper; not needed for our use.
+  protobufjs: false
+
+# pnpm 11's default is `true`, which fails `pnpm install --frozen-lockfile` whenever a new
+# build-script transitive lands. We keep the security benefit (only allowlisted scripts run)
+# without making installs flaky on every dependency bump.
+strictDepBuilds: false
+
+# Dependency version overrides. pnpm 11 reads these from the workspace manifest, not package.json.
+overrides:
+  "@modelcontextprotocol/sdk": "1.29.0"

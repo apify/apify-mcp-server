@@ -51,24 +51,19 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install dependencies
-                run: npm ci --force
-            -   name: Build web widgets
-                working-directory: src/web
-                run: |
-                    npm ci
-                    npm run build
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             -   name: Build module
-                run: npm run build
+                run: pnpm run build
             -   name: Prepare MCPB package
+                # `pnpm deploy --prod mcpb` builds a self-contained deployment dir:
+                # production-only deps, a flat (hoisted) node_modules with no `.pnpm/`
+                # store or symlinks — the MCPB packer requires a portable tree.
+                # Then we copy in the build output and assets the packer expects.
                 run: |
-                    mkdir mcpb
-                    cp -r node_modules mcpb/node_modules
+                    pnpm deploy --prod mcpb
                     cp -r dist mcpb/dist
                     cp -r docs mcpb/docs
-                    cp package.json mcpb/package.json
                     cp manifest.json mcpb/manifest.json
                     cp docs/apify-logo-claude-desktop.png mcpb/icon.png
             -   name: Validate MCPB manifest

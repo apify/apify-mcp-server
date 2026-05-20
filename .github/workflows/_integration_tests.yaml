@@ -17,10 +17,8 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
-            -   name: Install Dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
             # Re-mask in case the token shows up transformed (base64/url-encoded/etc.) in
             # any downstream log output. Literal value is already masked by GitHub.
             -   name: Mask token
@@ -30,4 +28,4 @@ jobs:
             -   name: Integration tests
                 env:
                     APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
-                run: npm run test:integration
+                run: pnpm run test:integration
