@@ -25,11 +25,16 @@ RUN corepack enable
 
 WORKDIR /app
 
-# `pnpm deploy --prod` produces a self-contained, hoisted node_modules (no `.pnpm/`
-# symlinks) with production dependencies only — the pnpm equivalent of
+# `pnpm deploy --legacy --filter` produces a self-contained node_modules for the
+# named package with production dependencies only — the pnpm equivalent of
 # `npm ci --omit=dev`, with no extra registry resolution at runtime.
+# - `--filter` is required from the workspace root so pnpm knows which package to
+#   deploy (workspace contains both the server and the `src/web` widget package).
+# - `--legacy` opts out of pnpm v10+'s `inject-workspace-packages` requirement; the
+#   server doesn't depend on any workspace package at runtime, so the legacy path is
+#   the correct one (see ERR_PNPM_DEPLOY_NONINJECTED_WORKSPACE).
 COPY --from=builder /app /build
-RUN cd /build && pnpm deploy --prod /app && rm -rf /build
+RUN cd /build && pnpm deploy --legacy --filter "@apify/actors-mcp-server" --prod /app && rm -rf /build
 COPY --from=builder /app/dist ./dist
 
 ENTRYPOINT ["node", "dist/stdio.js"]
