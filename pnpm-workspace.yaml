@@ -1,10 +1,11 @@
 packages:
   - "src/web"
 
-# 24-hour quarantine on newly published versions to blunt supply-chain attacks
-# (compromised packages typically get yanked within hours of discovery).
+# 72-hour quarantine on newly published versions to blunt supply-chain attacks
+# (compromised packages typically get yanked within hours of discovery, but the
+# longer window catches slow-detection cases too).
 # Excludes are scopes we publish ourselves and trust on the same release cadence.
-minimumReleaseAge: 1440
+minimumReleaseAge: 4320
 minimumReleaseAgeExclude:
   - "@apify/*"
   - "@apify-packages/*"
