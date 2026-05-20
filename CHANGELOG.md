@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.7 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- Unify search-actors keywords description across variants ([#868](https://github.com/apify/apify-mcp-server/pull/868)) ([c6c7d41](https://github.com/apify/apify-mcp-server/commit/c6c7d41d95caca7c243ccb55c798f675eee8080b)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#833](https://github.com/apify/apify-mcp-server/issues/833)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.10.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.6) (2026-05-19)
