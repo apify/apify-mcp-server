@@ -26,11 +26,31 @@ const X402_TOOL_INSTRUCTIONS = [
     'Your MCP client must support the x402 payment protocol.',
 ].join(' ');
 
+/** Preferred scheme order when selecting the flat fields exposed on `_meta.x402`. */
+const X402_PREFERRED_SCHEMES = ['upto', 'exact'] as const;
+
 /**
- * x402 payment requirements returned by the Apify API.
- * Decoded from the base64 `payment-required` response header.
+ * One entry in a 402 `accepts` array. Mirrors the public x402 v2 wire shape;
+ * carried verbatim from the Apify API.
  */
-export type X402PaymentRequirements = Record<string, unknown>;
+export type X402PaymentAccept = {
+    scheme?: string;
+    network?: string;
+    amount?: string;
+    asset?: string;
+    payTo?: string;
+    maxTimeoutSeconds?: number;
+    extra?: Record<string, unknown>;
+};
+
+/**
+ * Decoded `payment-required` payload returned by the Apify API.
+ */
+export type X402PaymentRequirements = {
+    x402Version?: number;
+    resource?: Record<string, unknown>;
+    accepts?: X402PaymentAccept[];
+};
 
 // Module-level cache for X402 payment requirements.
 // We cache the Promise itself (rather than just the JSON result) to prevent the "thundering herd"
@@ -156,14 +176,18 @@ export class X402PaymentProvider implements PaymentProvider {
     }
 
     /**
-     * Extracts the first accept entry from the full payment requirements.
-     * This is the flattened payment info that goes into _meta.x402 for tool schemas.
+     * Picks the preferred accept entry for flat `_meta.x402` advertising.
+     * Order: `upto`, then `exact`, then the first remaining entry.
+     *
+     * Clients that read only the flat fields (no `accepts[]` walking) get the
+     * richest payment option by default.
      */
-    private getFirstAcceptEntry(): Record<string, unknown> | undefined {
-        if (!this.requirements) return undefined;
-        const accepts = this.requirements.accepts as unknown[] | undefined;
-        if (!Array.isArray(accepts) || accepts.length === 0) return undefined;
-        return accepts[0] as Record<string, unknown>;
+    private selectPreferredAcceptEntry(accepts: X402PaymentAccept[]): X402PaymentAccept {
+        for (const preferred of X402_PREFERRED_SCHEMES) {
+            const match = accepts.find((entry) => entry.scheme === preferred);
+            if (match) return match;
+        }
+        return accepts[0];
     }
 
     decorateToolSchema(tool: ToolEntry): ToolEntry {
@@ -171,16 +195,20 @@ export class X402PaymentProvider implements PaymentProvider {
 
         const cloned = cloneToolEntry(tool);
 
-        // Add _meta.x402 to signal payment requirement to clients (idempotent)
-        // Only include the first accept entry (scheme, network, amount, asset, payTo, etc.)
-        // matching the demo server format — NOT the full API response
+        // Flat preferred fields stay for back-compat with clients that don't iterate `accepts[]`.
         if (!cloned._meta) {
             cloned._meta = {};
         }
         const metaRecord = cloned._meta as Record<string, unknown>;
         if (!metaRecord.x402) {
-            const acceptEntry = this.getFirstAcceptEntry();
-            metaRecord.x402 = { paymentRequired: true, ...acceptEntry };
+            const acceptsRaw = this.requirements?.accepts;
+            const accepts = Array.isArray(acceptsRaw) && acceptsRaw.length > 0 ? acceptsRaw : undefined;
+            const preferred = accepts ? this.selectPreferredAcceptEntry(accepts) : undefined;
+            metaRecord.x402 = {
+                paymentRequired: true,
+                ...(preferred ?? {}),
+                ...(accepts && { accepts }),
+            };
         }
 
         // Append x402 instructions to description (idempotent)
