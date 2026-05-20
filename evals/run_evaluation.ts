@@ -77,7 +77,7 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('Examples:')
     .epilogue('  $0                                    # Use default dataset from config')
     .epilogue('  $0 --dataset-name tmp-1               # Evaluate custom dataset')
-    .epilogue('  npm run evals:run -- --dataset-name custom_v1  # Via npm script')
+    .epilogue('  pnpm run evals:run -- --dataset-name custom_v1  # Via pnpm script')
     .parseSync() as CliArgs;
 
 // Tools match evaluator: returns score 1 if expected tool_calls match output list, 0 otherwise

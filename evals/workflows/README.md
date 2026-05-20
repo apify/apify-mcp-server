@@ -18,34 +18,34 @@ export APIFY_TOKEN="your_apify_token"
 export OPENROUTER_API_KEY="your_openrouter_key"
 
 # 2. Build the MCP server
-npm run build
+pnpm run build
 
 # 3. Run tests
-npm run evals:workflow
+pnpm run evals:workflow
 ```
 
 **Common options:**
 ```bash
 # Filter by category
-npm run evals:workflow -- --category search
+pnpm run evals:workflow -- --category search
 
 # Run specific test
-npm run evals:workflow -- --id search-google-maps
+pnpm run evals:workflow -- --id search-google-maps
 
 # Filter by line range in test_cases.json
-npm run evals:workflow -- --lines 277-283
+pnpm run evals:workflow -- --lines 277-283
 
 # Show detailed conversation logs
-npm run evals:workflow -- --verbose
+pnpm run evals:workflow -- --verbose
 
 # Increase timeout for long-running Actors (default: 60s)
-npm run evals:workflow -- --tool-timeout 300
+pnpm run evals:workflow -- --tool-timeout 300
 
 # Run tests in parallel (default: 4)
-npm run evals:workflow -- --concurrency 8
+pnpm run evals:workflow -- --concurrency 8
 
 # Save results to JSON file
-npm run evals:workflow -- --output
+pnpm run evals:workflow -- --output
 ```
 
 **Exit codes:**
@@ -266,13 +266,13 @@ The `--lines` (or `-l`) option filters test cases by their line numbers in the `
 **Combine with other filters (AND logic):**
 ```bash
 # Line range + category
-npm run evals:workflow -- --lines 100-200 --category call
+pnpm run evals:workflow -- --lines 100-200 --category call
 
 # Line range + ID pattern
-npm run evals:workflow -- --lines 50-100 --id "search.*"
+pnpm run evals:workflow -- --lines 50-100 --id "search.*"
 
 # All three filters
-npm run evals:workflow -- --lines 277-283 --category mcp --verbose
+pnpm run evals:workflow -- --lines 277-283 --category mcp --verbose
 ```
 
 **Error handling:**
@@ -288,16 +288,16 @@ npm run evals:workflow -- --lines 277-283 --category mcp --verbose
 **Examples:**
 ```bash
 # Single test at specific line
-npm run evals:workflow -- --lines 283
+pnpm run evals:workflow -- --lines 283
 
 # Range of tests
-npm run evals:workflow -- --lines 277-283
+pnpm run evals:workflow -- --lines 277-283
 
 # Multiple ranges
-npm run evals:workflow -- --lines 10-20,50-60,100-110
+pnpm run evals:workflow -- --lines 10-20,50-60,100-110
 
 # With verbose output for debugging
-npm run evals:workflow -- --lines 277-283 --verbose
+pnpm run evals:workflow -- --lines 277-283 --verbose
 ```
 
 ### Concurrency
@@ -313,8 +313,8 @@ The `--concurrency` (or `-c`) option controls how many tests run in parallel.
 **Example:**
 ```bash
 # Run 8 tests in parallel
-npm run evals:workflow -- --concurrency 8
-npm run evals:workflow -- -c 8
+pnpm run evals:workflow -- --concurrency 8
+pnpm run evals:workflow -- -c 8
 ```
 
 **Note:** Each test spawns its own MCP server instance, so higher concurrency uses more system resources.
@@ -336,7 +336,7 @@ The `--tool-timeout` option sets the maximum time (in seconds) to wait for a sin
 **Example:**
 ```bash
 # Long-running Actor calls
-npm run evals:workflow -- --tool-timeout 300
+pnpm run evals:workflow -- --tool-timeout 300
 ```
 
 ### Saving Results to File
@@ -383,20 +383,20 @@ The `--output` (or `-o`) option saves test results to `evals/workflows/results.j
 **Examples:**
 ```bash
 # Basic usage - save all test results
-npm run evals:workflow -- --output
-npm run evals:workflow -- -o
+pnpm run evals:workflow -- --output
+pnpm run evals:workflow -- -o
 
 # Save results for specific category
-npm run evals:workflow -- --category search --output
+pnpm run evals:workflow -- --category search --output
 
 # Compare different agent models
-npm run evals:workflow -- --agent-model anthropic/claude-haiku-4.5 --output
-npm run evals:workflow -- --agent-model openai/gpt-4o --output
+pnpm run evals:workflow -- --agent-model anthropic/claude-haiku-4.5 --output
+pnpm run evals:workflow -- --agent-model openai/gpt-4o --output
 # Results file now contains entries for both models
 
 # Compare different judge models
-npm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
-npm run evals:workflow -- --judge-model openai/gpt-4o --output
+pnpm run evals:workflow -- --judge-model x-ai/grok-4.1-fast --output
+pnpm run evals:workflow -- --judge-model openai/gpt-4o --output
 ```
 
 **Partial runs:**

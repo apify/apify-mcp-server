@@ -521,7 +521,7 @@ End-to-end coverage uses **mcpc against the local stdio build**. mcpc drives the
 Workflow per code change:
 
 ```bash
-npm run build
+pnpm run build
 mcpc @stdio restart
 mcpc @stdio tools-call call-actor actor:='"apify/rag-web-browser"' input:='{"query":"hello"}' --json | jq '.result.structuredContent'
 ```
@@ -533,4 +533,4 @@ Notes:
 - Use `--json` piped through `jq` to assert on response shape. No inline Python.
 - Notification-stream tests (`notifications/tasks/status`, progress events) use mcpc's notification capture; the suite-level harness can mirror those assertions for CI.
 
-The behavioural list above maps 1:1 onto mcpc-driven test cases. Programmatic equivalents land in `tests/integration/suite.ts` — the shared suite used by both stdio and streamable-HTTP transports — and run via `npm run test:integration` with a real token. New cases must go in `suite.ts`, not in standalone files. Integration runs are humans/CI only; agents drive mcpc instead.
+The behavioural list above maps 1:1 onto mcpc-driven test cases. Programmatic equivalents land in `tests/integration/suite.ts` — the shared suite used by both stdio and streamable-HTTP transports — and run via `pnpm run test:integration` with a real token. New cases must go in `suite.ts`, not in standalone files. Integration runs are humans/CI only; agents drive mcpc instead.

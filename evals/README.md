@@ -43,9 +43,9 @@ export PHOENIX_API_KEY="your_key"
 export OPENROUTER_API_KEY="your_key"
 export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
-npm ci
-npm run evals:create-dataset  # one-time: creates dataset from test_cases.json
-npm run evals:run              # runs evaluation on default dataset (v1.6)
+pnpm install --frozen-lockfile
+pnpm run evals:create-dataset  # one-time: creates dataset from test_cases.json
+pnpm run evals:run              # runs evaluation on default dataset (v1.6)
 ```
 
 ### Using a specific dataset version
@@ -54,10 +54,10 @@ By default, the evaluation uses the dataset version from `test_cases.json` (`v1.
 
 ```bash
 # Create a new dataset with custom name
-npm run evals:create-dataset -- --dataset-name mcp_server_dataset_v1.3
+pnpm run evals:create-dataset -- --dataset-name mcp_server_dataset_v1.3
 
 # Run evaluation on custom dataset
-npm run evals:run -- --dataset-name mcp_server_dataset_v1.3
+pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 ```
 
 ## Test cases

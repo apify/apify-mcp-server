@@ -40,7 +40,7 @@
 **Workflow:**
 1. analyze phoenix results to understand the problem
 2. manually write/update tool description based on understanding
-3. `npm run evals:run`
+3. `pnpm run evals:run`
 4. check phoenix dashboard
 5. verify no regressions
 6. iterate experimentally (trial and error)
@@ -259,7 +259,7 @@ Already covered in section 2 above (do not use for overly general queries).
 
 ## Testing
 
-1. `npm run evals:run`
+1. `pnpm run evals:run`
 2. check phoenix dashboard
 3. verify phase 1 cases now pass
 4. check for regressions
