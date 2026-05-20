@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - Unify search-actors keywords description across variants ([#868](https://github.com/apify/apify-mcp-server/pull/868)) ([c6c7d41](https://github.com/apify/apify-mcp-server/commit/c6c7d41d95caca7c243ccb55c798f675eee8080b)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#833](https://github.com/apify/apify-mcp-server/issues/833)
+- **docker:** Repair pnpm deploy and add build smoke test to CI ([#870](https://github.com/apify/apify-mcp-server/pull/870)) ([6ade7b8](https://github.com/apify/apify-mcp-server/commit/6ade7b8fd3f661e9bce503e527b645507eb3b63f)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
