@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - **docker:** Repair pnpm deploy and add build smoke test to CI ([#870](https://github.com/apify/apify-mcp-server/pull/870)) ([6ade7b8](https://github.com/apify/apify-mcp-server/commit/6ade7b8fd3f661e9bce503e527b645507eb3b63f)) by [@MQ37](https://github.com/MQ37)
 - **ci:** Replace npx with pnpm dlx; lower node engine to 20 ([#871](https://github.com/apify/apify-mcp-server/pull/871)) ([6d63ae3](https://github.com/apify/apify-mcp-server/commit/6d63ae31f2df3639e4c82ea496c5adb1abad328e)) by [@MQ37](https://github.com/MQ37)
 - **ci:** Switch pkg-pr-new to pnpm pack; restore Node 22 minimum ([#874](https://github.com/apify/apify-mcp-server/pull/874)) ([b28a65e](https://github.com/apify/apify-mcp-server/commit/b28a65e6a12b6fd3fe049ad5c01928ddfab42a95)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Swap npm show for pnpm view in before-beta-release script ([#877](https://github.com/apify/apify-mcp-server/pull/877)) ([48dee51](https://github.com/apify/apify-mcp-server/commit/48dee5114ddd88afaf4ffb726e10afd3f5d79791)) by [@MQ37](https://github.com/MQ37)
 
 
 <!-- git-cliff-unreleased-end -->
