@@ -10,8 +10,8 @@ import type { PricingTier } from '../../utils/pricing_info.js';
 import { actorSearchOutputSchema } from '../structured_output_schemas.js';
 
 /**
- * Shared base schema for search-actors arguments. Used directly by the widget
- * variant; extended by `searchActorsArgsSchema` with a longer `keywords` description.
+ * Shared schema for search-actors arguments. Used by both the default and
+ * widget variants — the widget variant calls `.strict()` on it.
  */
 export const searchActorsBaseArgsSchema = z.object({
     keywords: z.string()
@@ -54,14 +54,6 @@ export const searchActorsBaseArgsSchema = z.object({
         .default(0)
         .describe('The number of elements to skip from the start (default = 0)'),
 });
-
-/**
- * Zod schema for the search-actors tool arguments. Equivalent to the base
- * schema; the widget variant uses the same base schema via `.strict()` — both
- * variants share the `keywords` description that lives on
- * `searchActorsBaseArgsSchema`.
- */
-export const searchActorsArgsSchema = searchActorsBaseArgsSchema.extend({});
 
 const SEARCH_ACTORS_DESCRIPTION = `
 Search the Apify Store to FIND and DISCOVER what scraping tools/Actors exist for specific platforms or use cases.
@@ -110,9 +102,9 @@ export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
     type: 'internal',
     name: HelperTools.STORE_SEARCH,
     description: SEARCH_ACTORS_DESCRIPTION,
-    inputSchema: z.toJSONSchema(searchActorsArgsSchema) as ToolInputSchema,
+    inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,
     outputSchema: actorSearchOutputSchema,
-    ajvValidate: compileSchema(z.toJSONSchema(searchActorsArgsSchema)),
+    ajvValidate: compileSchema(z.toJSONSchema(searchActorsBaseArgsSchema)),
     annotations: {
         title: 'Search Actors',
         readOnlyHint: true,
