@@ -28,4 +28,7 @@ jobs:
             -   name: Build
                 run: pnpm run build
 
-            -   run: npx -y pkg-pr-new publish
+                # `pnpm dlx` instead of `npx` because devEngines.packageManager is
+                # pinned to pnpm with onFail: error, and any invocation of npm at the
+                # repo root (including by `npx`) is rejected with EBADDEVENGINES.
+            -   run: pnpm dlx pkg-pr-new publish

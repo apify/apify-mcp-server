@@ -44,9 +44,13 @@ jobs:
                 if: ${{ inputs.tag == 'latest' }}
                 env:
                       SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+                # `pnpm exec` instead of `npx` because devEngines.packageManager is
+                # pinned to pnpm with onFail: error (npx invokes npm, which refuses to
+                # run with EBADDEVENGINES). `@sentry/cli` is already in devDependencies,
+                # so `pnpm exec` runs the locally-installed binary — no extra download.
                 run: |
-                      npx sentry-cli sourcemaps inject ./dist
-                      npx sentry-cli sourcemaps upload --release "$(jq -r '.version' package.json)" ./dist
+                      pnpm exec sentry-cli sourcemaps inject ./dist
+                      pnpm exec sentry-cli sourcemaps upload --release "$(jq -r '.version' package.json)" ./dist
             -   name: Publish to NPM
                 # `pnpm publish` honours the dist-tag flag and is safe under our
                 # devEngines `onFail: error` pin (`npm publish` would be rejected).

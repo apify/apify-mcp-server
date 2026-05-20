@@ -66,13 +66,16 @@ jobs:
                     cp -r docs mcpb/docs
                     cp manifest.json mcpb/manifest.json
                     cp docs/apify-logo-claude-desktop.png mcpb/icon.png
+                # `pnpm dlx` instead of `npx` because devEngines.packageManager is
+                # pinned to pnpm with onFail: error — npx invokes npm, which is rejected
+                # with EBADDEVENGINES at the repo root. Pinned mcpb version preserved
+                # for reproducible builds.
             -   name: Validate MCPB manifest
-                run: npx -y @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json
+                run: pnpm dlx @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json
             -   name: Create MCPB package
-                # fix version of anthropic-ai/mcpb to 2.1.2 so that we have a reproducible build
-                run: npx -y @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
+                run: pnpm dlx @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
             -   name: Clean MCPB package
-                run: npx -y @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
+                run: pnpm dlx @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
             -   name: Upload MCPB artifacts
                 uses: actions/upload-artifact@v4
                 with:
