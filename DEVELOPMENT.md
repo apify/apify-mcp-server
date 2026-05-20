@@ -55,13 +55,19 @@ Rule of thumb:
 
 ## Node.js version policy
 
-The minimum supported Node.js version is **20** (`engines.node >= 20` in `package.json`).
+The minimum supported Node.js version is **22** (`engines.node >= 22.0.0` in `package.json`).
 
-**Why Node.js 20:**
+**Why Node.js 22 (not 20):**
 
-`@segment/analytics-node` (used for telemetry) declares `engines: { node: ">=20" }`, which makes Node.js 20 the hard floor for this package.
+- pnpm 11 (the pinned package manager) requires Node 22.13+, so the dev workflow needs Node 22+ regardless.
+- The CI test matrix runs on `[22, 24, 26]` — Node 20 is not validated pre-publish.
+- The only pre-publish static gate that could catch Node-22-only API usage on the source was `eslint-plugin-n`. We migrated lint to oxlint, which has no equivalent rule, so reintroducing ESLint just for that rule would be a regression.
+- A matrix tarball smoke test on Node 20 at release time would close the gap, but the CI complexity isn't worth it given Sentry data shows Node 20 is a small user segment.
+- Setting `engines >= 22` matches what CI actually validates and what dev tooling already requires. It's the honest floor.
 
-- The `.nvmrc` file pins the latest Node.js version for development tooling (lint, type-check, build) — this is intentionally higher than the minimum supported version.
+If you ever want to lower the floor again, you'd need either an oxlint rule that flags unsupported Node builtins, or a matrix tarball smoke gate before `npm publish`. Don't lower `engines` without one of those in place.
+
+The `.nvmrc` file pins the dev-tooling Node version (currently 24) — this is intentionally higher than the published floor.
 
 ## How to contribute
 
