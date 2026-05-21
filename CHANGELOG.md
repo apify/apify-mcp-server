@@ -3,7 +3,26 @@
 All notable changes to this project will be documented in this file.
 
 <!-- git-cliff-unreleased-start -->
-## 0.10.5 - **not yet released**
+## 0.10.7 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- Unify search-actors keywords description across variants ([#868](https://github.com/apify/apify-mcp-server/pull/868)) ([c6c7d41](https://github.com/apify/apify-mcp-server/commit/c6c7d41d95caca7c243ccb55c798f675eee8080b)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#833](https://github.com/apify/apify-mcp-server/issues/833)
+- **docker:** Repair pnpm deploy and add build smoke test to CI ([#870](https://github.com/apify/apify-mcp-server/pull/870)) ([6ade7b8](https://github.com/apify/apify-mcp-server/commit/6ade7b8fd3f661e9bce503e527b645507eb3b63f)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Replace npx with pnpm dlx; lower node engine to 20 ([#871](https://github.com/apify/apify-mcp-server/pull/871)) ([6d63ae3](https://github.com/apify/apify-mcp-server/commit/6d63ae31f2df3639e4c82ea496c5adb1abad328e)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Switch pkg-pr-new to pnpm pack; restore Node 22 minimum ([#874](https://github.com/apify/apify-mcp-server/pull/874)) ([b28a65e](https://github.com/apify/apify-mcp-server/commit/b28a65e6a12b6fd3fe049ad5c01928ddfab42a95)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Swap npm show for pnpm view in before-beta-release script ([#877](https://github.com/apify/apify-mcp-server/pull/877)) ([48dee51](https://github.com/apify/apify-mcp-server/commit/48dee5114ddd88afaf4ffb726e10afd3f5d79791)) by [@MQ37](https://github.com/MQ37)
+
+
+<!-- git-cliff-unreleased-end -->
+## [0.10.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.6) (2026-05-19)
+
+### 🐛 Bug Fixes
+
+- **ci:** Migrate bump_dependency_in_internal_repo job to pnpm ([#867](https://github.com/apify/apify-mcp-server/pull/867)) ([bae8fa7](https://github.com/apify/apify-mcp-server/commit/bae8fa7050ad875b27782db2bd22e9e54dbef9cf)) by [@MQ37](https://github.com/MQ37)
+
+
+## [0.10.5](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.5) (2026-05-19)
 
 ### 🚀 Features
 
@@ -12,13 +31,16 @@ All notable changes to this project will be documented in this file.
 - Accept build, maxItems, maxTotalChargeUsd in callOptions ([#820](https://github.com/apify/apify-mcp-server/pull/820)) ([f772433](https://github.com/apify/apify-mcp-server/commit/f77243308422120015373838e0969e0563167ce1)) by [@jirispilka](https://github.com/jirispilka), closes [#815](https://github.com/apify/apify-mcp-server/issues/815)
 - Add X-Apify-Request-Origin: MCP header to API requests ([#835](https://github.com/apify/apify-mcp-server/pull/835)) ([3068106](https://github.com/apify/apify-mcp-server/commit/30681066bb6b849790d01b74d7baa1e0bb28034f)) by [@RobertCrupa](https://github.com/RobertCrupa), closes [#832](https://github.com/apify/apify-mcp-server/issues/832)
 - Remove widget meta from actor tools and add corresponding test ([#845](https://github.com/apify/apify-mcp-server/pull/845)) ([a40befa](https://github.com/apify/apify-mcp-server/commit/a40befa858995d1dfbf0c7be76a1794b1ea8f43d)) by [@jirispilka](https://github.com/jirispilka)
+- Modify get-actor-run - add waitSec and progress ([#823](https://github.com/apify/apify-mcp-server/pull/823)) ([54881ba](https://github.com/apify/apify-mcp-server/commit/54881bafaebf1a4ee956c3ce6c210fcedaeb43a2)) by [@jirispilka](https://github.com/jirispilka), closes [#822](https://github.com/apify/apify-mcp-server/issues/822)
+- Track tool response size in telemetry ([#864](https://github.com/apify/apify-mcp-server/pull/864)) ([78a9654](https://github.com/apify/apify-mcp-server/commit/78a9654f04a2393a5d92d6a60436971db20ee379)) by [@MQ37](https://github.com/MQ37), closes [#838](https://github.com/apify/apify-mcp-server/issues/838)
 
 ### 🐛 Bug Fixes
 
 - Use long commit SHA in release workflow [internal] ([#850](https://github.com/apify/apify-mcp-server/pull/850)) ([1c8388e](https://github.com/apify/apify-mcp-server/commit/1c8388e4f2756d825598401135e3dc3c8e858735)) by [@fnesveda](https://github.com/fnesveda)
+- Stabilise flaky rag-web-browser integration tests ([#863](https://github.com/apify/apify-mcp-server/pull/863)) ([291b0e5](https://github.com/apify/apify-mcp-server/commit/291b0e5782853198962ee2b4df4760a6d60676fb)) by [@MQ37](https://github.com/MQ37)
+- Include mcpTools in fetch-actor-details structured content ([#858](https://github.com/apify/apify-mcp-server/pull/858)) ([fdb4a6b](https://github.com/apify/apify-mcp-server/commit/fdb4a6baefa40e2db9e2a3d4c7303b16ad817769)) by [@RobertCrupa](https://github.com/RobertCrupa)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.4](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.4) (2026-05-13)
 
 ### 🐛 Bug Fixes

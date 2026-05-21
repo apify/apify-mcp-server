@@ -114,6 +114,13 @@ export type ActorTool = ToolBase & {
     actorFullName: string;
     /** Optional memory limit in MB for the Actor execution */
     memoryMbytes?: number;
+    /**
+     * Per-Actor dataset row properties (e.g. `{ url: { type: 'string' } }`) from the actorStore.
+     * Stashed at tools/list time and injected by the executor into
+     * `structuredContent.storages.datasets.default.itemsSchema` so the declared outputSchema
+     * matches the response. Stripped before the public tools/list wire output.
+     */
+    datasetItemsSchema?: Record<string, unknown>;
 };
 
 /**
@@ -146,6 +153,8 @@ export type InternalToolArgs = {
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
     mcpSessionId?: string;
+    /** True when the tool is executing as a background MCP task. */
+    taskMode?: boolean;
 };
 
 /**
@@ -344,6 +353,8 @@ export type ToolCallTelemetryProperties = {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
+    /** Byte size of the tool response (text content + JSON-stringified structured content). */
+    tool_response_size_bytes?: number;
     failure_category?: FailureCategory;
     failure_http_status?: number;
     failure_detail?: string;
@@ -440,6 +451,17 @@ export type ActorExecutionParams = {
     abortSignal?: AbortSignal;
     /** MCP session ID for logging */
     mcpSessionId?: string;
+    /**
+     * Per-Actor dataset row properties from {@link ActorTool.datasetItemsSchema}. Forwarded
+     * by the request handler so the executor can inject `itemsSchema` into the response.
+     */
+    datasetItemsSchema?: Record<string, unknown>;
+    /**
+     * When true, the call is wrapped in an MCP task. The executor ignores the LLM-provided
+     * `waitSecs` and waits until the run reaches a terminal status — honoring `waitSecs` in
+     * task mode would let the task complete before the Actor has produced output.
+     */
+    taskMode?: boolean;
 };
 
 /**

@@ -14,7 +14,6 @@ import {
     TOOL_STATUS,
 } from '../../const.js';
 import { connectMCPClient } from '../../mcp/client.js';
-import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolInputSchema } from '../../types.js';
 import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -23,7 +22,9 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
+import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -51,137 +52,55 @@ USAGE:
 export const CALL_ACTOR_EXAMPLES_SECTION = `EXAMPLES:
 - user_input: Get instagram posts using apify/instagram-scraper`;
 
-type CallActorDescriptionParams = {
-    actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
-    alwaysAsync: boolean;
-};
-
-type StartedActorRun = {
-    id: string;
-    status: string;
-    startedAt?: Date;
-};
-
-type StartAsyncResponseResult = {
-    content: { type: 'text'; text: string }[];
-    structuredContent: {
-        runId: string;
-        actorName: string;
-        status: string;
-        startedAt: string;
-        input: Record<string, unknown>;
-    };
-    _meta?: Record<string, unknown>;
-};
-
 type CallActorErrorResponseParams = {
     actorName: string;
     error: unknown;
     actorId?: string;
-    isAsync: boolean;
     mcpSessionId?: string;
     actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS;
 };
 
-export function buildCallActorDescription(params: CallActorDescriptionParams): string {
-    const { actorGetDetailsTool, alwaysAsync } = params;
+const WIDGET_ADDENDUM = dedent`
+    WIDGET ALTERNATIVE (apps mode):
+    - If the user explicitly asks to see live progress, call ${HelperTools.ACTOR_CALL_WIDGET} instead — it renders an interactive UI that tracks the run.
+    - For silent name resolution before this call, use ${HelperTools.STORE_SEARCH} (not ${HelperTools.STORE_SEARCH_WIDGET}, which renders UI).
+`;
 
-    const sections: string[] = [];
+function buildCallActorDescriptionSections(includeWidget: boolean): string {
+    const sections: string[] = [
+        'Call any Actor from the Apify Store.',
+        dedent`
+            WORKFLOW:
+            1. Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema
+            2. Call this tool with the actor name and proper input based on the schema
 
-    sections.push('Call any Actor from the Apify Store.');
-
-    sections.push(dedent`
-        WORKFLOW:
-        1. Use ${actorGetDetailsTool} to get the Actor's input schema
-        2. Call this tool with the actor name and proper input based on the schema
-
-        If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
-    `);
-
-    sections.push(CALL_ACTOR_MCP_SERVER_SECTION);
-
-    if (alwaysAsync) {
-        sections.push(dedent`
+            If the actor name is not in "username/name" format and ${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first.
+        `,
+        CALL_ACTOR_MCP_SERVER_SECTION,
+        dedent`
             IMPORTANT:
-            - This tool always runs asynchronously — it starts the Actor and returns immediately with a runId. It renders no UI.
-            - For a live progress widget the user can watch, call ${HelperTools.ACTOR_CALL_WIDGET} instead.
-            - To check status or wait for completion, poll ${HelperTools.ACTOR_RUNS_GET} with the runId.
-            - Once the run completes, use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results.
-            - If the Actor name needs resolving first, use ${HelperTools.STORE_SEARCH} (silent). Do NOT use ${HelperTools.STORE_SEARCH_WIDGET} for name resolution.
+            - Waits up to waitSecs (default 30s) for completion; returns run status, storage IDs, and field metadata
+            - Use ${HelperTools.DATASET_GET_ITEMS} with the datasetId to fetch results; non-terminal runs include a nextStep with polling instructions
             - Use dedicated Actor tools when available for better experience
-        `);
-    } else {
-        sections.push(dedent`
-            IMPORTANT:
-            - Typically returns a datasetId and preview of output items
-            - Use ${HelperTools.ACTOR_OUTPUT_GET} tool with the datasetId to fetch full results
-            - Use dedicated Actor tools when available for better experience
-        `);
-    }
+        `,
+        CALL_ACTOR_USAGE_SECTION,
+        dedent`
+            - Use \`waitSecs\` (0–45) to control how long to wait. Default 30s returns results for fast actors. Use \`waitSecs: 0\` to start and return immediately for long-running actors.
+        `,
+        CALL_ACTOR_EXAMPLES_SECTION,
+    ];
 
-    sections.push(CALL_ACTOR_USAGE_SECTION);
-
-    if (!alwaysAsync) {
-        sections.push(dedent`
-            - This tool supports async execution via the \`async\` parameter:
-              - **When \`async: false\` or not provided** (default): Waits for completion and returns results immediately with dataset preview. Use this whenever the user asks for data or results.
-              - **When \`async: true\`**: Starts the run and returns immediately with runId. Only use this when the user explicitly asks to run the Actor in the background or does not need immediate results.
-        `);
-    }
-
-    sections.push(CALL_ACTOR_EXAMPLES_SECTION);
+    if (includeWidget) sections.push(WIDGET_ADDENDUM);
 
     return sections.join('\n\n');
 }
 
-export function buildStartAsyncResponse(params: {
-    actorName: string;
-    actorRun: StartedActorRun;
-    input: Record<string, unknown>;
-    widget: boolean;
-}): StartAsyncResponseResult {
-    const { actorName, actorRun, input, widget } = params;
+export function buildCallActorDescription(): string {
+    return buildCallActorDescriptionSections(false);
+}
 
-    const structuredContent = {
-        runId: actorRun.id,
-        actorName,
-        status: actorRun.status,
-        startedAt: actorRun.startedAt?.toISOString() || '',
-        input,
-    };
-
-    if (!widget) {
-        return {
-            content: [{
-                type: 'text',
-                text: `Started Actor "${actorName}" (Run ID: ${actorRun.id}).`,
-            }],
-            structuredContent,
-        };
-    }
-
-    const responseText = dedent`
-        Started Actor "${actorName}" (Run ID: ${actorRun.id}).
-
-        A live progress widget has been rendered that automatically tracks this run and refreshes status every few seconds until completion.
-
-        The widget will update the context with run status and datasetId when the run completes. Once complete (or if the user requests results), use ${HelperTools.ACTOR_OUTPUT_GET} with the datasetId to retrieve the output.
-
-        Do NOT proactively poll using ${HelperTools.ACTOR_RUNS_GET}. Wait for the widget state update or user instructions. Ask the user what they would like to do next.
-    `;
-
-    const widgetConfig = getWidgetConfig(WIDGET_URIS.ACTOR_RUN);
-    return {
-        content: [{
-            type: 'text',
-            text: responseText,
-        }],
-        structuredContent,
-        _meta: {
-            ...widgetConfig?.meta,
-            'openai/widgetDescription': `Actor run progress for ${actorName}`,
-        },
-    };
+export function buildCallActorAppsDescription(): string {
+    return buildCallActorDescriptionSections(true);
 }
 
 export function isPermissionApprovalError(error: unknown): error is ApifyApiError {
@@ -208,11 +127,11 @@ function buildPermissionApprovalErrorResponse(
     actorName: string,
     error: ApifyApiError,
     actorId: string | undefined,
-    logContext: { async: boolean; mcpSessionId: string | undefined },
+    mcpSessionId: string | undefined,
 ): ReturnType<typeof buildMCPResponse> {
     logHttpError(error, 'Failed to call Actor — permission approval required', {
         actorName,
-        ...logContext,
+        mcpSessionId,
         failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
     });
     return {
@@ -232,20 +151,18 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
         actorName,
         error,
         actorId,
-        isAsync,
         mcpSessionId,
         actorGetDetailsTool,
     } = params;
 
     if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
-        return buildPermissionApprovalErrorResponse(actorName, error, actorId, { async: isAsync, mcpSessionId });
+        return buildPermissionApprovalErrorResponse(actorName, error, actorId, mcpSessionId);
     }
 
     const errMsg = error instanceof Error ? error.message : String(error);
     const failureCategory = classifyFailureCategory(error);
     logHttpError(error, 'Failed to call Actor', {
         actorName,
-        async: isAsync,
         mcpSessionId,
         failureCategory,
     });
@@ -283,9 +200,43 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
     });
 }
 
-/**
- * Zod schema for call-actor arguments — shared between default and apps variants.
- */
+export const callOptionsSchema = z.object({
+    memory: z.number()
+        .min(128, 'Memory must be at least 128 MB')
+        .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
+        .optional()
+        .describe(dedent`
+            Memory per run in MB. Power of 2 from 128 to 32768.
+            Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
+        `),
+    timeout: z.number()
+        .min(0, 'Timeout must be 0 or greater')
+        .optional()
+        .describe(dedent`
+            Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
+            Use 0 for infinite timeout (no time limit).
+        `),
+    build: z.string()
+        .optional()
+        .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
+    maxItems: z.number()
+        .int()
+        .positive()
+        .optional()
+        .describe(dedent`
+            Pay-per-result Actors only — ignored otherwise.
+            Caps billed dataset items; does NOT limit production. Prefer the Actor's own input fields (e.g. maxResults) to bound work.
+        `),
+    maxTotalChargeUsd: z.number()
+        .positive()
+        .optional()
+        .describe(dedent`
+            Pay-per-event Actors only — ignored otherwise.
+            Caps total USD billed; does NOT limit work. Prefer the Actor's own input fields to bound work.
+        `),
+});
+
+/** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
     actor: z.string()
         .describe(dedent`
@@ -295,64 +246,18 @@ export const callActorArgs = z.object({
         `),
     input: z.object({}).passthrough()
         .describe('The input JSON to pass to the Actor. Required.'),
-    async: z.boolean()
+    waitSecs: z.number()
+        .int()
+        .min(0, 'waitSecs must be 0 or greater')
+        .max(45, 'waitSecs cannot exceed 45')
+        .default(CALL_ACTOR_WAIT_SECS_DEFAULT)
         .optional()
-        .describe(dedent`
-            When true, starts the run and returns immediately with runId.
-            When false or omitted, behavior depends on the active server mode/tool variant.
-            IMPORTANT: use async=true only when the user explicitly asks to run in the background or does not need immediate results.
-        `),
-    previewOutput: z.boolean()
-        .optional()
-        .describe(dedent`
-            When true (default): includes preview items. When false: metadata only (reduces context).
-            Use when fetching fields via get-actor-output.`),
-    callOptions: z.object({
-        memory: z.number()
-            .min(128, 'Memory must be at least 128 MB')
-            .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
-            .optional()
-            .describe(dedent`
-                Memory per run in MB. Power of 2 from 128 to 32768.
-                Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
-            `),
-        timeout: z.number()
-            .min(0, 'Timeout must be 0 or greater')
-            .optional()
-            .describe(dedent`
-                Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
-                Use 0 for infinite timeout (no time limit). Minimum: 0 seconds (infinite).
-            `),
-        build: z.string()
-            .optional()
-            .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
-        maxItems: z.number()
-            .int()
-            .positive()
-            .optional()
-            .describe(dedent`
-                Pay-per-result Actors ONLY — has no effect on any other pricing model (pay-per-event, pay-per-usage, rental, free).
-                Caps the number of dataset items billed for this run; does NOT limit how many items the Actor produces.
-                Most Actors also expose their own input field (e.g. "maxResults", "maxPages", "maxItems") to bound how much work they do — prefer those when limiting actual output, since this option only caps billing.
-            `),
-        maxTotalChargeUsd: z.number()
-            .positive()
-            .optional()
-            .describe(dedent`
-                Pay-per-event Actors ONLY — has no effect on any other pricing model (pay-per-result, pay-per-usage, rental, free).
-                Caps the total USD billed for this run; does NOT limit how much work the Actor does.
-                Most Actors also expose their own input field to bound work — prefer those when limiting actual output, since this option only caps billing.
-            `),
-    }).optional()
-        .describe('Optional call options for the Actor run configuration.'),
+        .describe('Seconds to wait for completion (0–45, default 30). Returns with current run status if not terminal within waitSecs.'),
+    callOptions: callOptionsSchema.optional()
+        .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
 });
 
-/**
- * Compiled AJV input schema — shared between both variants.
- */
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
-
-// Allow additional properties for dynamic Actor input fields passed via the `input` object
 export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorArgs), additionalProperties: true });
 
 /**
@@ -422,7 +327,25 @@ export async function handleMcpToolCall(params: {
             arguments: input,
         });
 
-        return { content: result.content };
+        // `call-actor` declares `getActorRunOutputSchema`, so MCP SDK ≥ 1.11.4 rejects any response
+        // without `structuredContent` (unless `isError: true`) with -32600. The pass-through has no
+        // Apify run, so synthesize a sentinel `RunResponse` matching the schema's `required` keys;
+        // the remote tool's payload still flows through `content`. Also forward `isError` so a
+        // failing remote tool surfaces as a failure here.
+        const isErrorFromRemote = result.isError === true;
+        return {
+            content: result.content,
+            isError: isErrorFromRemote,
+            structuredContent: {
+                runId: 'mcp-passthrough',
+                actorId: baseActorName,
+                actorName: baseActorName,
+                status: isErrorFromRemote ? 'FAILED' : 'SUCCEEDED',
+                storages: {},
+                summary: `Called MCP tool '${mcpToolName}' on '${baseActorName}'.`,
+                nextStep: 'Response content carries the remote MCP tool result; no Apify run was started.',
+            },
+        };
     } catch (error) {
         logHttpError(error, `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}'`, {
             actorName: baseActorName,
@@ -617,4 +540,81 @@ export async function callActorPreExecute(
     }
 
     return { parsed, baseActorName, mcpToolName };
+}
+
+/**
+ * Shared start-then-wait flow for call-actor variants (default + apps).
+ * `taskMode` is honored — when true, `waitSecs` is ignored and the SDK waits until terminal.
+ */
+export async function executeCallActor(toolArgs: InternalToolArgs): Promise<object> {
+    const preResult = await callActorPreExecute(toolArgs, { route: HelperTools.ACTOR_CALL });
+    if ('earlyResponse' in preResult) {
+        return preResult.earlyResponse;
+    }
+
+    const { parsed, baseActorName } = preResult;
+    const { input, callOptions } = parsed;
+    // Task mode waits until terminal (waitSecs=undefined uses SDK default ~999999s); caller's waitSecs is ignored.
+    // Non-task mode: pass waitSecs so the SDK blocks up to that many seconds before returning.
+    const waitSecs = toolArgs.taskMode ? undefined : parsed.waitSecs;
+
+    let resolvedActorId: string | undefined;
+    try {
+        const resolution = await resolveAndValidateActor({
+            actorName: baseActorName,
+            input: input as Record<string, unknown>,
+            toolArgs,
+        });
+        if ('error' in resolution) {
+            return resolution.error;
+        }
+
+        resolvedActorId = extractActorId(resolution.actor);
+        const { apifyClient } = toolArgs;
+        const abortSignal = toolArgs.extra.signal;
+
+        if (abortSignal?.aborted) return {};
+
+        const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
+        log.debug('Started Actor run', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId, waitSecs });
+
+        // Abort can arrive while start() was in flight — abort the newly created run.
+        if (abortSignal?.aborted) {
+            await abortRunOnSignal(actorRun.id, apifyClient);
+            return {};
+        }
+
+        // waitSecs:0 means "fire and forget" — start() already returned the full run, skip re-fetch.
+        if (waitSecs === 0) {
+            const response = buildStartRunResponse({ actorName: baseActorName, actorRun });
+            return { ...response, toolTelemetry: { actorId: resolvedActorId } };
+        }
+
+        const fetchResult = await fetchActorRunData({
+            runId: actorRun.id,
+            waitSecs,
+            actorName: baseActorName,
+            client: apifyClient,
+            progressTracker: toolArgs.progressTracker,
+            abortSignal,
+            mcpSessionId: toolArgs.mcpSessionId,
+            onAbort: abortRunOnSignal,
+        });
+
+        if ('aborted' in fetchResult) return {};
+        if ('error' in fetchResult) return fetchResult.error;
+
+        return {
+            ...buildGetActorRunSuccessResponse({ ...fetchResult.result, widget: false }),
+            toolTelemetry: { actorId: resolvedActorId },
+        };
+    } catch (error) {
+        return buildCallActorErrorResponse({
+            actorName: baseActorName,
+            error,
+            actorId: resolvedActorId,
+            mcpSessionId: toolArgs.mcpSessionId,
+            actorGetDetailsTool: HelperTools.ACTOR_GET_DETAILS,
+        });
+    }
 }

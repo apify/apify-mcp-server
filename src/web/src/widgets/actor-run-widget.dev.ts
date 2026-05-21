@@ -194,21 +194,44 @@ export function setupActorRunWidgetDev(): void {
                     },
                     structuredContent: {
                         runId: (args.runId as string) || "test_run_123",
+                        actorId: "test_actor_id",
                         actorName: "apify/rag-web-browser",
                         status: isComplete ? "SUCCEEDED" : "RUNNING",
                         startedAt: mockRunData.startedAt,
                         finishedAt: isComplete ? new Date().toISOString() : undefined,
                         stats: {
+                            runTimeSecs: 12,
                             computeUnits: 0.0123,
-                            memoryMaxBytes: 134217728,
+                            memMaxBytes: 134217728,
                         },
-                        dataset: isComplete
+                        storages: isComplete
                             ? {
-                                  datasetId: "test_dataset_456",
-                                  totalItemCount: mockPreviewItems.length,
-                                  previewItems: mockPreviewItems,
+                                  datasets: {
+                                      default: {
+                                          id: "test_dataset_456",
+                                          itemCount: mockPreviewItems.length,
+                                          fields: ["title", "url", "description"],
+                                      },
+                                  },
                               }
-                            : undefined,
+                            : { datasets: { default: { id: "test_dataset_456" } } },
+                        summary: isComplete
+                            ? `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`
+                            : "RUNNING for 5s. In progress.",
+                        nextStep: isComplete
+                            ? "Use get-dataset-items with datasetId=test_dataset_456 and limit=20 to fetch items."
+                            : "Use get-actor-run with runId=test_run_123 and waitSecs=10 to poll for completion.",
+                    },
+                };
+            }
+            if (name === "get-dataset-items") {
+                return {
+                    result: "success",
+                    structuredContent: {
+                        datasetId: (args.datasetId as string) || "test_dataset_456",
+                        items: mockPreviewItems,
+                        itemCount: mockPreviewItems.length,
+                        totalItemCount: mockPreviewItems.length,
                     },
                 };
             }
@@ -221,13 +244,20 @@ export function setupActorRunWidgetDev(): void {
         updateMockOpenAiState({
             toolOutput: {
                 ...mockRunData,
+                actorId: "test_actor_id",
                 status: "SUCCEEDED",
                 finishedAt: new Date().toISOString(),
-                dataset: {
-                    datasetId: "test_dataset_456",
-                    totalItemCount: mockPreviewItems.length,
-                    previewItems: mockPreviewItems,
+                storages: {
+                    datasets: {
+                        default: {
+                            id: "test_dataset_456",
+                            itemCount: mockPreviewItems.length,
+                            fields: ["title", "url", "description"],
+                        },
+                    },
                 },
+                summary: `SUCCEEDED in 12s. ${mockPreviewItems.length} items; 3 fields available.`,
+                nextStep: "Use get-dataset-items with datasetId=test_dataset_456 and limit=20 to fetch items.",
             },
         });
     }, LOADING_DELAY_MS);

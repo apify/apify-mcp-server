@@ -471,7 +471,7 @@ For detailed development setup, project structure, and local testing instruction
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/en) (v20 or higher)
+- [Node.js](https://nodejs.org/en) (v22 or higher)
 
 Create an environment file, `.env`, with the following content:
 ```text
@@ -481,7 +481,7 @@ APIFY_TOKEN="your-apify-token"
 Build the `actors-mcp-server` package:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 ## Start HTTP streamable MCP server

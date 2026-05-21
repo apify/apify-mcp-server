@@ -30,7 +30,7 @@ Key entry points:
 - `src/index.ts` - Main library export (`ActorsMcpServer` class)
 - `src/index_internals.ts` - Internal exports for testing / advanced usage
 - `src/stdio.ts` - Standard input/output (CLI) entry point
-- `src/dev_server.ts` - Express HTTP server for local development (`npm start`)
+- `src/dev_server.ts` - Express HTTP server for local development (`pnpm start`)
 - `src/input.ts` - Input processing and validation
 
 ## Tool loading phases
@@ -55,13 +55,18 @@ Rule of thumb:
 
 ## Node.js version policy
 
-The minimum supported Node.js version is **20** (`engines.node >= 20` in `package.json`).
+The minimum supported Node.js version is **22** (`engines.node >= 22.0.0` in `package.json`).
 
-**Why Node.js 20:**
+**Why Node.js 22 (not 20):**
 
-`@segment/analytics-node` (used for telemetry) declares `engines: { node: ">=20" }`, which makes Node.js 20 the hard floor for this package.
+- pnpm 11 (the pinned package manager) requires Node 22.13+, so the dev workflow needs Node 22+ regardless.
+- The CI test matrix runs on `[22, 24, 26]` — Node 20 is not validated pre-publish.
+- A matrix tarball smoke test on Node 20 at release time would close the gap, but the CI complexity isn't worth it given Sentry data shows Node 20 is a small user segment.
+- Setting `engines >= 22` matches what CI actually validates and what dev tooling already requires. It's the honest floor.
 
-- The `.nvmrc` file pins the latest Node.js version for development tooling (lint, type-check, build) — this is intentionally higher than the minimum supported version.
+If you ever want to lower the floor again, you'd need either an oxlint rule that flags unsupported Node builtins, or a matrix tarball smoke gate before `npm publish`. Don't lower `engines` without one of those in place.
+
+The `.nvmrc` file pins the dev-tooling Node version (currently 24) — this is intentionally higher than the published floor.
 
 ## How to contribute
 
@@ -69,10 +74,15 @@ Refer to the [CONTRIBUTING.md](./CONTRIBUTING.md) file.
 
 ### Installation
 
+This repo uses **pnpm 11+** as the package manager. corepack (bundled with Node 16+) reads
+`package.json#packageManager` and pins the exact version for you — no manual install needed.
+
 ```bash
-npm install
-cd src/web && npm install
+corepack enable     # one-off, makes pnpm available
+pnpm install        # installs root + src/web (workspace package) in one pass
 ```
+
+`devEngines.packageManager` is pinned with `onFail: "error"`, so `npm install` / `yarn install` refuse to run inside the checkout — keeps the lockfile single-source.
 
 ### Working on the MCP Apps (ChatGPT Apps) UI widgets
 
@@ -85,7 +95,7 @@ See the [OpenAI Apps SDK documentation](https://developers.openai.com/apps-sdk) 
 ### Production build
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 Builds the core TypeScript project and `src/web/` widgets, then copies widgets into `dist/web/`. Required before running integration tests or the compiled server.
@@ -93,7 +103,7 @@ Builds the core TypeScript project and `src/web/` widgets, then copies widgets i
 ### Hot-reload development
 
 ```bash
-APIFY_TOKEN='your-apify-token' npm run dev
+APIFY_TOKEN='your-apify-token' pnpm run dev
 ```
 
 Starts the web widgets builder in watch mode and the MCP server in standby mode on port `3001`. Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
@@ -121,8 +131,8 @@ Restart Claude Code for the change to take effect. This token is picked up by bo
 
 | Layer | Command | What it covers |
 |---|---|---|
-| **Unit tests** | `npm run test:unit` | Individual modules in isolation — no credentials needed |
-| **Integration tests** | `npm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `npm run build`) |
+| **Unit tests** | `pnpm run test:unit` | Individual modules in isolation — no credentials needed |
+| **Integration tests** | `pnpm run test:integration` | Full server over all transports against real Apify API (requires `APIFY_TOKEN` + `pnpm run build`) |
 | **mcpc probing** | `mcpc @stdio tools-call ...` | Interactive end-to-end verification during development |
 | **LLM evals** | CI only — apply `validated` label | Runs `evals/run_evaluation.ts` against multiple models via OpenRouter; requires `PHOENIX_*` and `OPENROUTER_*` secrets |
 
@@ -146,8 +156,8 @@ It also runs automatically on every merge to the `master` branch.
 #### Setup
 
 ```bash
-npm install -g @apify/mcpc
-npm run build
+pnpm add -g @apify/mcpc
+pnpm run build
 mcpc --config .mcp.json stdio connect @stdio
 mcpc @stdio tools-list   # verify
 ```

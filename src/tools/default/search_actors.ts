@@ -8,7 +8,7 @@ import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
     buildSearchActorsEmptyResponse,
     buildSearchActorsResult,
-    searchActorsArgsSchema,
+    searchActorsBaseArgsSchema,
     searchActorsMetadata,
 } from '../core/search_actors_common.js';
 
@@ -20,7 +20,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
     ...searchActorsMetadata,
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyToken, apifyClient, apifyMcpServer } = toolArgs;
-        const parsed = searchActorsArgsSchema.parse(args);
+        const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
         const [actors, { userPlanTier }] = await Promise.all([

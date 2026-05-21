@@ -38,8 +38,11 @@ const MOCK_ACTOR_TOOL: ToolEntry = {
 
 const MOCK_RUN = {
     id: 'run-widget-1',
+    actId: 'actor-id-rag',
     status: 'RUNNING',
     startedAt: new Date('2026-04-20T12:00:00.000Z'),
+    defaultDatasetId: 'dataset-id-1',
+    defaultKeyValueStoreId: 'kv-id-1',
 };
 
 function stubApifyClient(startSpy: (input: unknown, opts: unknown) => Promise<typeof MOCK_RUN>) {
@@ -81,10 +84,13 @@ describe('call-actor-widget response', () => {
         const { structuredContent, content, _meta } = result as {
             structuredContent: {
                 runId: string;
+                actorId: string;
                 actorName: string;
                 status: string;
                 startedAt: string;
-                input: Record<string, unknown>;
+                storages: { datasets?: { default: { id: string } }; keyValueStores?: { default: { id: string } } };
+                summary: string;
+                nextStep: string;
             };
             content: { type: string; text: string }[];
             _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
@@ -92,17 +98,25 @@ describe('call-actor-widget response', () => {
 
         expect(startSpy).toHaveBeenCalledWith({ query: 'test' }, undefined);
 
-        expect(structuredContent).toEqual({
-            runId: 'run-widget-1',
-            actorName: 'apify/rag-web-browser',
-            status: 'RUNNING',
-            startedAt: '2026-04-20T12:00:00.000Z',
-            input: { query: 'test' },
-        });
+        expect(structuredContent.runId).toBe('run-widget-1');
+        expect(structuredContent.actorId).toBe('actor-id-rag');
+        expect(structuredContent.actorName).toBe('apify/rag-web-browser');
+        expect(structuredContent.status).toBe('RUNNING');
+        expect(structuredContent.startedAt).toBe('2026-04-20T12:00:00.000Z');
+        expect(structuredContent.storages.datasets?.default.id).toBe('dataset-id-1');
+        expect(structuredContent.storages.keyValueStores?.default.id).toBe('kv-id-1');
+        expect(structuredContent.summary).toContain('RUNNING');
+        // Widget nextStep must not instruct LLM to poll — widget self-updates.
+        expect(structuredContent.nextStep).toContain('Widget is rendering live progress');
+        expect(structuredContent.nextStep).not.toContain('actor-runs-get');
 
-        expect(content).toHaveLength(1);
-        expect(content[0].text).toContain('A live progress widget has been rendered');
-        expect(content[0].text).toContain('Run ID: run-widget-1');
+        // content[0] mirrors structuredContent as JSON (MCP spec backwards-compat); content[1] is
+        // the LLM-readable narrative with identifiers interpolated.
+        expect(content).toHaveLength(2);
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toContain('RUNNING');
+        // Widget: no poll hint in the LLM-visible narrative either.
+        expect(content[1].text).not.toContain('actor-runs-get');
 
         expect(_meta?.ui?.resourceUri).toBe(WIDGET_URIS.ACTOR_RUN);
         expect(_meta?.ui?.visibility).toEqual(['model', 'app']);

@@ -44,7 +44,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             -   name: Execute publish workflow
-                uses: apify/workflows/execute-workflow@main
+                uses: apify/actions/execute-workflow@v1.1.2
                 with:
                     workflow: manual_publish_to_npm.yaml
                     inputs: >

@@ -1,12 +1,12 @@
 import React from "react";
 import styled from "styled-components";
 
-import { Actor } from "../../types";
+import type { Actor } from "../../types";
 import { Text, Box, ActorAvatar, theme, clampLines } from "@apify/ui-library";
 import { PeopleIcon, CoinIcon, StarEmptyIcon, ExternalLinkIcon } from "@apify/ui-icons";
 import { useMcpApp } from "../../context/mcp-app-context";
 import { formatNumber, formatDecimalNumber, formatPricing } from "../../utils/formatting";
-import { ActorStats, StructuredPricingInfo } from "../../types";
+import type { ActorStats, StructuredPricingInfo } from "../../types";
 
 interface ActorCardProps {
     actor: Actor;

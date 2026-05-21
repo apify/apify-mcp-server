@@ -7,7 +7,7 @@ import type { ApifyClient } from '../apify_client.js';
 // Exported for tests to keep fake-timer advances in sync with the production interval.
 export const PROGRESS_NOTIFICATION_INTERVAL_MS = 3000; // 3 seconds
 
-const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
+export const TERMINAL_RUN_STATUSES = new Set(['SUCCEEDED', 'FAILED', 'ABORTED', 'TIMED-OUT']);
 
 /**
  * Leads with the run status so clients can see lifecycle transitions

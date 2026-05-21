@@ -5,11 +5,11 @@
  * Main CLI entry point for workflow evaluations
  *
  * Usage:
- *   npm run evals:workflow
- *   npm run evals:workflow -- --category basic
- *   npm run evals:workflow -- --id test-001
- *   npm run evals:workflow -- --verbose
- *   npm run evals:workflow -- --concurrency 10
+ *   pnpm run evals:workflow
+ *   pnpm run evals:workflow -- --category basic
+ *   pnpm run evals:workflow -- --id test-001
+ *   pnpm run evals:workflow -- --verbose
+ *   pnpm run evals:workflow -- --concurrency 10
  */
 
 import path from 'node:path';

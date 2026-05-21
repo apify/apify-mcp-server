@@ -21,19 +21,16 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
 
-            -   name: Install dependencies
-                run: npm ci --force
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
 
-            -   name: Build web widgets
-                working-directory: src/web
-                run: |
-                    npm ci --force
-                    npm run build
-                
             -   name: Build
-                run: npm run build
+                run: pnpm run build
 
-            -   run: npx -y pkg-pr-new publish
+                # `pnpm dlx` instead of `npx` (which invokes npm — rejected at the repo
+                # root by devEngines.packageManager.onFail: error).
+                # `--pnpm` switches pkg-pr-new's internal packer from `npm pack` to
+                # `pnpm pack`; without it the tool would still shell out to npm pack
+                # inside the checkout and trigger EBADDEVENGINES (see pkg.pr.new README).
+            -   run: pnpm dlx pkg-pr-new publish --pnpm

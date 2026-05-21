@@ -1,4 +1,4 @@
-import { ActorDetails, Actor } from "../types";
+import type { ActorDetails, Actor } from "../types";
 
 /**
  * Mock response for actor details based on the real fetch-actor-details response structure

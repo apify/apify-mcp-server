@@ -22,17 +22,15 @@ jobs:
                 uses: actions/setup-node@v6
                 with:
                     node-version-file: '.nvmrc'
-                    cache: 'npm'
-                    cache-dependency-path: 'package-lock.json'
 
-            -   name: Install Node dependencies
-                run: npm ci --force --include=dev
+            -   name: Install pnpm and dependencies
+                uses: apify/actions/pnpm-install@v1.1.2
 
             -   name: Build project
-                run: npm run build
+                run: pnpm run build
 
             -   name: Run evaluations
-                run: npm run evals:run
+                run: pnpm run evals:run
                 env:
                     GITHUB_PR_NUMBER: ${{ inputs.pr_number }}
                     PHOENIX_API_KEY: ${{ secrets.PHOENIX_API_KEY }}

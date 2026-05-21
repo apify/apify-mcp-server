@@ -4,28 +4,35 @@ import { getNormalActorsAsTools } from '../../src/tools/core/actor_tools_factory
 import {
     actorDetailsOutputSchema,
     actorInfoSchema,
-    buildEnrichedCallActorOutputSchema,
-    callActorOutputSchema,
+    buildEnrichedDirectActorOutputSchema,
+    getActorRunOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
 import { compileSchema } from '../../src/utils/ajv.js';
 
-// Helper type for testing schema structure
-type EnrichedSchema = {
-    type: string;
+/** Helper type for navigating to `storages.datasets.default.itemsSchema` in a tool's outputSchema. */
+type EnrichedDatasetSchema = {
     properties: {
-        items: {
-            type: string;
-            items: {
-                type: string;
-                properties?: Record<string, unknown>;
+        storages: {
+            properties: {
+                datasets: {
+                    properties: {
+                        default: {
+                            properties: {
+                                itemsSchema?: { type: string; properties?: Record<string, unknown> };
+                            };
+                        };
+                    };
+                };
             };
-            description?: string;
         };
-        [key: string]: unknown;
     };
-    required?: string[];
 };
+
+function pickItemsSchema(schema: unknown): { type: string; properties?: Record<string, unknown> } | undefined {
+    return (schema as EnrichedDatasetSchema).properties.storages.properties.datasets
+        .properties.default.properties.itemsSchema;
+}
 
 function createMockActorInfo(actorFullName: string): ActorInfo {
     return {
@@ -76,47 +83,30 @@ function createMockActorStore(schemas: Record<string, Record<string, unknown> | 
 }
 
 describe('Structured Output Schemas', () => {
-    describe('buildEnrichedCallActorOutputSchema', () => {
-        it('should enrich schema with simple properties', () => {
+    describe('buildEnrichedDirectActorOutputSchema', () => {
+        it('injects itemsSchema with the supplied row properties', () => {
             const itemProperties = { url: { type: 'string' }, price: { type: 'number' } };
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
 
-            const { items } = enrichedSchema.properties;
-            expect(items.type).toBe('array');
-            const itemsSchema = items.items;
-            expect(itemsSchema.type).toBe('object');
-            expect(itemsSchema.properties).toEqual(itemProperties);
+            const itemsSchema = pickItemsSchema(enriched);
+            expect(itemsSchema?.type).toBe('object');
+            expect(itemsSchema?.properties).toEqual(itemProperties);
         });
 
-        it('should NOT mutate original callActorOutputSchema', () => {
-            const itemProperties = { url: { type: 'string' } };
-            buildEnrichedCallActorOutputSchema(itemProperties);
+        it('does not mutate the canonical getActorRunOutputSchema', () => {
+            buildEnrichedDirectActorOutputSchema({ url: { type: 'string' } });
 
-            // Cast to EnrichedSchema to access the nested properties easily
-            const originalSchema = callActorOutputSchema as unknown as EnrichedSchema;
-            const originalItems = originalSchema.properties.items.items;
-
-            expect(originalItems).toEqual({ type: 'object' });
-            expect(originalItems.properties).toBeUndefined();
+            expect(pickItemsSchema(getActorRunOutputSchema)).toBeUndefined();
         });
 
-        it('should handle complex nested properties', () => {
+        it('handles nested item properties', () => {
             const itemProperties = {
                 user: { type: 'object', properties: { name: { type: 'string' } } },
                 tags: { type: 'array', items: { type: 'string' } },
             };
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
+            const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
 
-            const itemsSchema = enrichedSchema.properties.items.items;
-            expect(itemsSchema.properties).toEqual(itemProperties);
-        });
-
-        it('should handle empty properties object', () => {
-            const itemProperties = {};
-            const enrichedSchema = buildEnrichedCallActorOutputSchema(itemProperties) as unknown as EnrichedSchema;
-
-            const itemsSchema = enrichedSchema.properties.items.items;
-            expect(itemsSchema.properties).toEqual({});
+            expect(pickItemsSchema(enriched)?.properties).toEqual(itemProperties);
         });
     });
 
@@ -157,124 +147,106 @@ describe('Structured Output Schemas', () => {
         });
     });
 
-    describe('getNormalActorsAsTools with actorStore', () => {
-        it('should return generic schema when no actorStore is provided', async () => {
-            const actorInfo = createMockActorInfo('apify/test-actor');
-            const tools = await getNormalActorsAsTools([actorInfo]);
+    describe('getNormalActorsAsTools enrichment', () => {
+        it('uses the canonical RunResponse schema when no actorStore is provided', async () => {
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
 
             expect(tools).toHaveLength(1);
             const tool = tools[0] as ActorTool;
-            expect(tool.outputSchema).toBeDefined();
-
-            const schema = tool.outputSchema as unknown as EnrichedSchema;
-            const itemsSchema = schema.properties.items.items;
-
-            expect(itemsSchema).toEqual({ type: 'object' });
-            expect(itemsSchema.properties).toBeUndefined();
+            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
         });
 
-        it('should enrich schema when actorStore returns properties', async () => {
+        it('injects waitSecs as an optional integer (0–45) into the input schema', async () => {
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
+
+            const tool = tools[0] as ActorTool;
+            const inputProps = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
+            const waitSecsField = inputProps.waitSecs as { type?: string; minimum?: number; maximum?: number } | undefined;
+            expect(waitSecsField?.type).toBe('integer');
+            expect(waitSecsField?.minimum).toBe(0);
+            expect(waitSecsField?.maximum).toBe(45);
+            // waitSecs must stay opt-in — never in `required`.
+            const required = (tool.inputSchema as { required?: string[] }).required ?? [];
+            expect(required).not.toContain('waitSecs');
+        });
+
+        it('enriches outputSchema with itemsSchema when actorStore returns properties', async () => {
             const actorName = 'apify/test-actor';
-            const actorInfo = createMockActorInfo(actorName);
-            const properties = { url: { type: 'string' }, title: { type: 'string' } };
-            const store = createMockActorStore({ [actorName]: properties });
+            const itemProperties = { url: { type: 'string' }, title: { type: 'string' } };
+            const store = createMockActorStore({ [actorName]: itemProperties });
 
-            const tools = await getNormalActorsAsTools([actorInfo], { actorStore: store });
-
-            expect(tools).toHaveLength(1);
+            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
             const tool = tools[0] as ActorTool;
 
-            const schema = tool.outputSchema as unknown as EnrichedSchema;
-            const itemsSchema = schema.properties.items.items;
-
-            expect(itemsSchema.properties).toEqual(properties);
+            expect(pickItemsSchema(tool.outputSchema)?.properties).toEqual(itemProperties);
         });
 
-        it('should return generic schema when actorStore returns null', async () => {
+        it('falls back to the canonical schema when actorStore returns null', async () => {
             const actorName = 'apify/test-actor';
-            const actorInfo = createMockActorInfo(actorName);
             const store = createMockActorStore({ [actorName]: null });
 
-            const tools = await getNormalActorsAsTools([actorInfo], { actorStore: store });
-
-            expect(tools).toHaveLength(1);
+            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
             const tool = tools[0] as ActorTool;
 
-            const schema = tool.outputSchema as unknown as EnrichedSchema;
-            const itemsSchema = schema.properties.items.items;
-
-            expect(itemsSchema).toEqual({ type: 'object' });
-            expect(itemsSchema.properties).toBeUndefined();
+            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
         });
 
-        it('should return generic schema when actorStore returns empty object', async () => {
+        it('falls back to the canonical schema when actorStore returns an empty object', async () => {
             const actorName = 'apify/test-actor';
-            const actorInfo = createMockActorInfo(actorName);
             const store = createMockActorStore({ [actorName]: {} });
 
-            const tools = await getNormalActorsAsTools([actorInfo], { actorStore: store });
-
-            expect(tools).toHaveLength(1);
+            const tools = await getNormalActorsAsTools([createMockActorInfo(actorName)], { actorStore: store });
             const tool = tools[0] as ActorTool;
 
-            const schema = tool.outputSchema as unknown as EnrichedSchema;
-            const itemsSchema = schema.properties.items.items;
-
-            expect(itemsSchema).toEqual({ type: 'object' });
-            expect(itemsSchema.properties).toBeUndefined();
+            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
         });
 
-        it('should gracefully degrade when actorStore throws', async () => {
-            const actorName = 'apify/test-actor';
-            const actorInfo = createMockActorInfo(actorName);
+        it('falls back to the canonical schema when actorStore throws', async () => {
             const store: ActorStore = {
-                getActorOutputSchema: async () => {
-                    throw new Error('Database connection failed');
-                },
-                getActorOutputSchemaAsTypeObject: async () => {
-                    throw new Error('Database connection failed');
-                },
+                getActorOutputSchema: async () => { throw new Error('Database connection failed'); },
+                getActorOutputSchemaAsTypeObject: async () => { throw new Error('Database connection failed'); },
             };
 
-            const tools = await getNormalActorsAsTools([actorInfo], { actorStore: store });
-
-            expect(tools).toHaveLength(1);
+            const tools = await getNormalActorsAsTools(
+                [createMockActorInfo('apify/test-actor')],
+                { actorStore: store },
+            );
             const tool = tools[0] as ActorTool;
 
-            const schema = tool.outputSchema as unknown as EnrichedSchema;
-            const itemsSchema = schema.properties.items.items;
-
-            expect(itemsSchema).toEqual({ type: 'object' });
-            expect(itemsSchema.properties).toBeUndefined();
+            expect(tool.outputSchema).toBe(getActorRunOutputSchema);
         });
 
-        it('should handle multiple actors with mixed schemas', async () => {
+        it('mixes enriched and canonical schemas across multiple actors', async () => {
             const actor1Name = 'apify/actor-with-schema';
             const actor2Name = 'apify/actor-no-schema';
-
-            const actor1 = createMockActorInfo(actor1Name);
-            const actor2 = createMockActorInfo(actor2Name);
-
-            const properties = { foo: { type: 'string' } };
+            const itemProperties = { foo: { type: 'string' } };
             const store = createMockActorStore({
-                [actor1Name]: properties,
+                [actor1Name]: itemProperties,
                 [actor2Name]: null,
             });
 
-            const tools = await getNormalActorsAsTools([actor1, actor2], { actorStore: store });
-
-            expect(tools).toHaveLength(2);
+            const tools = await getNormalActorsAsTools(
+                [createMockActorInfo(actor1Name), createMockActorInfo(actor2Name)],
+                { actorStore: store },
+            );
 
             const tool1 = tools.find((t) => (t as ActorTool).actorFullName === actor1Name) as ActorTool;
-            expect(tool1).toBeDefined();
-            const schema1 = tool1.outputSchema as unknown as EnrichedSchema;
-            expect(schema1.properties.items.items.properties).toEqual(properties);
-
             const tool2 = tools.find((t) => (t as ActorTool).actorFullName === actor2Name) as ActorTool;
-            expect(tool2).toBeDefined();
-            const schema2 = tool2.outputSchema as unknown as EnrichedSchema;
-            expect(schema2.properties.items.items).toEqual({ type: 'object' });
-            expect(schema2.properties.items.items.properties).toBeUndefined();
+
+            expect(pickItemsSchema(tool1.outputSchema)?.properties).toEqual(itemProperties);
+            expect(tool2.outputSchema).toBe(getActorRunOutputSchema);
+        });
+
+        it('emits no widget meta on actor tools', async () => {
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')]);
+
+            expect(tools).toHaveLength(1);
+            const meta = tools[0]._meta ?? {};
+            for (const key of Object.keys(meta)) {
+                expect(key).not.toMatch(/^openai\//);
+                expect(key).not.toBe('ui');
+                expect(key).not.toBe('ui/resourceUri');
+            }
         });
 
         it('emits no widget meta on actor tools', async () => {

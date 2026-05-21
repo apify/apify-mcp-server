@@ -64,7 +64,7 @@ Use the `EnterPlanMode` tool, then design the approach.
 1. Assess internal repo impact (check `../apify-mcp-server-internal` if available)
 2. Check MCP spec/SDK if the feature involves protocol behavior
 3. Check MCP Apps spec/SDK if the feature involves widgets or interactive UIs
-4. Use `mcpc @stdio tools-call` to probe current behavior if useful (requires `npm run build`)
+4. Use `mcpc @stdio tools-call` to probe current behavior if useful (requires `pnpm run build`)
 5. Follow key conventions (see below)
 6. Ask clarifying questions if ambiguous — prefer narrowing scope over guessing intent
 
@@ -145,4 +145,4 @@ Present issue content to the user for review before creating. Use `gh issue crea
 | **MCP Apps spec**      | `https://github.com/modelcontextprotocol/ext-apps/blob/main/specification/2026-01-26/apps.mdx` | MCP Apps extension specification                            |
 | **Dev server (no UI)** | `http://localhost:3001/` / tools: `mcp__apify-dev__*`               | Test tools without widgets                                  |
 | **Dev server (UI)**    | `http://localhost:3001/?ui=true` / tools: `mcp__apify-dev-ui__*`    | Test tools with widget rendering                            |
-| **mcpc stdio**         | `mcpc @stdio tools-call ...` (requires `npm run build`)             | Test tools — no running server needed                       |
+| **mcpc stdio**         | `mcpc @stdio tools-call ...` (requires `pnpm run build`)             | Test tools — no running server needed                       |

@@ -65,13 +65,11 @@ import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
-import { appsActorExecutor } from '../tools/apps/actor_executor.js';
+import { actorExecutor } from '../tools/actor_executor.js';
 import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
-import { defaultActorExecutor } from '../tools/default/actor_executor.js';
 import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
-    ActorExecutor,
     ActorsMcpServerOptions,
     ActorStore,
     ApifyRequestParams,
@@ -85,7 +83,7 @@ import type {
 } from '../types.js';
 import { ServerMode } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, getToolCallErrorUserText } from '../utils/mcp.js';
+import { buildMCPResponse, computeToolResponseSizeBytes, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
@@ -102,12 +100,6 @@ import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
 import { EXTERNAL_TOOL_CALL_TIMEOUT_MSEC, LOG_LEVEL_MAP } from './const.js';
 import { createTaskCancellationWatcher, isTaskCancelled, parseInputParamsFromUrl } from './utils.js';
-
-/** Mode → actor executor. Add new modes here. */
-const actorExecutorsByMode: Record<ServerMode, ActorExecutor> = {
-    [ServerMode.DEFAULT]: defaultActorExecutor,
-    [ServerMode.APPS]: appsActorExecutor,
-};
 
 /**
  * Returns true when the initialize request advertises the MCP Apps UI extension
@@ -173,8 +165,6 @@ export class ActorsMcpServer {
      * client's capabilities are known. Effectively set-once per connection.
      */
     public serverMode: ServerMode;
-    /** Mode-specific executor for direct actor tools (`type: 'actor'`). Finalized with `serverMode`. */
-    private actorExecutor: ActorExecutor;
     /**
      * Raw option captured from `options.serverMode` (or the legacy `uiMode`). Re-resolved
      * inside the initialize handler when set to `'auto'`; explicit `'default'`/`'apps'`
@@ -227,7 +217,6 @@ export class ActorsMcpServer {
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
         this.serverModeResolved = this.serverModeOption !== 'auto';
-        this.actorExecutor = actorExecutorsByMode[this.serverMode];
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
@@ -324,7 +313,6 @@ export class ActorsMcpServer {
                 const resolved = resolveServerMode('auto', this.clientSupportsUi);
                 if (resolved !== this.serverMode) {
                     this.serverMode = resolved;
-                    this.actorExecutor = actorExecutorsByMode[this.serverMode];
                 }
                 this.serverModeResolved = true;
             }
@@ -838,6 +826,12 @@ export class ActorsMcpServer {
             let callDiagnostics: CallDiagnostics = {};
             let shouldTrackTelemetry = true;
             let resolvedToolName = name;
+            // Captured by `captureResult` so the `finally` block can measure response size for telemetry.
+            let toolResult: unknown = null;
+            const captureResult = <T>(r: T): T => {
+                toolResult = r;
+                return r;
+            };
             const failInvalidParams = async (
                 message: string,
                 details: CallDiagnostics,
@@ -1010,13 +1004,16 @@ export class ActorsMcpServer {
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
                     };
-                    return paymentRequiredResult;
+                    return captureResult(paymentRequiredResult);
                 }
 
                 // Handle internal tool
                 if (tool.type === 'internal') {
-                    // Only create a progress tracker for call-actor tool
-                    const progressTracker = tool.name === 'call-actor'
+                    // Tools that may emit notifications/progress during a sync wait must be opted in here.
+                    // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
+                    const progressTrackerOptIn = tool.name === HelperTools.ACTOR_CALL
+                        || tool.name === HelperTools.ACTOR_RUNS_GET;
+                    const progressTracker = progressTrackerOptIn
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
@@ -1038,7 +1035,7 @@ export class ActorsMcpServer {
                         const diag = extractToolTelemetry(res, actorName, actorId);
                         toolStatus = diag.toolStatus;
                         callDiagnostics = { ...callDiagnostics, ...diag.callDiagnostics };
-                        return res;
+                        return captureResult(res);
                     } finally {
                         progressTracker?.stop();
                     }
@@ -1057,7 +1054,7 @@ export class ActorsMcpServer {
                             await this.server.sendLoggingMessage({ level: 'error', data: msg });
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
                             callDiagnostics = { ...callDiagnostics, failure_category: FAILURE_CATEGORY.INTERNAL_ERROR };
-                            return buildMCPResponse({ texts: [msg], isError: true });
+                            return captureResult(buildMCPResponse({ texts: [msg], isError: true }));
                         }
 
                         // Only set up notification handlers if progressToken is provided by the client
@@ -1101,7 +1098,7 @@ export class ActorsMcpServer {
                             callDiagnostics = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
                         }
 
-                        return { ...res };
+                        return captureResult({ ...res });
                     } catch (error) {
                         toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
                         const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
@@ -1115,10 +1112,10 @@ export class ActorsMcpServer {
                             toolName: tool.originToolName,
                             failureCategory: callDiagnostics.failure_category,
                         });
-                        return buildMCPResponse({
+                        return captureResult(buildMCPResponse({
                             texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
                             isError: true,
-                        });
+                        }));
                     } finally {
                         if (client) await client.close();
                     }
@@ -1130,7 +1127,7 @@ export class ActorsMcpServer {
 
                     try {
                         log.info('Calling Actor', { toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
-                        const executorResult = await this.actorExecutor.executeActorTool({
+                        const executorResult = await actorExecutor.executeActorTool({
                             actorFullName: tool.actorFullName,
                             input: toolArgs!,
                             apifyClient: apifyClient!,
@@ -1138,16 +1135,17 @@ export class ActorsMcpServer {
                             progressTracker,
                             abortSignal: extra.signal,
                             mcpSessionId,
+                            datasetItemsSchema: tool.datasetItemsSchema,
                         });
 
                         if (!executorResult) {
                             toolStatus = TOOL_STATUS.ABORTED;
                             // Receivers of cancellation notifications SHOULD NOT send a response for the cancelled request
                             // https://modelcontextprotocol.io/specification/2025-06-18/basic/utilities/cancellation#behavior-requirements
-                            return {};
+                            return captureResult({});
                         }
 
-                        return executorResult;
+                        return captureResult(executorResult);
                     } finally {
                         if (progressTracker) {
                             progressTracker.stop();
@@ -1168,7 +1166,7 @@ export class ActorsMcpServer {
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
                     };
-                    return buildPaymentRequiredResponse(error);
+                    return captureResult(buildPaymentRequiredResponse(error));
                 }
 
                 if (isPermissionApprovalError(error)) {
@@ -1179,7 +1177,7 @@ export class ActorsMcpServer {
                         ...buildActorFields(actorName, actorId),
                     };
                     logHttpError(error, 'Permission approval required while calling tool', { toolName: name, mcpSessionId });
-                    return buildPermissionApprovalResponse(error);
+                    return captureResult(buildPermissionApprovalResponse(error));
                 }
 
                 // Re-throw MCP protocol errors (e.g. from failInvalidParams) so the SDK
@@ -1213,11 +1211,11 @@ export class ActorsMcpServer {
                     validationMissingProperty: callDiagnostics.validation_missing_property,
                     validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
-                return buildMCPResponse({
+                return captureResult(buildMCPResponse({
                     texts: [getToolCallErrorUserText(name, error)],
                     isError: true,
                     telemetry: { toolStatus },
-                });
+                }));
             } finally {
                 if (shouldTrackTelemetry) {
                     this.logToolCallAndTelemetry({
@@ -1228,6 +1226,7 @@ export class ActorsMcpServer {
                         telemetryData,
                         userId,
                         callDiagnostics,
+                        responseSizeBytes: computeToolResponseSizeBytes(toolResult),
                     });
                 }
             }
@@ -1263,6 +1262,7 @@ export class ActorsMcpServer {
         telemetryData: ToolCallTelemetryProperties | null;
         userId: string | null;
         callDiagnostics?: CallDiagnostics;
+        responseSizeBytes?: number;
     }): void {
         const durationMs = Date.now() - params.startTime;
 
@@ -1271,6 +1271,7 @@ export class ActorsMcpServer {
             mcpSessionId: params.mcpSessionId,
             toolStatus: params.toolStatus,
             durationMs,
+            ...(params.responseSizeBytes !== undefined && { responseSizeBytes: params.responseSizeBytes }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
 
@@ -1279,6 +1280,7 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
+                ...(params.responseSizeBytes !== undefined && { tool_response_size_bytes: params.responseSizeBytes }),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
             };
@@ -1334,7 +1336,7 @@ export class ActorsMcpServer {
         // This avoids re-fetching user data in the error handler.
         const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
 
-        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics) => {
+        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, responseSizeBytes?: number) => {
             this.logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
@@ -1344,6 +1346,7 @@ export class ActorsMcpServer {
                 telemetryData,
                 userId,
                 callDiagnostics: diagnostics,
+                responseSizeBytes,
             });
         };
 
@@ -1434,6 +1437,7 @@ export class ActorsMcpServer {
                         userRentedActorIds,
                         progressTracker,
                         mcpSessionId,
+                        taskMode: true,
                     }) as Record<string, unknown>;
 
                     const diag = extractToolTelemetry(res, actorName, actorId);
@@ -1453,7 +1457,7 @@ export class ActorsMcpServer {
 
                 try {
                     log.info('Calling Actor for task', { taskId, toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
-                    const executorResult = await this.actorExecutor.executeActorTool({
+                    const executorResult = await actorExecutor.executeActorTool({
                         actorFullName: tool.actorFullName,
                         input: toolArgs,
                         apifyClient,
@@ -1461,6 +1465,8 @@ export class ActorsMcpServer {
                         progressTracker,
                         abortSignal: cancelWatcher.signal,
                         mcpSessionId,
+                        datasetItemsSchema: tool.datasetItemsSchema,
+                        taskMode: true,
                     });
 
                     if (!executorResult) {
@@ -1490,7 +1496,7 @@ export class ActorsMcpServer {
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics);
+            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseSizeBytes(result));
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
@@ -1503,13 +1509,14 @@ export class ActorsMcpServer {
                     TOOL_STATUS.ABORTED,
                     { ...buildActorFields(actorName, actorId) },
                 )) return;
-                await this.taskStore.storeTaskResult(taskId, 'completed', buildPaymentRequiredResponse(error), mcpSessionId);
+                const paymentResponse = buildPaymentRequiredResponse(error);
+                await this.taskStore.storeTaskResult(taskId, 'completed', paymentResponse, mcpSessionId);
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,
                     failure_http_status: 402,
                     ...buildActorFields(actorName, actorId),
-                });
+                }, computeToolResponseSizeBytes(paymentResponse));
                 return;
             }
 
@@ -1522,13 +1529,14 @@ export class ActorsMcpServer {
                     TOOL_STATUS.ABORTED,
                     { ...buildActorFields(actorName, actorId) },
                 )) return;
-                await this.taskStore.storeTaskResult(taskId, 'completed', buildPermissionApprovalResponse(error), mcpSessionId);
+                const approvalResponse = buildPermissionApprovalResponse(error);
+                await this.taskStore.storeTaskResult(taskId, 'completed', approvalResponse, mcpSessionId);
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
                 finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
                     failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
                     failure_http_status: error.statusCode,
                     ...buildActorFields(actorName, actorId),
-                });
+                }, computeToolResponseSizeBytes(approvalResponse));
                 return;
             }
 
@@ -1578,17 +1586,18 @@ export class ActorsMcpServer {
                 taskId,
                 mcpSessionId,
             });
-            await this.taskStore.storeTaskResult(taskId, 'failed', {
+            const failedResult = {
                 content: [{
                     type: 'text' as const,
                     text: userText,
                 }],
                 isError: true,
                 internalToolStatus: toolStatus,
-            }, mcpSessionId);
+            };
+            await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics);
+            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseSizeBytes(failedResult));
         } finally {
             cancelWatcher.dispose();
         }

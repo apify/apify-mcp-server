@@ -18,33 +18,47 @@ interface ActorRunData {
     cost?: number;
     timestamp: string;
     duration: string;
-    startedAt: string;
+    startedAt?: string;
     finishedAt?: string;
     stats?: {
         computeUnits?: number;
-        memoryAvgBytes?: number;
-        memoryMaxBytes?: number;
     };
+    /** Identifier + count only. Item bodies are fetched separately via get-dataset-items. */
     dataset?: {
-        datasetId: string;
-        totalItemCount: number;
-        previewItems: Record<string, any>[];
+        id: string;
+        itemCount?: number;
     };
 }
 
+/**
+ * Shape from get-actor-run / get-actor-run-widget.
+ * storages mirrors ActorRunStorageIds: alias-map where "default" is always the primary entry,
+ * extended with fetched metadata. Named Actor storages occupy additional alias keys.
+ * Item bodies are not inlined — fetch via get-dataset-items.
+ */
 interface ToolOutput extends Record<string, unknown> {
     runId?: string;
-    actorName?: string; // Full actor name with username (e.g., "apify/rag-web-browser")
+    actorId?: string;
+    actorName?: string;
     status?: string;
     startedAt?: string;
     finishedAt?: string;
     stats?: any;
-    dataset?: any;
+    storages?: {
+        datasets?: {
+            default: { id: string; itemCount?: number; fields?: string[] };
+            [alias: string]: { id: string; itemCount?: number; fields?: string[] };
+        };
+        keyValueStores?: {
+            default: { id: string; keys?: string[]; keyCount?: number };
+            [alias: string]: { id: string; keys?: string[]; keyCount?: number };
+        };
+    };
 }
 
 
 const TERMINAL_STATUSES = new Set(["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"]);
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay =  async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const getStatusVariant = (status: string): BadgeVariant => {
     switch (status.toUpperCase()) {
@@ -281,13 +295,21 @@ function extractUsageTotalUsd(meta: ActorRunMeta): number | undefined {
     return typeof value === "number" ? value : undefined;
 }
 
+function extractDatasetSummary(toolOutput: ToolOutput): ActorRunData["dataset"] {
+    const ds = toolOutput.storages?.datasets?.default;
+    if (!ds?.id) return undefined;
+    return { id: ds.id, itemCount: ds.itemCount };
+}
+
 function toolOutputToRunData(
     toolOutput: ToolOutput,
     meta?: ActorRunMeta
 ): ActorRunData {
-    const startedAt = toolOutput.startedAt as string;
-    const finishedAt = toolOutput.finishedAt;
-    const duration = formatDuration(startedAt, finishedAt);
+    // READY runs have no `startedAt`. Feeding `undefined` into formatDuration/formatTimestamp
+    // yields "NaN-NaN-NaN NaN:NaN" / "NaNs"; render an em-dash placeholder instead.
+    const { startedAt, finishedAt } = toolOutput;
+    const duration = startedAt ? formatDuration(startedAt, finishedAt) : "—";
+    const timestamp = startedAt ? formatTimestamp(startedAt) : "—";
     const fullActorName = (toolOutput.actorName as string) || "Unknown Actor";
     const actorNameOnly = extractActorName(fullActorName);
     const humanizedName = humanizeActorName(actorNameOnly);
@@ -301,11 +323,11 @@ function toolOutputToRunData(
         status: (toolOutput.status as string) || "RUNNING",
         startedAt,
         finishedAt,
-        timestamp: formatTimestamp(startedAt),
+        timestamp,
         duration,
         cost: usageTotalUsd,
         stats: toolOutput.stats,
-        dataset: toolOutput.dataset,
+        dataset: extractDatasetSummary(toolOutput),
     };
 }
 
@@ -318,6 +340,11 @@ export const ActorRun: React.FC = () => {
 
     const [runData, setRunData] = useState<ActorRunData | null>(null);
     const [pictureUrl, setPictureUrl] = useState<string | undefined>(undefined);
+    /**
+     * Run response carries identifiers only; item bodies are fetched separately.
+     * We fetch a small preview via `get-dataset-items` once the run reaches SUCCEEDED and a datasetId is available.
+     */
+    const [previewItems, setPreviewItems] = useState<Record<string, any>[] | null>(null);
 
     // Initialize runData from toolOutput (call-actor result) or by fetching run when we have a stable runId.
     // When the host overwrites toolResult with another tool (e.g. search-actors), toolOutput has no runId;
@@ -335,7 +362,7 @@ export const ActorRun: React.FC = () => {
         let cancelled = false;
         const fetchRunByRunId = async () => {
             try {
-                const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: stableRunId } });
+                const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: stableRunId, waitSecs: 0 } });
                 if (cancelled) return;
                 const data = response?.structuredContent as ToolOutput | undefined;
                 if (data?.runId) {
@@ -351,6 +378,44 @@ export const ActorRun: React.FC = () => {
             cancelled = true;
         };
     }, [toolOutput, runData, toolResponseMetadata, stableRunId, app]);
+
+    // Drop a stale preview when the dataset id changes (e.g. host swaps toolResult to a new run).
+    useEffect(() => { setPreviewItems(null); }, [runData?.dataset?.id]);
+
+    // Once the run reaches SUCCEEDED, fetch a small preview via get-dataset-items.
+    // Run response carries shape + identifiers only; item bodies are fetched via get-dataset-items.
+    useEffect(() => {
+        if (!app || !runData) return;
+        if (previewItems !== null) return;
+        if (runData.status.toUpperCase() !== "SUCCEEDED") return;
+        if (!runData.dataset?.id || !runData.dataset.itemCount) return;
+
+        let cancelled = false;
+        (async () => {
+            try {
+                const response = await app.callServerTool({
+                    name: "get-dataset-items",
+                    arguments: { datasetId: runData.dataset!.id, limit: 20, clean: true },
+                });
+                if (cancelled) return;
+                const content = response?.structuredContent as { items?: Record<string, any>[] } | undefined;
+                if (Array.isArray(content?.items)) {
+                    setPreviewItems(content!.items);
+                } else {
+                    setPreviewItems([]);
+                }
+            } catch (err) {
+                if (!cancelled) {
+                    console.error("[ActorRun] Failed to fetch dataset items:", err);
+                    setPreviewItems([]);
+                }
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [app, runData?.status, runData?.dataset?.id, runData?.dataset?.itemCount, previewItems]);
 
     // Fetch actor details to get pictureUrl
     useEffect(() => {
@@ -398,45 +463,42 @@ export const ActorRun: React.FC = () => {
                 if (isCancelled) break;
 
                 try {
-                    const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: runData.runId } });
+                    // waitSecs: 0 keeps each refresh non-blocking; the widget polls on its own cadence.
+                    const response = await app.callServerTool({ name: "get-actor-run", arguments: { runId: runData.runId, waitSecs: 0 } });
 
                     if (response.structuredContent) {
                         const newData = response.structuredContent as unknown as ToolOutput;
-                        const startedAt = newData.startedAt as string;
-                        const finishedAt = newData.finishedAt;
-                        const duration = formatDuration(startedAt, finishedAt);
-
-                        const fullActorName = (newData.actorName as string) || runData.actorFullName;
-                        const actorNameOnly = extractActorName(fullActorName);
-                        const humanizedName = humanizeActorName(actorNameOnly);
-                        const developerUsername = extractDeveloperUsername(fullActorName);
-
-                        const pollUsageTotalUsd = extractUsageTotalUsd(response._meta as ActorRunMeta);
-
-                        const updatedRunData: ActorRunData = {
-                            runId: newData.runId!,
-                            actorName: humanizedName,
-                            actorFullName: fullActorName, // Keep the full name for API calls
-                            actorDeveloperUsername: developerUsername,
-                            status: (newData.status as string) || "RUNNING",
-                            startedAt,
-                            finishedAt,
-                            timestamp: formatTimestamp(startedAt),
-                            duration,
-                            cost: pollUsageTotalUsd,
-                            stats: newData.stats,
-                            dataset: newData.dataset,
+                        const meta = response._meta as ActorRunMeta;
+                        const computed = toolOutputToRunData(newData, meta);
+                        // Preserve all name-derived fields when the response omits actorName, so a
+                        // transient actor-name lookup miss doesn't flip the widget to "Unknown Actor"
+                        // when the previous run snapshot already had a known name.
+                        const updatedRunData: ActorRunData = newData.actorName ? computed : {
+                            ...computed,
+                            actorName: runData.actorName,
+                            actorFullName: runData.actorFullName,
+                            actorDeveloperUsername: runData.actorDeveloperUsername,
                         };
 
-                        setRunData(updatedRunData);
+                        // Skip the state update when nothing visible changed; otherwise every poll
+                        // forces a re-render with identical data.
+                        if (
+                            updatedRunData.status !== runData.status
+                            || updatedRunData.finishedAt !== runData.finishedAt
+                            || updatedRunData.dataset?.id !== runData.dataset?.id
+                            || updatedRunData.dataset?.itemCount !== runData.dataset?.itemCount
+                            || updatedRunData.cost !== runData.cost
+                        ) {
+                            setRunData(updatedRunData);
+                        }
 
-                        const newStatus = (newData.status || '').toUpperCase();
+                        const newStatus = updatedRunData.status.toUpperCase();
                         if (TERMINAL_STATUSES.has(newStatus)) {
-                            // Notify the model that the run completed so it can follow up.
+                            const ds = updatedRunData.dataset;
                             const ctx = [
                                 `Actor run ${runData.runId} finished with status: ${newStatus}.`,
-                                newData.dataset?.datasetId ? `Dataset ID: ${newData.dataset.datasetId}` : null,
-                                newData.dataset?.totalItemCount != null ? `Items scraped: ${newData.dataset.totalItemCount}` : null,
+                                ds?.id ? `Dataset ID: ${ds.id}` : null,
+                                ds?.itemCount != null ? `Items scraped: ${ds.itemCount}` : null,
                             ].filter(Boolean).join(' ');
                             await app.updateModelContext({ content: [{ type: 'text', text: ctx }] }).catch(() => {});
                             break;
@@ -492,10 +554,13 @@ export const ActorRun: React.FC = () => {
         );
     }
 
-    // Extract table columns from first item
-    const columns = runData.dataset?.previewItems.length
-        ? Object.keys(runData.dataset.previewItems[0])
+    const statusUpper = runData.status.toUpperCase();
+    const columns = previewItems && previewItems.length > 0
+        ? Object.keys(previewItems[0])
         : [];
+    // Show the skeleton while running OR while the preview fetch is in flight on a fresh SUCCEEDED.
+    const showSkeleton = statusUpper === 'RUNNING'
+        || (statusUpper === 'SUCCEEDED' && (runData.dataset?.itemCount ?? 0) > 0 && previewItems === null);
 
 
     const handleOpenRun = () => {
@@ -550,44 +615,42 @@ export const ActorRun: React.FC = () => {
                 {/* <IconButton Icon={ExpandIcon} onClick={() => setIsExpanded(!isExpanded)} /> */}
                 </ActorHeader>
 
-                {runData.dataset && runData.dataset.previewItems.length > 0 ? (
-                    <>
-                        <TableContainer>
-                            <Table>
-                                <TableHeader>
-                                    <tr>
-                                        {columns.map((column) => (
-                                            <TableHeaderCell key={column}>
-                                                {column.charAt(0).toUpperCase() + column.slice(1)}
-                                            </TableHeaderCell>
-                                        ))}
-                                    </tr>
-                                </TableHeader>
-                                <TableBody>
-                                    {runData.dataset.previewItems.map((item, index) => (
-                                        <TableRow key={index}>
-                                            {columns.map((column) => (
-                                                <TableCell key={column}>
-                                                    {item[column] == null
-                                                        ? "—"
-                                                        // If the value is an object, show number of fields instead of [object Object]
-                                                        : typeof item[column] === 'object'
-                                                            ? `${Object.keys(item[column]).length} fields`
-                                                            : String(item[column]) || "—"}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
+                {previewItems && previewItems.length > 0 ? (
+                    <TableContainer>
+                        <Table>
+                            <TableHeader>
+                                <tr>
+                                    {columns.map((column) => (
+                                        <TableHeaderCell key={column}>
+                                            {column.charAt(0).toUpperCase() + column.slice(1)}
+                                        </TableHeaderCell>
                                     ))}
-                                </TableBody>
-                            </Table>
-                            {runData.dataset.previewItems.length > 3 && <TableGradientOverlay />}
-                        </TableContainer>
-                    </>
-                ) : runData.status.toUpperCase() === 'RUNNING' ? (
+                                </tr>
+                            </TableHeader>
+                            <TableBody>
+                                {previewItems.map((item, index) => (
+                                    <TableRow key={index}>
+                                        {columns.map((column) => (
+                                            <TableCell key={column}>
+                                                {item[column] == null
+                                                    ? "—"
+                                                    // If the value is an object, show number of fields instead of [object Object]
+                                                    : typeof item[column] === 'object'
+                                                        ? `${Object.keys(item[column]).length} fields`
+                                                        : String(item[column]) || "—"}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                        {previewItems.length > 3 && <TableGradientOverlay />}
+                    </TableContainer>
+                ) : showSkeleton ? (
                     <TableSkeleton />
                 ) : (
                     <EmptyStateContainer>
-                        {runData.status.toUpperCase() === 'READY' ? (
+                        {statusUpper === 'READY' ? (
                             <Text type="body" size="small" style={{ color: theme.color.neutral.textMuted }}>
                                 The Actor is ready to run.
                             </Text>
@@ -604,9 +667,9 @@ export const ActorRun: React.FC = () => {
                     </Button>
                 </Footer>
             </Container>
-            {runData.status.toUpperCase() === 'SUCCEEDED' && runData && runData.dataset && runData.dataset.totalItemCount > 0 && (
+            {statusUpper === 'SUCCEEDED' && runData.dataset?.itemCount && runData.dataset.itemCount > 0 && (
                 <SuccessMessage>
-                    The {runData.actorName} found {runData.dataset.totalItemCount} result{runData.dataset.totalItemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
+                    The {runData.actorName} found {runData.dataset.itemCount} result{runData.dataset.itemCount !== 1 ? 's' : ''}. You can visit results via the provided link.
                 </SuccessMessage>
             )}
         </WidgetLayout>

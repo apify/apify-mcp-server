@@ -24,12 +24,33 @@ import type {
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { getActorDefinition } from '../build.js';
-import { buildEnrichedCallActorOutputSchema, callActorOutputSchema } from '../structured_output_schemas.js';
+import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
+import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**
- * Enriches actor tool output schemas with field-level detail from the ActorStore.
- * Uses Promise.allSettled to ensure individual failures don't block other tools.
+ * MCP-only opt-in injected next to the Actor's own input fields. Same contract as `call-actor`'s
+ * `waitSecs`: default 30, max 45. If the Actor's own input schema happens to declare `waitSecs`,
+ * this property overrides it — the field is reserved for the MCP server's wait control.
+ */
+const WAIT_SECS_INPUT_PROPERTY = {
+    type: 'integer',
+    minimum: 0,
+    maximum: WAIT_SECS_MAX,
+    default: CALL_ACTOR_WAIT_SECS_DEFAULT,
+    description: `Max seconds (0–45, default ${CALL_ACTOR_WAIT_SECS_DEFAULT}) to cap the wait for the Actor run to reach terminal state. `
+        + 'For long-running Actors the response returns at the cap with the current run status; '
+        + `follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
+} as const;
+
+/**
+ * For each direct actor tool with a known historical item schema, replaces the generic
+ * `getActorRunOutputSchema` with a per-tool variant that declares
+ * `storages.datasets.default.itemsSchema` — letting an LLM plan field projection from
+ * `tools/list` alone, before any call.
+ *
+ * Uses `Promise.allSettled` so a single store failure doesn't block other tools. Individual
+ * misses (null / empty properties / thrown errors) leave the tool on the generic schema.
  */
 export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
     const enrichPromises = tools
@@ -39,12 +60,16 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
                 const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
                 if (itemProperties && Object.keys(itemProperties).length > 0) {
                     // eslint-disable-next-line no-param-reassign
-                    tool.outputSchema = buildEnrichedCallActorOutputSchema(itemProperties);
+                    tool.outputSchema = buildEnrichedDirectActorOutputSchema(itemProperties);
+                    // Stash the raw properties so the executor can mirror them into
+                    // `structuredContent.storages.datasets.default.itemsSchema` at runtime.
+                    // eslint-disable-next-line no-param-reassign
+                    tool.datasetItemsSchema = itemProperties;
                 }
             } catch (error) {
                 log.debug('Failed to enrich output schema for Actor', {
                     actorName: tool.actorFullName,
-                    error: error instanceof Error ? error.message : String(error),
+                    errMessage: error instanceof Error ? error.message : String(error),
                 });
             }
         });
@@ -70,7 +95,7 @@ export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStor
  * 5. Enums are added to descriptions with examples using addEnumsToDescriptionsWithExamples()
  *
  * @param {ActorInfo[]} actorsInfo - An array of ActorInfo objects with webServerMcpPath, definition, and Actor.
- * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for caching.
+ * @param options - Optional settings: mcpSessionId for telemetry correlation, actorStore for per-Actor itemsSchema enrichment.
  * @returns {Promise<ToolEntry[]>} - A promise that resolves to an array of MCP tools.
  */
 export async function getNormalActorsAsTools(
@@ -87,6 +112,13 @@ export async function getNormalActorsAsTools(
 
         const isRag = definition.actorFullName === RAG_WEB_BROWSER;
         const { inputSchema } = buildActorInputSchema(definition.actorFullName, definition.input, isRag);
+
+        // Inject the MCP-only `waitSecs` opt-in before AJV compile so the LLM can cap the wait.
+        const inputSchemaWithWaitSecs = inputSchema as { properties?: Record<string, unknown> };
+        inputSchemaWithWaitSecs.properties = {
+            ...(inputSchemaWithWaitSecs.properties ?? {}),
+            waitSecs: WAIT_SECS_INPUT_PROPERTY,
+        };
 
         let description = `This tool calls the Actor "${definition.actorFullName}" and retrieves its output results.
 Use this tool instead of the "${HelperTools.ACTOR_CALL}" if user requests this specific Actor.
@@ -122,8 +154,8 @@ Actor description: ${definition.description}`;
             actorFullName: definition.actorFullName,
             description,
             inputSchema: inputSchema as ToolInputSchema,
-            // reuse the common output schema
-            outputSchema: callActorOutputSchema,
+            // Canonical RunResponse shape — same as call-actor and get-actor-run.
+            outputSchema: getActorRunOutputSchema,
             ajvValidate,
             paymentRequired: true,
             memoryMbytes,
@@ -143,7 +175,6 @@ Actor description: ${definition.description}`;
         });
     }
 
-    // Enrich output schemas with field-level detail if actorStore is available
     if (actorStore) {
         await enrichActorToolOutputSchemas(tools, actorStore);
     }

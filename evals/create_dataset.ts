@@ -121,7 +121,7 @@ async function createDatasetFromTestCases(
             log.error('💡 Solutions:');
             log.error('  1. Use --dataset-name to specify a different name:');
             log.error(`     tsx create-dataset.ts --dataset-name ${datasetName}_v2`);
-            log.error(`     npm run evals:create-dataset -- --dataset-name ${datasetName}_v2`);
+            log.error(`     pnpm run evals:create-dataset -- --dataset-name ${datasetName}_v2`);
             log.error('  2. Delete the existing dataset from Phoenix dashboard first');
             log.error('');
             log.error(`📋 Technical details: ${error.message}`);
