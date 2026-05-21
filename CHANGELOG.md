@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.10.7 - **not yet released**
+
+### 🚀 Features
+
+- **x402:** Expose multi-scheme accepts[] and structuredContent ([#876](https://github.com/apify/apify-mcp-server/pull/876)) ([acf6030](https://github.com/apify/apify-mcp-server/commit/acf6030ecb574eddd6af650d51d9f69a33501d8c)) by [@MQ37](https://github.com/MQ37), closes [#169](https://github.com/apify/apify-mcp-server/issues/169)
+
+### 🐛 Bug Fixes
+
+- Unify search-actors keywords description across variants ([#868](https://github.com/apify/apify-mcp-server/pull/868)) ([c6c7d41](https://github.com/apify/apify-mcp-server/commit/c6c7d41d95caca7c243ccb55c798f675eee8080b)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#833](https://github.com/apify/apify-mcp-server/issues/833)
+- **docker:** Repair pnpm deploy and add build smoke test to CI ([#870](https://github.com/apify/apify-mcp-server/pull/870)) ([6ade7b8](https://github.com/apify/apify-mcp-server/commit/6ade7b8fd3f661e9bce503e527b645507eb3b63f)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Replace npx with pnpm dlx; lower node engine to 20 ([#871](https://github.com/apify/apify-mcp-server/pull/871)) ([6d63ae3](https://github.com/apify/apify-mcp-server/commit/6d63ae31f2df3639e4c82ea496c5adb1abad328e)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Switch pkg-pr-new to pnpm pack; restore Node 22 minimum ([#874](https://github.com/apify/apify-mcp-server/pull/874)) ([b28a65e](https://github.com/apify/apify-mcp-server/commit/b28a65e6a12b6fd3fe049ad5c01928ddfab42a95)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Swap npm show for pnpm view in before-beta-release script ([#877](https://github.com/apify/apify-mcp-server/pull/877)) ([48dee51](https://github.com/apify/apify-mcp-server/commit/48dee5114ddd88afaf4ffb726e10afd3f5d79791)) by [@MQ37](https://github.com/MQ37)
+- Merge dataset item schemas across heterogeneous shapes ([#854](https://github.com/apify/apify-mcp-server/pull/854)) ([f2691c0](https://github.com/apify/apify-mcp-server/commit/f2691c09510fb2cf485731f322a23265fb2ee7df)) by [@MQ37](https://github.com/MQ37)
+- **ci:** Repair mcpb package build under pnpm 11 ([#896](https://github.com/apify/apify-mcp-server/pull/896)) ([61a0787](https://github.com/apify/apify-mcp-server/commit/61a07877ca11af9df54bd61c296336962248220c)) by [@MQ37](https://github.com/MQ37)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.10.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.7) (2026-05-21)
 
 ### 🚀 Features
