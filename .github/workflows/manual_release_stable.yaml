@@ -56,12 +56,12 @@ jobs:
             -   name: Build module
                 run: pnpm run build
             -   name: Prepare MCPB package
-                # `pnpm deploy --prod mcpb` builds a self-contained deployment dir:
+                # `pnpm --filter=@apify/actors-mcp-server deploy --prod --legacy --node-linker=hoisted mcpb` builds a self-contained deployment dir:
                 # production-only deps, a flat (hoisted) node_modules with no `.pnpm/`
                 # store or symlinks — the MCPB packer requires a portable tree.
                 # Then we copy in the build output and assets the packer expects.
                 run: |
-                    pnpm deploy --prod mcpb
+                    pnpm --filter=@apify/actors-mcp-server deploy --prod --legacy --node-linker=hoisted mcpb
                     cp -r dist mcpb/dist
                     cp -r docs mcpb/docs
                     cp manifest.json mcpb/manifest.json
