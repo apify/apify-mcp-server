@@ -14,7 +14,7 @@ const getKeyValueStoreKeysArgs = z.object({
     limit: z.number()
         .max(10)
         .optional()
-        .describe('Number of keys to be returned. Maximum value is 1000.'),
+        .describe('Number of keys to be returned. Maximum value is 10.'),
 });
 
 /**

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getKeyValueStoreArgs = z.object({
     keyValueStoreId: z.string()
@@ -39,6 +40,13 @@ USAGE EXAMPLES:
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
         const store = await client.keyValueStore(parsed.keyValueStoreId).get();
+        if (!store) {
+            return buildMCPResponse({
+                texts: [`Key-value store '${parsed.keyValueStoreId}' not found.`],
+                isError: true,
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+            });
+        }
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
     },
 } as const);

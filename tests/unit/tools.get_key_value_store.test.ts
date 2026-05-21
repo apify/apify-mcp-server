@@ -1,4 +1,3 @@
-// Per-file stubs match the repo convention; see tools.get_dataset_items.test.ts.
 import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
@@ -39,6 +38,16 @@ describe('get-key-value-store', () => {
         expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_STORE);
+    });
+
+    it('returns isError with a not-found message when the store does not exist', async () => {
+        const result = await (getKeyValueStore as HelperTool).call(
+            stubArgs({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
+        );
+        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+
+        expect(isError).toBe(true);
+        expect(content[0].text).toContain("Key-value store 'missing' not found");
     });
 
     it('rejects empty keyValueStoreId via ajv validation', () => {

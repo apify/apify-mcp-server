@@ -1,4 +1,3 @@
-// Per-file stubs match the repo convention; see tools.get_dataset_items.test.ts.
 import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';

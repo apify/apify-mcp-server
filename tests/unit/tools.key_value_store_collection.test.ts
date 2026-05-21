@@ -1,4 +1,3 @@
-// Per-file stubs match the repo convention; see tools.get_dataset_items.test.ts.
 // key_value_store_collection.ts constructs its own ApifyClient from apifyToken, so we mock the module.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
