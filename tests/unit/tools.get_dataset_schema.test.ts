@@ -49,7 +49,6 @@ describe('get-dataset-schema', () => {
         expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         const schema = JSON.parse(json);
-        // The generated schema describes an array of objects with the input fields.
         expect(schema).toMatchObject({ type: 'array' });
     });
 
