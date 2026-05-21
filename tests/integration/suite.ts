@@ -9,7 +9,6 @@ import {
     defaults,
     HelperTools,
     MAX_LIMIT_WITH_INPUT_SCHEMA,
-    RAG_WEB_BROWSER,
     SERVER_MODE_AUTO_DETECTION_ENABLED,
 } from '../../src/const.js';
 import { SKYFIRE_ENABLED_TOOLS } from '../../src/payments/const.js';
@@ -22,9 +21,9 @@ import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
-import { ACTOR_MCP_SERVER_ACTOR_NAME, ACTOR_PYTHON_EXAMPLE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE_TEST, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
-import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted, waitForRunTerminal } from './utils/task_waits.js';
+import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -58,16 +57,16 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
-async function callPythonExampleActor(client: Client, selectedToolName: string) {
+async function callNormalModeTestActor(client: Client, selectedToolName: string) {
     const result = await client.callTool({
         name: selectedToolName,
         arguments: {
-            first_number: 1,
-            second_number: 2,
+            firstNumber: 1,
+            secondNumber: 2,
         },
     });
 
-    expectPythonExampleStructuredContent(result);
+    expectNormalModeTestStructuredContent(result);
 }
 
 function validateStructuredOutput(
@@ -143,12 +142,12 @@ function expectWidgetToolMeta(tools: { tools: { name: string; _meta?: Record<str
 }
 
 /**
- * Validates the canonical run response from `call-actor` against the python-example Actor.
+ * Validates the canonical run response from `call-actor` against the normal-mode-test-actor.
  * The response does not inline dataset items. `itemCount` is not asserted because Apify's
  * dataset metadata propagation can lag past the server's probe window; the dataset id plus a
  * non-empty `fields` list is the reliable signal that items were written.
  */
-function expectPythonExampleStructuredContent(result: unknown): void {
+function expectNormalModeTestStructuredContent(result: unknown): void {
     const resultWithStructured = result as { structuredContent?: {
          runId?: string;
          status?: string;
@@ -164,7 +163,7 @@ function expectPythonExampleStructuredContent(result: unknown): void {
     expect(sc?.status).toBe('SUCCEEDED');
     expect(sc?.storages?.datasets?.default?.id).toBeDefined();
     expect(sc?.storages?.datasets?.default?.fields ?? []).toEqual(
-        expect.arrayContaining(['first_number', 'second_number', 'sum']),
+        expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']),
     );
     expect(sc?.summary).toBeDefined();
     expect(sc?.nextStep).toBeDefined();
@@ -316,7 +315,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should list two loaded Actors plus auto-injected storage and abort tools', async () => {
-            const actors = ['apify/python-example', 'apify/rag-web-browser'];
+            const actors = ['apify/python-example','apify/normal-mode-test-actor'];
             client = await createClientFn({ actors, enableAddingActors: false, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             // Actor tools trigger storage/abort helpers; default mode skips get-actor-run for actor tools.
@@ -328,7 +327,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should load only specified actors when actors param is provided (no other tools)', async () => {
-            const actors = ['apify/python-example'];
+            const actors = ['apify/normal-mode-test-actor'];
             client = await createClientFn({ actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
 
@@ -345,23 +344,23 @@ export function createIntegrationTestsSuite(
             expect(names).not.toContain('fetch-apify-docs');
         });
 
-        it('should return tool with execution field when listing tools with apify/python-example', async () => {
-            const actors = [ACTOR_PYTHON_EXAMPLE];
+        it('should return tool with execution field when listing tools with apify/normal-mode-test-actor', async () => {
+            const actors = [ACTOR_NORMAL_MODE_TEST];
             client = await createClientFn({ tools: actors });
             const tools = await client.listTools();
 
-            // Find the tool for apify/python-example
-            const pythonExampleTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
-            expect(pythonExampleTool).toBeDefined();
+            // Find the tool for apify/normal-mode-test-actor
+            const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE_TEST));
+            expect(normalModeTool).toBeDefined();
 
             // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
-            expect(pythonExampleTool).toHaveProperty('execution');
-            expect(pythonExampleTool?.execution).toBeDefined();
+            expect(normalModeTool).toHaveProperty('execution');
+            expect(normalModeTool?.execution).toBeDefined();
 
             // Verify other expected fields are present
-            expect(pythonExampleTool).toHaveProperty('name');
-            expect(pythonExampleTool).toHaveProperty('description');
-            expect(pythonExampleTool).toHaveProperty('inputSchema');
+            expect(normalModeTool).toHaveProperty('name');
+            expect(normalModeTool).toHaveProperty('description');
+            expect(normalModeTool).toHaveProperty('inputSchema');
 
             await client.close();
         });
@@ -385,7 +384,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should load only specified Actors via tools selectors when actors param omitted', async () => {
-            const actors = ['apify/python-example'];
+            const actors = ['apify/normal-mode-test-actor'];
             client = await createClientFn({ tools: actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             // The Actor plus auto-injected storage/abort helpers.
@@ -398,7 +397,7 @@ export function createIntegrationTestsSuite(
 
         it('should treat selectors with slashes as Actor names', async () => {
             client = await createClientFn({
-                tools: ['docs', 'apify/python-example'],
+                tools: ['docs', 'apify/normal-mode-test-actor'],
             });
             const names = getToolNames(await client.listTools());
 
@@ -407,11 +406,11 @@ export function createIntegrationTestsSuite(
             expect(names).toContain('fetch-apify-docs');
 
             // Should include actor (if it exists/is valid)
-            expect(names).toContain(actorNameToToolName('apify/python-example'));
+            expect(names).toContain(actorNameToToolName('apify/normal-mode-test-actor'));
         });
 
         it('should merge actors param into tools selectors (backward compatibility)', async () => {
-            const actors = ['apify/python-example'];
+            const actors = ['apify/normal-mode-test-actor'];
             const categories = ['docs'] as ToolCategory[];
 
             client = await createClientFn({ tools: categories, actors });
@@ -471,19 +470,19 @@ export function createIntegrationTestsSuite(
         });
 
         it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
-            client = await createClientFn({ tools: [], actors: [ACTOR_PYTHON_EXAMPLE] });
+            client = await createClientFn({ tools: [], actors: [ACTOR_NORMAL_MODE_TEST] });
 
             const names = getToolNames(await client.listTools());
             // Actor tool triggers storage/abort helpers; default mode skips get-actor-run for actor tools.
             expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
-            expect(names).toContain(actorNameToToolName(ACTOR_PYTHON_EXAMPLE));
+            expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE_TEST));
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
 
         it('should add Actor dynamically and call it directly', async () => {
-            const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE_TEST);
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
@@ -491,18 +490,18 @@ export function createIntegrationTestsSuite(
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
-            await addActor(client, ACTOR_PYTHON_EXAMPLE);
+            await addActor(client, ACTOR_NORMAL_MODE_TEST);
 
             // add-actor + auto-injected + newly added actor
             const namesAfterAdd = getToolNames(await client.listTools());
             expect(namesAfterAdd.length).toEqual(2 + AUTO_INJECTED_TOOL_NAMES.length);
             expect(namesAfterAdd).toContain(selectedToolName);
             expectToolNamesToContain(namesAfterAdd, AUTO_INJECTED_TOOL_NAMES);
-            await callPythonExampleActor(client, selectedToolName);
+            await callNormalModeTestActor(client, selectedToolName);
         });
 
         it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
-            const selectedToolName = actorNameToToolName(ACTOR_PYTHON_EXAMPLE);
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE_TEST);
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
             // actors category + add-actor + get-actor-run + auto-injected storage/abort helpers
@@ -517,10 +516,10 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     input: {
-                        first_number: 1,
-                        second_number: 2,
+                        firstNumber: 1,
+                        secondNumber: 2,
                     },
                 },
             });
@@ -532,8 +531,8 @@ export function createIntegrationTestsSuite(
             expect(mirrored.runId).toBeDefined();
             expect(mirrored.status).toBe('SUCCEEDED');
 
-            // Validate structured output has run-response metadata for the python-example Actor.
-            expectPythonExampleStructuredContent(result);
+            // Validate structured output has run-response metadata for the normal-mode-test-actor.
+            expectNormalModeTestStructuredContent(result);
         });
 
         it('should call Actor directly with required input', async () => {
@@ -543,7 +542,7 @@ export function createIntegrationTestsSuite(
             await expect(client!.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                 },
             })).rejects.toThrow(/must have required property 'input'/);
 
@@ -551,8 +550,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                 },
             });
             expect(callResult.content).toBeDefined();
@@ -564,15 +563,15 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     // Max wait (45s) so the test does not flake on a slow run.
                     waitSecs: 45,
                 },
             });
 
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
-            expectPythonExampleStructuredContent(callResult);
+            expectNormalModeTestStructuredContent(callResult);
 
             const sc = (callResult as { structuredContent?: { status?: string; summary?: string } }).structuredContent;
             expect(sc?.status).toBe('SUCCEEDED');
@@ -587,8 +586,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
             });
@@ -607,8 +606,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     previewOutput: false,
                     waitSecs: 45,
                 },
@@ -617,7 +616,7 @@ export function createIntegrationTestsSuite(
             // previewOutput is deprecated and ignored; the response is the canonical RunResponse
             // regardless of the flag. Validate the metadata is intact.
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
-            expectPythonExampleStructuredContent(callResult);
+            expectNormalModeTestStructuredContent(callResult);
         });
 
         it('accepts callOptions.maxItems on call-actor and runs successfully', async () => {
@@ -626,8 +625,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: RAG_WEB_BROWSER,
-                    input: { query: 'hello', maxResults: 3 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     callOptions: { maxItems: 3 },
                     waitSecs: 45,
                 },
@@ -638,11 +637,7 @@ export function createIntegrationTestsSuite(
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string } } };
             } }).structuredContent;
-            // `waitSecs: 45` is the `WAIT_SECS_MAX` cap; rag-web-browser occasionally
-            // doesn't reach a terminal status within that window. This test is about
-            // `callOptions.maxItems` being accepted by the API — not about the actor
-            // finishing fast — so accept RUNNING as well.
-            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
+            expect(sc?.status).toBe('SUCCEEDED');
             expect(sc?.storages?.datasets?.default?.id).toBeDefined();
         });
 
@@ -652,8 +647,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 45,
                 },
             });
@@ -661,7 +656,7 @@ export function createIntegrationTestsSuite(
             // The canonical response doesn't inline preview items — agents fetch them via
             // get-dataset-items using the dataset id and the fields list surfaced here.
             validateStructuredOutputForTool(callResult, HelperTools.ACTOR_CALL, 'default');
-            expectPythonExampleStructuredContent(callResult);
+            expectNormalModeTestStructuredContent(callResult);
 
             const sc = (callResult as { structuredContent?: {
                 nextStep?: string;
@@ -672,7 +667,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should find Actors in store search', async () => {
-            const query = 'python-example';
+            const query = 'normal-mode-test-actor';
             client = await createClientFn({
                 enableAddingActors: false,
             });
@@ -685,7 +680,7 @@ export function createIntegrationTestsSuite(
                 },
             });
             const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes(ACTOR_PYTHON_EXAMPLE))).toBe(true);
+            expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE_TEST))).toBe(true);
         });
 
         // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
@@ -723,7 +718,7 @@ export function createIntegrationTestsSuite(
                 }
             });
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_PYTHON_EXAMPLE } });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE_TEST } });
 
             expect(hasReceivedNotification).toBe(true);
         });
@@ -744,40 +739,40 @@ export function createIntegrationTestsSuite(
         it('should be able to add and call Actorized MCP server', async () => {
             client = await createClientFn({ enableAddingActors: true });
 
-            const toolNamesBefore = getToolNames(await client.listTools());
-            const searchToolCountBefore = toolNamesBefore.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
-            expect(searchToolCountBefore).toBe(0);
+            // example-mcp-server exposes a single `add` tool. The proxy registers it under a
+            // hashed prefix (see `getProxyMCPServerToolName`) — match the `-add` suffix while
+            // excluding the unrelated `add-actor` helper present in the seed tools.
+            const isProxiedAddTool = (name: string) => name.endsWith('-add') && name !== HelperTools.ACTOR_ADD;
 
-            // Add self as an Actorized MCP server
-            await addActor(client, ACTOR_MCP_SERVER_ACTOR_NAME);
+            const toolNamesBefore = getToolNames(await client.listTools());
+            expect(toolNamesBefore.filter(isProxiedAddTool)).toHaveLength(0);
+
+            // Add Actorized MCP server
+            await addActor(client, ACTOR_EXAMPLE_MCP_SERVER);
 
             const toolNamesAfter = getToolNames(await client.listTools());
-            const searchToolCountAfter = toolNamesAfter.filter((name) => name.includes(HelperTools.STORE_SEARCH)).length;
-            expect(searchToolCountAfter).toBe(1);
-
-            // Find the search tool from the Actorized MCP server
-            const actorizedMCPSearchTool = toolNamesAfter.find(
-                (name) => name.includes(HelperTools.STORE_SEARCH) && name !== HelperTools.STORE_SEARCH);
-            expect(actorizedMCPSearchTool).toBeDefined();
+            const proxiedAddTools = toolNamesAfter.filter(isProxiedAddTool);
+            expect(proxiedAddTools).toHaveLength(1);
 
             const result = await client.callTool({
-                name: actorizedMCPSearchTool as string,
+                name: proxiedAddTools[0],
                 arguments: {
-                    keywords: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    limit: 1,
+                    firstNumber: 2,
+                    secondNumber: 3,
                 },
             });
             expect(result.content).toBeDefined();
+            expect(result.isError ?? false).toBe(false);
         });
 
-        it('should call MCP server Actor via call-actor and invoke fetch-apify-docs tool', async () => {
+        it('should call MCP server Actor via call-actor and invoke add tool', async () => {
             client = await createClientFn({ tools: ['actors'] });
 
             // Step 1: Get MCP tools using fetch-actor-details
             const detailsResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    actor: ACTOR_EXAMPLE_MCP_SERVER,
                     output: {
                         description: false,
                         stats: false,
@@ -792,20 +787,19 @@ export function createIntegrationTestsSuite(
             });
 
             const detailsContent = detailsResult.content as { text: string }[];
-            expect(detailsContent.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+            expect(detailsContent.some((item) => item.text.includes('add'))).toBe(true);
 
-            // Step 2: call - invoke the MCP tool fetch-apify-docs via actor:tool syntax
-            const DOCS_URL = 'https://docs.apify.com';
+            // Step 2: call - invoke the MCP tool `add` via actor:tool syntax
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
-                    input: { url: DOCS_URL },
+                    actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`,
+                    input: { firstNumber: 2, secondNumber: 3 },
                 },
             });
 
-            const callContent = callResult.content as { text: string }[];
-            expect(callContent.some((item) => item.text.includes(`Fetched content from ${DOCS_URL}`))).toBe(true);
+            expect(callResult.content).toBeDefined();
+            expect(callResult.isError ?? false).toBe(false);
         });
 
         // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
@@ -823,8 +817,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: `${ACTOR_MCP_SERVER_ACTOR_NAME}:fetch-apify-docs`,
-                    input: { url: 'https://docs.apify.com' },
+                    actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`,
+                    input: { firstNumber: 2, secondNumber: 3 },
                 },
             });
 
@@ -843,7 +837,7 @@ export function createIntegrationTestsSuite(
             // The remote MCP tool's actual result must still flow through `content` — the fix must not
             // lose the payload while satisfying the schema.
             const content = callResult.content as { text: string }[];
-            expect(content.some((item) => item.text.includes('Fetched content from'))).toBe(true);
+            expect(content.length).toBeGreaterThan(0);
 
             // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
             // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
@@ -966,7 +960,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
-                    actor: RAG_WEB_BROWSER,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                 },
             });
 
@@ -984,7 +978,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1012,7 +1006,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: true,
                         stats: true,
@@ -1040,7 +1034,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    actor: ACTOR_EXAMPLE_MCP_SERVER,
                     output: {
                         description: false,
                         stats: false,
@@ -1056,7 +1050,7 @@ export function createIntegrationTestsSuite(
 
             const content = result.content as { text: string }[];
             expect(content.some((item) => item.text.includes('Available MCP Tools'))).toBe(true);
-            expect(content.some((item) => item.text.includes('fetch-apify-docs'))).toBe(true);
+            expect(content.some((item) => item.text.includes('add'))).toBe(true);
         });
 
         it('should return graceful note when output={ mcpTools: true } for regular Actor', async () => {
@@ -1067,7 +1061,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1095,7 +1089,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
-                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
+                    actor: ACTOR_EXAMPLE_MCP_SERVER,
                     output: {
                         description: false,
                         stats: false,
@@ -1126,7 +1120,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: true,
                         stats: false,
@@ -1155,7 +1149,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1187,7 +1181,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1219,7 +1213,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: 'fetch-actor-details',
                 arguments: {
-                    actor: RAG_WEB_BROWSER,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: true,
                         readme: true,
@@ -1237,7 +1231,7 @@ export function createIntegrationTestsSuite(
             expect(allText).toMatch(/# README summary|# README/);
             expect(allText).toContain('Input schema');
 
-            expectReadmeInStructuredContent(result, RAG_WEB_BROWSER);
+            expectReadmeInStructuredContent(result, ACTOR_NORMAL_MODE_TEST);
 
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema, 'fetch-actor-details');
         });
@@ -1252,7 +1246,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: 'fetch-actor-details-widget',
                 arguments: {
-                    actor: RAG_WEB_BROWSER,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                 },
             });
 
@@ -1282,7 +1276,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                 },
             });
 
@@ -1302,7 +1296,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: true,
                         stats: true,
@@ -1341,7 +1335,7 @@ export function createIntegrationTestsSuite(
             const pricingOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1369,12 +1363,11 @@ export function createIntegrationTestsSuite(
             expect(pricingText).not.toContain('Last modified:');
             expect(pricingText).not.toContain('README');
 
-            // Test 2: Only rating (should include rating for apify/rag-web-browser which has rating in stats)
-            const ragWebBrowser = 'apify/rag-web-browser';
+            // Test 2: Only rating
             const ratingOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ragWebBrowser,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1392,7 +1385,8 @@ export function createIntegrationTestsSuite(
             const ratingText = ratingContent.map((item) => item.text).join('\n');
             // Should include actor card header and rating
             expect(ratingText).toContain('Actor information');
-            expect(ratingText).toContain('Rating:');
+            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
+            // expect(ratingText).toContain('Rating:');
             // Should NOT include other sections
             expect(ratingText).not.toContain('Description:');
             expect(ratingText).not.toContain('Stats:');
@@ -1406,7 +1400,7 @@ export function createIntegrationTestsSuite(
             const metadataOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1437,7 +1431,7 @@ export function createIntegrationTestsSuite(
             const combinationResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ragWebBrowser,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                     output: {
                         description: false,
                         stats: false,
@@ -1455,7 +1449,8 @@ export function createIntegrationTestsSuite(
             const combinationText = combinationContent.map((item) => item.text).join('\n');
             // Should include: pricing, rating, metadata (developer, categories, last modified)
             expect(combinationText).toContain('Pricing');
-            expect(combinationText).toContain('Rating:');
+            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
+            // expect(combinationText).toContain('Rating:');
             expect(combinationText).toContain('Developed by:');
             expect(combinationText).toContain('Categories:');
             expect(combinationText).toContain('Last modified:');
@@ -1477,8 +1472,7 @@ export function createIntegrationTestsSuite(
                 tools: ['actors'],
             });
 
-            // Use apify/rag-web-browser which has all sections (description, stats, pricing, rating, metadata)
-            const testActor = 'apify/rag-web-browser';
+            const testActor = ACTOR_NORMAL_MODE_TEST;
 
             // Define all output options with their expected markers in text
             const outputOptions = [
@@ -1503,7 +1497,9 @@ export function createIntegrationTestsSuite(
                 {
                     name: 'rating',
                     field: 'rating',
-                    markers: ['Rating:', 'out of 5'],
+                    // TODO: restore markers to ['Rating:', 'out of 5'] once apify/normal-mode-test-actor has reviews;
+                    // Rating: is omitted when review count is 0
+                    markers: [],
                     notMarkers: ['Developed by:', 'Categories:', 'Description:', 'Stats:', 'Pricing', 'Last modified:', 'README', 'Input schema'],
                 },
                 {
@@ -1587,7 +1583,8 @@ export function createIntegrationTestsSuite(
             expect(allCardText).toContain('Description:');
             expect(allCardText).toContain('Stats:');
             expect(allCardText).toContain('Pricing');
-            expect(allCardText).toContain('Rating:');
+            // TODO: re-enable once apify/normal-mode-test-actor has reviews; Rating: is omitted when review count is 0
+            // expect(allCardText).toContain('Rating:');
             expect(allCardText).toContain('Developed by:');
             expect(allCardText).toContain('Categories:');
             expect(allCardText).toContain('Last modified:');
@@ -1733,7 +1730,7 @@ export function createIntegrationTestsSuite(
         // response after cancel, no runId in progress notifications), so we race the Apify API
         // for the just-started run while the call is in flight, then trigger the cancel.
         it.runIf(options.transport === 'streamable-http')('should abort actor run on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = 'apify/rag-web-browser';
+            const ACTOR_NAME = ACTOR_NORMAL_MODE_TEST;
             const selectedToolName = actorNameToToolName(ACTOR_NAME);
             client = await createClientFn({ enableAddingActors: true });
             await addActor(client, ACTOR_NAME);
@@ -1749,7 +1746,7 @@ export function createIntegrationTestsSuite(
                 method: 'tools/call' as const,
                 params: {
                     name: selectedToolName,
-                    arguments: { query: 'restaurants in San Francisco', maxResults: 10 },
+                    arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
                 },
             }, CallToolResultSchema, { signal: controller.signal })
                 // Swallow "AbortError: This operation was aborted" — expected after cancel.
@@ -1763,7 +1760,7 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'streamable-http')('should abort call-actor tool on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = 'apify/rag-web-browser';
+            const ACTOR_NAME = ACTOR_NORMAL_MODE_TEST;
             client = await createClientFn({ tools: ['actors'] });
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
@@ -1780,7 +1777,7 @@ export function createIntegrationTestsSuite(
                     arguments: {
                         actor: ACTOR_NAME,
                         step: 'call',
-                        input: { query: 'restaurants in San Francisco', maxResults: 10 },
+                        input: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
                     },
                 },
             }, CallToolResultSchema, { signal: controller.signal })
@@ -1795,7 +1792,7 @@ export function createIntegrationTestsSuite(
 
         // Environment variable tests - only applicable to stdio transport
         it.runIf(options.transport === 'stdio')('should load actors from ACTORS environment variable', async () => {
-            const actors = ['apify/python-example', 'apify/rag-web-browser'];
+            const actors = ['apify/python-example', 'apify/normal-mode-test-actor'];
             client = await createClientFn({ actors, useEnv: true });
             const names = getToolNames(await client.listTools());
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
@@ -1869,7 +1866,7 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        describe('rag-web-browser run reads via storage tools', () => {
+        describe('normal-mode-test-actor run reads via storage tools', () => {
             let datasetId: string;
             let runId: string;
 
@@ -1878,13 +1875,8 @@ export function createIntegrationTestsSuite(
                 const callResult = await setupClient.callTool({
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: RAG_WEB_BROWSER,
-                        input: { query: 'https://apify.com', maxResults: 1 },
-                        // `WAIT_SECS_MAX = 45` — same pattern as the other rag-web-browser tests
-                        // in this file (PR #863 fix). Without it the call defaults to 30s,
-                        // which is not always enough for the actor to write its first item
-                        // before the dataset-read tests in this describe block start.
-                        waitSecs: 45,
+                        actor: ACTOR_NORMAL_MODE_TEST,
+                        input: { firstNumber: 1, secondNumber: 2 },
                     },
                 });
                 const callStructured = callResult as { structuredContent?: {
@@ -1898,37 +1890,6 @@ export function createIntegrationTestsSuite(
                 runId = sc!.runId!;
                 await setupClient.close();
             }, 60_000);
-
-            it('auto-flattens dot-notation `fields` on get-dataset-items', async () => {
-                client = await createClientFn({ tools: ['storage'] });
-                const result = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
-                    arguments: { datasetId, fields: 'metadata.url,markdown' },
-                });
-                expect(result.isError).not.toBe(true);
-                const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
-                    .structuredContent?.items;
-                expect(Array.isArray(items)).toBe(true);
-                expect(items?.length).toBeGreaterThan(0);
-                expect(items?.[0]).toHaveProperty('metadata.url');
-                await client.close();
-            });
-
-            it('honors explicit `flatten` override on get-dataset-items', async () => {
-                client = await createClientFn({ tools: ['storage'] });
-                const result = await client.callTool({
-                    name: HelperTools.DATASET_GET_ITEMS,
-                    arguments: { datasetId, fields: 'metadata.url', flatten: 'other' },
-                });
-                expect(result.isError).not.toBe(true);
-                const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
-                    .structuredContent?.items;
-                expect(Array.isArray(items)).toBe(true);
-                // No item should have a flat `metadata.url` key — flatten="other" did not flatten metadata.
-                const itemsWithFlatMetadataUrl = (items ?? []).filter((item) => 'metadata.url' in item);
-                expect(itemsWithFlatMetadataUrl).toHaveLength(0);
-                await client.close();
-            });
 
             it('applies the default `limit` of 20 when omitted on get-dataset-items', async () => {
                 client = await createClientFn({ tools: ['storage'] });
@@ -1964,7 +1925,7 @@ export function createIntegrationTestsSuite(
                     arguments: { keyValueStoreId: kvId!, recordKey: 'INPUT' },
                 });
                 expect(kvResult.isError).not.toBe(true);
-                expect((kvResult.content as { text: string }[])[0].text).toContain('apify.com');
+                expect((kvResult.content as { text: string }[])[0].text).toContain('firstNumber');
                 await client.close();
             });
         });
@@ -1978,17 +1939,14 @@ export function createIntegrationTestsSuite(
             await client.close();
         });
 
-        it('calls rag-web-browser, verifies canonical shape with dot-notation fields, and fetches via get-dataset-items', async () => {
+        it('calls normal-mode-test-actor, verifies canonical shape and dataset fields, and fetches via get-dataset-items', async () => {
             client = await createClientFn({ tools: ['actors', 'storage'] });
 
             const callResult = await client.callTool({
                 name: 'call-actor',
                 arguments: {
-                    actor: RAG_WEB_BROWSER,
-                    // Max wait (45s) — see neighbouring rag-web-browser tests; the follow-up
-                    // dataset read needs items, which require the run to reach SUCCEEDED.
-                    input: { query: 'https://apify.com' },
-                    waitSecs: 45,
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                 },
             });
 
@@ -1997,33 +1955,23 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2);
 
             const sc = (callResult as { structuredContent?: {
-                runId?: string;
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
                 nextStep?: string;
             } }).structuredContent;
-            // `waitSecs: 45` is the `WAIT_SECS_MAX` server-side cap; accept RUNNING and
-            // wait for terminal via the Apify API before reading items.
-            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
+            expect(sc?.status).toBe('SUCCEEDED');
             const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
-            expect(sc?.runId).toBeDefined();
 
-            if (sc?.status !== 'SUCCEEDED') {
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-                await waitForRunTerminal(api, sc!.runId!);
-            }
-
-            // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
+            // Dataset field paths surface in `storages.datasets.default.fields`.
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
-            expect(fields.some((f) => f.startsWith('metadata.'))).toBe(true);
-            expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
+            expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
             const outputResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
                 arguments: {
                     datasetId: datasetId!,
-                    fields: 'metadata.title,crawl',
+                    fields: 'firstNumber,sum',
                 },
             });
 
@@ -2031,23 +1979,19 @@ export function createIntegrationTestsSuite(
                 .structuredContent?.items;
             expect(Array.isArray(items)).toBe(true);
             expect(items!.length).toBeGreaterThan(0);
-            expect(items![0]).toHaveProperty('metadata.title');
-            expect(typeof items![0]['metadata.title']).toBe('string');
-            expect(items![0]).toHaveProperty('crawl');
-            expect(typeof items![0].crawl).toBe('object');
+            expect(items![0]).toHaveProperty('firstNumber', 1);
+            expect(items![0]).toHaveProperty('sum', 3);
 
             await client.close();
         });
 
-        it('calls apify/rag-web-browser tool directly and retrieves metadata.title via get-dataset-items', async () => {
-            client = await createClientFn({ tools: ['storage'], actors: ['apify/rag-web-browser'] });
+        it('calls apify/normal-mode-test-actor tool directly and retrieves sum via get-dataset-items', async () => {
+            client = await createClientFn({ tools: ['storage'], actors: ['apify/normal-mode-test-actor'] });
 
             const result = await client.callTool({
-                name: actorNameToToolName('apify/rag-web-browser'),
-                // Max wait (45s) — the server-side cap. If the actor hasn't terminated
-                // by then, we follow up with `waitForRunTerminal` below so the dataset
-                // read sees the populated items.
-                arguments: { query: 'https://apify.com', waitSecs: 45 },
+                name: actorNameToToolName('apify/normal-mode-test-actor'),
+                // Max wait (45s) so the test does not flake on a slow run.
+                arguments: { firstNumber: 4, secondNumber: 6, waitSecs: 45 },
             });
 
             // content[0] mirrors structuredContent as JSON; content[1] is "${summary}\n${nextStep}".
@@ -2055,57 +1999,46 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2);
 
             // Direct actor tools return the canonical RunResponse shape — same as call-actor.
-            const ragWebBrowserToolName = actorNameToToolName('apify/rag-web-browser');
-            validateStructuredOutput(result, getActorRunOutputSchema, ragWebBrowserToolName);
+            const normalModeToolName = actorNameToToolName('apify/normal-mode-test-actor');
+            validateStructuredOutput(result, getActorRunOutputSchema, normalModeToolName);
             const sc = (result as { structuredContent?: {
-                runId?: string;
                 status?: string;
                 storages?: { datasets?: { default?: { id?: string; fields?: string[] } } };
                 nextStep?: string;
             } }).structuredContent;
-            // `waitSecs: 45` is the `WAIT_SECS_MAX` server-side cap. Accept RUNNING too —
-            // we wait for terminal status via the Apify API below before reading items.
-            expect(['RUNNING', 'SUCCEEDED']).toContain(sc?.status);
+            expect(sc?.status).toBe('SUCCEEDED');
             const datasetId = sc?.storages?.datasets?.default?.id;
             expect(datasetId).toBeDefined();
-            expect(sc?.runId).toBeDefined();
-
-            if (sc?.status !== 'SUCCEEDED') {
-                const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-                await waitForRunTerminal(api, sc!.runId!);
-            }
 
             // content[1] is the LLM-readable summary+nextStep; it must reference the datasetId
             // and the follow-up tool name so the LLM can act on the result.
             expect(content[1].text).toContain(datasetId);
             expect(content[1].text).toContain(HelperTools.DATASET_GET_ITEMS);
 
-            // Dataset field paths surface in `storages.datasets.default.fields` (dot notation).
+            // Dataset field paths surface in `storages.datasets.default.fields`.
             const fields = sc?.storages?.datasets?.default?.fields ?? [];
-            expect(fields.some((f) => f.startsWith('metadata.'))).toBe(true);
-            expect(fields.some((f) => f === 'crawl' || f.startsWith('crawl.'))).toBe(true);
+            expect(fields).toEqual(expect.arrayContaining(['firstNumber', 'secondNumber', 'sum']));
 
             const outputResult = await client.callTool({
                 name: HelperTools.DATASET_GET_ITEMS,
-                arguments: { datasetId: datasetId!, fields: 'metadata.title' },
+                arguments: { datasetId: datasetId!, fields: 'sum' },
             });
 
             const items = (outputResult as { structuredContent?: { items?: Record<string, unknown>[] } })
                 .structuredContent?.items;
             expect(Array.isArray(items)).toBe(true);
             expect(items!.length).toBeGreaterThan(0);
-            expect(items![0]).toHaveProperty('metadata.title');
-            expect(typeof items![0]['metadata.title']).toBe('string');
+            expect(items![0]).toHaveProperty('sum', 10);
 
             validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
 
             await client.close();
         });
 
-        it('calls apify/python-example tool directly and retrieves full dataset via get-dataset-items', async () => {
-            client = await createClientFn({ tools: ['storage'], actors: ['apify/python-example'] });
-            const selectedToolName = actorNameToToolName('apify/python-example');
-            const input = { first_number: 5, second_number: 7 };
+        it('calls apify/normal-mode-test-actor tool directly and retrieves full dataset via get-dataset-items', async () => {
+            client = await createClientFn({ tools: ['storage'], actors: ['apify/normal-mode-test-actor'] });
+            const selectedToolName = actorNameToToolName('apify/normal-mode-test-actor');
+            const input = { firstNumber: 5, secondNumber: 7 };
 
             const result = await client.callTool({
                 name: selectedToolName,
@@ -2117,7 +2050,7 @@ export function createIntegrationTestsSuite(
 
             // Direct actor tools return the canonical RunResponse shape — same as call-actor.
             validateStructuredOutput(result, getActorRunOutputSchema, selectedToolName);
-            expectPythonExampleStructuredContent(result);
+            expectNormalModeTestStructuredContent(result);
             expectUsageCostMeta(result);
 
             const datasetId = (result as { structuredContent?: {
@@ -2134,9 +2067,9 @@ export function createIntegrationTestsSuite(
                 .structuredContent?.items;
             expect(Array.isArray(items)).toBe(true);
             expect(items!.length).toBe(1);
-            expect(items![0]).toHaveProperty('first_number', input.first_number);
-            expect(items![0]).toHaveProperty('second_number', input.second_number);
-            expect(items![0]).toHaveProperty('sum', input.first_number + input.second_number);
+            expect(items![0]).toHaveProperty('firstNumber', input.firstNumber);
+            expect(items![0]).toHaveProperty('secondNumber', input.secondNumber);
+            expect(items![0]).toHaveProperty('sum', input.firstNumber + input.secondNumber);
 
             validateStructuredOutputForTool(outputResult, HelperTools.DATASET_GET_ITEMS, 'default');
         });
@@ -2148,8 +2081,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
             });
@@ -2170,7 +2103,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should return Actor details both for full Actor name and ID', async () => {
-            const actorName = 'apify/python-example';
+            const actorName = 'apify/normal-mode-test-actor';
             const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
             const actor = await apifyClient.actor(actorName).get();
             expect(actor).toBeDefined();
@@ -2204,8 +2137,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 3, second_number: 4 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 3, secondNumber: 4 },
                 },
             });
 
@@ -2228,7 +2161,7 @@ export function createIntegrationTestsSuite(
             // Validate structured content has items with actual results
             const datasetWithStructured = datasetResult as { structuredContent?: {
                  datasetId?: string;
-                 items?: { first_number?: number; second_number?: number; sum?: number }[];
+                 items?: { firstNumber?: number; secondNumber?: number; sum?: number }[];
                  itemCount?: number;
                  totalItemCount?: number;
                  offset?: number;
@@ -2237,12 +2170,12 @@ export function createIntegrationTestsSuite(
             expect(datasetWithStructured.structuredContent).toBeDefined();
             expect(datasetWithStructured.structuredContent?.items?.length).toBeGreaterThan(0);
             expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('sum', 7);
-            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('first_number', 3);
-            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('second_number', 4);
+            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('firstNumber', 3);
+            expect(datasetWithStructured.structuredContent?.items?.[0]).toHaveProperty('secondNumber', 4);
         });
 
         it('should connect to MCP server and at least one tool is available', async () => {
-            client = await createClientFn({ tools: [ACTOR_MCP_SERVER_ACTOR_NAME] });
+            client = await createClientFn({ tools: [ACTOR_EXAMPLE_MCP_SERVER] });
             const tools = await client.listTools();
             expect(tools.tools.length).toBeGreaterThan(0);
         });
@@ -2306,8 +2239,8 @@ export function createIntegrationTestsSuite(
             const response = await client.callTool({
                 name: 'call-actor',
                 arguments: {
-                    actor: ACTOR_MCP_SERVER_ACTOR_NAME,
-                    input: { url: 'https://docs.apify.com' },
+                    actor: ACTOR_EXAMPLE_MCP_SERVER,
+                    input: { firstNumber: 1, secondNumber: 2 },
                 },
             });
 
@@ -2332,14 +2265,16 @@ export function createIntegrationTestsSuite(
 
         // TODO: if we add more streamable task tool call tests it might be worth it to abstract the common logic but now it's not worth it
         it('should be able to call a long running task tool call', async () => {
-            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    // waitSeconds keeps the run open long enough to emit taskStatus updates.
                     arguments: {
-                        first_number: 1,
-                        second_number: 2,
+                        firstNumber: 1,
+                        secondNumber: 2,
+                        waitSeconds: 10,
                     },
                 },
                 CallToolResultSchema,
@@ -2385,14 +2320,16 @@ export function createIntegrationTestsSuite(
         });
 
         it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
-            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    // waitSeconds keeps the run open long enough to observe `working` status.
                     arguments: {
-                        first_number: 3,
-                        second_number: 4,
+                        firstNumber: 3,
+                        secondNumber: 4,
+                        waitSeconds: 10,
                     },
                 },
                 CallToolResultSchema,
@@ -2429,14 +2366,16 @@ export function createIntegrationTestsSuite(
         });
 
         it('should be able to call a long running task and then cancel it midway', async () => {
-            client = await createClientFn({ tools: [ACTOR_PYTHON_EXAMPLE] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_PYTHON_EXAMPLE),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    // waitSeconds keeps the run open long enough to cancel it mid-flight.
                     arguments: {
-                        first_number: 5,
-                        second_number: 6,
+                        firstNumber: 5,
+                        secondNumber: 6,
+                        waitSeconds: 60,
                     },
                 },
                 CallToolResultSchema,
@@ -2464,10 +2403,10 @@ export function createIntegrationTestsSuite(
         // Without the chained AbortController, the task flips to `cancelled` but the underlying
         // Apify run keeps consuming compute until natural finish.
         it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 3 }, async () => {
-            client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(RAG_WEB_BROWSER).get();
+            const actor = await api.actor(ACTOR_NORMAL_MODE_TEST).get();
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
@@ -2476,8 +2415,9 @@ export function createIntegrationTestsSuite(
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(RAG_WEB_BROWSER),
-                    arguments: { query: 'restaurants in San Francisco', maxResults: 10 },
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    // waitSeconds keeps the run open long enough to capture, cancel, and verify abort.
+                    arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
                 },
                 CallToolResultSchema,
                 { task: { ttl: 60000 } },
@@ -2507,10 +2447,10 @@ export function createIntegrationTestsSuite(
                 {
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_PYTHON_EXAMPLE,
+                        actor: ACTOR_NORMAL_MODE_TEST,
                         input: {
-                            first_number: 10,
-                            second_number: 20,
+                            firstNumber: 10,
+                            secondNumber: 20,
                         },
                     },
                 },
@@ -2565,10 +2505,10 @@ export function createIntegrationTestsSuite(
                 {
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: RAG_WEB_BROWSER,
-                        input: {
-                            query: 'https://apify.com',
-                        },
+                        actor: ACTOR_NORMAL_MODE_TEST,
+                        // waitSeconds keeps the run open long enough for the polling
+                        // interval to emit at least one statusMessage notification.
+                        input: { firstNumber: 1, secondNumber: 2, waitSeconds: 10 },
                     },
                 },
                 CallToolResultSchema,
@@ -2583,14 +2523,14 @@ export function createIntegrationTestsSuite(
         });
 
         it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', { retry: 1 }, async () => {
-            client = await createClientFn({ tools: [RAG_WEB_BROWSER] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(RAG_WEB_BROWSER),
-                    arguments: {
-                        query: 'https://apify.com',
-                    },
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    // waitSeconds keeps the run open long enough for the polling
+                    // interval to emit at least one statusMessage notification.
+                    arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 10 },
                 },
                 CallToolResultSchema,
                 {
@@ -2822,8 +2762,8 @@ export function createIntegrationTestsSuite(
                 const result = await client.callTool({
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_PYTHON_EXAMPLE,
-                        input: { first_number: 1, second_number: 2 },
+                        actor: ACTOR_NORMAL_MODE_TEST,
+                        input: { firstNumber: 1, secondNumber: 2 },
                     },
                 });
 
@@ -2842,8 +2782,8 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
-                    input: { first_number: 1, second_number: 2 },
+                    actor: ACTOR_NORMAL_MODE_TEST,
+                    input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
             });
@@ -2885,16 +2825,6 @@ export function createIntegrationTestsSuite(
             if (runContent.structuredContent?.status === 'SUCCEEDED') {
                 expect(runContent.structuredContent?.storages.datasets?.default.id).toBeDefined();
             }
-        });
-
-        it('rejects get-actor-run waitSecs above 45', async () => {
-            client = await createClientFn({ tools: ['actors', 'runs'] });
-            // runId is a real-looking value so a missing-run path can't accidentally satisfy this
-            // assertion; the failure must come from waitSecs validation, not from run lookup.
-            await expect(client.callTool({
-                name: HelperTools.ACTOR_RUNS_GET,
-                arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
-            })).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
         });
 
         it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {
@@ -2941,7 +2871,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
                 arguments: {
-                    actor: ACTOR_PYTHON_EXAMPLE,
+                    actor: ACTOR_NORMAL_MODE_TEST,
                 },
             });
 

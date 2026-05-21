@@ -8,7 +8,7 @@ Unit tests are located in the `tests/unit` directory.
 
 To run the unit tests, you can use the following command:
 ```bash
-pnpm run test:unit
+npm run test:unit
 ```
 
 ## Integration tests
@@ -19,13 +19,13 @@ Also, the following Actors need to exist on the target execution Apify platform:
 ```
 ALL DEFAULT ONES DEFINED IN consts.ts AND ALSO EXPLICITLY:
 apify/rag-web-browser
-apify/instagram-scraper
-apify/python-example
+apify/normal-mode-test-actor
+apify/example-mcp-server
 ```
 
 To run the integration tests, you can use the following command:
 ```bash
-APIFY_TOKEN=your_token pnpm run test:integration
+APIFY_TOKEN=your_token npm run test:integration
 ```
 
 ## Integration test conventions
