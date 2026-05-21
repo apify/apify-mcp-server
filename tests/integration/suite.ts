@@ -2823,6 +2823,32 @@ export function createIntegrationTestsSuite(
 
         // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
         it.runIf(options.transport === 'streamable-http')(
+            'should not load the default standby Actor apify/rag-web-browser in x402 payment mode',
+            async () => {
+                // Connect with ?payment=x402 — should load defaults, but filter out standby/MCP actors
+                client = await createClientFn({ payment: 'x402' });
+
+                const toolsList = await client.listTools();
+                const ragWebBrowserTool = toolsList.tools.find((t) => t.name === 'apify--rag-web-browser');
+
+                expect(ragWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in payment mode').toBeUndefined();
+
+                await client.close();
+
+                // Connect without payment mode (standard token auth) — standby/MCP actors should load normally
+                client = await createClientFn();
+
+                const normalToolsList = await client.listTools();
+                const normalRagWebBrowserTool = normalToolsList.tools.find((t) => t.name === 'apify--rag-web-browser');
+
+                expect(normalRagWebBrowserTool, 'apify--rag-web-browser (standby) should be loaded under standard token auth').toBeDefined();
+
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
             'should return x402 payment error when calling paymentRequired tool without payment signature',
             async () => {
                 client = await createClientFn({ tools: ['actors'], payment: 'x402' });
