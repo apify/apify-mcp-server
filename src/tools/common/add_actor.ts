@@ -2,8 +2,10 @@ import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
+import { actorDefinitionPrunedCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { fixActorNameInput } from '../core/actor_tools_factory.js';
 
 export const addToolArgsSchema = z.object({
     actor: z.string()
@@ -54,6 +56,18 @@ USAGE EXAMPLES:
          * loadActorsAsTools method returns an empty array and does not throw an error.
          */
         if (tools.length === 0) {
+            // Check cache to see if the Actor exists but was filtered out as a standby Actor in payment mode
+            const normalizedName = fixActorNameInput(parsed.actor);
+            const cached = actorDefinitionPrunedCache.get(normalizedName);
+            if (cached?.info?.actorStandby?.isEnabled && apifyMcpServer.options.paymentProvider) {
+                return {
+                    content: [{
+                        type: 'text',
+                        text: `Actor "${parsed.actor}" is a standby Actor, which is not supported in agentic payment mode.`,
+                    }],
+                };
+            }
+
             return {
                 content: [{
                     type: 'text',

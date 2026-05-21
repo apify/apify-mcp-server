@@ -741,6 +741,22 @@ export function createIntegrationTestsSuite(
             expect(content[0].text).toContain('no tools were added');
         });
 
+        it.runIf(options.transport === 'streamable-http')(
+            'should return error when adding a standby Actor in x402 payment mode',
+            async () => {
+                client = await createClientFn({ enableAddingActors: true, payment: 'x402' });
+                const result = await client.callTool({
+                    name: HelperTools.ACTOR_ADD,
+                    arguments: { actor: 'apify/rag-web-browser' },
+                });
+                expect(result).toBeDefined();
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');
+                await client.close();
+            },
+        );
+
         it('should be able to add and call Actorized MCP server', async () => {
             client = await createClientFn({ enableAddingActors: true });
 

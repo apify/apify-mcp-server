@@ -360,8 +360,12 @@ export async function getActorsAsTools(
     // Separate Actors with MCP servers and normal Actors
     // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled
     const actorMCPServersInfo = nonNullActors.filter((actorInfo) => isActorInfoMcpServer(actorInfo));
-    // all others
-    const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
+    // All other Actors
+    const normalActorsInfo = nonNullActors.filter((actorInfo) => {
+        if (isActorInfoMcpServer(actorInfo)) return false;
+        if (paymentProvider && actorInfo.actor.actorStandby?.isEnabled) return false;
+        return true;
+    });
 
     if (paymentProvider && actorMCPServersInfo.length > 0) {
         log.debug('Skipping MCP-server Actors for payment-provider session', {
