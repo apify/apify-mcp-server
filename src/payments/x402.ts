@@ -206,7 +206,8 @@ export class X402PaymentProvider implements PaymentProvider {
         }
         const metaRecord = cloned._meta as Record<string, unknown>;
         if (!metaRecord.x402) {
-            const acceptsRaw = this.requirements?.accepts;
+            const reqs = this.requirements ? structuredClone(this.requirements) : undefined;
+            const acceptsRaw = reqs?.accepts;
             const accepts = Array.isArray(acceptsRaw) && acceptsRaw.length > 0 ? acceptsRaw : undefined;
             const preferred = accepts ? this.selectPreferredAcceptEntry(accepts) : undefined;
             metaRecord.x402 = {
