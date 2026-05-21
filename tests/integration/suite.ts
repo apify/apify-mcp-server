@@ -2804,7 +2804,7 @@ export function createIntegrationTestsSuite(
                     const accepts = x402?.accepts as Record<string, unknown>[] | undefined;
                     expect(accepts, `Tool "${toolName}" should advertise x402.accepts[]`).toBeInstanceOf(Array);
                     expect(accepts?.length, `Tool "${toolName}" should advertise at least one accept entry`).toBeGreaterThan(0);
-                    for (const entry of accepts!) {
+                    for (const entry of accepts ?? []) {
                         expect(entry.scheme, `Tool "${toolName}" accepts entry should have a scheme`).toBeTypeOf('string');
                     }
                 }
