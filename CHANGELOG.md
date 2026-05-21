@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.7 - **not yet released**
+## [0.10.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.8) (2026-05-21)
 
 ### 🚀 Features
 
@@ -20,7 +19,6 @@ All notable changes to this project will be documented in this file.
 - **ci:** Repair mcpb package build under pnpm 11 ([#896](https://github.com/apify/apify-mcp-server/pull/896)) ([61a0787](https://github.com/apify/apify-mcp-server/commit/61a07877ca11af9df54bd61c296336962248220c)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.7) (2026-05-21)
 
 ### 🚀 Features
