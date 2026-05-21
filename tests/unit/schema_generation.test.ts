@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
     generateSchemaFromItems,
     type JsonSchemaProperty,
-    removeEmptyArrays,
+    cleanEmptyArrays,
 } from '../../src/utils/schema_generation.js';
 
 /** Extract item-level properties from a generated array schema. */
@@ -288,23 +288,23 @@ describe('generateSchemaFromItems — user-reported regression', () => {
     });
 });
 
-describe('removeEmptyArrays', () => {
+describe('cleanEmptyArrays', () => {
     it('drops keys whose value is an empty array', () => {
-        expect(removeEmptyArrays({ kept: 1, dropped: [] })).toEqual({ kept: 1 });
+        expect(cleanEmptyArrays({ kept: 1, dropped: [] })).toEqual({ kept: 1 });
     });
 
     it('recurses into nested objects', () => {
-        expect(removeEmptyArrays({ a: { kept: 1, dropped: [] } })).toEqual({ a: { kept: 1 } });
+        expect(cleanEmptyArrays({ a: { kept: 1, dropped: [] } })).toEqual({ a: { kept: 1 } });
     });
 
     it('recurses into array elements', () => {
-        expect(removeEmptyArrays([{ x: [] }, { y: 1 }])).toEqual([{}, { y: 1 }]);
+        expect(cleanEmptyArrays([{ x: [] }, { y: 1 }])).toEqual([{}, { y: 1 }]);
     });
 
     it('preserves primitives, null, and non-empty arrays', () => {
-        expect(removeEmptyArrays(null)).toBeNull();
-        expect(removeEmptyArrays(42)).toBe(42);
-        expect(removeEmptyArrays('s')).toBe('s');
-        expect(removeEmptyArrays([1, 2, 3])).toEqual([1, 2, 3]);
+        expect(cleanEmptyArrays(null)).toBeNull();
+        expect(cleanEmptyArrays(42)).toBe(42);
+        expect(cleanEmptyArrays('s')).toBe('s');
+        expect(cleanEmptyArrays([1, 2, 3])).toEqual([1, 2, 3]);
     });
 });

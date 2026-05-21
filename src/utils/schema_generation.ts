@@ -22,15 +22,17 @@ export type SchemaGenerationOptions = {
 };
 
 // Local counterpart to the dataset API's `clean=true` — empty arrays carry no schema info.
-export function removeEmptyArrays(obj: unknown): unknown {
+// Strips only empty arrays; keeps null / '' / empty objects so schema inference still sees those fields.
+// Stricter sibling: `cleanEmptyProperties` in `src/tools/common/get_actor_output.ts` also strips nullish and empty strings.
+export function cleanEmptyArrays(obj: unknown): unknown {
     if (Array.isArray(obj)) {
-        return obj.map(removeEmptyArrays);
+        return obj.map(cleanEmptyArrays);
     }
     if (typeof obj !== 'object' || obj === null) {
         return obj;
     }
     return Object.entries(obj).reduce((acc, [key, value]) => {
-        const processed = removeEmptyArrays(value);
+        const processed = cleanEmptyArrays(value);
         if (Array.isArray(processed) && processed.length === 0) {
             return acc;
         }
@@ -149,7 +151,7 @@ export function generateSchemaFromItems(
     const itemsToUse = datasetItems.slice(0, limit);
     if (itemsToUse.length === 0) return null;
 
-    const processed = clean ? itemsToUse.map(removeEmptyArrays) : itemsToUse;
+    const processed = clean ? itemsToUse.map(cleanEmptyArrays) : itemsToUse;
 
     const itemSchemas = processed.map(inferSchema);
     const merged = itemSchemas.reduce(mergeSchemas);

@@ -29,7 +29,8 @@ const getActorOutputArgs = z.object({
 });
 
 /**
- * Cleans empty properties (null, undefined, empty strings, empty arrays, empty objects) from an object
+ * Cleans empty properties (null, undefined, empty strings, empty arrays, empty objects) from an object.
+ * Looser sibling: `cleanEmptyArrays` in `src/utils/schema_generation.ts` strips only empty arrays.
  * @param obj - The object to clean
  * @returns The cleaned object or undefined if the result is empty
  */
