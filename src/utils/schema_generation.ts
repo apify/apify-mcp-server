@@ -55,7 +55,7 @@ function detectFormat(value: string): string | undefined {
 }
 
 function inferType(value: unknown): JsonSchemaPrimitiveType {
-    if (value === null) return 'null';
+    if (value === null || value === undefined) return 'null';
     if (Array.isArray(value)) return 'array';
     if (typeof value === 'number') return Number.isInteger(value) && Number.isFinite(value) ? 'integer' : 'number';
     if (typeof value === 'boolean') return 'boolean';
