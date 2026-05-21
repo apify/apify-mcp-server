@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.7 - **not yet released**
+## [0.10.7](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.7) (2026-05-21)
 
 ### 🚀 Features
 
@@ -19,7 +18,6 @@ All notable changes to this project will be documented in this file.
 - Merge dataset item schemas across heterogeneous shapes ([#854](https://github.com/apify/apify-mcp-server/pull/854)) ([f2691c0](https://github.com/apify/apify-mcp-server/commit/f2691c09510fb2cf485731f322a23265fb2ee7df)) by [@MQ37](https://github.com/MQ37)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.6](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.6) (2026-05-19)
 
 ### 🐛 Bug Fixes
