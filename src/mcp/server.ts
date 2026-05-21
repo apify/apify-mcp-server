@@ -439,7 +439,10 @@ export class ActorsMcpServer {
         if (missingToolNames.length === 0) return;
 
         const restoreInput = toolNamesToInput(missingToolNames);
-        const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
+        const actorTools = await getActors(restoreInput, apifyClient, {
+            actorStore: this.actorStore,
+            ...(this.options.paymentProvider && { paymentProvider: this.options.paymentProvider }),
+        });
 
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
@@ -461,7 +464,10 @@ export class ActorsMcpServer {
      * @returns Promise<ToolEntry[]> - Array of loaded tool entries
      */
     public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
-        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient, { actorStore: this.actorStore });
+        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient, {
+            actorStore: this.actorStore,
+            ...(this.options.paymentProvider && { paymentProvider: this.options.paymentProvider }),
+        });
         if (actorTools.length > 0) {
             this.upsertTools(actorTools, true);
         }
@@ -471,7 +477,10 @@ export class ActorsMcpServer {
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
-        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        const actorTools = await getActors(input, apifyClient, {
+            actorStore: this.actorStore,
+            ...(this.options.paymentProvider && { paymentProvider: this.options.paymentProvider }),
+        });
 
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input, actorTools });
@@ -499,7 +508,10 @@ export class ActorsMcpServer {
      * work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
-        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        const actorTools = await getActors(input, apifyClient, {
+            actorStore: this.actorStore,
+            ...(this.options.paymentProvider && { paymentProvider: this.options.paymentProvider }),
+        });
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools);

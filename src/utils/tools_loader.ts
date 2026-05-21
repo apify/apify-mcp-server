@@ -16,6 +16,7 @@ import {
     WIDGET_BY_BASE_TOOL,
 } from '../tools/categories.js';
 import { abortActorRun } from '../tools/common/abort_actor_run.js';
+import type { PaymentProvider } from '../payments/types.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getDatasetItems } from '../tools/common/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
@@ -132,15 +133,21 @@ function resolveActorsToLoad(input: Input): string[] {
     return [];
 }
 
-/** Fetch Actor tool entries for all Actor names in `input`. */
+/**
+ * Fetch Actor tool entries for all Actor names in `input`.
+ *
+ * Pass `paymentProvider` for sessions authenticated via an external payment
+ * provider (x402, Skyfire) so standby/MCP-server Actors are filtered out —
+ * see `getActorsAsTools` for the full rationale.
+ */
 export async function getActors(
     input: Input,
     apifyClient: ApifyClient,
-    actorStore?: ActorStore,
+    options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
 ): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
     return actorNames.length > 0
-        ? getActorsAsTools(actorNames, apifyClient, { actorStore })
+        ? getActorsAsTools(actorNames, apifyClient, options)
         : [];
 }
 
@@ -308,6 +315,6 @@ export async function loadToolsFromInput(
     mode: ServerMode = ServerMode.DEFAULT,
     actorStore?: ActorStore,
 ): Promise<ToolEntry[]> {
-    const actorTools = await getActors(input, apifyClient, actorStore);
+    const actorTools = await getActors(input, apifyClient, { actorStore });
     return getToolsForServerMode(input, actorTools, mode);
 }

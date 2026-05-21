@@ -12,6 +12,7 @@ import {
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
+import type { PaymentProvider } from '../../payments/types.js';
 import { actorDefinitionPrunedCache } from '../../state.js';
 import type {
     ActorInfo,
@@ -283,13 +284,30 @@ export function fixActorNameInput(actorName: string): string {
     return s.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Loads Actor metadata + builds tool entries for each requested Actor.
+ *
+ * When `paymentProvider` is set, standby/MCP-server Actors are dropped from
+ * the result. External payment providers (x402, Skyfire) cannot pay for
+ * standby Actor runs — the call-time guard in `call_actor_common.ts` rejects
+ * any such tool call. Filtering at list time keeps the advertised tool
+ * surface honest so agents never discover a tool that can only fail later.
+ */
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
-    options?: { mcpSessionId?: string; actorStore?: ActorStore },
+    options?: {
+        mcpSessionId?: string;
+        actorStore?: ActorStore;
+        paymentProvider?: PaymentProvider;
+    },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore } = options ?? {};
-    log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames, mcpSessionId });
+    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
+    log.debug('Fetching Actors as tools', {
+        actorNames: actorIdsOrNames,
+        mcpSessionId,
+        paymentProviderId: paymentProvider?.id,
+    });
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
@@ -345,9 +363,19 @@ export async function getActorsAsTools(
     // all others
     const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
 
+    if (paymentProvider && actorMCPServersInfo.length > 0) {
+        log.debug('Skipping MCP-server Actors for payment-provider session', {
+            mcpSessionId,
+            paymentProviderId: paymentProvider.id,
+            droppedActors: actorMCPServersInfo.map((a) => a.definition.actorFullName),
+        });
+    }
+
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
-        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
+        paymentProvider
+            ? Promise.resolve([] as ToolEntry[])
+            : getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
     return [...normalTools, ...mcpServerTools];
