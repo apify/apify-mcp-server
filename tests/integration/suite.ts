@@ -315,7 +315,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should list two loaded Actors plus auto-injected storage and abort tools', async () => {
-            const actors = ['apify/python-example','apify/normal-mode-test-actor'];
+            const actors = ['apify/python-example', 'apify/rag-web-browser'];
             client = await createClientFn({ actors, enableAddingActors: false, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             // Actor tools trigger storage/abort helpers; default mode skips get-actor-run for actor tools.
@@ -1792,7 +1792,7 @@ export function createIntegrationTestsSuite(
 
         // Environment variable tests - only applicable to stdio transport
         it.runIf(options.transport === 'stdio')('should load actors from ACTORS environment variable', async () => {
-            const actors = ['apify/python-example', 'apify/normal-mode-test-actor'];
+            const actors = ['apify/python-example', 'apify/rag-web-browser'];
             client = await createClientFn({ actors, useEnv: true });
             const names = getToolNames(await client.listTools());
             expectToolNamesToContain(names, actors.map((actor) => actorNameToToolName(actor)));
