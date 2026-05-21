@@ -2827,6 +2827,16 @@ export function createIntegrationTestsSuite(
             }
         });
 
+        it('rejects get-actor-run waitSecs above 45', async () => {
+            client = await createClientFn({ tools: ['actors', 'runs'] });
+            // runId is a real-looking value so a missing-run path can't accidentally satisfy this
+            // assertion; the failure must come from waitSecs validation, not from run lookup.
+            await expect(client.callTool({
+                name: HelperTools.ACTOR_RUNS_GET,
+                arguments: { runId: 'aaaaaaaaaaaaaaaaa', waitSecs: 46 },
+            })).rejects.toThrow(/waitSecs|less than or equal to 45|<= 45/i);
+        });
+
         it('should return required structuredContent fields for ActorSearch widget (search-actors-widget)', async () => {
             client = await createClientFn({
                 tools: ['actors'],
