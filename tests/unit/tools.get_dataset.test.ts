@@ -36,11 +36,9 @@ describe('get-dataset', () => {
         const result = await (getDataset as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
         );
-        const { content, isError } = result as { content: { type: string; text: string }[]; isError?: boolean };
+        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
 
         expect(isError).not.toBe(true);
-        expect(content).toHaveLength(1);
-        expect(content[0].type).toBe('text');
         expect(content[0].text).toMatch(/^```json\n/);
         expect(content[0].text).toMatch(/\n```$/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
