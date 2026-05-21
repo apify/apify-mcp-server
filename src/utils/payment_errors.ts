@@ -95,15 +95,16 @@ function extractPaymentRequiredData(error: unknown): Record<string, unknown> | u
 
 /**
  * Builds an MCP response for a 402 Payment Required error.
- * Formats the response as a tool result containing the PaymentRequired JSON
- * per the x402 MCP transport spec, which allows clients to automatically handle the payment flow.
+ *
+ * Per the x402 MCP transport spec (coinbase/x402 `specs/transports-v2/mcp.md`), the
+ * PaymentRequired payload is carried in two places with identical data:
+ * `structuredContent` (preferred) and `content[0].text` as JSON (fallback for clients
+ * that can't read structured content).
  */
 export function buildPaymentRequiredResponse(errorOrMessage: unknown, precomputedPaymentData?: unknown) {
     const paymentData = precomputedPaymentData ?? extractPaymentRequiredData(errorOrMessage);
     const message = errorOrMessage instanceof Error ? errorOrMessage.message : String(errorOrMessage);
 
-    // When paymentData exists, return two text entries: JSON payload first (backward-compatible
-    // position for x402 clients that parse content[0].text), then a human-readable explanation.
     const texts = paymentData
         ? [
             JSON.stringify(paymentData),
@@ -111,5 +112,5 @@ export function buildPaymentRequiredResponse(errorOrMessage: unknown, precompute
         ]
         : [message];
 
-    return buildMCPResponse({ texts, isError: true });
+    return buildMCPResponse({ texts, isError: true, structuredContent: paymentData });
 }

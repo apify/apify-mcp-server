@@ -2787,7 +2787,8 @@ export function createIntegrationTestsSuite(
 
                 const toolsList = await client.listTools();
 
-                // Positive: paid tools advertise _meta.x402 with the expected fields.
+                // Positive: paid tools advertise _meta.x402 with both shapes —
+                // flat preferred-scheme fields (back-compat) and the full accepts[] array.
                 for (const toolName of paidToolNames) {
                     const tool = toolsList.tools.find((t) => t.name === toolName);
                     expect(tool, `Tool "${toolName}" should exist in the tools list`).toBeDefined();
@@ -2798,6 +2799,13 @@ export function createIntegrationTestsSuite(
 
                     for (const field of ['scheme', 'network', 'asset', 'payTo', 'amount'] as const) {
                         expect(x402?.[field], `Tool "${toolName}" should advertise x402.${field}`).toBeDefined();
+                    }
+
+                    const accepts = x402?.accepts as Record<string, unknown>[] | undefined;
+                    expect(accepts, `Tool "${toolName}" should advertise x402.accepts[]`).toBeInstanceOf(Array);
+                    expect(accepts?.length, `Tool "${toolName}" should advertise at least one accept entry`).toBeGreaterThan(0);
+                    for (const entry of accepts ?? []) {
+                        expect(entry.scheme, `Tool "${toolName}" accepts entry should have a scheme`).toBeTypeOf('string');
                     }
                 }
 
@@ -2830,6 +2838,13 @@ export function createIntegrationTestsSuite(
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content[0].text).toContain('x402');
+
+                // x402 MCP transport spec: 402 tool results MUST also expose the PaymentRequired
+                // payload via structuredContent (preferred over content[0].text JSON parsing).
+                const structured = (result as { structuredContent?: Record<string, unknown> }).structuredContent;
+                expect(structured, 'x402 402 tool result should expose structuredContent').toBeDefined();
+                expect(structured?.x402Version, 'structuredContent.x402Version should be set').toBeDefined();
+                expect(structured?.accepts, 'structuredContent.accepts should be an array').toBeInstanceOf(Array);
 
                 await client.close();
             },
