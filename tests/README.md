@@ -8,7 +8,7 @@ Unit tests are located in the `tests/unit` directory.
 
 To run the unit tests, you can use the following command:
 ```bash
-npm run test:unit
+pnpm run test:unit
 ```
 
 ## Integration tests
@@ -25,7 +25,7 @@ apify/example-mcp-server
 
 To run the integration tests, you can use the following command:
 ```bash
-APIFY_TOKEN=your_token npm run test:integration
+APIFY_TOKEN=your_token pnpm run test:integration
 ```
 
 ## Integration test conventions
