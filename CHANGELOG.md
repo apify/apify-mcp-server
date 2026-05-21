@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.7 - **not yet released**
 
+### 🚀 Features
+
+- **x402:** Expose multi-scheme accepts[] and structuredContent ([#876](https://github.com/apify/apify-mcp-server/pull/876)) ([acf6030](https://github.com/apify/apify-mcp-server/commit/acf6030ecb574eddd6af650d51d9f69a33501d8c)) by [@MQ37](https://github.com/MQ37), closes [#169](https://github.com/apify/apify-mcp-server/issues/169)
+
 ### 🐛 Bug Fixes
 
 - Unify search-actors keywords description across variants ([#868](https://github.com/apify/apify-mcp-server/pull/868)) ([c6c7d41](https://github.com/apify/apify-mcp-server/commit/c6c7d41d95caca7c243ccb55c798f675eee8080b)) by [@vojtechj-apify](https://github.com/vojtechj-apify), closes [#833](https://github.com/apify/apify-mcp-server/issues/833)
