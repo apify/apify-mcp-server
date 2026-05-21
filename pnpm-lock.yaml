@@ -255,9 +255,6 @@ importers:
       mcp-client-capabilities:
         specifier: ^0.0.14
         version: 0.0.14
-      to-json-schema:
-        specifier: ^0.2.5
-        version: 0.2.5
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -289,9 +286,6 @@ importers:
       '@types/express':
         specifier: ^4.0.0
         version: 4.17.25
-      '@types/to-json-schema':
-        specifier: ^0.2.4
-        version: 0.2.4
       '@types/yargs':
         specifier: ^17.0.33
         version: 17.0.35
@@ -2147,9 +2141,6 @@ packages:
   '@types/http-errors@2.0.5':
     resolution: {integrity: sha512-r8Tayk8HJnX0FztbZN7oVqGccWgw98T/0neJphO91KkmOzug1KkofZURD4UaD5uH8AqcFLfdPErnBod0u71/qg==}
 
-  '@types/json-schema@7.0.15':
-    resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
-
   '@types/mdast@4.0.4':
     resolution: {integrity: sha512-kGaNbPh1k7AFzgpud/gMdvIm5xuECykRR+JnWKQno9TAXVa6WIVCGTPvYGekIDL4uwCZQSYbUxNBSb1aUo79oA==}
 
@@ -2213,9 +2204,6 @@ packages:
 
   '@types/tedious@4.0.14':
     resolution: {integrity: sha512-KHPsfX/FoVbUGbyYvk1q9MMQHLPeRZhRJZdO45Q4YjvFkv4hMNghCWTvy7rdKessBsmtz4euWCWAB6/tVpI1Iw==}
-
-  '@types/to-json-schema@0.2.4':
-    resolution: {integrity: sha512-ENEB7JBlKODdihNrg08RgtLT8DZj43K48dV39yzV93QQPZhbQ+zan8osWpKll3HFEuLsiSttBdJ6QZFGsvRd4Q==}
 
   '@types/ungap__structured-clone@1.2.0':
     resolution: {integrity: sha512-ZoaihZNLeZSxESbk9PUAPZOlSpcKx81I1+4emtULDVmBLkYutTcMlCj2K9VNlf9EWODxdO6gkAqEaLorXwZQVA==}
@@ -3167,21 +3155,6 @@ packages:
     resolution: {integrity: sha512-pDo3lu8Jhfjqls6GkMgpahsF9kCyayhgykjyLMNFTKWrpVdAQtYyB4muAMWozBB4ig/dtWAmsMxLEI8wuz+DYQ==}
     deprecated: This package is deprecated. Use require('node:util').isDeepStrictEqual instead.
 
-  lodash.keys@4.2.0:
-    resolution: {integrity: sha512-J79MkJcp7Df5mizHiVNpjoHXLi4HLjh9VLS/M7lQSGoQ+0oQ+lWEigREkqKyizPB1IawvQLLKY8mzEcm1tkyxQ==}
-
-  lodash.merge@4.6.2:
-    resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
-
-  lodash.omit@4.18.0:
-    resolution: {integrity: sha512-hZXIupXdHtocTnvIJ2aCd2vxKYtxex6gbiGuPvgBRnFQO9yu3AtmDAbVuCXcSsQx3INo/1g71OktlFFA/ES8Xg==}
-
-  lodash.without@4.4.0:
-    resolution: {integrity: sha512-M3MefBwfDhgKgINVuBJCO1YR3+gf6s9HNJsIiZ/Ru77Ws6uTb9eBuvrkpzO+9iLoAaRodGuq7tyrPCx+74QYGQ==}
-
-  lodash.xor@4.5.0:
-    resolution: {integrity: sha512-sVN2zimthq7aZ5sPGXnSz32rZPuqcparVW50chJQe+mzTYV+IsxSsl/2gnkWWE2Of7K3myBQBqtLKOUEHJKRsQ==}
-
   lodash@4.18.1:
     resolution: {integrity: sha512-dMInicTPVE8d1e5otfwmmjlxkZoUpiVLwyeTdUsi/Caj/gfzzblBcCE5sRHV/AsjuCmxWrte2TNGSYuCeCq+0Q==}
 
@@ -4085,9 +4058,6 @@ packages:
   tinyspy@4.0.4:
     resolution: {integrity: sha512-azl+t0z7pw/z958Gy9svOTuzqIk6xq+NSheJzn5MMWtWTFywIacg2wUlzKFGtt3cthx0r2SxMK0yzJOR0IES7Q==}
     engines: {node: '>=14.0.0'}
-
-  to-json-schema@0.2.5:
-    resolution: {integrity: sha512-jP1ievOee8pec3tV9ncxLSS48Bnw7DIybgy112rhMCEhf3K4uyVNZZHr03iQQBzbV5v5Hos+dlZRRyk6YSMNDw==}
 
   to-regex-range@5.0.1:
     resolution: {integrity: sha512-65P7iz6X5yEr1cwcgvQxbbIw7Uk3gOy5dIdtZ4rDveLqhrdJP+Li/Hx6tyK0NEb+2GCyneCMJiGqrADCSNk8sQ==}
@@ -6013,8 +5983,6 @@ snapshots:
 
   '@types/http-errors@2.0.5': {}
 
-  '@types/json-schema@7.0.15': {}
-
   '@types/mdast@4.0.4':
     dependencies:
       '@types/unist': 3.0.3
@@ -6083,10 +6051,6 @@ snapshots:
   '@types/tedious@4.0.14':
     dependencies:
       '@types/node': 25.9.0
-
-  '@types/to-json-schema@0.2.4':
-    dependencies:
-      '@types/json-schema': 7.0.15
 
   '@types/ungap__structured-clone@1.2.0': {}
 
@@ -7144,16 +7108,6 @@ snapshots:
   lines-and-columns@1.2.4: {}
 
   lodash.isequal@4.5.0: {}
-
-  lodash.keys@4.2.0: {}
-
-  lodash.merge@4.6.2: {}
-
-  lodash.omit@4.18.0: {}
-
-  lodash.without@4.4.0: {}
-
-  lodash.xor@4.5.0: {}
 
   lodash@4.18.1: {}
 
@@ -8387,15 +8341,6 @@ snapshots:
   tinyrainbow@2.0.0: {}
 
   tinyspy@4.0.4: {}
-
-  to-json-schema@0.2.5:
-    dependencies:
-      lodash.isequal: 4.5.0
-      lodash.keys: 4.2.0
-      lodash.merge: 4.6.2
-      lodash.omit: 4.18.0
-      lodash.without: 4.4.0
-      lodash.xor: 4.5.0
 
   to-regex-range@5.0.1:
     dependencies:

@@ -16,9 +16,6 @@ const getDatasetSchemaArgs = z.object({
     clean: z.boolean().optional()
         .describe('If true, uses only non-empty items and skips hidden fields (starting with #). Default is true.')
         .default(true),
-    arrayMode: z.enum(['first', 'all']).optional()
-        .describe('Strategy for handling arrays. "first" uses first item as template, "all" merges all items. Default is "all".')
-        .default('all'),
 });
 
 /**
@@ -75,7 +72,6 @@ USAGE EXAMPLES:
         const schema = generateSchemaFromItems(datasetItems, {
             limit: parsed.limit,
             clean: parsed.clean,
-            arrayMode: parsed.arrayMode,
         });
 
         if (!schema) {
