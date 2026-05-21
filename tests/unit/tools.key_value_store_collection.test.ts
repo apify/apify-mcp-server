@@ -35,7 +35,7 @@ function stubArgs(args: Record<string, unknown>): InternalToolArgs {
     } as InternalToolArgs;
 }
 
-describe('get-user-key-value-stores-list', () => {
+describe('get-key-value-store-list', () => {
     beforeEach(() => {
         listSpy.mockReset();
         vi.mocked(ApifyClient).mockClear();

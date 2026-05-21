@@ -6,10 +6,10 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 
 const MOCK_KEYS = {
     items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
-    nextExclusiveStartKey: null,
+    nextExclusiveStartKey: '',
     isTruncated: false,
     count: 2,
-    limit: 1000,
+    limit: 2,
 };
 
 function stubApifyClient(listKeysSpy: ReturnType<typeof vi.fn>): InternalToolArgs['apifyClient'] {

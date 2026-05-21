@@ -1,8 +1,18 @@
 // Per-file stubs match the repo convention; see tools.get_dataset_items.test.ts.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
+import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
+
+vi.mock('../../src/utils/schema_generation.js', async (importOriginal) => {
+    const actual = await importOriginal<typeof SchemaGenModule>();
+    return {
+        ...actual,
+        generateSchemaFromItems: vi.fn(actual.generateSchemaFromItems),
+    };
+});
 
 const MOCK_ITEMS = [
     { title: 'a', count: 1 },
@@ -61,5 +71,17 @@ describe('get-dataset-schema', () => {
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Dataset 'missing' not found");
+    });
+
+    it('returns isError when schema generation fails (generator returns null)', async () => {
+        vi.mocked(generateSchemaFromItems).mockReturnValueOnce(null);
+
+        const result = await (getDatasetSchema as HelperTool).call(
+            stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
+        );
+        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+
+        expect(isError).toBe(true);
+        expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");
     });
 });

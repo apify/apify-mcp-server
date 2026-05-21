@@ -35,7 +35,7 @@ function stubArgs(args: Record<string, unknown>): InternalToolArgs {
     } as InternalToolArgs;
 }
 
-describe('get-user-datasets-list', () => {
+describe('get-dataset-list', () => {
     beforeEach(() => {
         listSpy.mockReset();
         vi.mocked(ApifyClient).mockClear();
