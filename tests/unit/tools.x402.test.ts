@@ -124,27 +124,28 @@ describe('decorateToolSchema()', () => {
         expect(decorated._meta).toBeUndefined();
     });
 
-    it('selects the upto entry over exact for flat fields and exposes both in accepts[]', () => {
+    it('selects the exact entry over upto for flat fields and exposes both in accepts[]', () => {
+        // Back-compat: clients that read only flat fields keep signing `exact` like before #876.
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [EXACT_ACCEPT, UPTO_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
         expect(x402?.paymentRequired).toBe(true);
-        expect(x402?.scheme).toBe('upto');
-        expect(x402?.amount).toBe(UPTO_ACCEPT.amount);
+        expect(x402?.scheme).toBe('exact');
+        expect(x402?.amount).toBe(EXACT_ACCEPT.amount);
         expect(x402?.accepts).toEqual([EXACT_ACCEPT, UPTO_ACCEPT]);
     });
 
-    it('falls back to exact when upto is not present', () => {
-        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [EXACT_ACCEPT] };
+    it('falls back to upto when exact is not present', () => {
+        const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [UPTO_ACCEPT] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
 
         const x402 = getX402Meta(decorated);
-        expect(x402?.scheme).toBe('exact');
-        expect(x402?.accepts).toEqual([EXACT_ACCEPT]);
+        expect(x402?.scheme).toBe('upto');
+        expect(x402?.accepts).toEqual([UPTO_ACCEPT]);
     });
 
-    it('falls back to the first entry when neither upto nor exact is present', () => {
+    it('falls back to the first entry when neither exact nor upto is present', () => {
         const customAccept = { ...EXACT_ACCEPT, scheme: 'custom-scheme' };
         const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [customAccept] };
         const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
@@ -162,7 +163,7 @@ describe('decorateToolSchema()', () => {
 
         const x402 = getX402Meta(decorated);
         expect(x402?.accepts).toEqual([UPTO_ACCEPT, EXACT_ACCEPT]);
-        expect(x402?.scheme).toBe('upto');
+        expect(x402?.scheme).toBe('exact');
     });
 
     it('marks paymentRequired without flat fields or accepts[] when requirements were not fetched', () => {

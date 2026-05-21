@@ -26,8 +26,15 @@ const X402_TOOL_INSTRUCTIONS = [
     'Your MCP client must support the x402 payment protocol.',
 ].join(' ');
 
-/** Preferred scheme order when selecting the flat fields exposed on `_meta.x402`. */
-const X402_PREFERRED_SCHEMES = ['upto', 'exact'] as const;
+/**
+ * Preferred scheme order when selecting the flat fields exposed on `_meta.x402`.
+ *
+ * `exact` first to keep the flat-fields contract back-compatible with clients
+ * that don't iterate `accepts[]` — they'll continue to sign `exact` payments
+ * just like before this PR. Clients that walk `accepts[]` (post-#876 — the
+ * current mcpc, the canary) can opt into `upto` via their scheme preference.
+ */
+const X402_PREFERRED_SCHEMES = ['exact', 'upto'] as const;
 
 /**
  * One entry in a 402 `accepts` array. Mirrors the public x402 v2 wire shape;
@@ -177,10 +184,10 @@ export class X402PaymentProvider implements PaymentProvider {
 
     /**
      * Picks the preferred accept entry for flat `_meta.x402` advertising.
-     * Order: `upto`, then `exact`, then the first remaining entry.
+     * Order: `exact`, then `upto`, then the first remaining entry.
      *
-     * Clients that read only the flat fields (no `accepts[]` walking) get the
-     * richest payment option by default.
+     * `exact` is the pre-#876 contract — keep it as the flat-fields default so
+     * clients that don't walk `accepts[]` keep signing what they always signed.
      */
     private selectPreferredAcceptEntry(accepts: X402PaymentAccept[]): X402PaymentAccept {
         for (const preferred of X402_PREFERRED_SCHEMES) {
