@@ -16,8 +16,8 @@ import {
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import type { ApifyToken, InternalToolArgs, ToolInputSchema } from '../../types.js';
-import { getActorMcpUrlCached } from '../../utils/actor.js';
+import type { ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -27,8 +27,6 @@ import { actorNameToToolName } from '../utils.js';
 import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
-import { actorDefinitionCache } from '../../state.js';
-import { getActorDefinition } from '../build.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -297,13 +295,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = !!mcpServerUrlOrFalse;
 
-    let actorDefinitionWithInfo = actorDefinitionCache.get(baseActorName);
-    if (!actorDefinitionWithInfo) {
-        actorDefinitionWithInfo = await getActorDefinition(baseActorName, apifyClientForDefinition);
-        if (actorDefinitionWithInfo) {
-            actorDefinitionCache.set(baseActorName, actorDefinitionWithInfo);
-        }
-    }
+    const actorDefinitionWithInfo = await getActorDefinitionCached(baseActorName, apifyClientForDefinition);
     const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;
 
     if (!isStandbyActor && !isActorMcpServer) {
@@ -431,11 +423,11 @@ export async function resolveAndValidateActor(params: {
     actorName: string;
     input: Record<string, unknown>;
     toolArgs: InternalToolArgs;
-}): Promise<{ error: object } | { actor: Awaited<ReturnType<typeof getActorsAsTools>>[0] }> {
+}): Promise<{ error: object } | { actor: ToolEntry }> {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    let actor: Awaited<ReturnType<typeof getActorsAsTools>>[0] | undefined;
+    let actor: ToolEntry | undefined;
     try {
         const [resolvedActor] = await getActorsAsTools([actorName], apifyClient, {
             mcpSessionId: toolArgs.mcpSessionId,

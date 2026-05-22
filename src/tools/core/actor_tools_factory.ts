@@ -10,11 +10,11 @@ import {
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
 } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
+import { getActorDefinitionCached } from '../../utils/actor.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import { actorDefinitionCache } from '../../state.js';
 import type {
     ActorDefinitionWithInfo,
     ActorInfo,
@@ -26,7 +26,6 @@ import type {
 } from '../../types.js';
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
-import { getActorDefinition } from '../build.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
 import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
@@ -315,22 +314,13 @@ export async function getActorsAsTools(
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
             const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
-            const actorDefinitionWithInfoCached = actorDefinitionCache.get(actorName);
-            if (actorDefinitionWithInfoCached) {
-                return {
-                    definition: actorDefinitionWithInfoCached.definition,
-                    actor: actorDefinitionWithInfoCached.info,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfoCached.definition),
-
-                } as ActorInfo;
-            }
 
             // Wrap ONLY the network call — semantic throws below must not be masked
             // by the catch block (otherwise "not found" gets rewritten to a generic
             // "Please try again later" message).
             let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
-                actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
+                actorDefinitionWithInfo = await getActorDefinitionCached(actorName, apifyClient);
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
@@ -357,8 +347,6 @@ export async function getActorsAsTools(
                 return null;
             }
 
-            // Cache the Actor definition with info
-            actorDefinitionCache.set(actorName, actorDefinitionWithInfo);
             return {
                 definition: actorDefinitionWithInfo.definition,
                 actor: actorDefinitionWithInfo.info,

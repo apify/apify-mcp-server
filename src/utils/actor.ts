@@ -1,9 +1,27 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
-import { mcpServerCache, actorDefinitionCache } from '../state.js';
+import { actorDefinitionCache, mcpServerCache } from '../state.js';
 import { getActorDefinition } from '../tools/build.js';
-import type { ActorDefinitionStorage, DatasetItem } from '../types.js';
+import type { ActorDefinitionStorage, ActorDefinitionWithInfo, DatasetItem } from '../types.js';
 import { getValuesByDotKeys } from './generic.js';
+
+/**
+ * Returns the cached Actor definition + info, fetching from the platform on miss
+ * and populating the cache on the way back.
+ *
+ * Returns `null` if the Actor does not exist (404 / 400 from the platform).
+ * Non-404 errors propagate to the caller.
+ */
+export async function getActorDefinitionCached(
+    actorIdOrName: string,
+    apifyClient: ApifyClient,
+): Promise<ActorDefinitionWithInfo | null> {
+    const cached = actorDefinitionCache.get(actorIdOrName);
+    if (cached) return cached;
+    const fetched = await getActorDefinition(actorIdOrName, apifyClient);
+    if (fetched) actorDefinitionCache.set(actorIdOrName, fetched);
+    return fetched;
+}
 
 /**
  * Resolve and cache the MCP server URL for the given Actor.
@@ -21,10 +39,7 @@ export async function getActorMcpUrlCached(
     }
 
     try {
-        const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
-        if (actorDefinitionWithInfo) {
-            actorDefinitionCache.set(actorIdOrName, actorDefinitionWithInfo);
-        }
+        const actorDefinitionWithInfo = await getActorDefinitionCached(actorIdOrName, apifyClient);
         const definition = actorDefinitionWithInfo?.definition;
         const mcpPath = definition && getActorMCPServerPath(definition);
         if (mcpPath) {
