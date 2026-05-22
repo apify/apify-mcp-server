@@ -765,43 +765,6 @@ export function createIntegrationTestsSuite(
             expect(result.isError ?? false).toBe(false);
         });
 
-        it('should call MCP server Actor via call-actor and invoke add tool', async () => {
-            client = await createClientFn({ tools: ['actors'] });
-
-            // Step 1: Get MCP tools using fetch-actor-details
-            const detailsResult = await client.callTool({
-                name: HelperTools.ACTOR_GET_DETAILS,
-                arguments: {
-                    actor: ACTOR_EXAMPLE_MCP_SERVER,
-                    output: {
-                        description: false,
-                        stats: false,
-                        pricing: false,
-                        rating: false,
-                        metadata: false,
-                        inputSchema: false,
-                        readme: false,
-                        mcpTools: true,
-                    },
-                },
-            });
-
-            const detailsContent = detailsResult.content as { text: string }[];
-            expect(detailsContent.some((item) => item.text.includes('add'))).toBe(true);
-
-            // Step 2: call - invoke the MCP tool `add` via actor:tool syntax
-            const callResult = await client.callTool({
-                name: HelperTools.ACTOR_CALL,
-                arguments: {
-                    actor: `${ACTOR_EXAMPLE_MCP_SERVER}:add`,
-                    input: { firstNumber: 2, secondNumber: 3 },
-                },
-            });
-
-            expect(callResult.content).toBeDefined();
-            expect(callResult.isError ?? false).toBe(false);
-        });
-
         // Regression: `call-actor` declares an `outputSchema` (since #415), but the MCP-server pass-through
         // path in `handleMcpToolCall` returns `{ content }` only — no `structuredContent`. SDK ≥ 1.11.4
         // throws -32600 "has an output schema but did not return structured content" once it has cached
