@@ -375,7 +375,21 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    const [actor] = await getActorsAsTools([actorName], apifyClient, { mcpSessionId: toolArgs.mcpSessionId });
+    let actor: Awaited<ReturnType<typeof getActorsAsTools>>[0] | undefined;
+    try {
+        const [resolvedActor] = await getActorsAsTools([actorName], apifyClient, {
+            mcpSessionId: toolArgs.mcpSessionId,
+            throwOnError: true,
+        });
+        actor = resolvedActor;
+    } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        if (errMsg.includes('was not found')) {
+            actor = undefined;
+        } else {
+            throw error;
+        }
+    }
 
     if (!actor) {
         return {
