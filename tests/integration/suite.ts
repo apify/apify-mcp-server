@@ -57,6 +57,13 @@ function expectToolNamesToContain(names: string[], toolNames: string[] = []) {
     toolNames.forEach((name) => expect(names).toContain(name));
 }
 
+function buildExampleMcpServerAddToolContent(firstNumber: number, secondNumber: number) {
+    return [{
+        type: 'text' as const,
+        text: `The sum of ${firstNumber} and ${secondNumber} is ${firstNumber + secondNumber}`,
+    }];
+}
+
 async function callNormalModeTestActor(client: Client, selectedToolName: string) {
     const result = await client.callTool({
         name: selectedToolName,
@@ -761,7 +768,7 @@ export function createIntegrationTestsSuite(
                     secondNumber: 3,
                 },
             });
-            expect(result.content).toBeDefined();
+            expect(result.content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
             expect(result.isError ?? false).toBe(false);
         });
 
@@ -800,7 +807,7 @@ export function createIntegrationTestsSuite(
             // The remote MCP tool's actual result must still flow through `content` — the fix must not
             // lose the payload while satisfying the schema.
             const content = callResult.content as { text: string }[];
-            expect(content.length).toBeGreaterThan(0);
+            expect(content).toEqual(buildExampleMcpServerAddToolContent(2, 3));
 
             // `isError` must reflect the remote tool's status — false on the happy path. Forwarding this
             // closes a second drop on the same line: `handleMcpToolCall` currently discards `result.isError`.
