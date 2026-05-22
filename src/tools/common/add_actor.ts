@@ -1,9 +1,13 @@
 import { z } from 'zod';
 
+import log from '@apify/log';
+
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
+import { ActorLoadError } from '../../errors.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 export const addToolArgsSchema = z.object({
     actor: z.string()
@@ -38,12 +42,9 @@ USAGE EXAMPLES:
         const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
         const parsed = addToolArgsSchema.parse(args);
         if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Actor ${parsed.actor} is already available. No new tools were added.`,
-                }],
-            };
+            return buildMCPResponse({
+                texts: [`Actor ${parsed.actor} is already available. No new tools were added.`],
+            });
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
@@ -51,25 +52,24 @@ USAGE EXAMPLES:
             const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
             await sendNotification({ method: 'notifications/tools/list_changed' });
 
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Actor ${parsed.actor} has been added. Newly available tools: ${
-                        tools.map(
-                            (t: ToolEntry) => `${t.name}`,
-                        ).join(', ')
-                    }.`,
-                }],
-            };
+            const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
+            return buildMCPResponse({
+                texts: [`Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}.`],
+            });
         } catch (error) {
-            const errMsg = error instanceof Error ? error.message : String(error);
-            return {
-                content: [{
-                    type: 'text',
-                    text: errMsg,
-                }],
+            // Sanitized at source — safe to forward verbatim
+            if (error instanceof ActorLoadError) {
+                return buildMCPResponse({
+                    texts: [error.message],
+                    isError: true,
+                });
+            }
+            // Unexpected error — log full detail server-side, return masked message to the agent
+            log.error('Unexpected error in add-actor', { actor: parsed.actor, error });
+            return buildMCPResponse({
+                texts: [`Failed to add Actor "${parsed.actor}". Please try again later.`],
                 isError: true,
-            };
+            });
         }
     },
 } as const);

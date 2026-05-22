@@ -9,6 +9,7 @@ import {
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
 } from '../../const.js';
+import { ActorLoadError } from '../../errors.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
@@ -337,14 +338,14 @@ export async function getActorsAsTools(
                     mcpSessionId,
                 });
                 if (throwOnError) {
-                    throw new Error(`Failed to load Actor "${actorIdOrName}". Please try again later.`);
+                    throw ActorLoadError.loadFailed(actorIdOrName);
                 }
                 return null;
             }
 
             if (!actorDefinitionWithInfo) {
                 if (throwOnError) {
-                    throw new Error(`Actor "${actorIdOrName}" was not found. Please verify the Actor ID or name.`);
+                    throw ActorLoadError.notFound(actorIdOrName);
                 }
                 log.softFail('Actor not found or definition is not available', {
                     actorName,
@@ -374,7 +375,7 @@ export async function getActorsAsTools(
     if (paymentProvider && throwOnError) {
         for (const actorInfo of nonNullActors) {
             if (actorInfo.actor.actorStandby?.isEnabled) {
-                throw new Error(`Actor "${actorInfo.definition.actorFullName}" is a standby Actor, which is not supported in agentic payment mode.`);
+                throw ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName);
             }
         }
     }

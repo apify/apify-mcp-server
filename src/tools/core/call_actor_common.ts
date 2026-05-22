@@ -13,6 +13,7 @@ import {
     HelperTools,
     TOOL_STATUS,
 } from '../../const.js';
+import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type { ApifyToken, InternalToolArgs, ToolInputSchema } from '../../types.js';
@@ -442,8 +443,9 @@ export async function resolveAndValidateActor(params: {
         });
         actor = resolvedActor;
     } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        if (errMsg.includes('was not found')) {
+        // NOT_FOUND falls through to the structured "Actor not found" response below;
+        // anything else propagates so the outer call-actor handler reports it.
+        if (error instanceof ActorLoadError && error.kind === ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
             actor = undefined;
         } else {
             throw error;
