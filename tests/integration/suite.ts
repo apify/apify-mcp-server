@@ -627,7 +627,7 @@ export function createIntegrationTestsSuite(
                 arguments: {
                     actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
-                    callOptions: { maxItems: 3 },
+                    callOptions: { maxItems: 1 },
                     waitSecs: 45,
                 },
             });
