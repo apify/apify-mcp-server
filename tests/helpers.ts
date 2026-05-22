@@ -23,10 +23,26 @@ export type McpClientOptions = {
     clientCapabilities?: ClientCapabilities; // Extra capabilities advertised by the client during initialize
 }
 
-function checkApifyToken(): void {
+/**
+ * Ensures `APIFY_TOKEN` is set unless the test runs in payment mode
+ * (where production also skips token requirements — see
+ * `apify-mcp-server-internal/src/server/shared.ts:authorizeRequestMiddleware`).
+ */
+function checkApifyToken(options?: McpClientOptions): void {
+    if (options?.payment) return;
     if (!process.env.APIFY_TOKEN) {
         throw new Error('APIFY_TOKEN environment variable is not set.');
     }
+}
+
+/**
+ * Returns the request headers a test client should send.
+ * In payment mode no `Authorization` header is sent — the server resolves
+ * the payment provider from the `?payment=` query param instead.
+ */
+function buildClientAuthHeaders(options?: McpClientOptions): Record<string, string> {
+    if (options?.payment) return {};
+    return { authorization: `Bearer ${process.env.APIFY_TOKEN}` };
 }
 
 function appendSearchParams(url: URL, options?: McpClientOptions): void {
@@ -55,7 +71,7 @@ export async function createMcpSseClient(
     serverUrl: string,
     options?: McpClientOptions,
 ): Promise<Client> {
-    checkApifyToken();
+    checkApifyToken(options);
     const url = new URL(serverUrl);
     appendSearchParams(url, options);
 
@@ -63,9 +79,7 @@ export async function createMcpSseClient(
         url,
         {
             requestInit: {
-                headers: {
-                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
-                },
+                headers: buildClientAuthHeaders(options),
             },
         },
     );
@@ -84,7 +98,7 @@ export async function createMcpStreamableClient(
     serverUrl: string,
     options?: McpClientOptions,
 ): Promise<Client> {
-    checkApifyToken();
+    checkApifyToken(options);
     const url = new URL(serverUrl);
     appendSearchParams(url, options);
 
@@ -92,9 +106,7 @@ export async function createMcpStreamableClient(
         url,
         {
             requestInit: {
-                headers: {
-                    authorization: `Bearer ${process.env.APIFY_TOKEN}`,
-                },
+                headers: buildClientAuthHeaders(options),
             },
         },
     );
@@ -112,7 +124,7 @@ export async function createMcpStreamableClient(
 export async function createMcpStdioClient(
     options?: McpClientOptions,
 ): Promise<Client> {
-    checkApifyToken();
+    checkApifyToken(options);
     const { actors, enableAddingActors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];
     const env: Record<string, string> = {

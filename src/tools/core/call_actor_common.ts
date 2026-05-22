@@ -14,7 +14,8 @@ import {
     TOOL_STATUS,
 } from '../../const.js';
 import { connectMCPClient } from '../../mcp/client.js';
-import type { InternalToolArgs, ToolInputSchema } from '../../types.js';
+import type { PaymentProvider } from '../../payments/types.js';
+import type { ApifyToken, InternalToolArgs, ToolInputSchema } from '../../types.js';
 import { getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
@@ -268,6 +269,64 @@ export const callActorAjvValidate = compileSchema({ ...z.toJSONSchema(callActorA
 export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
 
 /**
+ * Returns a rejection MCP response when the requested Actor is a standby
+ * (or MCP-server) Actor AND the session uses a third-party payment provider.
+ * Otherwise returns `null`.
+ *
+ * Standby Actors cannot be paid for via x402 / Skyfire — calling them in
+ * payment mode is a hard input error, so this guard must run BEFORE the
+ * generic payment-required short-circuit in the tool-call handler so the
+ * agent receives the precise reason instead of a generic 402.
+ *
+ * Uses `actorDefinitionPrunedCache` + `getActorMcpUrlCached` — cheap on a
+ * warm cache, one definition fetch on a cold cache.
+ */
+export async function checkPaymentProviderStandbyConflict(params: {
+    actorName: string;
+    paymentProvider: PaymentProvider;
+    apifyToken: ApifyToken;
+    mcpSessionId?: string;
+}): Promise<object | null> {
+    const { actorName, paymentProvider, apifyToken, mcpSessionId } = params;
+    const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
+    const { baseActorName } = resolveActorContext(normalizedActorName);
+
+    // Token-based client — payment headers are only relevant for actual Actor runs.
+    const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
+    const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
+    const isActorMcpServer = !!mcpServerUrlOrFalse;
+
+    let actorDefinitionWithInfo = actorDefinitionPrunedCache.get(baseActorName);
+    if (!actorDefinitionWithInfo) {
+        actorDefinitionWithInfo = await getActorDefinition(baseActorName, apifyClientForDefinition);
+        if (actorDefinitionWithInfo) {
+            actorDefinitionPrunedCache.set(baseActorName, actorDefinitionWithInfo);
+        }
+    }
+    const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;
+
+    if (!isStandbyActor && !isActorMcpServer) {
+        return null;
+    }
+
+    log.softFail('Rejecting call-actor for standby Actor under third-party payment provider', {
+        actorName: baseActorName,
+        paymentProviderId: paymentProvider.id,
+        mcpSessionId,
+        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+    });
+
+    return buildMCPResponse({
+        texts: [dedent`
+            This Actor (${normalizedActorName}) is a standby Actor and cannot be accessed using a third-party payment provider.
+            To use this Actor, please provide a valid Apify token instead.
+        `],
+        isError: true,
+        telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+    });
+}
+
+/**
  * Resolves MCP URL and parses the "actor:tool" format.
  * Shared pre-processing step used by both default and apps variants.
  */
@@ -501,40 +560,19 @@ export async function callActorPreExecute(
         mcpToolName: string | undefined;
     }
 > {
-    const { args, apifyToken, apifyMcpServer, mcpSessionId } = toolArgs;
+    const { args, apifyToken, mcpSessionId } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
     const actorName = fixActorNameInputAndLog(parsedArgs.actor, { mcpSessionId, route: options.route });
     const parsed: CallActorParsedArgs = { ...parsedArgs, actor: actorName };
 
     const { baseActorName, mcpToolName } = resolveActorContext(parsed.actor);
 
-    // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs
+    // For definition resolution we always use a token-based client; payment provider is only for actual Actor runs.
+    // Standby/MCP-server Actors under a third-party payment provider are rejected upstream by
+    // `checkPaymentProviderStandbyConflict` in the generic tool-call handler — see src/mcp/server.ts.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = !!mcpServerUrlOrFalse;
-
-    let actorDefinitionWithInfo = actorDefinitionPrunedCache.get(baseActorName);
-    if (!actorDefinitionWithInfo) {
-        actorDefinitionWithInfo = await getActorDefinition(baseActorName, apifyClientForDefinition);
-        if (actorDefinitionWithInfo) {
-            actorDefinitionPrunedCache.set(baseActorName, actorDefinitionWithInfo);
-        }
-    }
-    const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;
-
-    // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
-    if ((isStandbyActor || isActorMcpServer) && apifyMcpServer.options.paymentProvider) {
-        return {
-            earlyResponse: buildMCPResponse({
-                texts: [dedent`
-                    This Actor (${parsed.actor}) is a standby Actor and cannot be accessed using a third-party payment provider.
-                    To use this Actor, please provide a valid Apify token instead.
-                `],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            }),
-        };
-    }
 
     // Handle the case where LLM does not respect instructions when calling MCP server Actors
     // and does not provide the tool name.

@@ -32,6 +32,59 @@ enum Routes {
     MESSAGE = '/message',
 }
 
+/**
+ * Extracts the Apify API token from the incoming request.
+ *
+ * Mirrors `apify-mcp-server-internal`'s `extractApiTokenFromRequest` so the
+ * dev server behaves identically to production for auth/payment routing:
+ *   1. `x-apify-authorization: Bearer <token>` header (preferred)
+ *   2. `authorization: Bearer <token>` header
+ *   3. `?token=<token>` query parameter
+ *
+ * Returns `undefined` if no valid token is present. The caller decides whether
+ * a missing token is an error (no payment provider) or expected (payment mode).
+ */
+function extractApiTokenFromRequest(req: Request): string | undefined {
+    for (const header of ['x-apify-authorization', 'authorization']) {
+        const value = req.headers[header];
+        if (typeof value !== 'string') continue;
+        const [schema, token] = value.trim().split(/\s+/);
+        if (schema?.toLowerCase() === 'bearer' && token) return token;
+    }
+    try {
+        const tokenFromUrl = new URL(req.url ?? '', `http://${req.headers.host}`).searchParams.get('token');
+        return tokenFromUrl || undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * Returns the resolved token for a request, or sends a 401 response.
+ * In payment mode, no token is required — returns `{ apifyToken: undefined }`.
+ */
+function resolveRequestAuth(
+    req: Request,
+    res: Response,
+    paymentProvider: Awaited<ReturnType<typeof resolvePaymentProvider>>,
+): { apifyToken: string | undefined } | null {
+    if (paymentProvider) return { apifyToken: undefined };
+
+    const apifyToken = extractApiTokenFromRequest(req);
+    if (apifyToken) return { apifyToken };
+
+    log.softFail('Apify API token missing on unauthenticated request', { statusCode: 401 });
+    res.status(401).json({
+        jsonrpc: '2.0',
+        error: {
+            code: -32001,
+            message: 'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
+        },
+        id: null,
+    });
+    return null;
+}
+
 export function createExpressApp(): express.Express {
     const app = express();
     const mcpServers: { [sessionId: string]: ActorsMcpServer } = {};
@@ -81,6 +134,11 @@ export function createExpressApp(): express.Express {
             // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
             const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
+            // Mirror production: no token required in payment mode, else require Bearer header
+            const auth = resolveRequestAuth(req, res, paymentProvider);
+            if (!auth) return;
+            const { apifyToken } = auth;
+
             const mcpServer = new ActorsMcpServer({
                 taskStore,
                 setupSigintHandler: false,
@@ -90,13 +148,13 @@ export function createExpressApp(): express.Express {
                 },
                 serverMode,
                 paymentProvider,
+                token: apifyToken,
             });
             const transport = new SSEServerTransport(Routes.MESSAGE, res);
 
             // Generate a unique session ID for this SSE connection
             const mcpSessionId = transport.sessionId;
 
-            const apifyToken = process.env.APIFY_TOKEN as string;
             const apifyClient = new ApifyClient({ token: apifyToken });
             // Fetch actor metadata and queue mode-agnostic sources. Composed with
             // the final mode inside the initialize request handler.
@@ -204,6 +262,11 @@ export function createExpressApp(): express.Express {
                 // Resolve payment provider from URL parameter (e.g., ?payment=skyfire)
                 const paymentProvider = await resolvePaymentProvider(urlParams.get('payment'));
 
+                // Mirror production: no token required in payment mode, else require Bearer header
+                const auth = resolveRequestAuth(req, res, paymentProvider);
+                if (!auth) return;
+                const { apifyToken } = auth;
+
                 const mcpServer = new ActorsMcpServer({
                     taskStore,
                     setupSigintHandler: false,
@@ -213,9 +276,9 @@ export function createExpressApp(): express.Express {
                     },
                     serverMode,
                     paymentProvider,
+                    token: apifyToken,
                 });
 
-                const apifyToken = process.env.APIFY_TOKEN as string;
                 const apifyClient = new ApifyClient({ token: apifyToken });
                 // Fetch actor metadata and queue mode-agnostic sources. Composed with
                 // the final mode inside the initialize request handler.
@@ -325,9 +388,11 @@ function isInitializeRequest(body: unknown): boolean {
 // --- Entry point: start the server when run directly ---
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    // Token is no longer read from the environment per-request — clients pass it
+    // via `Authorization: Bearer <token>` (or use `?payment=<provider>`). Warn if
+    // unset so local dev runs without payment mode fail fast with a clear hint.
     if (!process.env.APIFY_TOKEN) {
-        log.error('APIFY_TOKEN is required but not set in the environment variables.');
-        process.exit(1);
+        log.warning('APIFY_TOKEN is not set. Clients must pass `Authorization: Bearer <token>` or `?payment=<provider>` per request.');
     }
 
     const HOST = process.env.HOST ?? 'http://localhost';

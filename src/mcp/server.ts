@@ -66,7 +66,11 @@ import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actor_executor.js';
-import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
+import {
+    buildPermissionApprovalResponse,
+    checkPaymentProviderStandbyConflict,
+    isPermissionApprovalError,
+} from '../tools/core/call_actor_common.js';
 import { getActorsAsTools } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
@@ -826,7 +830,11 @@ export class ActorsMcpServer {
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
             const metaApifyToken = meta?.apifyToken;
-            const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
+            // Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
+            // option (set by the transport from `Authorization` header or stdio env). No env fallback:
+            // dev_server / production must explicitly extract the token from request headers so payment
+            // mode (no token) behaves identically to production.
+            const apifyToken = (metaApifyToken || this.options.token) as string;
             const userRentedActorIds = meta?.userRentedActorIds;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
@@ -1007,6 +1015,32 @@ export class ActorsMcpServer {
                     // Return the task immediately; execution continues asynchronously
                     shouldTrackTelemetry = false;
                     return { task };
+                }
+
+                // Standby / MCP-server Actors are never payable via a third-party provider —
+                // reject BEFORE the payment short-circuit so the agent gets the precise reason
+                // instead of a generic 402 PaymentRequired response.
+                if (
+                    this.options.paymentProvider
+                    && (tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET)
+                ) {
+                    const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
+                    if (typeof actorArg === 'string' && actorArg.length > 0) {
+                        const standbyRejection = await checkPaymentProviderStandbyConflict({
+                            actorName: actorArg,
+                            paymentProvider: this.options.paymentProvider,
+                            apifyToken,
+                            mcpSessionId,
+                        });
+                        if (standbyRejection) {
+                            toolStatus = TOOL_STATUS.SOFT_FAIL;
+                            callDiagnostics = {
+                                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                                ...buildActorFields(actorName, actorId),
+                            };
+                            return captureResult(standbyRejection);
+                        }
+                    }
                 }
 
                 // Check payment validation (already computed by prepareToolCallContext)
