@@ -4,7 +4,6 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
-import { getActorDefinition } from '../../src/tools/build.js';
 
 /**
  * Apps / UI mode: call-actor-widget starts the run and renders an interactive UI element
@@ -13,10 +12,6 @@ import { getActorDefinition } from '../../src/tools/build.js';
  */
 vi.mock('../../src/utils/actor.js', () => ({
     getActorMcpUrlCached: vi.fn(),
-}));
-
-vi.mock('../../src/tools/build.js', () => ({
-    getActorDefinition: vi.fn(),
 }));
 
 vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
@@ -73,16 +68,6 @@ describe('call-actor-widget response', () => {
     beforeEach(() => {
         vi.mocked(getActorMcpUrlCached).mockReset();
         vi.mocked(getActorMcpUrlCached).mockResolvedValue(false);
-        vi.mocked(getActorDefinition).mockReset();
-        vi.mocked(getActorDefinition).mockResolvedValue({
-            definition: {
-                id: 'actor-id-rag',
-                actorFullName: 'apify/rag-web-browser',
-            },
-            info: {
-                actorStandby: { isEnabled: false },
-            },
-        } as any);
         vi.mocked(getActorsAsTools).mockReset();
         vi.mocked(getActorsAsTools).mockResolvedValue([MOCK_ACTOR_TOOL] as never);
     });

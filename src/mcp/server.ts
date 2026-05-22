@@ -832,7 +832,7 @@ export class ActorsMcpServer {
             const metaApifyToken = meta?.apifyToken;
             // Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
             // option (set by the transport from `Authorization` header or stdio env). No env fallback:
-            // dev_server / production must explicitly extract the token from request headers so payment
+            // dev_server / production must extract the token from request headers so payment
             // mode (no token) behaves identically to production.
             const apifyToken = (metaApifyToken || this.options.token) as string;
             const userRentedActorIds = meta?.userRentedActorIds;

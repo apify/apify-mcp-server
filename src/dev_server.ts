@@ -54,7 +54,8 @@ function extractApiTokenFromRequest(req: Request): string | undefined {
     try {
         const tokenFromUrl = new URL(req.url ?? '', `http://${req.headers.host}`).searchParams.get('token');
         return tokenFromUrl || undefined;
-    } catch {
+    } catch (error) {
+        log.softFail('Failed to parse request URL for token extraction', { url: req.url, error });
         return undefined;
     }
 }
