@@ -149,6 +149,41 @@ It also runs automatically on every merge to the `master` branch.
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 
+### Test organization across repos
+
+This package is consumed by the hosted server in `apify-mcp-server-internal`. Tests are split between the two repos to avoid copying test bodies across the boundary.
+
+**Public** owns:
+
+- **Layer 1 — MCP protocol (wire).** `initialize` handshake, request/response shapes for `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notification delivery, JSON-RPC error codes.
+- **Layer 2 — Package implementation.** Tool loader and selectors, widget metadata shape, structured output schemas, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name capability detection, `?ui=` server-mode parsing.
+
+**Internal** owns:
+
+- **Layer 3 — Hosted-only behaviors.** IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
+- **Layer 4 — Multi-node coordination.** Cross-node session continuity, cross-node cancellation, failover, legacy SSE — runs the streamable suite through Caddy across two nodes.
+- **Contract smoke suite.** A small set of tests asserting that layer-1 and layer-2 behaviors survive the hosted server's extra code (auth, rate limiter, Caddy, response handlers). One test per consumed behavior, with a one-line comment naming the behavior and the risk it guards against.
+
+#### When in doubt, keep the test
+
+The hosted server wraps the package with extra code — auth check, rate limiter, Caddy load balancer, response handlers. Any of that code can change, drop, or delay something the package produced. The package's own tests don't see that wrapping, so they can't catch it.
+
+Duplication does cost us — tighter coupling between the two repos, fixture renames in two places, harder refactors. We accept all of that. It beats finding out from a user that auth stripped `_meta`, or that the load balancer batched live update notifications, or that the rate limiter ate a long-running run's status poll.
+
+**Default is keep, not delete.** A test moves out of internal only when all three of these hold:
+
+1. There is a named, equivalent test in public — same setup, same assertions. Not just "covers the same area."
+2. None of the hosted code (auth, rate limiter, load balancer, response handlers) can plausibly change or drop the thing being asserted.
+3. If the public test ever quietly disappears, we'll find out fast — a TypeScript error when we bump the package, or a nearby contract test that fails first.
+
+Anything that doesn't clear all three stays in internal as a contract test.
+
+#### Where a new test belongs
+
+1. Does the code under test require IAM, Redis, the rate limiter, multi-node coordination, or a non-MCP HTTP route to make sense? → internal (layer 3 or 4). Stop.
+2. Otherwise the implementation is in the package → public (layer 1 or 2).
+3. Then ask: does any of the hosted server's extra code sit between the HTTP request and this behavior? If yes — or if you're not sure — internal also writes a contract smoke test for it.
+
 ### Live probing with mcpc
 
 `mcpc` (`@apify/mcpc`) provides a CLI feedback loop against the local server.

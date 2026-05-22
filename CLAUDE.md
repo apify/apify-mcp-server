@@ -62,6 +62,13 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 - **Expose methods on `ActorsMcpServer`**, not raw data exports via `./internals` — minimize the coupling surface
 - When designing a new feature, ask: can this land in one repo? Prefer exposing a method or interface over exporting internals that the other repo re-implements
 
+### Public/internal integration tests ownership
+
+- **New tests for this repo's code go in `tests/integration/suite.ts` here, never in internal.** Covers: MCP protocol (handshake, `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notifications), tool loader + selectors, widget metadata shape, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name detection, `?ui=` parsing.
+- **Internal-only tests** (don't add here): anything that needs IAM auth (401 / unauth user toolset / `?payment=skyfire` bypass), the rate limiter, `RedisEventStore` replay, user-aware rental filter, non-MCP routes (`/`, OAuth metadata), multi-node coordination.
+- **When changing a behavior listed above in a way internal consumes** (`internals.js` exports, `_meta` shape, `structuredContent`, `clientInfo`-based logic, `?ui=`/`?payment=` parsing, notification timing), flag it in the PR — internal's contract suite likely needs a matching smoke test.
+- **Never delete a public test "because internal covers it"** — that's backwards. Public is the source; internal smokes guard against the hosted server's extra code (auth, rate limiter, Caddy, response handlers) breaking or stripping the package's output. See [DEVELOPMENT.md → Test organization across repos](./DEVELOPMENT.md#test-organization-across-repos).
+
 ## Code conventions
 
 - **Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for all naming and coding standards.** It is the single source of truth for naming rules (function verbs, boolean prefixes, type suffixes, enumerations, file names, etc.), string formatting, parameters, error handling, and anti-patterns. Read it before writing code.
