@@ -327,7 +327,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should load only specified actors when actors param is provided (no other tools)', async () => {
-            const actors = ['apify/normal-mode-test-actor'];
+            const actors = [ACTOR_NORMAL_MODE];
             client = await createClientFn({ actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
 
@@ -384,7 +384,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should load only specified Actors via tools selectors when actors param omitted', async () => {
-            const actors = ['apify/normal-mode-test-actor'];
+            const actors = [ACTOR_NORMAL_MODE];
             client = await createClientFn({ tools: actors, serverMode: 'default' });
             const names = getToolNames(await client.listTools());
             // The Actor plus auto-injected storage/abort helpers.
@@ -397,7 +397,7 @@ export function createIntegrationTestsSuite(
 
         it('should treat selectors with slashes as Actor names', async () => {
             client = await createClientFn({
-                tools: ['docs', 'apify/normal-mode-test-actor'],
+                tools: ['docs', ACTOR_NORMAL_MODE],
             });
             const names = getToolNames(await client.listTools());
 
@@ -406,11 +406,11 @@ export function createIntegrationTestsSuite(
             expect(names).toContain('fetch-apify-docs');
 
             // Should include actor (if it exists/is valid)
-            expect(names).toContain(actorNameToToolName('apify/normal-mode-test-actor'));
+            expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE));
         });
 
         it('should merge actors param into tools selectors (backward compatibility)', async () => {
-            const actors = ['apify/normal-mode-test-actor'];
+            const actors = [ACTOR_NORMAL_MODE];
             const categories = ['docs'] as ToolCategory[];
 
             client = await createClientFn({ tools: categories, actors });
@@ -1435,8 +1435,6 @@ export function createIntegrationTestsSuite(
                 tools: ['actors'],
             });
 
-            const testActor = ACTOR_NORMAL_MODE;
-
             // Define all output options with their expected markers in text
             const outputOptions = [
                 {
@@ -1490,7 +1488,7 @@ export function createIntegrationTestsSuite(
                 const result = await client.callTool({
                     name: HelperTools.ACTOR_GET_DETAILS,
                     arguments: {
-                        actor: testActor,
+                        actor: ACTOR_NORMAL_MODE,
                         output: {
                             description: option.field === 'description',
                             stats: option.field === 'stats',
@@ -1525,7 +1523,7 @@ export function createIntegrationTestsSuite(
             const allCardSectionsResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: testActor,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: true,
                         stats: true,
@@ -1693,13 +1691,12 @@ export function createIntegrationTestsSuite(
         // response after cancel, no runId in progress notifications), so we race the Apify API
         // for the just-started run while the call is in flight, then trigger the cancel.
         it.runIf(options.transport === 'streamable-http')('should abort actor run on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = ACTOR_NORMAL_MODE;
-            const selectedToolName = actorNameToToolName(ACTOR_NAME);
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             client = await createClientFn({ enableAddingActors: true });
-            await addActor(client, ACTOR_NAME);
+            await addActor(client, ACTOR_NORMAL_MODE);
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(ACTOR_NAME).get();
+            const actor = await api.actor(ACTOR_NORMAL_MODE).get();
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
@@ -1723,11 +1720,10 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'streamable-http')('should abort call-actor tool on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = ACTOR_NORMAL_MODE;
             client = await createClientFn({ tools: ['actors'] });
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(ACTOR_NAME).get();
+            const actor = await api.actor(ACTOR_NORMAL_MODE).get();
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
@@ -1738,7 +1734,7 @@ export function createIntegrationTestsSuite(
                 params: {
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_NAME,
+                        actor: ACTOR_NORMAL_MODE,
                         step: 'call',
                         input: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
                     },
@@ -1949,10 +1945,10 @@ export function createIntegrationTestsSuite(
         });
 
         it('calls apify/normal-mode-test-actor tool directly and retrieves sum via get-dataset-items', async () => {
-            client = await createClientFn({ tools: ['storage'], actors: ['apify/normal-mode-test-actor'] });
+            client = await createClientFn({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] });
 
             const result = await client.callTool({
-                name: actorNameToToolName('apify/normal-mode-test-actor'),
+                name: actorNameToToolName(ACTOR_NORMAL_MODE),
                 // Max wait (45s) so the test does not flake on a slow run.
                 arguments: { firstNumber: 4, secondNumber: 6, waitSecs: 45 },
             });
@@ -1962,7 +1958,7 @@ export function createIntegrationTestsSuite(
             expect(content.length).toBe(2);
 
             // Direct actor tools return the canonical RunResponse shape — same as call-actor.
-            const normalModeToolName = actorNameToToolName('apify/normal-mode-test-actor');
+            const normalModeToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             validateStructuredOutput(result, getActorRunOutputSchema, normalModeToolName);
             const sc = (result as { structuredContent?: {
                 status?: string;
@@ -1999,8 +1995,8 @@ export function createIntegrationTestsSuite(
         });
 
         it('calls apify/normal-mode-test-actor tool directly and retrieves full dataset via get-dataset-items', async () => {
-            client = await createClientFn({ tools: ['storage'], actors: ['apify/normal-mode-test-actor'] });
-            const selectedToolName = actorNameToToolName('apify/normal-mode-test-actor');
+            client = await createClientFn({ tools: ['storage'], actors: [ACTOR_NORMAL_MODE] });
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             const input = { firstNumber: 5, secondNumber: 7 };
 
             const result = await client.callTool({
@@ -2066,9 +2062,8 @@ export function createIntegrationTestsSuite(
         });
 
         it('should return Actor details both for full Actor name and ID', async () => {
-            const actorName = 'apify/normal-mode-test-actor';
             const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await apifyClient.actor(actorName).get();
+            const actor = await apifyClient.actor(ACTOR_NORMAL_MODE).get();
             expect(actor).toBeDefined();
             const actorId = actor!.id as string;
 
@@ -2077,10 +2072,10 @@ export function createIntegrationTestsSuite(
             // Fetch by full Actor name
             const resultByName = await client.callTool({
                 name: 'fetch-actor-details',
-                arguments: { actor: actorName },
+                arguments: { actor: ACTOR_NORMAL_MODE },
             });
             const contentByName = resultByName.content as { text: string }[];
-            expect(contentByName[0].text).toContain(actorName);
+            expect(contentByName[0].text).toContain(ACTOR_NORMAL_MODE);
 
             // Fetch by Actor ID only
             const resultById = await client.callTool({
@@ -2088,7 +2083,7 @@ export function createIntegrationTestsSuite(
                 arguments: { actor: actorId },
             });
             const contentById = resultById.content as { text: string }[];
-            expect(contentById[0].text).toContain(actorName);
+            expect(contentById[0].text).toContain(ACTOR_NORMAL_MODE);
 
             await client.close();
         });
