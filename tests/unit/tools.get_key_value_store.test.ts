@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_STORE = {
     id: 'kv-1',
@@ -25,8 +25,7 @@ describe('get-key-value-store', () => {
         );
         const { content } = result as TextToolResult;
 
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        expect(JSON.parse(json)).toEqual(MOCK_STORE);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_STORE);
     });
 
     it('returns isError with a not-found message when the store does not exist', async () => {

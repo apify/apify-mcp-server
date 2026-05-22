@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -31,8 +31,7 @@ describe('get-key-value-store-record', () => {
         const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        expect(JSON.parse(json)).toEqual(MOCK_RECORD);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD);
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {

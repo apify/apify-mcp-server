@@ -31,7 +31,6 @@ export function buildUsageMeta(source: {
  *   then stripped by `extractToolTelemetry()` before the response reaches the client.
  *   Contains tool outcome (toolStatus, failureCategory, etc.) used for Segment telemetry.
  */
-// TODO: annotate return type as `CallToolResult & { toolTelemetry?: ToolTelemetryContext }` (from '@modelcontextprotocol/sdk/types.js').
 export function buildMCPResponse(options: {
     texts: string[];
     isError?: boolean;

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_KEYS = {
     items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
@@ -29,8 +29,7 @@ describe('get-key-value-store-keys', () => {
         );
         const { content } = result as TextToolResult;
 
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        expect(JSON.parse(json)).toEqual(MOCK_KEYS);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_KEYS);
     });
 
     it('forwards exclusiveStartKey and limit to listKeys', async () => {

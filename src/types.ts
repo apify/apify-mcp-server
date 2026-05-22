@@ -169,7 +169,6 @@ export type HelperTool = ToolBase & {
      * @param toolArgs - Arguments and server references
      * @returns Promise resolving to the tool's output
      */
-    // TODO: tighten to `Promise<CallToolResult>` (from '@modelcontextprotocol/sdk/types.js'); will surface shape mismatches across tool implementations.
     call: (toolArgs: InternalToolArgs) => Promise<object>;
 };
 

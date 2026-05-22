@@ -18,6 +18,13 @@ export type TextToolResult = Omit<CallToolResult, 'content'> & {
 };
 
 /**
+ * Strip the ```` ```json … ``` ```` fence emitted by internal tools and parse the inner JSON.
+ */
+export function parseFencedJson(text: string): unknown {
+    return JSON.parse(text.replace(/^```json\n/, '').replace(/\n```$/, ''));
+}
+
+/**
  * Build a minimal `InternalToolArgs` for unit tests. Stubs the fields tools
  * don't read (`extra`, `mcpServer`, `apifyMcpServer`) and lets each test inject
  * `args` and a partial `apifyClient`.

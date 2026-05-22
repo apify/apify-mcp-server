@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getDataset } from '../../src/tools/common/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_DATASET = {
     id: 'ds-1',
@@ -28,8 +28,7 @@ describe('get-dataset', () => {
         const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        expect(JSON.parse(json)).toEqual(MOCK_DATASET);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_DATASET);
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {

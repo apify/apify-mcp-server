@@ -4,7 +4,7 @@ import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 vi.mock('../../src/utils/schema_generation.js', async (importOriginal) => {
     const actual = await importOriginal<typeof SchemaGenModule>();
@@ -35,9 +35,7 @@ describe('get-dataset-schema', () => {
         const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        const schema = JSON.parse(json);
-        expect(schema).toMatchObject({ type: 'array' });
+        expect(parseFencedJson(content[0].text)).toMatchObject({ type: 'array' });
     });
 
     it('returns a plain "is empty" message when the dataset has no items', async () => {

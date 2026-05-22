@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserKeyValueStoresList } from '../../src/tools/common/key_value_store_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -31,8 +31,7 @@ describe('get-key-value-store-list', () => {
         const result = await (getUserKeyValueStoresList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { content } = result as TextToolResult;
 
-        const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
-        expect(JSON.parse(json)).toEqual(MOCK_LIST);
+        expect(parseFencedJson(content[0].text)).toEqual(MOCK_LIST);
     });
 
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
