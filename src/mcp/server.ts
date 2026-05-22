@@ -1020,7 +1020,7 @@ export class ActorsMcpServer {
                 // Standby / MCP-server Actors are never payable via a third-party provider —
                 // reject BEFORE the payment short-circuit so the agent gets the precise reason
                 // instead of a generic 402 PaymentRequired response.
-                const paymentProvider = this.options.paymentProvider;
+                const { paymentProvider } = this.options;
                 const isCallActorTool = tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
                 const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
