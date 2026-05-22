@@ -300,9 +300,10 @@ export async function getActorsAsTools(
         mcpSessionId?: string;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
+        throwOnError?: boolean;
     },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
+    const { mcpSessionId, actorStore, paymentProvider, throwOnError } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorNames: actorIdsOrNames,
         mcpSessionId,
@@ -325,6 +326,9 @@ export async function getActorsAsTools(
             try {
                 const actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
                 if (!actorDefinitionWithInfo) {
+                    if (throwOnError) {
+                        throw new Error(`Actor "${actorIdOrName}" was not found. Please verify the Actor ID or name.`);
+                    }
                     log.softFail('Actor not found or definition is not available', {
                         actorName,
                         ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
@@ -342,6 +346,9 @@ export async function getActorsAsTools(
                     webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
                 } as ActorInfo;
             } catch (error) {
+                if (throwOnError) {
+                    throw error;
+                }
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
                     ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
@@ -356,6 +363,14 @@ export async function getActorsAsTools(
 
     // Filter out nulls - actorInfo can be null if the Actor was not found or an error occurred
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
+
+    if (paymentProvider && throwOnError) {
+        for (const actorInfo of nonNullActors) {
+            if (actorInfo.actor.actorStandby?.isEnabled) {
+                throw new Error(`Actor "${actorInfo.definition.actorFullName}" is a standby Actor, which is not supported in agentic payment mode.`);
+            }
+        }
+    }
 
     // Separate Actors with MCP servers and normal Actors
     // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled

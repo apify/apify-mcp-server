@@ -728,7 +728,7 @@ export function createIntegrationTestsSuite(
             expect(hasReceivedNotification).toBe(true);
         });
 
-        it('should return no tools were added when adding a non-existent actor', async () => {
+        it('should return error when adding a non-existent actor', async () => {
             client = await createClientFn({ enableAddingActors: true });
             const nonExistentActor = 'apify/this-actor-does-not-exist';
             const result = await client.callTool({
@@ -736,9 +736,10 @@ export function createIntegrationTestsSuite(
                 arguments: { actor: nonExistentActor },
             });
             expect(result).toBeDefined();
+            expect(result.isError).toBe(true);
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
-            expect(content[0].text).toContain('no tools were added');
+            expect(content[0].text).toContain('was not found');
         });
 
         it.runIf(options.transport === 'streamable-http')(
@@ -750,6 +751,7 @@ export function createIntegrationTestsSuite(
                     arguments: { actor: 'apify/rag-web-browser' },
                 });
                 expect(result).toBeDefined();
+                expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content.length).toBeGreaterThan(0);
                 expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');

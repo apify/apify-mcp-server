@@ -467,6 +467,7 @@ export class ActorsMcpServer {
         const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient, {
             actorStore: this.actorStore,
             ...(this.options.paymentProvider && { paymentProvider: this.options.paymentProvider }),
+            throwOnError: true,
         });
         if (actorTools.length > 0) {
             this.upsertTools(actorTools, true);

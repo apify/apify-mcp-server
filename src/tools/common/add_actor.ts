@@ -2,10 +2,8 @@ import { z } from 'zod';
 
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
-import { actorDefinitionPrunedCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { fixActorNameInput } from '../core/actor_tools_factory.js';
 
 export const addToolArgsSchema = z.object({
     actor: z.string()
@@ -49,44 +47,29 @@ USAGE EXAMPLES:
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
-        const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
-        /**
-         * If no tools were found, return a message that the Actor was not found
-         * instead of returning that non-existent tool was added since the
-         * loadActorsAsTools method returns an empty array and does not throw an error.
-         */
-        if (tools.length === 0) {
-            // Check cache to see if the Actor exists but was filtered out as a standby Actor in payment mode
-            const normalizedName = fixActorNameInput(parsed.actor);
-            const cached = actorDefinitionPrunedCache.get(normalizedName);
-            if (cached?.info?.actorStandby?.isEnabled && apifyMcpServer.options.paymentProvider) {
-                return {
-                    content: [{
-                        type: 'text',
-                        text: `Actor "${parsed.actor}" is a standby Actor, which is not supported in agentic payment mode.`,
-                    }],
-                };
-            }
+        try {
+            const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
+            await sendNotification({ method: 'notifications/tools/list_changed' });
 
             return {
                 content: [{
                     type: 'text',
-                    text: `Actor ${parsed.actor} not found, no tools were added.`,
+                    text: `Actor ${parsed.actor} has been added. Newly available tools: ${
+                        tools.map(
+                            (t: ToolEntry) => `${t.name}`,
+                        ).join(', ')
+                    }.`,
                 }],
             };
+        } catch (error) {
+            const errMsg = error instanceof Error ? error.message : String(error);
+            return {
+                content: [{
+                    type: 'text',
+                    text: errMsg,
+                }],
+                isError: true,
+            };
         }
-
-        await sendNotification({ method: 'notifications/tools/list_changed' });
-
-        return {
-            content: [{
-                type: 'text',
-                text: `Actor ${parsed.actor} has been added. Newly available tools: ${
-                    tools.map(
-                        (t: ToolEntry) => `${t.name}`,
-                    ).join(', ')
-                }.`,
-            }],
-        };
     },
 } as const);
