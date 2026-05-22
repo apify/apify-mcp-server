@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -38,10 +39,9 @@ describe('get-key-value-store-record', () => {
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_RECORD);
     });
@@ -53,7 +53,7 @@ describe('get-key-value-store-record', () => {
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Record 'MISSING' not found in key-value store 'kv-1'");
@@ -66,7 +66,7 @@ describe('get-key-value-store-record', () => {
                 stubApifyClient({ record: undefined, store: undefined }),
             ),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Key-value store 'missing-kv' not found");

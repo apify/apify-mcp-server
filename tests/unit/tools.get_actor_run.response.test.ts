@@ -11,6 +11,7 @@ import {
 } from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
@@ -330,11 +331,7 @@ describe('get-actor-run default response', () => {
         } as unknown as InternalToolArgs['apifyClient'];
 
         const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
-        const { content, structuredContent, isError } = result as {
-            content: { text: string }[];
-            structuredContent: RunResponse;
-            isError?: boolean;
-        };
+        const { content, structuredContent, isError } = result as TextToolResult & { structuredContent: RunResponse };
 
         // The whole call must NOT hard-fail just because one metadata fetch errored.
         expect(isError).not.toBe(true);
@@ -448,7 +445,7 @@ describe('get-actor-run default response', () => {
         } as unknown as InternalToolArgs['apifyClient'];
         const result = await (defaultGetActorRun as HelperTool).call(
             callArgs(client, { runId: 'missing', waitSecs: 0 }),
-        ) as { isError?: boolean; content: { text: string }[] };
+        ) as TextToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('not found');
     });

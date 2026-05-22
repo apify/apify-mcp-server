@@ -39,14 +39,14 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-        const store = await client.keyValueStore(parsed.keyValueStoreId).get();
-        if (!store) {
+        const kvStore = await client.keyValueStore(parsed.keyValueStoreId).get();
+        if (!kvStore) {
             return buildMCPResponse({
                 texts: [`Key-value store '${parsed.keyValueStoreId}' not found.`],
                 isError: true,
                 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(store)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(kvStore)}\n\`\`\`` }] };
     },
 } as const);

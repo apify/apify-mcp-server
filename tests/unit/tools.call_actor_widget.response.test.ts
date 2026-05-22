@@ -4,6 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
+import type { TextToolResult } from '../helpers.js';
 
 /**
  * Apps / UI mode: call-actor-widget starts the run and renders an interactive UI element
@@ -169,7 +170,7 @@ describe('call-actor-widget response', () => {
             apifyClient,
         ));
 
-        const { content, isError } = result as { content: { type: string; text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
         expect(isError).toBe(true);
         expect(startSpy).not.toHaveBeenCalled();
         const joined = content.map((c) => c.text).join(' ');

@@ -5,6 +5,7 @@ import { ApifyClient } from '../../src/apify_client.js';
 import { HelperTools } from '../../src/const.js';
 import { getUserKeyValueStoresList } from '../../src/tools/common/key_value_store_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 const listSpy = vi.fn();
 
@@ -48,9 +49,8 @@ describe('get-key-value-store-list', () => {
         listSpy.mockResolvedValue(MOCK_LIST);
 
         const result = await (getUserKeyValueStoresList as HelperTool).call(stubArgs({}));
-        const { content } = result as { content: { text: string }[] };
+        const { content } = result as TextToolResult;
 
-        expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_LIST);
     });

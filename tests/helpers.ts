@@ -2,11 +2,20 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
 import type { TelemetryEnv, ToolCategory } from '../src/types.js';
+
+/**
+ * `CallToolResult` narrowed to text-only content. All current internal tools
+ * emit text content, so tests cast results to this shape to avoid the
+ * `content[i]` union (text | image | audio | resource_link | resource).
+ */
+export type TextToolResult = Omit<CallToolResult, 'content'> & {
+    content: Extract<CallToolResult['content'][number], { type: 'text' }>[];
+};
 
 export type McpClientOptions = {
     actors?: string[];

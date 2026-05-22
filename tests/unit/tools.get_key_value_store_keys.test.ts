@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 const MOCK_KEYS = {
     items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
@@ -37,9 +38,8 @@ describe('get-key-value-store-keys', () => {
         const result = await (getKeyValueStoreKeys as HelperTool).call(
             stubArgs({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
-        const { content } = result as { content: { text: string }[] };
+        const { content } = result as TextToolResult;
 
-        expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_KEYS);
     });

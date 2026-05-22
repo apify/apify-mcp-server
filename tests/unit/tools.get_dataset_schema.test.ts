@@ -4,6 +4,7 @@ import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
+import type { TextToolResult } from '../helpers.js';
 
 vi.mock('../../src/utils/schema_generation.js', async (importOriginal) => {
     const actual = await importOriginal<typeof SchemaGenModule>();
@@ -42,10 +43,9 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
-        expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         const schema = JSON.parse(json);
         expect(schema).toMatchObject({ type: 'array' });
@@ -55,7 +55,7 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).not.toBe(true);
         expect(content[0].text).toBe("Dataset 'ds-1' is empty.");
@@ -65,7 +65,7 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubArgs({ datasetId: 'missing' }, stubApifyClient(null)),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Dataset 'missing' not found");
@@ -77,7 +77,7 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");

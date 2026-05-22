@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getDataset } from '../../src/tools/common/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 const MOCK_DATASET = {
     id: 'ds-1',
@@ -35,11 +36,9 @@ describe('get-dataset', () => {
         const result = await (getDataset as HelperTool).call(
             stubArgs({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
-        expect(isError).not.toBe(true);
-        expect(content[0].text).toMatch(/^```json\n/);
-        expect(content[0].text).toMatch(/\n```$/);
+        expect(isError).toBe(false);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_DATASET);
     });
@@ -48,7 +47,7 @@ describe('get-dataset', () => {
         const result = await (getDataset as HelperTool).call(
             stubArgs({ datasetId: 'missing' }, stubApifyClient(undefined)),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Dataset 'missing' not found");

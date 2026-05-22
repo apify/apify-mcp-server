@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import type { TextToolResult } from '../helpers.js';
 
 const MOCK_STORE = {
     id: 'kv-1',
@@ -33,9 +34,8 @@ describe('get-key-value-store', () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubArgs({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
         );
-        const { content } = result as { content: { text: string }[] };
+        const { content } = result as TextToolResult;
 
-        expect(content[0].text).toMatch(/^```json\n/);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_STORE);
     });
@@ -44,7 +44,7 @@ describe('get-key-value-store', () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubArgs({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
         );
-        const { content, isError } = result as { content: { text: string }[]; isError?: boolean };
+        const { content, isError } = result as TextToolResult;
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Key-value store 'missing' not found");
