@@ -16,6 +16,22 @@ Eliminate test-code duplication between the two repos while still covering every
 
 A package regression that internal depends on surfaces at the version bump — the right moment, with clear blame.
 
+### When in doubt, keep the test
+
+mcp.apify.com serves thousands of users. If something silently breaks there, it's a P0. A duplicated test costs us a CI minute and some maintenance drag. We pay the drag.
+
+The hosted server wraps the package with extra code — auth check, rate limiter, Caddy load balancer, response handlers. Any of that extra code can change, drop, or delay something the package produced. The package's own tests don't see that wrapping, so they can't catch it.
+
+Duplication does cost us. The two repos get more tightly coupled, fixture renames have to happen in two places, refactors get harder. We accept all of that. It still beats finding out from a user that auth stripped `_meta`, or that the load balancer is batching live update notifications, or that the rate limiter ate a long-running run's status poll.
+
+So the migration's default is **keep**, not **delete**. A test moves to **DROP** only when all three of these hold:
+
+1. There is a named, equivalent test in public — same setup, same assertions. Not just "covers the same area."
+2. None of the extra hosted code (auth, rate limiter, load balancer, response handlers) can plausibly change or drop the thing being asserted.
+3. If the public test ever quietly disappears, we'll find out fast — a TypeScript error when we bump the package, or a nearby contract test that fails first.
+
+Anything that doesn't clear all three stays in internal as a contract test. The downside of being wrong is much bigger than the cost of an extra test, so the rule leans the same way.
+
 ## Layers
 
 The system has four layers. Each layer has one owner; tests for a layer live with its owner.
@@ -75,7 +91,7 @@ One test per consumed behavior, with a one-line comment naming both the behavior
 
 1. Does the code under test require IAM, Redis, the rate-limiter, multi-node coordination, or a non-MCP hosted route to make sense? → internal (layer 3 or 4). Stop.
 2. Otherwise the implementation is in the package → public (layer 1 or 2).
-3. **Additionally**, if internal's middleware sits between the wire and this behavior in a way that could plausibly break or strip it → internal also writes a contract smoke test. Default to "no contract test" unless there's a concrete risk story.
+3. **Then** ask: does any of the hosted server's extra code (auth, rate limiter, load balancer, response handlers) sit between the HTTP request and this behavior? If yes — or if you're not sure — internal also writes a small smoke test for it. Default is to write one; skip only when none of that code can touch the behavior.
 
 ## Target structure
 
@@ -92,8 +108,8 @@ One test per consumed behavior, with a one-line comment naming both the behavior
 
 ## Acceptance
 
-- No test in internal exercises pure package logic. Layer-2 behaviors appear only as contract tests with a middleware-risk justification in the test comment.
-- Every contract test has a one-line comment naming the consumed behavior and (if layer-2) the middleware risk.
+- A migration matrix (in this doc) lists every existing internal test and assigns it to **DROP / CONTRACT / HOSTED** with a one-line justification. Every **DROP** row names the equivalent public test it relies on.
+- Every contract test has a one-line comment naming the consumed behavior and the middleware risk it guards against.
 - Every hosted test references a layer-3 behavior in its name or comment.
 - `pnpm run test:integration` and `pnpm run test:multinode` both pass.
 
