@@ -2865,6 +2865,27 @@ export function createIntegrationTestsSuite(
 
         // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
         it.runIf(options.transport === 'streamable-http')(
+            'should return error when calling a standby Actor via call-actor in x402 payment mode',
+            async () => {
+                client = await createClientFn({ payment: 'x402' });
+                const result = await client.callTool({
+                    name: 'call-actor',
+                    arguments: {
+                        actor: 'apify/rag-web-browser',
+                        input: { query: 'test' },
+                    },
+                });
+                expect(result).toBeDefined();
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain('standby Actor and cannot be accessed using a third-party payment provider');
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
             'should return x402 payment error when calling paymentRequired tool without payment signature',
             async () => {
                 client = await createClientFn({ tools: ['actors'], payment: 'x402' });

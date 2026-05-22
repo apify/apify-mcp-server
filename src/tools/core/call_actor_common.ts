@@ -25,6 +25,8 @@ import { actorNameToToolName } from '../utils.js';
 import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
+import { actorDefinitionPrunedCache } from '../../state.js';
+import { getActorDefinition } from '../build.js';
 
 // ---------------------------------------------------------------------------
 // Shared call-actor description building blocks
@@ -497,12 +499,21 @@ export async function callActorPreExecute(
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = !!mcpServerUrlOrFalse;
 
+    let actorDefinitionWithInfo = actorDefinitionPrunedCache.get(baseActorName);
+    if (!actorDefinitionWithInfo) {
+        actorDefinitionWithInfo = await getActorDefinition(baseActorName, apifyClientForDefinition);
+        if (actorDefinitionWithInfo) {
+            actorDefinitionPrunedCache.set(baseActorName, actorDefinitionWithInfo);
+        }
+    }
+    const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;
+
     // Standby Actors (MCPs) are not supported with external payment providers (like Skyfire or x402)
-    if (isActorMcpServer && apifyMcpServer.options.paymentProvider) {
+    if ((isStandbyActor || isActorMcpServer) && apifyMcpServer.options.paymentProvider) {
         return {
             earlyResponse: buildMCPResponse({
                 texts: [dedent`
-                    This Actor (${parsed.actor}) is an MCP server and cannot be accessed using a third-party payment provider.
+                    This Actor (${parsed.actor}) is a standby Actor and cannot be accessed using a third-party payment provider.
                     To use this Actor, please provide a valid Apify token instead.
                 `],
                 isError: true,
