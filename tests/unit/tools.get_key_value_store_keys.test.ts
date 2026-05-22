@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_KEYS = {
     items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
@@ -20,23 +20,12 @@ function stubApifyClient(listKeysSpy: ReturnType<typeof vi.fn>): InternalToolArg
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-key-value-store-keys', () => {
     it('returns the keys response as JSON in a fenced code block', async () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubArgs({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
         );
         const { content } = result as TextToolResult;
 
@@ -48,7 +37,7 @@ describe('get-key-value-store-keys', () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
         await (getKeyValueStoreKeys as HelperTool).call(
-            stubArgs(
+            stubToolCallContext(
                 { keyValueStoreId: 'kv-1', exclusiveStartKey: 'data.json', limit: 5 },
                 stubApifyClient(listKeysSpy),
             ),

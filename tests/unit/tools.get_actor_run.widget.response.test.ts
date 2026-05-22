@@ -4,6 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
 import type { RunResponse } from '../../src/tools/core/actor_run_response.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { stubToolCallContext } from '../helpers.js';
 
 /**
  * Apps / UI mode: get-actor-run-widget renders an interactive UI element (widget)
@@ -35,21 +36,10 @@ function stubApifyClient(): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: stubApifyClient(),
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-actor-run-widget response', () => {
     it('returns structured content and widget _meta on the response', async () => {
         const result = await (getActorRunWidgetTool as HelperTool).call(
-            stubArgs({ runId: 'run-widget-1' }),
+            stubToolCallContext({ runId: 'run-widget-1' }, stubApifyClient()),
         );
 
         const { structuredContent, content, _meta } = result as {

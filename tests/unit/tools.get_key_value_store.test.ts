@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_STORE = {
     id: 'kv-1',
@@ -18,21 +18,10 @@ function stubApifyClient(store: unknown): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-key-value-store', () => {
     it('returns store metadata as JSON in a fenced code block', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
-            stubArgs({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
         );
         const { content } = result as TextToolResult;
 
@@ -42,7 +31,7 @@ describe('get-key-value-store', () => {
 
     it('returns isError with a not-found message when the store does not exist', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
-            stubArgs({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
+            stubToolCallContext({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
         );
         const { content, isError } = result as TextToolResult;
 

@@ -1,7 +1,6 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -51,9 +50,8 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getUserDatasetsListArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
         const datasets = await client.datasets().list({
             limit: parsed.limit,
             offset: parsed.offset,

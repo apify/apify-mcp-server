@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getDataset } from '../../src/tools/common/get_dataset.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_DATASET = {
     id: 'ds-1',
@@ -20,32 +20,21 @@ function stubApifyClient(dataset: unknown): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-dataset', () => {
     it('returns dataset metadata as JSON in a fenced code block', async () => {
         const result = await (getDataset as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(MOCK_DATASET)),
         );
         const { content, isError } = result as TextToolResult;
 
-        expect(isError).toBe(false);
+        expect(isError).not.toBe(true);
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
         expect(JSON.parse(json)).toEqual(MOCK_DATASET);
     });
 
     it('returns isError with a not-found message when the dataset does not exist', async () => {
         const result = await (getDataset as HelperTool).call(
-            stubArgs({ datasetId: 'missing' }, stubApifyClient(undefined)),
+            stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(undefined)),
         );
         const { content, isError } = result as TextToolResult;
 

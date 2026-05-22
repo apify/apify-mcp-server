@@ -4,7 +4,7 @@ import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 vi.mock('../../src/utils/schema_generation.js', async (importOriginal) => {
     const actual = await importOriginal<typeof SchemaGenModule>();
@@ -27,21 +27,10 @@ function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyCli
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-dataset-schema', () => {
     it('returns a JSON schema in a fenced code block on the happy path', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
         const { content, isError } = result as TextToolResult;
 
@@ -53,7 +42,7 @@ describe('get-dataset-schema', () => {
 
     it('returns a plain "is empty" message when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
         );
         const { content, isError } = result as TextToolResult;
 
@@ -63,7 +52,7 @@ describe('get-dataset-schema', () => {
 
     it('returns isError with a not-found message when listItems returns no response', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
-            stubArgs({ datasetId: 'missing' }, stubApifyClient(null)),
+            stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(null)),
         );
         const { content, isError } = result as TextToolResult;
 
@@ -75,7 +64,7 @@ describe('get-dataset-schema', () => {
         vi.mocked(generateSchemaFromItems).mockReturnValueOnce(null);
 
         const result = await (getDatasetSchema as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
         const { content, isError } = result as TextToolResult;
 

@@ -4,7 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 /**
  * Apps / UI mode: call-actor-widget starts the run and renders an interactive UI element
@@ -54,17 +54,6 @@ function stubApifyClient(startSpy: (input: unknown, opts: unknown) => Promise<ty
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, apifyClient: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('call-actor-widget response', () => {
     beforeEach(() => {
         vi.mocked(getActorMcpUrlCached).mockReset();
@@ -77,7 +66,7 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn().mockResolvedValue(MOCK_RUN);
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(stubArgs(
+        const result = await (appsCallActorWidget as HelperTool).call(stubToolCallContext(
             { actor: 'apify/rag-web-browser', input: { query: 'test' } },
             apifyClient,
         ));
@@ -165,7 +154,7 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn();
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(stubArgs(
+        const result = await (appsCallActorWidget as HelperTool).call(stubToolCallContext(
             { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
             apifyClient,
         ));

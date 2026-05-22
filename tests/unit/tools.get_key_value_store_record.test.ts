@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import type { TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
@@ -20,21 +20,10 @@ function stubApifyClient(opts: {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-key-value-store-record', () => {
     it('returns the record as JSON in a fenced code block', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubArgs(
+            stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'INPUT' },
                 stubApifyClient({ record: MOCK_RECORD }),
             ),
@@ -48,7 +37,7 @@ describe('get-key-value-store-record', () => {
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubArgs(
+            stubToolCallContext(
                 { keyValueStoreId: 'kv-1', recordKey: 'MISSING' },
                 stubApifyClient({ record: undefined, store: MOCK_STORE }),
             ),
@@ -61,7 +50,7 @@ describe('get-key-value-store-record', () => {
 
     it('returns isError "store not found" when both getRecord and store get are undefined', async () => {
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubArgs(
+            stubToolCallContext(
                 { keyValueStoreId: 'missing-kv', recordKey: 'INPUT' },
                 stubApifyClient({ record: undefined, store: undefined }),
             ),

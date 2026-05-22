@@ -10,8 +10,18 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/** Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`. */
-export function deriveFlattenFromFields(fields: string[]): string[] {
+/**
+ * Extract top-level dot prefixes from nested field paths. Only the first prefix
+ * is needed — Apify's `flatten` parameter recurses through nested objects, so
+ * `flatten=a` already produces `a.b.c` keys at any depth.
+ *
+ * Examples:
+ *   ["metadata.url", "crawl.statusCode"] → ["metadata", "crawl"]
+ *   ["metadata.url", "metadata.title"] → ["metadata"]  (deduplicated)
+ *   ["a.b.c", "a.x"] → ["a"] (flatten recurses)
+ *   ["title", "url"] → [] (top-level fields need no flatten)
+ */
+export function extractDotPrefixes(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
         const dotIndex = field.indexOf('.');
@@ -83,7 +93,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const omit = parseCommaSeparatedList(parsed.omit);
         const flatten = parsed.flatten !== undefined
             ? parseCommaSeparatedList(parsed.flatten)
-            : deriveFlattenFromFields(fields);
+            : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const v = await client.dataset(parsed.datasetId).listItems({

@@ -1,19 +1,9 @@
-// dataset_collection.ts constructs its own ApifyClient from apifyToken, so we mock the module.
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { ApifyClient } from '../../src/apify_client.js';
 import { HelperTools } from '../../src/const.js';
 import { getUserDatasetsList } from '../../src/tools/common/dataset_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import type { TextToolResult } from '../helpers.js';
-
-const listSpy = vi.fn();
-
-vi.mock('../../src/apify_client.js', () => ({
-    ApifyClient: vi.fn().mockImplementation(() => ({
-        datasets: () => ({ list: listSpy }),
-    })),
-}));
+import { stubToolCallContext, type TextToolResult } from '../helpers.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -24,31 +14,21 @@ const MOCK_LIST = {
     items: [{ id: 'ds-1', name: 'a' }, { id: 'ds-2', name: 'b' }],
 };
 
-function stubArgs(args: Record<string, unknown>): InternalToolArgs {
+function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['apifyClient'] {
     return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: {} as InternalToolArgs['apifyClient'],
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
+        datasets: () => ({ list: listSpy }),
+    } as unknown as InternalToolArgs['apifyClient'];
 }
 
 describe('get-dataset-list', () => {
-    beforeEach(() => {
-        listSpy.mockReset();
-        vi.mocked(ApifyClient).mockClear();
-    });
-
     it('has the expected tool name', () => {
         expect(getUserDatasetsList.name).toBe(HelperTools.DATASET_LIST_GET);
     });
 
     it('returns the list response as JSON in a fenced code block', async () => {
-        listSpy.mockResolvedValue(MOCK_LIST);
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        const result = await (getUserDatasetsList as HelperTool).call(stubArgs({}));
+        const result = await (getUserDatasetsList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
         const { content } = result as TextToolResult;
 
         const json = content[0].text.replace(/^```json\n/, '').replace(/\n```$/, '');
@@ -56,32 +36,24 @@ describe('get-dataset-list', () => {
     });
 
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
-        listSpy.mockResolvedValue(MOCK_LIST);
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserDatasetsList as HelperTool).call(stubArgs({
+        await (getUserDatasetsList as HelperTool).call(stubToolCallContext({
             limit: 5,
             offset: 10,
             desc: true,
             unnamed: true,
-        }));
+        }, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 5, offset: 10, desc: true, unnamed: true });
     });
 
     it('applies defaults (limit=10, offset=0, desc=false, unnamed=false) when no params given', async () => {
-        listSpy.mockResolvedValue(MOCK_LIST);
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserDatasetsList as HelperTool).call(stubArgs({}));
+        await (getUserDatasetsList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
-    });
-
-    it('constructs ApifyClient with the user-provided token', async () => {
-        listSpy.mockResolvedValue(MOCK_LIST);
-
-        await (getUserDatasetsList as HelperTool).call(stubArgs({}));
-
-        expect(ApifyClient).toHaveBeenCalledWith({ token: 'test-token' });
     });
 
     it('rejects limit above 20 via ajv validation', () => {

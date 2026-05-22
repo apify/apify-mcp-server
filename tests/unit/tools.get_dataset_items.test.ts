@@ -1,38 +1,39 @@
 import { describe, expect, it } from 'vitest';
 
-import { deriveFlattenFromFields, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
+import { extractDotPrefixes, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { stubToolCallContext } from '../helpers.js';
 
-describe('deriveFlattenFromFields', () => {
+describe('extractDotPrefixes', () => {
     it('returns empty list when no fields contain a dot', () => {
-        expect(deriveFlattenFromFields(['title', 'url'])).toEqual([]);
+        expect(extractDotPrefixes(['title', 'url'])).toEqual([]);
     });
 
     it('extracts unique top-level prefixes from dot-notation fields', () => {
-        expect(deriveFlattenFromFields(['metadata.url', 'crawl.statusCode', 'title']))
+        expect(extractDotPrefixes(['metadata.url', 'crawl.statusCode', 'title']))
             .toEqual(['metadata', 'crawl']);
     });
 
     it('deduplicates repeated prefixes', () => {
-        expect(deriveFlattenFromFields(['metadata.url', 'metadata.title']))
+        expect(extractDotPrefixes(['metadata.url', 'metadata.title']))
             .toEqual(['metadata']);
     });
 
     it('handles mixed deep and shallow paths', () => {
-        expect(deriveFlattenFromFields(['a.b.c', 'a.x', 'd']))
+        expect(extractDotPrefixes(['a.b.c', 'a.x', 'd']))
             .toEqual(['a']);
     });
 
     it('returns empty list for empty input', () => {
-        expect(deriveFlattenFromFields([])).toEqual([]);
+        expect(extractDotPrefixes([])).toEqual([]);
     });
 
     it('skips fields with leading dot (no top-level prefix)', () => {
-        expect(deriveFlattenFromFields(['.a', '.b.c'])).toEqual([]);
+        expect(extractDotPrefixes(['.a', '.b.c'])).toEqual([]);
     });
 
     it('extracts the prefix from fields with a trailing dot', () => {
-        expect(deriveFlattenFromFields(['a.', 'b.c'])).toEqual(['a', 'b']);
+        expect(extractDotPrefixes(['a.', 'b.c'])).toEqual(['a', 'b']);
     });
 });
 
@@ -49,21 +50,10 @@ function stubApifyClient(returnTotal = 1): InternalToolArgs['apifyClient'] {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function stubArgs(args: Record<string, unknown>): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: stubApifyClient(),
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-dataset-items structuredContent', () => {
     it('echoes the default `limit` of 20 when caller did not provide one', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1' }),
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
@@ -74,7 +64,7 @@ describe('get-dataset-items structuredContent', () => {
 
     it('echoes the caller-provided `limit` in structuredContent', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubArgs({ datasetId: 'ds-1', limit: 10 }),
+            stubToolCallContext({ datasetId: 'ds-1', limit: 10 }, stubApifyClient()),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 

@@ -6,7 +6,7 @@ import type { CallToolResult, ClientCapabilities } from '@modelcontextprotocol/s
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { TelemetryEnv, ToolCategory } from '../src/types.js';
+import type { InternalToolArgs, TelemetryEnv, ToolCategory } from '../src/types.js';
 
 /**
  * `CallToolResult` narrowed to text-only content. All current internal tools
@@ -16,6 +16,22 @@ import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 export type TextToolResult = Omit<CallToolResult, 'content'> & {
     content: Extract<CallToolResult['content'][number], { type: 'text' }>[];
 };
+
+/**
+ * Build a minimal `InternalToolArgs` for unit tests. Stubs the fields tools
+ * don't read (`extra`, `mcpServer`, `apifyMcpServer`) and lets each test inject
+ * `args` and a partial `apifyClient`.
+ */
+export function stubToolCallContext(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
+    return {
+        args,
+        apifyToken: 'test-token',
+        apifyClient: client,
+        extra: {} as InternalToolArgs['extra'],
+        mcpServer: {} as InternalToolArgs['mcpServer'],
+        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
+    } as InternalToolArgs;
+}
 
 export type McpClientOptions = {
     actors?: string[];
