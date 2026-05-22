@@ -21,7 +21,7 @@ import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { ServerMode, ToolCategory, ToolEntry } from '../../src/types.js';
 import { getExpectedToolNamesByCategories } from '../../src/utils/tool_categories_helpers.js';
 import { AUTO_INJECTED_TOOLS } from '../../src/utils/tools_loader.js';
-import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE_TEST, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
+import { ACTOR_EXAMPLE_MCP_SERVER, ACTOR_NORMAL_MODE, DEFAULT_ACTOR_NAMES, getDefaultToolNames } from '../const.js';
 import { addActor, type McpClientOptions } from '../helpers.js';
 import { assertStatusMessagePropagated, captureInflightActorRunId, waitForRunAborted } from './utils/task_waits.js';
 
@@ -345,12 +345,12 @@ export function createIntegrationTestsSuite(
         });
 
         it('should return tool with execution field when listing tools with apify/normal-mode-test-actor', async () => {
-            const actors = [ACTOR_NORMAL_MODE_TEST];
+            const actors = [ACTOR_NORMAL_MODE];
             client = await createClientFn({ tools: actors });
             const tools = await client.listTools();
 
             // Find the tool for apify/normal-mode-test-actor
-            const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE_TEST));
+            const normalModeTool = tools.tools.find((tool) => tool.name === actorNameToToolName(ACTOR_NORMAL_MODE));
             expect(normalModeTool).toBeDefined();
 
             // Verify the tool contains the execution field (as returned by getToolPublicFieldOnly)
@@ -470,19 +470,19 @@ export function createIntegrationTestsSuite(
         });
 
         it('should not load any internal tools when tools param is empty and use custom Actor if specified', async () => {
-            client = await createClientFn({ tools: [], actors: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [], actors: [ACTOR_NORMAL_MODE] });
 
             const names = getToolNames(await client.listTools());
             // Actor tool triggers storage/abort helpers; default mode skips get-actor-run for actor tools.
             expect(names.length).toEqual(1 + AUTO_INJECTED_TOOL_NAMES.length);
-            expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE_TEST));
+            expect(names).toContain(actorNameToToolName(ACTOR_NORMAL_MODE));
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
 
             await client.close();
         });
 
         it('should add Actor dynamically and call it directly', async () => {
-            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE_TEST);
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             client = await createClientFn({ enableAddingActors: true });
             const names = getToolNames(await client.listTools());
             expect(names).toHaveLength(1 + AUTO_INJECTED_TOOL_NAMES.length);
@@ -490,7 +490,7 @@ export function createIntegrationTestsSuite(
             expectToolNamesToContain(names, AUTO_INJECTED_TOOL_NAMES);
             expect(names).not.toContain(selectedToolName);
             // Add Actor dynamically
-            await addActor(client, ACTOR_NORMAL_MODE_TEST);
+            await addActor(client, ACTOR_NORMAL_MODE);
 
             // add-actor + auto-injected + newly added actor
             const namesAfterAdd = getToolNames(await client.listTools());
@@ -501,7 +501,7 @@ export function createIntegrationTestsSuite(
         });
 
         it('should call Actor dynamically via generic call-actor tool without need to add it first', async () => {
-            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE_TEST);
+            const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
             client = await createClientFn({ enableAddingActors: true, tools: ['actors'] });
             const names = getToolNames(await client.listTools());
             // actors category + add-actor + get-actor-run + auto-injected storage/abort helpers
@@ -516,7 +516,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: {
                         firstNumber: 1,
                         secondNumber: 2,
@@ -542,7 +542,7 @@ export function createIntegrationTestsSuite(
             await expect(client!.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                 },
             })).rejects.toThrow(/must have required property 'input'/);
 
@@ -550,7 +550,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                 },
             });
@@ -563,7 +563,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     // Max wait (45s) so the test does not flake on a slow run.
                     waitSecs: 45,
@@ -586,7 +586,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
@@ -606,7 +606,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     previewOutput: false,
                     waitSecs: 45,
@@ -625,7 +625,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     callOptions: { maxItems: 3 },
                     waitSecs: 45,
@@ -647,7 +647,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 45,
                 },
@@ -680,7 +680,7 @@ export function createIntegrationTestsSuite(
                 },
             });
             const content = result.content as { text: string }[];
-            expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE_TEST))).toBe(true);
+            expect(content.some((item) => item.text.includes(ACTOR_NORMAL_MODE))).toBe(true);
         });
 
         // Upstream-contract canary: apify-core's `AGENT_SAFE_PRICING_MODELS` filter
@@ -718,7 +718,7 @@ export function createIntegrationTestsSuite(
                 }
             });
             // Add Actor dynamically
-            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE_TEST } });
+            await client.callTool({ name: HelperTools.ACTOR_ADD, arguments: { actor: ACTOR_NORMAL_MODE } });
 
             expect(hasReceivedNotification).toBe(true);
         });
@@ -923,7 +923,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                 },
             });
 
@@ -941,7 +941,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -969,7 +969,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: true,
                         stats: true,
@@ -1024,7 +1024,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1083,7 +1083,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: toolName,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: true,
                         stats: false,
@@ -1112,7 +1112,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1144,7 +1144,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1176,7 +1176,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: 'fetch-actor-details',
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: true,
                         readme: true,
@@ -1194,7 +1194,7 @@ export function createIntegrationTestsSuite(
             expect(allText).toMatch(/# README summary|# README/);
             expect(allText).toContain('Input schema');
 
-            expectReadmeInStructuredContent(result, ACTOR_NORMAL_MODE_TEST);
+            expectReadmeInStructuredContent(result, ACTOR_NORMAL_MODE);
 
             validateStructuredOutput(result, findToolByName(HelperTools.ACTOR_GET_DETAILS, 'default')?.outputSchema, 'fetch-actor-details');
         });
@@ -1209,7 +1209,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: 'fetch-actor-details-widget',
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                 },
             });
 
@@ -1239,7 +1239,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                 },
             });
 
@@ -1259,7 +1259,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: true,
                         stats: true,
@@ -1298,7 +1298,7 @@ export function createIntegrationTestsSuite(
             const pricingOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1330,7 +1330,7 @@ export function createIntegrationTestsSuite(
             const ratingOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1363,7 +1363,7 @@ export function createIntegrationTestsSuite(
             const metadataOnlyResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1394,7 +1394,7 @@ export function createIntegrationTestsSuite(
             const combinationResult = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     output: {
                         description: false,
                         stats: false,
@@ -1435,7 +1435,7 @@ export function createIntegrationTestsSuite(
                 tools: ['actors'],
             });
 
-            const testActor = ACTOR_NORMAL_MODE_TEST;
+            const testActor = ACTOR_NORMAL_MODE;
 
             // Define all output options with their expected markers in text
             const outputOptions = [
@@ -1693,7 +1693,7 @@ export function createIntegrationTestsSuite(
         // response after cancel, no runId in progress notifications), so we race the Apify API
         // for the just-started run while the call is in flight, then trigger the cancel.
         it.runIf(options.transport === 'streamable-http')('should abort actor run on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = ACTOR_NORMAL_MODE_TEST;
+            const ACTOR_NAME = ACTOR_NORMAL_MODE;
             const selectedToolName = actorNameToToolName(ACTOR_NAME);
             client = await createClientFn({ enableAddingActors: true });
             await addActor(client, ACTOR_NAME);
@@ -1723,7 +1723,7 @@ export function createIntegrationTestsSuite(
         });
 
         it.runIf(options.transport === 'streamable-http')('should abort call-actor tool on notifications/cancelled', { retry: 1 }, async () => {
-            const ACTOR_NAME = ACTOR_NORMAL_MODE_TEST;
+            const ACTOR_NAME = ACTOR_NORMAL_MODE;
             client = await createClientFn({ tools: ['actors'] });
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
@@ -1838,7 +1838,7 @@ export function createIntegrationTestsSuite(
                 const callResult = await setupClient.callTool({
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_NORMAL_MODE_TEST,
+                        actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
                     },
                 });
@@ -1908,7 +1908,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: 'call-actor',
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                 },
             });
@@ -2044,7 +2044,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
@@ -2100,7 +2100,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 3, secondNumber: 4 },
                 },
             });
@@ -2228,11 +2228,11 @@ export function createIntegrationTestsSuite(
 
         // TODO: if we add more streamable task tool call tests it might be worth it to abstract the common logic but now it's not worth it
         it('should be able to call a long running task tool call', async () => {
-            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE),
                     // waitSeconds keeps the run open long enough to emit taskStatus updates.
                     arguments: {
                         firstNumber: 1,
@@ -2283,11 +2283,11 @@ export function createIntegrationTestsSuite(
         });
 
         it('should be able to call a long running task and list it, get the status and then separately retrieve the result', async () => {
-            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE),
                     // waitSeconds keeps the run open long enough to observe `working` status.
                     arguments: {
                         firstNumber: 3,
@@ -2329,11 +2329,11 @@ export function createIntegrationTestsSuite(
         });
 
         it('should be able to call a long running task and then cancel it midway', async () => {
-            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE),
                     // waitSeconds keeps the run open long enough to cancel it mid-flight.
                     arguments: {
                         firstNumber: 5,
@@ -2366,10 +2366,10 @@ export function createIntegrationTestsSuite(
         // Without the chained AbortController, the task flips to `cancelled` but the underlying
         // Apify run keeps consuming compute until natural finish.
         it('should abort the Apify run when tasks/cancel is sent (direct actor tool)', { retry: 3 }, async () => {
-            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
             const api = new ApifyClient({ token: process.env.APIFY_TOKEN as string });
-            const actor = await api.actor(ACTOR_NORMAL_MODE_TEST).get();
+            const actor = await api.actor(ACTOR_NORMAL_MODE).get();
             expect(actor).toBeDefined();
             const actId = actor!.id as string;
 
@@ -2378,7 +2378,7 @@ export function createIntegrationTestsSuite(
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE),
                     // waitSeconds keeps the run open long enough to capture, cancel, and verify abort.
                     arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 60 },
                 },
@@ -2410,7 +2410,7 @@ export function createIntegrationTestsSuite(
                 {
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_NORMAL_MODE_TEST,
+                        actor: ACTOR_NORMAL_MODE,
                         input: {
                             firstNumber: 10,
                             secondNumber: 20,
@@ -2468,7 +2468,7 @@ export function createIntegrationTestsSuite(
                 {
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_NORMAL_MODE_TEST,
+                        actor: ACTOR_NORMAL_MODE,
                         // waitSeconds keeps the run open long enough for the polling
                         // interval to emit at least one statusMessage notification.
                         input: { firstNumber: 1, secondNumber: 2, waitSeconds: 10 },
@@ -2486,11 +2486,11 @@ export function createIntegrationTestsSuite(
         });
 
         it('should propagate statusMessage to tasks/get and tasks/list for actor tools in task mode', { retry: 1 }, async () => {
-            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE_TEST] });
+            client = await createClientFn({ tools: [ACTOR_NORMAL_MODE] });
 
             const stream = client.experimental.tasks.callToolStream(
                 {
-                    name: actorNameToToolName(ACTOR_NORMAL_MODE_TEST),
+                    name: actorNameToToolName(ACTOR_NORMAL_MODE),
                     // waitSeconds keeps the run open long enough for the polling
                     // interval to emit at least one statusMessage notification.
                     arguments: { firstNumber: 1, secondNumber: 2, waitSeconds: 10 },
@@ -2725,7 +2725,7 @@ export function createIntegrationTestsSuite(
                 const result = await client.callTool({
                     name: HelperTools.ACTOR_CALL,
                     arguments: {
-                        actor: ACTOR_NORMAL_MODE_TEST,
+                        actor: ACTOR_NORMAL_MODE,
                         input: { firstNumber: 1, secondNumber: 2 },
                     },
                 });
@@ -2745,7 +2745,7 @@ export function createIntegrationTestsSuite(
             const callResult = await client.callTool({
                 name: HelperTools.ACTOR_CALL,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                     input: { firstNumber: 1, secondNumber: 2 },
                     waitSecs: 0,
                 },
@@ -2844,7 +2844,7 @@ export function createIntegrationTestsSuite(
             const result = await client.callTool({
                 name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
                 arguments: {
-                    actor: ACTOR_NORMAL_MODE_TEST,
+                    actor: ACTOR_NORMAL_MODE,
                 },
             });
 

@@ -11,7 +11,7 @@ import { actorNameToToolName } from '../../src/tools/utils.js';
 import type { Input } from '../../src/types.js';
 import { ServerMode } from '../../src/types.js';
 import { loadToolsFromInput } from '../../src/utils/tools_loader.js';
-import { ACTOR_NORMAL_MODE_TEST } from '../const.js';
+import { ACTOR_NORMAL_MODE } from '../const.js';
 import { expectArrayWeakEquals } from '../helpers.js';
 
 beforeAll(() => {
@@ -28,19 +28,19 @@ describe('MCP server internals integration tests', () => {
         actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
-        const newTool = await getActorsAsTools([ACTOR_NORMAL_MODE_TEST], apifyClient);
+        const newTool = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
         actorsMcpServer.upsertTools(newTool);
 
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
         // enableAddingActors=true seeds add-actor + 3 auto-injected helpers (dataset, kv, abort);
-        // then ACTOR_NORMAL_MODE_TEST is added on top.
+        // then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
             addTool.name,
             'get-dataset-items',
             'get-key-value-store-record',
             'abort-actor-run',
-            ACTOR_NORMAL_MODE_TEST,
+            ACTOR_NORMAL_MODE,
         ];
         expectArrayWeakEquals(expectedToolNames, names);
 
@@ -73,7 +73,7 @@ describe('MCP server internals integration tests', () => {
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
-        const actor = ACTOR_NORMAL_MODE_TEST;
+        const actor = ACTOR_NORMAL_MODE;
         const newTool = await getActorsAsTools([actor], apifyClient);
         actorsMCPServer.upsertTools(newTool, true);
 
@@ -112,7 +112,7 @@ describe('MCP server internals integration tests', () => {
         actorsMCPServer.registerToolsChangedHandler(onToolsChanged);
 
         // Add a new Actor
-        const actor = ACTOR_NORMAL_MODE_TEST;
+        const actor = ACTOR_NORMAL_MODE;
         const newTool = await getActorsAsTools([actor], apifyClient);
         actorsMCPServer.upsertTools(newTool, true);
 
