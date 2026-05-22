@@ -1,6 +1,6 @@
 import type { ApifyClient } from '../apify_client.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../mcp/actors.js';
-import { mcpServerCache } from '../state.js';
+import { mcpServerCache, actorDefinitionPrunedCache } from '../state.js';
 import { getActorDefinition } from '../tools/build.js';
 import type { ActorDefinitionStorage, DatasetItem } from '../types.js';
 import { getValuesByDotKeys } from './generic.js';
@@ -22,6 +22,9 @@ export async function getActorMcpUrlCached(
 
     try {
         const actorDefinitionWithInfo = await getActorDefinition(actorIdOrName, apifyClient);
+        if (actorDefinitionWithInfo) {
+            actorDefinitionPrunedCache.set(actorIdOrName, actorDefinitionWithInfo);
+        }
         const definition = actorDefinitionWithInfo?.definition;
         const mcpPath = definition && getActorMCPServerPath(definition);
         if (mcpPath) {
