@@ -427,22 +427,17 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    let actor: ToolEntry | undefined;
-    try {
-        const [resolvedActor] = await getActorsAsTools([actorName], apifyClient, {
-            mcpSessionId: toolArgs.mcpSessionId,
-            throwOnError: true,
-        });
-        actor = resolvedActor;
-    } catch (error) {
+    const [actor] = await getActorsAsTools([actorName], apifyClient, {
+        mcpSessionId: toolArgs.mcpSessionId,
+        throwOnError: true,
+    }).catch((error: unknown) => {
         // NOT_FOUND falls through to the structured "Actor not found" response below;
         // anything else propagates so the outer call-actor handler reports it.
         if (error instanceof ActorLoadError && error.kind === ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
-            actor = undefined;
-        } else {
-            throw error;
+            return [];
         }
-    }
+        throw error;
+    });
 
     if (!actor) {
         return {
