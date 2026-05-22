@@ -363,6 +363,8 @@ export async function getActorsAsTools(
     // All other Actors
     const normalActorsInfo = nonNullActors.filter((actorInfo) => {
         if (isActorInfoMcpServer(actorInfo)) return false;
+        // Even non-MCP "normal" Actors can have standby mode enabled. The platform API hard-rejects
+        // standby Actor runs under third-party payment providers, so we must filter them out in payment mode.
         if (paymentProvider && actorInfo.actor.actorStandby?.isEnabled) return false;
         return true;
     });
