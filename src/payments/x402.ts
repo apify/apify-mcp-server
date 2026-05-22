@@ -3,6 +3,7 @@ import log from '@apify/log';
 import { getApifyAPIBaseUrl } from '../apify_client.js';
 import type { ToolEntry } from '../types.js';
 import { cloneToolEntry } from '../utils/tools.js';
+import { PAYMENT_PROTOCOL_HEADER } from './const.js';
 import type { PaymentHeaders, PaymentMeta, PaymentProvider, RequestHeaders } from './types.js';
 
 /**
@@ -13,7 +14,6 @@ const X402_META_KEY = 'x402/payment';
 
 /** HTTP header name for forwarding x402 payment signatures to the Apify API. */
 const PAYMENT_SIGNATURE_HEADER = 'PAYMENT-SIGNATURE';
-const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
 
 const PAYMENT_REQUIRED_HEADER = 'payment-required';
 

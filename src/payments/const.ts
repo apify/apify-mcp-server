@@ -1,5 +1,7 @@
 import { HelperTools } from '../const.js';
 
+export const PAYMENT_PROTOCOL_HEADER = 'x-apify-payment-protocol';
+
 const SKYFIRE_MIN_CHARGE_USD = 5.0;
 const SKYFIRE_SELLER_ID = process.env.SKYFIRE_SELLER_SERVICE_ID;
 

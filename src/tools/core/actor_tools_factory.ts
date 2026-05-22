@@ -15,6 +15,7 @@ import { getMCPServerTools } from '../../mcp/proxy.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import { actorDefinitionPrunedCache } from '../../state.js';
 import type {
+    ActorDefinitionWithInfo,
     ActorInfo,
     ActorStore,
     ActorTool,
@@ -323,28 +324,12 @@ export async function getActorsAsTools(
                 } as ActorInfo;
             }
 
+            // Wrap ONLY the network call — semantic throws below must not be masked
+            // by the catch block (otherwise "not found" gets rewritten to a generic
+            // "Please try again later" message).
+            let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
-                const actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
-                if (!actorDefinitionWithInfo) {
-                    if (throwOnError) {
-                        throw new Error(`Actor "${actorIdOrName}" was not found. Please verify the Actor ID or name.`);
-                    }
-                    log.softFail('Actor not found or definition is not available', {
-                        actorName,
-                        ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
-                        mcpSessionId,
-                        statusCode: 404,
-                        failureCategory: 'INVALID_INPUT',
-                    });
-                    return null;
-                }
-                // Cache the Actor definition with info
-                actorDefinitionPrunedCache.set(actorName, actorDefinitionWithInfo);
-                return {
-                    definition: actorDefinitionWithInfo.definition,
-                    actor: actorDefinitionWithInfo.info,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
-                } as ActorInfo;
+                actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
@@ -356,6 +341,28 @@ export async function getActorsAsTools(
                 }
                 return null;
             }
+
+            if (!actorDefinitionWithInfo) {
+                if (throwOnError) {
+                    throw new Error(`Actor "${actorIdOrName}" was not found. Please verify the Actor ID or name.`);
+                }
+                log.softFail('Actor not found or definition is not available', {
+                    actorName,
+                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                    mcpSessionId,
+                    statusCode: 404,
+                    failureCategory: 'INVALID_INPUT',
+                });
+                return null;
+            }
+
+            // Cache the Actor definition with info
+            actorDefinitionPrunedCache.set(actorName, actorDefinitionWithInfo);
+            return {
+                definition: actorDefinitionWithInfo.definition,
+                actor: actorDefinitionWithInfo.info,
+                webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
+            } as ActorInfo;
         }),
     );
 
