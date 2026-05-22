@@ -26,7 +26,7 @@ import { actorNameToToolName } from '../utils.js';
 import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
-import { actorDefinitionPrunedCache } from '../../state.js';
+import { actorDefinitionCache } from '../../state.js';
 import { getActorDefinition } from '../build.js';
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
  * generic payment-required short-circuit in the tool-call handler so the
  * agent receives the precise reason instead of a generic 402.
  *
- * Uses `actorDefinitionPrunedCache` + `getActorMcpUrlCached` — cheap on a
+ * Uses `actorDefinitionCache` + `getActorMcpUrlCached` — cheap on a
  * warm cache, one definition fetch on a cold cache.
  */
 export async function checkPaymentProviderStandbyConflict(params: {
@@ -296,11 +296,11 @@ export async function checkPaymentProviderStandbyConflict(params: {
     const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
     const isActorMcpServer = !!mcpServerUrlOrFalse;
 
-    let actorDefinitionWithInfo = actorDefinitionPrunedCache.get(baseActorName);
+    let actorDefinitionWithInfo = actorDefinitionCache.get(baseActorName);
     if (!actorDefinitionWithInfo) {
         actorDefinitionWithInfo = await getActorDefinition(baseActorName, apifyClientForDefinition);
         if (actorDefinitionWithInfo) {
-            actorDefinitionPrunedCache.set(baseActorName, actorDefinitionWithInfo);
+            actorDefinitionCache.set(baseActorName, actorDefinitionWithInfo);
         }
     }
     const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;

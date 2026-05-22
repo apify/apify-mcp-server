@@ -8,7 +8,7 @@ const APIFY_DOCS_CACHE_TTL_SECS = 60 * 60; // 1 hour
 const MCP_SERVER_CACHE_MAX_SIZE = 500;
 const MCP_SERVER_CACHE_TTL_SECS = 30 * 60; // 30 minutes
 
-export const actorDefinitionPrunedCache = new TTLLRUCache<ActorDefinitionWithInfo>(ACTOR_CACHE_MAX_SIZE, ACTOR_CACHE_TTL_SECS);
+export const actorDefinitionCache = new TTLLRUCache<ActorDefinitionWithInfo>(ACTOR_CACHE_MAX_SIZE, ACTOR_CACHE_TTL_SECS);
 export const searchApifyDocsCache = new TTLLRUCache<ApifyDocsSearchResult[]>(APIFY_DOCS_CACHE_MAX_SIZE, APIFY_DOCS_CACHE_TTL_SECS);
 /** Stores processed Markdown content */
 export const fetchApifyDocsCache = new TTLLRUCache<string>(APIFY_DOCS_CACHE_MAX_SIZE, APIFY_DOCS_CACHE_TTL_SECS);

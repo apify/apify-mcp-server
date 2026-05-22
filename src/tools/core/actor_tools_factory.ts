@@ -13,7 +13,7 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import { actorDefinitionPrunedCache } from '../../state.js';
+import { actorDefinitionCache } from '../../state.js';
 import type {
     ActorDefinitionWithInfo,
     ActorInfo,
@@ -314,7 +314,7 @@ export async function getActorsAsTools(
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
             const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
-            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(actorName);
+            const actorDefinitionWithInfoCached = actorDefinitionCache.get(actorName);
             if (actorDefinitionWithInfoCached) {
                 return {
                     definition: actorDefinitionWithInfoCached.definition,
@@ -357,7 +357,7 @@ export async function getActorsAsTools(
             }
 
             // Cache the Actor definition with info
-            actorDefinitionPrunedCache.set(actorName, actorDefinitionWithInfo);
+            actorDefinitionCache.set(actorName, actorDefinitionWithInfo);
             return {
                 definition: actorDefinitionWithInfo.definition,
                 actor: actorDefinitionWithInfo.info,
