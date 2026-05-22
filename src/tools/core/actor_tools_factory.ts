@@ -346,14 +346,14 @@ export async function getActorsAsTools(
                     webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
                 } as ActorInfo;
             } catch (error) {
-                if (throwOnError) {
-                    throw error;
-                }
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
                     ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
+                if (throwOnError) {
+                    throw new Error(`Failed to load Actor "${actorIdOrName}". Please try again later.`);
+                }
                 return null;
             }
         }),
