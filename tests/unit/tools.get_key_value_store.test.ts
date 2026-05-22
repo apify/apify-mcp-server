@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
+import {
+    expectSoftFailInvalidInput,
+    parseFencedJson,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 const MOCK_STORE = {
     id: 'kv-1',
@@ -12,19 +18,22 @@ const MOCK_STORE = {
 
 function stubApifyClient(store: unknown): InternalToolArgs['apifyClient'] {
     return {
-        keyValueStore: (_id: string) => ({
-            get: async () => store,
-        }),
+        keyValueStore: (_id: string) => ({ get: async () => store }),
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
 describe('get-key-value-store', () => {
+    it('has the expected tool name', () => {
+        expect(getKeyValueStore.name).toBe(HelperTools.KEY_VALUE_STORE_GET);
+    });
+
     it('returns store metadata as JSON in a fenced code block', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
         );
-        const { content } = result as TextToolResult;
+        const { content, isError } = result as TextToolResult;
 
+        expect(isError).not.toBe(true);
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_STORE);
     });
 
@@ -32,9 +41,9 @@ describe('get-key-value-store', () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'missing' }, stubApifyClient(undefined)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content } = result as TextToolResult;
 
-        expect(isError).toBe(true);
+        expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain("Key-value store 'missing' not found");
     });
 

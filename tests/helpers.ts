@@ -2,43 +2,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import type { CallToolResult, ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
+import type { ClientCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { expect } from 'vitest';
 
 import { HelperTools } from '../src/const.js';
-import type { InternalToolArgs, TelemetryEnv, ToolCategory } from '../src/types.js';
-
-/**
- * `CallToolResult` narrowed to text-only content. All current internal tools
- * emit text content, so tests cast results to this shape to avoid the
- * `content[i]` union (text | image | audio | resource_link | resource).
- */
-export type TextToolResult = Omit<CallToolResult, 'content'> & {
-    content: Extract<CallToolResult['content'][number], { type: 'text' }>[];
-};
-
-/**
- * Strip the ```` ```json … ``` ```` fence emitted by internal tools and parse the inner JSON.
- */
-export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.replace(/^```json\n/, '').replace(/\n```$/, ''));
-}
-
-/**
- * Build a minimal `InternalToolArgs` for unit tests. Stubs the fields tools
- * don't read (`extra`, `mcpServer`, `apifyMcpServer`) and lets each test inject
- * `args` and a partial `apifyClient`.
- */
-export function stubToolCallContext(args: Record<string, unknown>, client: InternalToolArgs['apifyClient']): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
+import type { TelemetryEnv, ToolCategory } from '../src/types.js';
 
 export type McpClientOptions = {
     actors?: string[];

@@ -1,10 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../src/const.js';
 import { getDatasetSchema } from '../../src/tools/common/get_dataset_schema.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
+import {
+    expectSoftFailInvalidInput,
+    parseFencedJson,
+    stubToolCallContext,
+    type TextToolResult,
+    type ToolTelemetrySnapshot,
+} from './helpers/tool_context.js';
 
 vi.mock('../../src/utils/schema_generation.js', async (importOriginal) => {
     const actual = await importOriginal<typeof SchemaGenModule>();
@@ -28,6 +35,10 @@ function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyCli
 }
 
 describe('get-dataset-schema', () => {
+    it('has the expected tool name', () => {
+        expect(getDatasetSchema.name).toBe(HelperTools.DATASET_SCHEMA_GET);
+    });
+
     it('returns a JSON schema in a fenced code block on the happy path', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
@@ -52,9 +63,9 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(null)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content } = result as TextToolResult;
 
-        expect(isError).toBe(true);
+        expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
@@ -64,9 +75,11 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, toolTelemetry } = result as TextToolResult & { toolTelemetry?: ToolTelemetrySnapshot };
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");
+        expect(toolTelemetry).toEqual(expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }));
+        expect(toolTelemetry?.failureCategory).not.toBe(FAILURE_CATEGORY.INVALID_INPUT);
     });
 });

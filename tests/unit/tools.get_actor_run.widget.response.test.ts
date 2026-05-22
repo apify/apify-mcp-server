@@ -4,7 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { getActorRunWidgetTool } from '../../src/tools/apps/get_actor_run_widget.js';
 import type { RunResponse } from '../../src/tools/core/actor_run_response.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext } from '../helpers.js';
+import { stubToolCallContext } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: get-actor-run-widget renders an interactive UI element (widget)

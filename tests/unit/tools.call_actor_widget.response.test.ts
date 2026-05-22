@@ -4,7 +4,7 @@ import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 /**
  * Apps / UI mode: call-actor-widget starts the run and renders an interactive UI element

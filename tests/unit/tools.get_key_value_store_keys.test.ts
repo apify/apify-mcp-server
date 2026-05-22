@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_KEYS = {
     items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
@@ -21,6 +22,10 @@ function stubApifyClient(listKeysSpy: ReturnType<typeof vi.fn>): InternalToolArg
 }
 
 describe('get-key-value-store-keys', () => {
+    it('has the expected tool name', () => {
+        expect(getKeyValueStoreKeys.name).toBe(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+    });
+
     it('returns the keys response as JSON in a fenced code block', async () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
@@ -43,6 +48,16 @@ describe('get-key-value-store-keys', () => {
         );
 
         expect(listKeysSpy).toHaveBeenCalledWith({ exclusiveStartKey: 'data.json', limit: 5 });
+    });
+
+    it('forwards undefined limit when caller omits it', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
+
+        await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+
+        expect(listKeysSpy).toHaveBeenCalledWith({ exclusiveStartKey: undefined, limit: undefined });
     });
 
     it('rejects limit above 10 via ajv validation', () => {

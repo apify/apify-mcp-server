@@ -11,7 +11,7 @@ import {
 } from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep

@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
@@ -10,17 +10,7 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/**
- * Extract top-level dot prefixes from nested field paths. Only the first prefix
- * is needed — Apify's `flatten` parameter recurses through nested objects, so
- * `flatten=a` already produces `a.b.c` keys at any depth.
- *
- * Examples:
- *   ["metadata.url", "crawl.statusCode"] → ["metadata", "crawl"]
- *   ["metadata.url", "metadata.title"] → ["metadata"]  (deduplicated)
- *   ["a.b.c", "a.x"] → ["a"] (flatten recurses)
- *   ["title", "url"] → [] (top-level fields need no flatten)
- */
+/** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
 export function extractDotPrefixes(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
@@ -109,7 +99,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 

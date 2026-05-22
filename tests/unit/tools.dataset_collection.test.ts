@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserDatasetsList } from '../../src/tools/common/dataset_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { parseFencedJson, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -28,7 +28,9 @@ describe('get-dataset-list', () => {
     it('returns the list response as JSON in a fenced code block', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        const result = await (getUserDatasetsList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
+        const result = await (getUserDatasetsList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(listSpy)),
+        );
         const { content } = result as TextToolResult;
 
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_LIST);
@@ -50,7 +52,9 @@ describe('get-dataset-list', () => {
     it('applies defaults (limit=10, offset=0, desc=false, unnamed=false) when no params given', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserDatasetsList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
+        await (getUserDatasetsList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(listSpy)),
+        );
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
     });

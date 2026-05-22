@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { HelperTools } from '../../src/const.js';
 import { extractDotPrefixes, getDatasetItems } from '../../src/tools/common/get_dataset_items.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from '../helpers.js';
+import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 describe('extractDotPrefixes', () => {
     it('returns empty list when no fields contain a dot', () => {
@@ -48,6 +49,10 @@ function stubApifyClient(
 }
 
 describe('get-dataset-items', () => {
+    it('has the expected tool name', () => {
+        expect(getDatasetItems.name).toBe(HelperTools.DATASET_GET_ITEMS);
+    });
+
     it('returns dataset items in structuredContent on happy path', async () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
@@ -80,9 +85,9 @@ describe('get-dataset-items', () => {
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(async () => null)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content } = result as TextToolResult;
 
-        expect(isError).toBe(true);
+        expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain("Dataset 'missing' not found");
     });
 
