@@ -742,7 +742,7 @@ export function createIntegrationTestsSuite(
             // example-mcp-server exposes a single `add` tool. The proxy registers it under a
             // hashed prefix (see `getProxyMCPServerToolName`) — match the `-add` suffix while
             // excluding the unrelated `add-actor` helper present in the seed tools.
-            const isProxiedAddTool = (name: string) => name.endsWith('-add') && name !== HelperTools.ACTOR_ADD;
+            const isProxiedAddTool = (name: string) => name.endsWith('-add');
 
             const toolNamesBefore = getToolNames(await client.listTools());
             expect(toolNamesBefore.filter(isProxiedAddTool)).toHaveLength(0);
