@@ -2839,28 +2839,29 @@ export function createIntegrationTestsSuite(
             },
         );
 
-        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        // Agentic payment modes (x402, skyfire) only work with Streamable-HTTP transport (require HTTP headers).
         it.runIf(options.transport === 'streamable-http')(
-            'should not load the default standby Actor apify/rag-web-browser in x402 payment mode',
+            'should not load the default standby Actor apify/rag-web-browser in payment mode',
             async () => {
                 // Connect with ?payment=x402 — should load defaults, but filter out standby/MCP actors
                 client = await createClientFn({ payment: 'x402' });
+                const x402Tools = await client.listTools();
+                const x402RagWebBrowserTool = x402Tools.tools.find((t) => t.name === 'apify--rag-web-browser');
+                expect(x402RagWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in x402 payment mode').toBeUndefined();
+                await client.close();
 
-                const toolsList = await client.listTools();
-                const ragWebBrowserTool = toolsList.tools.find((t) => t.name === 'apify--rag-web-browser');
-
-                expect(ragWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in payment mode').toBeUndefined();
-
+                // Connect with ?payment=skyfire — standby/MCP actors should be filtered out too
+                client = await createClientFn({ payment: 'skyfire' });
+                const skyfireTools = await client.listTools();
+                const skyfireRagWebBrowserTool = skyfireTools.tools.find((t) => t.name === 'apify--rag-web-browser');
+                expect(skyfireRagWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in skyfire payment mode').toBeUndefined();
                 await client.close();
 
                 // Connect without payment mode (standard token auth) — standby/MCP actors should load normally
                 client = await createClientFn();
-
-                const normalToolsList = await client.listTools();
-                const normalRagWebBrowserTool = normalToolsList.tools.find((t) => t.name === 'apify--rag-web-browser');
-
+                const normalTools = await client.listTools();
+                const normalRagWebBrowserTool = normalTools.tools.find((t) => t.name === 'apify--rag-web-browser');
                 expect(normalRagWebBrowserTool, 'apify--rag-web-browser (standby) should be loaded under standard token auth').toBeDefined();
-
                 await client.close();
             },
         );
