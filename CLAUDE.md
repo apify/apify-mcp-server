@@ -64,10 +64,9 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 ### Public/internal integration tests ownership
 
-- **New tests for this repo's code go in `tests/integration/suite.ts` here, never in internal.** Covers: MCP protocol (handshake, `tools/*`, `prompts/*`, `resources/*`, `tasks/*`, notifications), tool loader + selectors, widget metadata shape, prompt registry, built-in tools, `call-actor` `RunResponse` shape, `SkyfirePaymentProvider`, client-name detection, `?ui=` parsing.
-- **Internal-only tests** (don't add here): anything that needs IAM auth (401 / unauth user toolset / `?payment=skyfire` bypass), the rate limiter, `RedisEventStore` replay, user-aware rental filter, non-MCP routes (`/`, OAuth metadata), multi-node coordination.
-- **When changing a behavior listed above in a way internal consumes** (`internals.js` exports, `_meta` shape, `structuredContent`, `clientInfo`-based logic, `?ui=`/`?payment=` parsing, notification timing), flag it in the PR — internal's contract suite likely needs a matching smoke test.
-- **Never delete a public test "because internal covers it"** — that's backwards. Public is the source; internal smokes guard against the hosted server's extra code (auth, rate limiter, Caddy, response handlers) breaking or stripping the package's output. See [DEVELOPMENT.md → Test organization across repos](./DEVELOPMENT.md#test-organization-across-repos).
+- **MCP and package-logic tests go in `tests/integration/suite.ts` here.** Hosted-only behavior (auth, rate limiter, Caddy, multi-node) lives in `apify-mcp-server-internal`, not here.
+- **Flag PRs that touch what the hosted server consumes** — `internals.js` exports, `_meta`, `structuredContent`, `clientInfo`-based logic, `?ui=` / `?payment=` parsing, notification timing. Internal's contract suite likely needs a matching test.
+- **Never delete a test here thinking internal covers it.** This repo is the source; internal only smoke-tests that our output survives its middleware. Full rules: [DEVELOPMENT.md → Test organization across repos](./DEVELOPMENT.md#test-organization-across-repos).
 
 ## Code conventions
 
