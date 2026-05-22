@@ -1020,27 +1020,26 @@ export class ActorsMcpServer {
                 // Standby / MCP-server Actors are never payable via a third-party provider —
                 // reject BEFORE the payment short-circuit so the agent gets the precise reason
                 // instead of a generic 402 PaymentRequired response.
-                if (
-                    this.options.paymentProvider
-                    && (tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET)
-                ) {
-                    const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
-                    if (typeof actorArg === 'string' && actorArg.length > 0) {
-                        const standbyRejection = await checkPaymentProviderStandbyConflict({
-                            actorName: actorArg,
-                            paymentProvider: this.options.paymentProvider,
-                            apifyToken,
-                            mcpSessionId,
-                        });
-                        if (standbyRejection) {
-                            toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            callDiagnostics = {
-                                failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                                ...buildActorFields(actorName, actorId),
-                            };
-                            return captureResult(standbyRejection);
-                        }
-                    }
+                const paymentProvider = this.options.paymentProvider;
+                const isCallActorTool = tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
+                const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
+
+                const standbyRejection = paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
+                    ? await checkPaymentProviderStandbyConflict({
+                        actorName: actorArg,
+                        paymentProvider,
+                        apifyToken,
+                        mcpSessionId,
+                    })
+                    : null;
+
+                if (standbyRejection) {
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    return captureResult(standbyRejection);
                 }
 
                 // Check payment validation (already computed by prepareToolCallContext)
