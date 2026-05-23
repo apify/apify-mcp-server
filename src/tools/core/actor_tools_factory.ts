@@ -16,7 +16,6 @@ import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
 import type { PaymentProvider } from '../../payments/types.js';
 import type {
-    ActorDefinitionWithInfo,
     ActorInfo,
     ActorStore,
     ActorTool,
@@ -301,10 +300,9 @@ export async function getActorsAsTools(
         mcpSessionId?: string;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
-        throwOnError?: boolean;
     },
 ): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore, paymentProvider, throwOnError } = options ?? {};
+    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorNames: actorIdsOrNames,
         mcpSessionId,
@@ -313,33 +311,11 @@ export async function getActorsAsTools(
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
-            const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
-
-            // Wrap ONLY the network call — semantic throws below must not be masked
-            // by the catch block (otherwise "not found" gets rewritten to a generic
-            // "Please try again later" message).
-            let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
-            try {
-                actorDefinitionWithInfo = await getActorDefinitionCached(actorName, apifyClient);
-            } catch (error) {
-                logHttpError(error, 'Failed to fetch Actor definition', {
-                    actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
-                    mcpSessionId,
-                });
-                if (throwOnError) {
-                    throw ActorLoadError.loadFailed(actorIdOrName);
-                }
-                return null;
-            }
-
-            if (!actorDefinitionWithInfo) {
-                if (throwOnError) {
-                    throw ActorLoadError.notFound(actorIdOrName);
-                }
+            const actorInfo = await loadActorInfo(actorIdOrName, apifyClient, { mcpSessionId });
+            if (actorInfo instanceof ActorLoadError) {
                 log.softFail('Actor not found or definition is not available', {
-                    actorName,
-                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                    actorName: actorInfo.actorName,
+                    ...(actorInfo.actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                     statusCode: 404,
                     failureCategory: 'INVALID_INPUT',
@@ -347,11 +323,7 @@ export async function getActorsAsTools(
                 return null;
             }
 
-            return {
-                definition: actorDefinitionWithInfo.definition,
-                actor: actorDefinitionWithInfo.info,
-                webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
-            } as ActorInfo;
+            return actorInfo;
         }),
     );
 
@@ -359,14 +331,6 @@ export async function getActorsAsTools(
 
     // Filter out nulls - actorInfo can be null if the Actor was not found or an error occurred
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
-
-    if (paymentProvider && throwOnError) {
-        for (const actorInfo of nonNullActors) {
-            if (actorInfo.actor.actorStandby?.isEnabled) {
-                throw ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName);
-            }
-        }
-    }
 
     // Separate Actors with MCP servers and normal Actors
     // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled
@@ -396,4 +360,58 @@ export async function getActorsAsTools(
     ]);
 
     return [...normalTools, ...mcpServerTools];
+}
+
+export async function loadActorAsTool(
+    actorIdOrName: string,
+    apifyClient: ApifyClient,
+    options?: {
+        mcpSessionId?: string;
+        actorStore?: ActorStore;
+        paymentProvider?: PaymentProvider;
+    },
+): Promise<ToolEntry | ActorLoadError> {
+    const actorInfo = await loadActorInfo(actorIdOrName, apifyClient, options);
+    if (actorInfo instanceof ActorLoadError) return actorInfo;
+
+    if (options?.paymentProvider && (actorInfo.actor.actorStandby?.isEnabled || isActorInfoMcpServer(actorInfo))) {
+        return ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName);
+    }
+
+    const [tool] = isActorInfoMcpServer(actorInfo)
+        ? await getMCPServersAsTools([actorInfo], apifyClient.token, options?.mcpSessionId)
+        : await getNormalActorsAsTools([actorInfo], {
+            mcpSessionId: options?.mcpSessionId,
+            actorStore: options?.actorStore,
+        });
+    return tool ?? ActorLoadError.loadFailed(actorIdOrName);
+}
+
+async function loadActorInfo(
+    actorIdOrName: string,
+    apifyClient: ApifyClient,
+    options?: { mcpSessionId?: string },
+): Promise<ActorInfo | ActorLoadError> {
+    const { mcpSessionId } = options ?? {};
+    const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
+
+    try {
+        const actorDefinitionWithInfo = await getActorDefinitionCached(actorName, apifyClient);
+        if (!actorDefinitionWithInfo) {
+            return ActorLoadError.notFound(actorIdOrName);
+        }
+
+        return {
+            definition: actorDefinitionWithInfo.definition,
+            actor: actorDefinitionWithInfo.info,
+            webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
+        } as ActorInfo;
+    } catch (error) {
+        logHttpError(error, 'Failed to fetch Actor definition', {
+            actorName,
+            ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
+            mcpSessionId,
+        });
+        return ActorLoadError.loadFailed(actorIdOrName);
+    }
 }

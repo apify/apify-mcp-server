@@ -2882,8 +2882,41 @@ export function createIntegrationTestsSuite(
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content.length).toBeGreaterThan(0);
-                expect(content[0].text).toContain('standby Actor and cannot be accessed using a third-party payment provider');
+                expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');
                 await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
+            'should reject task-mode call-actor for standby Actor before x402 payment response',
+            async () => {
+                client = await createClientFn({ payment: 'x402' });
+                const stream = client.experimental.tasks.callToolStream(
+                    {
+                        name: HelperTools.ACTOR_CALL,
+                        arguments: {
+                            actor: 'apify/rag-web-browser',
+                            input: { query: 'test' },
+                        },
+                    },
+                    CallToolResultSchema,
+                    {
+                        task: { ttl: 60000 },
+                    },
+                );
+
+                let result: { isError?: boolean; content?: unknown[] } | undefined;
+                for await (const message of stream) {
+                    if (message.type === 'result') {
+                        result = message.result;
+                    }
+                }
+
+                expect(result).toBeDefined();
+                expect(result?.isError).toBe(true);
+                const content = result?.content as { text: string }[];
+                expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');
             },
         );
 

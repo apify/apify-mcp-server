@@ -20,11 +20,11 @@ vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
     );
     return {
         ...actual,
-        getActorsAsTools: vi.fn(),
+        loadActorAsTool: vi.fn(),
     };
 });
 
-const { getActorsAsTools } = await import('../../src/tools/core/actor_tools_factory.js');
+const { loadActorAsTool } = await import('../../src/tools/core/actor_tools_factory.js');
 
 const MOCK_ACTOR_TOOL: ToolEntry = {
     type: 'actor',
@@ -68,8 +68,8 @@ describe('call-actor-widget response', () => {
     beforeEach(() => {
         vi.mocked(getActorMcpUrlCached).mockReset();
         vi.mocked(getActorMcpUrlCached).mockResolvedValue(false);
-        vi.mocked(getActorsAsTools).mockReset();
-        vi.mocked(getActorsAsTools).mockResolvedValue([MOCK_ACTOR_TOOL] as never);
+        vi.mocked(loadActorAsTool).mockReset();
+        vi.mocked(loadActorAsTool).mockResolvedValue(MOCK_ACTOR_TOOL as never);
     });
 
     it('starts the run and returns runId + widget _meta on the response', async () => {

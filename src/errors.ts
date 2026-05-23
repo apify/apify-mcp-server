@@ -10,8 +10,8 @@ export const ACTOR_LOAD_ERROR_KIND = {
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
 
 /**
- * Thrown by `getActorsAsTools` when `throwOnError: true` and the load fails
- * for a *sanitized*, user-safe reason.
+ * Returned or thrown by single-Actor loading paths when the load fails for a
+ * *sanitized*, user-safe reason.
  *
  * `message` is always safe to forward to the LLM agent / client verbatim.
  * Raw backend errors (network, 5xx, auth) are caught at the throw site and

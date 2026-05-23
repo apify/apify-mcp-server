@@ -25,7 +25,7 @@ import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName } from '../utils.js';
 import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
-import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
+import { fixActorNameInputAndLog, loadActorAsTool } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
 // ---------------------------------------------------------------------------
@@ -310,10 +310,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     });
 
     return buildMCPResponse({
-        texts: [dedent`
-            This Actor (${normalizedActorName}) is a standby Actor and cannot be accessed using a third-party payment provider.
-            To use this Actor, please provide a valid Apify token instead.
-        `],
+        texts: [ActorLoadError.standbyPaymentNotSupported(normalizedActorName).message],
         isError: true,
         telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
     });
@@ -427,19 +424,11 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    const [actor] = await getActorsAsTools([actorName], apifyClient, {
+    const actor = await loadActorAsTool(actorName, apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
-        throwOnError: true,
-    }).catch((error: unknown) => {
-        // NOT_FOUND falls through to the structured "Actor not found" response below;
-        // anything else propagates so the outer call-actor handler reports it.
-        if (error instanceof ActorLoadError && error.kind === ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
-            return [];
-        }
-        throw error;
     });
 
-    if (!actor) {
+    if (actor instanceof ActorLoadError && actor.kind === ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
         return {
             error: buildMCPResponse({
                 texts: [dedent`
@@ -453,6 +442,19 @@ export async function resolveAndValidateActor(params: {
                     failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
                     failureHttpStatus: 404,
                     failureDetail: `Actor '${actorName}' was not found`,
+                },
+            }),
+        };
+    }
+    if (actor instanceof ActorLoadError) {
+        return {
+            error: buildMCPResponse({
+                texts: [actor.message],
+                isError: true,
+                telemetry: {
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureDetail: actor.message,
                 },
             }),
         };
