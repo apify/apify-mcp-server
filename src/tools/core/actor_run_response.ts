@@ -315,13 +315,26 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-// TODO: Apify's fields list expands array indices (e.g. `entities.hashtags.0.text`,
+// Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
 // `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or array-heavy
-// schemas balloon into hundreds of paths and bloat nextStep. Real example: a Twitter dataset
-// returned 174 expanded paths for ~30 unique schema fields. Two viable fixes — collapse `.N`
-// segments to the array root (`entities.hashtags`) and dedupe (all paths stay projection-valid,
-// schema detail lost inside arrays), or collapse `.N.` to `[]` (preserves shape but produces
-// paths that aren't directly valid for `fields="..."`). Deferred pending a real-world choice.
+// schemas balloon into hundreds of redundant paths. Strip pure-numeric segments and dedupe;
+// the resulting paths stay valid projections for `fields="..."`.
+function collapseArrayIndices(fields: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const field of fields) {
+        const collapsed = field
+            .split('.')
+            .filter((segment) => !/^\d+$/.test(segment))
+            .join('.');
+        if (collapsed && !seen.has(collapsed)) {
+            seen.add(collapsed);
+            result.push(collapsed);
+        }
+    }
+    return result;
+}
+
 function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields || fields.length === 0) return '';
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
@@ -340,7 +353,7 @@ function buildSucceededSummaryNextStep(
     // Dataset is primary. nextStep stays dataset-only (one primary action) but the summary mentions
     // KV when both exist so the caller can see the run also produced key-value records.
     if (itemCount !== undefined && itemCount > 0 && datasetId) {
-        const fields = dataset?.fields ?? [];
+        const fields = collapseArrayIndices(dataset?.fields ?? []);
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
@@ -361,7 +374,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(collapseArrayIndices(dataset?.fields ?? []))}`,
         };
     }
 
@@ -387,7 +400,7 @@ function buildTimedOutSummaryNextStep(
     // surfaced as the primary follow-up — partial output is the diagnostic signal here.
     if (datasetId) {
         const itemCount = dataset?.itemCount ?? 0;
-        const fields = dataset?.fields ?? [];
+        const fields = collapseArrayIndices(dataset?.fields ?? []);
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,

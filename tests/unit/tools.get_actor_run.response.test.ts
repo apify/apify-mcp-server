@@ -611,6 +611,49 @@ describe('buildStatusTemplate', () => {
         expect(t.nextStep).toContain('no dataset to fetch');
     });
 
+    // ---- array-index collapsing in fieldsProjectionHint (#894) ----
+    // Apify expands array indices in dataset fields (e.g. `latestComments.0.id`,
+    // `latestComments.1.id`, ...). For deeply-nested or array-heavy schemas this balloons
+    // hundreds of redundant paths into nextStep. fieldsProjectionHint collapses numeric
+    // segments and dedupes so the output stays a flat list of projection-valid paths.
+
+    it('SUCCEEDED collapses numeric segments in array-indexed fields and dedupes', () => {
+        const dataset: RunDataset = {
+            id: 'ds-1',
+            itemCount: 1,
+            fields: [
+                'latestComments.0.id',
+                'latestComments.0.text',
+                'latestComments.1.id',
+                'latestComments.1.text',
+                'latestComments.2.owner.username',
+            ],
+        };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.nextStep).toContain('latestComments.id');
+        expect(t.nextStep).toContain('latestComments.text');
+        expect(t.nextStep).toContain('latestComments.owner.username');
+        expect(t.nextStep).not.toMatch(/latestComments\.\d/);
+    });
+
+    it('SUCCEEDED preserves non-array fields and reports the deduplicated count', () => {
+        const dataset: RunDataset = {
+            id: 'ds-1',
+            itemCount: 1,
+            fields: [
+                'metadata.url',
+                'entities.hashtags.0.text',
+                'entities.hashtags.1.text',
+                'entities.hashtags.2.text',
+            ],
+        };
+        const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset });
+        expect(t.summary).toContain('1 item; 2 fields available');
+        expect(t.nextStep).toContain('metadata.url');
+        expect(t.nextStep).toContain('entities.hashtags.text');
+        expect(t.nextStep).not.toContain('entities.hashtags.0');
+    });
+
     // ---- statusMessage attribution + double-period invariants ----
     // The upstream statusMessage can be stale relative to elapsedSecs and often arrives with a
     // trailing period. We always render it as ` Actor status: "..."` (no double period) so a
