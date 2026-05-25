@@ -2,7 +2,21 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { AUTO_INJECTED_TOOLS, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import type { ActorTool } from '../../src/types.js';
+import { ServerMode } from '../../src/types.js';
+import { AUTO_INJECTED_TOOLS, getToolsForServerMode, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+
+function makeFakeActorTool(name: string): ActorTool {
+    return {
+        type: 'actor',
+        name,
+        actorId: 'fake-id',
+        actorFullName: name.replace('--', '/'),
+        description: 'fake',
+        inputSchema: { type: 'object', properties: {} },
+        ajvValidate: () => true,
+    } as unknown as ActorTool;
+}
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -111,6 +125,20 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
 
         expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
         expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
+        for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+    });
+
+    it('auto-injects get-actor-run when direct actor tools are present in default mode', () => {
+        const actorTool = makeFakeActorTool('apify--instagram-scraper');
+        const tools = getToolsForServerMode(
+            { tools: [], actors: ['apify/instagram-scraper'] },
+            [actorTool],
+            ServerMode.DEFAULT,
+        );
+        const toolNames = tools.map((t) => t.name);
+
+        expect(toolNames).toContain('apify--instagram-scraper');
+        expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
         for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
     });
 });

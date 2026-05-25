@@ -269,7 +269,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     // `get-actor-run` for polling (when the run is non-terminal at waitSecs cap), so the LLM
     // needs that tool available. `call-actor-widget` returns immediately and the widget UI
     // polls run status itself — that path doesn't drive the auto-inject decision here.
-    if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
+    if (hasCallActor || hasActorTools) {
         toolsToInject.push(defaultGetActorRun);
     }
     if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
