@@ -389,13 +389,6 @@ function isInitializeRequest(body: unknown): boolean {
 // --- Entry point: start the server when run directly ---
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-    // Token is no longer read from the environment per-request — clients pass it
-    // via `Authorization: Bearer <token>` (or use `?payment=<provider>`). Warn if
-    // unset so local dev runs without payment mode fail fast with a clear hint.
-    if (!process.env.APIFY_TOKEN) {
-        log.warning('APIFY_TOKEN is not set. Clients must pass `Authorization: Bearer <token>` or `?payment=<provider>` per request.');
-    }
-
     const HOST = process.env.HOST ?? 'http://localhost';
     const PORT = Number(process.env.PORT ?? 3001);
 
