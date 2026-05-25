@@ -750,7 +750,7 @@ export function createIntegrationTestsSuite(
                 client = await createClientFn({ enableAddingActors: true, payment: 'x402' });
                 const result = await client.callTool({
                     name: HelperTools.ACTOR_ADD,
-                    arguments: { actor: 'apify/rag-web-browser' },
+                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
                 });
                 expect(result).toBeDefined();
                 expect(result.isError).toBe(true);
@@ -2745,28 +2745,37 @@ export function createIntegrationTestsSuite(
         );
 
         // Agentic payment modes (x402, skyfire) only work with Streamable-HTTP transport (require HTTP headers).
+        // `ACTOR_EXAMPLE_MCP_SERVER` is a standby MCP-server Actor; in normal mode the proxy registers its
+        // sub-tools (e.g. `*-add`), in payment mode the standby/MCP filter drops them from list-tools.
         it.runIf(options.transport === 'streamable-http')(
-            'should not load the default standby Actor apify/rag-web-browser in payment mode',
+            'should filter standby MCP-server Actor from list-tools in payment mode',
             async () => {
-                // Connect with ?payment=x402 — should load defaults, but filter out standby/MCP actors
-                client = await createClientFn({ payment: 'x402' });
+                const isProxiedAddTool = (name: string) => name.endsWith('-add');
+
+                client = await createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const x402Tools = await client.listTools();
-                const x402RagWebBrowserTool = x402Tools.tools.find((t) => t.name === 'apify--rag-web-browser');
-                expect(x402RagWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in x402 payment mode').toBeUndefined();
+                expect(
+                    x402Tools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should not be loaded in x402 payment mode',
+                ).toHaveLength(0);
                 await client.close();
 
-                // Connect with ?payment=skyfire — standby/MCP actors should be filtered out too
-                client = await createClientFn({ payment: 'skyfire' });
+                client = await createClientFn({ payment: 'skyfire', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const skyfireTools = await client.listTools();
-                const skyfireRagWebBrowserTool = skyfireTools.tools.find((t) => t.name === 'apify--rag-web-browser');
-                expect(skyfireRagWebBrowserTool, 'apify--rag-web-browser (standby) should not be loaded in skyfire payment mode').toBeUndefined();
+                expect(
+                    skyfireTools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should not be loaded in skyfire payment mode',
+                ).toHaveLength(0);
                 await client.close();
 
-                // Connect without payment mode (standard token auth) — standby/MCP actors should load normally
-                client = await createClientFn();
+                // Standard token auth — sub-tools must load normally so the regression also catches
+                // an over-eager filter that would block them outside payment mode.
+                client = await createClientFn({ actors: [ACTOR_EXAMPLE_MCP_SERVER] });
                 const normalTools = await client.listTools();
-                const normalRagWebBrowserTool = normalTools.tools.find((t) => t.name === 'apify--rag-web-browser');
-                expect(normalRagWebBrowserTool, 'apify--rag-web-browser (standby) should be loaded under standard token auth').toBeDefined();
+                expect(
+                    normalTools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should be loaded under standard token auth',
+                ).not.toHaveLength(0);
                 await client.close();
             },
         );
@@ -2779,8 +2788,8 @@ export function createIntegrationTestsSuite(
                 const result = await client.callTool({
                     name: 'call-actor',
                     arguments: {
-                        actor: 'apify/rag-web-browser',
-                        input: { query: 'test' },
+                        actor: ACTOR_EXAMPLE_MCP_SERVER,
+                        input: {},
                     },
                 });
                 expect(result).toBeDefined();
@@ -2803,8 +2812,8 @@ export function createIntegrationTestsSuite(
                     {
                         name: 'call-actor',
                         arguments: {
-                            actor: 'apify/rag-web-browser',
-                            input: { query: 'test' },
+                            actor: ACTOR_EXAMPLE_MCP_SERVER,
+                            input: {},
                         },
                     },
                     CallToolResultSchema,
