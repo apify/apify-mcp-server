@@ -980,11 +980,11 @@ export class ActorsMcpServer {
                 }
 
                 // Standby / MCP-server Actors are never payable via a third-party provider —
-                // reject BEFORE both the task short-circuit and the payment short-circuit so
-                // the agent gets the precise reason instead of a queued task whose stored
-                // result is a generic 402 PaymentRequired. Task-mode `call-actor` declares
-                // `taskSupport: 'optional'`, so without this ordering the standby check
-                // would only run for the sync path.
+                // compute the rejection here so both the sync short-circuit and the task path
+                // can use it. In task-mode we still create the task and store this rejection
+                // as its result (instead of a generic 402), so the agent gets the precise reason
+                // when fetching the task result. Task-mode `call-actor` declares
+                // `taskSupport: 'optional'`, so without this both paths would 402 by default.
                 const { paymentProvider } = this.options;
                 const isCallActorTool = tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
                 const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
@@ -997,15 +997,6 @@ export class ActorsMcpServer {
                         mcpSessionId,
                     })
                     : null;
-
-                if (standbyRejection) {
-                    toolStatus = TOOL_STATUS.SOFT_FAIL;
-                    callDiagnostics = {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...buildActorFields(actorName, actorId),
-                    };
-                    return captureResult(standbyRejection);
-                }
 
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
@@ -1027,6 +1018,7 @@ export class ActorsMcpServer {
                             tool,
                             toolArgs: toolArgs!,
                             logSafeArgs,
+                            standbyRejection,
                             paymentRequiredResult,
                             apifyClient: apifyClient!,
                             apifyToken,
@@ -1042,6 +1034,17 @@ export class ActorsMcpServer {
                     // Return the task immediately; execution continues asynchronously
                     shouldTrackTelemetry = false;
                     return { task };
+                }
+
+                // Sync path: standby rejection wins over the generic payment-required short-circuit
+                // so the agent gets the precise reason instead of a 402.
+                if (standbyRejection) {
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    return captureResult(standbyRejection);
                 }
 
                 // Check payment validation (already computed by prepareToolCallContext)
@@ -1355,6 +1358,7 @@ export class ActorsMcpServer {
         tool: ToolEntry;
         toolArgs: Record<string, unknown>;
         logSafeArgs: unknown;
+        standbyRejection?: Record<string, unknown> | null;
         paymentRequiredResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
@@ -1366,7 +1370,7 @@ export class ActorsMcpServer {
         userRentedActorIds?: string[];
     }): Promise<void> {
         const {
-            taskId, tool, toolArgs, logSafeArgs, paymentRequiredResult,
+            taskId, tool, toolArgs, logSafeArgs, standbyRejection, paymentRequiredResult,
             apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
@@ -1450,8 +1454,16 @@ export class ActorsMcpServer {
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Check payment validation (already computed by prepareToolCallContext in the caller)
-            if (paymentRequiredResult) {
+            // Mirror the sync-path ordering: standby rejection wins over the generic 402 so the
+            // stored task result carries the precise reason the agent should act on.
+            if (standbyRejection) {
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
+                callDiagnostics = {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    ...buildActorFields(actorName, actorId),
+                };
+                result = standbyRejection;
+            } else if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
                 callDiagnostics = {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,

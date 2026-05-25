@@ -2820,10 +2820,13 @@ export function createIntegrationTestsSuite(
                     { task: { ttl: 60000 } },
                 );
 
+                let taskCreated = false;
                 let resultText: string | undefined;
                 let resultIsError: boolean | undefined;
                 for await (const message of stream) {
-                    if (message.type === 'result') {
+                    if (message.type === 'taskCreated') {
+                        taskCreated = true;
+                    } else if (message.type === 'result') {
                         resultIsError = message.result.isError as boolean | undefined;
                         const content = message.result.content as { text: string }[];
                         resultText = content[0]?.text;
@@ -2832,6 +2835,9 @@ export function createIntegrationTestsSuite(
                     }
                 }
 
+                // The server MUST create a task (not short-circuit with a sync error envelope) —
+                // anything else breaks the SDK's task creation contract.
+                expect(taskCreated, 'server should create a task even when the eventual result is a standby rejection').toBe(true);
                 expect(resultIsError, 'task result should be flagged as error').toBe(true);
                 expect(resultText, 'task result should expose the standby rejection text').toBeDefined();
                 expect(resultText).toContain('is not supported in agentic payment mode');

@@ -285,7 +285,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     paymentProvider: PaymentProvider;
     apifyToken: ApifyToken;
     mcpSessionId?: string;
-}): Promise<object | null> {
+}): Promise<Record<string, unknown> | null> {
     const { actorName, paymentProvider, apifyToken, mcpSessionId } = params;
     const normalizedActorName = fixActorNameInputAndLog(actorName, { mcpSessionId });
     const { baseActorName } = resolveActorContext(normalizedActorName);
