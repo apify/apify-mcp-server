@@ -26,8 +26,8 @@ import { SERVER_MODES, ServerMode } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
- * actor tools / add-actor). Order matches the workflow: fetch items → fetch
- * KV record → abort.
+ * actor tools / add-actor). Order matches the workflow: fetch run status →
+ * fetch items → fetch KV record → abort.
  */
 export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
     defaultGetActorRun,
