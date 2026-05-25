@@ -10,15 +10,18 @@ export const ACTOR_LOAD_ERROR_KIND = {
 export type ActorLoadErrorKind = (typeof ACTOR_LOAD_ERROR_KIND)[keyof typeof ACTOR_LOAD_ERROR_KIND];
 
 /**
- * Thrown by `getActorsAsTools` when `throwOnError: true` and the load fails
- * for a *sanitized*, user-safe reason.
+ * Surfaced (not thrown) by `getActorsAsTools` in the `errors[]` field when an
+ * Actor cannot be loaded for a *sanitized*, user-safe reason. Single-Actor
+ * callers (`add-actor`, `call-actor`) read `errors[0]` and forward the
+ * message to the agent; bulk callers ignore the array.
  *
  * `message` is always safe to forward to the LLM agent / client verbatim.
- * Raw backend errors (network, 5xx, auth) are caught at the throw site and
- * re-thrown as `ActorLoadError` of kind `LOAD_FAILED` with a generic masked
+ * Raw backend errors (network, 5xx, auth) are caught at the call site and
+ * surfaced as `ActorLoadError` of kind `LOAD_FAILED` with a generic masked
  * message — never with the original error's text.
  *
- * Use the static factories so canonical messages stay in one place.
+ * Use the static factories so canonical messages stay in one place — the
+ * call-time standby guard and the list-time filter both reuse them.
  */
 export class ActorLoadError extends Error {
     override readonly name = 'ActorLoadError';
@@ -51,7 +54,7 @@ export class ActorLoadError extends Error {
         return new ActorLoadError(
             ACTOR_LOAD_ERROR_KIND.STANDBY_PAYMENT_NOT_SUPPORTED,
             actorName,
-            `Actor "${actorName}" is a standby Actor, which is not supported in agentic payment mode.`,
+            `Actor "${actorName}" is a standby Actor, which is not supported in agentic payment mode. Please use OAuth or direct Apify token authentication in order to use standby Actors.`,
         );
     }
 }

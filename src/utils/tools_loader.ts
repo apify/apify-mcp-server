@@ -146,9 +146,9 @@ export async function getActors(
     options?: { actorStore?: ActorStore; paymentProvider?: PaymentProvider },
 ): Promise<ToolEntry[]> {
     const actorNames = resolveActorsToLoad(input);
-    return actorNames.length > 0
-        ? getActorsAsTools(actorNames, apifyClient, options)
-        : [];
+    if (actorNames.length === 0) return [];
+    const { tools } = await getActorsAsTools(actorNames, apifyClient, options);
+    return tools;
 }
 
 /** Build a restore {@link Input} from concrete tool names: internal names → `tools`, actor names → `actors`. */

@@ -2882,7 +2882,46 @@ export function createIntegrationTestsSuite(
                 expect(result.isError).toBe(true);
                 const content = result.content as { text: string }[];
                 expect(content.length).toBeGreaterThan(0);
-                expect(content[0].text).toContain('standby Actor and cannot be accessed using a third-party payment provider');
+                expect(content[0].text).toContain('is not supported in agentic payment mode');
+                await client.close();
+            },
+        );
+
+        // Task-mode `call-actor` declares `taskSupport: 'optional'`, so it must hit the same
+        // standby guard the sync path does — otherwise the stored task result would be a generic
+        // 402 PaymentRequired rather than the precise standby rejection. Regression for #893.
+        it.runIf(options.transport === 'streamable-http')(
+            'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
+            async () => {
+                client = await createClientFn({ payment: 'x402' });
+                const stream = client.experimental.tasks.callToolStream(
+                    {
+                        name: 'call-actor',
+                        arguments: {
+                            actor: 'apify/rag-web-browser',
+                            input: { query: 'test' },
+                        },
+                    },
+                    CallToolResultSchema,
+                    { task: { ttl: 60000 } },
+                );
+
+                let resultText: string | undefined;
+                let resultIsError: boolean | undefined;
+                for await (const message of stream) {
+                    if (message.type === 'result') {
+                        resultIsError = message.result.isError as boolean | undefined;
+                        const content = message.result.content as { text: string }[];
+                        resultText = content[0]?.text;
+                    } else if (message.type === 'error') {
+                        throw message.error;
+                    }
+                }
+
+                expect(resultIsError, 'task result should be flagged as error').toBe(true);
+                expect(resultText, 'task result should expose the standby rejection text').toBeDefined();
+                expect(resultText).toContain('is not supported in agentic payment mode');
+                expect(resultText).not.toContain('x402');
                 await client.close();
             },
         );

@@ -310,10 +310,7 @@ export async function checkPaymentProviderStandbyConflict(params: {
     });
 
     return buildMCPResponse({
-        texts: [dedent`
-            This Actor (${normalizedActorName}) is a standby Actor and cannot be accessed using a third-party payment provider.
-            To use this Actor, please provide a valid Apify token instead.
-        `],
+        texts: [ActorLoadError.standbyPaymentNotSupported(normalizedActorName).message],
         isError: true,
         telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
     });
@@ -427,17 +424,18 @@ export async function resolveAndValidateActor(params: {
     const { actorName, input, toolArgs } = params;
     const { apifyClient } = toolArgs;
 
-    const [actor] = await getActorsAsTools([actorName], apifyClient, {
+    const { tools, errors } = await getActorsAsTools([actorName], apifyClient, {
         mcpSessionId: toolArgs.mcpSessionId,
-        throwOnError: true,
-    }).catch((error: unknown) => {
-        // NOT_FOUND falls through to the structured "Actor not found" response below;
-        // anything else propagates so the outer call-actor handler reports it.
-        if (error instanceof ActorLoadError && error.kind === ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
-            return [];
-        }
-        throw error;
     });
+
+    // NOT_FOUND falls through to the structured "Actor not found" response below.
+    // Any other error (LOAD_FAILED / STANDBY_PAYMENT_NOT_SUPPORTED) is rethrown so the
+    // outer call-actor handler reports it; STANDBY is also caught upstream by the
+    // call-time guard in server.ts, so it's a defensive fallback here.
+    if (errors[0] && errors[0].kind !== ACTOR_LOAD_ERROR_KIND.NOT_FOUND) {
+        throw errors[0];
+    }
+    const actor = tools[0];
 
     if (!actor) {
         return {

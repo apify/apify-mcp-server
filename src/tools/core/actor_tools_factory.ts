@@ -286,13 +286,33 @@ export function fixActorNameInput(actorName: string): string {
 }
 
 /**
- * Loads Actor metadata + builds tool entries for each requested Actor.
+ * Result type for {@link getActorsAsTools}: every requested name produces
+ * either a successful load (contributing to `tools` — a single Actor can fan
+ * out into multiple tools for MCP-server Actors) or an `ActorLoadError`
+ * describing why the load failed.
  *
- * When `paymentProvider` is set, standby/MCP-server Actors are dropped from
- * the result. External payment providers (x402, Skyfire) cannot pay for
- * standby Actor runs — the call-time guard in `call_actor_common.ts` rejects
- * any such tool call. Filtering at list time keeps the advertised tool
- * surface honest so agents never discover a tool that can only fail later.
+ * Bulk callers (`getActors`, server load-helpers) typically only read
+ * `tools`. Single-Actor callers (`add-actor`, `call-actor`) read `errors[0]`
+ * to surface the precise reason back to the agent.
+ */
+export type ActorsAsToolsResult = {
+    tools: ToolEntry[];
+    errors: ActorLoadError[];
+};
+
+/**
+ * Loads Actor metadata + builds MCP tool entries for the requested Actor
+ * names. Returns both successful tools and `ActorLoadError` entries so
+ * callers can surface precise reasons when needed (single-Actor flows like
+ * `add-actor` / `call-actor`) or just ignore failures (bulk session-boot
+ * flows that build the initial tool surface).
+ *
+ * When `paymentProvider` is set, standby and MCP-server Actors are reported
+ * as `STANDBY_PAYMENT_NOT_SUPPORTED` errors instead of contributing tools.
+ * External payment providers (x402, Skyfire) cannot pay for standby Actor
+ * runs — the call-time guard in `call_actor_common.ts` rejects any such
+ * tool call. Filtering at list time keeps the advertised tool surface
+ * honest so agents never discover a tool that can only fail later.
  */
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
@@ -301,23 +321,21 @@ export async function getActorsAsTools(
         mcpSessionId?: string;
         actorStore?: ActorStore;
         paymentProvider?: PaymentProvider;
-        throwOnError?: boolean;
     },
-): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore, paymentProvider, throwOnError } = options ?? {};
+): Promise<ActorsAsToolsResult> {
+    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
     log.debug('Fetching Actors as tools', {
         actorNames: actorIdsOrNames,
         mcpSessionId,
         paymentProviderId: paymentProvider?.id,
     });
 
+    const errors: ActorLoadError[] = [];
+
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
             const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
 
-            // Wrap ONLY the network call — semantic throws below must not be masked
-            // by the catch block (otherwise "not found" gets rewritten to a generic
-            // "Please try again later" message).
             let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
                 actorDefinitionWithInfo = await getActorDefinitionCached(actorName, apifyClient);
@@ -327,16 +345,11 @@ export async function getActorsAsTools(
                     ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
-                if (throwOnError) {
-                    throw ActorLoadError.loadFailed(actorIdOrName);
-                }
+                errors.push(ActorLoadError.loadFailed(actorIdOrName));
                 return null;
             }
 
             if (!actorDefinitionWithInfo) {
-                if (throwOnError) {
-                    throw ActorLoadError.notFound(actorIdOrName);
-                }
                 log.softFail('Actor not found or definition is not available', {
                     actorName,
                     ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
@@ -344,6 +357,7 @@ export async function getActorsAsTools(
                     statusCode: 404,
                     failureCategory: 'INVALID_INPUT',
                 });
+                errors.push(ActorLoadError.notFound(actorIdOrName));
                 return null;
             }
 
@@ -356,44 +370,28 @@ export async function getActorsAsTools(
     );
 
     const clonedActors = structuredClone(actorsInfo);
-
-    // Filter out nulls - actorInfo can be null if the Actor was not found or an error occurred
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
-    if (paymentProvider && throwOnError) {
-        for (const actorInfo of nonNullActors) {
-            if (actorInfo.actor.actorStandby?.isEnabled) {
-                throw ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName);
-            }
+    // Split MCP-server vs normal Actors. Under `paymentProvider`, standby/MCP-server
+    // Actors are reported as STANDBY_PAYMENT_NOT_SUPPORTED errors instead of contributing
+    // tools — the platform API hard-rejects standby runs under third-party providers.
+    const actorMCPServersInfo: ActorInfo[] = [];
+    const normalActorsInfo: ActorInfo[] = [];
+    for (const actorInfo of nonNullActors) {
+        const isMcpServer = isActorInfoMcpServer(actorInfo);
+        const isStandby = !!actorInfo.actor.actorStandby?.isEnabled;
+        if (paymentProvider && (isMcpServer || isStandby)) {
+            errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
+            continue;
         }
-    }
-
-    // Separate Actors with MCP servers and normal Actors
-    // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled
-    const actorMCPServersInfo = nonNullActors.filter((actorInfo) => isActorInfoMcpServer(actorInfo));
-    // All other Actors
-    const normalActorsInfo = nonNullActors.filter((actorInfo) => {
-        if (isActorInfoMcpServer(actorInfo)) return false;
-        // Even non-MCP "normal" Actors can have standby mode enabled. The platform API hard-rejects
-        // standby Actor runs under third-party payment providers, so we must filter them out in payment mode.
-        if (paymentProvider && actorInfo.actor.actorStandby?.isEnabled) return false;
-        return true;
-    });
-
-    if (paymentProvider && actorMCPServersInfo.length > 0) {
-        log.debug('Skipping MCP-server Actors for payment-provider session', {
-            mcpSessionId,
-            paymentProviderId: paymentProvider.id,
-            droppedActors: actorMCPServersInfo.map((a) => a.definition.actorFullName),
-        });
+        if (isMcpServer) actorMCPServersInfo.push(actorInfo);
+        else normalActorsInfo.push(actorInfo);
     }
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
-        paymentProvider
-            ? Promise.resolve([] as ToolEntry[])
-            : getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
+        getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
-    return [...normalTools, ...mcpServerTools];
+    return { tools: [...normalTools, ...mcpServerTools], errors };
 }
