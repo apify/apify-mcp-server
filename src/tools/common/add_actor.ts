@@ -1,7 +1,5 @@
 import { z } from 'zod';
 
-import log from '@apify/log';
-
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
@@ -47,28 +45,19 @@ USAGE EXAMPLES:
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
-        try {
-            const { tools, errors } = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
-            // First error is the precise reason this Actor could not be added —
-            // safe to forward verbatim (sanitized at source by ActorLoadError factories).
-            if (errors[0]) {
-                return buildMCPResponse({
-                    texts: [errors[0].message],
-                    isError: true,
-                });
-            }
-            await sendNotification({ method: 'notifications/tools/list_changed' });
-            const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
+        const { tools, errors } = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
+        // First error is the precise reason this Actor could not be added —
+        // safe to forward verbatim (sanitized at source by ActorLoadError factories).
+        if (errors[0]) {
             return buildMCPResponse({
-                texts: [`Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}.`],
-            });
-        } catch (error) {
-            // Unexpected non-sanitized error — log full detail server-side, return masked message to the agent
-            log.error('Unexpected error in add-actor', { actor: parsed.actor, error });
-            return buildMCPResponse({
-                texts: [`Failed to add Actor "${parsed.actor}". Please try again later.`],
+                texts: [errors[0].message],
                 isError: true,
             });
         }
+        await sendNotification({ method: 'notifications/tools/list_changed' });
+        const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
+        return buildMCPResponse({
+            texts: [`Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}.`],
+        });
     },
 } as const);
