@@ -33,10 +33,11 @@ describe('MCP server internals integration tests', () => {
 
         // Store the tool name list
         const names = actorsMcpServer.listAllToolNames();
-        // enableAddingActors=true seeds add-actor + 3 auto-injected helpers (dataset, kv, abort);
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (get-actor-run, dataset, kv, abort);
         // then ACTOR_NORMAL_MODE is added on top.
         const expectedToolNames = [
             addTool.name,
+            'get-actor-run',
             'get-dataset-items',
             'get-key-value-store-record',
             'abort-actor-run',
@@ -57,8 +58,8 @@ describe('MCP server internals integration tests', () => {
 
     it('should notify tools changed handler on tool modifications', async () => {
         let latestTools: string[] = [];
-        // enableAddingActors=true seeds add-actor + 3 auto-injected helpers (dataset, kv, abort)
-        const numberOfTools = 4;
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (get-actor-run, dataset, kv, abort)
+        const numberOfTools = 5;
 
         let toolNotificationCount = 0;
         const onToolsChanged = (tools: string[]) => {
@@ -98,8 +99,8 @@ describe('MCP server internals integration tests', () => {
     it('should stop notifying after unregistering tools changed handler', async () => {
         let latestTools: string[] = [];
         let notificationCount = 0;
-        // enableAddingActors=true seeds add-actor + 3 auto-injected helpers (dataset, kv, abort)
-        const numberOfTools = 4;
+        // enableAddingActors=true seeds add-actor + 4 auto-injected helpers (get-actor-run, dataset, kv, abort)
+        const numberOfTools = 5;
         const onToolsChanged = (tools: string[]) => {
             latestTools = tools;
             notificationCount++;

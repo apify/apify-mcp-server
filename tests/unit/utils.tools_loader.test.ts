@@ -2,7 +2,8 @@ import { ApifyClient } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
-import { AUTO_INJECTED_TOOLS, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import type { ToolEntry } from '../../src/types.js';
+import { AUTO_INJECTED_TOOLS, getToolsForServerMode, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -113,6 +114,19 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
         expect(toolNames).not.toContain(HelperTools.ACTOR_CALL);
         for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
     });
+
+    it.each(['default', 'apps'] as const)(
+        'auto-injects get-actor-run when only direct actor tools are present (%s mode)',
+        (mode) => {
+            const actorTool = { type: 'actor', name: 'apify--rag-web-browser', actorFullName: 'apify/rag-web-browser' } as unknown as ToolEntry;
+            const tools = getToolsForServerMode({ actors: ['apify/rag-web-browser'], tools: [] }, [actorTool], mode);
+            const toolNames = tools.map((t) => t.name);
+
+            expect(toolNames).toContain('apify--rag-web-browser');
+            expect(toolNames).toContain(HelperTools.ACTOR_RUNS_GET);
+            for (const name of AUTO_INJECTED_TOOL_NAMES) expect(toolNames).toContain(name);
+        },
+    );
 });
 
 describe('loadToolsFromInput explicit widget selection', () => {
