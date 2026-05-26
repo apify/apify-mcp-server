@@ -62,6 +62,12 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 - **Expose methods on `ActorsMcpServer`**, not raw data exports via `./internals` — minimize the coupling surface
 - When designing a new feature, ask: can this land in one repo? Prefer exposing a method or interface over exporting internals that the other repo re-implements
 
+### Public/internal integration tests ownership
+
+- **MCP and package-logic tests go in `tests/integration/suite.ts` here.** Hosted-only behavior (auth, rate limiter, Caddy, multi-node) lives in `apify-mcp-server-internal`, not here.
+- **Flag PRs that touch what the hosted server consumes** — `internals.js` exports, `_meta`, `structuredContent`, `clientInfo`-based logic, `?ui=` / `?payment=` parsing, notification timing. Internal's contract suite likely needs a matching test.
+- **Never delete a test here thinking internal covers it.** This repo is the source; internal only smoke-tests that our output survives its middleware. Full rules: [DEVELOPMENT.md → Test organization across repos](./DEVELOPMENT.md#test-organization-across-repos).
+
 ## Code conventions
 
 - **Follow [CONTRIBUTING.md](./CONTRIBUTING.md) for all naming and coding standards.** It is the single source of truth for naming rules (function verbs, boolean prefixes, type suffixes, enumerations, file names, etc.), string formatting, parameters, error handling, and anti-patterns. Read it before writing code.
