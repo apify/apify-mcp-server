@@ -6,7 +6,7 @@ import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, to
 import { getActorsAsTools } from './core/actor_tools_factory.js';
 import type { ActorsAsToolsResult } from './core/actor_tools_factory.js';
 
-// Use string constants instead of importing tool objects to avoid circular dependency
+// Use string constants instead of tool object imports to avoid circular dependencies
 export const unauthEnabledTools: string[] = [
     HelperTools.DOCS_SEARCH,
     HelperTools.DOCS_FETCH,

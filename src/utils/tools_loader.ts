@@ -27,10 +27,11 @@ import { SERVER_MODES, ServerMode } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
- * actor tools / add-actor). Order matches the workflow: fetch items → fetch
- * KV record → abort.
+ * actor tools / add-actor). Order matches the workflow: fetch run status →
+ * fetch items → fetch KV record → abort.
  */
 export const AUTO_INJECTED_TOOLS: readonly ToolEntry[] = [
+    defaultGetActorRun,
     getDatasetItems,
     getKeyValueStoreRecord,
     abortActorRun,
@@ -190,7 +191,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
             toolsByName.set(tool.name, tool);
         }
     }
-    // Widgets are apps-only and not in any category; include for direct selection
+    // Widgets are apps-only and not in any category; include it for direct selection
     if (mode === ServerMode.APPS) {
         for (const widget of WIDGET_BY_BASE_TOOL.values()) {
             toolsByName.set(widget.name, widget);
@@ -270,15 +271,8 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     // (e.g. `tools: ['runs']`) would otherwise land on an unrecommendable tool / empty widget.
     const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
 
-    // No presence guards here — the de-dup pass at the end drops any duplicates.
+    // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
     const toolsToInject: ToolEntry[] = [];
-    // `call-actor` and direct actor tools return a RunResponse whose `nextStep` may point at
-    // `get-actor-run` for polling (when the run is non-terminal at waitSecs cap), so the LLM
-    // needs that tool available. `call-actor-widget` returns immediately and the widget UI
-    // polls run status itself — that path doesn't drive the auto-inject decision here.
-    if (hasCallActor || (hasActorTools && mode === ServerMode.APPS)) {
-        toolsToInject.push(defaultGetActorRun);
-    }
     if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
         toolsToInject.push(...AUTO_INJECTED_TOOLS);
     }
@@ -293,7 +287,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     // Apps mode: append a widget tool for each base tool already in the result.
-    // Runs after the get-actor-run auto-inject so an auto-injected base still
+    // Runs after the get-actor-run auto-inject, so an auto-injected base still
     // brings its widget sibling.
     if (mode === ServerMode.APPS) {
         for (const entry of [...result]) {
