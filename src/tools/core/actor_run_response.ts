@@ -71,6 +71,12 @@ export type RunDataset = {
     title?: string;
     itemCount?: number;
     cleanItemCount?: number;
+    /**
+     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
+     * list is deduped at build time, so callers receive a flat unique projection-valid list
+     * rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
+     * shape Apify returns for array-heavy datasets.
+     */
     fields?: string[];
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
@@ -138,6 +144,31 @@ function slashToDot(field: string): string {
 }
 
 /**
+ * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
+ * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
+ * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
+ * segments and dedupe; the resulting paths stay valid projections for `fields="..."`.
+ *
+ * Exported for direct unit testing — production callers go through `buildRunDataset`,
+ * which is the single boundary where this transformation is applied.
+ */
+export function collapseArrayIndices(fields: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const field of fields) {
+        const collapsed = field
+            .split('.')
+            .filter((segment) => !/^\d+$/.test(segment))
+            .join('.');
+        if (collapsed && !seen.has(collapsed)) {
+            seen.add(collapsed);
+            result.push(collapsed);
+        }
+    }
+    return result;
+}
+
+/**
  * Drop undefined and null keys. Apify's SDK returns null for fields it doesn't have (e.g.
  * an unnamed default dataset's `name`), and the response shape declares no nullable fields, so we
  * filter both to keep the response clean and pass `getActorRunOutputSchema` validation.
@@ -177,7 +208,7 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
-        fields: datasetMeta.fields?.map(slashToDot),
+        fields: datasetMeta.fields ? collapseArrayIndices(datasetMeta.fields.map(slashToDot)) : undefined,
     });
 }
 
@@ -315,26 +346,6 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-// Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
-// `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or array-heavy
-// schemas balloon into hundreds of redundant paths. Strip pure-numeric segments and dedupe;
-// the resulting paths stay valid projections for `fields="..."`.
-function collapseArrayIndices(fields: string[]): string[] {
-    const seen = new Set<string>();
-    const result: string[] = [];
-    for (const field of fields) {
-        const collapsed = field
-            .split('.')
-            .filter((segment) => !/^\d+$/.test(segment))
-            .join('.');
-        if (collapsed && !seen.has(collapsed)) {
-            seen.add(collapsed);
-            result.push(collapsed);
-        }
-    }
-    return result;
-}
-
 function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields || fields.length === 0) return '';
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
@@ -353,7 +364,7 @@ function buildSucceededSummaryNextStep(
     // Dataset is primary. nextStep stays dataset-only (one primary action) but the summary mentions
     // KV when both exist so the caller can see the run also produced key-value records.
     if (itemCount !== undefined && itemCount > 0 && datasetId) {
-        const fields = collapseArrayIndices(dataset?.fields ?? []);
+        const fields = dataset?.fields ?? [];
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. ${itemCount} ${itemCount === 1 ? 'item' : 'items'}; ${fields.length} fields available.${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch items (${itemCount} total).${fieldsProjectionHint(fields)}`,
@@ -374,7 +385,7 @@ function buildSucceededSummaryNextStep(
     if (itemCount === 0 && datasetId) {
         return {
             summary: `SUCCEEDED in ${runTimeSecs}s. No dataset items found.${statusMessageLine(statusMessage)}${kv.summarySuffix}`,
-            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(collapseArrayIndices(dataset?.fields ?? []))}`,
+            nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to verify output (metadata reports 0 items).${fieldsProjectionHint(dataset?.fields)}`,
         };
     }
 
@@ -400,7 +411,7 @@ function buildTimedOutSummaryNextStep(
     // surfaced as the primary follow-up — partial output is the diagnostic signal here.
     if (datasetId) {
         const itemCount = dataset?.itemCount ?? 0;
-        const fields = collapseArrayIndices(dataset?.fields ?? []);
+        const fields = dataset?.fields ?? [];
         return {
             summary: `TIMED-OUT after ${runTimeSecs}s.${kv.summarySuffix}`,
             nextStep: `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and limit=20 to fetch any partial output (${itemCount} ${itemCount === 1 ? 'item' : 'items'} written). Available fields: ${fields.length > 0 ? fields.join(', ') : 'none'}.`,
