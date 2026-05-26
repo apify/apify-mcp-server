@@ -24,7 +24,7 @@ export type SchemaGenerationOptions = {
 /**
  * Local counterpart to the dataset API's `clean=true` — empty arrays carry no schema info.
  * Strips only empty arrays; keeps null / '' / empty objects so schema inference still sees those fields.
- * Stricter sibling: `cleanEmptyProperties` in `src/tools/common/get_actor_output.ts` also strips nullish and empty strings.
+ * Stricter sibling: {@link cleanEmptyProperties} also strips nullish and empty strings.
  */
 export function cleanEmptyArrays(obj: unknown): unknown {
     if (Array.isArray(obj)) {
@@ -41,6 +41,39 @@ export function cleanEmptyArrays(obj: unknown): unknown {
         acc[key] = processed;
         return acc;
     }, {} as Record<string, unknown>);
+}
+
+/**
+ * Cleans empty properties (null, undefined, empty strings, empty arrays, empty objects) from an object.
+ * Looser sibling: {@link cleanEmptyArrays} strips only empty arrays.
+ * @param obj - The object to clean
+ * @returns The cleaned object or undefined if the result is empty
+ */
+export function cleanEmptyProperties(obj: unknown): unknown {
+    if (obj === null || obj === undefined || obj === '') {
+        return undefined;
+    }
+
+    if (typeof obj !== 'object') {
+        return obj;
+    }
+
+    if (Array.isArray(obj)) {
+        const cleaned = obj
+            .map((item) => cleanEmptyProperties(item))
+            .filter((item) => item !== undefined);
+        return cleaned.length > 0 ? cleaned : undefined;
+    }
+
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+        const cleanedValue = cleanEmptyProperties(value);
+        if (cleanedValue !== undefined) {
+            cleaned[key] = cleanedValue;
+        }
+    }
+
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
 }
 
 const FORMAT_DETECTORS: [string, (s: string) => boolean][] = [

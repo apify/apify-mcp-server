@@ -8,7 +8,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
-import { cleanEmptyProperties } from '../common/get_actor_output.js';
+import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 
 /** Cap on `storages.keyValueStores.default.keys` array length. */
 const KV_KEYS_LIMIT = 50;
