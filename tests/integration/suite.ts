@@ -1845,7 +1845,6 @@ export function createIntegrationTestsSuite(
             client = await createClientFn({ tools: ['docs'] });
             const names = getToolNames(await client.listTools());
             for (const name of AUTO_INJECTED_TOOL_NAMES) expect(names).not.toContain(name);
-            expect(names).not.toContain(HelperTools.ACTOR_OUTPUT_GET);
             expect(names).not.toContain(HelperTools.ACTOR_RUNS_GET);
             await client.close();
         });
@@ -2690,7 +2689,6 @@ export function createIntegrationTestsSuite(
                 // and any silent drift (e.g. a tool losing paymentRequired) is caught here.
                 const paidToolNames = [
                     HelperTools.ACTOR_CALL,
-                    HelperTools.ACTOR_OUTPUT_GET,
                     HelperTools.ACTOR_RUNS_GET,
                     HelperTools.ACTOR_RUNS_LOG,
                     HelperTools.ACTOR_RUNS_ABORT,

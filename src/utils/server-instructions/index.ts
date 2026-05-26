@@ -63,8 +63,6 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
     - \`waitSecs > 0\`: waits up to that many seconds for the run to complete, then returns the result.
 
 ### Tool disambiguation
-- **\`${HelperTools.ACTOR_OUTPUT_GET}\` vs \`${HelperTools.DATASET_GET_ITEMS}\`:**
-  Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **\`${HelperTools.STORE_SEARCH}\` vs \`${HelperTools.ACTOR_GET_DETAILS}\`:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
 ${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**

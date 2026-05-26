@@ -200,7 +200,7 @@ mcpc --json @stdio tools-call search-actors keywords:="scraper" | jq ‘.content
 - `search-actors` — test valid keywords, empty keywords
 - `fetch-actor-details` — test valid Actor, non-existent Actor
 - `call-actor` — test with valid input; check async mode
-- `get-actor-output` — test field filtering with dot notation, non-existent dataset
+- `get-dataset-items` — test field filtering with dot notation, non-existent dataset
 - `search-apify-docs` / `fetch-apify-docs` — test relevant and non-existent queries
 
 

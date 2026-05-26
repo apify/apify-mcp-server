@@ -46,7 +46,7 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     completion — do NOT poll or call any other tool after this.
 
     For silent async starts where no UI is needed (e.g., "start this in the background",
-    or when your next step is to fetch results via ${HelperTools.ACTOR_OUTPUT_GET}), use
+    or when your next step is to fetch results via ${HelperTools.DATASET_GET_ITEMS}), use
     ${HelperTools.ACTOR_CALL} instead — it returns the same runId without rendering a widget.
 
     WORKFLOW:

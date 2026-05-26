@@ -63,7 +63,6 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
                 HelperTools.DATASET_GET,
                 HelperTools.DATASET_GET_ITEMS,
                 HelperTools.DATASET_SCHEMA_GET,
-                HelperTools.ACTOR_OUTPUT_GET,
                 HelperTools.KEY_VALUE_STORE_GET,
                 HelperTools.KEY_VALUE_STORE_KEYS_GET,
                 HelperTools.KEY_VALUE_STORE_RECORD_GET,
