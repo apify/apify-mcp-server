@@ -1,6 +1,5 @@
 import { z } from 'zod';
 
-import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -49,9 +48,8 @@ USAGE EXAMPLES:
         openWorldHint: false,
     },
     call: async (toolArgs: InternalToolArgs) => {
-        const { args, apifyToken } = toolArgs;
+        const { args, apifyClient: client } = toolArgs;
         const parsed = getUserKeyValueStoresListArgs.parse(args);
-        const client = new ApifyClient({ token: apifyToken });
         const stores = await client.keyValueStores().list({
             limit: parsed.limit,
             offset: parsed.offset,

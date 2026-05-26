@@ -42,8 +42,8 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-        const v = await client.dataset(parsed.datasetId).get();
-        if (!v) {
+        const dataset = await client.dataset(parsed.datasetId).get();
+        if (!dataset) {
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
@@ -57,7 +57,7 @@ USAGE EXAMPLES:
         // hints for `get-dataset-items` (which expects dot-notation). Run the same
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
-        const normalized = v.fields ? { ...v, fields: normalizeDatasetFields(v.fields) } : v;
+        const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
         return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(normalized)}\n\`\`\`` }] };
     },
 } as const);

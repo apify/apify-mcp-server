@@ -14,7 +14,7 @@ const getKeyValueStoreKeysArgs = z.object({
     limit: z.number()
         .max(10)
         .optional()
-        .describe('Number of keys to be returned. Maximum value is 1000.'),
+        .describe('Number of keys to be returned. Maximum value is 10.'),
 });
 
 /**
@@ -31,7 +31,7 @@ USAGE:
 - Use when you need to discover what records exist in a store.
 
 USAGE EXAMPLES:
-- user_input: List first 100 keys in store username~my-store
+- user_input: List first 10 keys in store username~my-store
 - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),

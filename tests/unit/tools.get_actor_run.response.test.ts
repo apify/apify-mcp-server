@@ -11,6 +11,7 @@ import {
 } from '../../src/tools/core/actor_run_response.js';
 import { defaultGetActorRun } from '../../src/tools/default/get_actor_run.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
+import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 /**
  * Default mode `get-actor-run` returns: runId, actorId, status, storages, summary, nextStep
@@ -77,22 +78,11 @@ function stubClient(opts: {
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
-function callArgs(client: InternalToolArgs['apifyClient'], args: Record<string, unknown>): InternalToolArgs {
-    return {
-        args,
-        apifyToken: 'test-token',
-        apifyClient: client,
-        extra: {} as InternalToolArgs['extra'],
-        mcpServer: {} as InternalToolArgs['mcpServer'],
-        apifyMcpServer: { options: { paymentProvider: undefined } } as InternalToolArgs['apifyMcpServer'],
-    } as InternalToolArgs;
-}
-
 describe('get-actor-run default response', () => {
     it('end-to-end SUCCEEDED: translates fields, omits legacy preview, carries identifiers in text, attaches usage _meta', async () => {
         const run = mockSucceededRun();
         const result = await (defaultGetActorRun as HelperTool).call(
-            callArgs(stubClient({ run, dataset: mockDataset() }), { runId: 'run-1', waitSecs: 0 }),
+            stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, stubClient({ run, dataset: mockDataset() })),
         );
 
         const { structuredContent, content, _meta } = result as {
@@ -146,7 +136,7 @@ describe('get-actor-run default response', () => {
             },
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        const result = await (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         const { structuredContent } = result as { structuredContent: RunResponse };
 
         expect(structuredContent.status).toBe('RUNNING');
@@ -165,9 +155,9 @@ describe('get-actor-run default response', () => {
         // Probe runs with `limit: 1`, so `items.length === 1` even when the dataset has more.
         // The recovered count must come from `total`, otherwise the lag fallback caps at 1.
         const result = await (defaultGetActorRun as HelperTool).call(
-            callArgs(
-                stubClient({ run, dataset, listItemsProbe: { items: [{ a: 1 }], total: 47 } }),
+            stubToolCallContext(
                 { runId: 'run-1', waitSecs: 0 },
+                stubClient({ run, dataset, listItemsProbe: { items: [{ a: 1 }], total: 47 } }),
             ),
         );
         const { structuredContent } = result as { structuredContent: RunResponse };
@@ -199,7 +189,7 @@ describe('get-actor-run default response', () => {
                 }),
             } as unknown as InternalToolArgs['apifyClient'];
 
-            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
+            const callPromise = (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client));
             await vi.runAllTimersAsync();
             const result = await callPromise;
             const { structuredContent } = result as { structuredContent: RunResponse };
@@ -234,7 +224,7 @@ describe('get-actor-run default response', () => {
                 }),
             } as unknown as InternalToolArgs['apifyClient'];
 
-            const callPromise = (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 5 }));
+            const callPromise = (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client));
             // Drive the [0, 1000, 2000, 2000]ms schedule to completion without real wall time.
             await vi.runAllTimersAsync();
             const result = await callPromise;
@@ -268,7 +258,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        await (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         // Exactly one immediate probe — no delayed retries.
         expect(probeCalls).toBe(1);
     });
@@ -294,7 +284,7 @@ describe('get-actor-run default response', () => {
         } as unknown as InternalToolArgs['apifyClient'];
 
         const result = await (defaultGetActorRun as HelperTool).call({
-            ...callArgs(client, { runId: 'run-1', waitSecs: 0 }),
+            ...stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client),
             extra: { signal: controller.signal } as InternalToolArgs['extra'],
         });
 
@@ -329,12 +319,8 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
-        const { content, structuredContent, isError } = result as {
-            content: { text: string }[];
-            structuredContent: RunResponse;
-            isError?: boolean;
-        };
+        const result = await (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
+        const { content, structuredContent, isError } = result as TextToolResult & { structuredContent: RunResponse };
 
         // The whole call must NOT hard-fail just because one metadata fetch errored.
         expect(isError).not.toBe(true);
@@ -367,7 +353,7 @@ describe('get-actor-run default response', () => {
             }),
         } as unknown as InternalToolArgs['apifyClient'];
 
-        const result = await (defaultGetActorRun as HelperTool).call(callArgs(client, { runId: 'run-1', waitSecs: 0 }));
+        const result = await (defaultGetActorRun as HelperTool).call(stubToolCallContext({ runId: 'run-1', waitSecs: 0 }, client));
         const { structuredContent, isError } = result as { structuredContent: RunResponse; isError?: boolean };
 
         expect(isError).not.toBe(true);
@@ -425,7 +411,7 @@ describe('get-actor-run default response', () => {
             stop: () => { stopCount += 1; },
         };
 
-        const baseArgs = callArgs(client, { runId: 'run-1', waitSecs: 5 });
+        const baseArgs = stubToolCallContext({ runId: 'run-1', waitSecs: 5 }, client);
         await (defaultGetActorRun as HelperTool).call({
             ...baseArgs,
             progressTracker: tracker as unknown as InternalToolArgs['progressTracker'],
@@ -447,8 +433,8 @@ describe('get-actor-run default response', () => {
             actor: (_id: string) => ({ get: async () => ACTOR }),
         } as unknown as InternalToolArgs['apifyClient'];
         const result = await (defaultGetActorRun as HelperTool).call(
-            callArgs(client, { runId: 'missing', waitSecs: 0 }),
-        ) as { isError?: boolean; content: { text: string }[] };
+            stubToolCallContext({ runId: 'missing', waitSecs: 0 }, client),
+        ) as TextToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toContain('not found');
     });

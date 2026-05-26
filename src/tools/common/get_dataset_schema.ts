@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -58,7 +58,7 @@ USAGE EXAMPLES:
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 
@@ -83,11 +83,6 @@ USAGE EXAMPLES:
             });
         }
 
-        return {
-            content: [{
-                type: 'text',
-                text: `\`\`\`json\n${JSON.stringify(schema)}\n\`\`\``,
-            }],
-        };
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(schema)}\n\`\`\`` }] };
     },
 } as const);

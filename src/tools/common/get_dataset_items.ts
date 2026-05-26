@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
@@ -10,8 +10,8 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
-/** Example: `["metadata.url", "crawl.statusCode", "title"]` → `["metadata", "crawl"]`. */
-export function deriveFlattenFromFields(fields: string[]): string[] {
+/** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
+export function extractDotPrefixes(fields: string[]): string[] {
     const prefixes = new Set<string>();
     for (const field of fields) {
         const dotIndex = field.indexOf('.');
@@ -83,7 +83,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
         const omit = parseCommaSeparatedList(parsed.omit);
         const flatten = parsed.flatten !== undefined
             ? parseCommaSeparatedList(parsed.flatten)
-            : deriveFlattenFromFields(fields);
+            : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const v = await client.dataset(parsed.datasetId).listItems({
@@ -99,7 +99,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [`Dataset '${parsed.datasetId}' not found.`],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
+                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
 
