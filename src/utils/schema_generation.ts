@@ -21,9 +21,11 @@ export type SchemaGenerationOptions = {
     clean?: boolean;
 };
 
-// Local counterpart to the dataset API's `clean=true` — empty arrays carry no schema info.
-// Strips only empty arrays; keeps null / '' / empty objects so schema inference still sees those fields.
-// Stricter sibling: `cleanEmptyProperties` in `src/tools/common/get_actor_output.ts` also strips nullish and empty strings.
+/**
+ * Local counterpart to the dataset API's `clean=true` — empty arrays carry no schema info.
+ * Strips only empty arrays; keeps null / '' / empty objects so schema inference still sees those fields.
+ * Stricter sibling: `cleanEmptyProperties` in `src/tools/common/get_actor_output.ts` also strips nullish and empty strings.
+ */
 export function cleanEmptyArrays(obj: unknown): unknown {
     if (Array.isArray(obj)) {
         return obj.map(cleanEmptyArrays);

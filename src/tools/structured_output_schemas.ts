@@ -402,7 +402,8 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
         properties: itemProperties,
     };
     const clone = structuredClone(getActorRunOutputSchema);
-    (clone.properties.storages.properties.datasets.properties.default.properties as Record<string, unknown>).itemsSchema = itemsSchema;
+    const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<string, unknown>;
+    datasetDefaultProps.itemsSchema = itemsSchema;
     return clone;
 }
 
