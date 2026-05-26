@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     buildStartRunResponse,
     buildStatusSummaryNextStep,
+    collapseArrayIndices,
     type RunDataset,
     type RunKeyValueStore,
     type RunResponse,
@@ -673,5 +674,46 @@ describe('buildStatusTemplate', () => {
         const t = buildStatusSummaryNextStep({ run: makeRun('SUCCEEDED'), dataset: datasetWithItems });
         expect(t.nextStep).toMatch(/to project\.$/);
         expect(t.nextStep).not.toMatch(/\.\.$/);
+    });
+});
+
+// -----------------------------------------------------------------------------
+// collapseArrayIndices (#894): the single boundary where Apify's index-expanded
+// `dataset.fields` is normalized. `buildRunDataset` calls this once, so every
+// downstream consumer (structured `storages.datasets.default.fields` AND the
+// narrative summary/nextStep) sees a flat deduped list.
+// -----------------------------------------------------------------------------
+describe('collapseArrayIndices', () => {
+    it('strips numeric segments and dedupes paths sharing the same shape', () => {
+        expect(
+            collapseArrayIndices([
+                'latestComments.0.id',
+                'latestComments.0.text',
+                'latestComments.1.id',
+                'latestComments.1.text',
+                'latestComments.2.owner.username',
+            ]),
+        ).toEqual(['latestComments.id', 'latestComments.text', 'latestComments.owner.username']);
+    });
+
+    it('preserves non-array fields unchanged and preserves first-occurrence order', () => {
+        expect(
+            collapseArrayIndices([
+                'metadata.url',
+                'entities.hashtags.0.text',
+                'entities.hashtags.1.text',
+                'markdown',
+            ]),
+        ).toEqual(['metadata.url', 'entities.hashtags.text', 'markdown']);
+    });
+
+    it('returns [] for empty input', () => {
+        expect(collapseArrayIndices([])).toEqual([]);
+    });
+
+    it('drops paths that collapse to empty (pathological all-numeric segments)', () => {
+        // Pure-numeric top-level keys are pathological (dataset fields are object keys, not
+        // array indices) but we still don't want them sneaking through as empty strings.
+        expect(collapseArrayIndices(['0', '1', '2'])).toEqual([]);
     });
 });

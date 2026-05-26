@@ -71,6 +71,12 @@ export type RunDataset = {
     title?: string;
     itemCount?: number;
     cleanItemCount?: number;
+    /**
+     * Dot-notation field paths. Pure-numeric segments (array indices) are stripped and the
+     * list is deduped at build time, so callers receive a flat unique projection-valid list
+     * rather than the inflated `entities.hashtags.0.text`, `entities.hashtags.1.text`, ...
+     * shape Apify returns for array-heavy datasets.
+     */
     fields?: string[];
     /**
      * JSON Schema fragment for each dataset row. Populated only by direct actor tools (where
@@ -138,6 +144,41 @@ function slashToDot(field: string): string {
 }
 
 /**
+ * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
+ * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
+ * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
+ * segments and dedupe; the resulting paths stay valid projections for `fields="..."`.
+ *
+ * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
+ * production callers go through `normalizeDatasetFields`.
+ */
+export function collapseArrayIndices(fields: string[]): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const field of fields) {
+        const collapsed = field
+            .split('.')
+            .filter((segment) => !/^\d+$/.test(segment))
+            .join('.');
+        if (collapsed && !seen.has(collapsed)) {
+            seen.add(collapsed);
+            result.push(collapsed);
+        }
+    }
+    return result;
+}
+
+/**
+ * Canonical normalization for an Apify-returned `dataset.fields` array: translate
+ * slash-notation to dot-notation AND collapse expanded array indices. Used at every
+ * MCP tool boundary that surfaces dataset field metadata (`buildRunDataset` for
+ * `call-actor` / `get-actor-run`, and `get-dataset` for the raw API passthrough).
+ */
+export function normalizeDatasetFields(fields: string[]): string[] {
+    return collapseArrayIndices(fields.map(slashToDot));
+}
+
+/**
  * Drop undefined and null keys. Apify's SDK returns null for fields it doesn't have (e.g.
  * an unnamed default dataset's `name`), and the response shape declares no nullable fields, so we
  * filter both to keep the response clean and pass `getActorRunOutputSchema` validation.
@@ -177,7 +218,7 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
-        fields: datasetMeta.fields?.map(slashToDot),
+        fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     });
 }
 
@@ -315,13 +356,6 @@ function summarizeKv(keyValueStore?: RunKeyValueStore): KvSummary {
     return { hasKv: true, kvId, keys, keyCountLabel, summarySuffix: ` Key-value store has ${keyCountLabel}.` };
 }
 
-// TODO: Apify's fields list expands array indices (e.g. `entities.hashtags.0.text`,
-// `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or array-heavy
-// schemas balloon into hundreds of paths and bloat nextStep. Real example: a Twitter dataset
-// returned 174 expanded paths for ~30 unique schema fields. Two viable fixes — collapse `.N`
-// segments to the array root (`entities.hashtags`) and dedupe (all paths stay projection-valid,
-// schema detail lost inside arrays), or collapse `.N.` to `[]` (preserves shape but produces
-// paths that aren't directly valid for `fields="..."`). Deferred pending a real-world choice.
 function fieldsProjectionHint(fields: string[] | undefined): string {
     if (!fields || fields.length === 0) return '';
     return ` Available fields (dot notation): ${fields.join(', ')} — pass via fields="..." to project.`;
