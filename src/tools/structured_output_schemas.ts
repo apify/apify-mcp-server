@@ -393,8 +393,6 @@ export const getActorRunOutputSchema = {
  *   (e.g. `{ url: { type: 'string' }, price: { type: 'number' } }`).
  */
 export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<string, unknown>) {
-    const { datasets } = getActorRunOutputSchema.properties.storages.properties;
-    const { default: defaultDataset } = datasets.properties;
     const itemsSchema = {
         type: 'object' as const,
         description: 'JSON Schema for rows in the dataset at `storages.datasets.default.id` — describes row '
@@ -403,31 +401,10 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
             + 'dataset id and a `fields` projection drawn from this schema.',
         properties: itemProperties,
     };
-    return {
-        ...getActorRunOutputSchema,
-        properties: {
-            ...getActorRunOutputSchema.properties,
-            storages: {
-                ...getActorRunOutputSchema.properties.storages,
-                properties: {
-                    ...getActorRunOutputSchema.properties.storages.properties,
-                    datasets: {
-                        ...datasets,
-                        properties: {
-                            ...datasets.properties,
-                            default: {
-                                ...defaultDataset,
-                                properties: {
-                                    ...defaultDataset.properties,
-                                    itemsSchema,
-                                },
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    };
+    const clone = structuredClone(getActorRunOutputSchema);
+    const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<string, unknown>;
+    datasetDefaultProps.itemsSchema = itemsSchema;
+    return clone;
 }
 
 /**

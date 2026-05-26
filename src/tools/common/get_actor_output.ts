@@ -6,6 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -27,38 +28,6 @@ const getActorOutputArgs = z.object({
         .default(100)
         .describe('Maximum number of items to return (default: 100).'),
 });
-
-/**
- * Cleans empty properties (null, undefined, empty strings, empty arrays, empty objects) from an object
- * @param obj - The object to clean
- * @returns The cleaned object or undefined if the result is empty
- */
-export function cleanEmptyProperties(obj: unknown): unknown {
-    if (obj === null || obj === undefined || obj === '') {
-        return undefined;
-    }
-
-    if (typeof obj !== 'object') {
-        return obj;
-    }
-
-    if (Array.isArray(obj)) {
-        const cleaned = obj
-            .map((item) => cleanEmptyProperties(item))
-            .filter((item) => item !== undefined);
-        return cleaned.length > 0 ? cleaned : undefined;
-    }
-
-    const cleaned: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-        const cleanedValue = cleanEmptyProperties(value);
-        if (cleanedValue !== undefined) {
-            cleaned[key] = cleanedValue;
-        }
-    }
-
-    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
-}
 
 /**
  * This tool is used specifically for retrieving Actor output.

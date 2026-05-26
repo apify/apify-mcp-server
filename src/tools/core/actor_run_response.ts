@@ -8,6 +8,7 @@ import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { formatRunStatusMessage, type ProgressTracker, TERMINAL_RUN_STATUSES } from '../../utils/progress.js';
+import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 
 /** Cap on `storages.keyValueStores.default.keys` array length. */
 const KV_KEYS_LIMIT = 50;
@@ -32,10 +33,6 @@ const ITEM_COUNT_PROBE_LIMIT = 1;
  * SUCCEEDED-but-empty dataset has the full propagation window to surface real items.
  */
 const ITEM_COUNT_PROBE_DELAYS_MS = [0, 1000, 2000, 2000] as const;
-
-async function sleep(ms: number): Promise<void> {
-    await new Promise<void>((resolve) => { setTimeout(resolve, ms); });
-}
 
 /** Sentinel used by `raceAbort` to signal that the abort signal won the race. */
 const ABORT = Symbol('ABORT');
@@ -138,11 +135,6 @@ export type FetchActorRunResult = {
 // Helpers
 // -----------------------------------------------------------------------------
 
-/** Translate Apify slash-notation field paths to dot-notation. */
-function slashToDot(field: string): string {
-    return field.replace(/\//g, '.');
-}
-
 /**
  * Apify expands array indices in dataset fields (e.g. `entities.hashtags.0.text`,
  * `entities.hashtags.1.text`, ... `entities.hashtags.14.text`), so deeply-nested or
@@ -175,20 +167,7 @@ export function collapseArrayIndices(fields: string[]): string[] {
  * `call-actor` / `get-actor-run`, and `get-dataset` for the raw API passthrough).
  */
 export function normalizeDatasetFields(fields: string[]): string[] {
-    return collapseArrayIndices(fields.map(slashToDot));
-}
-
-/**
- * Drop undefined and null keys. Apify's SDK returns null for fields it doesn't have (e.g.
- * an unnamed default dataset's `name`), and the response shape declares no nullable fields, so we
- * filter both to keep the response clean and pass `getActorRunOutputSchema` validation.
- */
-function omitNullish<T extends Record<string, unknown>>(obj: T): T {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-        if (v !== undefined && v !== null) out[k] = v;
-    }
-    return out as T;
+    return collapseArrayIndices(fields.map((f) => f.replace(/\//g, '.')));
 }
 
 function toIsoString(value: Date | string | undefined | null): string | undefined {
@@ -199,12 +178,11 @@ function toIsoString(value: Date | string | undefined | null): string | undefine
 function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     const stats = run.stats as ActorRun['stats'] | undefined;
     if (!stats) return undefined;
-    const out = omitNullish({
+    return cleanEmptyProperties({
         runTimeSecs: stats.runTimeSecs,
         computeUnits: stats.computeUnits,
         memMaxBytes: stats.memMaxBytes,
-    });
-    return Object.keys(out).length > 0 ? out : undefined;
+    }) as RunResponse['stats'] | undefined;
 }
 
 function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset | undefined {
@@ -212,14 +190,14 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
     if (!datasetMeta) {
         return { id: run.defaultDatasetId };
     }
-    return omitNullish({
+    return cleanEmptyProperties({
         id: datasetMeta.id,
         name: datasetMeta.name,
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
         fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
-    });
+    }) as RunDataset;
 }
 
 function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore | undefined {
@@ -236,7 +214,7 @@ function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientList
     // we know the page count equals the total; when truncated, omit keyCount and let the agent
     // detect "more keys exist" from `keys.length === KV_KEYS_LIMIT`.
     const keyCount = listKeysResult.isTruncated ? undefined : keys.length;
-    return omitNullish({ id: run.defaultKeyValueStoreId, keys, keyCount });
+    return cleanEmptyProperties({ id: run.defaultKeyValueStoreId, keys, keyCount }) as RunKeyValueStore;
 }
 
 function errMessage(error: unknown): string {
@@ -268,7 +246,7 @@ async function resolveItemCountWithLagFallback(
         let lastTotal = 0;
         for (const delay of delays) {
             if (delay > 0) {
-                const sleepResult = await raceAbort(sleep(delay), abortSignal);
+                const sleepResult = await raceAbort(new Promise<void>((resolve) => { setTimeout(resolve, delay); }), abortSignal);
                 if (sleepResult === ABORT) return lastTotal;
             }
             const result = await raceAbort(
