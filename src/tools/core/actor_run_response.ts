@@ -149,8 +149,8 @@ function slashToDot(field: string): string {
  * array-heavy schemas balloon into hundreds of redundant paths. Strip pure-numeric
  * segments and dedupe; the resulting paths stay valid projections for `fields="..."`.
  *
- * Exported for direct unit testing — production callers go through `buildRunDataset`,
- * which is the single boundary where this transformation is applied.
+ * Exported for direct unit testing of edge cases (empty input, all-numeric paths) —
+ * production callers go through `normalizeDatasetFields`.
  */
 export function collapseArrayIndices(fields: string[]): string[] {
     const seen = new Set<string>();
@@ -166,6 +166,16 @@ export function collapseArrayIndices(fields: string[]): string[] {
         }
     }
     return result;
+}
+
+/**
+ * Canonical normalization for an Apify-returned `dataset.fields` array: translate
+ * slash-notation to dot-notation AND collapse expanded array indices. Used at every
+ * MCP tool boundary that surfaces dataset field metadata (`buildRunDataset` for
+ * `call-actor` / `get-actor-run`, and `get-dataset` for the raw API passthrough).
+ */
+export function normalizeDatasetFields(fields: string[]): string[] {
+    return collapseArrayIndices(fields.map(slashToDot));
 }
 
 /**
@@ -208,7 +218,7 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
         title: datasetMeta.title,
         itemCount: resolvedItemCount ?? datasetMeta.itemCount,
         cleanItemCount: datasetMeta.cleanItemCount,
-        fields: datasetMeta.fields ? collapseArrayIndices(datasetMeta.fields.map(slashToDot)) : undefined,
+        fields: datasetMeta.fields ? normalizeDatasetFields(datasetMeta.fields) : undefined,
     });
 }
 

@@ -4,6 +4,7 @@ import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
+import { normalizeDatasetFields } from '../core/actor_run_response.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string()
@@ -49,6 +50,14 @@ USAGE EXAMPLES:
                 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
+        // Apify returns `fields` slash-separated AND with array indices expanded
+        // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
+        // dataset this inflates ~78 schema fields into 528 paths (~85% bloat) and
+        // produces slash-notation paths that aren't directly usable as projection
+        // hints for `get-dataset-items` (which expects dot-notation). Run the same
+        // normalization `buildRunDataset` applies so this tool's `fields` matches
+        // the structured `storages.datasets.default.fields` shape.
+        const normalized = v.fields ? { ...v, fields: normalizeDatasetFields(v.fields) } : v;
+        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(normalized)}\n\`\`\`` }] };
     },
 } as const);
