@@ -27,7 +27,13 @@ import type {
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
-import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
+import {
+    actorNameToToolName,
+    buildActorInputSchema,
+    fixedAjvCompile,
+    isActorBlockedUnderPaymentProvider,
+    isActorInfoMcpServer,
+} from '../utils.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**
@@ -379,8 +385,7 @@ export async function getActorsAsTools(
     const normalActorsInfo: ActorInfo[] = [];
     for (const actorInfo of nonNullActors) {
         const isMcpServer = isActorInfoMcpServer(actorInfo);
-        const isStandby = !!actorInfo.actor.actorStandby?.isEnabled;
-        if (paymentProvider && (isMcpServer || isStandby)) {
+        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo)) {
             errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
             continue;
         }

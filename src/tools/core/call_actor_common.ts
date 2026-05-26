@@ -16,14 +16,14 @@ import {
 import { ACTOR_LOAD_ERROR_KIND, ActorLoadError } from '../../errors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import type { ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import type { ActorInfo, ApifyToken, InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { getActorDefinitionCached, getActorMcpUrlCached } from '../../utils/actor.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getHttpStatusCode, logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
-import { actorNameToToolName } from '../utils.js';
+import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../utils.js';
 import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
@@ -277,8 +277,7 @@ export type CallActorParsedArgs = z.infer<typeof callActorArgs>;
  * generic payment-required short-circuit in the tool-call handler so the
  * agent receives the precise reason instead of a generic 402.
  *
- * Uses `actorDefinitionCache` + `getActorMcpUrlCached` — cheap on a
- * warm cache, one definition fetch on a cold cache.
+ * Uses `actorDefinitionCache` — one definition fetch on a cold cache.
  */
 export async function checkPaymentProviderStandbyConflict(params: {
     actorName: string;
@@ -292,13 +291,18 @@ export async function checkPaymentProviderStandbyConflict(params: {
 
     // Token-based client — payment headers are only relevant for actual Actor runs.
     const apifyClientForDefinition = new ApifyClient({ token: apifyToken });
-    const mcpServerUrlOrFalse = await getActorMcpUrlCached(baseActorName, apifyClientForDefinition);
-    const isActorMcpServer = !!mcpServerUrlOrFalse;
-
     const actorDefinitionWithInfo = await getActorDefinitionCached(baseActorName, apifyClientForDefinition);
-    const isStandbyActor = !!actorDefinitionWithInfo?.info?.actorStandby?.isEnabled;
+    if (!actorDefinitionWithInfo) {
+        return null;
+    }
 
-    if (!isStandbyActor && !isActorMcpServer) {
+    const actorInfo: ActorInfo = {
+        definition: actorDefinitionWithInfo.definition,
+        actor: actorDefinitionWithInfo.info,
+        webServerMcpPath: null,
+    };
+
+    if (!isActorBlockedUnderPaymentProvider(actorInfo)) {
         return null;
     }
 
