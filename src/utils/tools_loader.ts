@@ -265,9 +265,10 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     const hasGetActorRun = result.some((entry) => entry.name === HelperTools.ACTOR_RUNS_GET);
 
     // Inject run-workflow helpers whenever any actor-running entrypoint is present; de-dup pass below drops repeats.
-    const toolsToInject: ToolEntry[] = (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun)
-        ? [...AUTO_INJECTED_TOOLS]
-        : [];
+    const toolsToInject: ToolEntry[] = [];
+    if (hasCallActor || hasActorTools || hasAddActorTool || hasGetActorRun) {
+        toolsToInject.push(...AUTO_INJECTED_TOOLS);
+    }
 
     if (toolsToInject.length > 0) {
         const callActorIndex = result.findIndex((entry) => entry.name === HelperTools.ACTOR_CALL);
@@ -279,7 +280,7 @@ export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mod
     }
 
     // Apps mode: append a widget tool for each base tool already in the result.
-    // Runs after the get-actor-run auto-inject so an auto-injected base still
+    // Runs after the get-actor-run auto-inject, so an auto-injected base still
     // brings its widget sibling.
     if (mode === ServerMode.APPS) {
         for (const entry of [...result]) {
