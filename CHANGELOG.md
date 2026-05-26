@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.9 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- **payments:** Reject standby Actors and sanitize loader errors under agentic payments ([#893](https://github.com/apify/apify-mcp-server/pull/893)) ([639b4bc](https://github.com/apify/apify-mcp-server/commit/639b4bc2a61edd393908f438ebd5df2b8616129c)) by [@MQ37](https://github.com/MQ37), closes [#875](https://github.com/apify/apify-mcp-server/issues/875)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.10.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.8) (2026-05-21)
