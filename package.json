@@ -79,7 +79,7 @@
     "@types/yargs-parser": "^21.0.3",
     "eventsource": "^3.0.2",
     "openai": "^6.10.0",
-    "oxfmt": "0.46.0",
+    "oxfmt": "0.51.0",
     "oxlint": "^1.64.0",
     "oxlint-tsgolint": "0.22.1",
     "p-limit": "^7.3.0",
