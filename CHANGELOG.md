@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **payments:** Reject standby Actors and sanitize loader errors under agentic payments ([#893](https://github.com/apify/apify-mcp-server/pull/893)) ([639b4bc](https://github.com/apify/apify-mcp-server/commit/639b4bc2a61edd393908f438ebd5df2b8616129c)) by [@MQ37](https://github.com/MQ37), closes [#875](https://github.com/apify/apify-mcp-server/issues/875)
+- Add get-actor-run to auto-injected tools and update related tests ([#909](https://github.com/apify/apify-mcp-server/pull/909)) ([c5eb2e4](https://github.com/apify/apify-mcp-server/commit/c5eb2e49a62b15a3a09e1a7f5272950b0fa7cbcd)) by [@jirispilka](https://github.com/jirispilka), closes [#908](https://github.com/apify/apify-mcp-server/issues/908)
 
 
 <!-- git-cliff-unreleased-end -->
