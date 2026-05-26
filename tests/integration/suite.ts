@@ -730,7 +730,7 @@ export function createIntegrationTestsSuite(
             expect(hasReceivedNotification).toBe(true);
         });
 
-        it('should return no tools were added when adding a non-existent actor', async () => {
+        it('should return error when adding a non-existent actor', async () => {
             client = await createClientFn({ enableAddingActors: true });
             const nonExistentActor = 'apify/this-actor-does-not-exist';
             const result = await client.callTool({
@@ -738,10 +738,28 @@ export function createIntegrationTestsSuite(
                 arguments: { actor: nonExistentActor },
             });
             expect(result).toBeDefined();
+            expect(result.isError).toBe(true);
             const content = result.content as { text: string }[];
             expect(content.length).toBeGreaterThan(0);
-            expect(content[0].text).toContain('no tools were added');
+            expect(content[0].text).toContain('was not found');
         });
+
+        it.runIf(options.transport === 'streamable-http')(
+            'should return error when adding a standby Actor in x402 payment mode',
+            async () => {
+                client = await createClientFn({ enableAddingActors: true, payment: 'x402' });
+                const result = await client.callTool({
+                    name: HelperTools.ACTOR_ADD,
+                    arguments: { actor: ACTOR_EXAMPLE_MCP_SERVER },
+                });
+                expect(result).toBeDefined();
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain('standby Actor, which is not supported in agentic payment mode');
+                await client.close();
+            },
+        );
 
         it('should be able to add and call Actorized MCP server', async () => {
             client = await createClientFn({ enableAddingActors: true });
@@ -2722,6 +2740,108 @@ export function createIntegrationTestsSuite(
                     expect(meta?.x402, `Tool "${toolName}" should not advertise _meta.x402`).toBeUndefined();
                 }
 
+                await client.close();
+            },
+        );
+
+        // Agentic payment modes (x402, skyfire) only work with Streamable-HTTP transport (require HTTP headers).
+        // `ACTOR_EXAMPLE_MCP_SERVER` is a standby MCP-server Actor; in normal mode the proxy registers its
+        // sub-tools (e.g. `*-add`), in payment mode the standby/MCP filter drops them from list-tools.
+        it.runIf(options.transport === 'streamable-http')(
+            'should filter standby MCP-server Actor from list-tools in payment mode',
+            async () => {
+                const isProxiedAddTool = (name: string) => name.endsWith('-add');
+
+                client = await createClientFn({ payment: 'x402', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
+                const x402Tools = await client.listTools();
+                expect(
+                    x402Tools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should not be loaded in x402 payment mode',
+                ).toHaveLength(0);
+                await client.close();
+
+                client = await createClientFn({ payment: 'skyfire', actors: [ACTOR_EXAMPLE_MCP_SERVER] });
+                const skyfireTools = await client.listTools();
+                expect(
+                    skyfireTools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should not be loaded in skyfire payment mode',
+                ).toHaveLength(0);
+                await client.close();
+
+                // Standard token auth — sub-tools must load normally so the regression also catches
+                // an over-eager filter that would block them outside payment mode.
+                client = await createClientFn({ actors: [ACTOR_EXAMPLE_MCP_SERVER] });
+                const normalTools = await client.listTools();
+                expect(
+                    normalTools.tools.filter((t) => isProxiedAddTool(t.name)),
+                    'standby MCP-server sub-tools should be loaded under standard token auth',
+                ).not.toHaveLength(0);
+                await client.close();
+            },
+        );
+
+        // x402 payment mode only works with Streamable-HTTP transport (requires HTTP headers).
+        it.runIf(options.transport === 'streamable-http')(
+            'should return error when calling a standby Actor via call-actor in x402 payment mode',
+            async () => {
+                client = await createClientFn({ payment: 'x402' });
+                const result = await client.callTool({
+                    name: 'call-actor',
+                    arguments: {
+                        actor: ACTOR_EXAMPLE_MCP_SERVER,
+                        input: {},
+                    },
+                });
+                expect(result).toBeDefined();
+                expect(result.isError).toBe(true);
+                const content = result.content as { text: string }[];
+                expect(content.length).toBeGreaterThan(0);
+                expect(content[0].text).toContain('is not supported in agentic payment mode');
+                await client.close();
+            },
+        );
+
+        // Task-mode `call-actor` declares `taskSupport: 'optional'`, so it must hit the same
+        // standby guard the sync path does — otherwise the stored task result would be a generic
+        // 402 PaymentRequired rather than the precise standby rejection. Regression for #893.
+        it.runIf(options.transport === 'streamable-http')(
+            'should reject standby Actor in task-mode call-actor under x402 (not 402, not platform error)',
+            async () => {
+                client = await createClientFn({ payment: 'x402' });
+                const stream = client.experimental.tasks.callToolStream(
+                    {
+                        name: 'call-actor',
+                        arguments: {
+                            actor: ACTOR_EXAMPLE_MCP_SERVER,
+                            input: {},
+                        },
+                    },
+                    CallToolResultSchema,
+                    { task: { ttl: 60000 } },
+                );
+
+                let taskCreated = false;
+                let resultText: string | undefined;
+                let resultIsError: boolean | undefined;
+                for await (const message of stream) {
+                    if (message.type === 'taskCreated') {
+                        taskCreated = true;
+                    } else if (message.type === 'result') {
+                        resultIsError = message.result.isError as boolean | undefined;
+                        const content = message.result.content as { text: string }[];
+                        resultText = content[0]?.text;
+                    } else if (message.type === 'error') {
+                        throw message.error;
+                    }
+                }
+
+                // The server MUST create a task (not short-circuit with a sync error envelope) —
+                // anything else breaks the SDK's task creation contract.
+                expect(taskCreated, 'server should create a task even when the eventual result is a standby rejection').toBe(true);
+                expect(resultIsError, 'task result should be flagged as error').toBe(true);
+                expect(resultText, 'task result should expose the standby rejection text').toBeDefined();
+                expect(resultText).toContain('is not supported in agentic payment mode');
+                expect(resultText).not.toContain('x402');
                 await client.close();
             },
         );

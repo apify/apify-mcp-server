@@ -28,7 +28,7 @@ describe('MCP server internals integration tests', () => {
         actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
-        const newTool = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
+        const { tools: newTool } = await getActorsAsTools([ACTOR_NORMAL_MODE], apifyClient);
         actorsMcpServer.upsertTools(newTool);
 
         // Store the tool name list
@@ -74,7 +74,7 @@ describe('MCP server internals integration tests', () => {
 
         // Add a new Actor
         const actor = ACTOR_NORMAL_MODE;
-        const newTool = await getActorsAsTools([actor], apifyClient);
+        const { tools: newTool } = await getActorsAsTools([actor], apifyClient);
         actorsMCPServer.upsertTools(newTool, true);
 
         // Check if the notification was received with the correct tools
@@ -113,7 +113,7 @@ describe('MCP server internals integration tests', () => {
 
         // Add a new Actor
         const actor = ACTOR_NORMAL_MODE;
-        const newTool = await getActorsAsTools([actor], apifyClient);
+        const { tools: newTool } = await getActorsAsTools([actor], apifyClient);
         actorsMCPServer.upsertTools(newTool, true);
 
         // Check if the notification was received

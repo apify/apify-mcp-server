@@ -66,8 +66,13 @@ import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actor_executor.js';
-import { buildPermissionApprovalResponse, isPermissionApprovalError } from '../tools/core/call_actor_common.js';
+import {
+    buildPermissionApprovalResponse,
+    checkPaymentProviderStandbyConflict,
+    isPermissionApprovalError,
+} from '../tools/core/call_actor_common.js';
 import { getActorsAsTools } from '../tools/index.js';
+import type { ActorsAsToolsResult } from '../tools/index.js';
 import { decodeDotPropertyNames, legacyToolNameToNew } from '../tools/utils.js';
 import type {
     ActorsMcpServerOptions,
@@ -439,7 +444,10 @@ export class ActorsMcpServer {
         if (missingToolNames.length === 0) return;
 
         const restoreInput = toolNamesToInput(missingToolNames);
-        const actorTools = await getActors(restoreInput, apifyClient, this.actorStore);
+        const actorTools = await getActors(restoreInput, apifyClient, {
+            actorStore: this.actorStore,
+            paymentProvider: this.options.paymentProvider,
+        });
 
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input: restoreInput, actorTools });
@@ -454,24 +462,29 @@ export class ActorsMcpServer {
     }
 
     /**
-     * Load actors as tools, upsert them to the server, and return the tool entries.
-     * This is a public method that wraps getActorsAsTools and handles the upsert operation.
-     * @param actorIdsOrNames - Array of actor IDs or names to load as tools
-     * @param apifyClient
-     * @returns Promise<ToolEntry[]> - Array of loaded tool entries
+     * Load Actors as tools, upsert successes into the server, and return both the tool
+     * entries and any per-name {@link ActorLoadError}s. Bulk callers read `tools`; the
+     * `add-actor` tool reads `errors[0]` to forward a precise reason to the agent
+     * (not-found / load-failed / standby-payment-not-supported).
      */
-    public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ToolEntry[]> {
-        const actorTools = await getActorsAsTools(actorIdsOrNames, apifyClient, { actorStore: this.actorStore });
-        if (actorTools.length > 0) {
-            this.upsertTools(actorTools, true);
+    public async loadActorsAsTools(actorIdsOrNames: string[], apifyClient: ApifyClient): Promise<ActorsAsToolsResult> {
+        const result = await getActorsAsTools(actorIdsOrNames, apifyClient, {
+            actorStore: this.actorStore,
+            paymentProvider: this.options.paymentProvider,
+        });
+        if (result.tools.length > 0) {
+            this.upsertTools(result.tools, true);
         }
-        return actorTools;
+        return result;
     }
 
     /** Load tools from URL params. Used by SSE and HTTP entry points. */
     public async loadToolsFromUrl(url: string, apifyClient: ApifyClient) {
         const input = parseInputParamsFromUrl(url);
-        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        const actorTools = await getActors(input, apifyClient, {
+            actorStore: this.actorStore,
+            paymentProvider: this.options.paymentProvider,
+        });
 
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input, actorTools });
@@ -499,7 +512,10 @@ export class ActorsMcpServer {
      * work. See #721.
      */
     public async loadToolsFromInput(input: Input, apifyClient: ApifyClient): Promise<void> {
-        const actorTools = await getActors(input, apifyClient, this.actorStore);
+        const actorTools = await getActors(input, apifyClient, {
+            actorStore: this.actorStore,
+            paymentProvider: this.options.paymentProvider,
+        });
         if (!this.serverModeResolved) {
             this.pendingToolsAfterModeResolved.push({ input, actorTools });
             if (actorTools.length > 0) this.upsertTools(actorTools);
@@ -813,7 +829,11 @@ export class ActorsMcpServer {
             let { name, arguments: args, _meta: meta } = params;
             const progressToken = meta?.progressToken;
             const metaApifyToken = meta?.apifyToken;
-            const apifyToken = (metaApifyToken || this.options.token || process.env.APIFY_TOKEN) as string;
+            // Token sources in order: per-request `_meta.apifyToken` (stdio inline) > server-instance
+            // option (set by the transport from `Authorization` header or stdio env). No env fallback:
+            // dev_server / production must extract the token from request headers so payment
+            // mode (no token) behaves identically to production.
+            const apifyToken = (metaApifyToken || this.options.token) as string;
             const userRentedActorIds = meta?.userRentedActorIds;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
@@ -959,6 +979,25 @@ export class ActorsMcpServer {
                     });
                 }
 
+                // Standby / MCP-server Actors are never payable via a third-party provider —
+                // compute the rejection here so both the sync short-circuit and the task path
+                // can use it. In task-mode we still create the task and store this rejection
+                // as its result (instead of a generic 402), so the agent gets the precise reason
+                // when fetching the task result. Task-mode `call-actor` declares
+                // `taskSupport: 'optional'`, so without this both paths would 402 by default.
+                const { paymentProvider } = this.options;
+                const isCallActorTool = tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
+                const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
+
+                const standbyRejection = paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
+                    ? await checkPaymentProviderStandbyConflict({
+                        actorName: actorArg,
+                        paymentProvider,
+                        apifyToken,
+                        mcpSessionId,
+                    })
+                    : null;
+
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
                 if (request.params.task) {
@@ -979,6 +1018,7 @@ export class ActorsMcpServer {
                             tool,
                             toolArgs: toolArgs!,
                             logSafeArgs,
+                            standbyRejection,
                             paymentRequiredResult,
                             apifyClient: apifyClient!,
                             apifyToken,
@@ -994,6 +1034,17 @@ export class ActorsMcpServer {
                     // Return the task immediately; execution continues asynchronously
                     shouldTrackTelemetry = false;
                     return { task };
+                }
+
+                // Sync path: standby rejection wins over the generic payment-required short-circuit
+                // so the agent gets the precise reason instead of a 402.
+                if (standbyRejection) {
+                    toolStatus = TOOL_STATUS.SOFT_FAIL;
+                    callDiagnostics = {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        ...buildActorFields(actorName, actorId),
+                    };
+                    return captureResult(standbyRejection);
                 }
 
                 // Check payment validation (already computed by prepareToolCallContext)
@@ -1307,6 +1358,7 @@ export class ActorsMcpServer {
         tool: ToolEntry;
         toolArgs: Record<string, unknown>;
         logSafeArgs: unknown;
+        standbyRejection?: Record<string, unknown> | null;
         paymentRequiredResult?: Record<string, unknown>;
         apifyClient: ApifyClient;
         apifyToken: string;
@@ -1318,7 +1370,7 @@ export class ActorsMcpServer {
         userRentedActorIds?: string[];
     }): Promise<void> {
         const {
-            taskId, tool, toolArgs, logSafeArgs, paymentRequiredResult,
+            taskId, tool, toolArgs, logSafeArgs, standbyRejection, paymentRequiredResult,
             apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId, userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
@@ -1402,8 +1454,16 @@ export class ActorsMcpServer {
             // Execute the tool and get the result
             let result: Record<string, unknown> = {};
 
-            // Check payment validation (already computed by prepareToolCallContext in the caller)
-            if (paymentRequiredResult) {
+            // Mirror the sync-path ordering: standby rejection wins over the generic 402 so the
+            // stored task result carries the precise reason the agent should act on.
+            if (standbyRejection) {
+                toolStatus = TOOL_STATUS.SOFT_FAIL;
+                callDiagnostics = {
+                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                    ...buildActorFields(actorName, actorId),
+                };
+                result = standbyRejection;
+            } else if (paymentRequiredResult) {
                 toolStatus = TOOL_STATUS.SOFT_FAIL;
                 callDiagnostics = {
                     failure_category: FAILURE_CATEGORY.INVALID_INPUT,

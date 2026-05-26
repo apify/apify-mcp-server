@@ -160,7 +160,7 @@ describe('ActorsMcpServer initialize handler', () => {
         async () => {
             const server = track(makeServer('auto'));
             const apifyClient = new ApifyClient({ token: 'test-token' });
-            const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue([]);
+            const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue({ tools: [], errors: [] });
 
             await server.loadToolsByName([HelperTools.STORE_SEARCH_WIDGET], apifyClient);
 

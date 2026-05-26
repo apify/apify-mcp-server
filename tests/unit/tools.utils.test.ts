@@ -9,11 +9,12 @@ import {
     filterAndShortenEnum,
     inferArrayItemsTypeIfMissing,
     inferArrayItemType,
+    isActorBlockedUnderPaymentProvider,
     markInputPropertiesAsRequired,
     shortenProperties,
     transformActorInputSchemaProperties,
 } from '../../src/tools/utils.js';
-import type { ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
+import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 describe('buildApifySpecificProperties', () => {
@@ -995,5 +996,25 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         expect(schema.required).toEqual(['query']);
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);
         expect(schema.properties?.maxResults?.description).not.toMatch(/^\*\*REQUIRED\*\*/);
+    });
+});
+
+describe('isActorBlockedUnderPaymentProvider', () => {
+    const actorInfo = ({ standby, mcpPath = null }: { standby: boolean; mcpPath?: string | null }): ActorInfo => ({
+        definition: { actorFullName: 'user/actor', id: 'act' } as ActorInfo['definition'],
+        actor: { actorStandby: standby ? { isEnabled: true } : undefined } as ActorInfo['actor'],
+        webServerMcpPath: mcpPath,
+    });
+
+    it('blocks standby Actors', () => {
+        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: true }))).toBe(true);
+    });
+
+    it('does not block normal Actors', () => {
+        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false }))).toBe(false);
+    });
+
+    it('does not block MCP path without standby (must match list-tools filter)', () => {
+        expect(isActorBlockedUnderPaymentProvider(actorInfo({ standby: false, mcpPath: '/mcp' }))).toBe(false);
     });
 });

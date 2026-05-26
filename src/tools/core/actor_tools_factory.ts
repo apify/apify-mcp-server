@@ -9,11 +9,14 @@ import {
     RAG_WEB_BROWSER,
     RAG_WEB_BROWSER_ADDITIONAL_DESC,
 } from '../../const.js';
+import { ActorLoadError } from '../../errors.js';
+import { getActorDefinitionCached } from '../../utils/actor.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
-import { actorDefinitionPrunedCache } from '../../state.js';
+import type { PaymentProvider } from '../../payments/types.js';
 import type {
+    ActorDefinitionWithInfo,
     ActorInfo,
     ActorStore,
     ActorTool,
@@ -23,9 +26,14 @@ import type {
 } from '../../types.js';
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
-import { getActorDefinition } from '../build.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
-import { actorNameToToolName, buildActorInputSchema, fixedAjvCompile, isActorInfoMcpServer } from '../utils.js';
+import {
+    actorNameToToolName,
+    buildActorInputSchema,
+    fixedAjvCompile,
+    isActorBlockedUnderPaymentProvider,
+    isActorInfoMcpServer,
+} from '../utils.js';
 import { CALL_ACTOR_WAIT_SECS_DEFAULT, WAIT_SECS_MAX } from './actor_run_response.js';
 
 /**
@@ -283,72 +291,112 @@ export function fixActorNameInput(actorName: string): string {
     return s.replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * Result type for {@link getActorsAsTools}: every requested name produces
+ * either a successful load (contributing to `tools` — a single Actor can fan
+ * out into multiple tools for MCP-server Actors) or an `ActorLoadError`
+ * describing why the load failed.
+ *
+ * Bulk callers (`getActors`, server load-helpers) typically only read
+ * `tools`. Single-Actor callers (`add-actor`, `call-actor`) read `errors[0]`
+ * to surface the precise reason back to the agent.
+ */
+export type ActorsAsToolsResult = {
+    tools: ToolEntry[];
+    errors: ActorLoadError[];
+};
+
+/**
+ * Loads Actor metadata + builds MCP tool entries for the requested Actor
+ * names. Returns both successful tools and `ActorLoadError` entries so
+ * callers can surface precise reasons when needed (single-Actor flows like
+ * `add-actor` / `call-actor`) or just ignore failures (bulk session-boot
+ * flows that build the initial tool surface).
+ *
+ * When `paymentProvider` is set, standby and MCP-server Actors are reported
+ * as `STANDBY_PAYMENT_NOT_SUPPORTED` errors instead of contributing tools.
+ * External payment providers (x402, Skyfire) cannot pay for standby Actor
+ * runs — the call-time guard in `call_actor_common.ts` rejects any such
+ * tool call. Filtering at list time keeps the advertised tool surface
+ * honest so agents never discover a tool that can only fail later.
+ */
 export async function getActorsAsTools(
     actorIdsOrNames: string[],
     apifyClient: ApifyClient,
-    options?: { mcpSessionId?: string; actorStore?: ActorStore },
-): Promise<ToolEntry[]> {
-    const { mcpSessionId, actorStore } = options ?? {};
-    log.debug('Fetching Actors as tools', { actorNames: actorIdsOrNames, mcpSessionId });
+    options?: {
+        mcpSessionId?: string;
+        actorStore?: ActorStore;
+        paymentProvider?: PaymentProvider;
+    },
+): Promise<ActorsAsToolsResult> {
+    const { mcpSessionId, actorStore, paymentProvider } = options ?? {};
+    log.debug('Fetching Actors as tools', {
+        actorNames: actorIdsOrNames,
+        mcpSessionId,
+        paymentProviderId: paymentProvider?.id,
+    });
+
+    const errors: ActorLoadError[] = [];
 
     const actorsInfo: (ActorInfo | null)[] = await Promise.all(
         actorIdsOrNames.map(async (actorIdOrName) => {
             const actorName = fixActorNameInputAndLog(actorIdOrName, { mcpSessionId });
-            const actorDefinitionWithInfoCached = actorDefinitionPrunedCache.get(actorName);
-            if (actorDefinitionWithInfoCached) {
-                return {
-                    definition: actorDefinitionWithInfoCached.definition,
-                    actor: actorDefinitionWithInfoCached.info,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfoCached.definition),
 
-                } as ActorInfo;
-            }
-
+            let actorDefinitionWithInfo: ActorDefinitionWithInfo | null;
             try {
-                const actorDefinitionWithInfo = await getActorDefinition(actorName, apifyClient);
-                if (!actorDefinitionWithInfo) {
-                    log.softFail('Actor not found or definition is not available', {
-                        actorName,
-                        ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
-                        mcpSessionId,
-                        statusCode: 404,
-                        failureCategory: 'INVALID_INPUT',
-                    });
-                    return null;
-                }
-                // Cache the Actor definition with info
-                actorDefinitionPrunedCache.set(actorName, actorDefinitionWithInfo);
-                return {
-                    definition: actorDefinitionWithInfo.definition,
-                    actor: actorDefinitionWithInfo.info,
-                    webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
-                } as ActorInfo;
+                actorDefinitionWithInfo = await getActorDefinitionCached(actorName, apifyClient);
             } catch (error) {
                 logHttpError(error, 'Failed to fetch Actor definition', {
                     actorName,
                     ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
                     mcpSessionId,
                 });
+                errors.push(ActorLoadError.loadFailed(actorIdOrName));
                 return null;
             }
+
+            if (!actorDefinitionWithInfo) {
+                log.softFail('Actor not found or definition is not available', {
+                    actorName,
+                    ...(actorName !== actorIdOrName && { actorNameInput: actorIdOrName }),
+                    mcpSessionId,
+                    statusCode: 404,
+                    failureCategory: 'INVALID_INPUT',
+                });
+                errors.push(ActorLoadError.notFound(actorIdOrName));
+                return null;
+            }
+
+            return {
+                definition: actorDefinitionWithInfo.definition,
+                actor: actorDefinitionWithInfo.info,
+                webServerMcpPath: getActorMCPServerPath(actorDefinitionWithInfo.definition),
+            } as ActorInfo;
         }),
     );
 
     const clonedActors = structuredClone(actorsInfo);
-
-    // Filter out nulls - actorInfo can be null if the Actor was not found or an error occurred
     const nonNullActors = clonedActors.filter((actorInfo): actorInfo is ActorInfo => Boolean(actorInfo));
 
-    // Separate Actors with MCP servers and normal Actors
-    // for MCP servers if mcp path is configured and also if the Actor standby mode is enabled
-    const actorMCPServersInfo = nonNullActors.filter((actorInfo) => isActorInfoMcpServer(actorInfo));
-    // all others
-    const normalActorsInfo = nonNullActors.filter((actorInfo) => !isActorInfoMcpServer(actorInfo));
+    // Split MCP-server vs normal Actors. Under `paymentProvider`, standby/MCP-server
+    // Actors are reported as STANDBY_PAYMENT_NOT_SUPPORTED errors instead of contributing
+    // tools — the platform API hard-rejects standby runs under third-party providers.
+    const actorMCPServersInfo: ActorInfo[] = [];
+    const normalActorsInfo: ActorInfo[] = [];
+    for (const actorInfo of nonNullActors) {
+        const isMcpServer = isActorInfoMcpServer(actorInfo);
+        if (paymentProvider && isActorBlockedUnderPaymentProvider(actorInfo)) {
+            errors.push(ActorLoadError.standbyPaymentNotSupported(actorInfo.definition.actorFullName));
+            continue;
+        }
+        if (isMcpServer) actorMCPServersInfo.push(actorInfo);
+        else normalActorsInfo.push(actorInfo);
+    }
 
     const [normalTools, mcpServerTools] = await Promise.all([
         getNormalActorsAsTools(normalActorsInfo, { mcpSessionId, actorStore }),
         getMCPServersAsTools(actorMCPServersInfo, apifyClient.token, mcpSessionId),
     ]);
 
-    return [...normalTools, ...mcpServerTools];
+    return { tools: [...normalTools, ...mcpServerTools], errors };
 }

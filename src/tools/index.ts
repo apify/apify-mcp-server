@@ -4,6 +4,7 @@ import { ServerMode } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
 import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
 import { getActorsAsTools } from './core/actor_tools_factory.js';
+import type { ActorsAsToolsResult } from './core/actor_tools_factory.js';
 
 // Use string constants instead of importing tool objects to avoid circular dependency
 export const unauthEnabledTools: string[] = [
@@ -40,3 +41,4 @@ export function getUnauthEnabledToolCategories(): ToolCategory[] {
 
 // Export actor-related tools
 export { getActorsAsTools };
+export type { ActorsAsToolsResult };

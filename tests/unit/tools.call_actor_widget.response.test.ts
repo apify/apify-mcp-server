@@ -69,7 +69,7 @@ describe('call-actor-widget response', () => {
         vi.mocked(getActorMcpUrlCached).mockReset();
         vi.mocked(getActorMcpUrlCached).mockResolvedValue(false);
         vi.mocked(getActorsAsTools).mockReset();
-        vi.mocked(getActorsAsTools).mockResolvedValue([MOCK_ACTOR_TOOL] as never);
+        vi.mocked(getActorsAsTools).mockResolvedValue({ tools: [MOCK_ACTOR_TOOL], errors: [] });
     });
 
     it('starts the run and returns runId + widget _meta on the response', async () => {

@@ -4,6 +4,7 @@ import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 
 export const addToolArgsSchema = z.object({
     actor: z.string()
@@ -38,41 +39,25 @@ USAGE EXAMPLES:
         const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
         const parsed = addToolArgsSchema.parse(args);
         if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Actor ${parsed.actor} is already available. No new tools were added.`,
-                }],
-            };
+            return buildMCPResponse({
+                texts: [`Actor ${parsed.actor} is already available. No new tools were added.`],
+            });
         }
 
         const apifyClient = new ApifyClient({ token: apifyToken });
-        const tools = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
-        /**
-         * If no tools were found, return a message that the Actor was not found
-         * instead of returning that non-existent tool was added since the
-         * loadActorsAsTools method returns an empty array and does not throw an error.
-         */
-        if (tools.length === 0) {
-            return {
-                content: [{
-                    type: 'text',
-                    text: `Actor ${parsed.actor} not found, no tools were added.`,
-                }],
-            };
+        const { tools, errors } = await apifyMcpServer.loadActorsAsTools([parsed.actor], apifyClient);
+        // First error is the precise reason this Actor could not be added —
+        // safe to forward verbatim (sanitized at source by ActorLoadError factories).
+        if (errors[0]) {
+            return buildMCPResponse({
+                texts: [errors[0].message],
+                isError: true,
+            });
         }
-
         await sendNotification({ method: 'notifications/tools/list_changed' });
-
-        return {
-            content: [{
-                type: 'text',
-                text: `Actor ${parsed.actor} has been added. Newly available tools: ${
-                    tools.map(
-                        (t: ToolEntry) => `${t.name}`,
-                    ).join(', ')
-                }.`,
-            }],
-        };
+        const toolNames = tools.map((t: ToolEntry) => t.name).join(', ');
+        return buildMCPResponse({
+            texts: [`Actor ${parsed.actor} has been added. Newly available tools: ${toolNames}.`],
+        });
     },
 } as const);
