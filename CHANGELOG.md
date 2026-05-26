@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.9 - **not yet released**
+## [0.10.9](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.9) (2026-05-26)
 
 ### 🐛 Bug Fixes
 
@@ -11,7 +10,6 @@ All notable changes to this project will be documented in this file.
 - Add get-actor-run to auto-injected tools and update related tests ([#909](https://github.com/apify/apify-mcp-server/pull/909)) ([c5eb2e4](https://github.com/apify/apify-mcp-server/commit/c5eb2e49a62b15a3a09e1a7f5272950b0fa7cbcd)) by [@jirispilka](https://github.com/jirispilka), closes [#908](https://github.com/apify/apify-mcp-server/issues/908)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.8](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.8) (2026-05-21)
 
 ### 🚀 Features
