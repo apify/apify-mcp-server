@@ -25,15 +25,13 @@ export type ConversationExecutorOptions = {
     model?: string;
     /** Additional instructions from MCP server (optional) */
     serverInstructions?: string | null;
-}
+};
 
 /**
  * Execute a multi-turn conversation with tool calling
  * Tools are fetched dynamically from MCP after each turn
  */
-export async function executeConversation(
-    options: ConversationExecutorOptions,
-): Promise<ConversationHistory> {
+export async function executeConversation(options: ConversationExecutorOptions): Promise<ConversationHistory> {
     const {
         userPrompt,
         mcpClient,

@@ -35,9 +35,7 @@ describe('extractActorRunErrorMessage', () => {
     it('returns null for non-error tool results', () => {
         const message = extractActorRunErrorMessage({
             isError: false,
-            content: [
-                { type: 'text', text: 'Started Actor "apify/rag-web-browser"' },
-            ],
+            content: [{ type: 'text', text: 'Started Actor "apify/rag-web-browser"' }],
         });
 
         expect(message).toBeNull();
@@ -55,9 +53,7 @@ describe('extractActorRunErrorMessage', () => {
     it('returns plain error text when there is no JSON blob to strip', () => {
         const message = extractActorRunErrorMessage({
             isError: true,
-            content: [
-                { type: 'text', text: 'Failed to call Actor: connection timeout' },
-            ],
+            content: [{ type: 'text', text: 'Failed to call Actor: connection timeout' }],
         });
 
         expect(message).toBe('Failed to call Actor: connection timeout');

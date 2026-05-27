@@ -12,9 +12,12 @@ import { classifyFailureCategory } from '../../utils/tool_status.js';
 import { fetchApifyDocsToolOutputSchema } from '../structured_output_schemas.js';
 
 const fetchApifyDocsToolArgsSchema = z.object({
-    url: z.string()
+    url: z
+        .string()
         .min(1)
-        .describe(`URL of the Apify documentation page to fetch. This should be the full URL, including the protocol (e.g., https://docs.apify.com/).`),
+        .describe(
+            `URL of the Apify documentation page to fetch. This should be the full URL, including the protocol (e.g., https://docs.apify.com/).`,
+        ),
 });
 
 const fetchApifyDocsToolInputSchema = z.toJSONSchema(fetchApifyDocsToolArgsSchema) as ToolInputSchema;
@@ -32,9 +35,7 @@ export function buildMarkdownUrl(url: string): string {
     return parsed.toString();
 }
 
-const ALLOWED_DOC_HOSTS: ReadonlySet<string> = new Set(
-    ALLOWED_DOC_DOMAINS.map((d) => new URL(d).hostname),
-);
+const ALLOWED_DOC_HOSTS: ReadonlySet<string> = new Set(ALLOWED_DOC_DOMAINS.map((d) => new URL(d).hostname));
 
 // `startsWith` on the raw URL is bypassable via `https://docs.apify.com.evil.com/`
 // or `https://docs.apify.com@evil.com/` — parse and compare the hostname instead.
@@ -90,11 +91,13 @@ USAGE EXAMPLES:
         if (!isAllowedDomain) {
             log.softFail(`[fetch-apify-docs] Invalid URL domain: ${url}`);
             return buildMCPResponse({
-                texts: [`Invalid URL: "${url}". \
+                texts: [
+                    `Invalid URL: "${url}". \
 Only documentation URLs from Apify and Crawlee are allowed \
 (starting with ${ALLOWED_DOC_DOMAINS.map((d) => `"${d}"`).join(' or ')}). \
 Please provide a valid documentation URL. \
-You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
+You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`,
+                ],
                 isError: true,
                 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
             });
@@ -112,7 +115,10 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
                     const error = Object.assign(new Error(`HTTP ${response.status} ${response.statusText}`), {
                         statusCode: response.status,
                     });
-                    logHttpError(error, 'Failed to fetch the documentation page', { url: mdUrl, statusText: response.statusText });
+                    logHttpError(error, 'Failed to fetch the documentation page', {
+                        url: mdUrl,
+                        statusText: response.statusText,
+                    });
                     const isUserError = response.status >= 400 && response.status < 500;
                     return buildMCPResponse({
                         texts: [buildFetchErrorMessage(url, `HTTP Status: ${response.status} ${response.statusText}.`)],
@@ -129,13 +135,21 @@ You can find documentation URLs using the ${HelperTools.DOCS_SEARCH} tool.`],
             } catch (error) {
                 logHttpError(error, 'Failed to fetch the documentation page', { url: mdUrl });
                 return buildMCPResponse({
-                    texts: [buildFetchErrorMessage(url, `Error: ${error instanceof Error ? error.message : String(error)}.`)],
+                    texts: [
+                        buildFetchErrorMessage(
+                            url,
+                            `Error: ${error instanceof Error ? error.message : String(error)}.`,
+                        ),
+                    ],
                     isError: true,
                     telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR },
                 });
             }
         }
 
-        return buildMCPResponse({ texts: [`Fetched content from ${url}:\n\n${markdown}`], structuredContent: { url, content: markdown } });
+        return buildMCPResponse({
+            texts: [`Fetched content from ${url}:\n\n${markdown}`],
+            structuredContent: { url, content: markdown },
+        });
     },
 } as const);

@@ -23,7 +23,7 @@ export type LlmResponse = {
         name: string;
         arguments: string;
     }[];
-}
+};
 
 /**
  * LLM client for chat completions with optional tool support

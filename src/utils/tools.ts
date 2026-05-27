@@ -15,10 +15,13 @@ import { fixZodSchemaRequired } from './ajv.js';
  */
 export function getToolFullName(tool: ToolEntry): string {
     switch (tool.type) {
-        case 'actor': return tool.actorFullName;
+        case 'actor':
+            return tool.actorFullName;
         case 'internal':
-        case 'actor-mcp': return tool.name;
-        default: return (tool satisfies never as ToolEntry).name;
+        case 'actor-mcp':
+            return tool.name;
+        default:
+            return (tool satisfies never as ToolEntry).name;
     }
 }
 
@@ -34,7 +37,10 @@ export function extractActorId(tool: ToolEntry): string | undefined {
 /**
  * Build actor identification fields for failure telemetry.
  */
-export function buildActorFields(actorName?: string, actorId?: string): Pick<CallDiagnostics, 'actor_name' | 'actor_id'> {
+export function buildActorFields(
+    actorName?: string,
+    actorId?: string,
+): Pick<CallDiagnostics, 'actor_name' | 'actor_id'> {
     return {
         ...(actorName ? { actor_name: actorName } : {}),
         ...(actorId ? { actor_id: actorId } : {}),
@@ -70,8 +76,9 @@ type ToolPublicFieldOptions = {
 function stripWidgetMeta(meta?: ToolBase['_meta']) {
     if (!meta) return meta;
 
-    const filteredEntries = Object.entries(meta)
-        .filter(([key]) => !key.startsWith('openai/') && key !== 'ui' && key !== 'ui/resourceUri');
+    const filteredEntries = Object.entries(meta).filter(
+        ([key]) => !key.startsWith('openai/') && key !== 'ui' && key !== 'ui/resourceUri',
+    );
 
     if (filteredEntries.length === 0) return undefined;
 
@@ -93,9 +100,7 @@ function fixZodInputSchemaRequired(inputSchema: ToolBase['inputSchema']): ToolBa
  */
 export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldOptions = {}) {
     const { mode, filterWidgetMeta = false } = options;
-    const meta = filterWidgetMeta && mode !== ServerMode.APPS
-        ? stripWidgetMeta(tool._meta)
-        : tool._meta;
+    const meta = filterWidgetMeta && mode !== ServerMode.APPS ? stripWidgetMeta(tool._meta) : tool._meta;
 
     return {
         name: tool.name,
@@ -120,10 +125,12 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     const originalCall = toolEntry.type === 'internal' ? toolEntry.call : undefined;
 
     // Create a deep copy using JSON serialization (excluding functions)
-    const cloned = JSON.parse(JSON.stringify(toolEntry, (key, value) => {
-        if (key === 'ajvValidate' || key === 'call') return undefined;
-        return value;
-    })) as ToolEntry;
+    const cloned = JSON.parse(
+        JSON.stringify(toolEntry, (key, value) => {
+            if (key === 'ajvValidate' || key === 'call') return undefined;
+            return value;
+        }),
+    ) as ToolEntry;
 
     // Restore the original functions
     cloned.ajvValidate = originalAjvValidate;
@@ -136,8 +143,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
 
 /** Returns true if the tool is eligible for Skyfire augmentation. */
 function isSkyfireEligible(tool: ToolEntry): boolean {
-    return tool.type === 'actor'
-        || (tool.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools));
+    return tool.type === 'actor' || (tool.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools));
 }
 
 /**

@@ -24,7 +24,12 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { classifyFailureCategory, extractAjvErrorDetails, getToolStatusFromError } from '../../utils/tool_status.js';
 import { extractActorId } from '../../utils/tools.js';
 import { actorNameToToolName, isActorBlockedUnderPaymentProvider } from '../utils.js';
-import { abortRunOnSignal, buildStartRunResponse, CALL_ACTOR_WAIT_SECS_DEFAULT, fetchActorRunData } from './actor_run_response.js';
+import {
+    abortRunOnSignal,
+    buildStartRunResponse,
+    CALL_ACTOR_WAIT_SECS_DEFAULT,
+    fetchActorRunData,
+} from './actor_run_response.js';
 import { fixActorNameInputAndLog, getActorsAsTools } from './actor_tools_factory.js';
 import { buildGetActorRunSuccessResponse } from './get_actor_run_common.js';
 
@@ -117,10 +122,7 @@ function isMemoryQuotaError(error: unknown): error is ApifyApiError {
 export function buildPermissionApprovalResponse(error: ApifyApiError): ReturnType<typeof buildMCPResponse> {
     const approvalUrl = typeof error.data?.approvalUrl === 'string' ? error.data.approvalUrl : undefined;
     return buildMCPResponse({
-        texts: [
-            error.message,
-            ...(approvalUrl ? [`Approve here: ${approvalUrl}`] : []),
-        ],
+        texts: [error.message, ...(approvalUrl ? [`Approve here: ${approvalUrl}`] : [])],
         isError: true,
     });
 }
@@ -149,13 +151,7 @@ function buildPermissionApprovalErrorResponse(
 }
 
 export function buildCallActorErrorResponse(params: CallActorErrorResponseParams): ReturnType<typeof buildMCPResponse> {
-    const {
-        actorName,
-        error,
-        actorId,
-        mcpSessionId,
-        actorGetDetailsTool,
-    } = params;
+    const { actorName, error, actorId, mcpSessionId, actorGetDetailsTool } = params;
 
     if (error instanceof ApifyApiError && error.type === APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED) {
         return buildPermissionApprovalErrorResponse(actorName, error, actorId, mcpSessionId);
@@ -203,36 +199,29 @@ export function buildCallActorErrorResponse(params: CallActorErrorResponseParams
 }
 
 export const callOptionsSchema = z.object({
-    memory: z.number()
+    memory: z
+        .number()
         .min(128, 'Memory must be at least 128 MB')
         .max(32768, 'Memory cannot exceed 32 GB (32768 MB)')
-        .optional()
-        .describe(dedent`
+        .optional().describe(dedent`
             Memory per run in MB. Power of 2 from 128 to 32768.
             Apify also caps total memory across all your concurrent runs (account plan limit); if a run is rejected because that quota would be exceeded, retry with a smaller value.
         `),
-    timeout: z.number()
-        .min(0, 'Timeout must be 0 or greater')
-        .optional()
-        .describe(dedent`
+    timeout: z.number().min(0, 'Timeout must be 0 or greater').optional().describe(dedent`
             Maximum runtime for the Actor in seconds. After this time elapses, the Actor will be automatically terminated.
             Use 0 for infinite timeout (no time limit).
         `),
-    build: z.string()
+    build: z
+        .string()
         .optional()
-        .describe('Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.'),
-    maxItems: z.number()
-        .int()
-        .positive()
-        .optional()
-        .describe(dedent`
+        .describe(
+            'Tag or number of the Actor build to run (e.g., "latest", "beta", "1.2.345"). If omitted, the Actor\'s default build is used.',
+        ),
+    maxItems: z.number().int().positive().optional().describe(dedent`
             Pay-per-result Actors only — ignored otherwise.
             Caps billed dataset items; does NOT limit production. Prefer the Actor's own input fields (e.g. maxResults) to bound work.
         `),
-    maxTotalChargeUsd: z.number()
-        .positive()
-        .optional()
-        .describe(dedent`
+    maxTotalChargeUsd: z.number().positive().optional().describe(dedent`
             Pay-per-event Actors only — ignored otherwise.
             Caps total USD billed; does NOT limit work. Prefer the Actor's own input fields to bound work.
         `),
@@ -240,23 +229,27 @@ export const callOptionsSchema = z.object({
 
 /** Zod schema for call-actor arguments — shared between default and apps variants. */
 export const callActorArgs = z.object({
-    actor: z.string()
-        .describe(dedent`
+    actor: z.string().describe(dedent`
             The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").
 
             For MCP server Actors, use format "actorName:toolName" to call a specific tool (e.g., "apify/actors-mcp-server:fetch-apify-docs").
         `),
-    input: z.object({}).passthrough()
-        .describe('The input JSON to pass to the Actor. Required.'),
-    waitSecs: z.number()
+    input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+    waitSecs: z
+        .number()
         .int()
         .min(0, 'waitSecs must be 0 or greater')
         .max(45, 'waitSecs cannot exceed 45')
         .default(CALL_ACTOR_WAIT_SECS_DEFAULT)
         .optional()
-        .describe('Seconds to wait for completion (0–45, default 30). Returns with current run status if not terminal within waitSecs.'),
-    callOptions: callOptionsSchema.optional()
-        .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
+        .describe(
+            'Seconds to wait for completion (0–45, default 30). Returns with current run status if not terminal within waitSecs.',
+        ),
+    callOptions: callOptionsSchema
+        .optional()
+        .describe(
+            'Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).',
+        ),
 });
 
 export const callActorInputSchema = z.toJSONSchema(callActorArgs) as ToolInputSchema;
@@ -362,7 +355,9 @@ export async function handleMcpToolCall(params: {
 
     if (!input) {
         return buildMCPResponse({
-            texts: [`Input is required for MCP tool '${mcpToolName}'. Please provide the input parameter based on the tool's input schema.`],
+            texts: [
+                `Input is required for MCP tool '${mcpToolName}'. Please provide the input parameter based on the tool's input schema.`,
+            ],
             isError: true,
         });
     }
@@ -408,7 +403,9 @@ export async function handleMcpToolCall(params: {
         });
         const errMsg = error instanceof Error ? error.message : String(error);
         return buildMCPResponse({
-            texts: [`Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${errMsg}. The MCP server may be temporarily unavailable.`],
+            texts: [
+                `Failed to call MCP tool '${mcpToolName}' on Actor '${baseActorName}': ${errMsg}. The MCP server may be temporarily unavailable.`,
+            ],
             isError: true,
         });
     } finally {
@@ -444,11 +441,13 @@ export async function resolveAndValidateActor(params: {
     if (!actor) {
         return {
             error: buildMCPResponse({
-                texts: [dedent`
+                texts: [
+                    dedent`
                     Actor '${actorName}' was not found.
                     Please verify Actor ID or name format (e.g., "username/name" like "apify/rag-web-browser") and ensure that the Actor exists.
                     You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
-                `],
+                `,
+                ],
                 isError: true,
                 telemetry: {
                     toolStatus: TOOL_STATUS.SOFT_FAIL,
@@ -489,9 +488,7 @@ export async function resolveAndValidateActor(params: {
     if (!actor.ajvValidate(input)) {
         const { errors } = actor.ajvValidate;
         const ajvDetails = extractAjvErrorDetails(errors ?? null);
-        const validationSummary = errors
-            ?.map((e) => (e as { message?: string }).message)
-            .join(', ') ?? '';
+        const validationSummary = errors?.map((e) => (e as { message?: string }).message).join(', ') ?? '';
 
         log.softFail('Input validation failed for Actor', {
             actorName,
@@ -546,10 +543,10 @@ export async function callActorPreExecute(
 ): Promise<
     | { earlyResponse: object }
     | {
-        parsed: CallActorParsedArgs;
-        baseActorName: string;
-        mcpToolName: string | undefined;
-    }
+          parsed: CallActorParsedArgs;
+          baseActorName: string;
+          mcpToolName: string | undefined;
+      }
 > {
     const { args, apifyToken, mcpSessionId } = toolArgs;
     const parsedArgs = callActorArgs.parse(args);
@@ -630,7 +627,12 @@ export async function executeCallActor(toolArgs: InternalToolArgs): Promise<obje
         if (abortSignal?.aborted) return {};
 
         const actorRun = await apifyClient.actor(baseActorName).start(input, callOptions);
-        log.debug('Started Actor run', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId, waitSecs });
+        log.debug('Started Actor run', {
+            actorName: baseActorName,
+            runId: actorRun.id,
+            mcpSessionId: toolArgs.mcpSessionId,
+            waitSecs,
+        });
 
         // Abort can arrive while start() was in flight — abort the newly created run.
         if (abortSignal?.aborted) {

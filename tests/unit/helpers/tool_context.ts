@@ -39,13 +39,12 @@ export function stubToolCallContext(
 }
 
 /** Assert not-found style soft-fail responses with INVALID_INPUT telemetry. */
-export function expectSoftFailInvalidInput(result: {
-    isError?: boolean;
-    toolTelemetry?: ToolTelemetrySnapshot;
-}): void {
+export function expectSoftFailInvalidInput(result: { isError?: boolean; toolTelemetry?: ToolTelemetrySnapshot }): void {
     expect(result.isError).toBe(true);
-    expect(result.toolTelemetry).toEqual(expect.objectContaining({
-        toolStatus: TOOL_STATUS.SOFT_FAIL,
-        failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-    }));
+    expect(result.toolTelemetry).toEqual(
+        expect.objectContaining({
+            toolStatus: TOOL_STATUS.SOFT_FAIL,
+            failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+        }),
+    );
 }

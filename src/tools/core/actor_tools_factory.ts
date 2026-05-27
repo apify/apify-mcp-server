@@ -3,14 +3,8 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import log from '@apify/log';
 
 import type { ApifyClient } from '../../apify_client.js';
-import {
-    ACTOR_MAX_MEMORY_MBYTES,
-    HelperTools,
-    RAG_WEB_BROWSER,
-    RAG_WEB_BROWSER_ADDITIONAL_DESC,
-} from '../../const.js';
+import { ACTOR_MAX_MEMORY_MBYTES, HelperTools, RAG_WEB_BROWSER, RAG_WEB_BROWSER_ADDITIONAL_DESC } from '../../const.js';
 import { ActorLoadError } from '../../errors.js';
-import { getActorDefinitionCached } from '../../utils/actor.js';
 import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js';
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
@@ -24,6 +18,7 @@ import type {
     ToolEntry,
     ToolInputSchema,
 } from '../../types.js';
+import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
@@ -46,9 +41,10 @@ const WAIT_SECS_INPUT_PROPERTY = {
     minimum: 0,
     maximum: WAIT_SECS_MAX,
     default: CALL_ACTOR_WAIT_SECS_DEFAULT,
-    description: `Max seconds (0–45, default ${CALL_ACTOR_WAIT_SECS_DEFAULT}) to cap the wait for the Actor run to reach terminal state. `
-        + 'For long-running Actors the response returns at the cap with the current run status; '
-        + `follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
+    description:
+        `Max seconds (0–45, default ${CALL_ACTOR_WAIT_SECS_DEFAULT}) to cap the wait for the Actor run to reach terminal state. ` +
+        'For long-running Actors the response returns at the cap with the current run status; ' +
+        `follow \`nextStep\` to poll via ${HelperTools.ACTOR_RUNS_GET}. Set to 0 to fire-and-forget.`,
 } as const;
 
 /**
@@ -167,9 +163,7 @@ Actor description: ${definition.description}`;
             ajvValidate,
             paymentRequired: true,
             memoryMbytes,
-            icons: definition.pictureUrl
-                ? [{ src: definition.pictureUrl, mimeType: 'image/png' }]
-                : undefined,
+            icons: definition.pictureUrl ? [{ src: definition.pictureUrl, mimeType: 'image/png' }] : undefined,
             annotations: {
                 title: definition.actorFullName,
                 readOnlyHint: false,
@@ -198,7 +192,7 @@ export async function getMCPServersAsTools(
     /**
      * This is case for the payment provider request without any Apify token, we do not support
      * standby Actors in this case, so we can skip MCP servers since they would fail anyway (they are standby Actors).
-    */
+     */
     if (apifyToken === null || apifyToken === undefined) {
         return [];
     }
@@ -252,7 +246,12 @@ export async function getMCPServersAsTools(
 }
 
 // Quote/backtick pairs that LLMs wrap actor names in (allocated once, not per call).
-const ACTOR_NAME_WRAPPERS: [string, string][] = [['`', '`'], ['"', '"'], ['\u201c', '\u201d'], ['\u2018', '\u2019']];
+const ACTOR_NAME_WRAPPERS: [string, string][] = [
+    ['`', '`'],
+    ['"', '"'],
+    ['\u201c', '\u201d'],
+    ['\u2018', '\u2019'],
+];
 
 /**
  * Fixes an Actor name input from LLM and logs at INFO when the input differed from the fixed version.

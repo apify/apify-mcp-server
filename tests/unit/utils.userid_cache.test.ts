@@ -64,7 +64,9 @@ describe('getUserInfoCached', () => {
     });
 
     it('returns FREE and null userId when API call fails', async () => {
-        const client = stubClient(async () => { throw new Error('network'); });
+        const client = stubClient(async () => {
+            throw new Error('network');
+        });
         const out = await getUserInfoCached(`token-${Math.random()}`, client);
         expect(out).toEqual({ userId: null, userPlanTier: 'FREE' });
     });

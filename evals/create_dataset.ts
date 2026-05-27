@@ -73,12 +73,7 @@ const argv = yargs(hideBin(process.argv))
     .epilogue('  $0 --test-cases custom.json --category search-actors')
     .parseSync() as CliArgs;
 
-
-async function createDatasetFromTestCases(
-    testCases: TestCase[],
-    datasetName: string,
-    version: string,
-): Promise<void> {
+async function createDatasetFromTestCases(testCases: TestCase[], datasetName: string, version: string): Promise<void> {
     log.info('Creating Phoenix dataset from test cases...');
 
     // Validate environment variables

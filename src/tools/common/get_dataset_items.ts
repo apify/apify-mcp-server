@@ -23,26 +23,37 @@ export function extractDotPrefixes(fields: string[]): string[] {
 }
 
 const getDatasetItemsArgs = z.object({
-    datasetId: z.string()
+    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    clean: z
+        .boolean()
+        .optional()
+        .describe(
+            'If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.',
+        ),
+    offset: z.number().optional().describe('Number of items to skip at the start. Default is 0.'),
+    limit: z
+        .number()
+        .int()
         .min(1)
-        .describe('Dataset ID or username~dataset-name.'),
-    clean: z.boolean().optional()
-        .describe('If true, returns only non-empty items and skips hidden fields (starting with #). Shortcut for skipHidden=true and skipEmpty=true.'),
-    offset: z.number().optional()
-        .describe('Number of items to skip at the start. Default is 0.'),
-    limit: z.number().int().min(1).optional()
+        .optional()
         .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
-    fields: z.string().optional()
-        .describe('Comma-separated list of fields to include in results. '
-            + 'Fields in output are sorted as specified. '
-            + 'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.'),
-    omit: z.string().optional()
-        .describe('Comma-separated list of fields to exclude from results.'),
-    desc: z.boolean().optional()
-        .describe('If true, results are returned in reverse order (newest to oldest).'),
-    flatten: z.string().optional()
-        .describe('Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). '
-            + 'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.'),
+    fields: z
+        .string()
+        .optional()
+        .describe(
+            'Comma-separated list of fields to include in results. ' +
+                'Fields in output are sorted as specified. ' +
+                'Use dot notation for nested objects (e.g. "metadata.url"); the server auto-flattens parent prefixes.',
+        ),
+    omit: z.string().optional().describe('Comma-separated list of fields to exclude from results.'),
+    desc: z.boolean().optional().describe('If true, results are returned in reverse order (newest to oldest).'),
+    flatten: z
+        .string()
+        .optional()
+        .describe(
+            'Comma-separated list of fields to flatten (e.g. flatten="metadata" turns {"metadata":{"url":"x"}} into {"metadata.url":"x"}). ' +
+                'Normally derived automatically from dot-notation in `fields`; specify only as a diagnostic override.',
+        ),
 });
 
 /**
@@ -81,9 +92,8 @@ export const getDatasetItems: ToolEntry = Object.freeze({
 
         const fields = parseCommaSeparatedList(parsed.fields);
         const omit = parseCommaSeparatedList(parsed.omit);
-        const flatten = parsed.flatten !== undefined
-            ? parseCommaSeparatedList(parsed.flatten)
-            : extractDotPrefixes(fields);
+        const flatten =
+            parsed.flatten !== undefined ? parseCommaSeparatedList(parsed.flatten) : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
         const v = await client.dataset(parsed.datasetId).listItems({

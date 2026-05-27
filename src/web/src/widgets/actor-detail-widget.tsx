@@ -1,7 +1,7 @@
-import { ActorSearchDetail } from "../pages/ActorSearch/ActorSearchDetail";
-import { renderWidget } from "../utils/init-widget";
-import { useWidgetProps } from "../hooks/use-widget-props";
-import type { ActorDetails } from "../types";
+import { useWidgetProps } from '../hooks/use-widget-props';
+import { ActorSearchDetail } from '../pages/ActorSearch/ActorSearchDetail';
+import type { ActorDetails } from '../types';
+import { renderWidget } from '../utils/init-widget';
 
 interface WidgetToolOutput extends Record<string, unknown> {
     details?: ActorDetails;
@@ -20,7 +20,7 @@ const ActorDetailWrapper = () => {
 
 (async () => {
     if (IS_DEV_BUILD) {
-        const { setupActorDetailWidgetDev } = await import("./actor-detail-widget.dev");
+        const { setupActorDetailWidgetDev } = await import('./actor-detail-widget.dev');
         setupActorDetailWidgetDev();
     }
     renderWidget(ActorDetailWrapper);

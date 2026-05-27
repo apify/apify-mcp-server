@@ -33,14 +33,17 @@ export function cleanEmptyArrays(obj: unknown): unknown {
     if (typeof obj !== 'object' || obj === null) {
         return obj;
     }
-    return Object.entries(obj).reduce((acc, [key, value]) => {
-        const processed = cleanEmptyArrays(value);
-        if (Array.isArray(processed) && processed.length === 0) {
+    return Object.entries(obj).reduce(
+        (acc, [key, value]) => {
+            const processed = cleanEmptyArrays(value);
+            if (Array.isArray(processed) && processed.length === 0) {
+                return acc;
+            }
+            acc[key] = processed;
             return acc;
-        }
-        acc[key] = processed;
-        return acc;
-    }, {} as Record<string, unknown>);
+        },
+        {} as Record<string, unknown>,
+    );
 }
 
 /**
@@ -59,9 +62,7 @@ export function cleanEmptyProperties(obj: unknown): unknown {
     }
 
     if (Array.isArray(obj)) {
-        const cleaned = obj
-            .map((item) => cleanEmptyProperties(item))
-            .filter((item) => item !== undefined);
+        const cleaned = obj.map((item) => cleanEmptyProperties(item)).filter((item) => item !== undefined);
         return cleaned.length > 0 ? cleaned : undefined;
     }
 

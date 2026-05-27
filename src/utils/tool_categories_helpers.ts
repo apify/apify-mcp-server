@@ -10,8 +10,7 @@ import type { ServerMode, ToolCategory, ToolEntry } from '../types.js';
  */
 export function getExpectedToolsByCategories(categories: ToolCategory[], mode: ServerMode): ToolEntry[] {
     const resolved = getCategoryTools(mode);
-    return categories
-        .flatMap((category) => resolved[category] || []);
+    return categories.flatMap((category) => resolved[category] || []);
 }
 
 /**

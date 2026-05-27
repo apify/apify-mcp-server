@@ -21,9 +21,7 @@ export function formatRunStatusMessage(
 ): string {
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
     const showStatusMessage = run.statusMessage && (!isTerminal || run.isStatusMessageTerminal === true);
-    return showStatusMessage
-        ? `${actorName}: ${run.status} — ${run.statusMessage}`
-        : `${actorName}: ${run.status}`;
+    return showStatusMessage ? `${actorName}: ${run.status} — ${run.statusMessage}` : `${actorName}: ${run.status}`;
 }
 
 export class ProgressTracker {

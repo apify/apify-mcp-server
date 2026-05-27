@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import type { App, McpUiHostContext } from "@modelcontextprotocol/ext-apps";
-import { useApp } from "@modelcontextprotocol/ext-apps/react";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { App, McpUiHostContext } from '@modelcontextprotocol/ext-apps';
+import { useApp } from '@modelcontextprotocol/ext-apps/react';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 interface McpAppState {
     app: App | null;
@@ -31,15 +31,14 @@ export function McpAppProvider({ children }: { children: React.ReactNode }) {
     const receivedViaBridge = useRef(false);
 
     const { app } = useApp({
-        appInfo: { name: "Apify MCP Widget", version: "1.0.0" },
+        appInfo: { name: 'Apify MCP Widget', version: '1.0.0' },
         capabilities: {},
         onAppCreated: (createdApp) => {
             createdApp.ontoolresult = (result) => {
                 receivedViaBridge.current = true;
                 setToolResult(result);
             };
-            createdApp.onhostcontextchanged = (ctx) =>
-                setHostContext((prev) => ({ ...prev, ...ctx }));
+            createdApp.onhostcontextchanged = (ctx) => setHostContext((prev) => ({ ...prev, ...ctx }));
         },
     });
 
@@ -62,15 +61,11 @@ export function McpAppProvider({ children }: { children: React.ReactNode }) {
         }
     }, [app]);
 
-    return (
-        <McpAppContext.Provider value={{ app, toolResult, hostContext }}>
-            {children}
-        </McpAppContext.Provider>
-    );
+    return <McpAppContext.Provider value={{ app, toolResult, hostContext }}>{children}</McpAppContext.Provider>;
 }
 
 export function useMcpApp(): McpAppState {
     const ctx = useContext(McpAppContext);
-    if (!ctx) throw new Error("useMcpApp must be used within McpAppProvider");
+    if (!ctx) throw new Error('useMcpApp must be used within McpAppProvider');
     return ctx;
 }

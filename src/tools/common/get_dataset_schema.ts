@@ -7,13 +7,15 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 
 const getDatasetSchemaArgs = z.object({
-    datasetId: z.string()
-        .min(1)
-        .describe('Dataset ID or username~dataset-name.'),
-    limit: z.number().optional()
+    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
+    limit: z
+        .number()
+        .optional()
         .describe('Maximum number of items to use for schema generation. Default is 5.')
         .default(5),
-    clean: z.boolean().optional()
+    clean: z
+        .boolean()
+        .optional()
         .describe('If true, uses only non-empty items and skips hidden fields (starting with #). Default is true.')
         .default(true),
 });

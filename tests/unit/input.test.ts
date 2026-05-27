@@ -77,7 +77,11 @@ describe('processInput', () => {
 
     it('passes tools through as-is, including invalid keys', () => {
         expect(processInput({ tools: ['docs', 'runs'] }).tools).toEqual(['docs', 'runs']);
-        expect(processInput({ tools: ['docs', 'invalidKey', 'storage'] as Input['tools'] }).tools).toEqual(['docs', 'invalidKey', 'storage']);
+        expect(processInput({ tools: ['docs', 'invalidKey', 'storage'] as Input['tools'] }).tools).toEqual([
+            'docs',
+            'invalidKey',
+            'storage',
+        ]);
         expect(processInput({ tools: [] }).tools).toEqual([]);
     });
 

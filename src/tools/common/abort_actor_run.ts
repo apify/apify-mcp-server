@@ -5,10 +5,11 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 
 const abortRunArgs = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run to abort.'),
-    gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
+    runId: z.string().min(1).describe('The ID of the Actor run to abort.'),
+    gracefully: z
+        .boolean()
+        .optional()
+        .describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
 });
 
 /**

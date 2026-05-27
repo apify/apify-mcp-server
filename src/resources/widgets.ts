@@ -49,23 +49,23 @@ export const WIDGET_URIS = {
 } as const;
 
 type WidgetMeta = NonNullable<Resource['_meta']> & {
-  // ChatGPT UX hints (does not affect MCP Jam renderer detection)
-  'openai/toolInvocation/invoking'?: string;
-  'openai/toolInvocation/invoked'?: string;
-  // ChatGPT-specific compatibility keys (OpenAI aliases for standard _meta.ui.* fields)
-  // See: https://developers.openai.com/apps-sdk/reference/#_meta-fields-on-tool-descriptor
-  //      https://developers.openai.com/apps-sdk/reference/#component-resource-_meta-fields
-  // 'openai/widgetAccessible'?: boolean;
-  'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
-  // 'openai/widgetPrefersBorder'?: boolean;
-  'openai/widgetDomain'?: string;
-  // MCP Apps standard metadata (SEP-1865)
-  ui: {
-    resourceUri: string;
-    visibility: readonly string[];
-    prefersBorder: boolean;
-    csp: typeof WIDGET_CSP;
-  };
+    // ChatGPT UX hints (does not affect MCP Jam renderer detection)
+    'openai/toolInvocation/invoking'?: string;
+    'openai/toolInvocation/invoked'?: string;
+    // ChatGPT-specific compatibility keys (OpenAI aliases for standard _meta.ui.* fields)
+    // See: https://developers.openai.com/apps-sdk/reference/#_meta-fields-on-tool-descriptor
+    //      https://developers.openai.com/apps-sdk/reference/#component-resource-_meta-fields
+    // 'openai/widgetAccessible'?: boolean;
+    'openai/widgetCSP'?: typeof OPENAI_WIDGET_CSP;
+    // 'openai/widgetPrefersBorder'?: boolean;
+    'openai/widgetDomain'?: string;
+    // MCP Apps standard metadata (SEP-1865)
+    ui: {
+        resourceUri: string;
+        visibility: readonly string[];
+        prefersBorder: boolean;
+        csp: typeof WIDGET_CSP;
+    };
 };
 
 /**
@@ -86,11 +86,7 @@ type WidgetMeta = NonNullable<Resource['_meta']> & {
  * `api.apify.com` is `Access-Control-Allow-Origin: *`, bearer-token auth).
  * ChatGPT uses `openai/widgetDomain` below, unaffected.
  */
-function createWidgetMeta(params: {
-    resourceUri: string;
-    invoking: string;
-    invoked: string;
-}): WidgetMeta {
+function createWidgetMeta(params: { resourceUri: string; invoking: string; invoked: string }): WidgetMeta {
     const { resourceUri, invoking, invoked } = params;
 
     return {
@@ -107,12 +103,12 @@ function createWidgetMeta(params: {
 }
 
 export type WidgetConfig = {
-  uri: Resource['uri'];
-  name: Resource['name'];
-  description: NonNullable<Resource['description']>;
-  jsFilename: string;
-  title: NonNullable<Resource['title']>;
-  meta: WidgetMeta;
+    uri: Resource['uri'];
+    name: Resource['name'];
+    description: NonNullable<Resource['description']>;
+    jsFilename: string;
+    title: NonNullable<Resource['title']>;
+    meta: WidgetMeta;
 };
 
 /**
@@ -146,8 +142,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetConfig> = {
 };
 
 export type AvailableWidget = WidgetConfig & {
-  jsPath: string;
-  exists: boolean;
+    jsPath: string;
+    exists: boolean;
 };
 
 /**

@@ -1,7 +1,12 @@
 import { RELATED_TASK_META_KEY } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
-import { createProgressTracker, formatRunStatusMessage, PROGRESS_NOTIFICATION_INTERVAL_MS, ProgressTracker } from '../../src/utils/progress.js';
+import {
+    createProgressTracker,
+    formatRunStatusMessage,
+    PROGRESS_NOTIFICATION_INTERVAL_MS,
+    ProgressTracker,
+} from '../../src/utils/progress.js';
 
 describe('ProgressTracker', () => {
     it('should send progress notifications correctly', async () => {
@@ -58,12 +63,18 @@ describe('ProgressTracker', () => {
         await tracker.updateProgress('apify/foo: SUCCEEDED — Done with extra');
 
         expect(mockSendNotification).toHaveBeenCalledTimes(2);
-        expect(mockSendNotification).toHaveBeenNthCalledWith(1, expect.objectContaining({
-            params: expect.objectContaining({ progress: 1, message: 'apify/foo: SUCCEEDED — Done' }),
-        }));
-        expect(mockSendNotification).toHaveBeenNthCalledWith(2, expect.objectContaining({
-            params: expect.objectContaining({ progress: 2, message: 'apify/foo: SUCCEEDED — Done with extra' }),
-        }));
+        expect(mockSendNotification).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                params: expect.objectContaining({ progress: 1, message: 'apify/foo: SUCCEEDED — Done' }),
+            }),
+        );
+        expect(mockSendNotification).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                params: expect.objectContaining({ progress: 2, message: 'apify/foo: SUCCEEDED — Done with extra' }),
+            }),
+        );
     });
 
     it('should handle notification send errors gracefully', async () => {
@@ -165,9 +176,12 @@ describe('ProgressTracker', () => {
             const mockSendNotification = vi.fn();
             const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
             let resolveGet: ((run: unknown) => void) | undefined;
-            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
-                resolveGet = resolve;
-            }));
+            const get = vi.fn().mockImplementation(
+                async () =>
+                    new Promise((resolve) => {
+                        resolveGet = resolve;
+                    }),
+            );
             const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
@@ -196,9 +210,12 @@ describe('ProgressTracker', () => {
             const mockSendNotification = vi.fn();
             const tracker = new ProgressTracker({ progressToken: 'tok', sendNotification: mockSendNotification });
             let resolveGet: ((run: unknown) => void) | undefined;
-            const get = vi.fn().mockImplementation(async () => new Promise((resolve) => {
-                resolveGet = resolve;
-            }));
+            const get = vi.fn().mockImplementation(
+                async () =>
+                    new Promise((resolve) => {
+                        resolveGet = resolve;
+                    }),
+            );
             const apifyClient = { run: vi.fn().mockReturnValue({ get }) } as never;
 
             tracker.startActorRunUpdates('run-1', apifyClient, 'apify/foo', { status: 'RUNNING' });
@@ -219,25 +236,30 @@ describe('ProgressTracker', () => {
 
 describe('formatRunStatusMessage', () => {
     it('leads with status and appends in-progress statusMessage', () => {
-        expect(formatRunStatusMessage('apify/foo', { status: 'RUNNING', statusMessage: 'Crawled 5/10 pages' }))
-            .toBe('apify/foo: RUNNING — Crawled 5/10 pages');
+        expect(formatRunStatusMessage('apify/foo', { status: 'RUNNING', statusMessage: 'Crawled 5/10 pages' })).toBe(
+            'apify/foo: RUNNING — Crawled 5/10 pages',
+        );
     });
 
     it('appends terminal statusMessage only when the actor marked it terminal', () => {
-        expect(formatRunStatusMessage('apify/foo', {
-            status: 'SUCCEEDED',
-            statusMessage: 'Actor finished with 1 result',
-            isStatusMessageTerminal: true,
-        })).toBe('apify/foo: SUCCEEDED — Actor finished with 1 result');
+        expect(
+            formatRunStatusMessage('apify/foo', {
+                status: 'SUCCEEDED',
+                statusMessage: 'Actor finished with 1 result',
+                isStatusMessageTerminal: true,
+            }),
+        ).toBe('apify/foo: SUCCEEDED — Actor finished with 1 result');
     });
 
     it('omits non-terminal statusMessage at terminal status to avoid showing stale text', () => {
         for (const isStatusMessageTerminal of [false, null, undefined]) {
-            expect(formatRunStatusMessage('apify/foo', {
-                status: 'SUCCEEDED',
-                statusMessage: 'Starting the crawler.',
-                isStatusMessageTerminal,
-            })).toBe('apify/foo: SUCCEEDED');
+            expect(
+                formatRunStatusMessage('apify/foo', {
+                    status: 'SUCCEEDED',
+                    statusMessage: 'Starting the crawler.',
+                    isStatusMessageTerminal,
+                }),
+            ).toBe('apify/foo: SUCCEEDED');
         }
     });
 

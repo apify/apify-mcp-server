@@ -4,28 +4,25 @@ import { typeObjectToString } from '../../src/utils/actor_details.js';
 
 describe('typeObjectToString', () => {
     it('formats a flat object of string-typed fields', () => {
-        expect(typeObjectToString({ name: 'string', age: 'number' }))
-            .toBe('{ name: string, age: number }');
+        expect(typeObjectToString({ name: 'string', age: 'number' })).toBe('{ name: string, age: number }');
     });
 
     it('formats an array of primitives', () => {
-        expect(typeObjectToString({ tags: ['string'] }))
-            .toBe('{ tags: string[] }');
+        expect(typeObjectToString({ tags: ['string'] })).toBe('{ tags: string[] }');
     });
 
     it('formats an array of objects', () => {
-        expect(typeObjectToString({ users: [{ name: 'string' }] }))
-            .toBe('{ users: { name: string }[] }');
+        expect(typeObjectToString({ users: [{ name: 'string' }] })).toBe('{ users: { name: string }[] }');
     });
 
     it('formats a nested object', () => {
-        expect(typeObjectToString({ profile: { name: 'string', age: 'number' } }))
-            .toBe('{ profile: { name: string, age: number } }');
+        expect(typeObjectToString({ profile: { name: 'string', age: 'number' } })).toBe(
+            '{ profile: { name: string, age: number } }',
+        );
     });
 
     it('formats deep nesting through arrays and objects', () => {
-        expect(typeObjectToString({ a: [{ b: ['string'] }] }))
-            .toBe('{ a: { b: string[] }[] }');
+        expect(typeObjectToString({ a: [{ b: ['string'] }] })).toBe('{ a: { b: string[] }[] }');
     });
 
     it('returns empty braces for an empty object', () => {
@@ -37,13 +34,15 @@ describe('typeObjectToString', () => {
     });
 
     it('skips fields with null / number / boolean / undefined values at top level', () => {
-        expect(typeObjectToString({
-            a: null,
-            b: 42,
-            c: true,
-            d: undefined,
-            keep: 'string',
-        })).toBe('{ keep: string }');
+        expect(
+            typeObjectToString({
+                a: null,
+                b: 42,
+                c: true,
+                d: undefined,
+                keep: 'string',
+            }),
+        ).toBe('{ keep: string }');
     });
 
     it('emits "unknown" for non-string primitives nested inside arrays', () => {
@@ -59,13 +58,15 @@ describe('typeObjectToString', () => {
     });
 
     it('mixes kept string/object/array fields with skipped primitives in one object', () => {
-        expect(typeObjectToString({
-            name: 'string',
-            count: 5,
-            tags: ['string'],
-            meta: { id: 'string' },
-            flag: false,
-        })).toBe('{ name: string, tags: string[], meta: { id: string } }');
+        expect(
+            typeObjectToString({
+                name: 'string',
+                count: 5,
+                tags: ['string'],
+                meta: { id: 'string' },
+                flag: false,
+            }),
+        ).toBe('{ name: string, tags: string[], meta: { id: string } }');
     });
 
     it('emits "unknown" for function / symbol nested inside an array', () => {
@@ -82,12 +83,14 @@ describe('typeObjectToString', () => {
     });
 
     it('recurses through a nested object containing mixed skipped values', () => {
-        expect(typeObjectToString({
-            outer: {
-                keep: 'string',
-                skip: 42,
-                tags: ['string'],
-            },
-        })).toBe('{ outer: { keep: string, tags: string[] } }');
+        expect(
+            typeObjectToString({
+                outer: {
+                    keep: 'string',
+                    skip: 42,
+                    tags: ['string'],
+                },
+            }),
+        ).toBe('{ outer: { keep: string, tags: string[] } }');
     });
 });

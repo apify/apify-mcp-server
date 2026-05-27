@@ -2,7 +2,13 @@ import { HelperTools } from '../const.js';
 import type { ToolCategory, ToolEntry } from '../types.js';
 import { ServerMode } from '../types.js';
 import { getExpectedToolsByCategories } from '../utils/tool_categories_helpers.js';
-import { CATEGORY_NAME_SET, CATEGORY_NAMES, getCategoryTools, toolCategories, toolCategoriesEnabledByDefault } from './categories.js';
+import {
+    CATEGORY_NAME_SET,
+    CATEGORY_NAMES,
+    getCategoryTools,
+    toolCategories,
+    toolCategoriesEnabledByDefault,
+} from './categories.js';
 import { getActorsAsTools } from './core/actor_tools_factory.js';
 import type { ActorsAsToolsResult } from './core/actor_tools_factory.js';
 

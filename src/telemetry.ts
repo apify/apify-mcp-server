@@ -4,10 +4,7 @@ import { Analytics } from '@segment/analytics-node';
 
 import log from '@apify/log';
 
-import {
-    DEFAULT_TELEMETRY_ENV,
-    TELEMETRY_ENV,
-} from './const.js';
+import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
 import type { TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';

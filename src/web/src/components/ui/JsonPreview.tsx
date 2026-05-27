@@ -1,6 +1,6 @@
-import React from "react";
+import React from 'react';
 
-import { Text } from "./Text";
+import { Text } from './Text';
 
 type JsonPreviewProps = {
     value: unknown;
@@ -9,7 +9,7 @@ type JsonPreviewProps = {
 };
 
 export const JsonPreview: React.FC<JsonPreviewProps> = ({ value, title, maxHeight = 300 }) => {
-    const text = typeof value === "string" ? value : JSON.stringify(value, null, 2);
+    const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
     return (
         <div className="flex flex-col gap-2">
@@ -23,7 +23,7 @@ export const JsonPreview: React.FC<JsonPreviewProps> = ({ value, title, maxHeigh
                 className="rounded-lg overflow-x-auto bg-[var(--color-card-bg)] border border-[var(--color-border)]"
                 style={{
                     maxHeight,
-                    overflowY: "auto",
+                    overflowY: 'auto',
                 }}
             >
                 <pre className="text-xs whitespace-pre-wrap font-mono p-2 rounded bg-[var(--color-code-bg)]">

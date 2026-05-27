@@ -12,7 +12,9 @@ describe('TTLLRUCache', () => {
     it('should return null after TTL expires', async () => {
         const cache = new TTLLRUCache<string>(2, 1); // 1 second TTL
         cache.set('a', 'valueA');
-        await new Promise((r) => { setTimeout(r, 1100); });
+        await new Promise((r) => {
+            setTimeout(r, 1100);
+        });
         expect(cache.get('a')).toBeNull();
     });
 
@@ -29,16 +31,22 @@ describe('TTLLRUCache', () => {
     it('should update value and TTL on set for existing key', async () => {
         const cache = new TTLLRUCache<string>(2, 1); // 1 second TTL
         cache.set('a', 'valueA');
-        await new Promise((r) => { setTimeout(r, 700); });
+        await new Promise((r) => {
+            setTimeout(r, 700);
+        });
         cache.set('a', 'valueA2'); // Reset TTL
-        await new Promise((r) => { setTimeout(r, 700); });
+        await new Promise((r) => {
+            setTimeout(r, 700);
+        });
         expect(cache.get('a')).toBe('valueA2');
     });
 
     it('should remove expired entry on get', async () => {
         const cache = new TTLLRUCache<string>(2, 1); // 1 second TTL
         cache.set('a', 'valueA');
-        await new Promise((r) => { setTimeout(r, 1100); });
+        await new Promise((r) => {
+            setTimeout(r, 1100);
+        });
         expect(cache.get('a')).toBeNull();
         // Should not throw if called again
         expect(cache.get('a')).toBeNull();

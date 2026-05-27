@@ -31,7 +31,10 @@ export function parseCommaSeparatedList(input?: string): string[] {
     if (!input) {
         return [];
     }
-    return input.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+    return input
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 }
 
 /**
@@ -72,9 +75,9 @@ export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[])
         let current: unknown = obj;
         for (const segment of path) {
             if (
-                current !== null
-                && typeof current === 'object'
-                && Object.prototype.hasOwnProperty.call(current, segment)
+                current !== null &&
+                typeof current === 'object' &&
+                Object.prototype.hasOwnProperty.call(current, segment)
             ) {
                 // Use index signature to avoid 'any' and type errors
                 current = (current as Record<string, unknown>)[segment];

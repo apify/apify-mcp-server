@@ -7,7 +7,8 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
 export const addToolArgsSchema = z.object({
-    actor: z.string()
+    actor: z
+        .string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
 });
@@ -36,7 +37,12 @@ USAGE EXAMPLES:
     },
     // TODO: I don't like that we are passing apifyMcpServer and mcpServer to the tool
     call: async (toolArgs: InternalToolArgs) => {
-        const { apifyMcpServer, apifyToken, args, extra: { sendNotification } } = toolArgs;
+        const {
+            apifyMcpServer,
+            apifyToken,
+            args,
+            extra: { sendNotification },
+        } = toolArgs;
         const parsed = addToolArgsSchema.parse(args);
         if (apifyMcpServer.listAllToolNames().includes(parsed.actor)) {
             return buildMCPResponse({

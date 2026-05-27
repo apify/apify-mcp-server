@@ -30,8 +30,8 @@ type EnrichedDatasetSchema = {
 };
 
 function pickItemsSchema(schema: unknown): { type: string; properties?: Record<string, unknown> } | undefined {
-    return (schema as EnrichedDatasetSchema).properties.storages.properties.datasets
-        .properties.default.properties.itemsSchema;
+    return (schema as EnrichedDatasetSchema).properties.storages.properties.datasets.properties.default.properties
+        .itemsSchema;
 }
 
 function createMockActorInfo(actorFullName: string): ActorInfo {
@@ -161,7 +161,9 @@ describe('Structured Output Schemas', () => {
 
             const tool = tools[0] as ActorTool;
             const inputProps = (tool.inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
-            const waitSecsField = inputProps.waitSecs as { type?: string; minimum?: number; maximum?: number } | undefined;
+            const waitSecsField = inputProps.waitSecs as
+                | { type?: string; minimum?: number; maximum?: number }
+                | undefined;
             expect(waitSecsField?.type).toBe('integer');
             expect(waitSecsField?.minimum).toBe(0);
             expect(waitSecsField?.maximum).toBe(45);
@@ -203,14 +205,17 @@ describe('Structured Output Schemas', () => {
 
         it('falls back to the canonical schema when actorStore throws', async () => {
             const store: ActorStore = {
-                getActorOutputSchema: async () => { throw new Error('Database connection failed'); },
-                getActorOutputSchemaAsTypeObject: async () => { throw new Error('Database connection failed'); },
+                getActorOutputSchema: async () => {
+                    throw new Error('Database connection failed');
+                },
+                getActorOutputSchemaAsTypeObject: async () => {
+                    throw new Error('Database connection failed');
+                },
             };
 
-            const tools = await getNormalActorsAsTools(
-                [createMockActorInfo('apify/test-actor')],
-                { actorStore: store },
-            );
+            const tools = await getNormalActorsAsTools([createMockActorInfo('apify/test-actor')], {
+                actorStore: store,
+            });
             const tool = tools[0] as ActorTool;
 
             expect(tool.outputSchema).toBe(getActorRunOutputSchema);

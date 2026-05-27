@@ -8,6 +8,7 @@ import type { ApifyClient } from 'apify-client';
 import log from '@apify/log';
 
 import { defaults, HelperTools } from '../const.js';
+import type { PaymentProvider } from '../payments/types.js';
 import {
     CATEGORY_NAME_SET,
     CATEGORY_NAMES,
@@ -16,7 +17,6 @@ import {
     WIDGET_BY_BASE_TOOL,
 } from '../tools/categories.js';
 import { abortActorRun } from '../tools/common/abort_actor_run.js';
-import type { PaymentProvider } from '../payments/types.js';
 import { addTool } from '../tools/common/add_actor.js';
 import { getDatasetItems } from '../tools/common/get_dataset_items.js';
 import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_record.js';
@@ -73,12 +73,13 @@ type NormalizedInput = {
  */
 function normalizeInput(input: Input): NormalizedInput {
     const raw = input.tools;
-    const selectors = raw === undefined
-        ? undefined
-        : (Array.isArray(raw) ? raw : [raw])
-            .map(String)
-            .map((s) => s.trim())
-            .filter((s) => s !== '');
+    const selectors =
+        raw === undefined
+            ? undefined
+            : (Array.isArray(raw) ? raw : [raw])
+                  .map(String)
+                  .map((s) => s.trim())
+                  .filter((s) => s !== '');
     return {
         selectors,
         addActorEnabled: input.enableAddingActors === true,
@@ -177,7 +178,11 @@ export function toolNamesToInput(toolNames: string[]): Input {
 }
 
 /** Compose the final tool list from pre-fetched actor tools and the original input for the given mode. */
-export function getToolsForServerMode(input: Input, actorTools: ToolEntry[], mode: ServerMode = ServerMode.DEFAULT): ToolEntry[] {
+export function getToolsForServerMode(
+    input: Input,
+    actorTools: ToolEntry[],
+    mode: ServerMode = ServerMode.DEFAULT,
+): ToolEntry[] {
     // Build mode-resolved categories — tools are already the correct variant for this mode
     const categories = getCategoryTools(mode);
 

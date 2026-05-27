@@ -1,26 +1,28 @@
 #!/usr/bin/env tsx
 
 import dotenv from 'dotenv';
+
 import log from '@apify/log';
+
+import { PASS_THRESHOLD } from './config.js';
 import {
     loadTools,
     createOpenRouterTask,
     createToolSelectionLLMEvaluator,
-    loadTestCases, filterById,
-    type TestCase
+    loadTestCases,
+    filterById,
+    type TestCase,
 } from './evaluation_utils.js';
-import { PASS_THRESHOLD } from './config.js';
 
 dotenv.config({ path: '.env' });
 log.setLevel(log.LEVELS.INFO);
 
 // const MODEL_NAME = 'openai/gpt-4.1-mini';
-const MODEL_NAME = 'anthropic/claude-haiku-4.5'
+const MODEL_NAME = 'anthropic/claude-haiku-4.5';
 const RUN_LLM_JUDGE = true;
 
 // Hardcoded examples for quick testing
-const EXAMPLES: TestCase[] = [
-];
+const EXAMPLES: TestCase[] = [];
 
 EXAMPLES.push(...filterById(loadTestCases('test_cases.json').testCases, 'fetch-actor-details-1'));
 
@@ -58,12 +60,12 @@ async function main() {
             const result = await llmEvaluator.evaluate({
                 input: example as unknown as Record<string, unknown>,
                 output,
-                expected: example as unknown as Record<string, unknown>
+                expected: example as unknown as Record<string, unknown>,
             });
 
-            const passed = result.score ? (result.score > PASS_THRESHOLD) : false;
+            const passed = result.score ? result.score > PASS_THRESHOLD : false;
             console.log('\nEvaluation result');
-            console.log('Score:', result.score );
+            console.log('Score:', result.score);
             console.log('Explanation:', result.explanation);
             console.log('Passed:', result.score ? (passed ? 'True ✅' : 'False ❌') : 'False ❌');
             console.log('='.repeat(50));

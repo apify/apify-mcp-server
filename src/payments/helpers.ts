@@ -61,9 +61,10 @@ export function prepareToolCallContext(input: {
     const toolArgsRedacted = provider.redactForLogging(args);
 
     const paymentHeaders = provider.getPaymentHeaders(args, meta, requestHeaders);
-    const apifyClient = Object.keys(paymentHeaders).length > 0
-        ? new ApifyClient({ paymentHeaders })
-        : new ApifyClient({ token: apifyToken });
+    const apifyClient =
+        Object.keys(paymentHeaders).length > 0
+            ? new ApifyClient({ paymentHeaders })
+            : new ApifyClient({ token: apifyToken });
     registerPaymentRequiredInterceptor(apifyClient);
 
     return {

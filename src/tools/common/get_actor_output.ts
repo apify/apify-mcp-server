@@ -13,20 +13,15 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
  * Zod schema for get-actor-output tool arguments
  */
 const getActorOutputArgs = z.object({
-    datasetId: z.string()
-        .min(1)
-        .describe('Actor output dataset ID to retrieve from.'),
-    fields: z.string()
+    datasetId: z.string().min(1).describe('Actor output dataset ID to retrieve from.'),
+    fields: z
+        .string()
         .optional()
-        .describe('Comma-separated list of fields to include (supports dot notation like "crawl.statusCode"). For example: "crawl.statusCode,text,metadata"'),
-    offset: z.number()
-        .optional()
-        .default(0)
-        .describe('Number of items to skip (default: 0).'),
-    limit: z.number()
-        .optional()
-        .default(100)
-        .describe('Maximum number of items to return (default: 100).'),
+        .describe(
+            'Comma-separated list of fields to include (supports dot notation like "crawl.statusCode"). For example: "crawl.statusCode,text,metadata"',
+        ),
+    offset: z.number().optional().default(0).describe('Number of items to skip (default: 0).'),
+    limit: z.number().optional().default(100).describe('Maximum number of items to return (default: 100).'),
 });
 
 /**
@@ -74,9 +69,9 @@ export const getActorOutput: ToolEntry = Object.freeze({
 
         // TODO: we can optimize the API level field filtering in future
         /**
-             * Only top-level fields can be filtered.
-             * If a dot is present, filtering is done here and not at the API level.
-             */
+         * Only top-level fields can be filtered.
+         * If a dot is present, filtering is done here and not at the API level.
+         */
         const hasDot = fieldsArray.some((field) => field.includes('.'));
         const response = await apifyClient.dataset(parsed.datasetId).listItems({
             offset: parsed.offset,
@@ -100,9 +95,7 @@ export const getActorOutput: ToolEntry = Object.freeze({
         }
 
         // Clean empty properties
-        const cleanedItems = items
-            .map((item) => cleanEmptyProperties(item))
-            .filter((item) => item !== undefined);
+        const cleanedItems = items.map((item) => cleanEmptyProperties(item)).filter((item) => item !== undefined);
 
         let outputText = `\`\`\`json\n${JSON.stringify(cleanedItems)}\n\`\`\``;
         let truncated = false;

@@ -6,7 +6,10 @@ import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { parseFencedJson, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_KEYS = {
-    items: [{ key: 'INPUT', size: 42 }, { key: 'OUTPUT', size: 128 }],
+    items: [
+        { key: 'INPUT', size: 42 },
+        { key: 'OUTPUT', size: 128 },
+    ],
     nextExclusiveStartKey: '',
     isTruncated: false,
     count: 2,

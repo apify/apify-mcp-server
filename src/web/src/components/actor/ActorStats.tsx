@@ -1,8 +1,9 @@
-import React from "react";
-import { MembersFilled, Play, Check } from "../ui/Icons";
-import { formatNumber } from "../../utils/formatting";
-import { cn } from "../../utils/cn";
-import { Text } from "../ui/Text";
+import React from 'react';
+
+import { cn } from '../../utils/cn';
+import { formatNumber } from '../../utils/formatting';
+import { MembersFilled, Play, Check } from '../ui/Icons';
+import { Text } from '../ui/Text';
 
 type ActorStatsProps = {
     totalUsers: number;
@@ -12,10 +13,10 @@ type ActorStatsProps = {
 };
 
 export const ActorStats: React.FC<ActorStatsProps> = ({ totalUsers, totalRuns, successRate, className }) => {
-    const iconSize = "w-[18px] h-[20px]";
+    const iconSize = 'w-[18px] h-[20px]';
 
     return (
-        <Text as="div" size="xs" tone="secondary" className={cn("flex items-center gap-4", className)}>
+        <Text as="div" size="xs" tone="secondary" className={cn('flex items-center gap-4', className)}>
             <Stat icon={<MembersFilled className={iconSize} />} text={`${formatNumber(totalUsers)} users`} />
             <Stat icon={<Play className={iconSize} />} text={`${formatNumber(totalRuns)} runs`} />
 

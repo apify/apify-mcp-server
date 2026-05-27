@@ -17,8 +17,8 @@ export function buildUsageMeta(source: {
     const { usageTotalUsd, usageUsd } = source;
     return usageTotalUsd !== undefined
         ? {
-            [APIFY_ACTOR_RUN_META_KEY]: { usageTotalUsd, usageUsd },
-        }
+              [APIFY_ACTOR_RUN_META_KEY]: { usageTotalUsd, usageUsd },
+          }
         : undefined;
 }
 

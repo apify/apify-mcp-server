@@ -75,7 +75,8 @@ export const pricingSchema = {
         userTier: {
             type: 'string',
             enum: ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'],
-            description: "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
+            description:
+                "The user's plan tier used to resolve pricing (always the user's tier, even if a different tier was used as fallback)",
         },
         pricePerUnit: { type: 'number', description: 'Price per unit (for non-free models)' },
         unitName: { type: 'string', description: 'Unit name for pricing' },
@@ -84,8 +85,9 @@ export const pricingSchema = {
         events: pricingEventsSchema,
         pricingNote: {
             type: 'string',
-            description: 'Note naming the resolved tier; only emitted in simplified mode '
-                + 'when the actor has multiple tiers and they resolve consistently',
+            description:
+                'Note naming the resolved tier; only emitted in simplified mode ' +
+                'when the actor has multiple tiers and they resolve consistently',
         },
         eventDescriptionsOmitted: {
             type: 'boolean',
@@ -93,7 +95,8 @@ export const pricingSchema = {
         },
         eventDescriptionsNote: {
             type: 'string',
-            description: 'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
+            description:
+                'Note explaining that event descriptions were omitted and full details are available via fetch-actor-details',
         },
     },
     required: ['model', 'userTier'],
@@ -145,7 +148,8 @@ export const actorInfoSchema = {
         // field by apify-core's `trimInputSchema`, so the per-field shape stays minimal.
         inputFields: {
             type: 'object' as const, // Literal type required for MCP SDK type compatibility
-            description: 'Compact JSON-Schema-shaped descriptor of the Actor input; only `type` is preserved per field.',
+            description:
+                'Compact JSON-Schema-shaped descriptor of the Actor input; only `type` is preserved per field.',
             properties: {
                 type: { type: 'string', description: 'Always `"object"`.' },
                 properties: {
@@ -184,12 +188,16 @@ export const actorDetailsOutputSchema = {
     type: 'object' as const, // Literal type required for MCP SDK type compatibility
     properties: {
         actorInfo: actorInfoSchema,
-        readme: { type: 'string', description: 'Actor README summary when available, otherwise the full README documentation.' },
+        readme: {
+            type: 'string',
+            description: 'Actor README summary when available, otherwise the full README documentation.',
+        },
         inputSchema: { type: 'object' as const, description: 'Actor input schema.' }, // Literal type required for MCP SDK type compatibility
         outputSchema: { type: 'object' as const, description: 'Output schema inferred from successful runs.' },
         mcpTools: {
             type: 'string',
-            description: 'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
+            description:
+                'Markdown listing of MCP tools exposed by the Actor (only present when `output.mcpTools` is requested).',
         },
     },
 };
@@ -206,7 +214,10 @@ export const actorDetailsWidgetOutputSchema = {
         actorDetails: {
             type: 'object' as const, // Literal type required for MCP SDK type compatibility
             properties: {
-                actorInfo: { type: 'object' as const, description: 'Widget-formatted Actor info (tier-aware pricing, widget display fields).' },
+                actorInfo: {
+                    type: 'object' as const,
+                    description: 'Widget-formatted Actor info (tier-aware pricing, widget display fields).',
+                },
                 actorCard: { type: 'string', description: 'Rendered Actor card markdown for widget display.' },
                 readme: { type: 'string', description: 'Formatted Actor README for widget display.' },
             },
@@ -231,7 +242,10 @@ export const actorSearchOutputSchema = {
         },
         query: { type: 'string', description: 'The search query used' },
         count: { type: 'number', description: 'Number of Actors returned' },
-        instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
+        instructions: {
+            type: 'string',
+            description: 'Additional instructions for the LLM to follow when processing the search results.',
+        },
     },
     required: ['actors', 'query', 'count'],
 };
@@ -254,7 +268,10 @@ export const actorSearchWidgetOutputSchema = {
         count: { type: 'number', description: 'Number of Actors returned' },
         widgetActors: {
             type: 'array' as const,
-            items: { type: 'object' as const, description: 'Widget-formatted Actor (tier-aware pricing, widget display fields).' },
+            items: {
+                type: 'object' as const,
+                description: 'Widget-formatted Actor (tier-aware pricing, widget display fields).',
+            },
             description: 'Widget-formatted Actor list for UI rendering',
         },
     },
@@ -269,13 +286,22 @@ export const searchApifyDocsToolOutputSchema = {
             items: {
                 type: 'object' as const, // Literal type required for MCP SDK type compatibility
                 properties: {
-                    url: { type: 'string', description: 'URL of the documentation page, may include anchor (e.g., #section-name).' },
-                    content: { type: 'string', description: 'A limited piece of content that matches the search query.' },
+                    url: {
+                        type: 'string',
+                        description: 'URL of the documentation page, may include anchor (e.g., #section-name).',
+                    },
+                    content: {
+                        type: 'string',
+                        description: 'A limited piece of content that matches the search query.',
+                    },
                 },
                 required: ['url'],
             },
         },
-        instructions: { type: 'string', description: 'Additional instructions for the LLM to follow when processing the search results.' },
+        instructions: {
+            type: 'string',
+            description: 'Additional instructions for the LLM to follow when processing the search results.',
+        },
     },
     required: ['results'],
 };
@@ -296,9 +322,16 @@ export const getActorRunOutputSchema = {
         runId: { type: 'string', description: 'Actor run ID' },
         actorId: { type: 'string', description: 'Stable Apify Actor ID from the run record' },
         actorName: { type: 'string', description: '"username/actor-name"' },
-        status: { type: 'string', description: 'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED' },
+        status: {
+            type: 'string',
+            description:
+                'Run status: READY | RUNNING | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED | SUCCEEDED | FAILED',
+        },
         statusMessage: { type: 'string', description: 'Pass-through from Apify run.statusMessage' },
-        exitCode: { type: 'number', description: 'Actor process exit code; populated for terminal states (especially FAILED)' },
+        exitCode: {
+            type: 'number',
+            description: 'Actor process exit code; populated for terminal states (especially FAILED)',
+        },
         startedAt: { type: 'string', description: 'ISO timestamp when the run started' },
         finishedAt: { type: 'string', description: 'ISO timestamp when the run finished (terminal states only)' },
         stats: {
@@ -346,7 +379,8 @@ export const getActorRunOutputSchema = {
                 },
                 keyValueStores: {
                     type: 'object' as const,
-                    description: 'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
+                    description:
+                        'Map of key-value store alias → metadata. Key "default" is always the run\'s primary store.',
                     properties: {
                         default: {
                             type: 'object' as const,
@@ -354,7 +388,10 @@ export const getActorRunOutputSchema = {
                                 id: { type: 'string', description: 'Key-value store ID' },
                                 name: { type: 'string' },
                                 title: { type: 'string' },
-                                keyCount: { type: 'number', description: 'Total number of keys (omitted when truncated)' },
+                                keyCount: {
+                                    type: 'number',
+                                    description: 'Total number of keys (omitted when truncated)',
+                                },
                                 keys: {
                                     type: 'array' as const,
                                     items: { type: 'string' },
@@ -395,14 +432,18 @@ export const getActorRunOutputSchema = {
 export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<string, unknown>) {
     const itemsSchema = {
         type: 'object' as const,
-        description: 'JSON Schema for rows in the dataset at `storages.datasets.default.id` — describes row '
-            + 'shape only; the rows themselves are NOT returned inline in this response. Inferred from this '
-            + 'Actor\'s historical successful runs. To fetch actual rows, call `get-dataset-items` with the '
-            + 'dataset id and a `fields` projection drawn from this schema.',
+        description:
+            'JSON Schema for rows in the dataset at `storages.datasets.default.id` — describes row ' +
+            'shape only; the rows themselves are NOT returned inline in this response. Inferred from this ' +
+            "Actor's historical successful runs. To fetch actual rows, call `get-dataset-items` with the " +
+            'dataset id and a `fields` projection drawn from this schema.',
         properties: itemProperties,
     };
     const clone = structuredClone(getActorRunOutputSchema);
-    const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<string, unknown>;
+    const datasetDefaultProps = clone.properties.storages.properties.datasets.properties.default.properties as Record<
+        string,
+        unknown
+    >;
     datasetDefaultProps.itemsSchema = itemsSchema;
     return clone;
 }
@@ -415,9 +456,7 @@ export const datasetItemsOutputSchema = {
     type: 'object' as const,
     properties: {
         datasetId: { type: 'string', description: 'Dataset ID' },
-        items: { type: 'array' as const,
-            items: { type: 'object' as const },
-            description: 'Dataset items' },
+        items: { type: 'array' as const, items: { type: 'object' as const }, description: 'Dataset items' },
         itemCount: { type: 'number', description: 'Number of items returned' },
         totalItemCount: { type: 'number', description: 'Total items in dataset' },
         offset: { type: 'number', description: 'Offset used for pagination' },

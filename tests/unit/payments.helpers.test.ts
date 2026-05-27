@@ -43,7 +43,8 @@ function makeSkyfireLikeProvider(): PaymentProvider {
         allowsUnauthenticated: true,
         decorateToolSchema: (tool) => tool,
         validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
-        getPaymentHeaders: (args): Record<string, string> => (args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {}),
+        getPaymentHeaders: (args): Record<string, string> =>
+            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
         removePaymentFields: (args) => {
             const { 'skyfire-pay-id': _removed, ...rest } = args;
             return rest;

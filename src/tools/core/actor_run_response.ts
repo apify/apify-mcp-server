@@ -14,7 +14,8 @@ import { cleanEmptyProperties } from '../../utils/schema_generation.js';
 const KV_KEYS_LIMIT = 50;
 
 /** nextStep text for widget-rendered responses: suppresses LLM polling. */
-export const WIDGET_NO_POLL_NEXT_STEP = 'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
+export const WIDGET_NO_POLL_NEXT_STEP =
+    'Widget is rendering live progress. Do NOT poll — the widget self-updates until completion.';
 
 /** Maximum value for `waitSecs`. Stays under the 60s tool-call ceiling several MCP clients impose. */
 export const WAIT_SECS_MAX = 45;
@@ -185,7 +186,11 @@ function buildStats(run: ActorRun): RunResponse['stats'] | undefined {
     }) as RunResponse['stats'] | undefined;
 }
 
-function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedItemCount?: number): RunDataset | undefined {
+function buildRunDataset(
+    run: ActorRun,
+    datasetMeta: Dataset | null,
+    resolvedItemCount?: number,
+): RunDataset | undefined {
     if (!run.defaultDatasetId) return undefined;
     if (!datasetMeta) {
         return { id: run.defaultDatasetId };
@@ -200,7 +205,10 @@ function buildRunDataset(run: ActorRun, datasetMeta: Dataset | null, resolvedIte
     }) as RunDataset;
 }
 
-function buildRunKeyValueStore(run: ActorRun, listKeysResult: KeyValueClientListKeysResult | null): RunKeyValueStore | undefined {
+function buildRunKeyValueStore(
+    run: ActorRun,
+    listKeysResult: KeyValueClientListKeysResult | null,
+): RunKeyValueStore | undefined {
     if (!run.defaultKeyValueStoreId) return undefined;
     if (!listKeysResult) {
         return { id: run.defaultKeyValueStoreId };
@@ -246,7 +254,12 @@ async function resolveItemCountWithLagFallback(
         let lastTotal = 0;
         for (const delay of delays) {
             if (delay > 0) {
-                const sleepResult = await raceAbort(new Promise<void>((resolve) => { setTimeout(resolve, delay); }), abortSignal);
+                const sleepResult = await raceAbort(
+                    new Promise<void>((resolve) => {
+                        setTimeout(resolve, delay);
+                    }),
+                    abortSignal,
+                );
                 if (sleepResult === ABORT) return lastTotal;
             }
             const result = await raceAbort(
@@ -259,12 +272,20 @@ async function resolveItemCountWithLagFallback(
         }
         return lastTotal;
     } catch (error) {
-        log.warning('itemCount lag-fallback probe failed', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
+        log.warning('itemCount lag-fallback probe failed', {
+            datasetId: run.defaultDatasetId,
+            mcpSessionId,
+            errMessage: errMessage(error),
+        });
         return datasetMeta.itemCount;
     }
 }
 
-async function actorNameForActorId(client: ApifyClient, actorId: string | undefined, mcpSessionId?: string): Promise<string | undefined> {
+async function actorNameForActorId(
+    client: ApifyClient,
+    actorId: string | undefined,
+    mcpSessionId?: string,
+): Promise<string | undefined> {
     if (!actorId) return undefined;
     try {
         const actor = await client.actor(actorId).get();
@@ -516,9 +537,10 @@ async function waitForRunWithProgress(opts: {
     // Callers that already know the actor name (e.g. `call-actor` just started the run) supply it to
     // skip the lookup entirely. Otherwise kick off the fetch in parallel with the wait/progress branch
     // below — it's only strictly needed for the progressTracker label and the response field.
-    const actorNamePromise = opts.actorName !== undefined
-        ? Promise.resolve<string | undefined>(opts.actorName)
-        : actorNameForActorId(client, run.actId, mcpSessionId);
+    const actorNamePromise =
+        opts.actorName !== undefined
+            ? Promise.resolve<string | undefined>(opts.actorName)
+            : actorNameForActorId(client, run.actId, mcpSessionId);
 
     if ((waitSecs === undefined || waitSecs > 0) && !TERMINAL_RUN_STATUSES.has(run.status)) {
         if (progressTracker) {
@@ -545,9 +567,15 @@ async function waitForRunWithProgress(opts: {
         // The platform may write the final statusMessage just after the status flips; re-fetch on
         // terminal so the response (and any final progress emission) sees the freshest snapshot.
         if (TERMINAL_RUN_STATUSES.has(run.status)) {
-            const finalRun = (await client.run(runId).get().catch(() => undefined)) ?? run;
+            const finalRun =
+                (await client
+                    .run(runId)
+                    .get()
+                    .catch(() => undefined)) ?? run;
             if (progressTracker) {
-                await progressTracker.updateProgress(formatRunStatusMessage((await actorNamePromise) ?? 'actor', finalRun));
+                await progressTracker.updateProgress(
+                    formatRunStatusMessage((await actorNamePromise) ?? 'actor', finalRun),
+                );
             }
             run = finalRun;
         }
@@ -605,9 +633,9 @@ export function buildStartRunResponse(params: {
 
     const widgetMeta = widget
         ? {
-            ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
-            'openai/widgetDescription': `Actor run progress for ${actorName}`,
-        }
+              ...(getWidgetConfig(WIDGET_URIS.ACTOR_RUN)?.meta ?? {}),
+              'openai/widgetDescription': `Actor run progress for ${actorName}`,
+          }
         : undefined;
 
     return buildMCPResponse({
@@ -627,9 +655,12 @@ export function buildStartRunResponse(params: {
  * cancellation result.
  */
 export const abortRunOnSignal = async (runId: string, client: ApifyClient): Promise<void> => {
-    await client.run(runId).abort({ gracefully: false }).catch((error) => {
-        logHttpError(error, 'Error aborting Actor run', { runId });
-    });
+    await client
+        .run(runId)
+        .abort({ gracefully: false })
+        .catch((error) => {
+            logHttpError(error, 'Error aborting Actor run', { runId });
+        });
 };
 
 export async function fetchActorRunData(params: {
@@ -645,7 +676,14 @@ export async function fetchActorRunData(params: {
     const { runId, waitSecs, client, progressTracker, abortSignal, mcpSessionId, onAbort } = params;
 
     const waitResult = await waitForRunWithProgress({
-        client, runId, waitSecs, actorName: params.actorName, progressTracker, abortSignal, mcpSessionId, onAbort,
+        client,
+        runId,
+        waitSecs,
+        actorName: params.actorName,
+        progressTracker,
+        abortSignal,
+        mcpSessionId,
+        onAbort,
     });
     if (waitResult.kind === 'aborted') return { aborted: true };
     if (waitResult.kind === 'not-found') {
@@ -675,26 +713,43 @@ export async function fetchActorRunData(params: {
     const isTerminal = TERMINAL_RUN_STATUSES.has(run.status);
     const [datasetFetched, kvFetched] = await Promise.all([
         run.defaultDatasetId
-            ? client.dataset(run.defaultDatasetId).get().catch((error) => {
-                log.warning('Failed to fetch dataset metadata', { datasetId: run.defaultDatasetId, mcpSessionId, errMessage: errMessage(error) });
-                return null;
-            })
+            ? client
+                  .dataset(run.defaultDatasetId)
+                  .get()
+                  .catch((error) => {
+                      log.warning('Failed to fetch dataset metadata', {
+                          datasetId: run.defaultDatasetId,
+                          mcpSessionId,
+                          errMessage: errMessage(error),
+                      });
+                      return null;
+                  })
             : Promise.resolve(null),
         run.defaultKeyValueStoreId && isTerminal
-            ? client.keyValueStore(run.defaultKeyValueStoreId).listKeys({ limit: KV_KEYS_LIMIT }).catch((error) => {
-                log.warning('Failed to list KV store keys', {
-                    keyValueStoreId: run.defaultKeyValueStoreId,
-                    mcpSessionId,
-                    errMessage: errMessage(error),
-                });
-                return null;
-            })
+            ? client
+                  .keyValueStore(run.defaultKeyValueStoreId)
+                  .listKeys({ limit: KV_KEYS_LIMIT })
+                  .catch((error) => {
+                      log.warning('Failed to list KV store keys', {
+                          keyValueStoreId: run.defaultKeyValueStoreId,
+                          mcpSessionId,
+                          errMessage: errMessage(error),
+                      });
+                      return null;
+                  })
             : Promise.resolve(null),
     ]);
     datasetInfo = datasetFetched ?? null;
     kvListResult = kvFetched ?? null;
 
-    const resolvedItemCount = await resolveItemCountWithLagFallback(client, run, datasetInfo, waitSecs, mcpSessionId, abortSignal);
+    const resolvedItemCount = await resolveItemCountWithLagFallback(
+        client,
+        run,
+        datasetInfo,
+        waitSecs,
+        mcpSessionId,
+        abortSignal,
+    );
     const dataset = buildRunDataset(run, datasetInfo, resolvedItemCount);
     const keyValueStore = buildRunKeyValueStore(run, kvListResult);
     const { summary, nextStep } = buildStatusSummaryNextStep({ run, dataset, keyValueStore });

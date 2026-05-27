@@ -16,9 +16,7 @@ vi.mock('../../src/utils/actor.js', () => ({
 }));
 
 vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
-    const actual = await vi.importActual<Record<string, unknown>>(
-        '../../src/tools/core/actor_tools_factory.js',
-    );
+    const actual = await vi.importActual<Record<string, unknown>>('../../src/tools/core/actor_tools_factory.js');
     return {
         ...actual,
         getActorsAsTools: vi.fn(),
@@ -66,10 +64,9 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn().mockResolvedValue(MOCK_RUN);
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(stubToolCallContext(
-            { actor: 'apify/rag-web-browser', input: { query: 'test' } },
-            apifyClient,
-        ));
+        const result = await (appsCallActorWidget as HelperTool).call(
+            stubToolCallContext({ actor: 'apify/rag-web-browser', input: { query: 'test' } }, apifyClient),
+        );
 
         const { structuredContent, content, _meta } = result as {
             structuredContent: {
@@ -83,7 +80,10 @@ describe('call-actor-widget response', () => {
                 nextStep: string;
             };
             content: { type: string; text: string }[];
-            _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
+            _meta?: {
+                ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown };
+                'openai/widgetDescription'?: string;
+            };
         };
 
         expect(startSpy).toHaveBeenCalledWith({ query: 'test' }, undefined);
@@ -125,7 +125,11 @@ describe('call-actor-widget response', () => {
     it('declares a strict input schema that silently strips stray keys like async/previewOutput', () => {
         const tool = appsCallActorWidget as HelperTool;
 
-        const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
+        const schema = tool.inputSchema as {
+            additionalProperties?: boolean;
+            properties?: Record<string, unknown>;
+            required?: string[];
+        };
         expect(schema.additionalProperties).toBe(false);
         expect(Object.keys(schema.properties ?? {}).sort()).toEqual(['actor', 'callOptions', 'input']);
         expect(schema.required?.sort()).toEqual(['actor', 'input']);
@@ -154,10 +158,12 @@ describe('call-actor-widget response', () => {
         const startSpy = vi.fn();
         const apifyClient = stubApifyClient(startSpy);
 
-        const result = await (appsCallActorWidget as HelperTool).call(stubToolCallContext(
-            { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
-            apifyClient,
-        ));
+        const result = await (appsCallActorWidget as HelperTool).call(
+            stubToolCallContext(
+                { actor: 'apify/actors-mcp-server:fetch-apify-docs', input: { query: 'test' } },
+                apifyClient,
+            ),
+        );
 
         const { content, isError } = result as TextToolResult;
         expect(isError).toBe(true);

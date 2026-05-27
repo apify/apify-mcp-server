@@ -1,16 +1,26 @@
-import React, { useState, useEffect, useRef } from "react";
-import styled from "styled-components";
-import { Box, Markdown, theme, useActorTitleHeadingFilter, Badge, IconButton, ICON_BUTTON_VARIANTS } from "@apify/ui-library";
-import { BookOpenIcon, FullscreenIcon, MinimizeIcon } from "@apify/ui-icons";
-import type { ActorDetails } from "../../types";
-import { ActorCard } from "../../components/actor/ActorCard";
-import { useMcpApp } from "../../context/mcp-app-context";
+import React, { useState, useEffect, useRef } from 'react';
+import styled from 'styled-components';
+
+import { BookOpenIcon, FullscreenIcon, MinimizeIcon } from '@apify/ui-icons';
+import {
+    Box,
+    Markdown,
+    theme,
+    useActorTitleHeadingFilter,
+    Badge,
+    IconButton,
+    ICON_BUTTON_VARIANTS,
+} from '@apify/ui-library';
+
+import { ActorCard } from '../../components/actor/ActorCard';
+import { useMcpApp } from '../../context/mcp-app-context';
+import type { ActorDetails } from '../../types';
 
 const FULLSCREEN_WIDTH_THRESHOLD = 900;
 
 type ActorSearchDetailProps = {
     details: ActorDetails;
-}
+};
 
 const README_CLASSNAMES = {
     MARKDOWN_WRAPPER: 'Readme-MarkdownWrapper',
@@ -47,11 +57,14 @@ const SectionContent = styled(Box)<{ $isExpanded: boolean }>`
     display: flex;
     flex-direction: column;
 
-    ${props => props.$isExpanded ? `
+    ${(props) =>
+        props.$isExpanded
+            ? `
         overflow-y: auto;
         max-height: none;
         flex: 1;
-    ` : `
+    `
+            : `
         overflow: hidden;
         max-height: 408px;
     `}
@@ -124,11 +137,17 @@ type ReadmeSectionProps = {
     setIsExpanded: (expanded: boolean) => void;
     manuallyCollapsed: React.RefObject<boolean>;
     manuallyExpanded: React.RefObject<boolean>;
-}
+};
 
-const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, isExpanded, setIsExpanded, manuallyCollapsed, manuallyExpanded }) => {
+const ReadmeSection: React.FC<ReadmeSectionProps> = ({
+    readme,
+    isExpanded,
+    setIsExpanded,
+    manuallyCollapsed,
+    manuallyExpanded,
+}) => {
     const sectionRef = useRef<HTMLDivElement>(null);
-    const allowElement = useActorTitleHeadingFilter("Readme");
+    const allowElement = useActorTitleHeadingFilter('Readme');
 
     // Detect container size changes especially when using third party app's fullscreen close button
     useEffect(() => {
@@ -180,10 +199,7 @@ const ReadmeSection: React.FC<ReadmeSectionProps> = ({ readme, isExpanded, setIs
             <ReadmeWrapper>
                 <ReadmeHeader>
                     <BadgeWrapper>
-                        <Badge
-                            size="small"
-                            LeadingIcon={BookOpenIcon}
-                        >
+                        <Badge size="small" LeadingIcon={BookOpenIcon}>
                             Readme
                         </Badge>
                     </BadgeWrapper>
@@ -214,12 +230,12 @@ export const ActorSearchDetail: React.FC<ActorSearchDetailProps> = ({ details })
             manuallyExpanded.current = true;
             manuallyCollapsed.current = false;
             setIsExpanded(true);
-            await app?.requestDisplayMode({ mode: "fullscreen" });
+            await app?.requestDisplayMode({ mode: 'fullscreen' });
         } else {
             manuallyCollapsed.current = true;
             manuallyExpanded.current = false;
             setIsExpanded(false);
-            await app?.requestDisplayMode({ mode: "inline" });
+            await app?.requestDisplayMode({ mode: 'inline' });
         }
     };
 

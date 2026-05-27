@@ -32,11 +32,13 @@ describe('search-actors-widget response', () => {
     it('returns widgetActors plus widget _meta and short pointer text', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (searchActorsWidgetTool as HelperTool).call(stubInternalToolArgs({
-            keywords: SEARCH_KEYWORDS,
-            limit: 5,
-            offset: 0,
-        }));
+        const result = await (searchActorsWidgetTool as HelperTool).call(
+            stubInternalToolArgs({
+                keywords: SEARCH_KEYWORDS,
+                limit: 5,
+                offset: 0,
+            }),
+        );
 
         const { structuredContent, content, _meta } = result as {
             structuredContent: {
@@ -46,7 +48,10 @@ describe('search-actors-widget response', () => {
                 count: number;
             };
             content: { type: string; text: string }[];
-            _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
+            _meta?: {
+                ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown };
+                'openai/widgetDescription'?: string;
+            };
         };
 
         expect(structuredContent.query).toBe(SEARCH_KEYWORDS);
@@ -71,11 +76,13 @@ describe('search-actors-widget response', () => {
     it('returns empty widgetActors and omits widget _meta when there are no results', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
-        const result = await (searchActorsWidgetTool as HelperTool).call(stubInternalToolArgs({
-            keywords: SEARCH_KEYWORDS,
-            limit: 5,
-            offset: 0,
-        }));
+        const result = await (searchActorsWidgetTool as HelperTool).call(
+            stubInternalToolArgs({
+                keywords: SEARCH_KEYWORDS,
+                limit: 5,
+                offset: 0,
+            }),
+        );
 
         const { structuredContent, content, _meta } = result as {
             structuredContent: {

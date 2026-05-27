@@ -6,10 +6,7 @@ import { compileSchema } from '../../utils/ajv.js';
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
-    lines: z.number()
-        .max(50)
-        .describe('Output the last NUM lines, instead of the last 10')
-        .default(10),
+    lines: z.number().max(50).describe('Output the last NUM lines, instead of the last 10').default(10),
 });
 
 /**
@@ -42,7 +39,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        const v = await client.run(parsed.runId).log().get() ?? '';
+        const v = (await client.run(parsed.runId).log().get()) ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
         return { content: [{ type: 'text', text }] };

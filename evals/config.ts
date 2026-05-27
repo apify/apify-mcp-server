@@ -9,7 +9,13 @@ import { fileURLToPath } from 'node:url';
 import log from '@apify/log';
 
 // Re-export shared config
-export { OPENROUTER_CONFIG, sanitizeEnvValue, sanitizeProcessEnv, validateEnvVars, getRequiredEnvVars } from './shared/config.js';
+export {
+    OPENROUTER_CONFIG,
+    sanitizeEnvValue,
+    sanitizeProcessEnv,
+    validateEnvVars,
+    getRequiredEnvVars,
+} from './shared/config.js';
 
 // Read the version from test-cases.json
 function getTestCasesVersion(): string {
@@ -24,7 +30,7 @@ export const EVALUATOR_NAMES = {
     TOOL_SELECTION_LLM: 'tool-selection-llm',
 } as const;
 
-export type EvaluatorName = typeof EVALUATOR_NAMES[keyof typeof EVALUATOR_NAMES];
+export type EvaluatorName = (typeof EVALUATOR_NAMES)[keyof typeof EVALUATOR_NAMES];
 
 // Models to evaluate
 // 'openai/gpt-4.1-mini', // DO NOT USE - it has much worse performance than gpt-4o-mini and other models
@@ -160,7 +166,7 @@ If the tool call does not conform, the answer must be "incorrect".
 The response must be exactly:
 Decision: either "correct" or "incorrect".
 Explanation: brief explanation of the decision.
-`
+`;
 /**
  * Get required environment variables for Phoenix-based evaluations
  * Extends shared config with Phoenix-specific variables

@@ -9,8 +9,12 @@ const paramsHolder: { params: Record<string, unknown> } = { params: {} };
 vi.mock('../../src/apify_client.js', () => ({
     ApifyClient: vi.fn().mockImplementation(() => ({
         store: () => ({
-            get params(): Record<string, unknown> { return paramsHolder.params; },
-            set params(value: Record<string, unknown>) { paramsHolder.params = value; },
+            get params(): Record<string, unknown> {
+                return paramsHolder.params;
+            },
+            set params(value: Record<string, unknown>) {
+                paramsHolder.params = value;
+            },
             list: listMock,
         }),
     })),

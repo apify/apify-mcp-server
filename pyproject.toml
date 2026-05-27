@@ -13,10 +13,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "mypy",
-    "ruff",
-]
+dev = ["mypy", "ruff"]
 
 [build-system]
 requires = ["hatchling"]
@@ -34,18 +31,18 @@ select = ["ALL"]
 ignore = [
     "ANN401", # Dynamically typed expressions (typing.Any) are disallowed in {filename}
     "BLE001", # Do not catch blind exception
-    "C901",   # `{name}` is too complex
+    "C901", # `{name}` is too complex
     "COM812", # This rule may cause conflicts when used with the formatter
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "D107",   # Missing docstring in `__init__`
-    "D203",   # One blank line required before class docstring
-    "D213",   # Multi-line docstring summary should start at the second line
-    "D413",   # Missing blank line after last section
-    "EM",     # flake8-errmsg
-    "G004",   # Logging statement uses f-string
+    "D100", # Missing docstring in public module
+    "D104", # Missing docstring in public package
+    "D107", # Missing docstring in `__init__`
+    "D203", # One blank line required before class docstring
+    "D213", # Multi-line docstring summary should start at the second line
+    "D413", # Missing blank line after last section
+    "EM", # flake8-errmsg
+    "G004", # Logging statement uses f-string
     "ISC001", # This rule may cause conflicts when used with the formatter
-    "FIX",    # flake8-fixme
+    "FIX", # flake8-fixme
     "TRY003", # Avoid specifying long messages outside the exception class
 ]
 
@@ -63,10 +60,7 @@ docstring-quotes = "double"
 inline-quotes = "single"
 
 [tool.ruff.lint.flake8-type-checking]
-runtime-evaluated-base-classes = [
-    "pydantic.BaseModel",
-    "pydantic_settings.BaseSettings",
-]
+runtime-evaluated-base-classes = ["pydantic.BaseModel", "pydantic_settings.BaseSettings"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["id"]

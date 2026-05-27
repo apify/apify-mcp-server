@@ -10,7 +10,9 @@ import { X402PaymentProvider } from './x402.js';
  *
  * @returns A PaymentProvider instance, or undefined if the value is not a known provider.
  */
-export async function resolvePaymentProvider(paymentParam: string | null | undefined): Promise<PaymentProvider | undefined> {
+export async function resolvePaymentProvider(
+    paymentParam: string | null | undefined,
+): Promise<PaymentProvider | undefined> {
     if (!paymentParam) return undefined;
 
     const providers: Record<PaymentProviderId, () => Promise<PaymentProvider>> = {
