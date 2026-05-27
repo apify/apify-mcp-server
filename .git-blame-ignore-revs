@@ -1,0 +1,8 @@
+# Revisions listed here are skipped by `git blame` (and GitHub's blame view),
+# so bulk no-op changes don't clutter line history.
+#
+# Enable locally with:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# chore: apply oxfmt formatting [internal] (#919)
+e8aa64589499b8a4575d71c4cea59f7fef8b310b
