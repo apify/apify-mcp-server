@@ -106,14 +106,6 @@ Visit [mcp.apify.com](https://mcp.apify.com) to configure the server for your pr
 - [Apify Tester MCP Client](https://apify.com/jiri.spilka/tester-mcp-client) — designed for testing Apify MCP servers
 
 
-**Smart tool selection based on client capabilities:**
-
-When the `actors` tool category is requested, the server intelligently selects the most appropriate Actor-related tools based on the client's capabilities:
-
-- **Clients with dynamic tool support** (e.g., Claude.ai web, VS Code Genie): The server provides the `add-actor` tool instead of `call-actor`. This allows for a better user experience where users can dynamically discover and add new Actors as tools during their conversation.
-
-- **Clients with limited dynamic tool support** (e.g., Claude Desktop): The server provides the standard `call-actor` tool along with other Actor category tools, ensuring compatibility while maintaining functionality.
-
 # 🪄 Try Apify MCP instantly
 
 Want to try Apify MCP without any setup?
@@ -254,33 +246,38 @@ Here are some special MCP operations and how the Apify MCP Server supports them:
 
 Here is an overview list of all the tools provided by the Apify MCP Server.
 
+Legend for the **Enabled by default** column:
+- ✅ — in the default tool set.
+- ⚡ — auto-injected when `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present (which is true in the default configuration).
+
 | Tool name | Category | Description | Enabled by default |
 | :--- | :--- | :--- | :---: |
 | `search-actors` | actors | Search for Actors in Apify Store. | ✅ |
 | `fetch-actor-details` | actors | Retrieve detailed information about a specific Actor, including its input schema, README (summary when available, full otherwise), pricing, and Actor output schema. | ✅ |
-| `call-actor`* | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ❔ |
-| `get-actor-run` | runs | Get detailed information about a specific Actor run. |  |
-| `get-actor-output`* | - | Retrieve the output from an Actor call which is not included in the output preview of the Actor tool. | ✅ |
+| `call-actor` | actors | Call an Actor and get its run results. Use fetch-actor-details first to get the Actor's input schema. | ✅ |
+| `get-actor-run` | runs | Get detailed information about a specific Actor run. | ⚡ |
+| `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. | ⚡ |
+| `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. | ⚡ |
+| `abort-actor-run` | runs | Abort a running Actor run, optionally gracefully. | ⚡ |
 | `search-apify-docs` | docs | Search the Apify documentation for relevant pages. | ✅ |
 | `fetch-apify-docs` | docs | Fetch the full content of an Apify documentation page by its URL. | ✅ |
 | [`apify--rag-web-browser`](https://apify.com/apify/rag-web-browser) | Actor (see [tool configuration](#tools-configuration)) | An Actor tool to browse the web. | ✅ |
 | `get-actor-run-list` | runs | Get a list of an Actor's runs, filterable by status. |  |
 | `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
-| `get-dataset-items` | storage | Retrieve items from a dataset with support for filtering and pagination. |  |
 | `get-dataset-schema` | storage | Generate a JSON schema from dataset items. |  |
+| `get-actor-output` | storage | Retrieve the output from an Actor call which is not included in the output preview of the Actor tool. |  |
 | `get-key-value-store` | storage | Get metadata about a specific key-value store. |  |
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
-| `get-key-value-store-record`| storage | Get the value associated with a specific key in a key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
 | `get-key-value-store-list`| storage | List all available key-value stores for the user. |  |
-| `add-actor`* | experimental | Add an Actor as a new tool for the user to call. | ❔ |
+| `add-actor` | experimental | Add an Actor as a new tool for the user to call. |  |
 
 > **Note:**
 >
-> When using the `actors` tool category, clients that support dynamic tool discovery (like Claude.ai web and VS Code) automatically receive the `add-actor` tool instead of `call-actor` for enhanced Actor discovery capabilities.
+> When `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
 >
-> The `get-actor-output` tool is automatically included with any Actor-related tool, such as `call-actor`, `add-actor`, or any specific Actor tool like `apify--rag-web-browser`. When you call an Actor - either through the `call-actor` tool or directly via an Actor tool (e.g., `apify--rag-web-browser`) - you receive a preview of the output. The preview depends on the Actor's output format and length; for some Actors and runs, it may include the entire output, while for others, only a limited version is returned to avoid overwhelming the LLM. To retrieve the full output of an Actor run, use the `get-actor-output` tool (supports limit, offset, and field filtering) with the `datasetId` provided by the Actor call.
+> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — you receive a preview of the output. For long outputs the preview is truncated. To retrieve the full output, use `get-dataset-items` (auto-injected) or `get-actor-output` from the `storage` category, passing the `datasetId` returned from the call.
 
 ### Tool annotations
 
@@ -416,7 +413,7 @@ Below are realistic examples showing how an AI assistant uses the Apify MCP Serv
 The AI assistant calls the pre-configured `apify--rag-web-browser` Actor tool to search the web and return content from top results.
 The tool returns markdown content from the top 3 search results, which the AI assistant then summarizes for the user.
 
-### Example 2: Discover and run an Actor from the Apify Store
+### Example 2: Discover and run an Actor from Apify Store
 
 **User prompt:**
 > Scrape the top 10 restaurants in Prague from Google Maps with their contact details.
