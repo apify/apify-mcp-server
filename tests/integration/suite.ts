@@ -1945,6 +1945,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
 
             describe('normal-mode-test-actor run reads via storage tools', () => {
                 let datasetId: string;
+                let defaultKvId: string;
                 let runId: string;
 
                 beforeAll(async () => {
@@ -1954,18 +1955,24 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                         arguments: {
                             actor: ACTOR_NORMAL_MODE,
                             input: { firstNumber: 1, secondNumber: 2 },
+                            waitSecs: 45,
                         },
                     });
                     const callStructured = callResult as {
                         structuredContent?: {
                             runId?: string;
-                            storages?: { datasets?: { default?: { id?: string } } };
+                            storages?: {
+                                datasets?: { default?: { id?: string } };
+                                keyValueStores?: { default?: { id?: string } };
+                            };
                         };
                     };
                     const sc = callStructured.structuredContent;
                     expect(sc?.runId).toBeDefined();
                     expect(sc?.storages?.datasets?.default?.id).toBeDefined();
+                    expect(sc?.storages?.keyValueStores?.default?.id).toBeDefined();
                     datasetId = sc!.storages!.datasets!.default!.id!;
+                    defaultKvId = sc!.storages!.keyValueStores!.default!.id!;
                     runId = sc!.runId!;
                     await setupClient.close();
                 }, 60_000);
@@ -2005,6 +2012,109 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                     });
                     expect(kvResult.isError).not.toBe(true);
                     expect((kvResult.content as { text: string }[])[0].text).toContain('firstNumber');
+                    await client.close();
+                });
+
+                it('returns dataset metadata via get-dataset', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.DATASET_GET,
+                        arguments: { datasetId },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain(datasetId);
+                    expect(text).toContain('firstNumber');
+                    expect(text).toContain('sum');
+                    await client.close();
+                });
+
+                it('infers schema from dataset items via get-dataset-schema', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.DATASET_SCHEMA_GET,
+                        arguments: { datasetId },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain('properties');
+                    // `math` is a nested object in the default-dataset item; its presence in the schema
+                    // proves the inference walks nested shapes, not just top-level fields.
+                    expect(text).toContain('math');
+                    await client.close();
+                });
+
+                it('lists user datasets and finds the run dataset via get-dataset-list', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.DATASET_LIST_GET,
+                        arguments: { desc: true, unnamed: true, limit: 20 },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    // desc=true → newest first, so the run's dataset is on page 1.
+                    expect(text).toContain(datasetId);
+                    await client.close();
+                });
+
+                it('returns key-value store metadata via get-key-value-store', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.KEY_VALUE_STORE_GET,
+                        arguments: { keyValueStoreId: defaultKvId },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain(defaultKvId);
+                    await client.close();
+                });
+
+                it('lists keys in the run KV store via get-key-value-store-keys', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
+                        arguments: { keyValueStoreId: defaultKvId, limit: 10 },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain('INPUT');
+                    expect(text).toContain('RESULT');
+                    expect(text).toContain('STATS');
+                    expect(text).toContain('LOG');
+                    expect(text).toContain('COVER');
+                    await client.close();
+                });
+
+                it('lists user key-value stores and finds the run KV store via get-key-value-store-list', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.KEY_VALUE_STORE_LIST_GET,
+                        arguments: { desc: true, unnamed: true, limit: 10 },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const { text } = (result.content as { text: string }[])[0];
+                    expect(text).toContain(defaultKvId);
+                    await client.close();
+                });
+
+                // Apify-contract canary for #880: get-dataset-items only sends the top-level prefix
+                // (e.g. `flatten=math` for fields `math.factorial.first`). If Apify's `flatten` ever
+                // stops recursing through nested levels, this 3-deep field will come back undefined and
+                // signal that we need to emit every prefix.
+                it('flattens 3-level nested fields via get-dataset-items', async () => {
+                    client = await createClientFn({ tools: ['storage'] });
+                    const result = await client.callTool({
+                        name: HelperTools.DATASET_GET_ITEMS,
+                        arguments: { datasetId, fields: 'math.factorial.first' },
+                    });
+                    expect(result.isError).not.toBe(true);
+                    const items = (result as { structuredContent?: { items?: Record<string, unknown>[] } })
+                        .structuredContent?.items;
+                    expect(Array.isArray(items)).toBe(true);
+                    // >=1 (not ==1): the signal is whether the nested field surfaces, not the count.
+                    expect(items!.length).toBeGreaterThanOrEqual(1);
+                    // factorial.first = 1! = 1; if flatten recurses, the value appears under the dot-notated key.
+                    expect(items![0]['math.factorial.first']).toBe(1);
                     await client.close();
                 });
             });
