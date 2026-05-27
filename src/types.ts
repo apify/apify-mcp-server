@@ -147,8 +147,6 @@ export type InternalToolArgs = {
     apifyToken: string;
     /** ApifyClient pre-configured with payment headers (if applicable) or standard token. */
     apifyClient: ApifyClient;
-    /** List of Actor IDs that the user has rented */
-    userRentedActorIds?: string[];
     /** Optional progress tracker for long running internal tools, like call-actor */
     progressTracker?: ProgressTracker | null;
     /** MCP session ID for logging context */
@@ -666,8 +664,6 @@ export type ApifyRequestParams = {
         mcpSessionId?: string;
         /** Apify API token for authentication */
         apifyToken?: string;
-        /** List of Actor IDs that the user has rented */
-        userRentedActorIds?: string[];
         /** Progress token for out-of-band progress notifications (standard MCP) */
         progressToken?: string | number;
         /** Allow other metadata fields */
