@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
+import { ToolType } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
@@ -44,7 +45,7 @@ USAGE EXAMPLES:
  * Mode-independent. Widget `_meta` lives in the widget variant.
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
-    type: 'internal',
+    type: ToolType.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET,
     description: GET_ACTOR_RUN_DESCRIPTION,
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients

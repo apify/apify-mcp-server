@@ -17,6 +17,7 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../../src/payments/const.js';
 import type { ActorMcpTool, ActorTool, HelperTool, ToolEntry } from '../../src/types.js';
+import { ToolType } from '../../src/types.js';
 import { applySkyfireAugmentation, cloneToolEntry } from '../../src/utils/tools.js';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,7 @@ function makeInternalTool(overrides: Partial<HelperTool> = {}): HelperTool {
     return {
         name: HelperTools.ACTOR_CALL,
         description: 'Call an Actor',
-        type: 'internal',
+        type: ToolType.INTERNAL,
         inputSchema: {
             type: 'object' as const,
             properties: { actor: { type: 'string' } },
@@ -44,7 +45,7 @@ function makeActorTool(overrides: Partial<ActorTool> = {}): ActorTool {
     return {
         name: 'apify--web-scraper',
         description: 'Web scraper tool',
-        type: 'actor',
+        type: ToolType.ACTOR,
         actorId: 'abc123',
         actorFullName: 'apify/web-scraper',
         inputSchema: {
@@ -60,7 +61,7 @@ function makeActorMcpTool(overrides: Partial<ActorMcpTool> = {}): ActorMcpTool {
     return {
         name: 'some-mcp-tool',
         description: 'A proxied MCP tool',
-        type: 'actor-mcp',
+        type: ToolType.ACTOR_MCP,
         originToolName: 'some-tool',
         actorId: 'apify/some-actor',
         serverId: 'server-123',

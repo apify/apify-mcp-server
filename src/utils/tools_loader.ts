@@ -23,7 +23,7 @@ import { getKeyValueStoreRecord } from '../tools/common/get_key_value_store_reco
 import { defaultGetActorRun } from '../tools/default/get_actor_run.js';
 import { getActorsAsTools } from '../tools/index.js';
 import type { ActorStore, Input, ToolCategory, ToolEntry } from '../types.js';
-import { SERVER_MODES, ServerMode } from '../types.js';
+import { SERVER_MODES, ServerMode, ToolType } from '../types.js';
 
 /**
  * Tools auto-injected alongside any actor-running tool (call-actor / direct
@@ -269,7 +269,7 @@ export function getToolsForServerMode(
      * via category before `actors`, the de-dup pass below preserves their selector order.
      */
     const hasCallActor = result.some((entry) => entry.name === HelperTools.ACTOR_CALL);
-    const hasActorTools = result.some((entry) => entry.type === 'actor');
+    const hasActorTools = result.some((entry) => entry.type === ToolType.ACTOR);
     const hasAddActorTool = result.some((entry) => entry.name === HelperTools.ACTOR_ADD);
     // `get-actor-run`'s nextStep templates point at `get-dataset-items` / `get-key-value-store-record`,
     // and the apps-mode widget calls `get-dataset-items` to fetch its preview. A runs-only session

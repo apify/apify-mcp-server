@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentMeta, RequestHeaders } from '../../src/payments/types.js';
 import { X402PaymentProvider, type X402PaymentRequirements } from '../../src/payments/x402.js';
 import type { HelperTool } from '../../src/types.js';
+import { ToolType } from '../../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -39,7 +40,7 @@ function makePaidTool(overrides: Partial<HelperTool> = {}): HelperTool {
     return {
         name: 'paid-tool',
         description: 'Paid tool',
-        type: 'internal',
+        type: ToolType.INTERNAL,
         paymentRequired: true,
         inputSchema: { type: 'object' as const, properties: {} },
         ajvValidate: vi.fn(() => true) as never,

@@ -9,14 +9,15 @@ import { getActorMCPServerPath, getActorMCPServerURL } from '../../mcp/actors.js
 import { connectMCPClient } from '../../mcp/client.js';
 import { getMCPServerTools } from '../../mcp/proxy.js';
 import type { PaymentProvider } from '../../payments/types.js';
-import type {
-    ActorDefinitionWithInfo,
-    ActorInfo,
-    ActorStore,
-    ActorTool,
-    ApifyToken,
-    ToolEntry,
-    ToolInputSchema,
+import {
+    type ActorDefinitionWithInfo,
+    type ActorInfo,
+    type ActorStore,
+    type ActorTool,
+    type ApifyToken,
+    type ToolEntry,
+    type ToolInputSchema,
+    ToolType,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
@@ -58,7 +59,7 @@ const WAIT_SECS_INPUT_PROPERTY = {
  */
 export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
     const enrichPromises = tools
-        .filter((tool): tool is ActorTool => tool.type === 'actor')
+        .filter((tool): tool is ActorTool => tool.type === ToolType.ACTOR)
         .map(async (tool) => {
             try {
                 const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
@@ -152,7 +153,7 @@ Actor description: ${definition.description}`;
         }
 
         tools.push({
-            type: 'actor',
+            type: ToolType.ACTOR,
             name: actorNameToToolName(definition.actorFullName),
             actorId: definition.id,
             actorFullName: definition.actorFullName,

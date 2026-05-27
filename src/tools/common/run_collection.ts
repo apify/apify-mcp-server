@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ToolType } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -32,7 +33,7 @@ const getUserRunsListArgs = z.object({
  * https://docs.apify.com/api/v2/act-runs-get
  */
 export const getUserRunsList: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: ToolType.INTERNAL,
     name: HelperTools.ACTOR_RUN_LIST_GET,
     description: `List Actor runs for the authenticated user with optional filtering and sorting.
 The results will include run details (including datasetId and keyValueStoreId) and can be filtered by status.

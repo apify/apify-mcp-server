@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { ToolType } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const getUserKeyValueStoresListArgs = z.object({
@@ -32,7 +33,7 @@ const getUserKeyValueStoresListArgs = z.object({
  * https://docs.apify.com/api/v2/key-value-stores-get
  */
 export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: ToolType.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_LIST_GET,
     description: `List key-value stores owned by the authenticated user.
 Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.

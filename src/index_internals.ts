@@ -19,6 +19,7 @@ import {
 } from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ActorStore, ServerCard, ToolCategory } from './types.js';
+import { ToolType } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';
 import { redactSkyfirePayId } from './utils/logging.js';
 import { getExpectedToolNamesByCategories } from './utils/tool_categories_helpers.js';
@@ -43,6 +44,7 @@ export {
     type ActorStore,
     type ServerCard,
     type ToolCategory,
+    ToolType,
     processParamsGetTools,
     getActorsAsTools,
     getToolPublicFieldOnly,

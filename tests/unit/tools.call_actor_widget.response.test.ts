@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WIDGET_URIS } from '../../src/resources/widgets.js';
 import { appsCallActorWidget } from '../../src/tools/apps/call_actor_widget.js';
 import type { HelperTool, InternalToolArgs, ToolEntry } from '../../src/types.js';
+import { ToolType } from '../../src/types.js';
 import { getActorMcpUrlCached } from '../../src/utils/actor.js';
 import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
@@ -26,7 +27,7 @@ vi.mock('../../src/tools/core/actor_tools_factory.js', async () => {
 const { getActorsAsTools } = await import('../../src/tools/core/actor_tools_factory.js');
 
 const MOCK_ACTOR_TOOL: ToolEntry = {
-    type: 'actor',
+    type: ToolType.ACTOR,
     name: 'apify--rag-web-browser',
     actorId: 'actor-id-rag',
     actorFullName: 'apify/rag-web-browser',

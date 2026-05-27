@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
+import { ToolType } from '../../types.js';
 import {
     type ActorDetailsResult,
     buildCardOptions,
@@ -120,7 +121,7 @@ EXAMPLES:
  * carries its own widget metadata.
  */
 export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
-    type: 'internal',
+    type: ToolType.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS,
     description: FETCH_ACTOR_DETAILS_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsToolArgsSchema) as ToolInputSchema,
