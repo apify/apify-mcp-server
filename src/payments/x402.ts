@@ -85,7 +85,7 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
     // block *while the first fetch is still in-flight*, they will also see lastFetchTime = 0 and
     // create duplicate promises. This is a known minor flaw in this specific caching pattern, but
     // acceptable since the overhead of a few duplicate calls during cold-start is negligible.
-    if (cachedRequirementsPromise && (now - lastFetchTime < CACHE_TTL_MS)) {
+    if (cachedRequirementsPromise && now - lastFetchTime < CACHE_TTL_MS) {
         return cachedRequirementsPromise;
     }
 
@@ -110,12 +110,17 @@ export async function fetchX402PaymentRequirements(): Promise<X402PaymentRequire
                 return undefined;
             }
 
-            const decoded = JSON.parse(Buffer.from(paymentRequiredBase64, 'base64').toString('utf-8')) as X402PaymentRequirements;
+            const decoded = JSON.parse(
+                Buffer.from(paymentRequiredBase64, 'base64').toString('utf-8'),
+            ) as X402PaymentRequirements;
             log.info('[x402] Fetched payment requirements from Apify API', { url });
             lastFetchTime = Date.now();
             return decoded;
         } catch (error) {
-            log.warning('[x402] Failed to fetch payment requirements — tools will advertise paymentRequired only', { url, error });
+            log.warning('[x402] Failed to fetch payment requirements — tools will advertise paymentRequired only', {
+                url,
+                error,
+            });
             cachedRequirementsPromise = null;
             return undefined;
         } finally {
@@ -225,11 +230,19 @@ export class X402PaymentProvider implements PaymentProvider {
         return Object.freeze(cloned);
     }
 
-    validatePayment(_args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): string | null {
+    validatePayment(
+        _args: Record<string, unknown>,
+        meta?: PaymentMeta,
+        requestHeaders?: RequestHeaders,
+    ): string | null {
         return getEncodedPaymentSignature(meta, requestHeaders) ? null : X402_TOOL_INSTRUCTIONS;
     }
 
-    getPaymentHeaders(_args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): PaymentHeaders {
+    getPaymentHeaders(
+        _args: Record<string, unknown>,
+        meta?: PaymentMeta,
+        requestHeaders?: RequestHeaders,
+    ): PaymentHeaders {
         const paymentSignature = getEncodedPaymentSignature(meta, requestHeaders);
         return paymentSignature
             ? { [PAYMENT_SIGNATURE_HEADER]: paymentSignature, [PAYMENT_PROTOCOL_HEADER]: 'x402' }

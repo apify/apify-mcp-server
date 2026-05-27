@@ -15,9 +15,7 @@ import { stubInternalToolArgs } from './tools.search_actors.fixtures.js';
  * the response.
  */
 vi.mock('../../src/utils/actor_details.js', async () => {
-    const actual = await vi.importActual<Record<string, unknown>>(
-        '../../src/utils/actor_details.js',
-    );
+    const actual = await vi.importActual<Record<string, unknown>>('../../src/utils/actor_details.js');
     return {
         ...actual,
         fetchActorDetails: vi.fn(),
@@ -74,7 +72,10 @@ describe('fetch-actor-details-widget response', () => {
                 actorDetails?: { actorInfo?: unknown; actorCard?: string; readme?: string };
             } & Record<string, unknown>;
             content: { type: string; text: string }[];
-            _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
+            _meta?: {
+                ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown };
+                'openai/widgetDescription'?: string;
+            };
         };
 
         // Widget-only structuredContent — no top-level actorInfo/inputSchema duplication.
@@ -109,7 +110,11 @@ describe('fetch-actor-details-widget response', () => {
         const tool = fetchActorDetailsWidgetTool as HelperTool;
 
         // Schema-level: strict shape (no extra properties allowed).
-        const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
+        const schema = tool.inputSchema as {
+            additionalProperties?: boolean;
+            properties?: Record<string, unknown>;
+            required?: string[];
+        };
         expect(schema.additionalProperties).toBe(false);
         expect(Object.keys(schema.properties ?? {})).toEqual(['actor']);
         expect(schema.required).toEqual(['actor']);

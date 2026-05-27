@@ -100,7 +100,9 @@ describe('getPaymentHeaders', () => {
     it('should prefer _meta over HTTP header when both are present', () => {
         const metaPayment = { x402Version: 2, payload: { signature: 'from-meta' } };
         const metaBase64 = Buffer.from(JSON.stringify(metaPayment)).toString('base64');
-        const headerBase64 = Buffer.from(JSON.stringify({ x402Version: 2, payload: { signature: 'from-header' } })).toString('base64');
+        const headerBase64 = Buffer.from(
+            JSON.stringify({ x402Version: 2, payload: { signature: 'from-header' } }),
+        ).toString('base64');
 
         const meta: PaymentMeta = { 'x402/payment': metaPayment };
         const headers: RequestHeaders = { 'PAYMENT-SIGNATURE': headerBase64 };

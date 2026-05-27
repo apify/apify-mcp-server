@@ -6,12 +6,8 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getKeyValueStoreRecordArgs = z.object({
-    keyValueStoreId: z.string()
-        .min(1)
-        .describe('Key-value store ID or username~store-name'),
-    recordKey: z.string()
-        .min(1)
-        .describe('Key of the record to retrieve.'),
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    recordKey: z.string().min(1).describe('Key of the record to retrieve.'),
 });
 
 /**

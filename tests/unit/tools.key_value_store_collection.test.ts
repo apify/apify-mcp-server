@@ -11,7 +11,10 @@ const MOCK_LIST = {
     limit: 10,
     desc: false,
     count: 2,
-    items: [{ id: 'kv-1', name: 'a' }, { id: 'kv-2', name: 'b' }],
+    items: [
+        { id: 'kv-1', name: 'a' },
+        { id: 'kv-2', name: 'b' },
+    ],
 };
 
 function stubApifyClient(listSpy: ReturnType<typeof vi.fn>): InternalToolArgs['apifyClient'] {
@@ -39,12 +42,17 @@ describe('get-key-value-store-list', () => {
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserKeyValueStoresList as HelperTool).call(stubToolCallContext({
-            limit: 5,
-            offset: 10,
-            desc: true,
-            unnamed: true,
-        }, stubApifyClient(listSpy)));
+        await (getUserKeyValueStoresList as HelperTool).call(
+            stubToolCallContext(
+                {
+                    limit: 5,
+                    offset: 10,
+                    desc: true,
+                    unnamed: true,
+                },
+                stubApifyClient(listSpy),
+            ),
+        );
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 5, offset: 10, desc: true, unnamed: true });
     });
@@ -52,9 +60,7 @@ describe('get-key-value-store-list', () => {
     it('applies defaults (limit=10, offset=0, desc=false, unnamed=false) when no params given', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
-        await (getUserKeyValueStoresList as HelperTool).call(
-            stubToolCallContext({}, stubApifyClient(listSpy)),
-        );
+        await (getUserKeyValueStoresList as HelperTool).call(stubToolCallContext({}, stubApifyClient(listSpy)));
 
         expect(listSpy).toHaveBeenCalledWith({ limit: 10, offset: 0, desc: false, unnamed: false });
     });

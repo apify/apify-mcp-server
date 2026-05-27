@@ -27,11 +27,7 @@ import { LlmClient } from './llm_client.js';
 import { McpClient } from './mcp_client.js';
 import type { EvaluationResult } from './output_formatter.js';
 import { formatDetailedResult, formatResultsTable } from './output_formatter.js';
-import {
-    loadResultsDatabase,
-    saveResultsDatabase,
-    updateResultsWithEvaluations,
-} from './results_writer.js';
+import { loadResultsDatabase, saveResultsDatabase, updateResultsWithEvaluations } from './results_writer.js';
 import type { WorkflowTestCase, WorkflowTestCaseWithLineNumbers } from './test_cases_loader.js';
 import { filterTestCases, loadTestCases, loadTestCasesWithLineNumbers } from './test_cases_loader.js';
 import { evaluateConversation } from './workflow_judge.js';
@@ -47,7 +43,7 @@ type CliArgs = {
     toolTimeout?: number;
     concurrency?: number;
     output?: boolean;
-}
+};
 
 /**
  * Helper function to log messages with test ID prefix
@@ -108,7 +104,10 @@ async function runSingleTest(
             durationMs,
         };
 
-        logWithPrefix(testId, `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`);
+        logWithPrefix(
+            testId,
+            `  ${judgeResult.verdict === 'PASS' ? '✅' : '❌'} ${judgeResult.verdict} (${durationMs}ms)`,
+        );
     } catch (error) {
         const durationMs = Date.now() - startTime;
 
@@ -151,7 +150,7 @@ async function runSingleTest(
 
 async function main() {
     // Parse CLI arguments
-    const argv = await yargs(hideBin(process.argv))
+    const argv = (await yargs(hideBin(process.argv))
         .option('category', {
             type: 'string',
             description: 'Filter by test case category',
@@ -163,8 +162,9 @@ async function main() {
         .option('lines', {
             alias: 'l',
             type: 'string',
-            description: 'Filter by line range in test-cases.json '
-                + '(format: "start-end" or single line, comma-separated, e.g., "10-20,50-60,100")',
+            description:
+                'Filter by line range in test-cases.json ' +
+                '(format: "start-end" or single line, comma-separated, e.g., "10-20,50-60,100")',
         })
         .option('verbose', {
             type: 'boolean',
@@ -202,8 +202,7 @@ async function main() {
             description: 'Save test results to JSON file (evals/workflows/results.json)',
             default: false,
         })
-        .help()
-        .argv as CliArgs;
+        .help().argv) as CliArgs;
 
     console.log('='.repeat(100));
     console.log('Workflow Evaluation Runner');
@@ -329,12 +328,7 @@ async function main() {
         const resultsPath = path.join(process.cwd(), 'evals/workflows/results.json');
         try {
             const database = loadResultsDatabase(resultsPath);
-            const updatedDatabase = updateResultsWithEvaluations(
-                database,
-                results,
-                argv.agentModel!,
-                argv.judgeModel!,
-            );
+            const updatedDatabase = updateResultsWithEvaluations(database, results, argv.agentModel!, argv.judgeModel!);
             saveResultsDatabase(resultsPath, updatedDatabase);
             console.log(`✅ Results saved to: ${resultsPath}`);
             console.log();

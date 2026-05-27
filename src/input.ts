@@ -16,7 +16,10 @@ export function normalizeList(value: string | unknown[] | undefined): string[] |
     if (Array.isArray(value)) return value.map((s) => String(s).trim()).filter((s) => s !== '');
     const trimmed = String(value).trim();
     if (trimmed === '') return [];
-    return trimmed.split(',').map((s) => s.trim()).filter((s) => s !== '');
+    return trimmed
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s !== '');
 }
 
 /**
@@ -44,7 +47,9 @@ export function processInput(originalInput: Partial<Input>): Input {
     }
 
     // Normalize tools (strings/arrays) to a clean array or undefined
-    let tools = normalizeList(originalInput.tools as string | string[] | undefined) as unknown as ToolSelector[] | undefined;
+    let tools = normalizeList(originalInput.tools as string | string[] | undefined) as unknown as
+        | ToolSelector[]
+        | undefined;
 
     // Merge actors into tools. If tools undefined → tools = actors, then remove actors;
     // otherwise append actors to tools.
@@ -53,9 +58,7 @@ export function processInput(originalInput: Partial<Input>): Input {
         if (tools === undefined) {
             tools = [...actors] as ToolSelector[];
         } else {
-            const currentTools: ToolSelector[] = Array.isArray(tools)
-                ? tools
-                : [tools as ToolSelector];
+            const currentTools: ToolSelector[] = Array.isArray(tools) ? tools : [tools as ToolSelector];
             tools = [...currentTools, ...actors] as ToolSelector[];
         }
     }

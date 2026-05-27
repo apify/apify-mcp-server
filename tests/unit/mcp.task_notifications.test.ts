@@ -77,7 +77,10 @@ describe('emitTaskStatusNotification', () => {
 
         await emitTaskStatusNotification('task-1', undefined, store as never, server);
 
-        const params = (server.notification as ReturnType<typeof vi.fn>).mock.calls[0][0].params as Record<string, unknown>;
+        const params = (server.notification as ReturnType<typeof vi.fn>).mock.calls[0][0].params as Record<
+            string,
+            unknown
+        >;
         expect(params).not.toHaveProperty('statusMessage');
     });
 
@@ -101,8 +104,7 @@ describe('emitTaskStatusNotification', () => {
         });
 
         // Should not throw
-        await expect(emitTaskStatusNotification('task-1', undefined, store as never, server))
-            .resolves.toBeUndefined();
+        await expect(emitTaskStatusNotification('task-1', undefined, store as never, server)).resolves.toBeUndefined();
     });
 });
 
@@ -112,7 +114,9 @@ describe('tasks/result _meta.related-task injection', () => {
     // Helper to dispatch a handler by method name via the SDK's internal handler map
     function getHandler(server: unknown, method: string) {
         // eslint-disable-next-line no-underscore-dangle
-        const handler = (server as { server: { _requestHandlers: Map<string, HandlerFn> } }).server._requestHandlers.get(method);
+        const handler = (
+            server as { server: { _requestHandlers: Map<string, HandlerFn> } }
+        ).server._requestHandlers.get(method);
         if (!handler) throw new Error(`Handler "${method}" not registered`);
         return handler;
     }
@@ -126,7 +130,12 @@ describe('tasks/result _meta.related-task injection', () => {
         const server = new ActorsMcpServer({ taskStore, setupSigintHandler: false, telemetry: { enabled: false } });
 
         const task = await taskStore.createTask({ ttl: 60_000 }, 'req-1', fakeRequest as never);
-        await taskStore.storeTaskResult(task.taskId, 'completed', { content: [{ type: 'text', text: 'done' }] }, undefined);
+        await taskStore.storeTaskResult(
+            task.taskId,
+            'completed',
+            { content: [{ type: 'text', text: 'done' }] },
+            undefined,
+        );
 
         const handler = getHandler(server as never, 'tasks/result');
         const result = await handler(
@@ -148,16 +157,21 @@ describe('tasks/result _meta.related-task injection', () => {
 
         const task = await taskStore.createTask({ ttl: 60_000 }, 'req-2', fakeRequest as never);
         const existingMeta = { 'com.apify/ActorRun': { runId: 'run-abc' } };
-        await taskStore.storeTaskResult(task.taskId, 'completed', {
-            content: [{ type: 'text', text: 'done' }],
-            _meta: existingMeta,
-        }, undefined);
+        await taskStore.storeTaskResult(
+            task.taskId,
+            'completed',
+            {
+                content: [{ type: 'text', text: 'done' }],
+                _meta: existingMeta,
+            },
+            undefined,
+        );
 
         const handler = getHandler(server as never, 'tasks/result');
-        const result = await handler(
+        const result = (await handler(
             { method: 'tasks/result', params: { taskId: task.taskId } },
             { sendNotification: vi.fn() },
-        ) as Record<string, unknown>;
+        )) as Record<string, unknown>;
 
         const meta = result._meta as Record<string, unknown>;
         expect(meta[RELATED_TASK_META_KEY]).toEqual({ taskId: task.taskId });

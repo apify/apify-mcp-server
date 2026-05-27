@@ -55,9 +55,7 @@ function limitField(value: string | undefined): string | undefined {
     return value.length > MAX_VALIDATION_FIELD_LENGTH ? value.slice(0, MAX_VALIDATION_FIELD_LENGTH) : value;
 }
 
-export function extractAjvErrorDetails(
-    errors: ErrorObject[] | null | undefined,
-): AjvErrorDetails {
+export function extractAjvErrorDetails(errors: ErrorObject[] | null | undefined): AjvErrorDetails {
     if (!errors?.length) return {};
 
     const firstError = errors[0];
@@ -81,7 +79,11 @@ export function extractAjvErrorDetails(
         if (typeof missingProperty === 'string') {
             diagnostics.validation_missing_property = limitField(missingProperty);
         }
-    } else if (firstError.keyword === 'additionalProperties' && hasParams && 'additionalProperty' in firstError.params) {
+    } else if (
+        firstError.keyword === 'additionalProperties' &&
+        hasParams &&
+        'additionalProperty' in firstError.params
+    ) {
         const { additionalProperty } = firstError.params as { additionalProperty?: unknown };
         if (typeof additionalProperty === 'string') {
             diagnostics.validation_additional_property = limitField(additionalProperty);
@@ -123,8 +125,7 @@ export function extractToolTelemetry(
         return { toolStatus: TOOL_STATUS.SUCCEEDED, callDiagnostics: {} };
     }
 
-    const toolStatus = telemetry.toolStatus
-        ?? (res.isError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.SUCCEEDED);
+    const toolStatus = telemetry.toolStatus ?? (res.isError ? TOOL_STATUS.SOFT_FAIL : TOOL_STATUS.SUCCEEDED);
 
     const callDiagnostics: CallDiagnostics = {
         ...(telemetry.failureCategory && { failure_category: telemetry.failureCategory }),

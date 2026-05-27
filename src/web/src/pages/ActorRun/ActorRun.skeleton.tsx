@@ -1,7 +1,9 @@
-import React from "react";
-import styled from "styled-components";
-import { SkeletonBlock } from "../../components/ui/SkeletonBlock";
-import { theme } from "@apify/ui-library";
+import React from 'react';
+import styled from 'styled-components';
+
+import { theme } from '@apify/ui-library';
+
+import { SkeletonBlock } from '../../components/ui/SkeletonBlock';
 
 const TableContainer = styled.div`
     width: 100%;
@@ -60,33 +62,33 @@ const TableCell = styled.td`
 export const TableSkeleton: React.FC = () => {
     return (
         <TableContainer>
-                <Table>
-                    <TableHeader>
-                        <tr>
-                            {[0, 1, 2, 3, 4].map((i) => (
-                                <TableHeaderCell key={i}>
-                                    <SkeletonBlock style={{ width: `${60 + (i * 10)}px`, height: '12px' }} />
-                                </TableHeaderCell>
-                            ))}
-                        </tr>
-                    </TableHeader>
-                    <TableBody>
-                        {[0, 1, 2, 3, 4].map((rowIndex) => (
-                            <TableRow key={rowIndex}>
-                                {[0, 1, 2, 3, 4].map((colIndex) => (
-                                    <TableCell key={colIndex}>
-                                        <SkeletonBlock
-                                            style={{
-                                                width: `${70 + ((rowIndex + colIndex) % 3) * 30}px`,
-                                                height: '14px'
-                                            }}
-                                        />
-                                    </TableCell>
-                                ))}
-                            </TableRow>
+            <Table>
+                <TableHeader>
+                    <tr>
+                        {[0, 1, 2, 3, 4].map((i) => (
+                            <TableHeaderCell key={i}>
+                                <SkeletonBlock style={{ width: `${60 + i * 10}px`, height: '12px' }} />
+                            </TableHeaderCell>
                         ))}
-                    </TableBody>
-                </Table>
-            </TableContainer>
+                    </tr>
+                </TableHeader>
+                <TableBody>
+                    {[0, 1, 2, 3, 4].map((rowIndex) => (
+                        <TableRow key={rowIndex}>
+                            {[0, 1, 2, 3, 4].map((colIndex) => (
+                                <TableCell key={colIndex}>
+                                    <SkeletonBlock
+                                        style={{
+                                            width: `${70 + ((rowIndex + colIndex) % 3) * 30}px`,
+                                            height: '14px',
+                                        }}
+                                    />
+                                </TableCell>
+                            ))}
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
     );
 };

@@ -75,7 +75,9 @@ describe('get-dataset-schema', () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
-        const { content, isError, toolTelemetry } = result as TextToolResult & { toolTelemetry?: ToolTelemetrySnapshot };
+        const { content, isError, toolTelemetry } = result as TextToolResult & {
+            toolTelemetry?: ToolTelemetrySnapshot;
+        };
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");

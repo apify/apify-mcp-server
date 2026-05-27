@@ -9,52 +9,70 @@ describe('isApiTokenRequired', () => {
     });
 
     it('should NOT require token for only public tools', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-actors'],
-        })).toBe(false);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-actors'],
+            }),
+        ).toBe(false);
 
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-apify-docs', 'fetch-apify-docs'],
-        })).toBe(false);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-apify-docs', 'fetch-apify-docs'],
+            }),
+        ).toBe(false);
 
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['fetch-actor-details'],
-        })).toBe(false);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['fetch-actor-details'],
+            }),
+        ).toBe(false);
 
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-actors', 'fetch-actor-details'],
-        })).toBe(false);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-actors', 'fetch-actor-details'],
+            }),
+        ).toBe(false);
     });
 
     it('should require token if any private tool is included', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-actors', 'call-actor'],
-        })).toBe(true);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-actors', 'call-actor'],
+            }),
+        ).toBe(true);
     });
 
     it('should require token if any non-public category is used', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['actors'],
-        })).toBe(true);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['actors'],
+            }),
+        ).toBe(true);
     });
 
     it('should require token if specifically requested actors subset', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-actors'],
-            actorList: ['apify/web-scraper'],
-        })).toBe(true);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-actors'],
+                actorList: ['apify/web-scraper'],
+            }),
+        ).toBe(true);
     });
 
     it('should require token if enableAddingActors is true', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['search-actors'],
-            enableAddingActors: true,
-        })).toBe(true);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['search-actors'],
+                enableAddingActors: true,
+            }),
+        ).toBe(true);
     });
 
     it('should handle unknown keys as potentially unsafe (requiring token)', () => {
-        expect(isApiTokenRequired({
-            toolCategoryKeys: ['some-unknown-potential-actor-name'],
-        })).toBe(true);
+        expect(
+            isApiTokenRequired({
+                toolCategoryKeys: ['some-unknown-potential-actor-name'],
+            }),
+        ).toBe(true);
     });
 });

@@ -29,15 +29,17 @@ describe('generateSchemaFromItems — basics', () => {
     });
 
     it('infers each primitive type', () => {
-        const result = generateSchemaFromItems([{
-            s: 'x',
-            i: 1,
-            n: 1.5,
-            b: true,
-            nul: null,
-            o: { nested: 'v' },
-            a: [1, 2, 3],
-        }]);
+        const result = generateSchemaFromItems([
+            {
+                s: 'x',
+                i: 1,
+                n: 1.5,
+                b: true,
+                nul: null,
+                o: { nested: 'v' },
+                a: [1, 2, 3],
+            },
+        ]);
         const p = props(result)!;
         expect(p.s?.type).toBe('string');
         expect(p.i?.type).toBe('integer');
@@ -66,11 +68,7 @@ describe('generateSchemaFromItems — object merge across items', () => {
     });
 
     it('unions completely disjoint key sets', () => {
-        const result = generateSchemaFromItems([
-            { onlyA: 1 },
-            { onlyB: 'x' },
-            { onlyC: true },
-        ]);
+        const result = generateSchemaFromItems([{ onlyA: 1 }, { onlyB: 'x' }, { onlyC: true }]);
         const p = props(result)!;
         expect(p.onlyA?.type).toBe('integer');
         expect(p.onlyB?.type).toBe('string');
@@ -90,10 +88,7 @@ describe('generateSchemaFromItems — object merge across items', () => {
     });
 
     it('merges three levels of nesting', () => {
-        const result = generateSchemaFromItems([
-            { a: { b: { c: 1 } } },
-            { a: { b: { d: 'x' } } },
-        ]);
+        const result = generateSchemaFromItems([{ a: { b: { c: 1 } } }, { a: { b: { d: 'x' } } }]);
         const c = props(result)!.a?.properties?.b?.properties?.c;
         const d = props(result)!.a?.properties?.b?.properties?.d;
         expect(c?.type).toBe('integer');
@@ -154,13 +149,15 @@ describe('generateSchemaFromItems — type unification', () => {
 
 describe('generateSchemaFromItems — format detection', () => {
     it('detects uri, date-time, date, email, uuid', () => {
-        const result = generateSchemaFromItems([{
-            url: 'https://example.com/path?q=1',
-            dt: '2025-05-16T14:00:00Z',
-            d: '2025-05-16',
-            email: 'a@b.com',
-            id: '550e8400-e29b-41d4-a716-446655440000',
-        }]);
+        const result = generateSchemaFromItems([
+            {
+                url: 'https://example.com/path?q=1',
+                dt: '2025-05-16T14:00:00Z',
+                d: '2025-05-16',
+                email: 'a@b.com',
+                id: '550e8400-e29b-41d4-a716-446655440000',
+            },
+        ]);
         const p = props(result)!;
         expect(p.url?.format).toBe('uri');
         expect(p.dt?.format).toBe('date-time');
@@ -172,11 +169,13 @@ describe('generateSchemaFromItems — format detection', () => {
     it('does not flag free-form text as a format (no `style`/`color`/`hostname` false positives)', () => {
         // Previously the old library emitted `format: "style"` on Markdown bodies
         // because the CSS-ish regex matched any `:` followed by `;`.
-        const result = generateSchemaFromItems([{
-            markdown: '# Heading\n\nSome **bold**: text; with punctuation.\n\n[link](http://x)',
-            plain: 'just a sentence with: stuff; in it',
-            cssLike: 'color: red; padding: 10px;',
-        }]);
+        const result = generateSchemaFromItems([
+            {
+                markdown: '# Heading\n\nSome **bold**: text; with punctuation.\n\n[link](http://x)',
+                plain: 'just a sentence with: stuff; in it',
+                cssLike: 'color: red; padding: 10px;',
+            },
+        ]);
         const p = props(result)!;
         expect(p.markdown?.format).toBeUndefined();
         expect(p.plain?.format).toBeUndefined();
@@ -184,10 +183,7 @@ describe('generateSchemaFromItems — format detection', () => {
     });
 
     it('drops format when items disagree (some formatted, some plain)', () => {
-        const result = generateSchemaFromItems([
-            { url: 'https://example.com' },
-            { url: 'not a url' },
-        ]);
+        const result = generateSchemaFromItems([{ url: 'https://example.com' }, { url: 'not a url' }]);
         expect(props(result)!.url?.type).toBe('string');
         expect(props(result)!.url?.format).toBeUndefined();
     });
@@ -201,12 +197,14 @@ describe('generateSchemaFromItems — arrays inside items', () => {
     });
 
     it('merges item schemas across heterogeneous object arrays', () => {
-        const result = generateSchemaFromItems([{
-            items: [
-                { sku: 'A', price: 10 },
-                { sku: 'B', stock: 5 },
-            ],
-        }]);
+        const result = generateSchemaFromItems([
+            {
+                items: [
+                    { sku: 'A', price: 10 },
+                    { sku: 'B', stock: 5 },
+                ],
+            },
+        ]);
         const inner = props(result)!.items?.items;
         expect(inner?.type).toBe('object');
         expect(inner?.properties?.sku?.type).toBe('string');

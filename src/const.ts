@@ -61,9 +61,7 @@ Examples of when to use:
 This is for general web scraping and immediate data needs. For repeated/scheduled scraping of specific platforms (e-commerce, social media), consider suggesting a specialized Actor from the Store for better performance and reliability.`;
 
 export const defaults = {
-    actors: [
-        RAG_WEB_BROWSER,
-    ],
+    actors: [RAG_WEB_BROWSER],
 };
 
 // Cache
@@ -99,8 +97,8 @@ export const DOCS_SOURCES = [
         indexName: 'test_test_apify_sdk',
         filters: 'version:latest',
         description:
-            'Apify Platform documentation including: Platform features, SDKs (JS, Python), CLI, '
-            + 'REST API, Academy (web scraping fundamentals), Actor development and deployment',
+            'Apify Platform documentation including: Platform features, SDKs (JS, Python), CLI, ' +
+            'REST API, Academy (web scraping fundamentals), Actor development and deployment',
     },
     {
         id: 'crawlee-js',
@@ -111,8 +109,8 @@ export const DOCS_SOURCES = [
         typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
         facetFilters: ['language:en', ['docusaurus_tag:default', 'docusaurus_tag:docs-default-3.15']],
         description:
-            'Crawlee is a web scraping library for JavaScript. '
-            + 'It handles blocking, crawling, proxies, and browsers for you.',
+            'Crawlee is a web scraping library for JavaScript. ' +
+            'It handles blocking, crawling, proxies, and browsers for you.',
     },
     {
         id: 'crawlee-py',
@@ -123,15 +121,12 @@ export const DOCS_SOURCES = [
         typeFilter: 'lvl1', // Filter to page-level results only (Docusaurus lvl1)
         facetFilters: ['language:en', ['docusaurus_tag:docs-default-current']],
         description:
-            'Crawlee is a web scraping library for Python. '
-            + 'It handles blocking, crawling, proxies, and browsers for you.',
+            'Crawlee is a web scraping library for Python. ' +
+            'It handles blocking, crawling, proxies, and browsers for you.',
     },
 ] as const;
 
-export const ALLOWED_DOC_DOMAINS = [
-    'https://docs.apify.com',
-    'https://crawlee.dev',
-] as const;
+export const ALLOWED_DOC_DOMAINS = ['https://docs.apify.com', 'https://crawlee.dev'] as const;
 
 export const APIFY_STORE_URL = 'https://apify.com';
 export const APIFY_FAVICON_URL = `${APIFY_STORE_URL}/favicon.ico`;

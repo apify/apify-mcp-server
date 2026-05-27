@@ -30,11 +30,13 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns structured actors and markdown text; no widget payload', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
 
-        const result = await (defaultSearchActors as HelperTool).call(stubInternalToolArgs({
-            keywords: SEARCH_KEYWORDS,
-            limit: 5,
-            offset: 0,
-        }));
+        const result = await (defaultSearchActors as HelperTool).call(
+            stubInternalToolArgs({
+                keywords: SEARCH_KEYWORDS,
+                limit: 5,
+                offset: 0,
+            }),
+        );
 
         const { structuredContent, content } = result as {
             structuredContent: {
@@ -72,11 +74,13 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     it('returns empty structured content and retry instructions when no actors match', async () => {
         vi.mocked(searchAgentSafeActors).mockResolvedValue([]);
 
-        const result = await (defaultSearchActors as HelperTool).call(stubInternalToolArgs({
-            keywords: SEARCH_KEYWORDS,
-            limit: 5,
-            offset: 0,
-        }));
+        const result = await (defaultSearchActors as HelperTool).call(
+            stubInternalToolArgs({
+                keywords: SEARCH_KEYWORDS,
+                limit: 5,
+                offset: 0,
+            }),
+        );
 
         const { structuredContent, content } = result as {
             structuredContent: {

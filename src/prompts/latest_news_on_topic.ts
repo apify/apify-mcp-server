@@ -15,7 +15,8 @@ const args: PromptArgument[] = [
     },
     {
         name: 'timespan',
-        description: 'The timespan for which to retrieve news articles. Defaults to "7 days". For example "1 day", "3 days", "7 days", "1 month", etc.',
+        description:
+            'The timespan for which to retrieve news articles. Defaults to "7 days". For example "1 day", "3 days", "7 days", "1 month", etc.',
         required: false,
     },
 ];
@@ -26,10 +27,15 @@ const args: PromptArgument[] = [
 const argsSchema = fixedAjvCompile(ajv, {
     type: 'object',
     properties: {
-        ...Object.fromEntries(args.map((arg) => [arg.name, {
-            type: 'string',
-            description: arg.description,
-        }])),
+        ...Object.fromEntries(
+            args.map((arg) => [
+                arg.name,
+                {
+                    type: 'string',
+                    description: arg.description,
+                },
+            ]),
+        ),
     },
     required: [...args.filter((arg) => arg.required).map((arg) => arg.name)],
 });

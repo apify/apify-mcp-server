@@ -14,9 +14,7 @@ import { actorSearchOutputSchema } from '../structured_output_schemas.js';
  * widget variants — the widget variant calls `.strict()` on it.
  */
 export const searchActorsBaseArgsSchema = z.object({
-    keywords: z.string()
-        .default('')
-        .describe(dedent`
+    keywords: z.string().default('').describe(dedent`
             Space-separated keywords used to search pre-built solutions (Actors) in the Apify Store.
             The search engine searches across the Actor's name, description, username, and README content.
 
@@ -42,17 +40,14 @@ export const searchActorsBaseArgsSchema = z.object({
             ❌ "top popular actors", "best scrapers", "trending" — ranking words aren't Actor keywords; pass "" instead
             ❌ "scraper", "extractor", "web crawler" — bare task words aren't Actor keywords; pass "" instead
         `),
-    limit: z.number()
+    limit: z
+        .number()
         .int()
         .min(1)
         .max(MAX_LIMIT_WITH_INPUT_SCHEMA)
         .default(5)
         .describe(`The maximum number of Actors to return (max = ${MAX_LIMIT_WITH_INPUT_SCHEMA}, default = 5).`),
-    offset: z.number()
-        .int()
-        .min(0)
-        .default(0)
-        .describe('The number of elements to skip from the start (default = 0)'),
+    offset: z.number().int().min(0).default(0).describe('The number of elements to skip from the start (default = 0)'),
 });
 
 const SEARCH_ACTORS_DESCRIPTION = `
@@ -119,10 +114,7 @@ export type SearchActorsResult = {
     actorCardStructured: StructuredActorCard[];
 };
 
-export function buildSearchActorsResult(
-    actors: ActorStoreList[],
-    userTier: PricingTier,
-): SearchActorsResult {
+export function buildSearchActorsResult(actors: ActorStoreList[], userTier: PricingTier): SearchActorsResult {
     const options = { ...DEFAULT_CARD_OPTIONS, userTier, simplifyPricingForUserTier: true };
     return {
         actorCardText: actors.map((actor) => formatActorToActorCard(actor, options)).join('\n\n'),
@@ -137,5 +129,8 @@ export function buildSearchActorsEmptyResponse(query: string): ReturnType<typeof
         (e.g., "TikTok" instead of "TikTok posts") before concluding no Actor exists.
     `;
 
-    return buildMCPResponse({ texts: [instructions], structuredContent: { actors: [], query, count: 0, instructions } });
+    return buildMCPResponse({
+        texts: [instructions],
+        structuredContent: { actors: [], query, count: 0, instructions },
+    });
 }

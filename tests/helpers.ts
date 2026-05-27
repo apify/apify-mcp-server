@@ -21,7 +21,7 @@ export type McpClientOptions = {
     serverMode?: string; // Raw server-mode value passed as ?ui= URL param or --ui CLI arg (e.g. 'apps', 'true', or the deprecated 'openai')
     payment?: string; // Payment provider identifier (e.g., 'x402', 'skyfire')
     clientCapabilities?: ClientCapabilities; // Extra capabilities advertised by the client during initialize
-}
+};
 
 /**
  * Ensures `APIFY_TOKEN` is set unless the test runs in payment mode
@@ -67,22 +67,16 @@ function appendSearchParams(url: URL, options?: McpClientOptions): void {
     }
 }
 
-export async function createMcpSseClient(
-    serverUrl: string,
-    options?: McpClientOptions,
-): Promise<Client> {
+export async function createMcpSseClient(serverUrl: string, options?: McpClientOptions): Promise<Client> {
     checkApifyToken(options);
     const url = new URL(serverUrl);
     appendSearchParams(url, options);
 
-    const transport = new SSEClientTransport(
-        url,
-        {
-            requestInit: {
-                headers: buildClientAuthHeaders(options),
-            },
+    const transport = new SSEClientTransport(url, {
+        requestInit: {
+            headers: buildClientAuthHeaders(options),
         },
-    );
+    });
 
     const client = new Client({
         name: options?.clientName || 'sse-client',
@@ -94,22 +88,16 @@ export async function createMcpSseClient(
     return client;
 }
 
-export async function createMcpStreamableClient(
-    serverUrl: string,
-    options?: McpClientOptions,
-): Promise<Client> {
+export async function createMcpStreamableClient(serverUrl: string, options?: McpClientOptions): Promise<Client> {
     checkApifyToken(options);
     const url = new URL(serverUrl);
     appendSearchParams(url, options);
 
-    const transport = new StreamableHTTPClientTransport(
-        url,
-        {
-            requestInit: {
-                headers: buildClientAuthHeaders(options),
-            },
+    const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: {
+            headers: buildClientAuthHeaders(options),
         },
-    );
+    });
 
     const client = new Client({
         name: options?.clientName || 'streamable-http-client',
@@ -121,9 +109,7 @@ export async function createMcpStreamableClient(
     return client;
 }
 
-export async function createMcpStdioClient(
-    options?: McpClientOptions,
-): Promise<Client> {
+export async function createMcpStdioClient(options?: McpClientOptions): Promise<Client> {
     checkApifyToken(options);
     const { actors, enableAddingActors, tools, useEnv, telemetry, serverMode, payment } = options || {};
     const args = ['dist/stdio.js'];

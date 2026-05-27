@@ -84,10 +84,6 @@ describe('getCategoryTools', () => {
         const actorNames = result.actors.map((t: ToolEntry) => t.name);
 
         // Verify workflow order: search → details → call
-        expect(actorNames).toEqual([
-            HelperTools.STORE_SEARCH,
-            HelperTools.ACTOR_GET_DETAILS,
-            HelperTools.ACTOR_CALL,
-        ]);
+        expect(actorNames).toEqual([HelperTools.STORE_SEARCH, HelperTools.ACTOR_GET_DETAILS, HelperTools.ACTOR_CALL]);
     });
 });

@@ -72,7 +72,11 @@ export type PaymentProvider = {
      * @param requestHeaders - Incoming HTTP request headers
      * @returns Headers to attach to outbound Apify API requests, or empty object if none.
      */
-    getPaymentHeaders(args: Record<string, unknown>, meta?: PaymentMeta, requestHeaders?: RequestHeaders): PaymentHeaders;
+    getPaymentHeaders(
+        args: Record<string, unknown>,
+        meta?: PaymentMeta,
+        requestHeaders?: RequestHeaders,
+    ): PaymentHeaders;
 
     /**
      * Remove payment-specific fields from tool call arguments before passing
@@ -107,4 +111,4 @@ export type PaymentProvider = {
      * @returns A new object with sensitive fields replaced by '[REDACTED]'.
      */
     redactForLogging(args: unknown): unknown;
-}
+};

@@ -30,7 +30,7 @@ export type StructuredPricingInfo = {
     pricingNote?: string;
     eventDescriptionsOmitted?: boolean;
     eventDescriptionsNote?: string;
-}
+};
 
 export interface ActorStats {
     totalUsers: number;
@@ -39,24 +39,24 @@ export interface ActorStats {
 }
 
 export interface ActorDetails {
-  actorInfo: Actor;
-  actorCard: string;
-  readme: string;
-  inputSchema?: {
-    type: string;
-    properties: Record<string, unknown>;
-  };
+    actorInfo: Actor;
+    actorCard: string;
+    readme: string;
+    inputSchema?: {
+        type: string;
+        properties: Record<string, unknown>;
+    };
 }
 
 export interface Actor {
-  id: string;
-  name: string;
-  username: string;
-  url: string;
-  fullName?: string;
-  title: string;
-  description: string;
-  pictureUrl?: string;
-  stats?: ActorStats;
-  currentPricingInfo?: StructuredPricingInfo;
+    id: string;
+    name: string;
+    username: string;
+    url: string;
+    fullName?: string;
+    title: string;
+    description: string;
+    pictureUrl?: string;
+    stats?: ActorStats;
+    currentPricingInfo?: StructuredPricingInfo;
 }

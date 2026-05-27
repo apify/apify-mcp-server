@@ -44,13 +44,17 @@ These tools are called **Actors**. They enable you to extract structured data fr
 ## Storage types
 - **Dataset:** Structured, append-only storage ideal for tabular or list data (e.g., scraped items).
 - **Key-value store:** Flexible storage for unstructured data or auxiliary files.
-${isApps ? `
+${
+    isApps
+        ? `
 ## Widget workflow (applies when tool responses include widget metadata)
 Some clients render widget-backed Actor tools: the response includes a live UI that automatically polls run status. When a widget is rendered, follow-up status polling by the model is a forbidden duplicate.
 
 - **After \`${HelperTools.ACTOR_CALL_WIDGET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\`, never call \`${HelperTools.ACTOR_RUNS_GET}\` or \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` for the same run.** Both widgets render live progress and poll themselves — stop after the widget response and defer to it for run status. Re-rendering the same run via \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` is a duplicate.
 - Polling \`${HelperTools.ACTOR_RUNS_GET}\` after \`${HelperTools.ACTOR_CALL}\` is fine — that tool renders no UI, so polling is expected when the run is non-terminal and you need the latest status.
-` : ''}
+`
+        : ''
+}
 ## Tool dependencies and disambiguation
 
 ### Tool dependencies
@@ -67,13 +71,17 @@ Some clients render widget-backed Actor tools: the response includes a live UI t
   Use \`${HelperTools.ACTOR_OUTPUT_GET}\` for Actor run outputs and \`${HelperTools.DATASET_GET_ITEMS}\` for direct dataset access.
 - **\`${HelperTools.STORE_SEARCH}\` vs \`${HelperTools.ACTOR_GET_DETAILS}\`:**
   \`${HelperTools.STORE_SEARCH}\` finds Actors; \`${HelperTools.ACTOR_GET_DETAILS}\` retrieves detailed info, README, and schema for a specific Actor.
-${isApps ? `- **Data vs widget Actor tools (when the client supports widgets):**
+${
+    isApps
+        ? `- **Data vs widget Actor tools (when the client supports widgets):**
   - \`${HelperTools.STORE_SEARCH}\` is a silent data lookup (Actor list for name resolution) with no UI; \`${HelperTools.STORE_SEARCH_WIDGET}\` renders an interactive UI element (widget) with Actor search results for the user to browse — use it only when the user explicitly asks to search or discover Actors.
   - \`${HelperTools.ACTOR_GET_DETAILS}\` is a silent data lookup (input schema, README, metadata) with no UI; \`${HelperTools.ACTOR_GET_DETAILS_WIDGET}\` renders an interactive UI element (widget) with Actor details — use it only when the user explicitly asks to see or browse the Actor.
   - \`${HelperTools.ACTOR_CALL}\` runs the Actor and returns its result (no UI); \`${HelperTools.ACTOR_CALL_WIDGET}\` renders an interactive UI element (widget) that tracks live Actor run progress — use it only when the user explicitly asks to see progress.
   - \`${HelperTools.ACTOR_RUNS_GET}\` is a silent data lookup (run status, dataset IDs, stats) with no UI; \`${HelperTools.ACTOR_RUNS_GET_WIDGET}\` renders an interactive UI element (widget) showing live run progress for the user — use it only when the user explicitly asks to see run progress.
   - When the next step is running an Actor, prefer silent lookups (\`${HelperTools.STORE_SEARCH}\`, \`${HelperTools.ACTOR_GET_DETAILS}\`) over widget-backed variants.
-` : ''}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
+`
+        : ''
+}- **\`${HelperTools.STORE_SEARCH}\` vs ${RAG_WEB_BROWSER}:**
   \`${HelperTools.STORE_SEARCH}\` finds robust and reliable Actors for specific websites; ${RAG_WEB_BROWSER} is a general and versatile web scraping tool.
 - **Dedicated Actor tools (e.g. ${RAG_WEB_BROWSER}) vs \`${HelperTools.ACTOR_CALL}\`:**
   Prefer dedicated tools when available; use \`${HelperTools.ACTOR_CALL}\` only when no specialized tool exists in the Apify store.

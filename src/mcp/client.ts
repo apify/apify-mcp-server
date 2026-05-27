@@ -13,9 +13,7 @@ import { getMCPServerID } from './proxy.js';
  * Creates and connects a ModelContextProtocol client.
  * First tries streamable HTTP transport, then falls back to SSE transport.
  */
-export async function connectMCPClient(
-    url: string, token: string, mcpSessionId?: string,
-): Promise<Client | null> {
+export async function connectMCPClient(url: string, token: string, mcpSessionId?: string): Promise<Client | null> {
     try {
         return await createMCPStreamableClient(url, token);
     } catch (error) {
@@ -57,20 +55,15 @@ export async function connectMCPClient(
 async function withTimeout<T>(millis: number, promise: Promise<T>): Promise<T> {
     let timeoutPid: NodeJS.Timeout | undefined;
     const timeout = new Promise<never>((_resolve, reject) => {
-        timeoutPid = setTimeout(
-            () => reject(new TimeoutError(`Timed out after ${millis} ms.`)),
-            millis,
-        );
+        timeoutPid = setTimeout(() => reject(new TimeoutError(`Timed out after ${millis} ms.`)), millis);
     });
 
-    return Promise.race([
-        promise,
-        timeout,
-    ]).finally(() => clearTimeout(timeoutPid));
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutPid));
 }
 
 async function connectWithTransport(
-    url: string, transport: SSEClientTransport | StreamableHTTPClientTransport,
+    url: string,
+    transport: SSEClientTransport | StreamableHTTPClientTransport,
 ): Promise<Client> {
     const client = new Client({
         name: getMCPServerID(url),
@@ -83,29 +76,25 @@ async function connectWithTransport(
 /**
  * Creates and connects a ModelContextProtocol client using the SSE transport.
  */
-async function createMCPSSEClient(
-    url: string, token: string,
-): Promise<Client> {
-    const transport = new SSEClientTransport(
-        new URL(url),
-        {
-            requestInit: {
-                headers: {
-                    authorization: `Bearer ${token}`,
-                },
+async function createMCPSSEClient(url: string, token: string): Promise<Client> {
+    const transport = new SSEClientTransport(new URL(url), {
+        requestInit: {
+            headers: {
+                authorization: `Bearer ${token}`,
             },
-            eventSourceInit: {
-                // The EventSource package augments EventSourceInit with a "fetch" parameter.
-                // You can use this to set additional headers on the outgoing request.
-                // Based on this example: https://github.com/modelcontextprotocol/typescript-sdk/issues/118
-                async fetch(input: Request | URL | string, init?: RequestInit) {
-                    const headers = new Headers(init?.headers || {});
-                    headers.set('authorization', `Bearer ${token}`);
-                    return fetch(input, { ...init, headers });
-                },
-                // We have to cast to "any" to use it, since it's non-standard
-            } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-        });
+        },
+        eventSourceInit: {
+            // The EventSource package augments EventSourceInit with a "fetch" parameter.
+            // You can use this to set additional headers on the outgoing request.
+            // Based on this example: https://github.com/modelcontextprotocol/typescript-sdk/issues/118
+            async fetch(input: Request | URL | string, init?: RequestInit) {
+                const headers = new Headers(init?.headers || {});
+                headers.set('authorization', `Bearer ${token}`);
+                return fetch(input, { ...init, headers });
+            },
+            // We have to cast to "any" to use it, since it's non-standard
+        } as any, // eslint-disable-line @typescript-eslint/no-explicit-any
+    });
 
     return await connectWithTransport(url, transport);
 }
@@ -113,18 +102,14 @@ async function createMCPSSEClient(
 /**
  * Creates and connects a ModelContextProtocol client using the streamable HTTP transport.
  */
-async function createMCPStreamableClient(
-    url: string, token: string,
-): Promise<Client> {
-    const transport = new StreamableHTTPClientTransport(
-        new URL(url),
-        {
-            requestInit: {
-                headers: {
-                    authorization: `Bearer ${token}`,
-                },
+async function createMCPStreamableClient(url: string, token: string): Promise<Client> {
+    const transport = new StreamableHTTPClientTransport(new URL(url), {
+        requestInit: {
+            headers: {
+                authorization: `Bearer ${token}`,
             },
-        });
+        },
+    });
 
     return await connectWithTransport(url, transport);
 }

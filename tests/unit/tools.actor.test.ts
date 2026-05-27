@@ -18,7 +18,9 @@ describe('actors', () => {
             // Strings longer than 64 chars without a slash should use hash-based truncation
             const longName = 'a'.repeat(70);
             const hash = createHash('sha256').update(longName).digest('hex').slice(0, TOOL_NAME_HASH_LENGTH);
-            expect(actorNameToToolName(longName)).toBe(`${'a'.repeat(MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`);
+            expect(actorNameToToolName(longName)).toBe(
+                `${'a'.repeat(MAX_TOOL_NAME_LENGTH - TOOL_NAME_HASH_LENGTH - 1)}-${hash}`,
+            );
         });
 
         it('should handle tool names longer than 64 characters by truncating with a hash', () => {

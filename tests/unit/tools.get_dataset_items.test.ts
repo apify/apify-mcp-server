@@ -11,18 +11,15 @@ describe('extractDotPrefixes', () => {
     });
 
     it('extracts unique top-level prefixes from dot-notation fields', () => {
-        expect(extractDotPrefixes(['metadata.url', 'crawl.statusCode', 'title']))
-            .toEqual(['metadata', 'crawl']);
+        expect(extractDotPrefixes(['metadata.url', 'crawl.statusCode', 'title'])).toEqual(['metadata', 'crawl']);
     });
 
     it('deduplicates repeated prefixes', () => {
-        expect(extractDotPrefixes(['metadata.url', 'metadata.title']))
-            .toEqual(['metadata']);
+        expect(extractDotPrefixes(['metadata.url', 'metadata.title'])).toEqual(['metadata']);
     });
 
     it('handles mixed deep and shallow paths', () => {
-        expect(extractDotPrefixes(['a.b.c', 'a.x', 'd']))
-            .toEqual(['a']);
+        expect(extractDotPrefixes(['a.b.c', 'a.x', 'd'])).toEqual(['a']);
     });
 
     it('returns empty list for empty input', () => {
@@ -83,7 +80,10 @@ describe('get-dataset-items', () => {
 
     it('returns isError with a not-found message when listItems returns no response', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(async () => null)),
+            stubToolCallContext(
+                { datasetId: 'missing' },
+                stubApifyClient(async () => null),
+            ),
         );
         const { content } = result as TextToolResult;
 
@@ -94,14 +94,17 @@ describe('get-dataset-items', () => {
     it('auto-derives flatten from dot-notation in fields', async () => {
         const listItemsSpy = vi.fn().mockResolvedValue({ items: [], total: 0 });
 
-        await (getDatasetItems as HelperTool).call(stubToolCallContext({
-            datasetId: 'ds-1',
-            fields: 'metadata.url,crawl.statusCode',
-        }, stubApifyClient(listItemsSpy)));
-
-        expect(listItemsSpy).toHaveBeenCalledWith(
-            expect.objectContaining({ flatten: ['metadata', 'crawl'] }),
+        await (getDatasetItems as HelperTool).call(
+            stubToolCallContext(
+                {
+                    datasetId: 'ds-1',
+                    fields: 'metadata.url,crawl.statusCode',
+                },
+                stubApifyClient(listItemsSpy),
+            ),
         );
+
+        expect(listItemsSpy).toHaveBeenCalledWith(expect.objectContaining({ flatten: ['metadata', 'crawl'] }));
     });
 
     it('rejects empty datasetId via ajv validation', () => {

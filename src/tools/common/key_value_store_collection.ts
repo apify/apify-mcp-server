@@ -5,18 +5,26 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 
 const getUserKeyValueStoresListArgs = z.object({
-    offset: z.number()
+    offset: z
+        .number()
         .describe('Number of array elements that should be skipped at the start. The default is 0.')
         .default(0),
-    limit: z.number()
+    limit: z
+        .number()
         .max(10)
         .describe('Maximum number of array elements to return. The default value (and maximum) is 10.')
         .default(10),
-    desc: z.boolean()
-        .describe('If true or 1 then the stores are sorted by the createdAt field in descending order. Default: sorted in ascending order.')
+    desc: z
+        .boolean()
+        .describe(
+            'If true or 1 then the stores are sorted by the createdAt field in descending order. Default: sorted in ascending order.',
+        )
         .default(false),
-    unnamed: z.boolean()
-        .describe('If true or 1 then all the stores are returned. By default, only named key-value stores are returned.')
+    unnamed: z
+        .boolean()
+        .describe(
+            'If true or 1 then all the stores are returned. By default, only named key-value stores are returned.',
+        )
         .default(false),
 });
 

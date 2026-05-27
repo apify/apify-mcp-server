@@ -1,6 +1,7 @@
-import { AppBridge, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-bridge";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
-import { MOCK_ACTOR_DETAILS_RESPONSE } from "./mock-actor-details";
+import { AppBridge, PostMessageTransport } from '@modelcontextprotocol/ext-apps/app-bridge';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
+import { MOCK_ACTOR_DETAILS_RESPONSE } from './mock-actor-details';
 
 interface MockHostConfig {
     toolOutput?: Record<string, unknown>;
@@ -23,9 +24,9 @@ let bridge: AppBridge | null = null;
  * it when tool-result arrives late over the bridge).
  */
 export const setupMockOpenAi = (config: MockHostConfig = {}) => {
-    if (typeof window === "undefined" || window.openai) return;
+    if (typeof window === 'undefined' || window.openai) return;
 
-    console.log("[mock-host] Setting up MCP Apps mock host");
+    console.log('[mock-host] Setting up MCP Apps mock host');
 
     // ChatGPT toolOutput fallback — see mcp-app-context.tsx
     window.openai = {
@@ -40,7 +41,7 @@ export const setupMockOpenAi = (config: MockHostConfig = {}) => {
 
     bridge = new AppBridge(
         null, // no MCP client — we handle tool calls manually
-        { name: "Dev Mock Host", version: "1.0.0" },
+        { name: 'Dev Mock Host', version: '1.0.0' },
         {
             updateModelContext: { text: {}, structuredContent: {} },
             message: { text: {} },
@@ -48,16 +49,16 @@ export const setupMockOpenAi = (config: MockHostConfig = {}) => {
         },
         {
             hostContext: {
-                theme: "light",
-                displayMode: "inline",
-                platform: "web",
-                locale: "en-US",
+                theme: 'light',
+                displayMode: 'inline',
+                platform: 'web',
+                locale: 'en-US',
             },
         },
     );
 
     bridge.oninitialized = () => {
-        console.log("[mock-host] App initialized, sending tool result");
+        console.log('[mock-host] App initialized, sending tool result');
         bridge!.sendToolResult(toolResult);
     };
 
@@ -75,7 +76,7 @@ export const setupMockOpenAi = (config: MockHostConfig = {}) => {
             };
         }
 
-        if (toolName === "fetch-actor-details") {
+        if (toolName === 'fetch-actor-details') {
             return {
                 content: [],
                 structuredContent: MOCK_ACTOR_DETAILS_RESPONSE.structuredContent as Record<string, unknown>,
@@ -87,34 +88,34 @@ export const setupMockOpenAi = (config: MockHostConfig = {}) => {
     };
 
     bridge.onopenlink = async ({ url }) => {
-        console.log("[mock-host] openLink", url);
-        if (url) window.open(url, "_blank");
+        console.log('[mock-host] openLink', url);
+        if (url) window.open(url, '_blank');
         return {};
     };
 
     bridge.onupdatemodelcontext = async (params) => {
-        console.log("[mock-host] updateModelContext", params);
+        console.log('[mock-host] updateModelContext', params);
         return {};
     };
 
     bridge.onmessage = async (params) => {
-        console.log("[mock-host] message", params);
+        console.log('[mock-host] message', params);
         return {};
     };
 
     bridge.onrequestdisplaymode = async ({ mode }) => {
-        console.log("[mock-host] requestDisplayMode", mode);
+        console.log('[mock-host] requestDisplayMode', mode);
         return { mode };
     };
 
     const transport = new PostMessageTransport(window, window);
     bridge.connect(transport).catch((err: unknown) => {
-        console.error("[mock-host] Failed to connect:", err);
+        console.error('[mock-host] Failed to connect:', err);
     });
 };
 
 export const updateMockOpenAiState = (updates: Record<string, unknown>) => {
-    if (typeof window === "undefined") return;
+    if (typeof window === 'undefined') return;
 
     // Update window.openai for the ChatGPT fallback
     if (window.openai) {

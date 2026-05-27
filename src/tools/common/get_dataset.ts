@@ -7,9 +7,7 @@ import { buildMCPResponse } from '../../utils/mcp.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
 
 const getDatasetArgs = z.object({
-    datasetId: z.string()
-        .min(1)
-        .describe('Dataset ID or username~dataset-name.'),
+    datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
 });
 
 /**

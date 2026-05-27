@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import { parseBooleanOrNull } from '@apify/utilities';
 
-import { getValuesByDotKeys, isValidHttpUrl, parseCommaSeparatedList, parseQueryParamList } from '../../src/utils/generic.js';
+import {
+    getValuesByDotKeys,
+    isValidHttpUrl,
+    parseCommaSeparatedList,
+    parseQueryParamList,
+} from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
     it('should get value for a key without dot', () => {

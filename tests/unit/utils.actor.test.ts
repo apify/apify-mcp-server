@@ -112,7 +112,12 @@ describe('ensureOutputWithinCharLimit', () => {
 
     it('should use important fields when all items exceed limit', () => {
         const items = [
-            { id: 1, name: 'Item 1', description: 'Very long description that makes this item exceed the limit', extra: 'unnecessary data' },
+            {
+                id: 1,
+                name: 'Item 1',
+                description: 'Very long description that makes this item exceed the limit',
+                extra: 'unnecessary data',
+            },
             { id: 2, name: 'Item 2', description: 'Another long description', extra: 'more unnecessary data' },
         ];
         const importantFields = ['id', 'name'];

@@ -15,9 +15,7 @@ import { ServerMode } from '../../src/types.js';
 type InitHandler = (req: InitializeRequest, ctx: unknown) => Promise<unknown>;
 
 function makeInitializeRequest(supportsUi: boolean): InitializeRequest {
-    const extensions = supportsUi
-        ? { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } }
-        : {};
+    const extensions = supportsUi ? { 'io.modelcontextprotocol/ui': { mimeTypes: [RESOURCE_MIME_TYPE] } } : {};
     return {
         method: 'initialize',
         params: {
@@ -43,9 +41,11 @@ function makeServer(serverMode: ServerModeOption): ActorsMcpServer {
  */
 async function dispatchInitialize(server: ActorsMcpServer, request: InitializeRequest): Promise<void> {
     // eslint-disable-next-line no-underscore-dangle
-    const handler = (server.server as unknown as {
-        _requestHandlers: Map<string, InitHandler>;
-    })._requestHandlers.get('initialize');
+    const handler = (
+        server.server as unknown as {
+            _requestHandlers: Map<string, InitHandler>;
+        }
+    )._requestHandlers.get('initialize');
     if (!handler) throw new Error('initialize handler not registered');
     await handler(request, {});
 }
@@ -91,22 +91,25 @@ describe('ActorsMcpServer initialize handler', () => {
         }
     });
 
-    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)('flushes pending sources from loadToolsFromInput with the resolved mode after initialize', async () => {
-        const server = track(makeServer('auto'));
-        const apifyClient = new ApifyClient({ token: 'test-token' });
+    it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
+        'flushes pending sources from loadToolsFromInput with the resolved mode after initialize',
+        async () => {
+            const server = track(makeServer('auto'));
+            const apifyClient = new ApifyClient({ token: 'test-token' });
 
-        await server.loadToolsFromInput({ tools: [HelperTools.STORE_SEARCH] }, apifyClient);
+            await server.loadToolsFromInput({ tools: [HelperTools.STORE_SEARCH] }, apifyClient);
 
-        // Sources are pending — no tools visible yet
-        expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
+            // Sources are pending — no tools visible yet
+            expect(server.tools.has(HelperTools.STORE_SEARCH)).toBe(false);
 
-        await dispatchInitialize(server, makeInitializeRequest(true));
+            await dispatchInitialize(server, makeInitializeRequest(true));
 
-        // After initialize (apps mode): composed with APPS-mode variants
-        // search-actors is mode-independent (data-only); search-actors-widget is the apps-only UI variant auto-added in apps mode.
-        expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
-        expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
-    });
+            // After initialize (apps mode): composed with APPS-mode variants
+            // search-actors is mode-independent (data-only); search-actors-widget is the apps-only UI variant auto-added in apps mode.
+            expect(server.tools.get(HelperTools.STORE_SEARCH)).toBe(defaultSearchActors);
+            expect(server.tools.get(HelperTools.STORE_SEARCH_WIDGET)).toBe(searchActorsWidgetTool);
+        },
+    );
 
     it('defaults to preliminary DEFAULT mode before initialize runs', () => {
         const server = track(makeServer('auto'));
@@ -133,7 +136,9 @@ describe('ActorsMcpServer initialize handler', () => {
 
         await dispatchInitialize(server, request);
 
-        expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(request);
+        expect((server.options as { initializeRequestData?: InitializeRequest }).initializeRequestData).toEqual(
+            request,
+        );
     });
 
     it.runIf(SERVER_MODE_AUTO_DETECTION_ENABLED)(
@@ -160,7 +165,9 @@ describe('ActorsMcpServer initialize handler', () => {
         async () => {
             const server = track(makeServer('auto'));
             const apifyClient = new ApifyClient({ token: 'test-token' });
-            const loadActorsAsTools = vi.spyOn(server, 'loadActorsAsTools').mockResolvedValue({ tools: [], errors: [] });
+            const loadActorsAsTools = vi
+                .spyOn(server, 'loadActorsAsTools')
+                .mockResolvedValue({ tools: [], errors: [] });
 
             await server.loadToolsByName([HelperTools.STORE_SEARCH_WIDGET], apifyClient);
 

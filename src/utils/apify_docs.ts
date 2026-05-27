@@ -127,10 +127,7 @@ function processAlgoliaResponse(results: AlgoliaResult[]): ApifyDocsSearchResult
  * @param {string} query - The search query string.
  * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
-export async function searchDocsBySource(
-    docSource: string,
-    query: string,
-): Promise<ApifyDocsSearchResult[]> {
+export async function searchDocsBySource(docSource: string, query: string): Promise<ApifyDocsSearchResult[]> {
     const indexConfig = DOCS_SOURCES.find((idx) => idx.id === docSource);
 
     if (!indexConfig) {
@@ -158,10 +155,7 @@ export async function searchDocsBySource(
  * @param {string} query - The search query string.
  * @returns {Promise<ApifyDocsSearchResult[]>} Array of search results with URL (may include anchor) and optional content.
  */
-export async function searchDocsBySourceCached(
-    docSource: string,
-    query: string,
-): Promise<ApifyDocsSearchResult[]> {
+export async function searchDocsBySourceCached(docSource: string, query: string): Promise<ApifyDocsSearchResult[]> {
     const cacheKey = `${docSource}::${query.trim().toLowerCase()}`;
     const cachedResults = searchApifyDocsCache.get(cacheKey);
     if (cachedResults) {

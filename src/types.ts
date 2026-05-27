@@ -66,8 +66,10 @@ export type ActorDefinitionWithDesc = Omit<ActorDefinition, 'input'> & {
  * Pruned Actor definition type.
  * The `id` property is set to Actor ID.
  */
-export type ActorDefinitionPruned = Pick<ActorDefinitionWithDesc,
-    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'> & {
+export type ActorDefinitionPruned = Pick<
+    ActorDefinitionWithDesc,
+    'id' | 'actorFullName' | 'buildTag' | 'readme' | 'readmeSummary' | 'input' | 'description' | 'defaultRunOptions'
+> & {
     webServerMcpPath?: string; // Optional, used for Actorized MCP server tools
     pictureUrl?: string; // Optional, URL to the Actor's icon/picture
 };
@@ -296,10 +298,7 @@ export type ActorDefinitionStorage = {
                 fields?: string[];
             };
             display: {
-                properties: Record<
-                    string,
-                    object
-                >;
+                properties: Record<string, object>;
             };
         }
     >;
@@ -367,12 +366,14 @@ export type ToolCallTelemetryProperties = {
     validation_error_count?: number;
 };
 
-export type AjvErrorDetails = Pick<ToolCallTelemetryProperties,
+export type AjvErrorDetails = Pick<
+    ToolCallTelemetryProperties,
     | 'validation_keyword'
     | 'validation_path'
     | 'validation_missing_property'
     | 'validation_additional_property'
-    | 'validation_error_count'>;
+    | 'validation_error_count'
+>;
 
 /**
  * Telemetry reported by tool handlers on the response object.
@@ -387,7 +388,8 @@ export type ToolTelemetryContext = {
     ajvErrorDetails?: AjvErrorDetails;
 };
 
-export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
+export type CallDiagnostics = Pick<
+    ToolCallTelemetryProperties,
     | 'failure_category'
     | 'failure_http_status'
     | 'failure_detail'
@@ -397,7 +399,8 @@ export type CallDiagnostics = Pick<ToolCallTelemetryProperties,
     | 'validation_path'
     | 'validation_missing_property'
     | 'validation_additional_property'
-    | 'validation_error_count'>;
+    | 'validation_error_count'
+>;
 
 /**
  * Server mode — controls which tool variants, descriptions, and response formats are served.
@@ -591,7 +594,7 @@ export type ActorsMcpServerOptions = {
      * @deprecated Use `serverMode` instead.
      */
     uiMode?: string;
-}
+};
 
 /** Compact schema returned by `GET /v2/store?includeInputSchema=true`; produced by apify-core `trimInputSchema`. */
 export type ActorStoreInputSchema = {
@@ -627,7 +630,7 @@ export type StructuredActorCard = {
     modifiedAt?: string;
     isDeprecated: boolean;
     inputFields?: ActorStoreInputSchema;
-}
+};
 
 /**
  * Options for controlling which sections to include in an Actor card.
@@ -651,7 +654,7 @@ export type ActorCardOptions = {
      * false/undefined → keep the full tiered matrix (fetch-actor-details).
      */
     simplifyPricingForUserTier?: boolean;
-}
+};
 
 /**
  * MCP request parameters with Apify-specific extensions.

@@ -5,16 +5,12 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { compileSchema } from '../../utils/ajv.js';
 
 const getKeyValueStoreKeysArgs = z.object({
-    keyValueStoreId: z.string()
-        .min(1)
-        .describe('Key-value store ID or username~store-name'),
-    exclusiveStartKey: z.string()
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    exclusiveStartKey: z
+        .string()
         .optional()
         .describe('All keys up to this one (including) are skipped from the result.'),
-    limit: z.number()
-        .max(10)
-        .optional()
-        .describe('Number of keys to be returned. Maximum value is 10.'),
+    limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum value is 10.'),
 });
 
 /**

@@ -71,25 +71,15 @@ function isModeMap(entry: CategoryToolEntry): entry is ModeMap {
  * Use {@link getCategoryTools} to resolve entries into concrete ToolEntry arrays for a given mode.
  */
 export const toolCategories = {
-    experimental: [
-        addTool,
-    ],
+    experimental: [addTool],
     actors: [
         defaultSearchActors,
         defaultFetchActorDetails,
         // call-actor is identical between modes; apps mode appends a widget addendum to the description.
         { default: defaultCallActor, apps: appsCallActor },
     ],
-    docs: [
-        searchApifyDocsTool,
-        fetchApifyDocsTool,
-    ],
-    runs: [
-        defaultGetActorRun,
-        getUserRunsList,
-        getActorRunLog,
-        abortActorRun,
-    ],
+    docs: [searchApifyDocsTool, fetchApifyDocsTool],
+    runs: [defaultGetActorRun, getUserRunsList, getActorRunLog, abortActorRun],
     storage: [
         getDataset,
         getDatasetItems,
@@ -101,8 +91,7 @@ export const toolCategories = {
         getUserDatasetsList,
         getUserKeyValueStoresList,
     ],
-    dev: [
-    ],
+    dev: [],
 } satisfies Record<string, CategoryToolEntry[]>;
 
 /**
@@ -153,10 +142,7 @@ export function getCategoryTools(mode: ServerMode = ServerMode.DEFAULT): ToolCat
     ) as ToolCategoryMap;
 }
 
-export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = [
-    'actors',
-    'docs',
-];
+export const toolCategoriesEnabledByDefault: (typeof CATEGORY_NAMES)[number][] = ['actors', 'docs'];
 
 /**
  * Apps-mode pairing: each base tool name maps to its widget sibling.

@@ -37,8 +37,8 @@ describe('computeToolResponseSizeBytes()', () => {
             content: [{ type: 'text', text: 'ok' }],
             structuredContent: { url: 'https://x' },
         };
-        const expected = Buffer.byteLength('ok', 'utf8')
-            + Buffer.byteLength(JSON.stringify({ url: 'https://x' }), 'utf8');
+        const expected =
+            Buffer.byteLength('ok', 'utf8') + Buffer.byteLength(JSON.stringify({ url: 'https://x' }), 'utf8');
         expect(computeToolResponseSizeBytes(result)).toBe(expected);
     });
 
@@ -54,9 +54,7 @@ describe('computeToolResponseSizeBytes()', () => {
 
     it('handles structuredContent without content[]', () => {
         const result = { structuredContent: { a: 1 } };
-        expect(computeToolResponseSizeBytes(result)).toBe(
-            Buffer.byteLength(JSON.stringify({ a: 1 }), 'utf8'),
-        );
+        expect(computeToolResponseSizeBytes(result)).toBe(Buffer.byteLength(JSON.stringify({ a: 1 }), 'utf8'));
     });
 
     it('returns 0 when structuredContent is not JSON-serialisable', () => {

@@ -29,9 +29,7 @@ export type SearchAgentSafeActorsOptions = {
     paymentProvider?: PaymentProvider;
 };
 
-export async function searchActorsByKeywords(
-    options: SearchActorsByKeywordsOptions,
-): Promise<ActorStoreList[]> {
+export async function searchActorsByKeywords(options: SearchActorsByKeywordsOptions): Promise<ActorStoreList[]> {
     const { search, apifyToken, limit, offset, allowsAgenticUsers, includeInputSchema } = options;
     const client = new ApifyClient({ token: apifyToken });
     const storeClient = client.store();
@@ -48,9 +46,7 @@ export async function searchActorsByKeywords(
  * when a `paymentProvider` is in play. The public arg schema caps `limit`
  * at apify-core's hard cap (`MAX_LIMIT_WITH_INPUT_SCHEMA`).
  */
-export async function searchAgentSafeActors(
-    options: SearchAgentSafeActorsOptions,
-): Promise<ActorStoreList[]> {
+export async function searchAgentSafeActors(options: SearchAgentSafeActorsOptions): Promise<ActorStoreList[]> {
     const { keywords, apifyToken, limit, offset, paymentProvider } = options;
 
     return searchActorsByKeywords({

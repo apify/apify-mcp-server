@@ -24,10 +24,7 @@ type TaskStreamMessage = {
     error?: Error;
 };
 
-export async function assertStatusMessagePropagated(
-    taskClient: Client,
-    stream: AsyncIterable<TaskStreamMessage>,
-) {
+export async function assertStatusMessagePropagated(taskClient: Client, stream: AsyncIterable<TaskStreamMessage>) {
     let taskId: string | null = null;
     let getTaskSawStatusMessage = false;
     let listTasksSawStatusMessage = false;
@@ -77,12 +74,16 @@ export async function captureInflightActorRunId(
     capturingSince: Date,
 ): Promise<string> {
     const startedAfter = new Date(capturingSince.getTime() - CLOCK_SKEW_BUFFER_MS);
-    const runId = await vi.waitUntil(async () => {
-        const runs = await apiClient.actor(actorId).runs().list({ limit: 3, desc: true });
-        return runs.items.find((r) => r.startedAt instanceof Date
-            && r.startedAt >= startedAfter
-            && !TERMINAL_RUN_STATUSES.has(r.status))?.id;
-    }, { timeout: RUN_DISCOVERY_TIMEOUT_MS, interval: RUN_DISCOVERY_INTERVAL_MS });
+    const runId = await vi.waitUntil(
+        async () => {
+            const runs = await apiClient.actor(actorId).runs().list({ limit: 3, desc: true });
+            return runs.items.find(
+                (r) =>
+                    r.startedAt instanceof Date && r.startedAt >= startedAfter && !TERMINAL_RUN_STATUSES.has(r.status),
+            )?.id;
+        },
+        { timeout: RUN_DISCOVERY_TIMEOUT_MS, interval: RUN_DISCOVERY_INTERVAL_MS },
+    );
     return runId as string;
 }
 
@@ -91,10 +92,13 @@ export async function captureInflightActorRunId(
  * Pair with `captureInflightActorRunId` for deterministic abort verification.
  */
 export async function waitForRunAborted(apiClient: ApifyClient, runId: string): Promise<void> {
-    await vi.waitUntil(async () => {
-        const run = await apiClient.run(runId).get();
-        return run?.status === 'ABORTED' || run?.status === 'ABORTING';
-    }, { timeout: RUN_ABORT_WAIT_TIMEOUT_MS, interval: RUN_ABORT_WAIT_INTERVAL_MS });
+    await vi.waitUntil(
+        async () => {
+            const run = await apiClient.run(runId).get();
+            return run?.status === 'ABORTED' || run?.status === 'ABORTING';
+        },
+        { timeout: RUN_ABORT_WAIT_TIMEOUT_MS, interval: RUN_ABORT_WAIT_INTERVAL_MS },
+    );
 }
 
 const RUN_TERMINAL_WAIT_TIMEOUT_MS = 90_000;
@@ -107,8 +111,11 @@ const RUN_TERMINAL_WAIT_INTERVAL_MS = 1_000;
  * `waitSecs` (capped at 45) elapsed before the actor finished.
  */
 export async function waitForRunTerminal(apiClient: ApifyClient, runId: string): Promise<void> {
-    await vi.waitUntil(async () => {
-        const run = await apiClient.run(runId).get();
-        return run && TERMINAL_RUN_STATUSES.has(run.status);
-    }, { timeout: RUN_TERMINAL_WAIT_TIMEOUT_MS, interval: RUN_TERMINAL_WAIT_INTERVAL_MS });
+    await vi.waitUntil(
+        async () => {
+            const run = await apiClient.run(runId).get();
+            return run && TERMINAL_RUN_STATUSES.has(run.status);
+        },
+        { timeout: RUN_TERMINAL_WAIT_TIMEOUT_MS, interval: RUN_TERMINAL_WAIT_INTERVAL_MS },
+    );
 }

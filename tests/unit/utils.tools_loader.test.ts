@@ -3,7 +3,12 @@ import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import type { ToolEntry } from '../../src/types.js';
-import { AUTO_INJECTED_TOOLS, getToolsForServerMode, loadToolsFromInput, toolNamesToInput } from '../../src/utils/tools_loader.js';
+import {
+    AUTO_INJECTED_TOOLS,
+    getToolsForServerMode,
+    loadToolsFromInput,
+    toolNamesToInput,
+} from '../../src/utils/tools_loader.js';
 
 const AUTO_INJECTED_TOOL_NAMES = AUTO_INJECTED_TOOLS.map((t) => t.name);
 
@@ -11,25 +16,37 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
     it('should not auto-add apps ui tools when tools are explicitly empty', async () => {
-        const tools = await loadToolsFromInput({
-            tools: [],
-        }, apifyClient, 'apps');
+        const tools = await loadToolsFromInput(
+            {
+                tools: [],
+            },
+            apifyClient,
+            'apps',
+        );
 
         expect(tools).toHaveLength(0);
     });
 
     it('should not auto-add apps ui tools when actors are explicitly empty', async () => {
-        const tools = await loadToolsFromInput({
-            actors: [],
-        }, apifyClient, 'apps');
+        const tools = await loadToolsFromInput(
+            {
+                actors: [],
+            },
+            apifyClient,
+            'apps',
+        );
 
         expect(tools).toHaveLength(0);
     });
 
     it('should not pair widgets whose base tool was not selected (apps mode, tools: ["docs"])', async () => {
-        const tools = await loadToolsFromInput({
-            tools: ['docs'],
-        }, apifyClient, 'apps');
+        const tools = await loadToolsFromInput(
+            {
+                tools: ['docs'],
+            },
+            apifyClient,
+            'apps',
+        );
 
         const toolNames = tools.map((tool) => tool.name);
         expect(toolNames).toContain(HelperTools.DOCS_SEARCH);
@@ -45,10 +62,7 @@ describe('loadToolsFromInput explicit-empty semantics', () => {
 
 describe('toolNamesToInput', () => {
     it('should keep internal tool names in tools and move actor names to actors', () => {
-        expect(toolNamesToInput([
-            HelperTools.STORE_SEARCH,
-            'apify/rag-web-browser',
-        ])).toEqual({
+        expect(toolNamesToInput([HelperTools.STORE_SEARCH, 'apify/rag-web-browser'])).toEqual({
             tools: [HelperTools.STORE_SEARCH],
             actors: ['apify/rag-web-browser'],
         });
@@ -118,7 +132,11 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
     it.each(['default', 'apps'] as const)(
         'auto-injects get-actor-run when only direct actor tools are present (%s mode)',
         (mode) => {
-            const actorTool = { type: 'actor', name: 'apify--rag-web-browser', actorFullName: 'apify/rag-web-browser' } as unknown as ToolEntry;
+            const actorTool = {
+                type: 'actor',
+                name: 'apify--rag-web-browser',
+                actorFullName: 'apify/rag-web-browser',
+            } as unknown as ToolEntry;
             const tools = getToolsForServerMode({ actors: ['apify/rag-web-browser'], tools: [] }, [actorTool], mode);
             const toolNames = tools.map((t) => t.name);
 
@@ -133,11 +151,7 @@ describe('loadToolsFromInput explicit widget selection', () => {
     const apifyClient = new ApifyClient({ token: 'test-token' });
 
     it('should resolve an explicit widget name to the widget tool in apps mode', async () => {
-        const tools = await loadToolsFromInput(
-            { tools: [HelperTools.STORE_SEARCH_WIDGET] },
-            apifyClient,
-            'apps',
-        );
+        const tools = await loadToolsFromInput({ tools: [HelperTools.STORE_SEARCH_WIDGET] }, apifyClient, 'apps');
         const toolNames = tools.map((t) => t.name);
         expect(toolNames).toContain(HelperTools.STORE_SEARCH_WIDGET);
     });

@@ -17,7 +17,10 @@ export const actorExecutor: ActorExecutor = {
         const { actorFullName, apifyClient, mcpSessionId, abortSignal, progressTracker, taskMode } = params;
         // Strip `waitSecs` from the Actor's input — it's an MCP-injected opt-in, not an
         // Actor field — so `actor.start()` doesn't reject or silently pass it through.
-        const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<string, unknown>;
+        const { waitSecs: argsWaitSecs, ...actorInput } = params.input as { waitSecs?: number } & Record<
+            string,
+            unknown
+        >;
         // Task mode waits until terminal; honoring waitSecs would let the task complete
         // before the Actor produced output. Mirrors executeCallActor.
         // AJV doesn't fill `default` values, so apply the 30 s default here when the LLM omits waitSecs.

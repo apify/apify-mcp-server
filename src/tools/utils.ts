@@ -23,7 +23,7 @@ type ActorInputSchemaProperties = Record<string, SchemaProperties>;
  * Checks if the given ActorInfo represents an MCP server Actor.
  */
 export function isActorInfoMcpServer(actorInfo: ActorInfo): boolean {
-    return !!((actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled));
+    return !!(actorInfo.webServerMcpPath && actorInfo.actor.actorStandby?.isEnabled);
 }
 
 /**
@@ -102,7 +102,9 @@ export function fixedAjvCompile(ajvInstance: Ajv, schema: object): ValidateFunct
  * @param {Record<string, SchemaProperties>} properties - The input schema properties
  * @returns {Record<string, SchemaProperties>} Modified properties with nested properties
  */
-export function buildApifySpecificProperties(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
+export function buildApifySpecificProperties(
+    properties: Record<string, SchemaProperties>,
+): Record<string, SchemaProperties> {
     const clonedProperties = { ...properties };
 
     for (const [propertyName, property] of Object.entries(clonedProperties)) {
@@ -137,7 +139,7 @@ export function buildApifySpecificProperties(properties: Record<string, SchemaPr
  * @param properties
  */
 export function filterSchemaProperties(properties: { [key: string]: SchemaProperties }): {
-    [key: string]: SchemaProperties
+    [key: string]: SchemaProperties;
 } {
     const filteredProperties: { [key: string]: SchemaProperties } = {};
     for (const [key, property] of Object.entries(properties)) {
@@ -161,7 +163,7 @@ export function filterSchemaProperties(properties: { [key: string]: SchemaProper
  * @param properties
  */
 export function inferArrayItemsTypeIfMissing(properties: { [key: string]: SchemaProperties }): {
-    [key: string]: SchemaProperties
+    [key: string]: SchemaProperties;
 } {
     for (const [, property] of Object.entries(properties)) {
         if (property.type === 'array' && !property.items?.type) {
@@ -287,11 +289,13 @@ export function pruneSchemaPropertiesByWhitelist(
  *
  */
 export function inferArrayItemType(property: SchemaProperties): string | null {
-    return property.items?.type
-        || (Array.isArray(property.prefill) && property.prefill.length > 0 && typeof property.prefill[0])
-        || (Array.isArray(property.default) && property.default.length > 0 && typeof property.default[0])
-        || (property.editor && getEditorItemType(property.editor))
-        || null;
+    return (
+        property.items?.type ||
+        (Array.isArray(property.prefill) && property.prefill.length > 0 && typeof property.prefill[0]) ||
+        (Array.isArray(property.default) && property.default.length > 0 && typeof property.default[0]) ||
+        (property.editor && getEditorItemType(property.editor)) ||
+        null
+    );
 
     function getEditorItemType(editor: string): string | null {
         const editorTypeMap: Record<string, string> = {
@@ -316,7 +320,9 @@ export function inferArrayItemType(property: SchemaProperties): string | null {
  *
  * @param properties
  */
-export function addEnumsToDescriptionsWithExamples(properties: Record<string, SchemaProperties>): Record<string, SchemaProperties> {
+export function addEnumsToDescriptionsWithExamples(
+    properties: Record<string, SchemaProperties>,
+): Record<string, SchemaProperties> {
     for (const property of Object.values(properties)) {
         if (property.enum && property.enum.length > 0) {
             property.description = `${property.description}\nPossible values: ${property.enum.slice(0, 20).join(',')}`;
@@ -355,7 +361,7 @@ export function filterAndShortenEnum(enumList: string[]): string[] | undefined {
  * @param properties
  */
 export function shortenProperties(properties: { [key: string]: SchemaProperties }): {
-    [key: string]: SchemaProperties
+    [key: string]: SchemaProperties;
 } {
     for (const property of Object.values(properties)) {
         if (property.description.length > ACTOR_MAX_DESCRIPTION_LENGTH) {

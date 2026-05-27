@@ -130,10 +130,10 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
 
         for (const name of modeVariantToolNames) {
             it(`should have identical inputSchema for ${name} across modes`, () => {
-                const defaultTool = [...defaultCategories.actors, ...defaultCategories.runs]
-                    .find((t) => t.name === name);
-                const appsTool = [...appsCategories.actors, ...appsCategories.runs]
-                    .find((t) => t.name === name);
+                const defaultTool = [...defaultCategories.actors, ...defaultCategories.runs].find(
+                    (t) => t.name === name,
+                );
+                const appsTool = [...appsCategories.actors, ...appsCategories.runs].find((t) => t.name === name);
 
                 expect(defaultTool).toBeDefined();
                 expect(appsTool).toBeDefined();

@@ -1,6 +1,6 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 
-export const ACTOR_RUN_META_KEY = "com.apify/ActorRun";
+export const ACTOR_RUN_META_KEY = 'com.apify/ActorRun';
 
 /**
  * Strip noise that is meant for the model, not the end-user:
@@ -9,9 +9,9 @@ export const ACTOR_RUN_META_KEY = "com.apify/ActorRun";
  */
 function cleanErrorText(raw: string): string {
     // Take only the first meaningful line (the rest is model guidance)
-    const firstLine = raw.split("\n")[0].trim();
+    const firstLine = raw.split('\n')[0].trim();
     // Strip trailing JSON blob (e.g. `{"statusCode":404}`)
-    return firstLine.replace(/\s*\{[^}]*}\s*\.?$/, "").trim();
+    return firstLine.replace(/\s*\{[^}]*}\s*\.?$/, '').trim();
 }
 
 export function extractActorRunErrorMessage(toolResult: CallToolResult | null | undefined): string | null {
@@ -20,16 +20,16 @@ export function extractActorRunErrorMessage(toolResult: CallToolResult | null | 
     }
 
     for (const item of toolResult.content) {
-        if (typeof item !== "object" || item === null || !("text" in item)) {
+        if (typeof item !== 'object' || item === null || !('text' in item)) {
             continue;
         }
 
         const { text } = item;
-        if (typeof text === "string" && text.trim()) {
+        if (typeof text === 'string' && text.trim()) {
             const cleaned = cleanErrorText(text);
             return cleaned || text.trim();
         }
     }
 
-    return "Actor run failed before it could start.";
+    return 'Actor run failed before it could start.';
 }

@@ -7,17 +7,23 @@ import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
 const getUserRunsListArgs = z.object({
-    offset: z.number()
+    offset: z
+        .number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')
         .default(0),
-    limit: z.number()
+    limit: z
+        .number()
         .max(10)
         .describe('Maximum number of array elements to return. The default value (as well as the maximum) is 10.')
         .default(10),
-    desc: z.boolean()
-        .describe('If true or 1 then the runs are sorted by the startedAt field in descending order. Default: sorted in ascending order.')
+    desc: z
+        .boolean()
+        .describe(
+            'If true or 1 then the runs are sorted by the startedAt field in descending order. Default: sorted in ascending order.',
+        )
         .default(false),
-    status: z.enum(['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'TIMING-OUT', 'TIMED-OUT', 'ABORTING', 'ABORTED'])
+    status: z
+        .enum(['READY', 'RUNNING', 'SUCCEEDED', 'FAILED', 'TIMING-OUT', 'TIMED-OUT', 'ABORTING', 'ABORTED'])
         .optional()
         .describe('Return only runs with the provided status.'),
 });
@@ -51,7 +57,9 @@ USAGE EXAMPLES:
         const { args, apifyToken } = toolArgs;
         const parsed = getUserRunsListArgs.parse(args);
         const client = new ApifyClient({ token: apifyToken });
-        const runs = await client.runs().list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
+        const runs = await client
+            .runs()
+            .list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
         return buildMCPResponse({
             texts: [`\`\`\`json\n${JSON.stringify(runs)}\n\`\`\``],
         });

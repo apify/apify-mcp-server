@@ -2,7 +2,13 @@ import path from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { type AvailableWidget, getWidgetConfig, resolveAvailableWidgets, WIDGET_REGISTRY, WIDGET_URIS } from '../../src/resources/widgets.js';
+import {
+    type AvailableWidget,
+    getWidgetConfig,
+    resolveAvailableWidgets,
+    WIDGET_REGISTRY,
+    WIDGET_URIS,
+} from '../../src/resources/widgets.js';
 
 vi.mock('node:fs', () => ({
     default: {
@@ -60,7 +66,9 @@ describe('Widget Utils', () => {
 
             for (const widget of resolved.values()) {
                 // Should resolve to ../web/dist relative to baseDir
-                expect(widget.jsPath).toBe(path.resolve('/test/path/dist/web/dist', (widget as AvailableWidget).jsFilename));
+                expect(widget.jsPath).toBe(
+                    path.resolve('/test/path/dist/web/dist', (widget as AvailableWidget).jsFilename),
+                );
             }
         });
     });

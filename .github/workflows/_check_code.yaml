@@ -29,10 +29,8 @@ jobs:
             -   name: Lint
                 run: pnpm run lint
 
-            # Enabled in the mass-reformat PR; until then `oxfmt --check .` would fail
-            # on the existing pre-oxfmt files.
-            # -   name: Check formatting with oxfmt
-            #     run: pnpm run format:check
+            -   name: Check formatting with oxfmt
+                run: pnpm run format:check
 
     build:
         name: Build

@@ -316,8 +316,16 @@ describe('applySkyfireAugmentation', () => {
 
 describe('Skyfire eligibility matrix', () => {
     const testCases: { tool: ToolEntry; eligible: boolean; label: string }[] = [
-        { tool: makeInternalTool({ name: HelperTools.ACTOR_CALL }), eligible: true, label: 'internal/eligible (call-actor)' },
-        { tool: makeInternalTool({ name: HelperTools.ACTOR_OUTPUT_GET }), eligible: true, label: 'internal/eligible (get-actor-output)' },
+        {
+            tool: makeInternalTool({ name: HelperTools.ACTOR_CALL }),
+            eligible: true,
+            label: 'internal/eligible (call-actor)',
+        },
+        {
+            tool: makeInternalTool({ name: HelperTools.ACTOR_OUTPUT_GET }),
+            eligible: true,
+            label: 'internal/eligible (get-actor-output)',
+        },
         { tool: makeNonEligibleInternalTool(), eligible: false, label: 'internal/non-eligible (search-apify-docs)' },
         { tool: makeActorTool(), eligible: true, label: 'actor tool' },
         { tool: makeActorMcpTool(), eligible: false, label: 'actor-mcp tool' },

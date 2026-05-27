@@ -9,10 +9,7 @@ import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
-import {
-    buildSearchActorsResult,
-    searchActorsBaseArgsSchema,
-} from '../core/search_actors_common.js';
+import { buildSearchActorsResult, searchActorsBaseArgsSchema } from '../core/search_actors_common.js';
 import { actorSearchWidgetOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -98,7 +95,8 @@ export const searchActorsWidgetTool: ToolEntry = Object.freeze({
             widgetActors: actors.map((actor) => formatActorForWidget(actor, userPlanTier)),
         };
 
-        const texts = [dedent`
+        const texts = [
+            dedent`
             # Search results:
             - **Search query:** ${parsed.keywords}
             - **Number of Actors found:** ${actors.length}
@@ -106,7 +104,8 @@ export const searchActorsWidgetTool: ToolEntry = Object.freeze({
             An interactive widget has been rendered with the search results. The user can already see
             the list of Actors visually in the widget, so do NOT print or summarize the Actor list
             in your response.
-        `];
+        `,
+        ];
 
         const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
         return buildMCPResponse({

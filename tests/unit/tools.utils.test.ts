@@ -170,10 +170,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.proxy.properties?.apifyProxyGroups).toBeDefined();
         expect(result.proxy.properties?.apifyProxyGroups.type).toBe('array');
         expect(result.proxy.properties?.apifyProxyGroups.items).toBeDefined();
-        expect(result.proxy.properties?.apifyProxyGroups.items?.enum).toEqual([
-            'RESIDENTIAL',
-            'DATACENTER',
-        ]);
+        expect(result.proxy.properties?.apifyProxyGroups.items?.enum).toEqual(['RESIDENTIAL', 'DATACENTER']);
 
         // Check that proxy object has proxyUrls property
         expect(result.proxy.properties?.proxyUrls).toBeDefined();
@@ -212,7 +209,7 @@ describe('buildApifySpecificProperties', () => {
         expect(result.otherProp).toEqual(properties.otherProp);
     });
 
-    it('should not modify properties that don\'t match special cases', () => {
+    it("should not modify properties that don't match special cases", () => {
         const properties: Record<string, SchemaProperties> = {
             regularObject: {
                 type: 'object',
@@ -368,7 +365,10 @@ describe('shortenProperties', () => {
     it('should shorten enum values if they exceed the limit', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
-        const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
+        const enumValues = Array.from(
+            { length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 },
+            (_, i) => `${value}${i}`,
+        );
         const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'string',
@@ -398,7 +398,10 @@ describe('shortenProperties', () => {
     it('should shorten items.enum values if they exceed the limit', () => {
         // Create an enum with many values to exceed the character limit
         const value = 'enum-value-';
-        const enumValues = Array.from({ length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 }, (_, i) => `${value}${i}`);
+        const enumValues = Array.from(
+            { length: Math.ceil(ACTOR_ENUM_MAX_LENGTH / value.length) + 1 },
+            (_, i) => `${value}${i}`,
+        );
         const properties: Record<string, SchemaProperties> = {
             prop1: {
                 type: 'array',
@@ -734,7 +737,17 @@ describe('transformActorInputSchemaProperties', () => {
         // 3. filterSchemaProperties: only allowed fields present
         // NOTE: includes phantom `default: undefined` etc. from filterSchemaProperties (#675).
         expect(Object.keys(result['foo-dot-bar'])).toEqual(
-            expect.arrayContaining(['title', 'description', 'type', 'default', 'prefill', 'properties', 'items', 'required', 'enum']),
+            expect.arrayContaining([
+                'title',
+                'description',
+                'type',
+                'default',
+                'prefill',
+                'properties',
+                'items',
+                'required',
+                'enum',
+            ]),
         );
         // 4. shortenProperties: longDesc is truncated, enumProp.enum is shortened
         expect(result.longDesc.description.length).toBeLessThanOrEqual(ACTOR_MAX_DESCRIPTION_LENGTH + 3);
@@ -918,7 +931,11 @@ describe('filterAndShortenEnum', () => {
 
 describe('getToolFullName', () => {
     it('returns actorFullName for actor tools', () => {
-        const tool = { type: 'actor', name: 'actor-web-scraper-by-apify', actorFullName: 'apify/web-scraper' } as unknown as ToolEntry;
+        const tool = {
+            type: 'actor',
+            name: 'actor-web-scraper-by-apify',
+            actorFullName: 'apify/web-scraper',
+        } as unknown as ToolEntry;
         expect(getToolFullName(tool)).toBe('apify/web-scraper');
     });
 
@@ -928,7 +945,11 @@ describe('getToolFullName', () => {
     });
 
     it('returns name for actor-mcp tools', () => {
-        const tool = { type: 'actor-mcp', name: 'mcp-tool-search', actorId: 'apify/actors-mcp-server' } as unknown as ToolEntry;
+        const tool = {
+            type: 'actor-mcp',
+            name: 'mcp-tool-search',
+            actorId: 'apify/actors-mcp-server',
+        } as unknown as ToolEntry;
         expect(getToolFullName(tool)).toBe('mcp-tool-search');
     });
 });
@@ -991,7 +1012,10 @@ describe('buildActorInputSchema + getToolPublicFieldOnly pipeline', () => {
         } as ToolBase;
 
         const pub = getToolPublicFieldOnly(tool, { filterWidgetMeta: false });
-        const schema = pub.inputSchema as { required?: string[]; properties?: Record<string, { description?: string }> };
+        const schema = pub.inputSchema as {
+            required?: string[];
+            properties?: Record<string, { description?: string }>;
+        };
 
         expect(schema.required).toEqual(['query']);
         expect(schema.properties?.query?.description).toMatch(/^\*\*REQUIRED\*\*/);

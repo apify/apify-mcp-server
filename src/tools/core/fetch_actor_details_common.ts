@@ -29,10 +29,19 @@ export const actorDetailsOutputOptionsSchema = z.object({
     stats: z.boolean().optional().describe('Include usage statistics (users, runs, success rate).'),
     pricing: z.boolean().optional().describe('Include pricing model and costs.'),
     rating: z.boolean().optional().describe('Include user rating (out of 5 stars).'),
-    metadata: z.boolean().optional().describe('Include developer, categories, last modified date, and deprecation status.'),
+    metadata: z
+        .boolean()
+        .optional()
+        .describe('Include developer, categories, last modified date, and deprecation status.'),
     inputSchema: z.boolean().optional().describe('Include required input parameters schema.'),
-    readme: z.boolean().optional().describe('Include Actor README documentation (summary when available, full otherwise).'),
-    outputSchema: z.boolean().optional().describe('Include inferred output schema from recent successful runs (TypeScript type).'),
+    readme: z
+        .boolean()
+        .optional()
+        .describe('Include Actor README documentation (summary when available, full otherwise).'),
+    outputSchema: z
+        .boolean()
+        .optional()
+        .describe('Include inferred output schema from recent successful runs (TypeScript type).'),
     mcpTools: z.boolean().optional().describe('List available tools (only for MCP server Actors).'),
 });
 
@@ -81,10 +90,12 @@ export function resolveOutputOptions(output?: z.infer<typeof actorDetailsOutputO
  * `src/tools/apps/fetch_actor_details_widget.ts`.
  */
 export const fetchActorDetailsToolArgsSchema = z.object({
-    actor: z.string()
+    actor: z
+        .string()
         .min(1)
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
-    output: actorDetailsOutputOptionsSchema.optional()
+    output: actorDetailsOutputOptionsSchema
+        .optional()
         .describe('Specify which information to include in the response to save tokens.'),
 });
 
@@ -129,11 +140,13 @@ export const fetchActorDetailsMetadata: Omit<HelperTool, 'call'> = {
  */
 export function buildActorNotFoundResponse(actorName: string): ReturnType<typeof buildMCPResponse> {
     return buildMCPResponse({
-        texts: [dedent`
+        texts: [
+            dedent`
             Actor information for '${actorName}' was not found.
             Please verify Actor ID or name format and ensure that the Actor exists.
             You can search for available Actors using the tool: ${HelperTools.STORE_SEARCH}.
-        `],
+        `,
+        ],
         isError: true,
         telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
     });
@@ -158,11 +171,7 @@ export function buildActorDetailsTextResponse(options: {
 
     const texts: string[] = [];
 
-    const needsCard = output.description
-        || output.stats
-        || output.pricing
-        || output.rating
-        || output.metadata;
+    const needsCard = output.description || output.stats || output.pricing || output.rating || output.metadata;
 
     if (needsCard) {
         texts.push(`# Actor information\n${details.actorCard}`);
@@ -174,12 +183,9 @@ export function buildActorDetailsTextResponse(options: {
     }
 
     if (output.inputSchema) {
-        texts.push([
-            `# [Input schema](${actorUrl}/input)`,
-            '```json',
-            JSON.stringify(details.inputSchema),
-            '```',
-        ].join('\n'));
+        texts.push(
+            [`# [Input schema](${actorUrl}/input)`, '```json', JSON.stringify(details.inputSchema), '```'].join('\n'),
+        );
     }
 
     if (output.outputSchema) {
@@ -247,7 +253,13 @@ export async function buildFetchActorDetailsResult(
             : null;
     }
     const mcpToolsMessage = resolvedOutput.mcpTools
-        ? await getMcpToolsMessage(actorName, apifyClient, apifyToken, apifyMcpServer?.options.paymentProvider, mcpSessionId)
+        ? await getMcpToolsMessage(
+              actorName,
+              apifyClient,
+              apifyToken,
+              apifyMcpServer?.options.paymentProvider,
+              mcpSessionId,
+          )
         : undefined;
 
     // NOTE: Data duplication between texts and structuredContent is intentional and required.
