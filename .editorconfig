@@ -16,6 +16,7 @@ end_of_line = lf
 # Note: editorconfig-tools is unable to ignore long strings or URLs, so this is informational
 # ESLint will enforce this limit with its max-len rule
 max_line_length = 160
+quote_type = single
 
 # IntelliJ IDEA / WebStorm specific settings
 # These settings configure code formatting behavior in JetBrains IDEs

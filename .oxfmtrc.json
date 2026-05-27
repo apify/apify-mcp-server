@@ -1,0 +1,37 @@
+{
+    "printWidth": 120,
+    "sortImports": {
+        "customGroups": [
+            { "groupName": "apify-public", "selector": "external", "modifiers": ["value"], "elementNamePattern": ["@apify/**"] },
+            { "groupName": "apify-public-type", "selector": "type", "elementNamePattern": ["@apify/**"] },
+            { "groupName": "apify-private", "selector": "external", "modifiers": ["value"], "elementNamePattern": ["@apify-packages/**"] },
+            { "groupName": "apify-private-type", "selector": "type", "elementNamePattern": ["@apify-packages/**"] }
+        ],
+        "groups": [
+            ["side_effect_style", "side_effect"],
+            "builtin",
+            "external",
+            ["apify-public", "apify-public-type"],
+            ["apify-private", "apify-private-type"],
+            ["parent", "sibling", "index"]
+        ]
+    },
+    "ignorePatterns": [
+        "**/*.md",
+        "**/*.mdx",
+        "**/*.json",
+        "**/*.jsonc",
+        "**/*.json5",
+        "**/*.yaml",
+        "**/*.yml",
+        "**/*.css",
+        "**/*.scss",
+        "**/*.html",
+        "**/*.graphql",
+        "**/*.gql",
+        "**/dist",
+        "**/.build",
+        "**/coverage",
+        "deploy"
+    ]
+}
