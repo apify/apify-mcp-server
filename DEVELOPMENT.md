@@ -103,12 +103,19 @@ Builds the core TypeScript project and `src/web/` widgets, then copies widgets i
 ### Hot-reload development
 
 ```bash
-APIFY_TOKEN='your-apify-token' pnpm run dev
+pnpm run dev
 ```
 
-Starts the web widgets builder in watch mode and the MCP server in standby mode on port `3001`. Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
+Starts the web widgets builder in watch mode and the MCP server in standby mode on port `3001`. The dev server mirrors production auth — it does **not** read `APIFY_TOKEN` from its environment. Every request must carry the token via one of (in priority order):
 
-- Get your `APIFY_TOKEN` from [Apify Console](https://console.apify.com/settings/integrations)
+1. `Authorization: Bearer <token>` header
+2. `x-apify-authorization: Bearer <token>` header
+3. `?token=<token>` query parameter (handy for quick browser-based widget previews)
+
+Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
+
+- The repo's [`.mcp.json`](./.mcp.json) ships a `dev` entry wired with `Authorization: Bearer ${APIFY_TOKEN}` — `${APIFY_TOKEN}` is populated via [Claude Code setup](#configuring-apify_token-for-claude-code) below.
+- Get your Apify API token from [Apify Console](https://console.apify.com/settings/integrations)
 - Preview widgets via the local esbuild dev server at `http://localhost:3226/index.html`
 
 The MCP server listens on port `3001`. The HTTP server implementation is in `src/dev_server.ts`. The hosted production server behind [mcp.apify.com](https://mcp.apify.com) is located in the internal Apify repository.
