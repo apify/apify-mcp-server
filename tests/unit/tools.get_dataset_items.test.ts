@@ -127,9 +127,7 @@ describe('get-dataset-items', () => {
     });
 
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
-        const datasetSpy = vi
-            .fn()
-            .mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
+        const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
         const client = { dataset: datasetSpy } as unknown as InternalToolArgs['apifyClient'];
 
         const result = await (getDatasetItems as HelperTool).call(

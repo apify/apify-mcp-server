@@ -213,6 +213,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
     }
 
     describe(
+        // eslint-disable-next-line vitest/valid-title -- parametric suite factory; title is the suiteName argument
         suiteName,
         {
             concurrent: false, // Make all tests sequential to prevent state interference
@@ -1773,7 +1774,9 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
                 async () => {
                     client = await createClientFn();
                     await client.listTools();
-                    await (client.transport as StreamableHTTPClientTransport).terminateSession();
+                    await expect(
+                        (client.transport as StreamableHTTPClientTransport).terminateSession(),
+                    ).resolves.toBeUndefined();
                 },
             );
 

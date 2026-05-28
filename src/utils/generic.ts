@@ -100,7 +100,10 @@ export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[])
  * and nested wrappers (`` `"id"` ``) uniformly.
  */
 export function stripQuoteWrappers(s: string): string {
-    return s.trim().replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, '').trim();
+    return s
+        .trim()
+        .replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, '')
+        .trim();
 }
 
 /**

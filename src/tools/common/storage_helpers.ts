@@ -50,5 +50,8 @@ export function normalizeStorageId(id: string): string {
  * (`/^[a-zA-Z0-9!\-_.'()]{1,256}$/`), so stripping it could corrupt a real key.
  */
 export function normalizeRecordKey(key: string): string {
-    return key.trim().replace(/^[`"“”‘’]+|[`"“”‘’]+$/g, '').trim();
+    return key
+        .trim()
+        .replace(/^[`"“”‘’]+|[`"“”‘’]+$/g, '')
+        .trim();
 }

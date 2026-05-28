@@ -50,7 +50,7 @@ describe('normalizeRecordKey()', () => {
         expect(normalizeRecordKey('“data.json”')).toBe('data.json');
     });
 
-    it('preserves apostrophes — `\'` is a valid record-key character', () => {
+    it("preserves apostrophes — `'` is a valid record-key character", () => {
         expect(normalizeRecordKey("o'reilly.json")).toBe("o'reilly.json");
         expect(normalizeRecordKey("'apostrophe-key'")).toBe("'apostrophe-key'");
     });
