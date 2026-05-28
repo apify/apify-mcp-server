@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+<!-- git-cliff-unreleased-start -->
+## 0.10.11 - **not yet released**
+
+### 🐛 Bug Fixes
+
+- **mcp:** Validate webServerMcpPath stays within Actor standby origin ([#927](https://github.com/apify/apify-mcp-server/pull/927)) ([ef686d7](https://github.com/apify/apify-mcp-server/commit/ef686d77da3d3c86c30b2ae24218d756aa38e09c)) by [@MQ37](https://github.com/MQ37)
+
+
+<!-- git-cliff-unreleased-end -->
 ## [0.10.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.11) (2026-05-28)
 
 ### 🐛 Bug Fixes
