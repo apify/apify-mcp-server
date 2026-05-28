@@ -1,11 +1,12 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { normalizeStorageId, wrapJsonText } from './storage_helpers.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
+import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -47,10 +48,20 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
         const keyValueStoreId = normalizeStorageId(parsed.keyValueStoreId);
-        const keys = await client.keyValueStore(keyValueStoreId).listKeys({
-            exclusiveStartKey: parsed.exclusiveStartKey,
-            limit: parsed.limit,
-        });
+        // `listKeys()` throws ApifyApiError on a missing store (the SDK only soft-catches
+        // 404 on `.get()` / `.getRecord()`), so translate 404 into a soft-fail.
+        const keys = await client
+            .keyValueStore(keyValueStoreId)
+            .listKeys({ exclusiveStartKey: parsed.exclusiveStartKey, limit: parsed.limit })
+            .catch((err: unknown) => {
+                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+                    return null;
+                }
+                throw err;
+            });
+        if (!keys) {
+            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+        }
         return { content: [{ type: 'text', text: wrapJsonText(keys) }] };
     },
 } as const);

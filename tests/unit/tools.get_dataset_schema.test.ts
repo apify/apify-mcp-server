@@ -34,6 +34,16 @@ function stubApifyClient(listItemsResponse: unknown): InternalToolArgs['apifyCli
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
+function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
+    return {
+        dataset: (_id: string) => ({
+            listItems: async () => {
+                throw err;
+            },
+        }),
+    } as unknown as InternalToolArgs['apifyClient'];
+}
+
 describe('get-dataset-schema', () => {
     it('has the expected tool name', () => {
         expect(getDatasetSchema.name).toBe(HelperTools.DATASET_SCHEMA_GET);
@@ -59,14 +69,24 @@ describe('get-dataset-schema', () => {
         expect(content[0].text).toBe("Dataset 'ds-1' is empty.");
     });
 
-    it('returns isError with a not-found message when listItems returns no response', async () => {
+    it('returns isError with a not-found message when listItems throws 404', async () => {
+        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
         const result = await (getDatasetSchema as HelperTool).call(
-            stubToolCallContext({ datasetId: 'missing' }, stubApifyClient(null)),
+            stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
         const { content } = result as TextToolResult;
 
         expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain("Dataset 'missing' not found");
+    });
+
+    it('rethrows non-404 errors from listItems', async () => {
+        const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
+        await expect(
+            (getDatasetSchema as HelperTool).call(
+                stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClientThrowing(serverError)),
+            ),
+        ).rejects.toBe(serverError);
     });
 
     it('returns isError when schema generation fails (generator returns null)', async () => {
