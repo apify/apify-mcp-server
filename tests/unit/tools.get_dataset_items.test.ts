@@ -78,17 +78,34 @@ describe('get-dataset-items', () => {
         expect(structuredContent).toHaveProperty('limit', 10);
     });
 
-    it('returns isError with a not-found message when listItems returns no response', async () => {
+    it('returns isError with a not-found message when listItems throws 404', async () => {
+        const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
         const result = await (getDatasetItems as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'missing' },
-                stubApifyClient(async () => null),
+                stubApifyClient(async () => {
+                    throw notFound;
+                }),
             ),
         );
         const { content } = result as TextToolResult;
 
         expectSoftFailInvalidInput(result);
         expect(content[0].text).toContain("Dataset 'missing' not found");
+    });
+
+    it('rethrows non-404 errors from listItems', async () => {
+        const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
+        await expect(
+            (getDatasetItems as HelperTool).call(
+                stubToolCallContext(
+                    { datasetId: 'ds-1' },
+                    stubApifyClient(async () => {
+                        throw serverError;
+                    }),
+                ),
+            ),
+        ).rejects.toBe(serverError);
     });
 
     it('auto-derives flatten from dot-notation in fields', async () => {

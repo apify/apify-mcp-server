@@ -5,6 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { wrapJsonText } from './storage_helpers.js';
 
 const getUserDatasetsListArgs = z.object({
     offset: z
@@ -65,6 +66,6 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(datasets)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: wrapJsonText(datasets) }] };
     },
 } as const);

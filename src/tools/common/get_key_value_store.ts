@@ -1,10 +1,11 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -16,15 +17,16 @@ const getKeyValueStoreArgs = z.object({
 export const getKeyValueStore: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_GET,
-    description: `Get details about a key-value store by ID or username~store-name.
-The results will include store metadata (ID, name, owner, access settings) and usage statistics.
+    description: dedent`
+        Get details about a key-value store by ID or username~store-name.
+        The results will include store metadata (ID, name, owner, access settings) and usage statistics.
 
-USAGE:
-- Use when you need to inspect a store to locate records or understand its properties.
+        USAGE:
+        - Use when you need to inspect a store to locate records or understand its properties.
 
-USAGE EXAMPLES:
-- user_input: Show info for key-value store username~my-store
-- user_input: Get details for store adb123`,
+        USAGE EXAMPLES:
+        - user_input: Show info for key-value store username~my-store
+        - user_input: Get details for store adb123`,
     inputSchema: z.toJSONSchema(getKeyValueStoreArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreArgs)),
     paymentRequired: true,
@@ -38,14 +40,11 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-        const kvStore = await client.keyValueStore(parsed.keyValueStoreId).get();
+        const keyValueStoreId = normalizeStorageId(parsed.keyValueStoreId);
+        const kvStore = await client.keyValueStore(keyValueStoreId).get();
         if (!kvStore) {
-            return buildMCPResponse({
-                texts: [`Key-value store '${parsed.keyValueStoreId}' not found.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(kvStore)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: wrapJsonText(kvStore) }] };
     },
 } as const);

@@ -1,11 +1,12 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
+import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -17,17 +18,18 @@ const getDatasetArgs = z.object({
 export const getDataset: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_GET,
-    description: `Get metadata for a dataset (collection of structured data created by an Actor run).
-The results will include dataset details such as itemCount, schema, fields, and stats.
-Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
-Note: itemCount updates may be delayed by up to ~5 seconds.
+    description: dedent`
+        Get metadata for a dataset (collection of structured data created by an Actor run).
+        The results will include dataset details such as itemCount, schema, fields, and stats.
+        Use fields to understand structure for filtering with ${HelperTools.DATASET_GET_ITEMS}.
+        Note: itemCount updates may be delayed by up to ~5 seconds.
 
-USAGE:
-- Use when you need dataset metadata to understand its structure before fetching items.
+        USAGE:
+        - Use when you need dataset metadata to understand its structure before fetching items.
 
-USAGE EXAMPLES:
-- user_input: Show info for dataset xyz123
-- user_input: What fields does username~my-dataset have?`,
+        USAGE EXAMPLES:
+        - user_input: Show info for dataset xyz123
+        - user_input: What fields does username~my-dataset have?`,
     inputSchema: z.toJSONSchema(getDatasetArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetArgs)),
     paymentRequired: true,
@@ -41,13 +43,10 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-        const dataset = await client.dataset(parsed.datasetId).get();
+        const datasetId = normalizeStorageId(parsed.datasetId);
+        const dataset = await client.dataset(datasetId).get();
         if (!dataset) {
-            return buildMCPResponse({
-                texts: [`Dataset '${parsed.datasetId}' not found.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
         // Apify returns `fields` slash-separated AND with array indices expanded
         // (e.g. `latestComments/0/owner/username`). For a real Instagram-scraper
@@ -57,6 +56,6 @@ USAGE EXAMPLES:
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(normalized)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: wrapJsonText(normalized) }] };
     },
 } as const);
