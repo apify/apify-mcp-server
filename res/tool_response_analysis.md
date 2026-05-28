@@ -1,12 +1,12 @@
 # Tool response shapes & telemetry coupling
 
-Inventory of the response patterns across all `src/tools` handlers, where they drift, and where the telemetry contract leaks into call sites. Plus five design options with a recommendation.
+Inventory of the response patterns across all `src/tools` handlers, where they drift, and where the telemetry contract leaks into call sites. Plus six design options with a recommendation.
 
 ## 1. TL;DR
 
-Tool handlers return MCP results in **six different shapes** with no clear taxonomy. The JSON-fence wrapper drifts (some sites use `wrapJsonText`, others inline the same string literally). `isError` + `toolTelemetry` are **structurally independent** but **semantically coupled**: every error site has to remember to attach the right telemetry, or it silently lands in `SOFT_FAIL + INTERNAL_ERROR` by default — a category that's almost never what the caller meant.
+Tool handlers return MCP results in **six different shapes** with no clear taxonomy. There's no shared JSON-fence helper, so ~8 sites inline the same fence string by hand. `isError` + `toolTelemetry` are **structurally independent** but **semantically coupled**: every error site has to remember to attach the right telemetry, or it silently lands in `SOFT_FAIL + INTERNAL_ERROR` by default — a category that's almost never what the caller meant.
 
-The win is small and concrete in the pragmatic version. The structural fix in Option E is bigger but eliminates an entire class of drift permanently.
+**Recommendation: Option F** — make a small `respond*` constructor family the only public way to build a response, un-export `buildMCPResponse`, and brand the output so an unclassified error won't compile. It delivers Option E's structural guarantee (the bad shape becomes unconstructable) as a handful of small, reversible PRs with no cross-repo coordination — because `buildMCPResponse` was never on the public `internals` surface. Option E (full discriminated-union rewrite) is reserved for when a concrete new outcome variant actually lands.
 
 ## 2. Patterns observed
 
@@ -15,23 +15,23 @@ The win is small and concrete in the pragmatic version. The structural fix in Op
 | **A** Happy-path raw shape: `{ content: [{type:'text', text}] }` | ~8 handlers | `get_dataset.ts:59`, `get_key_value_store.ts:48`, `dataset_collection.ts:69`, `key_value_store_collection.ts:71`, `get_key_value_store_keys.ts:65` |
 | **B** Happy path + `structuredContent` | 2 handlers | `get_dataset_items.ts:135`, `get_actor_output.ts:120` |
 | **C** Informational (non-error, no data), e.g. `"Dataset 'X' is empty."` | 2 sites | `get_dataset_schema.ts:78`, `buildSearchActorsEmptyResponse` |
-| **D** Soft-fail user error via wrapper (`buildStorageNotFound`, `buildActorNotFoundResponse`) | 2 helpers, ~6 sites | `get_dataset.ts:49`, `fetch_actor_details_common.ts:142` |
+| **D** Soft-fail user error — one wrapper (`buildActorNotFoundResponse`), rest inline the literal | 1 helper, ~6 sites | `fetch_actor_details_common.ts:142` (helper); `get_dataset.ts:49` (inline) |
 | **E** Inline `buildMCPResponse({ isError: true, telemetry: {...} })` | ~12 sites | `get_dataset_schema.ts:89`, `get_actor_output.ts:85`, `call_actor_common.ts:143`, `fetch_apify_docs.ts:94` |
 | **F** Inline `buildMCPResponse({ isError: true })` **without** telemetry | ~4 sites | `buildPermissionApprovalResponse` (call_actor_common.ts:124), `server.ts:1150, 1221, 1333` |
 
 ### Plus: fence-wrapper drift
 
-Despite `wrapJsonText()` existing in `storage_helpers.ts`, two sites **inline the same fence string literally**:
+There is **no shared JSON-fence helper** — every site that wants a fenced JSON block inlines the same `` ```json\n…\n``` `` string by hand. ~8 sites do this:
 
 ```ts
 // abort_actor_run.ts:46
 return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }] };
 
-// get_actor_output.ts:99
+// get_actor_output.ts:101
 let outputText = `\`\`\`json\n${JSON.stringify(cleanedItems)}\n\`\`\``;
 ```
 
-Same drift the prior PR caught for storage tools, still present in two non-storage handlers.
+Also at `get_dataset.ts:60`, `get_dataset_schema.ts:89`, `get_key_value_store.ts:49`, `dataset_collection.ts:68`, `key_value_store_collection.ts:68`, `get_key_value_store_keys.ts:50`, `get_key_value_store_record.ts:56`. The fence rule lives in eight places at once.
 
 ## 3. Concrete problems
 
@@ -61,13 +61,13 @@ Telemetry shows up in Segment as `FAILED` with no category, while every other se
 
 ### P3 — Every soft-fail site re-types the same telemetry literal
 
-Five places spell out:
+**Ten** places spell out:
 
 ```ts
 telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT }
 ```
 
-Storage tools centralized it as `buildStorageNotFound`; `fetch_actor_details_common.ts:142` as `buildActorNotFoundResponse`; `fetch_apify_docs.ts` inlines it three times; `call_actor_common.ts:143` inlines it. There's no shared "this is a user error" constructor.
+`get_dataset_items.ts:113`, `get_actor_output.ts:88`, `fetch_apify_docs.ts:103`, `get_dataset.ts:49`, `get_key_value_store_record.ts:53`, `get_dataset_schema.ts:64`, `get_key_value_store.ts:46`, `call_actor_common.ts:312`, `fetch_actor_details_common.ts:152`, `actor_run_response.ts:694`. `fetch_actor_details_common.ts` wraps it as `buildActorNotFoundResponse`; the rest inline it. There's no shared "this is a user error" constructor.
 
 ### P4 — `isError: true` without telemetry is structurally legal but semantically broken
 
@@ -104,9 +104,9 @@ ABORTED     → (no category)
 SUCCEEDED   → (no category)
 ```
 
-Tools needing a non-default category (e.g. `SOFT_FAIL` + `AUTH` for a 401) override explicitly. That collapses today's 5+ repeated literals into "say what happened, the helper picks the category."
+Tools needing a non-default category (e.g. `SOFT_FAIL` + `AUTH` for a 401) override explicitly. That collapses today's ten repeated literals into "say what happened, the helper picks the category."
 
-Bonus: `classifyFailureCategory(error)` and `getToolStatusFromError(error, isAborted)` already exist in `utils/tool_status.ts` — they're **only** used by `mcp/server.ts` for uncaught exceptions. Tools that catch internally re-classify by hand instead of reusing these.
+Bonus: `classifyFailureCategory(error)` and `getToolStatusFromError(error, isAborted)` already exist in `utils/tool_status.ts`. `mcp/server.ts` uses them for uncaught exceptions, but `fetch_apify_docs.ts` and `call_actor_common.ts` also call them — and most other tools that catch internally re-classify by hand instead of reusing these.
 
 ## 5. Design options
 
@@ -133,8 +133,8 @@ export function serverError(text: string, opts?: {
 - Single migration target: every `buildMCPResponse({...})` call site collapses to one of five names.
 - Telemetry becomes a property of *intent*, not boilerplate.
 - Killing the default-`INTERNAL_ERROR` trap (P1) costs one line in `extractToolTelemetry`.
-- Compatible with `buildStorageNotFound`, `buildActorNotFoundResponse` — they become 1-line aliases.
-- `okJson` absorbs `wrapJsonText` at the boundary — fence drift dies.
+- `buildActorNotFoundResponse` becomes a 1-line alias; the inline storage-tool literals collapse to `userError`.
+- `okJson` becomes the single JSON-fence home — fence drift dies.
 
 **Cons**
 - Still two layers of helper. Discoverability depends on naming and JSDoc.
@@ -320,12 +320,16 @@ call: async (toolArgs) => {
         });
 
     if (!v) {
-        return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
+        return buildMCPResponse({
+            texts: [`Dataset '${datasetId}' not found.`],
+            isError: true,
+            telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+        });
     }
 
     const structuredContent = { datasetId, items: v.items, ... };
     return {
-        content: [{ type: 'text', text: wrapJsonText(v) }],
+        content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }],
         structuredContent,
     };
 }
@@ -344,11 +348,13 @@ call: async (toolArgs): Promise<ToolResult> => {
 
     return {
         status: 'ok',
-        text: wrapJsonText(v),
+        text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\``,  // or the encoder fences it
         structured: { datasetId, items: v.items, ... },
     };
 }
 ```
+
+(`catchNotFound` here is a helper Option E would introduce, not one that exists today.)
 
 Same line count, stricter contract. The compiler now enforces that *every* non-success branch is one of the named statuses. There's no shape where you can return `isError: true` without classifying.
 
@@ -357,7 +363,7 @@ Same line count, stricter contract. The compiler now enforces that *every* non-s
 | Killed | Why |
 | --- | --- |
 | `buildMCPResponse` (public) | Only the encoder builds the wire shape. |
-| `buildStorageNotFound` | `{ status: 'userError', text }` inline. |
+| inline storage not-found literals (`get_dataset.ts:49`, …) | `{ status: 'userError', text }` inline. |
 | `buildActorNotFoundResponse` | Same. |
 | `buildSearchActorsEmptyResponse` | `{ status: 'ok', text, structured: { actors:[], ... } }` inline. |
 | `buildPermissionApprovalResponse` | `{ status: 'userError', text, category: 'PERMISSION_APPROVAL_REQUIRED', detail, httpStatus }`. |
@@ -379,11 +385,11 @@ Same line count, stricter contract. The compiler now enforces that *every* non-s
 
 | Cost | Detail |
 | --- | --- |
-| Tool signature change | `ToolEntry.call` return type changes from MCP shape to `Promise<ToolResult>`. Every `call:` definition touched — ~25 files in `src/tools`. |
+| Tool signature change | `ToolEntry.call` return type changes from `Promise<object>` to `Promise<ToolResult>`. Every `call:` definition touched — 24 files in `src/tools`. |
 | Server dispatcher | `mcp/server.ts` wraps every tool invocation in `encodeToolResult(await tool.call(...))`. Removes the inline `buildMCPResponse` error paths in `server.ts` too. |
 | Test migration | ~50 unit tests assert on `content` / `isError` / `toolTelemetry`. Migrate assertions to the union shape. Mechanical. |
-| Internals contract | `internals.ts` exports change. Encoder lives on the public side; `apify-mcp-server-internal` still receives MCP-shaped responses. Coordinate. |
-| Atomic landing | The union change can't ship in waves — the tool signature is uniform. Either every tool returns `ToolResult` or none does. |
+| Internals contract | None at the import level — `buildMCPResponse`/`extractToolTelemetry`/`ToolEntry` aren't exported from `index_internals.ts`. As long as the encoder emits the same wire shape, `apify-mcp-server-internal` needs no change. The only obligation is the existing rule: flag any change to the observable `_meta` / `structuredContent` shape. |
+| Atomic landing | The transitional `callAndEncode` (step 2 below) accepts either shape, so the migration is *not* a flag day — it lands tool-by-tool with the wire output held constant. (Earlier framing called this "atomic / can't ship in waves," which contradicts the transitional helper.) |
 
 #### Migration order (atomic, but staged within the PR)
 
@@ -405,9 +411,9 @@ Same line count, stricter contract. The compiler now enforces that *every* non-s
 | Tool handlers | ~25 | Storage (7), core (5), apps (3), other common (~10). Mostly 1-3 line edits per file. |
 | Server dispatcher | 1 | `src/mcp/server.ts` — wrap dispatch + remove inline error builders. |
 | Tests | ~25 unit + integration | Migrate assertions. Mechanical. |
-| Domain builders deleted | 6+ files lose builders | `buildStorageNotFound`, `buildActorNotFoundResponse`, `buildSearchActorsEmptyResponse`, `buildPermissionApprovalResponse`, `buildGetActorRunError`, `buildCallActorErrorResponse`. |
+| Domain builders deleted | 6 builders | `buildActorNotFoundResponse`, `buildSearchActorsEmptyResponse`, `buildPermissionApprovalResponse`, `buildPermissionApprovalErrorResponse`, `buildGetActorRunError`, `buildCallActorErrorResponse` (plus inline storage not-found literals). |
 | `extractToolTelemetry` | 1 | Shrinks dramatically. |
-| `internals.ts` | 1 | Re-export `encodeToolResult` and `ToolResult`. Drop `buildMCPResponse` from public surface. |
+| `index_internals.ts` | 1 | `buildMCPResponse` is not exported here, so nothing changes on the public surface. (Earlier drafts overstated this as a coordinated contract change.) |
 
 Rough order-of-magnitude: ~50 files touched, net code reduction (probably 200–400 lines once builders are deleted). One sustained branch, one coordinated merge with internal.
 
@@ -424,10 +430,130 @@ Rough order-of-magnitude: ~50 files touched, net code reduction (probably 200–
 - The two channels (client-visible / server-internal) become one channel at the source. The split happens at the boundary, not at the call site.
 - The type system gains the ability to talk about tool outcomes. Everything in this analysis (P1–P5) becomes a type-checker concern, not a code-review concern.
 - Future additions — `elicitation-required`, `partial-data`, `retry-after` — slot into the union without a new builder or new telemetry literal.
-- The "describe the result, the framework handles the protocol" pattern is what the MCP SDK itself converges to. Aligning with it costs nothing once we've paid the migration.
+
+> **Correction (review):** an earlier draft claimed the discriminated-union encoder "is what the MCP SDK itself converges to." That is false. This codebase uses the low-level `Server`/`setRequestHandler`, and the SDK expects a handler to return a raw `CallToolResult` (`{ content, isError?, structuredContent?, _meta? }`) — exactly the shape `buildMCPResponse` already builds. The SDK has no describe-the-result union at the handler boundary. Option E's encoder is an app-level layer **on top of** the SDK, not alignment **with** it. The "costs nothing" argument stands on its own; the SDK-convergence justification does not.
+
+### Option F — intent constructors as the only door (recommended)
+
+Premise: get Option E's structural guarantee — "you cannot construct an unclassified error" — without E's blast radius, atomic landing, or cross-repo coordination. The trick: the bad shape can't drift if **no one can author it directly**.
+
+`buildMCPResponse` is **not on the `internals` surface** (`src/index_internals.ts` doesn't export it; neither does `extractToolTelemetry`, `ToolEntry`, or the telemetry types). The hosted server consumes only the *stripped wire shape* (`content` / `isError` / `structuredContent` / `_meta`); `toolTelemetry` is stripped inside this package before the boundary. So *how* we build that wire shape is a private implementation detail — changing it needs **zero** coordination with `apify-mcp-server-internal` as long as the serialized output is unchanged.
+
+That lets us do three things:
+
+1. **Un-export `buildMCPResponse`** — it becomes private to `utils/mcp.ts`.
+2. Expose a small `respond*` family as the *only* public way a handler builds a response. Each constructor bakes in correct telemetry by construction.
+3. The bad shape (`isError: true` + no/garbage telemetry) becomes **unconstructable** — there's no public function that emits it. Same structural guarantee as E, via encapsulation instead of a uniform return-type change across ~50 files.
+
+#### The constructor family
+
+`respond*` prefix — verb-first per CONTRIBUTING naming rules, groups in autocomplete.
+
+```ts
+// utils/mcp.ts — buildMCPResponse is now private to this module
+
+/** Success with text. */
+export function respondOk(
+    text: string | string[],
+    opts?: { structuredContent?: unknown; meta?: Record<string, unknown> },
+): ToolResponse;
+
+/** Success carrying a JSON payload. Owns the ```json fence — the single place it lives. */
+export function respondJson(
+    value: unknown,
+    opts?: { structuredContent?: unknown; meta?: Record<string, unknown> },
+): ToolResponse;
+
+/** Success, intentionally no data — "Dataset 'X' is empty." (P5). */
+export function respondEmpty(text: string): ToolResponse;
+
+/** User-fixable error → SOFT_FAIL. Category defaults to INVALID_INPUT. */
+export function respondUserError(
+    text: string | string[],
+    opts?: {
+        category?: Exclude<FailureCategory, 'INTERNAL_ERROR'>;  // INVALID_INPUT | AUTH | PERMISSION_APPROVAL_REQUIRED
+        httpStatus?: number;
+        detail?: string;
+        structuredContent?: unknown;
+    },
+): ToolResponse;
+
+/** Our fault → FAILED. Pass the caught error; category + httpStatus are derived. */
+export function respondServerError(
+    text: string | string[],
+    opts?: { error?: unknown; detail?: string },
+): ToolResponse;
+```
+
+Three moves do the work:
+
+- **Status determines category (kills P3).** `respondUserError` defaults to `SOFT_FAIL + INVALID_INPUT`, `respondServerError` to `FAILED + INTERNAL_ERROR`. The ten duplicated literals collapse to `respondUserError(text)`. This is the invariant from §4, enforced in the constructor instead of repeated by hand.
+- **`respondServerError` reuses the existing classifiers.** It calls `classifyFailureCategory(error)` + `getHttpStatusCode(error)` — the functions tools currently re-implement. P2 (`FAILED` with no category) disappears: the default fills it.
+- **Narrowed category args.** `Exclude<…, 'INTERNAL_ERROR'>` on user errors, `error`-derived on server errors — same `Exclude`/`Extract` safety E proposed, applied to the constructor argument rather than a union variant.
+
+#### The compile-time lock — what makes F beat A
+
+Plain structural typing wouldn't stop a handler from hand-rolling `{ content: [...] }` and bypassing the constructors. Brand the output so it can't:
+
+```ts
+declare const wireBrand: unique symbol;
+export type ToolResponse = MCPWireShape & { readonly [wireBrand]?: never };
+```
+
+Constructors return `ToolResponse`; raw object literals don't carry the brand. As the **final** migration step, narrow the handler signature (`src/types.ts:187`):
+
+```ts
+// was: call: (args: InternalToolArgs) => Promise<object>;
+call: (args: InternalToolArgs) => Promise<ToolResponse>;
+```
+
+Now a handler that hand-rolls a shape, or sets `isError` by hand, **won't compile**. That is the exact "unclassified error is a compile error" guarantee E advertises — delivered by a 3-line brand + a one-line signature change. No discriminated union rippling through every file, no encoder, no transitional `callAndEncode`, and no leaky all-optional `serverError` (here the *function* requires `error` or accepts the documented default — there is no silent half-spec).
+
+`ToolEntry.call` is `Promise<object>` today — completely untyped — so this narrowing is pure gain, not a downgrade of an existing contract.
+
+#### What every existing builder collapses to
+
+| Today | After |
+| --- | --- |
+| `buildMCPResponse({ texts:[t], isError:true, telemetry:{SOFT_FAIL, INVALID_INPUT} })` ×10 | `respondUserError(t)` |
+| `buildActorNotFoundResponse` (`fetch_actor_details_common.ts:142`) | `respondUserError(t)` — delete the builder |
+| `buildSearchActorsEmptyResponse` (`search_actors_common.ts:126`) | `respondOk(t, { structuredContent: { actors: [], query, count: 0 } })` |
+| `buildPermissionApprovalResponse` + `buildPermissionApprovalErrorResponse` (`call_actor_common.ts`) | `respondUserError(texts, { category: 'PERMISSION_APPROVAL_REQUIRED', httpStatus, detail })` |
+| `buildCallActorErrorResponse`, `buildGetActorRunError` | `respondServerError(msg, { error })` — classifier fills category/status |
+| ~8 hand-rolled `` ```json `` fences | `respondJson(v)` — fence in one place |
+| `get_dataset_schema.ts` `FAILED` with no category (P2) | `respondServerError(msg)` → default fills it |
+
+#### P1 ships first, on its own
+
+`extractToolTelemetry`'s `isError && !telemetry` default (`SOFT_FAIL + INTERNAL_ERROR`) is incoherent. Land a **1-line fix to `FAILED + INTERNAL_ERROR`** (coherent "unknown → assume our fault, keep it visible in dashboards") with a failing test first. Once constructors are the only door this branch is dead for tools, but it stays as a backstop for `server.ts` inline paths until those migrate.
+
+#### Migration — incremental, reversible, no coordination
+
+1. P1 1-line default fix + regression test. Ships alone.
+2. Add the `respond*` family (`buildMCPResponse` still exported temporarily). Unit-test the constructors.
+3. Migrate handlers tool-by-tool. **Each tool is an independent PR** — wire output is byte-identical, so `internals` and the hosted server see no change.
+4. Migrate `server.ts` inline error paths.
+5. Delete the six domain builders, un-export `buildMCPResponse`, shrink `extractToolTelemetry`.
+6. **Last:** add the brand + narrow `call` to `Promise<ToolResponse>`. The compiler points at every remaining hand-rolled shape; fix and done.
+
+Steps 1–4 each merge to `master` independently. Nothing is atomic, nothing coordinates with `apify-mcp-server-internal`, every step is reversible.
+
+**Pros**
+- Structural guarantee (unclassified error won't compile) — E's headline win — at ~1/25th the cost, and the guarantee holds *during* the migration because each step lands independently.
+- One layer, not two: the constructors *are* the API; `buildMCPResponse` disappears from view. Kills Option A's "still two layers / discoverability depends on JSDoc" con.
+- Reuses what exists (`classifyFailureCategory`, `getHttpStatusCode`, one JSON fence) instead of re-typing it.
+- Honors the repo's scope rules: minimal, one-thing-per-change, reversible — no "we don't care about blast radius."
+- Zero cross-repo coordination (the wire shape and `./internals` surface never change).
+
+**Cons**
+- The brand is a mild TS idiom that a reader must understand (≈3 lines + a comment).
+- `respondEmpty` is a thin alias of `respondOk` until product wants a distinct `NO_DATA` telemetry signal — wiring that into Segment is a separate, optional follow-up (touches the `TOOL_STATUS` enum), so P5's analytics gap is only *half* closed now.
+- Doesn't make `aborted` first-class (E does). Abort stays framework-derived in `server.ts`, which is fine — it isn't a problem any of P1–P5 raised.
 
 ## 6. Recommendation
 
-**Go with Option E.** A ~50-file PR that nets a smaller codebase, a compile-checked contract, and the disappearance of every drift class P1–P5 simultaneously. The migration is mechanical, the wins are structural, and the only real friction is one-PR coordination with `apify-mcp-server-internal`.
+**Go with Option F.** It closes P1–P4 and the fence drift, delivers the compile-enforced classification that was Option E's whole point, and does it as a handful of small, reversible, one-thing-per-change PRs with no cross-repo coordination — because `buildMCPResponse` was never on the public surface to begin with.
 
-Option A is the consolation prize if E is blocked for scheduling reasons — it solves the ergonomics but leaves the structural trap (`isError: true` without telemetry is still constructible) in place.
+Option E remains the right move **only** if a concrete future requirement lands that needs genuinely new outcome variants with distinct wire behavior (real `elicitation-required` / `partial-data`). At that point the union solves a current problem instead of an imagined one — and, thanks to F's brand, it can be adopted incrementally rather than as an atomic flag day.
+
+Option A is strictly dominated by F: F is A's constructors plus the encapsulation that closes the structural trap A leaves open (`isError: true` without telemetry still constructible). There's no reason to pick A over F.
