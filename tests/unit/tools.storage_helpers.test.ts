@@ -35,30 +35,8 @@ describe('buildStorageNotFound()', () => {
 });
 
 describe('normalizeStorageId()', () => {
-    it('returns the input unchanged when no wrappers or whitespace are present', () => {
-        expect(normalizeStorageId('ds-1')).toBe('ds-1');
-        expect(normalizeStorageId('user~my-dataset')).toBe('user~my-dataset');
-    });
-
-    it('trims surrounding whitespace', () => {
-        expect(normalizeStorageId('  ds-1  ')).toBe('ds-1');
-    });
-
-    it('strips matched markdown backtick wrappers', () => {
+    // Wrapper-stripping behavior is pinned via `stripQuoteWrappers` in utils.generic.test.ts.
+    it('delegates to stripQuoteWrappers — typical wrapped id is returned canonical', () => {
         expect(normalizeStorageId('`user~my-store`')).toBe('user~my-store');
-    });
-
-    it('strips matched straight double-quote wrappers', () => {
-        expect(normalizeStorageId('"ds-1"')).toBe('ds-1');
-    });
-
-    it('strips matched smart quote wrappers', () => {
-        expect(normalizeStorageId('“ds-1”')).toBe('ds-1');
-        expect(normalizeStorageId('‘ds-1’')).toBe('ds-1');
-    });
-
-    it('strips unpaired trailing quote/backtick noise', () => {
-        expect(normalizeStorageId('ds-1"')).toBe('ds-1');
-        expect(normalizeStorageId('`ds-1')).toBe('ds-1');
     });
 });
