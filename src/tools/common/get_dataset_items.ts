@@ -6,6 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
 
@@ -113,7 +114,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
                 flatten,
             })
             .catch((err: unknown) => {
-                if (typeof err === 'object' && err !== null && 'statusCode' in err && err.statusCode === HTTP_NOT_FOUND) {
+                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
                     return null;
                 }
                 throw err;

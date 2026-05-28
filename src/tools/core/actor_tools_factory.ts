@@ -21,6 +21,7 @@ import {
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildEnrichedDirectActorOutputSchema, getActorRunOutputSchema } from '../structured_output_schemas.js';
 import {
@@ -246,14 +247,6 @@ export async function getMCPServersAsTools(
     return actorToolsArrays.flat();
 }
 
-// Quote/backtick pairs that LLMs wrap actor names in (allocated once, not per call).
-const ACTOR_NAME_WRAPPERS: [string, string][] = [
-    ['`', '`'],
-    ['"', '"'],
-    ['\u201c', '\u201d'],
-    ['\u2018', '\u2019'],
-];
-
 /**
  * Fixes an Actor name input from LLM and logs at INFO when the input differed from the fixed version.
  * Single entry point for fix+log — avoids duplicating the pattern at every call site.
@@ -278,16 +271,7 @@ export function fixActorNameInputAndLog(actorName: string, extra?: Record<string
  * and strips common wrappers / spacing noise; valid names pass through unchanged.
  */
 export function fixActorNameInput(actorName: string): string {
-    let s = actorName.trim();
-    for (const [open, close] of ACTOR_NAME_WRAPPERS) {
-        if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
-            s = s.slice(open.length, -close.length).trim();
-            break;
-        }
-    }
-    // Unpaired markdown / JSON leakage (Mezmo: `apify/rag-web-browser` or `...pr-226"`)
-    s = s.replace(/^[`'"\u201c\u201d\u2018\u2019]+|[`'"\u201c\u201d\u2018\u2019]+$/g, '').trim();
-    s = s.replace(/\s*\/\s*/g, '/');
+    const s = stripQuoteWrappers(actorName).replace(/\s*\/\s*/g, '/');
     return s.replace(/\s+/g, ' ').trim();
 }
 

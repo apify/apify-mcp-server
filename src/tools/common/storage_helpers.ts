@@ -1,4 +1,5 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../const.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
 /**
@@ -22,28 +23,13 @@ export function buildStorageNotFound(text: string) {
     });
 }
 
-const STORAGE_ID_WRAPPERS: [string, string][] = [
-    ['`', '`'],
-    ['"', '"'],
-    ['“', '”'],
-    ['‘', '’'],
-];
-
 /**
  * Normalize a dataset / key-value store id before SDK lookup.
  *
  * LLMs commonly wrap ids in markdown backticks or smart quotes, which the
- * Apify API treats as distinct strings and 404s. This mirrors the trim/strip
+ * Apify API treats as distinct strings and 404s. Mirrors the trim/strip
  * half of `fixActorNameInput` (no slash-padding — storage ids use `~`).
- * Valid ids pass through unchanged.
  */
 export function normalizeStorageId(id: string): string {
-    let s = id.trim();
-    for (const [open, close] of STORAGE_ID_WRAPPERS) {
-        if (s.startsWith(open) && s.endsWith(close) && s.length >= open.length + close.length) {
-            s = s.slice(open.length, -close.length).trim();
-            break;
-        }
-    }
-    return s.replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, '').trim();
+    return stripQuoteWrappers(id);
 }
