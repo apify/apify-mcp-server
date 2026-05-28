@@ -365,9 +365,9 @@ export type ToolCallTelemetryProperties = {
     tool_name: string;
     tool_status: ToolStatus;
     tool_exec_time_ms: number;
-    /** UTF-8 byte size of the tool response text content (`content[].text`). */
+    /** UTF-8 bytes of tool response text content (`content[].text`). */
     tool_response_content_bytes?: number;
-    /** UTF-8 byte size of the JSON-stringified structured content. */
+    /** UTF-8 bytes of JSON-stringified structured content. */
     tool_response_structured_content_bytes?: number;
     failure_category?: FailureCategory;
     failure_http_status?: number;

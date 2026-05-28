@@ -50,7 +50,7 @@ export function buildMCPResponse(options: {
 }
 
 /**
- * Computes the byte size of a tool response, split by payload side:
+ * Computes tool response payload bytes, split by payload side:
  * `contentBytes` sums the UTF-8 byte length of every text item in `content[]`;
  * `structuredContentBytes` is the UTF-8 byte length of JSON-stringified
  * `structuredContent` (if present). Kept separate because clients consume only
@@ -58,7 +58,7 @@ export function buildMCPResponse(options: {
  * them double-counts mirrored payloads. Other fields (`isError`, `_meta`, etc.)
  * are not counted.
  */
-export function computeToolResponseSizeBytes(result: unknown): {
+export function computeToolResponseBytes(result: unknown): {
     contentBytes: number;
     structuredContentBytes: number;
 } {
