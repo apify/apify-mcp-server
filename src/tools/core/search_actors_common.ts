@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { HelperTools, MAX_LIMIT_WITH_INPUT_SCHEMA } from '../../const.js';
 import type { ActorStoreList, HelperTool, StructuredActorCard, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { DEFAULT_CARD_OPTIONS, formatActorToActorCard, formatActorToStructuredCard } from '../../utils/actor_card.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -94,7 +95,7 @@ Returns list of Actor cards with the following info:
  * Used by `defaultSearchActors` in both default and apps modes.
  */
 export const searchActorsMetadata: Omit<HelperTool, 'call'> = {
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH,
     description: SEARCH_ACTORS_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsBaseArgsSchema) as ToolInputSchema,

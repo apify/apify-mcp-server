@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { DOCS_SOURCES, HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -68,7 +69,7 @@ Use this to paginate through the search results. For example, if you want to get
 const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema;
 
 export const searchApifyDocsTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_SEARCH,
     description: buildToolDescription(),
     inputSchema: searchApifyDocsToolInputSchema,

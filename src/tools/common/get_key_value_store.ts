@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -13,7 +14,7 @@ const getKeyValueStoreArgs = z.object({
  * https://docs.apify.com/api/v2/key-value-store-get
  */
 export const getKeyValueStore: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_GET,
     description: `Get details about a key-value store by ID or username~store-name.
 The results will include store metadata (ID, name, owner, access settings) and usage statistics.

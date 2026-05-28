@@ -6,6 +6,7 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -64,7 +65,7 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const appsCallActorWidget: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL_WIDGET,
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,

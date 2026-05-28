@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { formatActorForWidget } from '../../utils/actor_card.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -35,7 +36,7 @@ const SEARCH_ACTORS_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const searchActorsWidgetTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.STORE_SEARCH_WIDGET,
     description: SEARCH_ACTORS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(searchActorsWidgetArgsSchema) as ToolInputSchema,

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import type { ToolEntry } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import {
     AUTO_INJECTED_TOOLS,
     getToolsForServerMode,
@@ -133,7 +134,7 @@ describe('loadToolsFromInput auto-injection of storage tools', () => {
         'auto-injects get-actor-run when only direct actor tools are present (%s mode)',
         (mode) => {
             const actorTool = {
-                type: 'actor',
+                type: TOOL_TYPE.ACTOR,
                 name: 'apify--rag-web-browser',
                 actorFullName: 'apify/rag-web-browser',
             } as unknown as ToolEntry;

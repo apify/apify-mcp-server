@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import { ProgressTracker } from '../../src/utils/progress.js';
 
 /**
@@ -37,7 +38,7 @@ function makeRecorderTool(name: string): {
         progressTracker: undefined,
     };
     const tool: ToolEntry = {
-        type: 'internal',
+        type: TOOL_TYPE.INTERNAL,
         name,
         description: 'recorder tool for progress wiring tests',
         inputSchema: { type: 'object', properties: {}, additionalProperties: true },

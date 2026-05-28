@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { ApifyClient } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -13,7 +14,7 @@ export const addToolArgsSchema = z.object({
         .describe(`Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".`),
 });
 export const addTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_ADD,
     description: `Add an Actor or MCP server to the Apify MCP Server as an available tool.
 This does not execute the Actor; it only registers it so it can be called later.

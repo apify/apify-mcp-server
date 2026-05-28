@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const getUserDatasetsListArgs = z.object({
@@ -31,7 +32,7 @@ const getUserDatasetsListArgs = z.object({
  * https://docs.apify.com/api/v2/datasets-get
  */
 export const getUserDatasetsList: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_LIST_GET,
     description: dedent`
         List datasets (collections of Actor run data) for the authenticated user.

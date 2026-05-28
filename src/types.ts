@@ -104,12 +104,27 @@ export type ToolBase = z.infer<typeof ToolSchema> & {
 export type ToolInputSchema = z.infer<typeof ToolSchema>['inputSchema'];
 
 /**
+ * Tool type discriminator values.
+ * Use these constants instead of string literals for better type safety and maintainability.
+ */
+export const TOOL_TYPE = {
+    INTERNAL: 'internal',
+    ACTOR: 'actor',
+    ACTOR_MCP: 'actor-mcp',
+} as const;
+
+/**
+ * Union of all tool type discriminator values.
+ */
+export type TOOL_TYPE = (typeof TOOL_TYPE)[keyof typeof TOOL_TYPE];
+
+/**
  * Type for Actor-based tools - tools that wrap Apify Actors.
- * Type discriminator: 'actor'
+ * Type discriminator: {@link TOOL_TYPE.ACTOR}
  */
 export type ActorTool = ToolBase & {
     /** Type discriminator for actor tools */
-    type: 'actor';
+    type: typeof TOOL_TYPE.ACTOR;
     /** Stable Apify Actor ID (e.g. "JxcaGGqy7TwBdHxMz") — does not change on rename */
     actorId: string;
     /** Full name of the Apify Actor (username/name) */
@@ -161,11 +176,11 @@ export type InternalToolArgs = {
 
 /**
  * Helper tool - tools implemented directly in the MCP server.
- * Type discriminator: 'internal'
+ * Type discriminator: {@link TOOL_TYPE.INTERNAL}
  */
 export type HelperTool = ToolBase & {
     /** Type discriminator for helper/internal tools */
-    type: 'internal';
+    type: typeof TOOL_TYPE.INTERNAL;
     /**
      * Executes the tool with the given arguments
      * @param toolArgs - Arguments and server references
@@ -176,11 +191,11 @@ export type HelperTool = ToolBase & {
 
 /**
  * Actor MCP tool - tools from Actorized MCP servers that this server proxies.
- * Type discriminator: 'actor-mcp'
+ * Type discriminator: {@link TOOL_TYPE.ACTOR_MCP}
  */
 export type ActorMcpTool = ToolBase & {
     /** Type discriminator for actor MCP tools */
-    type: 'actor-mcp';
+    type: typeof TOOL_TYPE.ACTOR_MCP;
     /** Origin MCP server tool name is needed for the tool call */
     originToolName: string;
     /** ID of the Actorized MCP server - for example, apify/actors-mcp-server */
@@ -430,7 +445,7 @@ export const SERVER_MODES: readonly ServerMode[] = Object.values(ServerMode);
 export type ServerModeOption = ServerMode | 'auto';
 
 /**
- * Parameters for executing a direct actor tool (`type: 'actor'`).
+ * Parameters for executing a direct actor tool ({@link TOOL_TYPE.ACTOR}).
  * Used by ActorExecutor implementations.
  */
 export type ActorExecutionParams = {
@@ -478,7 +493,7 @@ export type ActorExecutionResult = {
 } | null;
 
 /**
- * Executor for direct actor tools (`type: 'actor'`).
+ * Executor for direct actor tools ({@link TOOL_TYPE.ACTOR}).
  * Selected at server construction time based on serverMode.
  * Default mode runs synchronously; apps mode runs async with widget metadata.
  */

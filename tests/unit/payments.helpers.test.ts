@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import type { HelperTool } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -25,7 +26,7 @@ function makeTool(paymentRequired = true): HelperTool {
     return {
         name: 'call-actor',
         description: 'Call an Actor',
-        type: 'internal',
+        type: TOOL_TYPE.INTERNAL,
         paymentRequired,
         inputSchema: { type: 'object', properties: { actor: { type: 'string' } } },
         ajvValidate: vi.fn(() => true) as never,

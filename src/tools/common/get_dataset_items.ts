@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -60,7 +61,7 @@ const getDatasetItemsArgs = z.object({
  * https://docs.apify.com/api/v2/dataset-items-get
  */
 export const getDatasetItems: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_GET_ITEMS,
     description: dedent`
         Retrieve dataset items with pagination, sorting, and field selection.

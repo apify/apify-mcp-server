@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const getKeyValueStoreKeysArgs = z.object({
@@ -17,7 +18,7 @@ const getKeyValueStoreKeysArgs = z.object({
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  */
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
     description: `List keys in a key-value store with optional pagination.
 The results will include keys and basic info about stored values (e.g., size).

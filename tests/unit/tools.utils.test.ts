@@ -15,6 +15,7 @@ import {
     transformActorInputSchemaProperties,
 } from '../../src/tools/utils.js';
 import type { ActorInfo, ActorInputSchema, SchemaProperties, ToolBase, ToolEntry } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import { extractActorName, getToolFullName, getToolPublicFieldOnly } from '../../src/utils/tools.js';
 
 describe('buildApifySpecificProperties', () => {
@@ -932,7 +933,7 @@ describe('filterAndShortenEnum', () => {
 describe('getToolFullName', () => {
     it('returns actorFullName for actor tools', () => {
         const tool = {
-            type: 'actor',
+            type: TOOL_TYPE.ACTOR,
             name: 'actor-web-scraper-by-apify',
             actorFullName: 'apify/web-scraper',
         } as unknown as ToolEntry;
@@ -940,13 +941,13 @@ describe('getToolFullName', () => {
     });
 
     it('returns name for internal tools', () => {
-        const tool = { type: 'internal', name: 'store-search' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'store-search' } as unknown as ToolEntry;
         expect(getToolFullName(tool)).toBe('store-search');
     });
 
     it('returns name for actor-mcp tools', () => {
         const tool = {
-            type: 'actor-mcp',
+            type: TOOL_TYPE.ACTOR_MCP,
             name: 'mcp-tool-search',
             actorId: 'apify/actors-mcp-server',
         } as unknown as ToolEntry;
@@ -956,27 +957,27 @@ describe('getToolFullName', () => {
 
 describe('extractActorName', () => {
     it('returns actorFullName for actor tools', () => {
-        const tool = { type: 'actor', actorFullName: 'apify/web-scraper' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.ACTOR, actorFullName: 'apify/web-scraper' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBe('apify/web-scraper');
     });
 
     it('returns actorId for actor-mcp tools', () => {
-        const tool = { type: 'actor-mcp', actorId: 'apify/actors-mcp-server' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.ACTOR_MCP, actorId: 'apify/actors-mcp-server' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBe('apify/actors-mcp-server');
     });
 
     it('parses actor name from call-actor args', () => {
-        const tool = { type: 'internal', name: 'call-actor' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
         expect(extractActorName(tool, { actor: 'apify/web-scraper' })).toBe('apify/web-scraper');
     });
 
     it('strips :toolName suffix from call-actor args', () => {
-        const tool = { type: 'internal', name: 'call-actor' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'call-actor' } as unknown as ToolEntry;
         expect(extractActorName(tool, { actor: 'apify/actors-mcp-server:search' })).toBe('apify/actors-mcp-server');
     });
 
     it('returns undefined for internal tools without actor arg', () => {
-        const tool = { type: 'internal', name: 'store-search' } as unknown as ToolEntry;
+        const tool = { type: TOOL_TYPE.INTERNAL, name: 'store-search' } as unknown as ToolEntry;
         expect(extractActorName(tool)).toBeUndefined();
     });
 });

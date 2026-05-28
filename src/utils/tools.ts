@@ -5,7 +5,7 @@ import {
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../payments/const.js';
 import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
-import { ServerMode } from '../types.js';
+import { ServerMode, TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
 /**
@@ -15,10 +15,10 @@ import { fixZodSchemaRequired } from './ajv.js';
  */
 export function getToolFullName(tool: ToolEntry): string {
     switch (tool.type) {
-        case 'actor':
+        case TOOL_TYPE.ACTOR:
             return tool.actorFullName;
-        case 'internal':
-        case 'actor-mcp':
+        case TOOL_TYPE.INTERNAL:
+        case TOOL_TYPE.ACTOR_MCP:
             return tool.name;
         default:
             return (tool satisfies never as ToolEntry).name;
@@ -30,7 +30,7 @@ export function getToolFullName(tool: ToolEntry): string {
  * Available for actor and actor-mcp tools; undefined for internal tools.
  */
 export function extractActorId(tool: ToolEntry): string | undefined {
-    if (tool.type === 'actor' || tool.type === 'actor-mcp') return tool.actorId;
+    if (tool.type === TOOL_TYPE.ACTOR || tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
     return undefined;
 }
 
@@ -53,8 +53,8 @@ export function buildActorFields(
  * Returns undefined for other internal tools or when the arg is missing/invalid.
  */
 export function extractActorName(tool: ToolEntry, args?: Record<string, unknown>): string | undefined {
-    if (tool.type === 'actor') return tool.actorFullName;
-    if (tool.type === 'actor-mcp') return tool.actorId;
+    if (tool.type === TOOL_TYPE.ACTOR) return tool.actorFullName;
+    if (tool.type === TOOL_TYPE.ACTOR_MCP) return tool.actorId;
 
     // For call-actor, the actor name is in `args.actor`.
     // The format can be "username/name" or "username/name:toolName" (MCP server Actors).
@@ -122,7 +122,7 @@ export function getToolPublicFieldOnly(tool: ToolBase, options: ToolPublicFieldO
 export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
     // Store the original functions
     const originalAjvValidate = toolEntry.ajvValidate;
-    const originalCall = toolEntry.type === 'internal' ? toolEntry.call : undefined;
+    const originalCall = toolEntry.type === TOOL_TYPE.INTERNAL ? toolEntry.call : undefined;
 
     // Create a deep copy using JSON serialization (excluding functions)
     const cloned = JSON.parse(
@@ -134,7 +134,7 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
 
     // Restore the original functions
     cloned.ajvValidate = originalAjvValidate;
-    if (toolEntry.type === 'internal' && originalCall) {
+    if (toolEntry.type === TOOL_TYPE.INTERNAL && originalCall) {
         (cloned as HelperTool).call = originalCall;
     }
 
@@ -143,7 +143,10 @@ export function cloneToolEntry(toolEntry: ToolEntry): ToolEntry {
 
 /** Returns true if the tool is eligible for Skyfire augmentation. */
 function isSkyfireEligible(tool: ToolEntry): boolean {
-    return tool.type === 'actor' || (tool.type === 'internal' && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools));
+    return (
+        tool.type === TOOL_TYPE.ACTOR ||
+        (tool.type === TOOL_TYPE.INTERNAL && SKYFIRE_ENABLED_TOOLS.has(tool.name as HelperTools))
+    );
 }
 
 /**

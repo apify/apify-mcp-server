@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
@@ -24,7 +25,7 @@ const getDatasetSchemaArgs = z.object({
  * Generates a JSON schema from dataset items
  */
 export const getDatasetSchema: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_SCHEMA_GET,
     description: `Generate a JSON schema from a sample of dataset items.
 The schema describes the structure of the data and can be used for validation, documentation, or processing.
