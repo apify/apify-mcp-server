@@ -1,12 +1,14 @@
-import React from "react";
-import { useWidgetProps } from "../../hooks/use-widget-props";
-import { ActorSearchDetail } from "./ActorSearchDetail";
-import { WidgetLayout } from "../../components/layout/WidgetLayout";
-import { Message, Box } from "@apify/ui-library";
-import type { ActorDetails, Actor } from "../../types";
-import { ActorCard } from "../../components/actor/ActorCard";
-import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from "./ActorSearch.skeleton";
-import styled from "styled-components";
+import React from 'react';
+import styled from 'styled-components';
+
+import { Message, Box } from '@apify/ui-library';
+
+import { ActorCard } from '../../components/actor/ActorCard';
+import { WidgetLayout } from '../../components/layout/WidgetLayout';
+import { useWidgetProps } from '../../hooks/use-widget-props';
+import type { ActorDetails, Actor } from '../../types';
+import { ActorSearchDetailSkeleton, ActorSearchResultsSkeleton } from './ActorSearch.skeleton';
+import { ActorSearchDetail } from './ActorSearchDetail';
 
 const ActorContainer = styled(Box)`
     width: 100%;
@@ -44,8 +46,8 @@ export const ActorSearch: React.FC = () => {
 
     const shouldForceDetailsView = hasToolActorDetails;
 
-    const showDetails = (shouldForceDetailsView) && Boolean(actorDetails);
-    const hasLoadedOnce = Boolean(toolOutput && ("actors" in toolOutput || "actorDetails" in toolOutput));
+    const showDetails = shouldForceDetailsView && Boolean(actorDetails);
+    const hasLoadedOnce = Boolean(toolOutput && ('actors' in toolOutput || 'actorDetails' in toolOutput));
 
     const isInitialLoading = !hasLoadedOnce && !actorDetails;
     const shouldShowDetailSkeleton = shouldForceDetailsView && !actorDetails;
@@ -53,21 +55,21 @@ export const ActorSearch: React.FC = () => {
     return (
         <WidgetLayout>
             <ActorSearchResults>
-            {showDetails ? (
-                <ActorSearchDetail details={actorDetails!} />
-            ) : shouldShowDetailSkeleton ? (
-                <ActorSearchDetailSkeleton />
-            ) : isInitialLoading ? (
-                <ActorSearchResultsSkeleton items={3} />
-            ) : actors.length === 0 ? (
-                <EmptyState title="No actors found" description="Try a different search query" />
-            ) : (
-                actors.map((actor: Actor) => (
-                    <ActorContainer key={actor.id} mb="space8">
-                        <ActorCard actor={actor} />
-                    </ActorContainer>
-                ))
-            )}
+                {showDetails ? (
+                    <ActorSearchDetail details={actorDetails!} />
+                ) : shouldShowDetailSkeleton ? (
+                    <ActorSearchDetailSkeleton />
+                ) : isInitialLoading ? (
+                    <ActorSearchResultsSkeleton items={3} />
+                ) : actors.length === 0 ? (
+                    <EmptyState title="No actors found" description="Try a different search query" />
+                ) : (
+                    actors.map((actor: Actor) => (
+                        <ActorContainer key={actor.id} mb="space8">
+                            <ActorCard actor={actor} />
+                        </ActorContainer>
+                    ))
+                )}
             </ActorSearchResults>
         </WidgetLayout>
     );
@@ -82,7 +84,7 @@ const EmptyState: React.FC<EmptyStateProps> = (props: EmptyStateProps) => {
     const { title, description } = props;
     return (
         <Message type="info" caption={title}>
-            {description ?? ""}
+            {description ?? ''}
         </Message>
     );
 };

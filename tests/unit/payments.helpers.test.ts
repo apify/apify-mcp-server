@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { prepareToolCallContext } from '../../src/payments/helpers.js';
 import type { PaymentProvider } from '../../src/payments/types.js';
 import type { HelperTool } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -25,7 +26,7 @@ function makeTool(paymentRequired = true): HelperTool {
     return {
         name: 'call-actor',
         description: 'Call an Actor',
-        type: 'internal',
+        type: TOOL_TYPE.INTERNAL,
         paymentRequired,
         inputSchema: { type: 'object', properties: { actor: { type: 'string' } } },
         ajvValidate: vi.fn(() => true) as never,
@@ -43,7 +44,8 @@ function makeSkyfireLikeProvider(): PaymentProvider {
         allowsUnauthenticated: true,
         decorateToolSchema: (tool) => tool,
         validatePayment: (args) => (args['skyfire-pay-id'] ? null : 'Missing skyfire-pay-id'),
-        getPaymentHeaders: (args): Record<string, string> => (args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {}),
+        getPaymentHeaders: (args): Record<string, string> =>
+            args['skyfire-pay-id'] ? { 'skyfire-pay-id': args['skyfire-pay-id'] as string } : {},
         removePaymentFields: (args) => {
             const { 'skyfire-pay-id': _removed, ...rest } = args;
             return rest;

@@ -29,10 +29,7 @@ export async function getActorDefinitionCached(
  * - Returns false when the Actor is not an MCP server
  * Uses a TTL LRU cache to avoid repeated API calls.
  */
-export async function getActorMcpUrlCached(
-    actorIdOrName: string,
-    apifyClient: ApifyClient,
-): Promise<string | false> {
+export async function getActorMcpUrlCached(actorIdOrName: string, apifyClient: ApifyClient): Promise<string | false> {
     const cached = mcpServerCache.get(actorIdOrName);
     if (cached !== null && cached !== undefined) {
         return cached as string | false;
@@ -52,10 +49,11 @@ export async function getActorMcpUrlCached(
         return false;
     } catch (error) {
         // Check if it's a "not found" error (404 or 400 status codes)
-        const isNotFound = typeof error === 'object'
-            && error !== null
-            && 'statusCode' in error
-            && (error.statusCode === 404 || error.statusCode === 400);
+        const isNotFound =
+            typeof error === 'object' &&
+            error !== null &&
+            'statusCode' in error &&
+            (error.statusCode === 404 || error.statusCode === 400);
 
         if (isNotFound) {
             // Actor doesn't exist - cache false and return false
@@ -98,7 +96,11 @@ export function getActorDefinitionStorageFieldNames(storage: ActorDefinitionStor
  *
  * This is primarily used to ensure the tool output does not exceed the LLM context length or tool output limit.
  */
-export function ensureOutputWithinCharLimit(items: DatasetItem[], importantFields: string[], charLimit: number): DatasetItem[] {
+export function ensureOutputWithinCharLimit(
+    items: DatasetItem[],
+    importantFields: string[],
+    charLimit: number,
+): DatasetItem[] {
     // Check if all items fit into the limit
     const allItemsString = JSON.stringify(items);
     if (allItemsString.length <= charLimit) {

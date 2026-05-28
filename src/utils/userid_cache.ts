@@ -37,10 +37,7 @@ function normalizePlanTier(tier: string | undefined): PricingTier {
  * missing/empty, the API call fails, or the plan is unrecognized. Failed lookups are NOT
  * cached so the next call retries.
  */
-export async function getUserInfoCached(
-    token: string | undefined,
-    apifyClient: ApifyClient,
-): Promise<CachedUserInfo> {
+export async function getUserInfoCached(token: string | undefined, apifyClient: ApifyClient): Promise<CachedUserInfo> {
     if (!token) return ANONYMOUS_USER_INFO;
     const tokenHash = createHash('sha256').update(token).digest('hex');
     const cached = userInfoCache.get(tokenHash);

@@ -51,9 +51,10 @@ describe('parseInputParamsFromUrl()', () => {
 });
 
 describe('isTaskCancelled()', () => {
-    const makeTaskStore = (getTaskReturn: unknown) => ({
-        getTask: vi.fn().mockResolvedValue(getTaskReturn),
-    } as unknown as TaskStore);
+    const makeTaskStore = (getTaskReturn: unknown) =>
+        ({
+            getTask: vi.fn().mockResolvedValue(getTaskReturn),
+        }) as unknown as TaskStore;
 
     it('returns true when task status is cancelled', async () => {
         const taskStore = makeTaskStore({ status: 'cancelled' });
@@ -85,9 +86,10 @@ describe('isTaskCancelled()', () => {
 });
 
 describe('createTaskCancellationWatcher', () => {
-    const makeTaskStore = (statusBox: { status: string }) => ({
-        getTask: vi.fn().mockImplementation(async () => ({ status: statusBox.status })),
-    } as unknown as TaskStore);
+    const makeTaskStore = (statusBox: { status: string }) =>
+        ({
+            getTask: vi.fn().mockImplementation(async () => ({ status: statusBox.status })),
+        }) as unknown as TaskStore;
 
     // Core happy path: tasks/cancel writes 'cancelled' to the store; the
     // watcher must observe it on the next poll and abort the signal.
@@ -105,9 +107,12 @@ describe('createTaskCancellationWatcher', () => {
         try {
             expect(watcher.signal.aborted).toBe(false);
             statusBox.status = 'cancelled';
-            await vi.waitFor(() => {
-                expect(watcher.signal.aborted).toBe(true);
-            }, { timeout: 500, interval: 10 });
+            await vi.waitFor(
+                () => {
+                    expect(watcher.signal.aborted).toBe(true);
+                },
+                { timeout: 500, interval: 10 },
+            );
         } finally {
             watcher.dispose();
         }
@@ -136,7 +141,9 @@ describe('createTaskCancellationWatcher', () => {
         try {
             requestSignal.abort(new Error('client disconnect'));
             // Give the watcher more than enough ticks to (incorrectly) react.
-            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            await new Promise((resolve) => {
+                setTimeout(resolve, 80);
+            });
             expect(watcher.signal.aborted).toBe(false);
         } finally {
             watcher.dispose();
@@ -156,10 +163,14 @@ describe('createTaskCancellationWatcher', () => {
             pollIntervalMs: 10,
         });
 
-        await new Promise((resolve) => { setTimeout(resolve, 30); });
+        await new Promise((resolve) => {
+            setTimeout(resolve, 30);
+        });
         watcher.dispose();
         const callsAtDispose = (taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length;
-        await new Promise((resolve) => { setTimeout(resolve, 50); });
+        await new Promise((resolve) => {
+            setTimeout(resolve, 50);
+        });
         expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callsAtDispose);
     });
 
@@ -186,9 +197,12 @@ describe('createTaskCancellationWatcher', () => {
         });
 
         try {
-            await vi.waitFor(() => {
-                expect(watcher.signal.aborted).toBe(true);
-            }, { timeout: 500, interval: 10 });
+            await vi.waitFor(
+                () => {
+                    expect(watcher.signal.aborted).toBe(true);
+                },
+                { timeout: 500, interval: 10 },
+            );
             expect(call).toBeGreaterThanOrEqual(2);
         } finally {
             watcher.dispose();
@@ -200,9 +214,12 @@ describe('createTaskCancellationWatcher', () => {
     // the backend is already struggling. The watcher must serialize ticks.
     it('does not start a new poll while the previous one is still in flight', async () => {
         let resolveFirst: ((task: { status: string }) => void) | undefined;
-        const firstCall = new Promise<{ status: string }>((resolve) => { resolveFirst = resolve; });
+        const firstCall = new Promise<{ status: string }>((resolve) => {
+            resolveFirst = resolve;
+        });
         const taskStore = {
-            getTask: vi.fn()
+            getTask: vi
+                .fn()
                 .mockImplementationOnce(async () => firstCall)
                 .mockImplementation(async () => ({ status: 'working' })),
         } as unknown as TaskStore;
@@ -216,13 +233,18 @@ describe('createTaskCancellationWatcher', () => {
 
         try {
             // Wait far longer than pollIntervalMs while the first call hangs.
-            await new Promise((resolve) => { setTimeout(resolve, 80); });
+            await new Promise((resolve) => {
+                setTimeout(resolve, 80);
+            });
             expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
 
             resolveFirst!({ status: 'working' });
-            await vi.waitFor(() => {
-                expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
-            }, { timeout: 500, interval: 10 });
+            await vi.waitFor(
+                () => {
+                    expect((taskStore.getTask as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
+                },
+                { timeout: 500, interval: 10 },
+            );
         } finally {
             watcher.dispose();
         }

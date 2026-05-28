@@ -4,6 +4,7 @@ import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import { fixedAjvCompile } from '../tools/utils.js';
 import type { ActorMcpTool, ToolEntry } from '../types.js';
+import { TOOL_TYPE } from '../types.js';
 import { ajv } from '../utils/ajv.js';
 import { MAX_TOOL_NAME_LENGTH, SERVER_ID_LENGTH } from './const.js';
 
@@ -34,23 +35,21 @@ function getProxyMCPServerToolName(url: string, toolName: string): string {
     return fullName.slice(0, MAX_TOOL_NAME_LENGTH);
 }
 
-export async function getMCPServerTools(
-    actorID: string,
-    client: Client,
-    serverUrl: string,
-): Promise<ToolEntry[]> {
+export async function getMCPServerTools(actorID: string, client: Client, serverUrl: string): Promise<ToolEntry[]> {
     const { tools } = await client.listTools();
 
-    return tools.map((tool): ActorMcpTool => ({
-        type: 'actor-mcp',
-        actorId: actorID,
-        serverId: getMCPServerID(serverUrl),
-        serverUrl,
-        originToolName: tool.name,
-        name: getProxyMCPServerToolName(serverUrl, tool.name),
-        description: tool.description || '',
-        inputSchema: tool.inputSchema,
-        ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
-        annotations: tool.annotations,
-    }));
+    return tools.map(
+        (tool): ActorMcpTool => ({
+            type: TOOL_TYPE.ACTOR_MCP,
+            actorId: actorID,
+            serverId: getMCPServerID(serverUrl),
+            serverUrl,
+            originToolName: tool.name,
+            name: getProxyMCPServerToolName(serverUrl, tool.name),
+            description: tool.description || '',
+            inputSchema: tool.inputSchema,
+            ajvValidate: fixedAjvCompile(ajv, tool.inputSchema),
+            annotations: tool.annotations,
+        }),
+    );
 }

@@ -13,10 +13,7 @@ import {
 const MOCK_RECORD = { key: 'INPUT', value: { query: 'hello' }, contentType: 'application/json' };
 const MOCK_STORE = { id: 'kv-1', name: 'my-store' };
 
-function stubApifyClient(opts: {
-    record: unknown;
-    store?: unknown;
-}): InternalToolArgs['apifyClient'] {
+function stubApifyClient(opts: { record: unknown; store?: unknown }): InternalToolArgs['apifyClient'] {
     const { record, store } = opts;
     return {
         keyValueStore: (_id: string) => ({

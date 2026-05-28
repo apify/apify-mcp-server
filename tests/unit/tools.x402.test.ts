@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaymentMeta, RequestHeaders } from '../../src/payments/types.js';
 import { X402PaymentProvider, type X402PaymentRequirements } from '../../src/payments/x402.js';
 import type { HelperTool } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -39,7 +40,7 @@ function makePaidTool(overrides: Partial<HelperTool> = {}): HelperTool {
     return {
         name: 'paid-tool',
         description: 'Paid tool',
-        type: 'internal',
+        type: TOOL_TYPE.INTERNAL,
         paymentRequired: true,
         inputSchema: { type: 'object' as const, properties: {} },
         ajvValidate: vi.fn(() => true) as never,
@@ -100,7 +101,9 @@ describe('getPaymentHeaders', () => {
     it('should prefer _meta over HTTP header when both are present', () => {
         const metaPayment = { x402Version: 2, payload: { signature: 'from-meta' } };
         const metaBase64 = Buffer.from(JSON.stringify(metaPayment)).toString('base64');
-        const headerBase64 = Buffer.from(JSON.stringify({ x402Version: 2, payload: { signature: 'from-header' } })).toString('base64');
+        const headerBase64 = Buffer.from(
+            JSON.stringify({ x402Version: 2, payload: { signature: 'from-header' } }),
+        ).toString('base64');
 
         const meta: PaymentMeta = { 'x402/payment': metaPayment };
         const headers: RequestHeaders = { 'PAYMENT-SIGNATURE': headerBase64 };

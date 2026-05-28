@@ -63,7 +63,7 @@ type CliArgs = {
      * - `'openai'`: deprecated alias for `'apps'`
      */
     ui: ServerModeOption;
-}
+};
 
 /**
  * Attempts to read Apify token from ~/.apify/auth.json file
@@ -90,7 +90,8 @@ const argv = yargs(hideBin(process.argv))
     .env()
     .option('actors', {
         type: 'string',
-        describe: 'Comma-separated list of Actor full names to add to the server. Can also be set via ACTORS environment variable.',
+        describe:
+            'Comma-separated list of Actor full names to add to the server. Can also be set via ACTORS environment variable.',
         example: 'apify/google-search-scraper,apify/instagram-scraper',
     })
     .option('enable-adding-actors', {
@@ -145,8 +146,8 @@ Only used when --telemetry-enabled is true`,
     .alias('h', 'help')
     .version(false)
     .epilogue(
-        'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`'
-        + ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
+        'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`' +
+            ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',
     )
     .epilogue('For more information, visit https://mcp.apify.com or https://github.com/apify/apify-mcp-server')
     .parseSync() as CliArgs;
@@ -189,8 +190,8 @@ async function main() {
     if (major < 20) {
         // eslint-disable-next-line no-console
         console.error(
-            `Error: Apify MCP server requires Node.js 20 or later (you have ${process.version}).\n`
-            + 'Please update Node.js: https://nodejs.org',
+            `Error: Apify MCP server requires Node.js 20 or later (you have ${process.version}).\n` +
+                'Please update Node.js: https://nodejs.org',
         );
         process.exit(1);
     }

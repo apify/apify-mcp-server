@@ -45,7 +45,10 @@ describe('get-actor-run-widget response', () => {
         const { structuredContent, content, _meta } = result as {
             structuredContent: RunResponse;
             content: { type: string; text: string }[];
-            _meta?: { ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown }; 'openai/widgetDescription'?: string };
+            _meta?: {
+                ui?: { resourceUri?: string; visibility?: readonly string[]; csp?: unknown };
+                'openai/widgetDescription'?: string;
+            };
         };
 
         expect(structuredContent.runId).toBe('run-widget-1');
@@ -81,7 +84,11 @@ describe('get-actor-run-widget response', () => {
     it('declares a strict input schema accepting runId only', () => {
         const tool = getActorRunWidgetTool as HelperTool;
 
-        const schema = tool.inputSchema as { additionalProperties?: boolean; properties?: Record<string, unknown>; required?: string[] };
+        const schema = tool.inputSchema as {
+            additionalProperties?: boolean;
+            properties?: Record<string, unknown>;
+            required?: string[];
+        };
         expect(schema.additionalProperties).toBe(false);
         expect(Object.keys(schema.properties ?? {})).toEqual(['runId']);
         expect(schema.required).toEqual(['runId']);

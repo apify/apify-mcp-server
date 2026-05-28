@@ -142,12 +142,15 @@ const multiTierRental = {
 
 const freeActor = { pricingModel: ACTOR_PRICING_MODEL.FREE } as PricingInfo;
 
-const NOTE_GOLD = 'Prices shown are for GOLD tier. Higher tiers may offer lower prices — '
-    + 'use fetch-actor-details to see the full pricing table.';
-const NOTE_FREE = 'Prices shown are for FREE tier. Higher tiers may offer lower prices — '
-    + 'use fetch-actor-details to see the full pricing table.';
-const EVENT_DESCRIPTIONS_OMITTED_NOTE = 'Event descriptions were omitted because this actor has many pricing events. '
-    + 'Use fetch-actor-details for full pricing details.';
+const NOTE_GOLD =
+    'Prices shown are for GOLD tier. Higher tiers may offer lower prices — ' +
+    'use fetch-actor-details to see the full pricing table.';
+const NOTE_FREE =
+    'Prices shown are for FREE tier. Higher tiers may offer lower prices — ' +
+    'use fetch-actor-details to see the full pricing table.';
+const EVENT_DESCRIPTIONS_OMITTED_NOTE =
+    'Event descriptions were omitted because this actor has many pricing events. ' +
+    'Use fetch-actor-details for full pricing details.';
 
 // ─── Complete mode: fetch-actor-details ───────────────────────────────────────
 
@@ -225,18 +228,17 @@ describe('pricingInfoToString (complete mode)', () => {
     it('E1: PAY_PER_EVENT lists all tiers inline for tiered events, flat for non-tiered', () => {
         const out = pricingInfoToString(multiTierPayPerEvent);
         expect(out).toBe(
-            'This Actor is paid per event:\n'
-            + '  - **Scraped place**: A Google Maps place scraped '
-            + '(FREE: $0.004, BRONZE: $0.004, SILVER: $0.003, '
-            + 'GOLD: $0.0021, PLATINUM: $0.00126, DIAMOND: $0.00076 per event)\n'
-            + '  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)',
+            'This Actor is paid per event:\n' +
+                '  - **Scraped place**: A Google Maps place scraped ' +
+                '(FREE: $0.004, BRONZE: $0.004, SILVER: $0.003, ' +
+                'GOLD: $0.0021, PLATINUM: $0.00126, DIAMOND: $0.00076 per event)\n' +
+                '  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)',
         );
     });
 
     it('E4: single-tier event renders as flat (no tier label)', () => {
         expect(pricingInfoToString(singleTierPayPerEvent)).toBe(
-            'This Actor is paid per event:\n'
-            + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+            'This Actor is paid per event:\n' + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
         );
     });
 
@@ -405,9 +407,21 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
             events: [
                 { title: 'Result', priceUsd: 0.0037, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0037 }] },
                 { title: 'Add-on: Date filter', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                { title: 'Add-on: Popularity filter', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
-                { title: 'Add-on: Follower / Following', priceUsd: 0.004, tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }] },
-                { title: 'Add-on: Search video sorting', priceUsd: 0.0013, tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }] },
+                {
+                    title: 'Add-on: Popularity filter',
+                    priceUsd: 0.0013,
+                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }],
+                },
+                {
+                    title: 'Add-on: Follower / Following',
+                    priceUsd: 0.004,
+                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.004 }],
+                },
+                {
+                    title: 'Add-on: Search video sorting',
+                    priceUsd: 0.0013,
+                    tieredPricing: [{ tier: 'FREE', priceUsd: 0.0013 }],
+                },
                 { title: 'Actor start', priceUsd: 0.001, tieredPricing: [{ tier: 'FREE', priceUsd: 0.001 }] },
             ],
             eventDescriptionsOmitted: true,
@@ -419,17 +433,15 @@ describe('pricingInfoToSimplifiedStructured (simplified mode)', () => {
 describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     it('E2: user on GOLD — one price per event, pricingNote appended', () => {
         expect(pricingInfoToSimplifiedString(multiTierPayPerEvent, 'GOLD')).toBe(
-            `This Actor is paid per event:\n`
-            + `  - **Scraped place**: A Google Maps place scraped ($0.0021 per event)\n`
-            + `  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)\n${
-                NOTE_GOLD}`,
+            `This Actor is paid per event:\n` +
+                `  - **Scraped place**: A Google Maps place scraped ($0.0021 per event)\n` +
+                `  - **Actor start**: Initial fee for starting the Actor ($0.00005 per event)\n${NOTE_GOLD}`,
         );
     });
 
     it('E4: single-tier actor — flat price, no pricingNote', () => {
         expect(pricingInfoToSimplifiedString(singleTierPayPerEvent, 'GOLD')).toBe(
-            'This Actor is paid per event:\n'
-            + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
+            'This Actor is paid per event:\n' + '  - **Scraped place**: A Google Maps place scraped ($0.004 per event)',
         );
     });
 
@@ -456,9 +468,7 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
                 DIAMOND: { tieredPricePerUnitUsd: 0.001 },
             },
         } as unknown as PricingInfo;
-        expect(pricingInfoToSimplifiedString(info, 'DIAMOND')).toBe(
-            'This Actor costs $1 per 1000 results.',
-        );
+        expect(pricingInfoToSimplifiedString(info, 'DIAMOND')).toBe('This Actor costs $1 per 1000 results.');
     });
 
     it('E8: FREE actor', () => {
@@ -468,21 +478,19 @@ describe('pricingInfoToSimplifiedString (simplified mode)', () => {
     });
     it('omits pricingNote text when PAY_PER_EVENT events resolve to different tiers', () => {
         expect(pricingInfoToSimplifiedString(mixedTierPayPerEvent, 'GOLD')).toBe(
-            'This Actor is paid per event:\n'
-            + '  - **A**:  ($0.005 per event)\n'
-            + '  - **B**:  ($0.02 per event)',
+            'This Actor is paid per event:\n' + '  - **A**:  ($0.005 per event)\n' + '  - **B**:  ($0.02 per event)',
         );
     });
 
     it('omits event descriptions in text when PAY_PER_EVENT has more than 5 events', () => {
         expect(pricingInfoToSimplifiedString(longPayPerEvent, 'FREE')).toBe(
-            'This Actor is paid per event:\n'
-            + '  - **Result**: $0.0037 per event\n'
-            + '  - **Add-on: Date filter**: $0.0013 per event\n'
-            + '  - **Add-on: Popularity filter**: $0.0013 per event\n'
-            + '  - **Add-on: Follower / Following**: $0.004 per event\n'
-            + '  - **Add-on: Search video sorting**: $0.0013 per event\n'
-            + `  - **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
+            'This Actor is paid per event:\n' +
+                '  - **Result**: $0.0037 per event\n' +
+                '  - **Add-on: Date filter**: $0.0013 per event\n' +
+                '  - **Add-on: Popularity filter**: $0.0013 per event\n' +
+                '  - **Add-on: Follower / Following**: $0.004 per event\n' +
+                '  - **Add-on: Search video sorting**: $0.0013 per event\n' +
+                `  - **Actor start**: $0.001 per event\n${EVENT_DESCRIPTIONS_OMITTED_NOTE}`,
         );
     });
 });

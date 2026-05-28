@@ -114,8 +114,20 @@ describe('extractAjvErrorDetails', () => {
 
     it('reports error count for multiple validation errors', () => {
         const diagnostics = extractAjvErrorDetails([
-            { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'query' }, message: '' },
-            { keyword: 'required', instancePath: '', schemaPath: '#/required', params: { missingProperty: 'url' }, message: '' },
+            {
+                keyword: 'required',
+                instancePath: '',
+                schemaPath: '#/required',
+                params: { missingProperty: 'query' },
+                message: '',
+            },
+            {
+                keyword: 'required',
+                instancePath: '',
+                schemaPath: '#/required',
+                params: { missingProperty: 'url' },
+                message: '',
+            },
             { keyword: 'type', instancePath: '/limit', schemaPath: '#/type', params: { type: 'number' }, message: '' },
         ]);
 
@@ -147,9 +159,12 @@ describe('extractToolTelemetry', () => {
         const { toolStatus, callDiagnostics } = extractToolTelemetry(res, 'apify/web-scraper', 'abc123');
 
         expect(toolStatus).toBe(TOOL_STATUS.SOFT_FAIL);
-        expect(callDiagnostics).toMatchObject(
-            { failure_category: FAILURE_CATEGORY.INVALID_INPUT, failure_http_status: 404, actor_name: 'apify/web-scraper', actor_id: 'abc123' },
-        );
+        expect(callDiagnostics).toMatchObject({
+            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+            failure_http_status: 404,
+            actor_name: 'apify/web-scraper',
+            actor_id: 'abc123',
+        });
         expect(res.toolTelemetry).toBeUndefined();
         expect(res.content).toBe('ok');
     });

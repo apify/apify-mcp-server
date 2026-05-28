@@ -21,7 +21,7 @@ export type JudgeResult = {
     reason: string;
     /** Raw response from judge (for debugging) */
     rawResponse: string;
-}
+};
 
 /**
  * JSON schema for structured judge output
@@ -101,8 +101,8 @@ function parseJudgeResponse(response: string): { verdict: 'PASS' | 'FAIL'; reaso
         return parsed;
     } catch (error) {
         throw new Error(
-            `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n`
-            + `Raw response: ${response}`,
+            `Failed to parse judge JSON response: ${error instanceof Error ? error.message : String(error)}\n` +
+                `Raw response: ${response}`,
         );
     }
 }
@@ -120,9 +120,10 @@ export async function evaluateConversation(
     const formattedConversation = formatConversationForJudge(conversation);
 
     // Create judge prompt using reference field
-    const judgePrompt = JUDGE_PROMPT_TEMPLATE
-        .replace('{{reference}}', testCase.reference || '')
-        .replace('{{conversation}}', formattedConversation);
+    const judgePrompt = JUDGE_PROMPT_TEMPLATE.replace('{{reference}}', testCase.reference || '').replace(
+        '{{conversation}}',
+        formattedConversation,
+    );
 
     // Call judge LLM with structured output schema
     const response = await llmClient.callLlm(
@@ -144,8 +145,8 @@ export async function evaluateConversation(
         };
     } catch (error) {
         throw new Error(
-            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n`
-            + `Raw response: ${rawResponse}`,
+            `Failed to parse judge response: ${error instanceof Error ? error.message : String(error)}\n` +
+                `Raw response: ${rawResponse}`,
         );
     }
 }

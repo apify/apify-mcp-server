@@ -72,20 +72,23 @@ export async function fetchActorDetails(
         // "apify/instagram-scraper" returns unrelated results, while "instagram-scraper" finds the correct actor.
         const actorSlug = actorName.split('/').pop() || actorName;
         const actor = apifyClient.actor(actorName);
-        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] = await Promise.all([
-            actor.get(),
-            actor.defaultBuild().then(async (build) => build.get()),
-            searchActorsByKeywords({
-                search: actorSlug,
-                apifyToken: apifyClient.token || '',
-                limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
-            }).catch(() => []),
-        ]);
+        const [actorInfo, buildInfo, storeActors]: [Actor | undefined, Build | undefined, ActorStoreList[]] =
+            await Promise.all([
+                actor.get(),
+                actor.defaultBuild().then(async (build) => build.get()),
+                searchActorsByKeywords({
+                    search: actorSlug,
+                    apifyToken: apifyClient.token || '',
+                    limit: ACTOR_DETAILS_PICTURE_SEARCH_LIMIT,
+                }).catch(() => []),
+            ]);
         if (!actorInfo || !buildInfo || !buildInfo.actorDefinition) return null;
 
         const storeActor = storeActors?.find((item) => item.id === actorInfo.id);
         const pictureUrl = storeActor?.pictureUrl;
-        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & { pictureUrl?: string };
+        const actorInfoWithPicture = { ...actorInfo, pictureUrl: pictureUrl || actorInfo.pictureUrl } as Actor & {
+            pictureUrl?: string;
+        };
 
         const inputSchema = (buildInfo.actorDefinition.input || {
             type: 'object',
@@ -160,14 +163,16 @@ export async function getMcpToolsMessage(
     try {
         const toolsResponse = await client.listTools();
         const mcpToolsInfo = toolsResponse.tools
-            .map((tool) => [
-                `**${tool.name}**`,
-                tool.description || 'No description',
-                'Input schema:',
-                '```json',
-                JSON.stringify(tool.inputSchema),
-                '```',
-            ].join('\n'))
+            .map((tool) =>
+                [
+                    `**${tool.name}**`,
+                    tool.description || 'No description',
+                    'Input schema:',
+                    '```json',
+                    JSON.stringify(tool.inputSchema),
+                    '```',
+                ].join('\n'),
+            )
             .join('\n\n');
 
         return [

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { HelperTools, TOOL_STATUS } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { HelperTool, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema, fixZodSchemaRequired } from '../../utils/ajv.js';
 import { buildMCPResponse, buildUsageMeta } from '../../utils/mcp.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
@@ -16,16 +17,8 @@ export const WAIT_SECS_DEFAULT = 30;
  * Zod schema for `get-actor-run` arguments — shared between default and widget variants.
  */
 export const getActorRunArgs = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run.'),
-    waitSecs: z.number()
-        .int()
-        .min(0)
-        .max(WAIT_SECS_MAX)
-        .optional()
-        .default(WAIT_SECS_DEFAULT)
-        .describe(dedent`
+    runId: z.string().min(1).describe('The ID of the Actor run.'),
+    waitSecs: z.number().int().min(0).max(WAIT_SECS_MAX).optional().default(WAIT_SECS_DEFAULT).describe(dedent`
             Maximum seconds to wait for the run to reach a terminal state (SUCCEEDED, FAILED, ABORTED, TIMED-OUT).
             0 returns immediately with the current status. Cap: ${WAIT_SECS_MAX}. Default: ${WAIT_SECS_DEFAULT}.
         `),
@@ -52,7 +45,7 @@ USAGE EXAMPLES:
  * Mode-independent. Widget `_meta` lives in the widget variant.
  */
 export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET,
     description: GET_ACTOR_RUN_DESCRIPTION,
     // `fixZodSchemaRequired` strips fields with a real `default` from `required` so MCP clients
@@ -77,10 +70,12 @@ export const getActorRunMetadata: Omit<HelperTool, 'call'> = {
 export function buildGetActorRunError(runId: string, error: unknown): ReturnType<typeof buildMCPResponse> {
     const errMsg = error instanceof Error ? error.message : String(error);
     return buildMCPResponse({
-        texts: [dedent`
+        texts: [
+            dedent`
             Failed to get Actor run '${runId}': ${errMsg}.
             Please verify the run ID and ensure that the run exists.
-        `],
+        `,
+        ],
         isError: true,
         telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL },
     });
@@ -98,10 +93,7 @@ export function buildGetActorRunSuccessResponse(
 
     if (!widget) {
         return buildMCPResponse({
-            texts: [
-                JSON.stringify(structuredContent),
-                `${structuredContent.summary}\n${structuredContent.nextStep}`,
-            ],
+            texts: [JSON.stringify(structuredContent), `${structuredContent.summary}\n${structuredContent.nextStep}`],
             structuredContent,
             _meta: buildUsageMeta(run),
         });

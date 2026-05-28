@@ -29,10 +29,7 @@ export type TestCaseWithLineNumbers = {
  * @param ranges - Array of line ranges to filter by
  * @returns Filtered test cases that overlap with any range
  */
-export function filterByLineRanges<T extends TestCaseWithLineNumbers>(
-    testCases: T[],
-    ranges: LineRange[],
-): T[] {
+export function filterByLineRanges<T extends TestCaseWithLineNumbers>(testCases: T[], ranges: LineRange[]): T[] {
     return testCases.filter((tc) => {
         // Include if test case overlaps with ANY range
         // eslint-disable-next-line no-underscore-dangle

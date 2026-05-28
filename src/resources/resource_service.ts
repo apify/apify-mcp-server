@@ -1,4 +1,10 @@
-import type { ListResourcesResult, ListResourceTemplatesResult, ReadResourceResult, Resource, TextResourceContents } from '@modelcontextprotocol/sdk/types.js';
+import type {
+    ListResourcesResult,
+    ListResourceTemplatesResult,
+    ReadResourceResult,
+    Resource,
+    TextResourceContents,
+} from '@modelcontextprotocol/sdk/types.js';
 
 import log from '@apify/log';
 
@@ -45,8 +51,9 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             resources.push({
                 uri: 'file://readme.md',
                 name: 'readme',
-                description: 'Apify MCP Server usage guide. Read this to understand how to use the server '
-                    + 'before interacting with it.',
+                description:
+                    'Apify MCP Server usage guide. Read this to understand how to use the server ' +
+                    'before interacting with it.',
                 mimeType: 'text/markdown',
             });
         }
@@ -73,11 +80,13 @@ export function createResourceService(options: ResourceServiceOptions): Resource
         const usageGuide = paymentProvider?.getUsageGuide?.();
         if (usageGuide && uri === 'file://readme.md') {
             return {
-                contents: [{
-                    uri: 'file://readme.md',
-                    mimeType: 'text/markdown',
-                    text: usageGuide,
-                }],
+                contents: [
+                    {
+                        uri: 'file://readme.md',
+                        mimeType: 'text/markdown',
+                        text: usageGuide,
+                    },
+                ],
             };
         }
 
@@ -86,11 +95,13 @@ export function createResourceService(options: ResourceServiceOptions): Resource
 
             if (!widget || !widget.exists) {
                 return {
-                    contents: [{
-                        uri,
-                        mimeType: 'text/plain',
-                        text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
-                    }],
+                    contents: [
+                        {
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Widget ${uri} is not available. ${!widget ? 'Not found in registry.' : `File not found at ${widget.jsPath}`}`,
+                        },
+                    ],
                 };
             }
 
@@ -125,21 +136,25 @@ export function createResourceService(options: ResourceServiceOptions): Resource
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 return {
-                    contents: [{
-                        uri,
-                        mimeType: 'text/plain',
-                        text: `Failed to load widget: ${errorMessage}`,
-                    }],
+                    contents: [
+                        {
+                            uri,
+                            mimeType: 'text/plain',
+                            text: `Failed to load widget: ${errorMessage}`,
+                        },
+                    ],
                 };
             }
         }
 
         return {
-            contents: [{
-                uri,
-                mimeType: 'text/plain',
-                text: `Resource ${uri} not found`,
-            }],
+            contents: [
+                {
+                    uri,
+                    mimeType: 'text/plain',
+                    text: `Resource ${uri} not found`,
+                },
+            ],
         };
     };
 

@@ -22,7 +22,10 @@ function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null 
     const requiredSet = new Set(inputSchema.required ?? []);
     const shown = entries.slice(0, MAX_INPUT_FIELDS_IN_TEXT_CARD);
     const fields = shown
-        .map(([name, prop]) => `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`)
+        .map(
+            ([name, prop]) =>
+                `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`,
+        )
         .join(', ');
     const overflow = entries.length - shown.length;
     const suffix = overflow > 0 ? ` ... (+${overflow} more)` : '';
@@ -100,10 +103,7 @@ type ExtractedActorData = {
  * Extracts all actor data into a normalized intermediate form.
  * Both formatActorToActorCard and formatActorToStructuredCard consume this.
  */
-function extractActorData(
-    actor: Actor | ActorStoreList,
-    options: ActorCardOptions,
-): ExtractedActorData {
+function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptions): ExtractedActorData {
     const actorFullName = `${actor.username}/${actor.name}`;
     const actorUrl = `${APIFY_STORE_URL}/${actorFullName}`;
 
@@ -112,9 +112,7 @@ function extractActorData(
         actorUrl,
         title: actor.title,
         pictureUrl: actor.pictureUrl || undefined,
-        description: options.includeDescription
-            ? (actor.description || 'No description provided.')
-            : '',
+        description: options.includeDescription ? actor.description || 'No description provided.' : '',
         pricingInfo: options.includePricing ? getActorPricingInfo(actor) : null,
         developer: { username: '', isOfficialApify: false, url: '' },
         categories: [],
@@ -143,8 +141,8 @@ function extractActorData(
             }
         }
 
-        const bookmarkCount = ('bookmarkCount' in actor && actor.bookmarkCount)
-            || ('bookmarkCount' in stats && stats.bookmarkCount);
+        const bookmarkCount =
+            ('bookmarkCount' in actor && actor.bookmarkCount) || ('bookmarkCount' in stats && stats.bookmarkCount);
         if (bookmarkCount) {
             data.stats ??= { totalUsers: 0, monthlyUsers: 0 };
             data.stats.bookmarks = Number(bookmarkCount);
@@ -153,11 +151,13 @@ function extractActorData(
 
     // Extract rating — only actorReviewRating is required (count is optional)
     if (options.includeRating) {
-        const actorReviewRating = ('actorReviewRating' in actor && actor.actorReviewRating)
-            || ('stats' in actor && actor.stats && 'actorReviewRating' in actor.stats && actor.stats.actorReviewRating);
+        const actorReviewRating =
+            ('actorReviewRating' in actor && actor.actorReviewRating) ||
+            ('stats' in actor && actor.stats && 'actorReviewRating' in actor.stats && actor.stats.actorReviewRating);
         if (actorReviewRating) {
-            const actorReviewCount = ('actorReviewCount' in actor && actor.actorReviewCount)
-                || ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
+            const actorReviewCount =
+                ('actorReviewCount' in actor && actor.actorReviewCount) ||
+                ('stats' in actor && actor.stats && 'actorReviewCount' in actor.stats && actor.stats.actorReviewCount);
             data.rating = {
                 average: Number(Number(actorReviewRating).toFixed(2)),
                 count: actorReviewCount ? Number(actorReviewCount) : 0,
@@ -227,8 +227,12 @@ export function formatActorToActorCard(
     }
 
     if (options.includeMetadata) {
-        markdownLines.push(`- **Developed by:** [${data.developer.username}](${data.developer.url}) ${data.developer.isOfficialApify ? '(Apify)' : '(community)'}`);
-        markdownLines.push(`- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`);
+        markdownLines.push(
+            `- **Developed by:** [${data.developer.username}](${data.developer.url}) ${data.developer.isOfficialApify ? '(Apify)' : '(community)'}`,
+        );
+        markdownLines.push(
+            `- **Categories:** ${data.categories.length ? data.categories.join(', ') : 'Uncategorized'}`,
+        );
         if (data.modifiedAt) {
             markdownLines.push(`- **Last modified:** ${data.modifiedAt}`);
         }
@@ -305,10 +309,7 @@ export type WidgetActor = {
  * `pricePerUnit` / `events[0].priceUsd` (which is what the widget UI renders)
  * matches the tier-filtered prices shown in the LLM text and structured output.
  */
-export function formatActorForWidget(
-    actor: Actor | ActorStoreList,
-    userTier: PricingTier,
-): WidgetActor {
+export function formatActorForWidget(actor: Actor | ActorStoreList, userTier: PricingTier): WidgetActor {
     const fullName = `${actor.username}/${actor.name}`;
     return {
         id: actor.id,
@@ -319,10 +320,10 @@ export function formatActorForWidget(
         description: actor.description || 'No description available',
         pictureUrl: actor.pictureUrl || '',
         stats: {
-            actorReviewRating: ('actorReviewRating' in actor && actor.actorReviewRating)
-                || actor.stats?.actorReviewRating || 0,
-            actorReviewCount: ('actorReviewCount' in actor && actor.actorReviewCount)
-                || actor.stats?.actorReviewCount || 0,
+            actorReviewRating:
+                ('actorReviewRating' in actor && actor.actorReviewRating) || actor.stats?.actorReviewRating || 0,
+            actorReviewCount:
+                ('actorReviewCount' in actor && actor.actorReviewCount) || actor.stats?.actorReviewCount || 0,
             totalUsers: actor.stats?.totalUsers || 0,
         },
         url: `${APIFY_STORE_URL}/${fullName}`,

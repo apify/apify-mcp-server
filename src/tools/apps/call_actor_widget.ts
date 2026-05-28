@@ -6,6 +6,7 @@ import log from '@apify/log';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { extractActorId } from '../../utils/tools.js';
@@ -28,14 +29,19 @@ import { getActorRunOutputSchema } from '../structured_output_schemas.js';
  *
  * The widget variant does not support MCP `actor:toolName` syntax — use `call-actor` for that.
  */
-const callActorWidgetArgsSchema = z.object({
-    actor: z.string()
-        .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
-    input: z.object({}).passthrough()
-        .describe('The input JSON to pass to the Actor. Required.'),
-    callOptions: callOptionsSchema.optional()
-        .describe('Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).'),
-}).strict();
+const callActorWidgetArgsSchema = z
+    .object({
+        actor: z
+            .string()
+            .describe('The name of the Actor to call. Format: "username/name" (e.g., "apify/rag-web-browser").'),
+        input: z.object({}).passthrough().describe('The input JSON to pass to the Actor. Required.'),
+        callOptions: callOptionsSchema
+            .optional()
+            .describe(
+                'Optional run config: memory (MB), timeout (s), build, maxItems (pay-per-result cap), maxTotalChargeUsd (pay-per-event cap).',
+            ),
+    })
+    .strict();
 
 const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
     Render an interactive UI element (widget) that displays live Actor run progress for the user.
@@ -59,7 +65,7 @@ const CALL_ACTOR_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const appsCallActorWidget: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL_WIDGET,
     description: CALL_ACTOR_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(callActorWidgetArgsSchema) as ToolInputSchema,
@@ -111,7 +117,11 @@ export const appsCallActorWidget: ToolEntry = Object.freeze({
 
             const actorClient = apifyClient.actor(baseActorName);
             const actorRun = await actorClient.start(input, callOptions);
-            log.debug('Started Actor run (widget)', { actorName: baseActorName, runId: actorRun.id, mcpSessionId: toolArgs.mcpSessionId });
+            log.debug('Started Actor run (widget)', {
+                actorName: baseActorName,
+                runId: actorRun.id,
+                mcpSessionId: toolArgs.mcpSessionId,
+            });
             const response = buildStartRunResponse({ actorName: baseActorName, actorRun, widget: true });
             return {
                 ...response,

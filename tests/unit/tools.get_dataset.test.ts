@@ -68,7 +68,11 @@ describe('get-dataset fields normalization', () => {
         const result = await (getDataset as HelperTool).call(
             stubToolCallContext(
                 { datasetId: 'ds-1' },
-                stubApifyClient({ id: 'ds-1', itemCount: 1, fields: ['crawl/httpStatusCode', 'metadata/url', 'markdown'] }),
+                stubApifyClient({
+                    id: 'ds-1',
+                    itemCount: 1,
+                    fields: ['crawl/httpStatusCode', 'metadata/url', 'markdown'],
+                }),
             ),
         );
         const { content } = result as TextToolResult;

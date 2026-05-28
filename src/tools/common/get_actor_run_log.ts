@@ -2,14 +2,12 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const GetRunLogArgs = z.object({
     runId: z.string().describe('The ID of the Actor run.'),
-    lines: z.number()
-        .max(50)
-        .describe('Output the last NUM lines, instead of the last 10')
-        .default(10),
+    lines: z.number().max(50).describe('Output the last NUM lines, instead of the last 10').default(10),
 });
 
 /**
@@ -17,7 +15,7 @@ const GetRunLogArgs = z.object({
  *  /v2/actor-runs/{runId}/log{?token}
  */
 export const getActorRunLog: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_LOG,
     description: `Retrieve recent log lines for a specific Actor run.
 The results will include the last N lines of the run's log output (plain text).
@@ -42,7 +40,7 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = GetRunLogArgs.parse(args);
-        const v = await client.run(parsed.runId).log().get() ?? '';
+        const v = (await client.run(parsed.runId).log().get()) ?? '';
         const lines = v.split('\n');
         const text = lines.slice(lines.length - parsed.lines - 1, lines.length).join('\n');
         return { content: [{ type: 'text', text }] };

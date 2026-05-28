@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import type { ActorsMcpServer } from '../../src/mcp/server.js';
 import type { InternalToolArgs, ToolEntry } from '../../src/types.js';
+import { TOOL_TYPE } from '../../src/types.js';
 import { ProgressTracker } from '../../src/utils/progress.js';
 
 /**
@@ -22,7 +23,9 @@ type HandlerFn = (req: Record<string, unknown>, extra: Record<string, unknown>) 
 
 function getCallToolHandler(server: unknown): HandlerFn {
     // eslint-disable-next-line no-underscore-dangle
-    const handler = (server as { server: { _requestHandlers: Map<string, HandlerFn> } }).server._requestHandlers.get('tools/call');
+    const handler = (server as { server: { _requestHandlers: Map<string, HandlerFn> } }).server._requestHandlers.get(
+        'tools/call',
+    );
     if (!handler) throw new Error('Handler "tools/call" not registered');
     return handler;
 }
@@ -31,9 +34,11 @@ function makeRecorderTool(name: string): {
     tool: ToolEntry;
     received: { progressTracker: InternalToolArgs['progressTracker'] | undefined };
 } {
-    const received: { progressTracker: InternalToolArgs['progressTracker'] | undefined } = { progressTracker: undefined };
+    const received: { progressTracker: InternalToolArgs['progressTracker'] | undefined } = {
+        progressTracker: undefined,
+    };
     const tool: ToolEntry = {
-        type: 'internal',
+        type: TOOL_TYPE.INTERNAL,
         name,
         description: 'recorder tool for progress wiring tests',
         inputSchema: { type: 'object', properties: {}, additionalProperties: true },
@@ -51,7 +56,12 @@ function makeRecorderTool(name: string): {
 async function withServer<T>(run: (server: ActorsMcpServer) => Promise<T>): Promise<T> {
     const { ActorsMcpServer: ActorsMcpServerClass } = await import('../../src/mcp/server.js');
     const taskStore = new InMemoryTaskStore();
-    const server = new ActorsMcpServerClass({ taskStore, setupSigintHandler: false, telemetry: { enabled: false }, token: 'fake-token' });
+    const server = new ActorsMcpServerClass({
+        taskStore,
+        setupSigintHandler: false,
+        telemetry: { enabled: false },
+        token: 'fake-token',
+    });
     try {
         return await run(server);
     } finally {
@@ -74,7 +84,10 @@ async function runRecorder(toolName: string, meta: Record<string, unknown>) {
 
 describe('tools/call progressToken wiring', () => {
     it('creates a ProgressTracker for get-actor-run when _meta.progressToken is provided', async () => {
-        const received = await runRecorder(HelperTools.ACTOR_RUNS_GET, { progressToken: 'tok-1', mcpSessionId: 'sess-1' });
+        const received = await runRecorder(HelperTools.ACTOR_RUNS_GET, {
+            progressToken: 'tok-1',
+            mcpSessionId: 'sess-1',
+        });
         expect(received.progressTracker).toBeInstanceOf(ProgressTracker);
     });
 

@@ -79,7 +79,8 @@ function resolveRequestAuth(
         jsonrpc: '2.0',
         error: {
             code: -32001,
-            message: 'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
+            message:
+                'Unauthorized: Apify API token is missing. Pass it as `Authorization: Bearer <token>`, or set `?payment=<provider>` to use a third-party payment provider.',
         },
         id: null,
     });
@@ -96,7 +97,10 @@ export function createExpressApp(): express.Express {
     function respondWithError(res: Response, error: unknown, logMessage: string, statusCode = 500) {
         if (statusCode >= 500) {
             // Server errors (>= 500) - log as exception
-            log.exception(error instanceof Error ? error : new Error(String(error)), 'Error in request', { logMessage, statusCode });
+            log.exception(error instanceof Error ? error : new Error(String(error)), 'Error in request', {
+                logMessage,
+                statusCode,
+            });
         } else {
             // Client errors (< 500) - log as softFail without stack trace
             const errorMessage = error instanceof Error ? error.message : String(error);
@@ -125,9 +129,8 @@ export function createExpressApp(): express.Express {
             const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
             const telemetryEnabledParam = urlParams.get('telemetry-enabled');
             // URL param > env var > default (true)
-            const telemetryEnabled = parseBooleanOrNull(telemetryEnabledParam)
-                ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
-                ?? true;
+            const telemetryEnabled =
+                parseBooleanOrNull(telemetryEnabledParam) ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ?? true;
 
             const uiParam = urlParams.get('ui');
             const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
@@ -219,8 +222,9 @@ export function createExpressApp(): express.Express {
                     jsonrpc: '2.0',
                     error: {
                         code: -32000,
-                        message: 'Not Found: Server is not connected to the client. '
-                        + 'Connect to the server with GET request to /sse endpoint',
+                        message:
+                            'Not Found: Server is not connected to the client. ' +
+                            'Connect to the server with GET request to /sse endpoint',
                     },
                     id: null,
                 });
@@ -253,9 +257,10 @@ export function createExpressApp(): express.Express {
                 const urlParams = new URL(req.url, `http://${req.headers.host}`).searchParams;
                 const telemetryEnabledParam = urlParams.get('telemetry-enabled');
                 // URL param > env var > default (true)
-                const telemetryEnabled = parseBooleanOrNull(telemetryEnabledParam)
-                    ?? parseBooleanOrNull(process.env.TELEMETRY_ENABLED)
-                    ?? true;
+                const telemetryEnabled =
+                    parseBooleanOrNull(telemetryEnabledParam) ??
+                    parseBooleanOrNull(process.env.TELEMETRY_ENABLED) ??
+                    true;
 
                 const uiParam = urlParams.get('ui');
                 const serverMode = uiParam !== null ? parseServerMode(uiParam) : parseServerMode(process.env.UI_MODE);
@@ -372,7 +377,9 @@ export function createExpressApp(): express.Express {
 
     // Catch-all for undefined routes
     app.use((req: Request, res: Response) => {
-        res.status(404).json({ message: `There is nothing at route ${req.method} ${req.originalUrl}.` }).end();
+        res.status(404)
+            .json({ message: `There is nothing at route ${req.method} ${req.originalUrl}.` })
+            .end();
     });
 
     return app;
@@ -381,7 +388,9 @@ export function createExpressApp(): express.Express {
 // Helper function to detect initialize requests
 function isInitializeRequest(body: unknown): boolean {
     if (Array.isArray(body)) {
-        return body.some((msg) => typeof msg === 'object' && msg !== null && 'method' in msg && msg.method === 'initialize');
+        return body.some(
+            (msg) => typeof msg === 'object' && msg !== null && 'method' in msg && msg.method === 'initialize',
+        );
     }
     return typeof body === 'object' && body !== null && 'method' in body && body.method === 'initialize';
 }

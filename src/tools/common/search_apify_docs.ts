@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import { DOCS_SOURCES, HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { searchDocsBySourceCached } from '../../utils/apify_docs.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -14,9 +15,7 @@ and Academy content (\`docs.apify.com/academy\`) on the same topic, prefer the p
  * Build docSource parameter description dynamically from DOCS_SOURCES
  */
 function buildDocSourceDescription(): string {
-    const options = DOCS_SOURCES.map(
-        (idx) => `• "${idx.id}" - ${idx.label}`,
-    ).join('\n');
+    const options = DOCS_SOURCES.map((idx) => `• "${idx.id}" - ${idx.label}`).join('\n');
     return `Documentation source to search. Defaults to "apify".\n${options}`;
 }
 
@@ -24,9 +23,9 @@ function buildDocSourceDescription(): string {
  * Build tool description dynamically from DOCS_SOURCES
  */
 function buildToolDescription(): string {
-    const sources = DOCS_SOURCES.map(
-        (idx) => `• docSource="${idx.id}" - ${idx.label}:\n  ${idx.description}`,
-    ).join('\n\n');
+    const sources = DOCS_SOURCES.map((idx) => `• docSource="${idx.id}" - ${idx.label}:\n  ${idx.description}`).join(
+        '\n\n',
+    );
 
     return `Search Apify and Crawlee documentation using full-text search.
 
@@ -43,37 +42,34 @@ ${PLATFORM_DOCS_PREFERENCE}`;
 }
 
 const searchApifyDocsToolArgsSchema = z.object({
-    docSource: z.enum(
-        DOCS_SOURCES.map((source) => source.id) as [string, ...string[]],
-    )
+    docSource: z
+        .enum(DOCS_SOURCES.map((source) => source.id) as [string, ...string[]])
         .optional()
         .default('apify')
         .describe(buildDocSourceDescription()),
-    query: z.string()
+    query: z
+        .string()
         .min(1)
         .describe(
             `Algolia full-text search query to find relevant documentation pages.
 Use only keywords, do not use full sentences or questions.
 For example, "standby actor" will return documentation pages that contain the words "standby" and "actor".`,
         ),
-    limit: z.number()
+    limit: z
+        .number()
         .min(1)
         .max(20) // Algolia does not return more than 20 results anyway
         .optional()
-        .default(5)
-        .describe(`Maximum number of search results to return. Defaults to 5. Maximum is 20.
+        .default(5).describe(`Maximum number of search results to return. Defaults to 5. Maximum is 20.
 You can increase this limit if you need more results, but keep in mind that the search results are limited to the most relevant pages.`),
-    offset: z.number()
-        .optional()
-        .default(0)
-        .describe(`Offset for the search results. Defaults to 0.
+    offset: z.number().optional().default(0).describe(`Offset for the search results. Defaults to 0.
 Use this to paginate through the search results. For example, if you want to get the next 5 results, set the offset to 5 and limit to 5.`),
 });
 
 const searchApifyDocsToolInputSchema = z.toJSONSchema(searchApifyDocsToolArgsSchema) as ToolInputSchema;
 
 export const searchApifyDocsTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_SEARCH,
     description: buildToolDescription(),
     inputSchema: searchApifyDocsToolInputSchema,
@@ -114,13 +110,15 @@ You can also try using more specific or alternative keywords related to your sea
         // Actual unstructured text result
         const textResult = `Search results for "${query}" in ${parsed.docSource}:
 
-${results.map((result) => {
-            let line = `- Document URL: ${result.url}`;
-            if (result.content) {
-                line += `\n  Content: ${result.content}`;
-            }
-            return line;
-        }).join('\n\n')}`;
+${results
+    .map((result) => {
+        let line = `- Document URL: ${result.url}`;
+        if (result.content) {
+            line += `\n  Content: ${result.content}`;
+        }
+        return line;
+    })
+    .join('\n\n')}`;
 
         const structuredContent = {
             results: results.map((result) => ({

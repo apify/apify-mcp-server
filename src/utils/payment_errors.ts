@@ -58,9 +58,10 @@ export function registerPaymentRequiredInterceptor(apifyClient: ApifyClient): vo
     // eslint-disable-next-line @typescript-eslint/promise-function-async -- axios interceptors must return a rejected promise, not throw
     axiosInstance.interceptors.response.use(null, (error: unknown) => {
         const response = (error as { response?: { status?: number; headers?: Record<string, string> } })?.response;
-        const paymentData = response?.status === HTTP_PAYMENT_REQUIRED
-            ? decodePaymentRequiredHeader(response.headers?.[PAYMENT_REQUIRED_HEADER])
-            : undefined;
+        const paymentData =
+            response?.status === HTTP_PAYMENT_REQUIRED
+                ? decodePaymentRequiredHeader(response.headers?.[PAYMENT_REQUIRED_HEADER])
+                : undefined;
 
         if (paymentData) {
             Object.defineProperty(error as object, PAYMENT_REQUIRED_DATA, { value: paymentData, enumerable: false });
@@ -106,10 +107,7 @@ export function buildPaymentRequiredResponse(errorOrMessage: unknown, precompute
     const message = errorOrMessage instanceof Error ? errorOrMessage.message : String(errorOrMessage);
 
     const texts = paymentData
-        ? [
-            JSON.stringify(paymentData),
-            'Payment required to run this Actor or access this resource.',
-        ]
+        ? [JSON.stringify(paymentData), 'Payment required to run this Actor or access this resource.']
         : [message];
 
     return buildMCPResponse({ texts, isError: true, structuredContent: paymentData });

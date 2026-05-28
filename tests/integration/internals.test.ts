@@ -20,11 +20,19 @@ beforeAll(() => {
 
 describe('MCP server internals integration tests', () => {
     it('should load and restore tools from a tool list', async () => {
-        const actorsMcpServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore(), serverMode: ServerMode.DEFAULT });
+        const actorsMcpServer = new ActorsMcpServer({
+            setupSigintHandler: false,
+            taskStore: new InMemoryTaskStore(),
+            serverMode: ServerMode.DEFAULT,
+        });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
-        const initialTools = await loadToolsFromInput({
-            enableAddingActors: true,
-        } as Input, apifyClient, 'default');
+        const initialTools = await loadToolsFromInput(
+            {
+                enableAddingActors: true,
+            } as Input,
+            apifyClient,
+            'default',
+        );
         actorsMcpServer.upsertTools(initialTools);
 
         // Load new tool
@@ -67,7 +75,11 @@ describe('MCP server internals integration tests', () => {
             toolNotificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore(), serverMode: ServerMode.DEFAULT });
+        const actorsMCPServer = new ActorsMcpServer({
+            setupSigintHandler: false,
+            taskStore: new InMemoryTaskStore(),
+            serverMode: ServerMode.DEFAULT,
+        });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');
         actorsMCPServer.upsertTools(seeded);
@@ -106,7 +118,11 @@ describe('MCP server internals integration tests', () => {
             notificationCount++;
         };
 
-        const actorsMCPServer = new ActorsMcpServer({ setupSigintHandler: false, taskStore: new InMemoryTaskStore(), serverMode: ServerMode.DEFAULT });
+        const actorsMCPServer = new ActorsMcpServer({
+            setupSigintHandler: false,
+            taskStore: new InMemoryTaskStore(),
+            serverMode: ServerMode.DEFAULT,
+        });
         const apifyClient = new ApifyClient({ token: process.env.APIFY_TOKEN });
         const seeded = await loadToolsFromInput({ enableAddingActors: true } as Input, apifyClient, 'default');
         actorsMCPServer.upsertTools(seeded);

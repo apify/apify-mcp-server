@@ -76,7 +76,7 @@ export class ApifyClient extends _ApifyClient {
 
         super({
             // token null case is handled, we can assert type here
-            ...clientOptions as ApifyClientOptions,
+            ...(clientOptions as ApifyClientOptions),
             baseUrl: getApifyAPIBaseUrl(),
             requestInterceptors,
         });

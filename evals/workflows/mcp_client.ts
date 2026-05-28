@@ -39,10 +39,7 @@ export class McpClient {
         const stdioBinPath = path.resolve(process.cwd(), 'dist/stdio.js');
 
         if (!fs.existsSync(stdioBinPath)) {
-            throw new Error(
-                'MCP server binary not found at dist/stdio.js. '
-                + 'Please run "pnpm run build" first.',
-            );
+            throw new Error('MCP server binary not found at dist/stdio.js. ' + 'Please run "pnpm run build" first.');
         }
 
         // Build args for MCP server

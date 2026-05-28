@@ -17,7 +17,9 @@ describe('call_actor_common', () => {
             const description = buildCallActorDescription();
 
             expect(description).toContain(`Use ${HelperTools.ACTOR_GET_DETAILS} to get the Actor's input schema`);
-            expect(description).toContain(`${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`);
+            expect(description).toContain(
+                `${HelperTools.STORE_SEARCH} is available in this session, use it to resolve the correct Actor first`,
+            );
             expect(description).toContain('waitSecs');
             expect(description).toContain(HelperTools.DATASET_GET_ITEMS);
             expect(description).not.toContain('always runs asynchronously');
@@ -52,27 +54,33 @@ describe('call_actor_common', () => {
             const allText = response.content.map((c) => c.text).join('\n');
             expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
-            expect(response.toolTelemetry).toEqual(expect.objectContaining({
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
-                failureHttpStatus: 404,
-                failureDetail: 'Actor not found',
-                actorId: 'actor-123',
-            }));
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.INVALID_INPUT,
+                    failureHttpStatus: 404,
+                    failureDetail: 'Actor not found',
+                    actorId: 'actor-123',
+                }),
+            );
         });
 
         it('returns approval URL for full-permission-actor-not-approved error', () => {
             const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';
-            const error = new ApifyApiError({
-                data: {
-                    error: {
-                        type: 'full-permission-actor-not-approved',
-                        message: 'This Actor requires full access to your account. You must approve its permissions before running it.',
-                        data: { approvalUrl },
+            const error = new ApifyApiError(
+                {
+                    data: {
+                        error: {
+                            type: 'full-permission-actor-not-approved',
+                            message:
+                                'This Actor requires full access to your account. You must approve its permissions before running it.',
+                            data: { approvalUrl },
+                        },
                     },
-                },
-                status: 403,
-            } as AxiosResponse, 1);
+                    status: 403,
+                } as AxiosResponse,
+                1,
+            );
 
             const response = buildCallActorErrorResponse({
                 actorName: 'apify/some-actor',
@@ -85,12 +93,14 @@ describe('call_actor_common', () => {
             const allText = response.content.map((c) => c.text).join('\n');
             expect(allText).toContain('This Actor requires full access to your account');
             expect(allText).toContain(approvalUrl);
-            expect(response.toolTelemetry).toEqual(expect.objectContaining({
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
-                failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
-                failureHttpStatus: 403,
-                actorId: 'actor-456',
-            }));
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.SOFT_FAIL,
+                    failureCategory: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+                    failureHttpStatus: 403,
+                    actorId: 'actor-456',
+                }),
+            );
         });
 
         it('uses public search helper name for generic errors', () => {
@@ -103,23 +113,29 @@ describe('call_actor_common', () => {
             const allText = response.content.map((c) => c.text).join('\n');
             expect(allText).toContain(`If ${HelperTools.STORE_SEARCH} is available in this session`);
             expect(allText).toContain(`using: ${HelperTools.ACTOR_GET_DETAILS}`);
-            expect(response.toolTelemetry).toEqual(expect.objectContaining({
-                toolStatus: TOOL_STATUS.FAILED,
-                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
-                failureDetail: 'boom',
-            }));
+            expect(response.toolTelemetry).toEqual(
+                expect.objectContaining({
+                    toolStatus: TOOL_STATUS.FAILED,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    failureDetail: 'boom',
+                }),
+            );
         });
 
         it('returns memory-quota recovery hint for HTTP 402 memory-limit errors', () => {
-            const error = new ApifyApiError({
-                data: {
-                    error: {
-                        type: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
-                        message: 'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
+            const error = new ApifyApiError(
+                {
+                    data: {
+                        error: {
+                            type: APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED,
+                            message:
+                                'By launching this job you will exceed the memory limit of 8192MB for all your Actor runs and builds.',
+                        },
                     },
-                },
-                status: 402,
-            } as AxiosResponse, 1);
+                    status: 402,
+                } as AxiosResponse,
+                1,
+            );
 
             const response = buildCallActorErrorResponse({
                 actorName: 'compass/crawler-google-places',
@@ -167,16 +183,21 @@ describe('call_actor_common', () => {
     });
 
     describe('buildPermissionApprovalResponse', () => {
-        const makeError = (approvalUrl?: string) => new ApifyApiError({
-            data: {
-                error: {
-                    type: 'full-permission-actor-not-approved',
-                    message: 'This Actor requires full access to your account. You must approve its permissions before running it.',
-                    ...(approvalUrl ? { data: { approvalUrl } } : {}),
-                },
-            },
-            status: 403,
-        } as AxiosResponse, 1);
+        const makeError = (approvalUrl?: string) =>
+            new ApifyApiError(
+                {
+                    data: {
+                        error: {
+                            type: 'full-permission-actor-not-approved',
+                            message:
+                                'This Actor requires full access to your account. You must approve its permissions before running it.',
+                            ...(approvalUrl ? { data: { approvalUrl } } : {}),
+                        },
+                    },
+                    status: 403,
+                } as AxiosResponse,
+                1,
+            );
 
         it('includes the approval URL when present', () => {
             const approvalUrl = 'https://console.apify.com/actors/abc123?approvePermissions=true';

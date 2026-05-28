@@ -1,7 +1,9 @@
-import React from "react";
-import styled from "styled-components";
-import { SkeletonBlock } from "../../components/ui/SkeletonBlock";
-import { Box, theme } from "@apify/ui-library";
+import React from 'react';
+import styled from 'styled-components';
+
+import { Box, theme } from '@apify/ui-library';
+
+import { SkeletonBlock } from '../../components/ui/SkeletonBlock';
 
 const Container = styled(Box)`
     background: ${theme.color.neutral.background};
@@ -52,7 +54,9 @@ const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = () => {
         <Container px="space16" py="space12">
             <BoxRow>
                 {/* Actor logo placeholder - matches StoreActorHeader size */}
-                <SkeletonBlock style={{ width: '40px', height: '40px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
+                <SkeletonBlock
+                    style={{ width: '40px', height: '40px', borderRadius: theme.radius.radius8, flexShrink: 0 }}
+                />
 
                 <ContentColumn>
                     {/* Title placeholder */}
@@ -60,20 +64,21 @@ const ActorListItemSkeleton: React.FC<ActorListItemSkeletonProps> = () => {
 
                     {/* Stats row placeholder - matches stats row height */}
                     <SkeletonBlock style={{ height: '16px', width: '80%' }} />
-
                 </ContentColumn>
 
                 {/* Icon button placeholder */}
                 <AlignEnd>
-                    <SkeletonBlock style={{ width: '32px', height: '32px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
+                    <SkeletonBlock
+                        style={{ width: '32px', height: '32px', borderRadius: theme.radius.radius8, flexShrink: 0 }}
+                    />
                 </AlignEnd>
             </BoxRow>
 
-                            {/* Description (2 lines) - matches Text size="small" */}
-                <DescriptionGroup>
-                    <SkeletonBlock style={{ height: '14px', width: '100%' }} />
-                    <SkeletonBlock style={{ height: '14px', width: '100%' }} />
-                </DescriptionGroup>
+            {/* Description (2 lines) - matches Text size="small" */}
+            <DescriptionGroup>
+                <SkeletonBlock style={{ height: '14px', width: '100%' }} />
+                <SkeletonBlock style={{ height: '14px', width: '100%' }} />
+            </DescriptionGroup>
         </Container>
     );
 };
@@ -153,7 +158,9 @@ export const ActorSearchDetailSkeleton: React.FC = () => {
                 <HeaderSection px="space16" py="space12">
                     <HeaderRow py="space2">
                         {/* Actor icon - matches StoreActorHeader size */}
-                        <SkeletonBlock style={{ width: '64px', height: '64px', borderRadius: theme.radius.radius8, flexShrink: 0 }} />
+                        <SkeletonBlock
+                            style={{ width: '64px', height: '64px', borderRadius: theme.radius.radius8, flexShrink: 0 }}
+                        />
                         <HeaderColumn>
                             {/* Title placeholder */}
                             <SkeletonBlock style={{ height: '20px', width: '50%' }} />
@@ -201,4 +208,3 @@ const SectionHeaderSkeleton: React.FC = () => {
         </SectionHeaderWrapper>
     );
 };
-

@@ -86,20 +86,27 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { ServerMode } from '../types.js';
+import { ServerMode, TOOL_TYPE } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, computeToolResponseSizeBytes, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
-import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
-import { classifyFailureCategory, extractAjvErrorDetails, extractToolTelemetry, getToolStatusFromError } from '../utils/tool_status.js';
-import { buildActorFields, extractActorId, extractActorName, getToolFullName, getToolPublicFieldOnly } from '../utils/tools.js';
+import { parseServerMode, resolveServerMode } from '../utils/server_mode.js';
 import {
-    getActors,
-    getToolsForServerMode,
-    toolNamesToInput,
-} from '../utils/tools_loader.js';
+    classifyFailureCategory,
+    extractAjvErrorDetails,
+    extractToolTelemetry,
+    getToolStatusFromError,
+} from '../utils/tool_status.js';
+import {
+    buildActorFields,
+    extractActorId,
+    extractActorName,
+    getToolFullName,
+    getToolPublicFieldOnly,
+} from '../utils/tools.js';
+import { getActors, getToolsForServerMode, toolNamesToInput } from '../utils/tools_loader.js';
 import { getUserInfoCached } from '../utils/userid_cache.js';
 import { getPackageVersion } from '../utils/version.js';
 import { connectMCPClient } from './client.js';
@@ -215,9 +222,8 @@ export class ActorsMcpServer {
         // consumers have migrated (see apify-mcp-server-internal#454).
         const legacyUiMode = (options as { uiMode?: string }).uiMode;
         const rawServerMode = options.serverMode as string | undefined;
-        this.serverModeOption = rawServerMode !== undefined
-            ? parseServerMode(rawServerMode)
-            : parseServerMode(legacyUiMode);
+        this.serverModeOption =
+            rawServerMode !== undefined ? parseServerMode(rawServerMode) : parseServerMode(legacyUiMode);
         // Preliminary resolution — re-resolved inside the initialize handler once
         // client capabilities are known (only for 'auto').
         this.serverMode = resolveServerMode(this.serverModeOption, false);
@@ -249,8 +255,8 @@ export class ActorsMcpServer {
                      * Declaring resources even though we are not using them
                      * to prevent clients like Claude desktop from failing.
                      */
-                    resources: { },
-                    prompts: { },
+                    resources: {},
+                    prompts: {},
                     logging: {},
                 },
                 instructions: getServerInstructions(),
@@ -307,9 +313,11 @@ export class ActorsMcpServer {
         // (protocolVersion, serverInfo, capabilities, instructions) instead of delegating.
         // The capability-gating unit tests construct a server and act as a canary.
         // eslint-disable-next-line no-underscore-dangle
-        const sdkInitHandler = (this.server as unknown as {
-            _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
-        })._oninitialize.bind(this.server);
+        const sdkInitHandler = (
+            this.server as unknown as {
+                _oninitialize(req: InitializeRequest): Promise<InitializeResult>;
+            }
+        )._oninitialize.bind(this.server);
 
         this.server.setRequestHandler(InitializeRequestSchema, async (request) => {
             this.clientSupportsUi = isUiSupportedByClient(request);
@@ -344,8 +352,8 @@ export class ActorsMcpServer {
     private updateToolsAfterServerModeResolved(): void {
         if (this.pendingToolsAfterModeResolved.length === 0) return;
 
-        const tools = this.pendingToolsAfterModeResolved.flatMap(
-            ({ input, actorTools }) => getToolsForServerMode(input, actorTools, this.serverMode),
+        const tools = this.pendingToolsAfterModeResolved.flatMap(({ input, actorTools }) =>
+            getToolsForServerMode(input, actorTools, this.serverMode),
         );
 
         this.pendingToolsAfterModeResolved = [];
@@ -367,13 +375,13 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Register handler to get notified when tools change.
-    * The handler receives an array of tool names that the server has after the change.
-    * This is primarily used to store the tools in shared state (e.g., Redis) for recovery
-    * when the server loses local state.
-    * @throws {Error} - If a handler is already registered.
-    * @param handler - The handler function to be called when tools change.
-    */
+     * Register handler to get notified when tools change.
+     * The handler receives an array of tool names that the server has after the change.
+     * This is primarily used to store the tools in shared state (e.g., Redis) for recovery
+     * when the server loses local state.
+     * @throws {Error} - If a handler is already registered.
+     * @param handler - The handler function to be called when tools change.
+     */
     public registerToolsChangedHandler(handler: (toolNames: string[]) => void) {
         if (this.toolsChangedHandler) {
             throw new Error('Tools changed handler is already registered.');
@@ -382,9 +390,9 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Unregister the handler for tools changed event.
-    * @throws {Error} - If no handler is currently registered.
-    */
+     * Unregister the handler for tools changed event.
+     * @throws {Error} - If no handler is currently registered.
+     */
     public unregisterToolsChangedHandler() {
         if (!this.toolsChangedHandler) {
             throw new Error('Tools changed handler is not registered.');
@@ -398,7 +406,7 @@ export class ActorsMcpServer {
      */
     private listInternalToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === 'internal')
+            .filter((tool) => tool.type === TOOL_TYPE.INTERNAL)
             .map((tool) => tool.name);
     }
 
@@ -408,7 +416,7 @@ export class ActorsMcpServer {
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === 'actor')
+            .filter((tool) => tool.type === TOOL_TYPE.ACTOR)
             .map((tool) => tool.actorFullName);
     }
 
@@ -418,7 +426,7 @@ export class ActorsMcpServer {
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())
-            .filter((tool: ToolEntry) => tool.type === 'actor-mcp')
+            .filter((tool: ToolEntry) => tool.type === TOOL_TYPE.ACTOR_MCP)
             .map((tool) => tool.actorId);
         // Ensure uniqueness
         return Array.from(new Set(ids));
@@ -433,11 +441,11 @@ export class ActorsMcpServer {
     }
 
     /**
-    * Loads missing toolNames from a provided list of tool names.
-    * Skips toolNames that are already loaded and loads only the missing ones.
-    * @param toolNames - Array of tool names to ensure are loaded
-    * @param apifyClient
-    */
+     * Loads missing toolNames from a provided list of tool names.
+     * Skips toolNames that are already loaded and loads only the missing ones.
+     * @param toolNames - Array of tool names to ensure are loaded
+     * @param apifyClient
+     */
     public async loadToolsByName(toolNames: string[], apifyClient: ApifyClient) {
         const loadedTools = new Set(this.listAllToolNames());
         const missingToolNames = toolNames.filter((toolName) => !loadedTools.has(toolName));
@@ -587,13 +595,16 @@ export class ActorsMcpServer {
             //     the client sends an Accept header missing one of the required MIME types — pure
             //     client misconfiguration, not a server fault; HTTP 406 is already returned to caller)
             // All are expected; log as softFail so they don't flood Mezmo error alerts.
-            const clientDisconnectPattern = new RegExp([
-                'Not connected',
-                'No connection established',
-                'Only one SSE stream',
-                'Controller is already closed',
-                'Not Acceptable: Client must accept',
-            ].join('|'), 'i');
+            const clientDisconnectPattern = new RegExp(
+                [
+                    'Not connected',
+                    'No connection established',
+                    'Only one SSE stream',
+                    'Controller is already closed',
+                    'Not Acceptable: Client must accept',
+                ].join('|'),
+                'i',
+            );
             if (clientDisconnectPattern.test(error.message ?? '')) {
                 // Mezmo (logDNA) promotes log entries to errors when the message contains "error".
                 // Use errMessage key and sanitize the string to preserve the soft-fail log level.
@@ -703,8 +714,8 @@ export class ActorsMcpServer {
     }
 
     /**
-      * Sets up MCP request handlers for long-running tasks.
-      */
+     * Sets up MCP request handlers for long-running tasks.
+     */
     private setupTaskHandlers(): void {
         // List tasks
         this.server.setRequestHandler(ListTasksRequestSchema, async (request) => {
@@ -743,10 +754,7 @@ export class ActorsMcpServer {
             if (!task) {
                 // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
                 log.softFail('[GetTaskPayloadRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" not found`,
-                );
+                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
             }
             if (task.status !== 'completed' && task.status !== 'failed') {
                 throw new McpError(
@@ -777,10 +785,7 @@ export class ActorsMcpServer {
             if (!task) {
                 // Client error (invalid/unknown taskId) — softFail to avoid polluting error logs.
                 log.softFail('[CancelTaskRequestSchema] Task not found', { taskId, mcpSessionId, statusCode: 404 });
-                throw new McpError(
-                    ErrorCode.InvalidParams,
-                    `Task "${taskId}" not found`,
-                );
+                throw new McpError(ErrorCode.InvalidParams, `Task "${taskId}" not found`);
             }
             if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
                 // Client error (cancel on terminal task) — softFail to avoid polluting error logs.
@@ -810,10 +815,12 @@ export class ActorsMcpServer {
          * @returns {object} - The response object containing the tools.
          */
         this.server.setRequestHandler(ListToolsRequestSchema, async () => {
-            const tools = Array.from(this.tools.values()).map((tool) => getToolPublicFieldOnly(tool, {
-                mode: this.serverMode,
-                filterWidgetMeta: true,
-            }));
+            const tools = Array.from(this.tools.values()).map((tool) =>
+                getToolPublicFieldOnly(tool, {
+                    mode: this.serverMode,
+                    filterWidgetMeta: true,
+                }),
+            );
             return { tools };
         });
 
@@ -883,31 +890,42 @@ export class ActorsMcpServer {
 
             try {
                 // Validate token
-                if (!apifyToken && !this.options.paymentProvider?.allowsUnauthenticated && !this.options.allowUnauthMode) {
-                    await failInvalidParams(dedent`
+                if (
+                    !apifyToken &&
+                    !this.options.paymentProvider?.allowsUnauthenticated &&
+                    !this.options.allowUnauthMode
+                ) {
+                    await failInvalidParams(
+                        dedent`
                     Apify API token is required but was not provided.
                     Please set the APIFY_TOKEN environment variable or pass it as a parameter in the request header as Authorization Bearer <token>.
                     You can get your Apify token from https://console.apify.com/account/integrations.
-                `, {
-                        failure_category: FAILURE_CATEGORY.AUTH,
-                    });
+                `,
+                        {
+                            failure_category: FAILURE_CATEGORY.AUTH,
+                        },
+                    );
                 }
 
                 // TODO - if connection is /mcp client will not receive notification on tool change
                 // Find tool by name, actor full name, or legacy tool name (e.g. apify-slash-rag-web-browser → apify--rag-web-browser)
                 const newName = legacyToolNameToNew(name) ?? name;
-                const toolEntry = Array.from(this.tools.values())
-                    .find((t) => t.name === newName || getToolFullName(t) === newName);
+                const toolEntry = Array.from(this.tools.values()).find(
+                    (t) => t.name === newName || getToolFullName(t) === newName,
+                );
 
                 if (!toolEntry) {
                     const availableTools = this.listToolNames();
-                    await failInvalidParams(dedent`
+                    await failInvalidParams(
+                        dedent`
                     Tool "${name}" was not found.
                     Available tools: ${availableTools.length > 0 ? availableTools.join(', ') : 'none'}.
                     Please verify the tool name is correct. You can list all available tools using the tools/list request.
-                `, {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                    });
+                `,
+                        {
+                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        },
+                    );
                 }
 
                 const tool = toolEntry!;
@@ -925,13 +943,16 @@ export class ActorsMcpServer {
                 callDiagnostics = { ...callDiagnostics, ...buildActorFields(actorName, actorId) };
 
                 if (!args) {
-                    await failInvalidParams(dedent`
+                    await failInvalidParams(
+                        dedent`
                     Missing arguments for tool "${name}".
                     Please provide the required arguments for this tool. Check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool to see what parameters are required.
-                `, {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...buildActorFields(actorName, actorId),
-                    });
+                `,
+                        {
+                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                            ...buildActorFields(actorName, actorId),
+                        },
+                    );
                 }
 
                 // Decode dot property names in arguments before validation,
@@ -940,7 +961,12 @@ export class ActorsMcpServer {
 
                 // Centralize all payment processing: validate, strip payment fields, create client.
                 // Must run before AJV validation so toolArgsWithoutPayment doesn't contain provider-specific fields.
-                const { toolArgsWithoutPayment: toolArgs, toolArgsRedacted: logSafeArgs, apifyClient, paymentRequiredResult } = prepareToolCallContext({
+                const {
+                    toolArgsWithoutPayment: toolArgs,
+                    toolArgsRedacted: logSafeArgs,
+                    apifyClient,
+                    paymentRequiredResult,
+                } = prepareToolCallContext({
                     provider: this.options.paymentProvider,
                     tool,
                     args: args as Record<string, unknown>,
@@ -953,29 +979,40 @@ export class ActorsMcpServer {
                 if (!tool.ajvValidate(toolArgs)) {
                     const errors = tool.ajvValidate.errors || [];
                     const ajvErrorDetails = extractAjvErrorDetails(errors);
-                    const errorMessages = errors.map((e: { message?: string; instancePath?: string }) => `${e.instancePath || 'root'}: ${e.message || 'validation error'}`).join('; ');
-                    await failInvalidParams(dedent`
+                    const errorMessages = errors
+                        .map(
+                            (e: { message?: string; instancePath?: string }) =>
+                                `${e.instancePath || 'root'}: ${e.message || 'validation error'}`,
+                        )
+                        .join('; ');
+                    await failInvalidParams(
+                        dedent`
                     Invalid arguments for tool "${tool.name}".
                     Validation errors: ${errorMessages}.
                     Please check the tool's input schema using ${HelperTools.ACTOR_GET_DETAILS} tool and ensure all required parameters are provided with correct types and values.
-                `, {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...ajvErrorDetails,
-                        ...buildActorFields(actorName, actorId),
-                    });
+                `,
+                        {
+                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                            ...ajvErrorDetails,
+                            ...buildActorFields(actorName, actorId),
+                        },
+                    );
                 }
 
                 // Check if tool call is a long-running task and the tool supports that
                 // Cast to allowed task mode types ('optional' | 'required') for type-safe includes() check
-                const taskSupport = tool.execution?.taskSupport as typeof ALLOWED_TASK_TOOL_EXECUTION_MODES[number];
+                const taskSupport = tool.execution?.taskSupport as (typeof ALLOWED_TASK_TOOL_EXECUTION_MODES)[number];
                 if (request.params.task && !ALLOWED_TASK_TOOL_EXECUTION_MODES.includes(taskSupport)) {
-                    await failInvalidParams(dedent`
+                    await failInvalidParams(
+                        dedent`
                     Tool "${tool.name}" does not support long running task calls.
                     Please remove the "task" parameter from the tool call request or use a different tool that supports long running tasks.
-                `, {
-                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                        ...buildActorFields(actorName, actorId),
-                    });
+                `,
+                        {
+                            failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                            ...buildActorFields(actorName, actorId),
+                        },
+                    );
                 }
 
                 // Standby / MCP-server Actors are never payable via a third-party provider —
@@ -985,17 +1022,19 @@ export class ActorsMcpServer {
                 // when fetching the task result. Task-mode `call-actor` declares
                 // `taskSupport: 'optional'`, so without this both paths would 402 by default.
                 const { paymentProvider } = this.options;
-                const isCallActorTool = tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
+                const isCallActorTool =
+                    tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_CALL_WIDGET;
                 const actorArg = (toolArgs as { actor?: unknown } | undefined)?.actor;
 
-                const standbyRejection = paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
-                    ? await checkPaymentProviderStandbyConflict({
-                        actorName: actorArg,
-                        paymentProvider,
-                        apifyToken,
-                        mcpSessionId,
-                    })
-                    : null;
+                const standbyRejection =
+                    paymentProvider && isCallActorTool && typeof actorArg === 'string' && actorArg.length > 0
+                        ? await checkPaymentProviderStandbyConflict({
+                              actorName: actorArg,
+                              paymentProvider,
+                              apifyToken,
+                              mcpSessionId,
+                          })
+                        : null;
 
                 // TODO: we should split this huge method into smaller parts as it is slowly getting out of hand
                 // Handle long-running task request
@@ -1008,7 +1047,11 @@ export class ActorsMcpServer {
                         request,
                         mcpSessionId,
                     );
-                    log.debug('Created task for tool execution', { taskId: task.taskId, toolName: tool.name, mcpSessionId });
+                    log.debug('Created task for tool execution', {
+                        taskId: task.taskId,
+                        toolName: tool.name,
+                        mcpSessionId,
+                    });
 
                     // Execute the tool asynchronously and update task status
                     setImmediate(() => {
@@ -1026,7 +1069,9 @@ export class ActorsMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                        }).catch((error) => log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }));
+                        }).catch((error) =>
+                            log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
+                        );
                     });
 
                     // Return the task immediately; execution continues asynchronously
@@ -1057,18 +1102,18 @@ export class ActorsMcpServer {
                 }
 
                 // Handle internal tool
-                if (tool.type === 'internal') {
+                if (tool.type === TOOL_TYPE.INTERNAL) {
                     // Tools that may emit notifications/progress during a sync wait must be opted in here.
                     // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
-                    const progressTrackerOptIn = tool.name === HelperTools.ACTOR_CALL
-                        || tool.name === HelperTools.ACTOR_RUNS_GET;
+                    const progressTrackerOptIn =
+                        tool.name === HelperTools.ACTOR_CALL || tool.name === HelperTools.ACTOR_RUNS_GET;
                     const progressTracker = progressTrackerOptIn
                         ? createProgressTracker(progressToken, extra.sendNotification)
                         : null;
 
                     try {
                         log.info('Calling internal tool', { toolName: tool.name, mcpSessionId, input: logSafeArgs });
-                        const res = await tool.call({
+                        const res = (await tool.call({
                             args: toolArgs!,
                             extra,
                             apifyMcpServer: this,
@@ -1077,7 +1122,7 @@ export class ActorsMcpServer {
                             apifyClient: apifyClient!,
                             progressTracker,
                             mcpSessionId,
-                        }) as Record<string, unknown>;
+                        })) as Record<string, unknown>;
 
                         // Extract diagnostics and strip internal fields from res before returning to client.
                         const diag = extractToolTelemetry(res, actorName, actorId);
@@ -1089,7 +1134,7 @@ export class ActorsMcpServer {
                     }
                 }
 
-                if (tool.type === 'actor-mcp') {
+                if (tool.type === TOOL_TYPE.ACTOR_MCP) {
                     let client: Client | null = null;
                     try {
                         client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
@@ -1129,13 +1174,17 @@ export class ActorsMcpServer {
                             mcpSessionId,
                             input: logSafeArgs,
                         });
-                        const res = await client.callTool({
-                            name: tool.originToolName,
-                            arguments: toolArgs!,
-                            _meta: { progressToken },
-                        }, CallToolResultSchema, {
-                            timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
-                        });
+                        const res = await client.callTool(
+                            {
+                                name: tool.originToolName,
+                                arguments: toolArgs!,
+                                _meta: { progressToken },
+                            },
+                            CallToolResultSchema,
+                            {
+                                timeout: EXTERNAL_TOOL_CALL_TIMEOUT_MSEC,
+                            },
+                        );
 
                         // TODO: actor-mcp responses are opaque — isError could be a user input problem
                         // (e.g. invalid query) or a genuine server failure. We can't distinguish without
@@ -1143,38 +1192,55 @@ export class ActorsMcpServer {
                         // actor-mcp gets deeper telemetry treatment.
                         if ('isError' in res && res.isError) {
                             toolStatus = TOOL_STATUS.SOFT_FAIL;
-                            callDiagnostics = { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...buildActorFields(actorName, actorId) };
+                            callDiagnostics = {
+                                failure_category: FAILURE_CATEGORY.INTERNAL_ERROR,
+                                ...buildActorFields(actorName, actorId),
+                            };
                         }
 
                         return captureResult({ ...res });
                     } catch (error) {
                         toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                        const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                        const failureDetail =
+                            error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
                         callDiagnostics = {
                             failure_category: classifyFailureCategory(error),
                             failure_detail: failureDetail,
                             ...buildActorFields(actorName, actorId),
                         };
-                        logHttpError(error, `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`, {
-                            actorId: tool.actorId,
-                            toolName: tool.originToolName,
-                            failureCategory: callDiagnostics.failure_category,
-                        });
-                        return captureResult(buildMCPResponse({
-                            texts: [`Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`],
-                            isError: true,
-                        }));
+                        logHttpError(
+                            error,
+                            `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}'`,
+                            {
+                                actorId: tool.actorId,
+                                toolName: tool.originToolName,
+                                failureCategory: callDiagnostics.failure_category,
+                            },
+                        );
+                        return captureResult(
+                            buildMCPResponse({
+                                texts: [
+                                    `Failed to call MCP tool '${tool.originToolName}' on Actor '${tool.actorId}': ${error instanceof Error ? error.message : String(error)}. The MCP server may be temporarily unavailable.`,
+                                ],
+                                isError: true,
+                            }),
+                        );
                     } finally {
                         if (client) await client.close();
                     }
                 }
 
                 // Handle actor tool
-                if (tool.type === 'actor') {
+                if (tool.type === TOOL_TYPE.ACTOR) {
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
                     try {
-                        log.info('Calling Actor', { toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
+                        log.info('Calling Actor', {
+                            toolName: tool.name,
+                            actorName: tool.actorFullName,
+                            mcpSessionId,
+                            input: logSafeArgs,
+                        });
                         const executorResult = await actorExecutor.executeActorTool({
                             actorFullName: tool.actorFullName,
                             input: toolArgs!,
@@ -1224,7 +1290,10 @@ export class ActorsMcpServer {
                         failure_http_status: error.statusCode,
                         ...buildActorFields(actorName, actorId),
                     };
-                    logHttpError(error, 'Permission approval required while calling tool', { toolName: name, mcpSessionId });
+                    logHttpError(error, 'Permission approval required while calling tool', {
+                        toolName: name,
+                        mcpSessionId,
+                    });
                     return captureResult(buildPermissionApprovalResponse(error));
                 }
 
@@ -1236,7 +1305,8 @@ export class ActorsMcpServer {
                 }
 
                 toolStatus = getToolStatusFromError(error, Boolean(extra.signal?.aborted));
-                const failureDetail = error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
+                const failureDetail =
+                    error instanceof Error ? error.message.slice(0, 200) : String(error).slice(0, 200);
                 callDiagnostics = {
                     // Spread existing diagnostics first (e.g. validation_keyword from failInvalidParams),
                     // then overwrite with freshly computed fields so they take precedence.
@@ -1259,11 +1329,13 @@ export class ActorsMcpServer {
                     validationMissingProperty: callDiagnostics.validation_missing_property,
                     validationAdditionalProperty: callDiagnostics.validation_additional_property,
                 });
-                return captureResult(buildMCPResponse({
-                    texts: [getToolCallErrorUserText(name, error)],
-                    isError: true,
-                    telemetry: { toolStatus },
-                }));
+                return captureResult(
+                    buildMCPResponse({
+                        texts: [getToolCallErrorUserText(name, error)],
+                        isError: true,
+                        telemetry: { toolStatus },
+                    }),
+                );
             } finally {
                 if (shouldTrackTelemetry) {
                     this.logToolCallAndTelemetry({
@@ -1290,10 +1362,7 @@ export class ActorsMcpServer {
                 level: 'error',
                 data: msg,
             });
-            throw new McpError(
-                ErrorCode.InvalidParams,
-                msg,
-            );
+            throw new McpError(ErrorCode.InvalidParams, msg);
         });
     }
 
@@ -1366,8 +1435,19 @@ export class ActorsMcpServer {
         actorId?: string;
     }): Promise<void> {
         const {
-            taskId, tool, toolArgs, logSafeArgs, standbyRejection, paymentRequiredResult,
-            apifyClient, apifyToken, progressToken, extra, mcpSessionId, actorName, actorId,
+            taskId,
+            tool,
+            toolArgs,
+            logSafeArgs,
+            standbyRejection,
+            paymentRequiredResult,
+            apifyClient,
+            apifyToken,
+            progressToken,
+            extra,
+            mcpSessionId,
+            actorName,
+            actorId,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         // Always populate actor fields so they're tracked on both success and failure paths.
@@ -1382,7 +1462,11 @@ export class ActorsMcpServer {
 
         // Prepare telemetry before try-catch so it's accessible to both paths.
         // This avoids re-fetching user data in the error handler.
-        const { telemetryData, userId } = await this.prepareTelemetryData(getToolFullName(tool), mcpSessionId, apifyToken);
+        const { telemetryData, userId } = await this.prepareTelemetryData(
+            getToolFullName(tool),
+            mcpSessionId,
+            apifyToken,
+        );
 
         const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, responseSizeBytes?: number) => {
             this.logToolCallAndTelemetry({
@@ -1438,11 +1522,12 @@ export class ActorsMcpServer {
             try {
                 await this.taskStore.updateTaskStatus(taskId, 'working', undefined, mcpSessionId);
             } catch (err) {
-                if (await skipIfTaskCancelled(
-                    ' before execution started, skipping',
-                    TOOL_STATUS.ABORTED,
-                    { ...buildActorFields(actorName, actorId) },
-                )) return;
+                if (
+                    await skipIfTaskCancelled(' before execution started, skipping', TOOL_STATUS.ABORTED, {
+                        ...buildActorFields(actorName, actorId),
+                    })
+                )
+                    return;
                 throw err;
             }
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
@@ -1478,12 +1563,22 @@ export class ActorsMcpServer {
             };
 
             // Handle internal tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'internal') {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.INTERNAL) {
+                const progressTracker = createProgressTracker(
+                    progressToken,
+                    extra.sendNotification,
+                    taskId,
+                    onStatusMessage,
+                );
 
                 try {
-                    log.info('Calling internal tool for task', { taskId, toolName: tool.name, mcpSessionId, input: logSafeArgs });
-                    const res = await tool.call({
+                    log.info('Calling internal tool for task', {
+                        taskId,
+                        toolName: tool.name,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
+                    const res = (await tool.call({
                         args: toolArgs,
                         extra: taskExtra,
                         apifyMcpServer: this,
@@ -1493,7 +1588,7 @@ export class ActorsMcpServer {
                         progressTracker,
                         mcpSessionId,
                         taskMode: true,
-                    }) as Record<string, unknown>;
+                    })) as Record<string, unknown>;
 
                     const diag = extractToolTelemetry(res, actorName, actorId);
                     toolStatus = diag.toolStatus;
@@ -1507,11 +1602,22 @@ export class ActorsMcpServer {
             }
 
             // Handle actor tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === 'actor') {
-                const progressTracker = createProgressTracker(progressToken, extra.sendNotification, taskId, onStatusMessage);
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.ACTOR) {
+                const progressTracker = createProgressTracker(
+                    progressToken,
+                    extra.sendNotification,
+                    taskId,
+                    onStatusMessage,
+                );
 
                 try {
-                    log.info('Calling Actor for task', { taskId, toolName: tool.name, actorName: tool.actorFullName, mcpSessionId, input: logSafeArgs });
+                    log.info('Calling Actor for task', {
+                        taskId,
+                        toolName: tool.name,
+                        actorName: tool.actorFullName,
+                        mcpSessionId,
+                        input: logSafeArgs,
+                    });
                     const executorResult = await actorExecutor.executeActorTool({
                         actorFullName: tool.actorFullName,
                         input: toolArgs,
@@ -1559,39 +1665,51 @@ export class ActorsMcpServer {
                 logHttpError(error, 'Payment required while calling tool (task mode)', { toolName: tool.name });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this 402.
-                if (await skipIfTaskCancelled(
-                    ', skipping 402 result storage',
-                    TOOL_STATUS.ABORTED,
-                    { ...buildActorFields(actorName, actorId) },
-                )) return;
+                if (
+                    await skipIfTaskCancelled(', skipping 402 result storage', TOOL_STATUS.ABORTED, {
+                        ...buildActorFields(actorName, actorId),
+                    })
+                )
+                    return;
                 const paymentResponse = buildPaymentRequiredResponse(error);
                 await this.taskStore.storeTaskResult(taskId, 'completed', paymentResponse, mcpSessionId);
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
-                    failure_category: FAILURE_CATEGORY.INVALID_INPUT,
-                    failure_http_status: 402,
-                    ...buildActorFields(actorName, actorId),
-                }, computeToolResponseSizeBytes(paymentResponse));
+                finishTaskTracking(
+                    TOOL_STATUS.SOFT_FAIL,
+                    {
+                        failure_category: FAILURE_CATEGORY.INVALID_INPUT,
+                        failure_http_status: 402,
+                        ...buildActorFields(actorName, actorId),
+                    },
+                    computeToolResponseSizeBytes(paymentResponse),
+                );
                 return;
             }
 
             if (isPermissionApprovalError(error)) {
-                logHttpError(error, 'Permission approval required while calling tool (task mode)', { toolName: tool.name });
+                logHttpError(error, 'Permission approval required while calling tool (task mode)', {
+                    toolName: tool.name,
+                });
                 // Per MCP tasks spec: once a task is cancelled it MUST remain cancelled,
                 // so guard storeTaskResult against a cancel that raced with this approval error.
-                if (await skipIfTaskCancelled(
-                    ', skipping permission-approval result storage',
-                    TOOL_STATUS.ABORTED,
-                    { ...buildActorFields(actorName, actorId) },
-                )) return;
+                if (
+                    await skipIfTaskCancelled(', skipping permission-approval result storage', TOOL_STATUS.ABORTED, {
+                        ...buildActorFields(actorName, actorId),
+                    })
+                )
+                    return;
                 const approvalResponse = buildPermissionApprovalResponse(error);
                 await this.taskStore.storeTaskResult(taskId, 'completed', approvalResponse, mcpSessionId);
                 await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
-                finishTaskTracking(TOOL_STATUS.SOFT_FAIL, {
-                    failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
-                    failure_http_status: error.statusCode,
-                    ...buildActorFields(actorName, actorId),
-                }, computeToolResponseSizeBytes(approvalResponse));
+                finishTaskTracking(
+                    TOOL_STATUS.SOFT_FAIL,
+                    {
+                        failure_category: FAILURE_CATEGORY.PERMISSION_APPROVAL_REQUIRED,
+                        failure_http_status: error.statusCode,
+                        ...buildActorFields(actorName, actorId),
+                    },
+                    computeToolResponseSizeBytes(approvalResponse),
+                );
                 return;
             }
 
@@ -1608,8 +1726,10 @@ export class ActorsMcpServer {
             //   FAILED/ABORTED/other                                    → error
             if (toolStatus === TOOL_STATUS.SOFT_FAIL) {
                 // Mezmo promotes on "error" in message/keys — use errMessage key, sanitized.
-                const errMessage = (error instanceof Error ? error.message : String(error))
-                    .replace(/ error:/gi, ' failure:');
+                const errMessage = (error instanceof Error ? error.message : String(error)).replace(
+                    / error:/gi,
+                    ' failure:',
+                );
                 log.softFail('Tool execution soft-failed for task', {
                     taskId,
                     toolName: tool.name,
@@ -1642,10 +1762,12 @@ export class ActorsMcpServer {
                 mcpSessionId,
             });
             const failedResult = {
-                content: [{
-                    type: 'text' as const,
-                    text: userText,
-                }],
+                content: [
+                    {
+                        type: 'text' as const,
+                        text: userText,
+                    },
+                ],
                 isError: true,
                 internalToolStatus: toolStatus,
             };
@@ -1660,9 +1782,11 @@ export class ActorsMcpServer {
 
     /*
      * Creates telemetry data for a tool call.
-    */
+     */
     private async prepareTelemetryData(
-        toolName: string, mcpSessionId: string | undefined, apifyToken: string,
+        toolName: string,
+        mcpSessionId: string | undefined,
+        apifyToken: string,
     ): Promise<{ telemetryData: ToolCallTelemetryProperties | null; userId: string | null }> {
         if (!this.telemetryEnabled) {
             return { telemetryData: null, userId: null };

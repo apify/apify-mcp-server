@@ -175,9 +175,13 @@ describe('actorExecutor', () => {
             const result = await actorExecutor.executeActorTool(params);
 
             const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
-            const storages = structuredContent?.storages as {
-                datasets?: { default?: { itemsSchema?: { type?: string; properties?: Record<string, unknown> } } };
-            } | undefined;
+            const storages = structuredContent?.storages as
+                | {
+                      datasets?: {
+                          default?: { itemsSchema?: { type?: string; properties?: Record<string, unknown> } };
+                      };
+                  }
+                | undefined;
             expect(storages?.datasets?.default?.itemsSchema?.type).toBe('object');
             expect(storages?.datasets?.default?.itemsSchema?.properties).toEqual(itemProperties);
         });
@@ -188,9 +192,11 @@ describe('actorExecutor', () => {
             const result = await actorExecutor.executeActorTool(params);
 
             const { structuredContent } = result as { structuredContent?: Record<string, unknown> };
-            const storages = structuredContent?.storages as {
-                datasets?: { default?: { itemsSchema?: unknown } };
-            } | undefined;
+            const storages = structuredContent?.storages as
+                | {
+                      datasets?: { default?: { itemsSchema?: unknown } };
+                  }
+                | undefined;
             expect(storages?.datasets?.default?.itemsSchema).toBeUndefined();
         });
     });

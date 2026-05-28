@@ -22,14 +22,12 @@ export function fixZodSchemaRequired(schema: Record<string, unknown>): Record<st
 
     if (Array.isArray(cleaned.required) && typeof cleaned.properties === 'object' && cleaned.properties !== null) {
         const properties = cleaned.properties as Record<string, unknown>;
-        cleaned.required = (cleaned.required as string[]).filter(
-            (fieldName) => {
-                const fieldSchema = properties[fieldName];
-                if (typeof fieldSchema !== 'object' || fieldSchema === null) return true;
-                // Value-check (NOT `'default' in fieldSchema`) — see docstring for why.
-                return (fieldSchema as { default?: unknown }).default === undefined;
-            },
-        );
+        cleaned.required = (cleaned.required as string[]).filter((fieldName) => {
+            const fieldSchema = properties[fieldName];
+            if (typeof fieldSchema !== 'object' || fieldSchema === null) return true;
+            // Value-check (NOT `'default' in fieldSchema`) — see docstring for why.
+            return (fieldSchema as { default?: unknown }).default === undefined;
+        });
     }
 
     return cleaned;

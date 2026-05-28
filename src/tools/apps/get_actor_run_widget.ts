@@ -4,13 +4,11 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
-import {
-    buildGetActorRunError,
-    buildGetActorRunSuccessResponse,
-} from '../core/get_actor_run_common.js';
+import { buildGetActorRunError, buildGetActorRunSuccessResponse } from '../core/get_actor_run_common.js';
 import { getActorRunOutputSchema } from '../structured_output_schemas.js';
 
 /**
@@ -18,11 +16,11 @@ import { getActorRunOutputSchema } from '../structured_output_schemas.js';
  * without delay; live status updates are driven by the widget UI itself, which polls
  * `get-actor-run` with `waitSecs: 0`. Strict so stray keys are rejected on bypass paths.
  */
-const getActorRunWidgetArgsSchema = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run.'),
-}).strict();
+const getActorRunWidgetArgsSchema = z
+    .object({
+        runId: z.string().min(1).describe('The ID of the Actor run.'),
+    })
+    .strict();
 
 const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
     Render an interactive UI element (widget) that displays live progress and status of an Actor run.
@@ -38,7 +36,7 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const getActorRunWidgetTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,

@@ -15,7 +15,7 @@ export type EvaluationResult = {
     judgeResult: JudgeResult;
     durationMs: number;
     error?: string;
-}
+};
 
 /**
  * Format results as a table
@@ -75,7 +75,9 @@ export function formatResultsTable(results: EvaluationResult[]): string {
     } else if (passedTests === totalTests && errorTests === 0) {
         lines.push(`✅ Overall: PASS (${passedTests}/${totalTests} tests passed)`);
     } else {
-        lines.push(`❌ Overall: FAIL (${passedTests}/${totalTests} tests passed, ${failedTests} failed, ${errorTests} errors)`);
+        lines.push(
+            `❌ Overall: FAIL (${passedTests}/${totalTests} tests passed, ${failedTests} failed, ${errorTests} errors)`,
+        );
     }
 
     lines.push('='.repeat(100));
@@ -172,7 +174,7 @@ export type TestResultRecord = {
     turns: number;
     /** Error message if execution failed, null otherwise */
     error: string | null;
-}
+};
 
 /**
  * Results database structure
@@ -181,4 +183,4 @@ export type TestResultRecord = {
 export type ResultsDatabase = {
     version: string;
     results: Record<string, TestResultRecord>;
-}
+};

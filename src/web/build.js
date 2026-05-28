@@ -27,10 +27,7 @@ const inlineCssPlugin = {
             const cssContent = await fs.readFile(args.path, 'utf8');
 
             // Process CSS through PostCSS with Tailwind
-            const result = await postcss([
-                tailwindcss,
-                autoprefixer,
-            ]).process(cssContent, {
+            const result = await postcss([tailwindcss, autoprefixer]).process(cssContent, {
                 from: args.path,
                 to: undefined,
             });
@@ -98,7 +95,7 @@ async function buildAll() {
     try {
         await fs.rm(distPath, { recursive: true, force: true });
     } catch (err) {
-    // Ignore if doesn't exist
+        // Ignore if doesn't exist
     }
     await fs.mkdir(distPath, { recursive: true });
 
@@ -135,7 +132,7 @@ async function buildAll() {
             process.exit(0);
         });
     } else {
-    // Production build
+        // Production build
         for (const widget of widgets) {
             await buildWidget(widget, false);
         }

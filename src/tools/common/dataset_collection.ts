@@ -3,20 +3,27 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const getUserDatasetsListArgs = z.object({
-    offset: z.number()
+    offset: z
+        .number()
         .describe('Number of array elements that should be skipped at the start. The default value is 0.')
         .default(0),
-    limit: z.number()
+    limit: z
+        .number()
         .max(20)
         .describe('Maximum number of array elements to return. The default value (as well as the maximum) is 20.')
         .default(10),
-    desc: z.boolean()
-        .describe('If true or 1 then the datasets are sorted by the createdAt field in descending order. Default: sorted in ascending order.')
+    desc: z
+        .boolean()
+        .describe(
+            'If true or 1 then the datasets are sorted by the createdAt field in descending order. Default: sorted in ascending order.',
+        )
         .default(false),
-    unnamed: z.boolean()
+    unnamed: z
+        .boolean()
         .describe('If true or 1 then all the datasets are returned. By default only named datasets are returned.')
         .default(false),
 });
@@ -25,7 +32,7 @@ const getUserDatasetsListArgs = z.object({
  * https://docs.apify.com/api/v2/datasets-get
  */
 export const getUserDatasetsList: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_LIST_GET,
     description: dedent`
         List datasets (collections of Actor run data) for the authenticated user.

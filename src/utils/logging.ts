@@ -13,7 +13,7 @@ export function getHttpStatusCode(error: unknown): number | undefined {
 
     // Check for statusCode property (used by apify-client)
     if ('statusCode' in error) {
-        const { statusCode } = (error as { statusCode?: unknown });
+        const { statusCode } = error as { statusCode?: unknown };
         if (typeof statusCode === 'number' && statusCode >= 100 && statusCode < 600) {
             return statusCode;
         }
@@ -21,7 +21,7 @@ export function getHttpStatusCode(error: unknown): number | undefined {
 
     // Check for code property (used by some error types)
     if ('code' in error) {
-        const { code } = (error as { code?: unknown });
+        const { code } = error as { code?: unknown };
         if (typeof code === 'number' && code >= 100 && code < 600) {
             return code;
         }

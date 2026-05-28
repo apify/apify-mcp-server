@@ -60,7 +60,7 @@ type TieredEventPrice = {
 };
 
 export const PRICING_TIERS = ['FREE', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'DIAMOND'] as const;
-export type PricingTier = typeof PRICING_TIERS[number];
+export type PricingTier = (typeof PRICING_TIERS)[number];
 
 export type ActorChargeEvent = {
     eventTitle: string;
@@ -81,9 +81,11 @@ type PricePerEventActorPricingInfo = PricePerEventActorPricingInfoOutdated & {
     };
 };
 
-export type PricingInfo = (ActorRunPricingInfo & {
-    tieredPricing?: TieredPricing;
-}) | PricePerEventActorPricingInfo;
+export type PricingInfo =
+    | (ActorRunPricingInfo & {
+          tieredPricing?: TieredPricing;
+      })
+    | PricePerEventActorPricingInfo;
 
 /**
  * Public structured pricing contract returned by actor cards.
@@ -138,13 +140,11 @@ const FREE_ACTOR_TEXT = 'This Actor is free to use. You are only charged for Api
 const UNKNOWN_PRICING_TEXT = 'Pricing information is not available.';
 const EVENTS_UNAVAILABLE_TEXT = 'Pricing information for events is not available.';
 const EVENT_DESCRIPTION_LIMIT = 5;
-const EVENT_DESCRIPTIONS_OMITTED_NOTE = 'Event descriptions were omitted because this actor has many pricing events. '
-    + 'Use fetch-actor-details for full pricing details.';
+const EVENT_DESCRIPTIONS_OMITTED_NOTE =
+    'Event descriptions were omitted because this actor has many pricing events. ' +
+    'Use fetch-actor-details for full pricing details.';
 
-function resolveTier<T>(
-    map: Record<string, T>,
-    userTier: PricingTier,
-): { tier: string; value: T } {
+function resolveTier<T>(map: Record<string, T>, userTier: PricingTier): { tier: string; value: T } {
     if (map[userTier]) return { tier: userTier, value: map[userTier] };
     if (map.FREE) return { tier: 'FREE', value: map.FREE };
     // Pathological fallback: actor provides neither the user's tier nor FREE.
@@ -162,8 +162,10 @@ function resolveTier<T>(
  */
 function buildPricingNote(resolvedTier: string): string | null {
     if (resolvedTier === 'DIAMOND') return null;
-    return `Prices shown are for ${resolvedTier} tier. `
-        + `Higher tiers may offer lower prices — use fetch-actor-details to see the full pricing table.`;
+    return (
+        `Prices shown are for ${resolvedTier} tier. ` +
+        `Higher tiers may offer lower prices — use fetch-actor-details to see the full pricing table.`
+    );
 }
 
 function getSingleResolvedTier(resolvedTiers: Set<string>): string | null {
@@ -231,15 +233,11 @@ function formatDatasetItemComplete(info: DatasetItemLike): string {
     const tierEntries = info.tieredPricing ? Object.entries(info.tieredPricing) : [];
 
     if (tierEntries.length > 1) {
-        const tierList = tierEntries
-            .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd * 1000}`)
-            .join(', ');
+        const tierList = tierEntries.map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd * 1000}`).join(', ');
         return `This Actor has tiered pricing per 1000 ${unitLabel}: ${tierList}.`;
     }
 
-    const price = tierEntries.length === 1
-        ? tierEntries[0][1].tieredPricePerUnitUsd
-        : (info.pricePerUnitUsd ?? 0);
+    const price = tierEntries.length === 1 ? tierEntries[0][1].tieredPricePerUnitUsd : (info.pricePerUnitUsd ?? 0);
     return `This Actor costs $${price * 1000} per 1000 ${unitLabel}.`;
 }
 
@@ -248,16 +246,14 @@ function formatRentalComplete(info: RentalLike): string {
     const tierEntries = info.tieredPricing ? Object.entries(info.tieredPricing) : [];
 
     if (tierEntries.length > 1) {
-        const tierList = tierEntries
-            .map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd}`)
-            .join(', ');
-        return `This Actor is rental and has tiered pricing per month: ${tierList}, `
-            + `with a trial period of ${value} ${unit}.`;
+        const tierList = tierEntries.map(([tier, obj]) => `${tier}: $${obj.tieredPricePerUnitUsd}`).join(', ');
+        return (
+            `This Actor is rental and has tiered pricing per month: ${tierList}, ` +
+            `with a trial period of ${value} ${unit}.`
+        );
     }
 
-    const price = tierEntries.length === 1
-        ? tierEntries[0][1].tieredPricePerUnitUsd
-        : (info.pricePerUnitUsd ?? 0);
+    const price = tierEntries.length === 1 ? tierEntries[0][1].tieredPricePerUnitUsd : (info.pricePerUnitUsd ?? 0);
     return `This Actor is rental and costs $${price} per month, with a trial period of ${value} ${unit}.`;
 }
 
@@ -288,10 +284,7 @@ function formatCompleteEventDetail(event: ActorChargeEvent): string {
 }
 
 /** Complete structured contract used by `fetch-actor-details`. */
-export function pricingInfoToStructured(
-    pricingInfo: PricingInfo | null,
-    userTier: PricingTier,
-): StructuredPricingInfo {
+export function pricingInfoToStructured(pricingInfo: PricingInfo | null, userTier: PricingTier): StructuredPricingInfo {
     const base = createStructuredBase(pricingInfo, userTier);
     if (isFreeActor(pricingInfo)) return base;
 
@@ -307,10 +300,7 @@ export function pricingInfoToStructured(
     }
 }
 
-function createStructuredBase(
-    pricingInfo: PricingInfo | null,
-    userTier: PricingTier,
-): StructuredPricingInfo {
+function createStructuredBase(pricingInfo: PricingInfo | null, userTier: PricingTier): StructuredPricingInfo {
     return {
         model: pricingInfo?.pricingModel || ACTOR_PRICING_MODEL.FREE,
         userTier,
@@ -341,18 +331,17 @@ function structurePayPerEventComplete(
             description: event.eventDescription || '',
             priceUsd: typeof event.eventPriceUsd === 'number' ? event.eventPriceUsd : undefined,
             tieredPricing: event.eventTieredPricingUsd
-                ? Object.entries(event.eventTieredPricingUsd)
-                    .map(([tier, price]) => ({ tier, priceUsd: (price as TieredEventPrice).tieredEventPriceUsd }))
+                ? Object.entries(event.eventTieredPricingUsd).map(([tier, price]) => ({
+                      tier,
+                      priceUsd: (price as TieredEventPrice).tieredEventPriceUsd,
+                  }))
                 : undefined,
         })),
     };
 }
 
 /** Simplified text contract used by `search-actors`. */
-export function pricingInfoToSimplifiedString(
-    pricingInfo: PricingInfo | null,
-    userTier: PricingTier,
-): string {
+export function pricingInfoToSimplifiedString(pricingInfo: PricingInfo | null, userTier: PricingTier): string {
     if (isFreeActor(pricingInfo)) return FREE_ACTOR_TEXT;
 
     switch (pricingInfo.pricingModel) {
@@ -382,8 +371,9 @@ function formatRentalSimplified(info: RentalLike, userTier: PricingTier): string
     const { value, unit } = convertMinutesToGreatestUnit(info.trialMinutes || 0);
     if (hasTiers(info.tieredPricing)) {
         const { tier, value: entry } = resolveTier(info.tieredPricing, userTier);
-        const base = `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, `
-            + `with a trial period of ${value} ${unit}.`;
+        const base =
+            `This Actor is rental and costs $${entry.tieredPricePerUnitUsd} per month, ` +
+            `with a trial period of ${value} ${unit}.`;
         const note = hasMultipleTiers(info.tieredPricing) ? buildPricingNote(tier) : null;
         return note ? `${base} ${note}` : base;
     }
@@ -462,10 +452,7 @@ function resolveSimplifiedPatch(pricingInfo: PricingInfo, userTier: PricingTier)
     }
 }
 
-function structureTieredUnitSimplified(
-    info: DatasetItemLike | RentalLike,
-    userTier: PricingTier,
-): SimplifiedResult {
+function structureTieredUnitSimplified(info: DatasetItemLike | RentalLike, userTier: PricingTier): SimplifiedResult {
     const patch: Partial<StructuredPricingInfo> = { pricePerUnit: info.pricePerUnitUsd ?? 0 };
     if (hasTiers(info.tieredPricing)) {
         const { tier, value } = resolveTier(info.tieredPricing, userTier);
@@ -517,9 +504,9 @@ function structurePayPerEventSimplified(
             events,
             ...(omitDescriptions
                 ? {
-                    eventDescriptionsOmitted: true,
-                    eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,
-                }
+                      eventDescriptionsOmitted: true,
+                      eventDescriptionsNote: EVENT_DESCRIPTIONS_OMITTED_NOTE,
+                  }
                 : {}),
         },
         noteTier,

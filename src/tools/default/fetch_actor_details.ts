@@ -1,8 +1,5 @@
 import type { ToolEntry } from '../../types.js';
-import {
-    buildFetchActorDetailsResult,
-    fetchActorDetailsMetadata,
-} from '../core/fetch_actor_details_common.js';
+import { buildFetchActorDetailsResult, fetchActorDetailsMetadata } from '../core/fetch_actor_details_common.js';
 
 /**
  * Default mode fetch-actor-details tool.

@@ -2,20 +2,22 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const abortRunArgs = z.object({
-    runId: z.string()
-        .min(1)
-        .describe('The ID of the Actor run to abort.'),
-    gracefully: z.boolean().optional().describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
+    runId: z.string().min(1).describe('The ID of the Actor run to abort.'),
+    gracefully: z
+        .boolean()
+        .optional()
+        .describe('If true, the Actor run will abort gracefully with a 30-second timeout.'),
 });
 
 /**
  * https://docs.apify.com/api/v2/actor-run-abort-post
  */
 export const abortActorRun: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_ABORT,
     description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.

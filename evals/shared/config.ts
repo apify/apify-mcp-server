@@ -28,8 +28,13 @@ export function getRequiredEnvVars(): Record<string, string | undefined> {
  */
 export function sanitizeEnvValue(value?: string): string | undefined {
     if (value == null) return value;
-    // eslint-disable-next-line no-control-regex
-    return value.replace(/[\x00-\x08\x0a-\x1f\x7f]/g, '').trim().replace(/^"|"$/g, '');
+    return (
+        value
+            // eslint-disable-next-line no-control-regex
+            .replace(/[\x00-\x08\x0a-\x1f\x7f]/g, '')
+            .trim()
+            .replace(/^"|"$/g, '')
+    );
 }
 
 /**
@@ -40,12 +45,7 @@ export function sanitizeEnvValue(value?: string): string | undefined {
  * throws ERR_INVALID_CHAR on any control characters. We can't intercept that
  * read, so we sanitize process.env itself before any library loads.
  */
-const ENV_KEYS_TO_SANITIZE = [
-    'OPENROUTER_API_KEY',
-    'OPENROUTER_BASE_URL',
-    'PHOENIX_API_KEY',
-    'PHOENIX_BASE_URL',
-];
+const ENV_KEYS_TO_SANITIZE = ['OPENROUTER_API_KEY', 'OPENROUTER_BASE_URL', 'PHOENIX_API_KEY', 'PHOENIX_BASE_URL'];
 
 /**
  * Redact a value for safe logging: shows first 4 and last 4 chars, masks the rest.

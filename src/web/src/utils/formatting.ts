@@ -1,6 +1,6 @@
 import pluralize from 'pluralize';
 
-import type {StructuredPricingInfo} from '../types';
+import type { StructuredPricingInfo } from '../types';
 
 const PER_THOUSAND_PRICING_THRESHOLD = 0.01;
 const PRICE_DISPLAY_UNIT_SIZE = 1000;
@@ -35,10 +35,7 @@ export function formatPrice(amount = 0, intlOptions: Intl.NumberFormatOptions = 
 export function formatPriceUsd(price: number, options: FormatPriceUsdOptions = {}) {
     const { decimals, fullCurrencyCode, ...rest } = options;
 
-    const {
-        minimumFractionDigits,
-        maximumFractionDigits,
-    } = options;
+    const { minimumFractionDigits, maximumFractionDigits } = options;
     const defaultMinimumFractionDigits = Number.isInteger(decimals) ? decimals : 2;
     const defaultMaximumFractionDigits = Number.isInteger(decimals) ? decimals : 2;
 
@@ -64,8 +61,8 @@ function formatPayPerEventPricing(event: NonNullable<StructuredPricingInfo['even
 
     if (event.tieredPricing && event.tieredPricing.length > 0) {
         const tieredPrices = event.tieredPricing
-            .filter(tier => tier.tier !== 'FREE' && tier.priceUsd > 0)
-            .map(tier => tier.priceUsd);
+            .filter((tier) => tier.tier !== 'FREE' && tier.priceUsd > 0)
+            .map((tier) => tier.priceUsd);
 
         if (tieredPrices.length > 0) {
             const minPrice = Math.min(...tieredPrices);
@@ -93,9 +90,9 @@ function formatPricePerDatasetItem(pricing: StructuredPricingInfo): string {
 
     if (pricing.tieredPricing && pricing.tieredPricing.length > 0) {
         const tieredPrices = pricing.tieredPricing
-            .filter(tier => tier.tier !== 'FREE')
-            .map(tier => tier.pricePerUnit)
-            .filter(price => price > 0);
+            .filter((tier) => tier.tier !== 'FREE')
+            .map((tier) => tier.pricePerUnit)
+            .filter((price) => price > 0);
 
         if (tieredPrices.length > 0) {
             const minPrice = Math.min(...tieredPrices);
@@ -143,8 +140,8 @@ export const formatNumber = (num: number): string => {
         if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
         return num.toString();
     } catch (error) {
-        console.error("Error formatting number:", error);
-        return "N/A";
+        console.error('Error formatting number:', error);
+        return 'N/A';
     }
 };
 

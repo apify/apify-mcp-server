@@ -2,26 +2,23 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const getKeyValueStoreKeysArgs = z.object({
-    keyValueStoreId: z.string()
-        .min(1)
-        .describe('Key-value store ID or username~store-name'),
-    exclusiveStartKey: z.string()
+    keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
+    exclusiveStartKey: z
+        .string()
         .optional()
         .describe('All keys up to this one (including) are skipped from the result.'),
-    limit: z.number()
-        .max(10)
-        .optional()
-        .describe('Number of keys to be returned. Maximum value is 10.'),
+    limit: z.number().max(10).optional().describe('Number of keys to be returned. Maximum value is 10.'),
 });
 
 /**
  * https://docs.apify.com/api/v2/key-value-store-keys-get
  */
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
     description: `List keys in a key-value store with optional pagination.
 The results will include keys and basic info about stored values (e.g., size).

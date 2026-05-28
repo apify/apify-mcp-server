@@ -4,19 +4,13 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import {
-    buildActorDetailsForWidget,
-    buildCardOptions,
-    fetchActorDetails,
-} from '../../utils/actor_details.js';
+import { TOOL_TYPE } from '../../types.js';
+import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { fixActorNameInputAndLog } from '../core/actor_tools_factory.js';
-import {
-    actorDetailsOutputDefaults,
-    buildActorNotFoundResponse,
-} from '../core/fetch_actor_details_common.js';
+import { actorDetailsOutputDefaults, buildActorNotFoundResponse } from '../core/fetch_actor_details_common.js';
 import { actorDetailsWidgetOutputSchema } from '../structured_output_schemas.js';
 
 const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
@@ -27,11 +21,14 @@ const widgetConfig = getWidgetConfig(WIDGET_URIS.SEARCH_ACTORS);
  * at the server boundary; the `.strict()` Zod parse below is belt-and-braces
  * for any path that bypasses AJV.
  */
-const fetchActorDetailsWidgetArgsSchema = z.object({
-    actor: z.string()
-        .min(1)
-        .describe('Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".'),
-}).strict();
+const fetchActorDetailsWidgetArgsSchema = z
+    .object({
+        actor: z
+            .string()
+            .min(1)
+            .describe('Actor ID or full name in the format "username/name", e.g., "apify/rag-web-browser".'),
+    })
+    .strict();
 
 const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
     Render an interactive UI element (widget) displaying detailed Actor information for the user.
@@ -48,7 +45,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
-    type: 'internal',
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
     description: FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,
@@ -68,7 +65,10 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { apifyToken, apifyClient, mcpSessionId } = toolArgs;
         const parsed = fetchActorDetailsWidgetArgsSchema.parse(toolArgs.args);
-        const actorName = fixActorNameInputAndLog(parsed.actor, { mcpSessionId, route: HelperTools.ACTOR_GET_DETAILS_WIDGET });
+        const actorName = fixActorNameInputAndLog(parsed.actor, {
+            mcpSessionId,
+            route: HelperTools.ACTOR_GET_DETAILS_WIDGET,
+        });
 
         const { userPlanTier } = await getUserInfoCached(apifyToken, apifyClient);
         const cardOptions = { ...buildCardOptions(actorDetailsOutputDefaults), userTier: userPlanTier };
@@ -86,13 +86,15 @@ export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
             },
         };
 
-        const texts = [dedent`
+        const texts = [
+            dedent`
             # Actor information:
             - **Actor:** ${actorName}
             - **URL:** ${actorUrl}
 
             An interactive widget has been rendered with detailed Actor information.
-        `];
+        `,
+        ];
 
         return buildMCPResponse({
             texts,

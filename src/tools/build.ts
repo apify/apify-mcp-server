@@ -42,7 +42,9 @@ export async function getActorDefinition(
             actorDefinitions.actorFullName = `${actor.username}/${actor.name}`;
             actorDefinitions.defaultRunOptions = actor.defaultRunOptions;
             // Pass pictureUrl from actor object (untyped property but present in API response)
-            (actorDefinitions as Record<string, unknown>).pictureUrl = (actor as unknown as Record<string, unknown>).pictureUrl;
+            (actorDefinitions as Record<string, unknown>).pictureUrl = (
+                actor as unknown as Record<string, unknown>
+            ).pictureUrl;
             return {
                 definition: pruneActorDefinition(actorDefinitions),
                 info: actor,
@@ -51,10 +53,11 @@ export async function getActorDefinition(
         return null;
     } catch (error) {
         // Check if it's a "not found" error (404 or 400 status codes)
-        const isNotFound = typeof error === 'object'
-            && error !== null
-            && 'statusCode' in error
-            && (error.statusCode === 404 || error.statusCode === 400);
+        const isNotFound =
+            typeof error === 'object' &&
+            error !== null &&
+            'statusCode' in error &&
+            (error.statusCode === 404 || error.statusCode === 400);
 
         if (isNotFound) {
             // Return null for not found - caller will log appropriately
@@ -73,17 +76,18 @@ function pruneActorDefinition(response: ActorDefinitionWithDesc): ActorDefinitio
         buildTag: response?.buildTag || '',
         readme: response?.readme || '',
         readmeSummary: response.readmeSummary,
-        input: response?.input && 'type' in response.input && 'properties' in response.input
-            ? {
-                ...response.input,
-                type: response.input.type as string,
-                properties: response.input.properties as Record<string, SchemaProperties>,
-            }
-            : undefined,
+        input:
+            response?.input && 'type' in response.input && 'properties' in response.input
+                ? {
+                      ...response.input,
+                      type: response.input.type as string,
+                      properties: response.input.properties as Record<string, SchemaProperties>,
+                  }
+                : undefined,
         description: response.description,
         defaultRunOptions: response.defaultRunOptions,
-        webServerMcpPath: 'webServerMcpPath' in response ? response.webServerMcpPath as string : undefined,
-        pictureUrl: 'pictureUrl' in response ? response.pictureUrl as string | undefined : undefined,
+        webServerMcpPath: 'webServerMcpPath' in response ? (response.webServerMcpPath as string) : undefined,
+        pictureUrl: 'pictureUrl' in response ? (response.pictureUrl as string | undefined) : undefined,
     };
 }
 /** Prune Actor README if it is too long

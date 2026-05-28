@@ -9,8 +9,14 @@ import { resolvePaymentProvider } from './payments/index.js';
 import type { PaymentProvider } from './payments/types.js';
 import { getServerCard } from './server_card.js';
 import { addTool } from './tools/common/add_actor.js';
-import { getActorsAsTools, getCategoryTools, getDefaultTools, getUnauthEnabledToolCategories,
-    toolCategoriesEnabledByDefault, unauthEnabledTools } from './tools/index.js';
+import {
+    getActorsAsTools,
+    getCategoryTools,
+    getDefaultTools,
+    getUnauthEnabledToolCategories,
+    toolCategoriesEnabledByDefault,
+    unauthEnabledTools,
+} from './tools/index.js';
 import { actorNameToToolName } from './tools/utils.js';
 import type { ActorStore, ServerCard, ToolCategory } from './types.js';
 import { parseCommaSeparatedList, parseQueryParamList, readJsonFile } from './utils/generic.js';

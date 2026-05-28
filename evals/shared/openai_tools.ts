@@ -14,7 +14,7 @@ type GenericTool = {
     name: string;
     description?: string;
     inputSchema: Record<string, unknown>;
-}
+};
 
 /**
  * Convert tools to OpenAI Chat Completion format

@@ -38,15 +38,17 @@ export function getActorMCPServerPath(actorDefinition: ActorDefinition | ActorDe
  */
 export async function getActorMCPServerURL(realActorId: string, mcpServerPath: string): Promise<string> {
     // TODO: get from API instead
-    const standbyBaseUrl = process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com'
-        ? 'securitybyobscurity.apify.actor' : 'apify.actor';
+    const standbyBaseUrl =
+        process.env.HOSTNAME === 'mcp-securitybyobscurity.apify.com'
+            ? 'securitybyobscurity.apify.actor'
+            : 'apify.actor';
     const standbyUrl = await getActorStandbyURL(realActorId, standbyBaseUrl);
     return `${standbyUrl}${mcpServerPath}`;
 }
 
 /**
-* Gets Actor ID from the Actor object.
-*/
+ * Gets Actor ID from the Actor object.
+ */
 export async function getRealActorID(actorIdOrName: string, apifyToken: string): Promise<string> {
     const apifyClient = new ApifyClient({ token: apifyToken });
 
@@ -59,8 +61,8 @@ export async function getRealActorID(actorIdOrName: string, apifyToken: string):
 }
 
 /**
-* Returns standby URL for given Actor ID.
-*/
+ * Returns standby URL for given Actor ID.
+ */
 export async function getActorStandbyURL(realActorId: string, standbyBaseUrl = 'apify.actor'): Promise<string> {
     return `https://${realActorId}.${standbyBaseUrl}`;
 }

@@ -2,10 +2,10 @@
  * Shared evaluation utilities extracted from run-evaluation.ts
  */
 
-import OpenAI from 'openai';
 import { createOpenAI } from '@ai-sdk/openai';
 import { asEvaluator } from '@arizeai/phoenix-client/experiments';
 import { createClassifierFn } from '@arizeai/phoenix-evals';
+import OpenAI from 'openai';
 
 import log from '@apify/log';
 
@@ -20,8 +20,8 @@ import {
     TEMPERATURE,
     OPENROUTER_CONFIG,
 } from './config.js';
-import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
 import { transformToolsToOpenAIFormat } from './shared/openai_tools.js';
+import { loadTestCases as loadTestCasesShared, filterByCategory, filterById } from './shared/test_case_loader.js';
 import type { ToolSelectionTestCase, TestData } from './shared/types.js';
 
 // Re-export types for backwards compatibility
@@ -31,7 +31,7 @@ export type { TestData } from './shared/types.js';
 // Re-export shared functions for backwards compatibility
 export { filterByCategory, filterById } from './shared/test_case_loader.js';
 
-type ExampleInputOnly = { input: Record<string, unknown>, metadata?: Record<string, unknown>, output?: never };
+type ExampleInputOnly = { input: Record<string, unknown>; metadata?: Record<string, unknown>; output?: never };
 
 /**
  * Load test cases from a JSON file (wrapper around shared function)
@@ -49,7 +49,9 @@ export async function loadTools(): Promise<ToolBase[]> {
 export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
     const toolsOpenAI = transformToolsToOpenAIFormat(tools);
 
-    return async (example: ExampleInputOnly): Promise<{
+    return async (
+        example: ExampleInputOnly,
+    ): Promise<{
         tool_calls: OpenAI.Chat.Completions.ChatCompletionMessageToolCall[];
         llm_response: string;
         query: string;
@@ -70,7 +72,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
         if (context) {
             messages.push({
                 role: 'user',
-                content: `My previous interaction with the assistant: ${context}`
+                content: `My previous interaction with the assistant: ${context}`,
             });
         }
 
@@ -85,7 +87,7 @@ export function createOpenRouterTask(modelName: string, tools: ToolBase[]) {
             model: modelName,
             messages,
             tools: toolsOpenAI,
-            temperature: TEMPERATURE,  // Use configured temperature (0 = deterministic)
+            temperature: TEMPERATURE, // Use configured temperature (0 = deterministic)
         });
 
         log.info(`Model response: ${JSON.stringify(response.choices[0])}`);
@@ -105,7 +107,7 @@ export function createClassifierEvaluator() {
 
     return createClassifierFn({
         model: openai(TOOL_SELECTION_EVAL_MODEL),
-        choices: {correct: 1.0, incorrect: 0.0},
+        choices: { correct: 1.0, incorrect: 0.0 },
         promptTemplate: TOOL_CALLING_BASE_TEMPLATE,
     });
 }
@@ -118,7 +120,6 @@ export function createToolSelectionLLMEvaluator(tools: ToolBase[]) {
         name: EVALUATOR_NAMES.TOOL_SELECTION_LLM,
         kind: 'LLM',
         evaluate: async ({ input, output, expected }: any) => {
-
             const evalInput = {
                 query: input?.query || '',
                 context: JSON.stringify(input?.context || {}),
@@ -140,13 +141,13 @@ reference: ${expected?.reference}`);
                 log.info(`🕵 Tool selection: score: ${result.score}: ${JSON.stringify(result)}`);
                 return {
                     score: result.score || 0.0,
-                    explanation: result.explanation || 'No explanation returned by model'
+                    explanation: result.explanation || 'No explanation returned by model',
                 };
             } catch (error) {
                 log.info(`Tool selection evaluation failed: ${error}`);
                 return {
                     score: 0.0,
-                    explanation: `Evaluation failed: ${error}`
+                    explanation: `Evaluation failed: ${error}`,
                 };
             }
         },

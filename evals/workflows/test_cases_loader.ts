@@ -7,7 +7,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import type { TestCaseWithLineNumbers } from '../shared/line_range_filter.js';
-import { filterTestCases as filterTestCasesShared, loadTestCases as loadTestCasesShared } from '../shared/test_case_loader.js';
+import {
+    filterTestCases as filterTestCasesShared,
+    loadTestCases as loadTestCasesShared,
+} from '../shared/test_case_loader.js';
 import type { WorkflowTestCase } from '../shared/types.js';
 
 // Re-export WorkflowTestCase type for backwards compatibility
@@ -48,17 +51,16 @@ export function loadTestCases(filePath?: string): WorkflowTestCase[] {
 
         if (missingFields.length > 0) {
             throw new Error(
-                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n`
-                + `Required fields: id, category, query, reference\n`
-                + `Test case: ${JSON.stringify(tc, null, 2)}`,
+                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n` +
+                    `Required fields: id, category, query, reference\n` +
+                    `Test case: ${JSON.stringify(tc, null, 2)}`,
             );
         }
 
         // Check for duplicate IDs
         if (seenIds.has(tc.id)) {
             throw new Error(
-                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n`
-                + `Each test case must have a unique ID.`,
+                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n` + `Each test case must have a unique ID.`,
             );
         }
         seenIds.add(tc.id);
@@ -120,17 +122,16 @@ export function loadTestCasesWithLineNumbers(filePath?: string): {
 
         if (missingFields.length > 0) {
             throw new Error(
-                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n`
-                + `Required fields: id, category, query, reference\n`
-                + `Test case: ${JSON.stringify(tc, null, 2)}`,
+                `${testCaseRef}: Missing or empty required field(s): ${missingFields.join(', ')}\n` +
+                    `Required fields: id, category, query, reference\n` +
+                    `Test case: ${JSON.stringify(tc, null, 2)}`,
             );
         }
 
         // Check for duplicate IDs
         if (seenIds.has(tc.id)) {
             throw new Error(
-                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n`
-                + `Each test case must have a unique ID.`,
+                `${testCaseRef}: Duplicate test case ID '${tc.id}'\n` + `Each test case must have a unique ID.`,
             );
         }
         seenIds.add(tc.id);
