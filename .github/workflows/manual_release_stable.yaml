@@ -56,15 +56,15 @@ jobs:
             -   name: Build module
                 run: pnpm run build
             -   name: Prepare MCPB package
-                # `pnpm --filter=@apify/actors-mcp-server deploy --prod --legacy --node-linker=hoisted mcpb` builds a self-contained deployment dir:
-                # production-only deps, a flat (hoisted) node_modules with no `.pnpm/`
-                # store or symlinks — the MCPB packer requires a portable tree.
-                # Then we copy in the build output and assets the packer expects.
+                # `pnpm deploy` (modern, non-`--legacy`) builds a self-contained deployment dir:
+                # production-only deps, a flat (hoisted) node_modules. Modern deploy also derives
+                # a dedicated lockfile from the workspace lockfile, which keeps the supply-chain
+                # check (blockExoticSubdeps) from re-resolving and tripping on transitive deps.
+                # `dist`, `manifest.json`, README/LICENSE land via the npm `files` field — only
+                # `docs/` and the icon copy still need an explicit cp.
                 run: |
-                    pnpm --filter=@apify/actors-mcp-server deploy --prod --legacy --node-linker=hoisted mcpb
-                    cp -r dist mcpb/dist
+                    pnpm --filter=@apify/actors-mcp-server deploy --prod --node-linker=hoisted mcpb
                     cp -r docs mcpb/docs
-                    cp manifest.json mcpb/manifest.json
                     cp docs/apify-logo-claude-desktop.png mcpb/icon.png
                 # `pnpm dlx` instead of `npx` because devEngines.packageManager is
                 # pinned to pnpm with onFail: error — npx invokes npm, which is rejected
