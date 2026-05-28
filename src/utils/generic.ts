@@ -91,32 +91,16 @@ export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[])
     return result;
 }
 
-// Quote/backtick pairs that LLMs wrap user-facing identifiers in
-// (markdown backticks, straight + smart quotes). Allocated once.
-const QUOTE_WRAPPERS: [string, string][] = [
-    ['`', '`'],
-    ['"', '"'],
-    ['“', '”'],
-    ['‘', '’'],
-];
-
 /**
  * Strip surrounding quote/backtick wrappers and whitespace from an LLM-supplied id.
  *
- * LLMs often paste names wrapped in markdown backticks or smart quotes; the Apify
- * API treats those as distinct strings and 404s. Trims, strips one matched pair,
- * then strips any remaining unpaired quote-like chars on either end.
+ * LLMs paste names wrapped in markdown backticks or smart quotes; the Apify API
+ * treats those as distinct strings and 404s. Strips any leading/trailing run of
+ * `` ` ``, `'`, `"` or smart quotes — handles matched pairs, unpaired leakage,
+ * and nested wrappers (`` `"id"` ``) uniformly.
  */
 export function stripQuoteWrappers(s: string): string {
-    let out = s.trim();
-    for (const [open, close] of QUOTE_WRAPPERS) {
-        if (out.startsWith(open) && out.endsWith(close) && out.length >= open.length + close.length) {
-            out = out.slice(open.length, -close.length).trim();
-            break;
-        }
-    }
-    // Unpaired markdown / JSON leakage (e.g. `apify/rag-web-browser` or `...pr-226"`)
-    return out.replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, '').trim();
+    return s.trim().replace(/^[`'"“”‘’]+|[`'"“”‘’]+$/g, '').trim();
 }
 
 /**
