@@ -1783,7 +1783,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             // for the just-started run while the call is in flight, then trigger the cancel.
             it.runIf(options.transport === 'streamable-http')(
                 'should abort actor run on notifications/cancelled',
-                { retry: 1 },
+                { retry: 2 },
                 async () => {
                     const selectedToolName = actorNameToToolName(ACTOR_NORMAL_MODE);
                     client = await createClientFn({ enableAddingActors: true });

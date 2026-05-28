@@ -277,7 +277,7 @@ Legend for the **Enabled by default** column:
 >
 > When `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
 >
-> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — you receive a preview of the output. For long outputs the preview is truncated. To retrieve the full output, use `get-dataset-items` (auto-injected) or `get-actor-output` from the `storage` category, passing the `datasetId` returned from the call.
+> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected) or `get-actor-output` from the `storage` category, passing the `datasetId` returned from the call.
 
 ### Tool annotations
 
