@@ -45,6 +45,12 @@ function stubApifyClient(
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
+function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
+    return stubApifyClient(async () => {
+        throw err;
+    });
+}
+
 describe('get-dataset-items', () => {
     it('has the expected tool name', () => {
         expect(getDatasetItems.name).toBe(HelperTools.DATASET_GET_ITEMS);
@@ -81,12 +87,7 @@ describe('get-dataset-items', () => {
     it('returns isError with a not-found message when listItems throws 404', async () => {
         const notFound = Object.assign(new Error('Dataset was not found'), { statusCode: 404 });
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext(
-                { datasetId: 'missing' },
-                stubApifyClient(async () => {
-                    throw notFound;
-                }),
-            ),
+            stubToolCallContext({ datasetId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
         const { content } = result as TextToolResult;
 
@@ -98,12 +99,7 @@ describe('get-dataset-items', () => {
         const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
         await expect(
             (getDatasetItems as HelperTool).call(
-                stubToolCallContext(
-                    { datasetId: 'ds-1' },
-                    stubApifyClient(async () => {
-                        throw serverError;
-                    }),
-                ),
+                stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClientThrowing(serverError)),
             ),
         ).rejects.toBe(serverError);
     });
@@ -128,5 +124,20 @@ describe('get-dataset-items', () => {
         const tool = getDatasetItems as HelperTool;
         expect(tool.ajvValidate({ datasetId: '' })).toBe(false);
         expect(tool.ajvValidate({ datasetId: 'ds-1' })).toBe(true);
+    });
+
+    it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
+        const datasetSpy = vi
+            .fn()
+            .mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
+        const client = { dataset: datasetSpy } as unknown as InternalToolArgs['apifyClient'];
+
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: '`user~my-dataset`' }, client),
+        );
+
+        expect(datasetSpy).toHaveBeenCalledWith('user~my-dataset');
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+        expect(structuredContent.datasetId).toBe('user~my-dataset');
     });
 });

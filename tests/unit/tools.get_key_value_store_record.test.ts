@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
@@ -77,5 +77,18 @@ describe('get-key-value-store-record', () => {
         const tool = getKeyValueStoreRecord as HelperTool;
         expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', recordKey: '' })).toBe(false);
         expect(tool.ajvValidate({ keyValueStoreId: 'kv-1', recordKey: 'INPUT' })).toBe(true);
+    });
+
+    it('passes wrapper-stripped keyValueStoreId and recordKey to the SDK', async () => {
+        const getRecordSpy = vi.fn().mockResolvedValue(MOCK_RECORD);
+        const kvStoreSpy = vi.fn().mockReturnValue({ getRecord: getRecordSpy, get: async () => MOCK_STORE });
+        const client = { keyValueStore: kvStoreSpy } as unknown as InternalToolArgs['apifyClient'];
+
+        await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: '`user~my-store`', recordKey: '`INPUT`' }, client),
+        );
+
+        expect(kvStoreSpy).toHaveBeenCalledWith('user~my-store');
+        expect(getRecordSpy).toHaveBeenCalledWith('INPUT');
     });
 });

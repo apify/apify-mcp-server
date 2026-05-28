@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../src/const.js';
 import {
     buildStorageNotFound,
+    normalizeRecordKey,
     normalizeStorageId,
+    parseFencedJson,
     wrapJsonText,
 } from '../../src/tools/common/storage_helpers.js';
 
@@ -38,5 +40,30 @@ describe('normalizeStorageId()', () => {
     // Wrapper-stripping behavior is pinned via `stripQuoteWrappers` in utils.generic.test.ts.
     it('delegates to stripQuoteWrappers — typical wrapped id is returned canonical', () => {
         expect(normalizeStorageId('`user~my-store`')).toBe('user~my-store');
+    });
+});
+
+describe('normalizeRecordKey()', () => {
+    it('strips backticks and double / smart quotes', () => {
+        expect(normalizeRecordKey('`INPUT`')).toBe('INPUT');
+        expect(normalizeRecordKey('"data.json"')).toBe('data.json');
+        expect(normalizeRecordKey('“data.json”')).toBe('data.json');
+    });
+
+    it('preserves apostrophes — `\'` is a valid record-key character', () => {
+        expect(normalizeRecordKey("o'reilly.json")).toBe("o'reilly.json");
+        expect(normalizeRecordKey("'apostrophe-key'")).toBe("'apostrophe-key'");
+    });
+
+    it('trims surrounding whitespace', () => {
+        expect(normalizeRecordKey('  INPUT  ')).toBe('INPUT');
+    });
+});
+
+describe('parseFencedJson()', () => {
+    it('round-trips with wrapJsonText for objects, arrays, and primitives', () => {
+        for (const value of [{ a: 1, b: [2, 3] }, [1, 2, 3], 'x', 42, true, null]) {
+            expect(parseFencedJson(wrapJsonText(value))).toEqual(value);
+        }
     });
 });

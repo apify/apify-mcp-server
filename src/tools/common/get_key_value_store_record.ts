@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
+import { buildStorageNotFound, normalizeRecordKey, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -42,13 +42,14 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreRecordArgs.parse(args);
         const keyValueStoreId = normalizeStorageId(parsed.keyValueStoreId);
+        const recordKey = normalizeRecordKey(parsed.recordKey);
         const store = client.keyValueStore(keyValueStoreId);
-        const record = await store.getRecord(parsed.recordKey);
+        const record = await store.getRecord(recordKey);
         if (record === undefined) {
             // getRecord returns undefined for both missing-store and missing-key; disambiguate.
             const storeInfo = await store.get();
             const text = storeInfo
-                ? `Record '${parsed.recordKey}' not found in key-value store '${keyValueStoreId}'.`
+                ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }

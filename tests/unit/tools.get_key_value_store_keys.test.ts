@@ -29,6 +29,10 @@ function stubApifyClient(listKeysSpy: ReturnType<typeof vi.fn>): InternalToolArg
     } as unknown as InternalToolArgs['apifyClient'];
 }
 
+function stubApifyClientThrowing(err: unknown): InternalToolArgs['apifyClient'] {
+    return stubApifyClient(vi.fn().mockRejectedValue(err));
+}
+
 describe('get-key-value-store-keys', () => {
     it('has the expected tool name', () => {
         expect(getKeyValueStoreKeys.name).toBe(HelperTools.KEY_VALUE_STORE_KEYS_GET);
@@ -76,10 +80,8 @@ describe('get-key-value-store-keys', () => {
 
     it('returns isError with a not-found message when listKeys throws 404', async () => {
         const notFound = Object.assign(new Error('Key-value store was not found'), { statusCode: 404 });
-        const listKeysSpy = vi.fn().mockRejectedValue(notFound);
-
         const result = await (getKeyValueStoreKeys as HelperTool).call(
-            stubToolCallContext({ keyValueStoreId: 'missing' }, stubApifyClient(listKeysSpy)),
+            stubToolCallContext({ keyValueStoreId: 'missing' }, stubApifyClientThrowing(notFound)),
         );
         const { content } = result as TextToolResult;
 
@@ -89,12 +91,21 @@ describe('get-key-value-store-keys', () => {
 
     it('rethrows non-404 errors from listKeys', async () => {
         const serverError = Object.assign(new Error('Internal server error'), { statusCode: 500 });
-        const listKeysSpy = vi.fn().mockRejectedValue(serverError);
-
         await expect(
             (getKeyValueStoreKeys as HelperTool).call(
-                stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+                stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClientThrowing(serverError)),
             ),
         ).rejects.toBe(serverError);
+    });
+
+    it('passes the wrapper-stripped keyValueStoreId to client.keyValueStore()', async () => {
+        const kvStoreSpy = vi.fn().mockReturnValue({ listKeys: async () => MOCK_KEYS });
+        const client = { keyValueStore: kvStoreSpy } as unknown as InternalToolArgs['apifyClient'];
+
+        await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: '`user~my-store`' }, client),
+        );
+
+        expect(kvStoreSpy).toHaveBeenCalledWith('user~my-store');
     });
 });

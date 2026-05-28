@@ -4,6 +4,8 @@ import { expect } from 'vitest';
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
 
+export { parseFencedJson } from '../../../src/tools/common/storage_helpers.js';
+
 /**
  * `CallToolResult` narrowed to text-only content. All current internal tools
  * emit text content, so tests cast results to this shape to avoid the
@@ -17,11 +19,6 @@ export type ToolTelemetrySnapshot = {
     toolStatus?: string;
     failureCategory?: string;
 };
-
-/** Parse the ```` ```json … ``` ```` block emitted by internal storage tools. */
-export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.replace(/^```json\n/, '').replace(/\n```$/, ''));
-}
 
 /** Minimal `InternalToolArgs` stub for unit tests. */
 export function stubToolCallContext(
