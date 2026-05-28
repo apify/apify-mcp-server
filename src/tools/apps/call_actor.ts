@@ -1,6 +1,6 @@
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import {
     buildCallActorAppsDescription,
     callActorAjvValidate,
@@ -16,7 +16,7 @@ const CALL_ACTOR_APPS_DESCRIPTION = buildCallActorAppsDescription();
  * Renders no widget; for a live progress UI, use the call-actor-widget sibling.
  */
 export const appsCallActor: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_APPS_DESCRIPTION,
     inputSchema: callActorInputSchema,

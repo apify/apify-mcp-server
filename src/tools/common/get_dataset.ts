@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
@@ -15,7 +15,7 @@ const getDatasetArgs = z.object({
  * https://docs.apify.com/api/v2/dataset-get
  */
 export const getDataset: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_GET,
     description: `Get metadata for a dataset (collection of structured data created by an Actor run).
 The results will include dataset details such as itemCount, schema, fields, and stats.

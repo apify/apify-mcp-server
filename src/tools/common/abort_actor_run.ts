@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 
 const abortRunArgs = z.object({
@@ -17,7 +17,7 @@ const abortRunArgs = z.object({
  * https://docs.apify.com/api/v2/actor-run-abort-post
  */
 export const abortActorRun: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_ABORT,
     description: `Abort an Actor run that is currently starting or running.
 For runs with status FINISHED, FAILED, ABORTING, or TIMED-OUT, this call has no effect.

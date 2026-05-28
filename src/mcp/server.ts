@@ -86,7 +86,7 @@ import type {
     ToolEntry,
     ToolStatus,
 } from '../types.js';
-import { ServerMode, ToolType } from '../types.js';
+import { ServerMode, TOOL_TYPE } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
 import { buildMCPResponse, computeToolResponseSizeBytes, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
@@ -406,7 +406,7 @@ export class ActorsMcpServer {
      */
     private listInternalToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === ToolType.INTERNAL)
+            .filter((tool) => tool.type === TOOL_TYPE.INTERNAL)
             .map((tool) => tool.name);
     }
 
@@ -416,7 +416,7 @@ export class ActorsMcpServer {
      */
     public listActorToolNames(): string[] {
         return Array.from(this.tools.values())
-            .filter((tool) => tool.type === ToolType.ACTOR)
+            .filter((tool) => tool.type === TOOL_TYPE.ACTOR)
             .map((tool) => tool.actorFullName);
     }
 
@@ -426,7 +426,7 @@ export class ActorsMcpServer {
      */
     private listActorMcpServerToolIds(): string[] {
         const ids = Array.from(this.tools.values())
-            .filter((tool: ToolEntry) => tool.type === ToolType.ACTOR_MCP)
+            .filter((tool: ToolEntry) => tool.type === TOOL_TYPE.ACTOR_MCP)
             .map((tool) => tool.actorId);
         // Ensure uniqueness
         return Array.from(new Set(ids));
@@ -1104,7 +1104,7 @@ export class ActorsMcpServer {
                 }
 
                 // Handle internal tool
-                if (tool.type === ToolType.INTERNAL) {
+                if (tool.type === TOOL_TYPE.INTERNAL) {
                     // Tools that may emit notifications/progress during a sync wait must be opted in here.
                     // call-actor: emits during start+waitForFinish. get-actor-run: emits when waitSecs > 0.
                     const progressTrackerOptIn =
@@ -1137,7 +1137,7 @@ export class ActorsMcpServer {
                     }
                 }
 
-                if (tool.type === ToolType.ACTOR_MCP) {
+                if (tool.type === TOOL_TYPE.ACTOR_MCP) {
                     let client: Client | null = null;
                     try {
                         client = await connectMCPClient(tool.serverUrl, apifyToken, mcpSessionId);
@@ -1234,7 +1234,7 @@ export class ActorsMcpServer {
                 }
 
                 // Handle actor tool
-                if (tool.type === ToolType.ACTOR) {
+                if (tool.type === TOOL_TYPE.ACTOR) {
                     const progressTracker = createProgressTracker(progressToken, extra.sendNotification);
 
                     try {
@@ -1568,7 +1568,7 @@ export class ActorsMcpServer {
             };
 
             // Handle internal tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === ToolType.INTERNAL) {
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.INTERNAL) {
                 const progressTracker = createProgressTracker(
                     progressToken,
                     extra.sendNotification,
@@ -1608,7 +1608,7 @@ export class ActorsMcpServer {
             }
 
             // Handle actor tool execution in task mode
-            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === ToolType.ACTOR) {
+            if (toolStatus === TOOL_STATUS.SUCCEEDED && tool.type === TOOL_TYPE.ACTOR) {
                 const progressTracker = createProgressTracker(
                     progressToken,
                     extra.sendNotification,

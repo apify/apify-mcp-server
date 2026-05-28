@@ -1,6 +1,6 @@
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import {
     buildCallActorDescription,
     callActorAjvValidate,
@@ -15,7 +15,7 @@ const CALL_ACTOR_DEFAULT_DESCRIPTION = buildCallActorDescription();
  * Default mode call-actor tool.
  */
 export const defaultCallActor: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_CALL,
     description: CALL_ACTOR_DEFAULT_DESCRIPTION,
     inputSchema: callActorInputSchema,

@@ -17,7 +17,7 @@ import {
     type ApifyToken,
     type ToolEntry,
     type ToolInputSchema,
-    ToolType,
+    TOOL_TYPE,
 } from '../../types.js';
 import { getActorDefinitionCached } from '../../utils/actor.js';
 import { ajv } from '../../utils/ajv.js';
@@ -59,7 +59,7 @@ const WAIT_SECS_INPUT_PROPERTY = {
  */
 export async function enrichActorToolOutputSchemas(tools: ToolEntry[], actorStore: ActorStore): Promise<void> {
     const enrichPromises = tools
-        .filter((tool): tool is ActorTool => tool.type === ToolType.ACTOR)
+        .filter((tool): tool is ActorTool => tool.type === TOOL_TYPE.ACTOR)
         .map(async (tool) => {
             try {
                 const itemProperties = await actorStore.getActorOutputSchema(tool.actorFullName);
@@ -153,7 +153,7 @@ Actor description: ${definition.description}`;
         }
 
         tools.push({
-            type: ToolType.ACTOR,
+            type: TOOL_TYPE.ACTOR,
             name: actorNameToToolName(definition.actorFullName),
             actorId: definition.id,
             actorFullName: definition.actorFullName,

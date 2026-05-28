@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -15,7 +15,7 @@ const getKeyValueStoreRecordArgs = z.object({
  * https://docs.apify.com/api/v2/key-value-store-record-get
  */
 export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_RECORD_GET,
     description: `Get a value stored in a key-value store under a specific key.
 The response preserves the original Content-Encoding; most clients handle decompression automatically.

@@ -3,7 +3,7 @@ import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_MAX_OUTPUT_CHARS, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { getValuesByDotKeys, parseCommaSeparatedList } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -30,7 +30,7 @@ const getActorOutputArgs = z.object({
  * It is a simplified version of the get-dataset-items tool.
  */
 export const getActorOutput: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_OUTPUT_GET,
     description: dedent`
         DEPRECATED: Use \`${HelperTools.DATASET_GET_ITEMS}\` instead.

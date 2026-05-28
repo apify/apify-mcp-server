@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { buildActorDetailsForWidget, buildCardOptions, fetchActorDetails } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -45,7 +45,7 @@ const FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const fetchActorDetailsWidgetTool: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_GET_DETAILS_WIDGET,
     description: FETCH_ACTOR_DETAILS_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(fetchActorDetailsWidgetArgsSchema) as ToolInputSchema,

@@ -5,7 +5,7 @@ import log from '@apify/log';
 import { ALLOWED_DOC_DOMAINS, FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
 import { fetchApifyDocsCache } from '../../state.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
@@ -58,7 +58,7 @@ You can search for available documentation pages using the ${HelperTools.DOCS_SE
 }
 
 export const fetchApifyDocsTool: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DOCS_FETCH,
     description: `Fetch the full content of an Apify or Crawlee documentation page by its URL.
 Use this after finding a relevant page with the ${HelperTools.DOCS_SEARCH} tool.

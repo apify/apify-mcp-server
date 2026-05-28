@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { HelperTools } from '../../const.js';
 import { getWidgetConfig, WIDGET_URIS } from '../../resources/widgets.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
-import { ToolType } from '../../types.js';
+import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { logHttpError } from '../../utils/logging.js';
 import { fetchActorRunData } from '../core/actor_run_response.js';
@@ -36,7 +36,7 @@ const GET_ACTOR_RUN_WIDGET_DESCRIPTION = dedent`
 `;
 
 export const getActorRunWidgetTool: ToolEntry = Object.freeze({
-    type: ToolType.INTERNAL,
+    type: TOOL_TYPE.INTERNAL,
     name: HelperTools.ACTOR_RUNS_GET_WIDGET,
     description: GET_ACTOR_RUN_WIDGET_DESCRIPTION,
     inputSchema: z.toJSONSchema(getActorRunWidgetArgsSchema) as ToolInputSchema,
