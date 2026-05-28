@@ -16,7 +16,7 @@ import { ProgressTracker } from '../../src/utils/progress.js';
  * `tests/unit/_helpers/` and reuse from `mcp.task_notifications.test.ts` and
  * `mcp.server.capability_gating.test.ts` (both already duplicate the same server bootstrap and
  * `_requestHandlers.get(...)` getter). The recorder pattern generalizes to any "did the server
- * pass X to the tool?" assertion (apifyClient, extra.signal, userRentedActorIds, future opt-ins).
+ * pass X to the tool?" assertion (apifyClient, extra.signal, future opt-ins).
  */
 
 type HandlerFn = (req: Record<string, unknown>, extra: Record<string, unknown>) => Promise<Record<string, unknown>>;

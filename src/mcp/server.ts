@@ -841,7 +841,6 @@ export class ActorsMcpServer {
             // dev_server / production must extract the token from request headers so payment
             // mode (no token) behaves identically to production.
             const apifyToken = (metaApifyToken || this.options.token) as string;
-            const userRentedActorIds = meta?.userRentedActorIds;
             // mcpSessionId was injected upstream it is important and required for long running tasks as the store uses it and there is not other way to pass it
             const mcpSessionId = meta?.mcpSessionId;
             if (!mcpSessionId) {
@@ -1070,7 +1069,6 @@ export class ActorsMcpServer {
                             mcpSessionId,
                             actorName,
                             actorId,
-                            userRentedActorIds,
                         }).catch((error) =>
                             log.error('executeToolAndUpdateTask failed unexpectedly', { taskId: task.taskId, error }),
                         );
@@ -1122,7 +1120,6 @@ export class ActorsMcpServer {
                             mcpServer: this.server,
                             apifyToken,
                             apifyClient: apifyClient!,
-                            userRentedActorIds,
                             progressTracker,
                             mcpSessionId,
                         })) as Record<string, unknown>;
@@ -1436,7 +1433,6 @@ export class ActorsMcpServer {
         mcpSessionId: string | undefined;
         actorName?: string;
         actorId?: string;
-        userRentedActorIds?: string[];
     }): Promise<void> {
         const {
             taskId,
@@ -1452,7 +1448,6 @@ export class ActorsMcpServer {
             mcpSessionId,
             actorName,
             actorId,
-            userRentedActorIds,
         } = params;
         let toolStatus: ToolStatus = TOOL_STATUS.SUCCEEDED;
         // Always populate actor fields so they're tracked on both success and failure paths.
@@ -1590,7 +1585,6 @@ export class ActorsMcpServer {
                         mcpServer: this.server,
                         apifyToken,
                         apifyClient,
-                        userRentedActorIds,
                         progressTracker,
                         mcpSessionId,
                         taskMode: true,
