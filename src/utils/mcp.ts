@@ -50,31 +50,40 @@ export function buildMCPResponse(options: {
 }
 
 /**
- * Computes the byte size of a tool response — sums UTF-8 byte length of every
- * text item in `content[]` plus JSON-stringified `structuredContent` (if present).
- * Other fields (`isError`, `_meta`, etc.) are not counted.
+ * Computes the byte size of a tool response, split by payload side:
+ * `contentBytes` sums the UTF-8 byte length of every text item in `content[]`;
+ * `structuredContentBytes` is the UTF-8 byte length of JSON-stringified
+ * `structuredContent` (if present). Kept separate because clients consume only
+ * one side — newer read `structuredContent`, older read `content[]` — so summing
+ * them double-counts mirrored payloads. Other fields (`isError`, `_meta`, etc.)
+ * are not counted.
  */
-export function computeToolResponseSizeBytes(result: unknown): number {
-    if (!result || typeof result !== 'object') return 0;
-    const res = result as { content?: unknown; structuredContent?: unknown };
-    let bytes = 0;
-    if (Array.isArray(res.content)) {
-        for (const item of res.content) {
-            const text = (item as { text?: unknown })?.text;
-            if (typeof text === 'string') {
-                bytes += Buffer.byteLength(text, 'utf8');
+export function computeToolResponseSizeBytes(result: unknown): {
+    contentBytes: number;
+    structuredContentBytes: number;
+} {
+    let contentBytes = 0;
+    let structuredContentBytes = 0;
+    if (result && typeof result === 'object') {
+        const res = result as { content?: unknown; structuredContent?: unknown };
+        if (Array.isArray(res.content)) {
+            for (const item of res.content) {
+                const text = (item as { text?: unknown })?.text;
+                if (typeof text === 'string') {
+                    contentBytes += Buffer.byteLength(text, 'utf8');
+                }
+            }
+        }
+        if (res.structuredContent != null) {
+            try {
+                const json = JSON.stringify(res.structuredContent);
+                if (json) structuredContentBytes += Buffer.byteLength(json, 'utf8');
+            } catch {
+                // Non-serialisable structured content (e.g. circular) — skip.
             }
         }
     }
-    if (res.structuredContent != null) {
-        try {
-            const json = JSON.stringify(res.structuredContent);
-            if (json) bytes += Buffer.byteLength(json, 'utf8');
-        } catch {
-            // Non-serialisable structured content (e.g. circular) — skip.
-        }
-    }
-    return bytes;
+    return { contentBytes, structuredContentBytes };
 }
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */

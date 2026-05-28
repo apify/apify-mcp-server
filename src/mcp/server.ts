@@ -1346,7 +1346,7 @@ export class ActorsMcpServer {
                         telemetryData,
                         userId,
                         callDiagnostics,
-                        responseSizeBytes: computeToolResponseSizeBytes(toolResult),
+                        responseSize: computeToolResponseSizeBytes(toolResult),
                     });
                 }
             }
@@ -1379,7 +1379,7 @@ export class ActorsMcpServer {
         telemetryData: ToolCallTelemetryProperties | null;
         userId: string | null;
         callDiagnostics?: CallDiagnostics;
-        responseSizeBytes?: number;
+        responseSize?: ReturnType<typeof computeToolResponseSizeBytes>;
     }): void {
         const durationMs = Date.now() - params.startTime;
 
@@ -1388,7 +1388,10 @@ export class ActorsMcpServer {
             mcpSessionId: params.mcpSessionId,
             toolStatus: params.toolStatus,
             durationMs,
-            ...(params.responseSizeBytes !== undefined && { responseSizeBytes: params.responseSizeBytes }),
+            ...(params.responseSize !== undefined && {
+                responseContentBytes: params.responseSize.contentBytes,
+                responseStructuredContentBytes: params.responseSize.structuredContentBytes,
+            }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
 
@@ -1397,7 +1400,10 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...(params.responseSizeBytes !== undefined && { tool_response_size_bytes: params.responseSizeBytes }),
+                ...(params.responseSize !== undefined && {
+                    tool_response_content_bytes: params.responseSize.contentBytes,
+                    tool_response_structured_content_bytes: params.responseSize.structuredContentBytes,
+                }),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
             };
@@ -1468,7 +1474,11 @@ export class ActorsMcpServer {
             apifyToken,
         );
 
-        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, responseSizeBytes?: number) => {
+        const finishTaskTracking = (
+            status: ToolStatus,
+            diagnostics?: CallDiagnostics,
+            responseSize?: ReturnType<typeof computeToolResponseSizeBytes>,
+        ) => {
             this.logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
@@ -1478,7 +1488,7 @@ export class ActorsMcpServer {
                 telemetryData,
                 userId,
                 callDiagnostics: diagnostics,
-                responseSizeBytes,
+                responseSize,
             });
         };
 
