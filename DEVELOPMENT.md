@@ -109,8 +109,7 @@ pnpm run dev
 Starts the web widgets builder in watch mode and the MCP server in standby mode on port `3001`. The dev server mirrors production auth — it does **not** read `APIFY_TOKEN` from its environment. Every request must carry the token via one of (in priority order):
 
 1. `Authorization: Bearer <token>` header
-2. `x-apify-authorization: Bearer <token>` header
-3. `?token=<token>` query parameter (handy for quick browser-based widget previews)
+2. `?token=<token>` query parameter (handy for quick browser-based widget previews)
 
 Editing `src/web/src/widgets/*.tsx` triggers a hot-reload — the next widget render uses updated code without restarting the server. Adding new widget filenames requires reconnecting the MCP client to pick them up.
 
