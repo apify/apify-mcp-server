@@ -188,7 +188,7 @@ interface CallToolResult {
 - `tools.listChanged` — sent when `add-actor` adds a new tool
 - `tasks` — full implementation (create, get, result, cancel, list)
 - `resources` — widgets + readme only, no dynamic resources
-- `prompts` — 8 helper prompts
+- `prompts` — 1 helper prompt (`latest-news-on-topic`)
 - `logging` — proxy with filtering
 
 ## Related Issues
