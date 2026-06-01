@@ -5,8 +5,10 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
+import { wrapJsonText } from '../../utils/mcp.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
-import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const getDatasetArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -43,7 +45,7 @@ export const getDataset: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetArgs.parse(args);
-        const datasetId = normalizeStorageId(parsed.datasetId);
+        const datasetId = stripQuoteWrappers(parsed.datasetId);
         const dataset = await client.dataset(datasetId).get();
         if (!dataset) {
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);

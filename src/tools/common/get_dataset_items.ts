@@ -5,10 +5,11 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { parseCommaSeparatedList } from '../../utils/generic.js';
+import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
+import { wrapJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -98,7 +99,7 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             parsed.flatten !== undefined ? parseCommaSeparatedList(parsed.flatten) : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
-        const datasetId = normalizeStorageId(parsed.datasetId);
+        const datasetId = stripQuoteWrappers(parsed.datasetId);
         // `dataset(id).listItems()` throws ApifyApiError on a missing dataset
         // instead of returning undefined (only `.get()` and `.getStatistics()`
         // soft-catch 404 in the SDK), so translate 404 into a soft-fail.

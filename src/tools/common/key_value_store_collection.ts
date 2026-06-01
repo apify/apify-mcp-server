@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from './storage_helpers.js';
+import { wrapJsonText } from '../../utils/mcp.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z

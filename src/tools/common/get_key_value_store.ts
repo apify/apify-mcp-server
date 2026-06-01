@@ -5,7 +5,9 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildStorageNotFound, normalizeStorageId, wrapJsonText } from './storage_helpers.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
+import { wrapJsonText } from '../../utils/mcp.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -40,7 +42,7 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreArgs.parse(args);
-        const keyValueStoreId = normalizeStorageId(parsed.keyValueStoreId);
+        const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
         const kvStore = await client.keyValueStore(keyValueStoreId).get();
         if (!kvStore) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
