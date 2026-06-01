@@ -266,7 +266,6 @@ Legend for the **Enabled by default** column:
 | `get-actor-log` | runs | Retrieve the logs for a specific Actor run. |  |
 | `get-dataset` | storage | Get metadata about a specific dataset. |  |
 | `get-dataset-schema` | storage | Generate a JSON schema from dataset items. |  |
-| `get-actor-output` | storage | Retrieve the output from an Actor call which is not included in the output preview of the Actor tool. |  |
 | `get-key-value-store` | storage | Get metadata about a specific key-value store. |  |
 | `get-key-value-store-keys`| storage | List the keys within a specific key-value store. |  |
 | `get-dataset-list` | storage | List all available datasets for the user. |  |
@@ -277,7 +276,7 @@ Legend for the **Enabled by default** column:
 >
 > When `call-actor`, `add-actor`, an Actor tool, or `get-actor-run` is present, the server auto-injects `get-actor-run`, `get-dataset-items`, `get-key-value-store-record`, and `abort-actor-run`.
 >
-> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected) or `get-actor-output` from the `storage` category, passing the `datasetId` returned from the call.
+> When you call an Actor — through `call-actor` or directly via an Actor tool (e.g., `apify--rag-web-browser`) — the response contains run metadata, storage IDs, and a `summary` + `nextStep`, but no dataset items. To fetch items, follow `nextStep` and call `get-dataset-items` (auto-injected), passing the `datasetId` returned from the call.
 
 ### Tool annotations
 

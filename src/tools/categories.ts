@@ -6,7 +6,7 @@
  * search/discover → get details → execute → check status → get results
  *
  * The final tool ordering presented to MCP clients is determined by tools-loader.ts,
- * which also auto-injects get-actor-run and get-actor-output right after call-actor.
+ * which also auto-injects get-actor-run right after call-actor.
  *
  * Each tool entry can be:
  * - A plain ToolEntry — mode-independent, always included
@@ -31,7 +31,6 @@ import { abortActorRun } from './common/abort_actor_run.js';
 import { addTool } from './common/add_actor.js';
 import { getUserDatasetsList } from './common/dataset_collection.js';
 import { fetchApifyDocsTool } from './common/fetch_apify_docs.js';
-import { getActorOutput } from './common/get_actor_output.js';
 import { getActorRunLog } from './common/get_actor_run_log.js';
 import { getDataset } from './common/get_dataset.js';
 import { getDatasetItems } from './common/get_dataset_items.js';
@@ -84,7 +83,6 @@ export const toolCategories = {
         getDataset,
         getDatasetItems,
         getDatasetSchema,
-        getActorOutput,
         getKeyValueStore,
         getKeyValueStoreKeys,
         getKeyValueStoreRecord,
