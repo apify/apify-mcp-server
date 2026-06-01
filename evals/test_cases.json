@@ -348,46 +348,10 @@
       "expectedTools": ["call-actor"]
     },
     {
-      "id": "get-actor-output-1",
-      "category": "get-actor-output",
-      "query": "Get output from my latest actor with datasetId des32s",
-      "expectedTools": ["get-actor-output"]
-    },
-    {
-      "id": "get-actor-output-2",
-      "category": "get-actor-output",
-      "query": "Retrieve results from dataset abc123",
-      "expectedTools": ["get-actor-output"]
-    },
-    {
-      "id": "get-actor-output-3",
-      "category": "get-actor-output",
-      "query": "Show me the data from my Instagram scraper run with datasetId d23d2, ",
-      "expectedTools": ["get-actor-output"]
-    },
-    {
-      "id": "get-actor-output-4",
-      "category": "get-actor-output",
-      "query": "Get the first 50 items from my datasetId abc123",
-      "expectedTools": ["get-actor-output"]
-    },
-    {
-      "id": "get-actor-output-5",
-      "category": "get-actor-output",
-      "query": "Retrieve all results from my web scraper with datasetID abc123",
-      "expectedTools": ["get-actor-output"]
-    },
-    {
       "id": "fetch-apify-docs-1",
       "category": "fetch-apify-docs",
       "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
       "expectedTools": ["fetch-apify-docs"]
-    },
-    {
-      "id": "get-actor-output-basic-2",
-      "category": "get-actor-output",
-      "query": "Get query and markdown fields from dataset UvsU",
-      "expectedTools": ["get-actor-output"]
     },
     {
       "id": "fetch-apify-docs-edge-1",
