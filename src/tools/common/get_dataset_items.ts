@@ -1,13 +1,15 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { parseCommaSeparatedList } from '../../utils/generic.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
+import { wrapJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
 
@@ -97,25 +99,33 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             parsed.flatten !== undefined ? parseCommaSeparatedList(parsed.flatten) : extractDotPrefixes(fields);
 
         const effectiveLimit = parsed.limit ?? DEFAULT_DATASET_ITEMS_LIMIT;
-        const v = await client.dataset(parsed.datasetId).listItems({
-            clean: parsed.clean,
-            offset: parsed.offset,
-            limit: effectiveLimit,
-            fields,
-            omit,
-            desc: parsed.desc,
-            flatten,
-        });
-        if (!v) {
-            return buildMCPResponse({
-                texts: [`Dataset '${parsed.datasetId}' not found.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
+        const datasetId = stripQuoteWrappers(parsed.datasetId);
+        // `dataset(id).listItems()` throws ApifyApiError on a missing dataset
+        // instead of returning undefined (only `.get()` and `.getStatistics()`
+        // soft-catch 404 in the SDK), so translate 404 into a soft-fail.
+        const v = await client
+            .dataset(datasetId)
+            .listItems({
+                clean: parsed.clean,
+                offset: parsed.offset,
+                limit: effectiveLimit,
+                fields,
+                omit,
+                desc: parsed.desc,
+                flatten,
+            })
+            .catch((err: unknown) => {
+                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+                    return null;
+                }
+                throw err;
             });
+        if (!v) {
+            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
         const structuredContent = {
-            datasetId: parsed.datasetId,
+            datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
@@ -123,6 +133,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(v)}\n\`\`\`` }], structuredContent };
+        return { content: [{ type: 'text', text: wrapJsonText(v) }], structuredContent };
     },
 } as const);

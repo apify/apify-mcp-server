@@ -7,6 +7,7 @@ import {
     isValidHttpUrl,
     parseCommaSeparatedList,
     parseQueryParamList,
+    stripQuoteWrappers,
 } from '../../src/utils/generic.js';
 
 describe('getValuesByDotKeys', () => {
@@ -144,6 +145,39 @@ describe('parseQueryParamList', () => {
     it('should trim whitespace from array items and their comma-separated values', () => {
         const result = parseQueryParamList([' tool1 , tool2 ', ' tool3']);
         expect(result).toEqual(['tool1', 'tool2', 'tool3']);
+    });
+});
+
+describe('stripQuoteWrappers', () => {
+    it('returns the input unchanged when no wrappers or whitespace are present', () => {
+        expect(stripQuoteWrappers('ds-1')).toBe('ds-1');
+        expect(stripQuoteWrappers('user~my-dataset')).toBe('user~my-dataset');
+    });
+
+    it('trims surrounding whitespace', () => {
+        expect(stripQuoteWrappers('  ds-1  ')).toBe('ds-1');
+    });
+
+    it('strips matched markdown backtick wrappers', () => {
+        expect(stripQuoteWrappers('`user~my-store`')).toBe('user~my-store');
+    });
+
+    it('strips matched straight double-quote wrappers', () => {
+        expect(stripQuoteWrappers('"ds-1"')).toBe('ds-1');
+    });
+
+    it('strips matched smart-quote wrappers', () => {
+        expect(stripQuoteWrappers('“ds-1”')).toBe('ds-1');
+        expect(stripQuoteWrappers('‘ds-1’')).toBe('ds-1');
+    });
+
+    it('strips nested wrappers (matched pair + trailing regex)', () => {
+        expect(stripQuoteWrappers('`"ds-1"`')).toBe('ds-1');
+    });
+
+    it('strips unpaired leading/trailing quote noise', () => {
+        expect(stripQuoteWrappers('ds-1"')).toBe('ds-1');
+        expect(stripQuoteWrappers('`ds-1')).toBe('ds-1');
     });
 });
 

@@ -1,11 +1,15 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
+import { HelperTools, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
+import { buildMCPResponse, wrapJsonText } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -27,16 +31,17 @@ const getDatasetSchemaArgs = z.object({
 export const getDatasetSchema: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.DATASET_SCHEMA_GET,
-    description: `Generate a JSON schema from a sample of dataset items.
-The schema describes the structure of the data and can be used for validation, documentation, or processing.
-Use this to understand the dataset before fetching many items.
+    description: dedent`
+        Generate a JSON schema from a sample of dataset items.
+        The schema describes the structure of the data and can be used for validation, documentation, or processing.
+        Use this to understand the dataset before fetching many items.
 
-USAGE:
-- Use when you need to infer the structure of dataset items for downstream processing or validation.
+        USAGE:
+        - Use when you need to infer the structure of dataset items for downstream processing or validation.
 
-USAGE EXAMPLES:
-- user_input: Generate schema for dataset 34das2 using 10 items
-- user_input: Show schema of username~my-dataset (clean items only)`,
+        USAGE EXAMPLES:
+        - user_input: Generate schema for dataset 34das2 using 10 items
+        - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: z.toJSONSchema(getDatasetSchemaArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetSchemaArgs)),
     paymentRequired: true,
@@ -50,25 +55,28 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getDatasetSchemaArgs.parse(args);
+        const datasetId = stripQuoteWrappers(parsed.datasetId);
 
-        // Get dataset items
-        const datasetResponse = await client.dataset(parsed.datasetId).listItems({
-            clean: parsed.clean,
-            limit: parsed.limit,
-        });
+        // `listItems()` throws ApifyApiError on a missing dataset (the SDK only soft-catches
+        // 404 on `.get()` / `.getStatistics()`), so translate 404 into a soft-fail.
+        const datasetResponse = await client
+            .dataset(datasetId)
+            .listItems({ clean: parsed.clean, limit: parsed.limit })
+            .catch((err: unknown) => {
+                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+                    return null;
+                }
+                throw err;
+            });
 
         if (!datasetResponse) {
-            return buildMCPResponse({
-                texts: [`Dataset '${parsed.datasetId}' not found.`],
-                isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.SOFT_FAIL, failureCategory: FAILURE_CATEGORY.INVALID_INPUT },
-            });
+            return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
         const datasetItems = datasetResponse.items;
 
         if (datasetItems.length === 0) {
-            return { content: [{ type: 'text', text: `Dataset '${parsed.datasetId}' is empty.` }] };
+            return { content: [{ type: 'text', text: `Dataset '${datasetId}' is empty.` }] };
         }
 
         // Generate schema using the shared utility
@@ -80,12 +88,12 @@ USAGE EXAMPLES:
         if (!schema) {
             // Schema generation failure is typically a server/processing error, not a user error
             return buildMCPResponse({
-                texts: [`Failed to generate schema for dataset '${parsed.datasetId}'.`],
+                texts: [`Failed to generate schema for dataset '${datasetId}'.`],
                 isError: true,
                 telemetry: { toolStatus: TOOL_STATUS.FAILED },
             });
         }
 
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(schema)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: wrapJsonText(schema) }] };
     },
 } as const);
