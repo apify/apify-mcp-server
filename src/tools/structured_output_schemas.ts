@@ -449,7 +449,7 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
 }
 
 /**
- * Schema for dataset items retrieval tools (get-actor-output, get-dataset-items).
+ * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.
  */
 export const datasetItemsOutputSchema = {

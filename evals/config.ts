@@ -114,7 +114,7 @@ You must judge whether this agent made the correct selection.
 - Searches across all documentation to find relevant pages
 - Example: "How to create an Apify Actor?" or "What is Apify Proxy?"
 
-**get-actor-output**: Retrieves the output data (results) from a completed Actor run using its datasetId.
+**get-dataset-items**: Retrieves the output data (results) from a completed Actor run using its datasetId.
 - Use when query asks to get/fetch/retrieve data from a previous Actor execution
 - Returns the actual scraped data, not Actor documentation
 - Example: "Get the data from my last Actor run" or "Show me the results from dataset abc123"

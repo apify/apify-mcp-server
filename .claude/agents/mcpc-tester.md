@@ -181,7 +181,7 @@ Many tests require chaining tool calls where one call's output feeds into the ne
 ```bash
 # Call an actor, extract datasetId, then fetch its output
 DATASET_ID=$(mcpc --json @stdio tools-call call-actor actorId:="apify/hello-world" input:='{}' | jq -r '.content[0].text | fromjson | .defaultDatasetId')
-mcpc --json @stdio tools-call get-actor-output datasetId:="$DATASET_ID"
+mcpc --json @stdio tools-call get-dataset-items datasetId:="$DATASET_ID"
 
 # Search → fetch details → call (full lifecycle)
 ACTOR_ID=$(mcpc --json @stdio tools-call search-actors keywords:="hello world" limit:=1 | jq -r '.content[0].text | fromjson | .[0].id')
