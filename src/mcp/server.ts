@@ -88,7 +88,7 @@ import type {
 } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, computeToolResponseSizeBytes, getToolCallErrorUserText } from '../utils/mcp.js';
+import { buildMCPResponse, computeToolResponseBytes, getToolCallErrorUserText } from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -1346,7 +1346,7 @@ export class ActorsMcpServer {
                         telemetryData,
                         userId,
                         callDiagnostics,
-                        responseSizeBytes: computeToolResponseSizeBytes(toolResult),
+                        responseBytes: computeToolResponseBytes(toolResult),
                     });
                 }
             }
@@ -1379,7 +1379,7 @@ export class ActorsMcpServer {
         telemetryData: ToolCallTelemetryProperties | null;
         userId: string | null;
         callDiagnostics?: CallDiagnostics;
-        responseSizeBytes?: number;
+        responseBytes?: ReturnType<typeof computeToolResponseBytes>;
     }): void {
         const durationMs = Date.now() - params.startTime;
 
@@ -1388,7 +1388,10 @@ export class ActorsMcpServer {
             mcpSessionId: params.mcpSessionId,
             toolStatus: params.toolStatus,
             durationMs,
-            ...(params.responseSizeBytes !== undefined && { responseSizeBytes: params.responseSizeBytes }),
+            ...(params.responseBytes !== undefined && {
+                responseContentBytes: params.responseBytes.contentBytes,
+                responseStructuredContentBytes: params.responseBytes.structuredContentBytes,
+            }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });
 
@@ -1397,7 +1400,10 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...(params.responseSizeBytes !== undefined && { tool_response_size_bytes: params.responseSizeBytes }),
+                ...(params.responseBytes !== undefined && {
+                    tool_response_content_bytes: params.responseBytes.contentBytes,
+                    tool_response_structured_content_bytes: params.responseBytes.structuredContentBytes,
+                }),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
             };
@@ -1468,7 +1474,11 @@ export class ActorsMcpServer {
             apifyToken,
         );
 
-        const finishTaskTracking = (status: ToolStatus, diagnostics?: CallDiagnostics, responseSizeBytes?: number) => {
+        const finishTaskTracking = (
+            status: ToolStatus,
+            diagnostics?: CallDiagnostics,
+            responseBytes?: ReturnType<typeof computeToolResponseBytes>,
+        ) => {
             this.logToolCallAndTelemetry({
                 toolName: tool.name,
                 mcpSessionId,
@@ -1478,7 +1488,7 @@ export class ActorsMcpServer {
                 telemetryData,
                 userId,
                 callDiagnostics: diagnostics,
-                responseSizeBytes,
+                responseBytes,
             });
         };
 
@@ -1657,7 +1667,7 @@ export class ActorsMcpServer {
             log.debug('Task completed successfully', { taskId, toolName: tool.name, mcpSessionId });
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseSizeBytes(result));
+            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(result));
         } catch (error) {
             // Handle 402 Payment Required — return structured x402 result so clients can auto-pay
             const httpStatus = getHttpStatusCode(error);
@@ -1681,7 +1691,7 @@ export class ActorsMcpServer {
                         failure_http_status: 402,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseSizeBytes(paymentResponse),
+                    computeToolResponseBytes(paymentResponse),
                 );
                 return;
             }
@@ -1708,7 +1718,7 @@ export class ActorsMcpServer {
                         failure_http_status: error.statusCode,
                         ...buildActorFields(actorName, actorId),
                     },
-                    computeToolResponseSizeBytes(approvalResponse),
+                    computeToolResponseBytes(approvalResponse),
                 );
                 return;
             }
@@ -1774,7 +1784,7 @@ export class ActorsMcpServer {
             await this.taskStore.storeTaskResult(taskId, 'failed', failedResult, mcpSessionId);
             await emitTaskStatusNotification(taskId, mcpSessionId, this.taskStore, this.server);
 
-            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseSizeBytes(failedResult));
+            finishTaskTracking(toolStatus, callDiagnostics, computeToolResponseBytes(failedResult));
         } finally {
             cancelWatcher.dispose();
         }
