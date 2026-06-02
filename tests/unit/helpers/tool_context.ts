@@ -3,6 +3,12 @@ import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
+import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from '../../../src/utils/mcp.js';
+
+/** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
+export function parseFencedJson(text: string): unknown {
+    return JSON.parse(text.slice(JSON_FENCE_PREFIX.length, -JSON_FENCE_SUFFIX.length));
+}
 
 /**
  * `CallToolResult` narrowed to text-only content. All current internal tools
@@ -17,11 +23,6 @@ export type ToolTelemetrySnapshot = {
     toolStatus?: string;
     failureCategory?: string;
 };
-
-/** Parse the ```` ```json … ``` ```` block emitted by internal storage tools. */
-export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.replace(/^```json\n/, '').replace(/\n```$/, ''));
-}
 
 /** Minimal `InternalToolArgs` stub for unit tests. */
 export function stubToolCallContext(

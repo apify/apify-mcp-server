@@ -87,13 +87,14 @@ describe('getCategoryTools mode contract (tool-mode separation)', () => {
         for (const categoryName of CATEGORY_NAMES) {
             const defaultNames = toolNames(defaultCategories[categoryName]);
             const appsNames = toolNames(appsCategories[categoryName]);
+            const bothModesHaveCategory = defaultNames.length > 0 && appsNames.length > 0;
 
-            // Only check categories that exist in both modes
-            if (defaultNames.length > 0 && appsNames.length > 0) {
-                it(`should have identical tool names in ${categoryName} category across modes`, () => {
+            it.runIf(bothModesHaveCategory)(
+                `should have identical tool names in ${categoryName} category across modes`,
+                () => {
                     expect(defaultNames).toEqual(appsNames);
-                });
-            }
+                },
+            );
         }
     });
 

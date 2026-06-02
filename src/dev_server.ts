@@ -37,17 +37,15 @@ enum Routes {
  *
  * Mirrors `apify-mcp-server-internal`'s `extractApiTokenFromRequest` so the
  * dev server behaves identically to production for auth/payment routing:
- *   1. `x-apify-authorization: Bearer <token>` header (preferred)
- *   2. `authorization: Bearer <token>` header
- *   3. `?token=<token>` query parameter
+ *   1. `authorization: Bearer <token>` header
+ *   2. `?token=<token>` query parameter
  *
  * Returns `undefined` if no valid token is present. The caller decides whether
  * a missing token is an error (no payment provider) or expected (payment mode).
  */
 function extractApiTokenFromRequest(req: Request): string | undefined {
-    for (const header of ['x-apify-authorization', 'authorization']) {
-        const value = req.headers[header];
-        if (typeof value !== 'string') continue;
+    const value = req.headers.authorization;
+    if (typeof value === 'string') {
         const [schema, token] = value.trim().split(/\s+/);
         if (schema?.toLowerCase() === 'bearer' && token) return token;
     }

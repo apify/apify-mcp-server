@@ -92,6 +92,27 @@ export function getValuesByDotKeys(obj: Record<string, unknown>, keys: string[])
 }
 
 /**
+ * Backtick + straight & smart double-quote chars LLMs wrap user inputs in.
+ * Shared between `stripQuoteWrappers` (which also strips apostrophes from ids)
+ * and `normalizeRecordKey` (which preserves apostrophes in KV record keys).
+ * Single source of truth: extend here and both call sites pick it up.
+ */
+export const QUOTE_WRAPPER_CHARS = '`"“”‘’';
+
+/**
+ * Strip surrounding quote/backtick wrappers and whitespace from an LLM-supplied id.
+ *
+ * LLMs paste names wrapped in markdown backticks or smart quotes; the Apify API
+ * treats those as distinct strings and 404s. Strips any leading/trailing run of
+ * `` ` ``, `'`, `"` or smart quotes — handles matched pairs, unpaired leakage,
+ * and nested wrappers (`` `"id"` ``) uniformly.
+ */
+const STRIP_QUOTE_WRAPPERS_REGEX = new RegExp(`^[${QUOTE_WRAPPER_CHARS}']+|[${QUOTE_WRAPPER_CHARS}']+$`, 'g');
+export function stripQuoteWrappers(s: string): string {
+    return s.trim().replace(STRIP_QUOTE_WRAPPERS_REGEX, '').trim();
+}
+
+/**
  * Validates whether a given string is a well-formed URL.
  *
  * Allows only valid HTTP or HTTPS URLs.

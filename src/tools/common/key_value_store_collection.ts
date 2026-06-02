@@ -1,9 +1,11 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { wrapJsonText } from '../../utils/mcp.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z
@@ -35,18 +37,19 @@ const getUserKeyValueStoresListArgs = z.object({
 export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_LIST_GET,
-    description: `List key-value stores owned by the authenticated user.
-Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
+    description: dedent`
+        List key-value stores owned by the authenticated user.
+        Actor runs automatically produce unnamed stores (set unnamed=true to include them). Users can also create named stores.
 
-The results will include basic info for each store, sorted by createdAt (ascending by default).
-Use limit, offset, and desc to paginate and sort.
+        The results will include basic info for each store, sorted by createdAt (ascending by default).
+        Use limit, offset, and desc to paginate and sort.
 
-USAGE:
-- Use when you need to browse available key-value stores (named or unnamed).
+        USAGE:
+        - Use when you need to browse available key-value stores (named or unnamed).
 
-USAGE EXAMPLES:
-- user_input: List my last 10 key-value stores (newest first)
-- user_input: List unnamed key-value stores`,
+        USAGE EXAMPLES:
+        - user_input: List my last 10 key-value stores (newest first)
+        - user_input: List unnamed key-value stores`,
     inputSchema: z.toJSONSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserKeyValueStoresListArgs)),
     annotations: {
@@ -65,6 +68,6 @@ USAGE EXAMPLES:
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(stores)}\n\`\`\`` }] };
+        return { content: [{ type: 'text', text: wrapJsonText(stores) }] };
     },
 } as const);

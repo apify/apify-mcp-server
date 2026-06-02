@@ -1,9 +1,14 @@
+import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools } from '../../const.js';
+import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { stripQuoteWrappers } from '../../utils/generic.js';
+import { getHttpStatusCode } from '../../utils/logging.js';
+import { wrapJsonText } from '../../utils/mcp.js';
+import { buildStorageNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -20,16 +25,17 @@ const getKeyValueStoreKeysArgs = z.object({
 export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
     type: TOOL_TYPE.INTERNAL,
     name: HelperTools.KEY_VALUE_STORE_KEYS_GET,
-    description: `List keys in a key-value store with optional pagination.
-The results will include keys and basic info about stored values (e.g., size).
-Use exclusiveStartKey and limit to paginate.
+    description: dedent`
+        List keys in a key-value store with optional pagination.
+        The results will include keys and basic info about stored values (e.g., size).
+        Use exclusiveStartKey and limit to paginate.
 
-USAGE:
-- Use when you need to discover what records exist in a store.
+        USAGE:
+        - Use when you need to discover what records exist in a store.
 
-USAGE EXAMPLES:
-- user_input: List first 10 keys in store username~my-store
-- user_input: Continue listing keys in store a123 from key data.json`,
+        USAGE EXAMPLES:
+        - user_input: List first 10 keys in store username~my-store
+        - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),
     paymentRequired: true,
@@ -43,10 +49,21 @@ USAGE EXAMPLES:
     call: async (toolArgs: InternalToolArgs) => {
         const { args, apifyClient: client } = toolArgs;
         const parsed = getKeyValueStoreKeysArgs.parse(args);
-        const keys = await client.keyValueStore(parsed.keyValueStoreId).listKeys({
-            exclusiveStartKey: parsed.exclusiveStartKey,
-            limit: parsed.limit,
-        });
-        return { content: [{ type: 'text', text: `\`\`\`json\n${JSON.stringify(keys)}\n\`\`\`` }] };
+        const keyValueStoreId = stripQuoteWrappers(parsed.keyValueStoreId);
+        // `listKeys()` throws ApifyApiError on a missing store (the SDK only soft-catches
+        // 404 on `.get()` / `.getRecord()`), so translate 404 into a soft-fail.
+        const keys = await client
+            .keyValueStore(keyValueStoreId)
+            .listKeys({ exclusiveStartKey: parsed.exclusiveStartKey, limit: parsed.limit })
+            .catch((err: unknown) => {
+                if (getHttpStatusCode(err) === HTTP_NOT_FOUND) {
+                    return null;
+                }
+                throw err;
+            });
+        if (!keys) {
+            return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
+        }
+        return { content: [{ type: 'text', text: wrapJsonText(keys) }] };
     },
 } as const);
