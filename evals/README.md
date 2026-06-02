@@ -77,7 +77,7 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
   - search-actors: Emphasizes finding/discovering what tools exist (informational intent)
   - apify--rag-web-browser: Emphasizes getting/retrieving actual data (data retrieval intent)
 
-Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `get-actor-output`, `fetch-apify-docs`
+Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `get-dataset-items`, `fetch-apify-docs`
 
 ## Output
 

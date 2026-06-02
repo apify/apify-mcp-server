@@ -6,7 +6,7 @@
  * search/discover → get details → execute → check status → get results
  *
  * The final tool ordering presented to MCP clients is determined by tools-loader.ts,
- * which also auto-injects get-actor-run right after call-actor.
+ * which also auto-injects run/storage tools (AUTO_INJECTED_TOOLS) right after call-actor.
  *
  * Each tool entry can be:
  * - A plain ToolEntry — mode-independent, always included

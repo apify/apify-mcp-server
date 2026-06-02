@@ -348,34 +348,34 @@
       "expectedTools": ["call-actor"]
     },
     {
-      "id": "get-actor-output-1",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-1",
+      "category": "get-dataset-items",
       "query": "Get output from my latest actor with datasetId des32s",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
-      "id": "get-actor-output-2",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-2",
+      "category": "get-dataset-items",
       "query": "Retrieve results from dataset abc123",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
-      "id": "get-actor-output-3",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-3",
+      "category": "get-dataset-items",
       "query": "Show me the data from my Instagram scraper run with datasetId d23d2, ",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
-      "id": "get-actor-output-4",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-4",
+      "category": "get-dataset-items",
       "query": "Get the first 50 items from my datasetId abc123",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
-      "id": "get-actor-output-5",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-5",
+      "category": "get-dataset-items",
       "query": "Retrieve all results from my web scraper with datasetID abc123",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
       "id": "fetch-apify-docs-1",
@@ -384,10 +384,10 @@
       "expectedTools": ["fetch-apify-docs"]
     },
     {
-      "id": "get-actor-output-basic-2",
-      "category": "get-actor-output",
+      "id": "get-dataset-items-basic-2",
+      "category": "get-dataset-items",
       "query": "Get query and markdown fields from dataset UvsU",
-      "expectedTools": ["get-actor-output"]
+      "expectedTools": ["get-dataset-items"]
     },
     {
       "id": "fetch-apify-docs-edge-1",
