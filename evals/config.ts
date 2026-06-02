@@ -39,9 +39,9 @@ export type EvaluatorName = (typeof EVALUATOR_NAMES)[keyof typeof EVALUATOR_NAME
 export const MODELS_TO_EVALUATE = [
     'anthropic/claude-haiku-4.5',
     // 'anthropic/claude-sonnet-4.5',
-    'google/gemini-2.5-flash',
+    // 'google/gemini-2.5-flash',
     // 'google/gemini-2.5-pro',
-    'openai/gpt-5.4',
+    // 'openai/gpt-5.4',
     // 'openai/gpt-5-mini',
     // 'openai/gpt-4o-mini', // deprecated model
 ];
