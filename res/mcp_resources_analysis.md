@@ -35,15 +35,11 @@ No templates are currently provided. `ListResourceTemplatesRequestSchema` always
 - **Keep resource handling explicit**: Resource listing and reading must be handled via request handlers.
 - **No new resources in this phase**: Only existing resources are in scope (Skyfire usage guide and UI widgets).
 
-## Gaps and Risks
+The `setupResourceHandlers` wiring lives in `src/mcp/server.ts` and delegates list/read to
+`src/resources/resource_service.ts`.
 
-- **Monolithic handler**: Resource logic is embedded in `ActorsMcpServer.setupResourceHandlers`, which makes extension harder.
-- **No resource registry**: There is no common interface for listing and reading resources; each resource type is handled inline.
-- **No subscriptions or notifications**: The server does not provide `subscribe`, `unsubscribe`, or `notifications/resources/*` handling.
-- **No templates**: Dynamic resources via URI templates are not supported.
+## Not implemented
 
-## References
-
-- Official MCP TypeScript SDK: `/home/jirka/github/typescript-sdk`
-- Example server implementing full MCP specs: `/home/jirka/github/servers/src/everything`
+- **No subscriptions or notifications**: no `subscribe`, `unsubscribe`, or `notifications/resources/*` handling.
+- **No templates**: `ListResourceTemplatesRequestSchema` always returns an empty list; dynamic resources via URI templates are not supported.
 
