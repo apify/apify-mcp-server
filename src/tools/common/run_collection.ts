@@ -5,7 +5,8 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
+import { buildMCPResponse, wrapJsonText } from '../../utils/mcp.js';
+import { actorRunListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserRunsListArgs = z.object({
     offset: z
@@ -46,6 +47,7 @@ USAGE EXAMPLES:
 - user_input: List my last 10 runs (newest first)
 - user_input: Show only SUCCEEDED runs`,
     inputSchema: z.toJSONSchema(getUserRunsListArgs) as ToolInputSchema,
+    outputSchema: actorRunListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserRunsListArgs)),
     annotations: {
         title: 'Get user runs list',
@@ -62,7 +64,8 @@ USAGE EXAMPLES:
             .runs()
             .list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
         return buildMCPResponse({
-            texts: [`\`\`\`json\n${JSON.stringify(runs)}\n\`\`\``],
+            texts: [wrapJsonText(runs)],
+            structuredContent: runs,
         });
     },
 } as const);
