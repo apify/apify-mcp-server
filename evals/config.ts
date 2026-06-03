@@ -114,10 +114,10 @@ You must judge whether this agent made the correct selection.
 - Searches across all documentation to find relevant pages
 - Example: "How to create an Apify Actor?" or "What is Apify Proxy?"
 
-**get-dataset-items**: Retrieves the actual items (rows/records) stored in a dataset, with pagination and field selection.
-- Use when query asks to get/read/fetch the data, results, items, or records from a dataset
-- Returns the scraped data itself, not metadata or schema
-- Example: "Get the first 50 items from dataset abc123" or "Show me the results in dataset des32s"
+**get-dataset-items**: Retrieves the output data (results) from a completed Actor run using its datasetId.
+- Use when query asks to get/fetch/retrieve data from a previous Actor execution
+- Returns the actual scraped data, not Actor documentation
+- Example: "Get the data from my last Actor run" or "Show me the results from dataset abc123"
 
 **get-dataset**: Gets metadata about a dataset (itemCount, fields, stats) — NOT the items themselves.
 - Use when query asks about a dataset's details, size, item count, or fields
