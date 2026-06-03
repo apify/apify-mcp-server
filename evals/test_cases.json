@@ -347,7 +347,7 @@
       "query": "Call epctex/weather-scraper for New York",
       "expectedTools": ["call-actor"]
     },
-     {
+    {
       "id": "get-dataset-items-1",
       "category": "get-dataset-items",
       "query": "Get output from my latest actor with datasetId des32s",
@@ -376,6 +376,13 @@
       "category": "get-dataset-items",
       "query": "Retrieve all results from my web scraper with datasetID abc123",
       "expectedTools": ["get-dataset-items"]
+    },
+    {
+      "id": "get-dataset-items-6",
+      "category": "get-dataset-items",
+      "query": "Retrieve only the title and url fields from dataset UvsU",
+      "expectedTools": ["get-dataset-items"],
+      "reference": "Field selection on dataset rows is handled by get-dataset-items."
     },
     {
       "id": "fetch-apify-docs-1",
@@ -458,27 +465,6 @@
       "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
       "expectedTools": ["search-actors"],
       "reference": "It must call the 'search-actors' tool with the query: 'tiktok comments' or their combination. It must not use queries with extra words such as 'tiktok comments cheap' or any more detailed variations."
-    },
-    {
-      "id": "get-dataset-items-1",
-      "category": "get-dataset-items",
-      "query": "Get the first 50 items from dataset abc123",
-      "expectedTools": ["get-dataset-items"],
-      "reference": "User wants the actual data rows from a dataset. Use get-dataset-items, not get-dataset (metadata) or get-dataset-schema."
-    },
-    {
-      "id": "get-dataset-items-2",
-      "category": "get-dataset-items",
-      "query": "Show me the scraped results stored in dataset des32s",
-      "expectedTools": ["get-dataset-items"],
-      "reference": "User wants the items/records themselves. Use get-dataset-items."
-    },
-    {
-      "id": "get-dataset-items-3",
-      "category": "get-dataset-items",
-      "query": "Retrieve only the title and url fields from dataset UvsU",
-      "expectedTools": ["get-dataset-items"],
-      "reference": "Field selection on dataset rows is handled by get-dataset-items."
     },
     {
       "id": "get-dataset-1",
