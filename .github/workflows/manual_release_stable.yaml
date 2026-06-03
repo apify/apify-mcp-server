@@ -74,8 +74,6 @@ jobs:
                 run: pnpm dlx @anthropic-ai/mcpb@2.1.2 validate mcpb/manifest.json
             -   name: Create MCPB package
                 run: pnpm dlx @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
-            -   name: Clean MCPB package
-                run: pnpm dlx @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
             -   name: Upload MCPB artifacts
                 uses: actions/upload-artifact@v4
                 with:
