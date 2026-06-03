@@ -449,6 +449,163 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
 }
 
 /**
+ * Builds the Apify `PaginatedList` envelope schema (offset-based pagination) shared by the
+ * run and storage list tools. `itemsSchema` describes one array element; mirrors `PaginatedList`
+ * from apify-client (api.apify.com `*-get` collection endpoints).
+ */
+function paginatedListOutputSchema(itemsSchema: object, itemsDescription: string) {
+    return {
+        type: 'object' as const,
+        properties: {
+            total: { type: 'number', description: 'Total number of items across all pages.' },
+            count: { type: 'number', description: 'Number of items returned in this page.' },
+            offset: { type: 'number', description: 'Number of items skipped from the start.' },
+            limit: { type: 'number', description: 'Maximum number of items requested.' },
+            desc: { type: 'boolean', description: 'Whether items are sorted in descending order.' },
+            items: { type: 'array' as const, items: itemsSchema, description: itemsDescription },
+        },
+        required: ['total', 'offset', 'limit', 'count', 'items'],
+    };
+}
+
+/** Schema for one run in get-actor-run-list (apify-client `ActorRunListItem`). */
+const actorRunListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Run ID.' },
+        actId: { type: 'string', description: 'ID of the Actor that produced the run.' },
+        actorTaskId: { type: 'string', description: 'ID of the Actor task, when the run was started from one.' },
+        status: {
+            type: 'string',
+            description:
+                'Run status: READY | RUNNING | SUCCEEDED | FAILED | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED.',
+        },
+        startedAt: { type: ['string', 'null'], description: 'ISO timestamp when the run started.' },
+        finishedAt: {
+            type: ['string', 'null'],
+            description: 'ISO timestamp when the run finished; null while still running.',
+        },
+        buildId: { type: 'string', description: 'ID of the Actor build used for the run.' },
+        buildNumber: { type: 'string', description: 'Build number used for the run.' },
+        defaultDatasetId: { type: 'string', description: "ID of the run's default dataset." },
+        defaultKeyValueStoreId: { type: 'string', description: "ID of the run's default key-value store." },
+        defaultRequestQueueId: { type: 'string', description: "ID of the run's default request queue." },
+        usageTotalUsd: { type: 'number', description: 'Total run cost in USD.' },
+    },
+    required: ['id', 'actId', 'status', 'defaultDatasetId', 'defaultKeyValueStoreId'],
+};
+
+/** Schema for get-actor-run-list output (paginated list of runs). */
+export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
+
+/** Schema for one dataset in get-dataset-list (apify-client `Dataset`). */
+const datasetListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID.' },
+        name: { type: ['string', 'null'], description: 'Dataset name; null for unnamed datasets.' },
+        title: { type: ['string', 'null'], description: 'Human-readable dataset title; null when unset.' },
+        userId: { type: 'string', description: 'ID of the owning user.' },
+        createdAt: { type: 'string', description: 'ISO timestamp when the dataset was created.' },
+        modifiedAt: { type: 'string', description: 'ISO timestamp when the dataset was last modified.' },
+        accessedAt: { type: 'string', description: 'ISO timestamp when the dataset was last accessed.' },
+        itemCount: { type: 'number', description: 'Total number of items in the dataset.' },
+        cleanItemCount: { type: 'number', description: 'Number of non-empty, non-hidden items.' },
+        actId: { type: ['string', 'null'], description: 'ID of the Actor that created the dataset; null otherwise.' },
+        actRunId: {
+            type: ['string', 'null'],
+            description: 'ID of the Actor run that created the dataset; null otherwise.',
+        },
+        fields: { type: 'array' as const, items: { type: 'string' }, description: 'Field names present in items.' },
+        stats: {
+            type: 'object' as const,
+            description: 'Dataset usage statistics.',
+            properties: {
+                readCount: { type: 'number' },
+                writeCount: { type: 'number' },
+                deleteCount: { type: 'number' },
+                storageBytes: { type: 'number' },
+            },
+        },
+    },
+    required: ['id', 'userId', 'itemCount', 'cleanItemCount'],
+};
+
+/** Schema for get-dataset-list output (paginated list of datasets). */
+export const datasetListOutputSchema = paginatedListOutputSchema(datasetListItemSchema, 'Datasets.');
+
+/** Schema for one store in get-key-value-store-list (apify-client `KeyValueStore`). */
+const keyValueStoreListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID.' },
+        name: { type: ['string', 'null'], description: 'Store name; null for unnamed stores.' },
+        title: { type: ['string', 'null'], description: 'Human-readable store title; null when unset.' },
+        userId: { type: 'string', description: 'ID of the owning user.' },
+        createdAt: { type: 'string', description: 'ISO timestamp when the store was created.' },
+        modifiedAt: { type: 'string', description: 'ISO timestamp when the store was last modified.' },
+        accessedAt: { type: 'string', description: 'ISO timestamp when the store was last accessed.' },
+        actId: { type: ['string', 'null'], description: 'ID of the Actor that created the store; null otherwise.' },
+        actRunId: {
+            type: ['string', 'null'],
+            description: 'ID of the Actor run that created the store; null otherwise.',
+        },
+        stats: {
+            type: 'object' as const,
+            description: 'Store usage statistics.',
+            properties: {
+                readCount: { type: 'number' },
+                writeCount: { type: 'number' },
+                deleteCount: { type: 'number' },
+                listCount: { type: 'number' },
+                storageBytes: { type: 'number' },
+            },
+        },
+    },
+    required: ['id', 'userId'],
+};
+
+/** Schema for get-key-value-store-list output (paginated list of stores). */
+export const keyValueStoreListOutputSchema = paginatedListOutputSchema(
+    keyValueStoreListItemSchema,
+    'Key-value stores.',
+);
+
+/**
+ * Schema for get-key-value-store-keys output (apify-client `KeyValueClientListKeysResult`).
+ * Uses key-cursor pagination (exclusiveStartKey), not the offset envelope of the list tools above.
+ */
+export const keyValueStoreKeysOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        count: { type: 'number', description: 'Number of keys returned in this page.' },
+        limit: { type: 'number', description: 'Maximum number of keys requested.' },
+        exclusiveStartKey: {
+            type: ['string', 'null'],
+            description: 'Key after which this listing started (exclusive); null on the first page.',
+        },
+        isTruncated: { type: 'boolean', description: 'Whether more keys are available beyond this page.' },
+        nextExclusiveStartKey: {
+            type: ['string', 'null'],
+            description: 'Pass as exclusiveStartKey to fetch the next page; null when isTruncated is false.',
+        },
+        items: {
+            type: 'array' as const,
+            description: 'Keys in the store with the byte size of each stored value.',
+            items: {
+                type: 'object' as const,
+                properties: {
+                    key: { type: 'string', description: 'Record key.' },
+                    size: { type: 'number', description: 'Size of the stored value in bytes.' },
+                },
+                required: ['key', 'size'],
+            },
+        },
+    },
+    required: ['count', 'limit', 'isTruncated', 'items'],
+};
+
+/**
  * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.
  */

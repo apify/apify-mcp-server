@@ -39,6 +39,17 @@ describe('get-dataset-list', () => {
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_LIST);
     });
 
+    it('mirrors the list response in structuredContent and declares an outputSchema', async () => {
+        const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
+
+        const result = await (getUserDatasetsList as HelperTool).call(
+            stubToolCallContext({}, stubApifyClient(listSpy)),
+        );
+
+        expect((result as TextToolResult).structuredContent).toEqual(MOCK_LIST);
+        expect((getUserDatasetsList as HelperTool).outputSchema).toMatchObject({ type: 'object' });
+    });
+
     it('forwards pagination params (limit, offset, desc, unnamed) to ApifyClient', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 

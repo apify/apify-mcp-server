@@ -49,6 +49,17 @@ describe('get-key-value-store-keys', () => {
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_KEYS);
     });
 
+    it('mirrors the keys response in structuredContent and declares an outputSchema', async () => {
+        const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+
+        expect((result as TextToolResult).structuredContent).toEqual(MOCK_KEYS);
+        expect((getKeyValueStoreKeys as HelperTool).outputSchema).toMatchObject({ type: 'object' });
+    });
+
     it('forwards exclusiveStartKey and limit to listKeys', async () => {
         const listKeysSpy = vi.fn().mockResolvedValue(MOCK_KEYS);
 
