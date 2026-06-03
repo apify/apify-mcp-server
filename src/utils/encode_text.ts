@@ -9,8 +9,8 @@ import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from './mcp.js';
  */
 const MAX_DEPTH = 20;
 
-const TOON_FENCE_PREFIX = '```toon\n';
-const TOON_FENCE_SUFFIX = '\n```';
+export const TOON_FENCE_PREFIX = '```toon\n';
+export const TOON_FENCE_SUFFIX = '\n```';
 
 function flattenValue(value: unknown, depth: number): unknown {
     if (depth > MAX_DEPTH) throw new RangeError('dotFlatten: max depth exceeded');
@@ -32,6 +32,10 @@ function flattenInto(obj: Record<string, unknown>, prefix: string, depth: number
         if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
             flattenInto(v as Record<string, unknown>, key, depth + 1, out); // lift nested object into dotted keys
         } else {
+            // `out` is a plain object, so a source key equal to an Object.prototype member
+            // (`constructor`, `__proto__`, `toString`, …) trips this guard as a false positive and
+            // drops the TOON candidate — JSON still ships, lossless. Apify payload keys are never
+            // named this, so we accept it rather than carry a null-prototype map.
             if (key in out) throw new RangeError(`dotFlatten: key collision on "${key}"`);
             out[key] = flattenValue(v, depth + 1); // scalars unchanged; arrays recursed into
         }
@@ -61,12 +65,18 @@ export function dotFlatten(value: unknown): unknown {
  * wire this on tools that ship `structuredContent` as the JSON fallback.
  */
 export function encodeCompactText(value: unknown): string {
-    const json = `${JSON_FENCE_PREFIX}${JSON.stringify(value)}${JSON_FENCE_SUFFIX}`;
+    // Single source of truth: both candidates derive from this one serialisation, so the TOON
+    // candidate can never encode different data than JSON. A `Date` (or any `toJSON` carrier)
+    // becomes its ISO string here, not an empty object — `dotFlatten` works on the JSON data
+    // model only. A non-serialisable value (circular, BigInt) throws here; API payloads are
+    // always JSON, so let it crash.
+    const jsonStr = JSON.stringify(value);
+    const json = `${JSON_FENCE_PREFIX}${jsonStr}${JSON_FENCE_SUFFIX}`;
     let toon: string | undefined;
     try {
-        toon = `${TOON_FENCE_PREFIX}${encode(dotFlatten(value))}${TOON_FENCE_SUFFIX}`;
+        toon = `${TOON_FENCE_PREFIX}${encode(dotFlatten(JSON.parse(jsonStr)))}${TOON_FENCE_SUFFIX}`;
     } catch {
-        // dotFlatten/encode failed (depth, key collision, non-serialisable value) — JSON ships.
+        // dotFlatten threw (depth overflow or key collision) or encode failed — JSON ships.
     }
     return toon !== undefined && Buffer.byteLength(toon, 'utf8') < Buffer.byteLength(json, 'utf8') ? toon : json;
 }

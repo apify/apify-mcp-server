@@ -6,7 +6,6 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { encodeCompactText } from '../../utils/encode_text.js';
-import { buildMCPResponse } from '../../utils/mcp.js';
 import { actorRunListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserRunsListArgs = z.object({
@@ -64,9 +63,6 @@ USAGE EXAMPLES:
         const runs = await client
             .runs()
             .list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
-        return buildMCPResponse({
-            texts: [encodeCompactText(runs)],
-            structuredContent: runs,
-        });
+        return { content: [{ type: 'text', text: encodeCompactText(runs) }], structuredContent: runs };
     },
 } as const);

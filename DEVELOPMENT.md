@@ -146,6 +146,15 @@ To trigger the eval workflow on a PR, apply the **`validated`** label.
 The workflow then runs automatically and posts results to Phoenix.
 It also runs automatically on every merge to the `master` branch.
 
+### Test Actors
+
+Integration tests run against two purpose-built Actors defined in [apify/mcp-server-test-actor](https://github.com/apify/mcp-server-test-actor) and referenced from [`tests/const.ts`](./tests/const.ts):
+
+| Actor | Constant | Purpose |
+|---|---|---|
+| `apify/normal-mode-test-actor` | `ACTOR_NORMAL_MODE` | A normal Actor that writes dataset and key-value-store output. Exercises `call-actor`, the canonical run response, and the storage tools (`get-dataset-items`, `get-dataset`, `get-key-value-store-*`). |
+| `apify/example-mcp-server` | `ACTOR_EXAMPLE_MCP_SERVER` | A standby MCP-server Actor. Exercises the MCP-in-MCP proxy path, where the server registers the Actor's own MCP tools as sub-tools. |
+
 ### Test structure
 
 - `tests/unit/` — unit tests for individual modules

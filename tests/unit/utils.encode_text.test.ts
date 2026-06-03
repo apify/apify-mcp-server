@@ -1,7 +1,7 @@
-import { decode as decodeToon } from '@toon-format/toon';
 import { describe, expect, it } from 'vitest';
 
-import { dotFlatten, encodeCompactText } from '../../src/utils/encode_text.js';
+import { dotFlatten, encodeCompactText, TOON_FENCE_PREFIX } from '../../src/utils/encode_text.js';
+import { decodeFencedToolText } from './helpers/tool_context.js';
 
 describe('dotFlatten', () => {
     it('lifts nested object keys into dot-joined top-level keys', () => {
@@ -43,12 +43,6 @@ describe('dotFlatten', () => {
     });
 });
 
-/** Decode whichever fence the picker shipped, back to a JSON value. */
-function decodeFenced(text: string): unknown {
-    if (text.startsWith('```toon\n')) return decodeToon(text.slice('```toon\n'.length, -'\n```'.length));
-    return JSON.parse(text.slice('```json\n'.length, -'\n```'.length));
-}
-
 const byteLen = (s: string) => Buffer.byteLength(s, 'utf8');
 
 describe('encodeCompactText', () => {
@@ -62,8 +56,34 @@ describe('encodeCompactText', () => {
 
     it('ships TOON when it is smaller and round-trips to the original value', () => {
         const text = encodeCompactText(uniformRows);
-        expect(text.startsWith('```toon\n')).toBe(true);
-        expect(decodeFenced(text)).toEqual(uniformRows);
+        expect(text.startsWith(TOON_FENCE_PREFIX)).toBe(true);
+        expect(decodeFencedToolText(text)).toEqual(uniformRows);
+    });
+
+    it('preserves Date, nested-object, and null fields (regression: dotFlatten dropped Date objects)', () => {
+        const startedAt = '2026-05-12T09:18:27.527Z';
+        const input = {
+            items: [
+                {
+                    id: 1,
+                    startedAt: new Date(startedAt),
+                    finishedAt: new Date('2026-05-12T09:19:01.000Z'),
+                    stats: { runs: 10 },
+                },
+                { id: 2, startedAt: new Date('2026-05-12T09:17:57.206Z'), finishedAt: null, stats: { runs: 20 } },
+            ],
+        };
+        const text = encodeCompactText(input);
+
+        // The Date must survive as an ISO string. Before the fix, dotFlatten treated a Date as an
+        // empty nested object and dropped it, so the lossy (smaller) candidate won the byte compare.
+        expect(text).toContain(startedAt);
+
+        // Whichever candidate ships, the text must round-trip to the JSON-normalised value
+        // (dot-flattened when TOON wins).
+        const normalized = JSON.parse(JSON.stringify(input));
+        const expected = text.startsWith(TOON_FENCE_PREFIX) ? dotFlatten(normalized) : normalized;
+        expect(decodeFencedToolText(text)).toEqual(expected);
     });
 
     it('never ships more bytes than the plain JSON candidate', () => {
@@ -74,15 +94,15 @@ describe('encodeCompactText', () => {
     it('falls back to JSON on a dotFlatten collision and still round-trips', () => {
         const value = { 'a.b': 1, a_b: 2 };
         const text = encodeCompactText(value);
-        expect(text.startsWith('```json\n')).toBe(true);
-        expect(decodeFenced(text)).toEqual(value);
+        expect(text.startsWith(TOON_FENCE_PREFIX)).toBe(false);
+        expect(decodeFencedToolText(text)).toEqual(value);
     });
 
     it('falls back to JSON when nesting exceeds the depth guard', () => {
         let deep: Record<string, unknown> = { leaf: 1 };
         for (let i = 0; i < 25; i++) deep = { nest: deep };
         const text = encodeCompactText(deep);
-        expect(text.startsWith('```json\n')).toBe(true);
-        expect(decodeFenced(text)).toEqual(deep);
+        expect(text.startsWith(TOON_FENCE_PREFIX)).toBe(false);
+        expect(decodeFencedToolText(text)).toEqual(deep);
     });
 });

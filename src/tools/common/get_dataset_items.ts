@@ -133,6 +133,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: encodeCompactText(v) }], structuredContent };
+        return { content: [{ type: 'text', text: encodeCompactText(structuredContent) }], structuredContent };
     },
 } as const);

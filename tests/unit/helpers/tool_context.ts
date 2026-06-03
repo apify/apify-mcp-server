@@ -4,6 +4,7 @@ import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
+import { TOON_FENCE_PREFIX, TOON_FENCE_SUFFIX } from '../../../src/utils/encode_text.js';
 import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from '../../../src/utils/mcp.js';
 
 /** Inverse of `encodeJsonText`; imports prod's fence constants so the two halves can't drift. */
@@ -16,8 +17,8 @@ export function parseFencedJson(text: string): unknown {
  * or TOON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
  */
 export function decodeFencedToolText(text: string): unknown {
-    if (text.startsWith('```toon\n')) {
-        return decodeToon(text.slice('```toon\n'.length, -JSON_FENCE_SUFFIX.length));
+    if (text.startsWith(TOON_FENCE_PREFIX)) {
+        return decodeToon(text.slice(TOON_FENCE_PREFIX.length, -TOON_FENCE_SUFFIX.length));
     }
     return parseFencedJson(text);
 }
