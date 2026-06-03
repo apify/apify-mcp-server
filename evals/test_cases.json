@@ -347,11 +347,47 @@
       "query": "Call epctex/weather-scraper for New York",
       "expectedTools": ["call-actor"]
     },
+     {
+      "id": "get-dataset-items-1",
+      "category": "get-dataset-items",
+      "query": "Get output from my latest actor with datasetId des32s",
+      "expectedTools": ["get-dataset-items"]
+    },
+    {
+      "id": "get-dataset-items-2",
+      "category": "get-dataset-items",
+      "query": "Retrieve results from dataset abc123",
+      "expectedTools": ["get-dataset-items"]
+    },
+    {
+      "id": "get-dataset-items-3",
+      "category": "get-dataset-items",
+      "query": "Show me the data from my Instagram scraper run with datasetId d23d2, ",
+      "expectedTools": ["get-dataset-items"]
+    },
+    {
+      "id": "get-dataset-items-4",
+      "category": "get-dataset-items",
+      "query": "Get the first 50 items from my datasetId abc123",
+      "expectedTools": ["get-dataset-items"]
+    },
+    {
+      "id": "get-dataset-items-5",
+      "category": "get-dataset-items",
+      "query": "Retrieve all results from my web scraper with datasetID abc123",
+      "expectedTools": ["get-dataset-items"]
+    },
     {
       "id": "fetch-apify-docs-1",
       "category": "fetch-apify-docs",
       "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
       "expectedTools": ["fetch-apify-docs"]
+    },
+    {
+      "id": "get-dataset-items-basic-2",
+      "category": "get-dataset-items",
+      "query": "Get query and markdown fields from dataset UvsU",
+      "expectedTools": ["get-dataset-items"]
     },
     {
       "id": "fetch-apify-docs-edge-1",
