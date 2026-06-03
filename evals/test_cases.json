@@ -484,8 +484,8 @@
       "id": "get-dataset-3",
       "category": "get-dataset",
       "query": "What fields does dataset UvsU contain?",
-      "expectedTools": ["get-dataset"],
-      "reference": "Listing the fields of a dataset is metadata. Use get-dataset; get-dataset-schema infers a JSON schema and is also acceptable, but get-dataset is the direct match."
+      "expectedTools": ["get-dataset", "get-dataset-schema"],
+      "reference": "Listing the fields of a dataset is metadata. Use get-dataset or get-dataset-schema to infer the JSON schema."
     },
     {
       "id": "get-dataset-schema-1",
