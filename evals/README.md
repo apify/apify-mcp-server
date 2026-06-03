@@ -62,7 +62,7 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 
 ## Test cases
 
-**Current version: v1.6** (73 test cases)
+**Current version: v1.7** (88 test cases)
 
 **Changes in v1.4:**
 - Fixed contradictory test cases (search-actors-1, search-actors-15)
@@ -77,7 +77,7 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
   - search-actors: Emphasizes finding/discovering what tools exist (informational intent)
   - apify--rag-web-browser: Emphasizes getting/retrieving actual data (data retrieval intent)
 
-Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `get-actor-output`, `fetch-apify-docs`
+Test categories: `fetch-actor-details`, `search-actors`, `apify--rag-web-browser`, `search-apify-docs`, `call-actor`, `fetch-apify-docs`, `get-dataset-items`, `get-dataset`, `get-dataset-schema`, `get-dataset-list`, `get-key-value-store-record`, `get-key-value-store-keys`, `get-key-value-store`, `get-key-value-store-list`
 
 ## Output
 

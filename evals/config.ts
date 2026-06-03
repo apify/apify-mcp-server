@@ -114,10 +114,38 @@ You must judge whether this agent made the correct selection.
 - Searches across all documentation to find relevant pages
 - Example: "How to create an Apify Actor?" or "What is Apify Proxy?"
 
-**get-actor-output**: Retrieves the output data (results) from a completed Actor run using its datasetId.
-- Use when query asks to get/fetch/retrieve data from a previous Actor execution
-- Returns the actual scraped data, not Actor documentation
-- Example: "Get the data from my last Actor run" or "Show me the results from dataset abc123"
+**get-dataset-items**: Retrieves the actual items (rows/records) stored in a dataset, with pagination and field selection.
+- Use when query asks to get/read/fetch the data, results, items, or records from a dataset
+- Returns the scraped data itself, not metadata or schema
+- Example: "Get the first 50 items from dataset abc123" or "Show me the results in dataset des32s"
+
+**get-dataset**: Gets metadata about a dataset (itemCount, fields, stats) — NOT the items themselves.
+- Use when query asks about a dataset's details, size, item count, or fields
+- Example: "How many items are in dataset abc123?" or "Show info for dataset des32s"
+
+**get-dataset-schema**: Generates a JSON schema inferred from a sample of dataset items.
+- Use when query asks for the schema, structure, or shape of a dataset
+- Example: "What is the schema of dataset abc123?" or "Generate a schema for dataset des32s"
+
+**get-dataset-list**: Lists the datasets owned by the authenticated user.
+- Use when query asks to list/browse the user's datasets (not a specific dataset's contents)
+- Example: "List all my datasets" or "What datasets do I have?"
+
+**get-key-value-store-record**: Gets the value stored under a specific key in a key-value store.
+- Use when query asks to read/get a record or value by key from a key-value store
+- Example: "Get record INPUT from store abc123" or "Read the value under key OUTPUT in store des32s"
+
+**get-key-value-store-keys**: Lists the keys in a key-value store.
+- Use when query asks which keys/records exist in a key-value store
+- Example: "List the keys in key-value store abc123"
+
+**get-key-value-store**: Gets metadata about a key-value store (details, owner, usage stats) — NOT a record value.
+- Use when query asks about a key-value store's details or properties
+- Example: "Show info for key-value store abc123"
+
+**get-key-value-store-list**: Lists the key-value stores owned by the authenticated user.
+- Use when query asks to list/browse the user's key-value stores (not a specific store's contents)
+- Example: "List all my key-value stores"
 
 **fetch-apify-docs**: Fetches the full content of a specific Apify documentation page by its URL.
 - Use when user provides a specific docs URL they want to read
