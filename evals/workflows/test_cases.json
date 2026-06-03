@@ -59,7 +59,7 @@
     {
       "id": "fetch-details-mcp-tools-list",
       "category": "mcp",
-      "query": "Show me what tools are available in the apify/actors-mcp-server MCP server",
+      "query": "Show me what tools are available in the apify/example-mcp-server MCP server",
       "reference": "The agent must use fetch-actor-details with output=['mcp-tools'] to list available tools. The response should present the list of tools with their names and descriptions."
     },
     {
