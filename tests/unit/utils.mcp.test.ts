@@ -1,18 +1,18 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeToolResponseBytes, wrapJsonText } from '../../src/utils/mcp.js';
+import { computeToolResponseBytes, encodeJsonText } from '../../src/utils/mcp.js';
 
-describe('wrapJsonText()', () => {
+describe('encodeJsonText()', () => {
     it('emits a ```json … ``` fenced block', () => {
-        expect(wrapJsonText({ a: 1 })).toBe('```json\n{"a":1}\n```');
+        expect(encodeJsonText({ a: 1 })).toBe('```json\n{"a":1}\n```');
     });
 
     it('serializes arrays', () => {
-        expect(wrapJsonText([1, 2])).toBe('```json\n[1,2]\n```');
+        expect(encodeJsonText([1, 2])).toBe('```json\n[1,2]\n```');
     });
 
     it('serializes primitives', () => {
-        expect(wrapJsonText('x')).toBe('```json\n"x"\n```');
+        expect(encodeJsonText('x')).toBe('```json\n"x"\n```');
     });
 });
 

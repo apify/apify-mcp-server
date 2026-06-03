@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { encodeJsonText } from '../../utils/mcp.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreArgs = z.object({
@@ -47,6 +47,6 @@ export const getKeyValueStore: ToolEntry = Object.freeze({
         if (!kvStore) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(kvStore) }] };
+        return { content: [{ type: 'text', text: encodeJsonText(kvStore) }] };
     },
 } as const);

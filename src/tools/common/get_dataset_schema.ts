@@ -7,7 +7,7 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { buildMCPResponse, wrapJsonText } from '../../utils/mcp.js';
+import { buildMCPResponse, encodeJsonText } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
@@ -94,6 +94,6 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             });
         }
 
-        return { content: [{ type: 'text', text: wrapJsonText(schema) }] };
+        return { content: [{ type: 'text', text: encodeJsonText(schema) }] };
     },
 } as const);

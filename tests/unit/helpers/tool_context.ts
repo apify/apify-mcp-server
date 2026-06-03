@@ -5,7 +5,7 @@ import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
 import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from '../../../src/utils/mcp.js';
 
-/** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
+/** Inverse of `encodeJsonText`; imports prod's fence constants so the two halves can't drift. */
 export function parseFencedJson(text: string): unknown {
     return JSON.parse(text.slice(JSON_FENCE_PREFIX.length, -JSON_FENCE_SUFFIX.length));
 }

@@ -6,7 +6,7 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { encodeJsonText } from '../../utils/mcp.js';
 import { normalizeDatasetFields } from '../core/actor_run_response.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
@@ -58,6 +58,6 @@ export const getDataset: ToolEntry = Object.freeze({
         // normalization `buildRunDataset` applies so this tool's `fields` matches
         // the structured `storages.datasets.default.fields` shape.
         const normalized = dataset.fields ? { ...dataset, fields: normalizeDatasetFields(dataset.fields) } : dataset;
-        return { content: [{ type: 'text', text: wrapJsonText(normalized) }] };
+        return { content: [{ type: 'text', text: encodeJsonText(normalized) }] };
     },
 } as const);

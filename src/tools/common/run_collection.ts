@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildMCPResponse, wrapJsonText } from '../../utils/mcp.js';
+import { buildMCPResponse, encodeJsonText } from '../../utils/mcp.js';
 import { actorRunListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserRunsListArgs = z.object({
@@ -64,7 +64,7 @@ USAGE EXAMPLES:
             .runs()
             .list({ limit: parsed.limit, offset: parsed.offset, desc: parsed.desc, status: parsed.status });
         return buildMCPResponse({
-            texts: [wrapJsonText(runs)],
+            texts: [encodeJsonText(runs)],
             structuredContent: runs,
         });
     },
