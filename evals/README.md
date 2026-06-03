@@ -45,12 +45,12 @@ export OPENROUTER_BASE_URL="https://openrouter.ai/api/v1"
 
 pnpm install --frozen-lockfile
 pnpm run evals:create-dataset  # one-time: creates dataset from test_cases.json
-pnpm run evals:run              # runs evaluation on default dataset (v1.6)
+pnpm run evals:run              # runs evaluation on default dataset (v1.7)
 ```
 
 ### Using a specific dataset version
 
-By default, the evaluation uses the dataset version from `test_cases.json` (`v1.6`). To use a different dataset:
+By default, the evaluation uses the dataset version from `test_cases.json` (`v1.7`). To use a different dataset:
 
 ```bash
 # Create a new dataset with custom name
