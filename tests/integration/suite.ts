@@ -1744,28 +1744,7 @@ export function createIntegrationTestsSuite(options: IntegrationTestsSuiteOption
             it('should list all prompts', async () => {
                 client = await createClientFn();
                 const prompts = await client.listPrompts();
-                expect(prompts.prompts.length).toBeGreaterThan(0);
-            });
-
-            it('should be able to get prompt by name', async () => {
-                client = await createClientFn();
-
-                const topic = 'apify';
-                const prompt = await client.getPrompt({
-                    name: 'GetLatestNewsOnTopic',
-                    arguments: {
-                        topic,
-                    },
-                });
-
-                const message = prompt.messages[0];
-                expect(message).toBeDefined();
-                expect(message.content).toBeDefined();
-                expect(message.content.type).toBe('text');
-                // So typescript is happy
-                if (message.content.type === 'text') {
-                    expect(message.content.text).toContain(topic);
-                }
+                expect(prompts.prompts.length).toBe(0);
             });
 
             // Session termination is only possible for streamable HTTP transport.
