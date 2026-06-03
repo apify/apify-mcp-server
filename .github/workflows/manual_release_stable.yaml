@@ -76,34 +76,20 @@ jobs:
                 run: pnpm dlx @anthropic-ai/mcpb@2.1.2 pack mcpb/ apify-mcp-server.mcpb
             -   name: Clean MCPB package
                 run: pnpm dlx @anthropic-ai/mcpb@2.1.2 clean apify-mcp-server.mcpb
-            -   name: Smoke test MCPB package
-                # Start the packed .mcpb the way a client does and exercise it over MCP.
-                # Catches packaging regressions where the bundle builds but can't start —
-                # e.g. a pruned peer-dep top-level module raising ERR_MODULE_NOT_FOUND at
-                # import (#862). Manifest validation and file listings miss this; only
-                # launching the asset does. Runs against the post-clean artifact, the exact
-                # file uploaded to the release. mcpc is a devDep, so use the pinned local
-                # binary.
-                run: |
-                    unzip -q apify-mcp-server.mcpb -d mcpb-smoke
-                    cat > .mcp.smoke.json <<EOF
-                    {"mcpServers":{"mcpb":{"command":"node","args":["$PWD/mcpb-smoke/dist/stdio.js","--tools","docs,search-actors,fetch-actor-details","--telemetry-enabled","false"]}}}
-                    EOF
-                    pnpm exec mcpc connect .mcp.smoke.json:mcpb @mcpb
-                    pnpm exec mcpc @mcpb ping
-                    pnpm exec mcpc --json @mcpb tools-list | jq -e 'length > 0'
-                    pnpm exec mcpc --json @mcpb tools-call search-actors keywords:="web scraper" | jq -e '.content[0].text'
-                    pnpm exec mcpc --json @mcpb tools-call fetch-actor-details actor:="apify/web-scraper" | jq -e '.content[0].text'
-                    pnpm exec mcpc @mcpb close
             -   name: Upload MCPB artifacts
                 uses: actions/upload-artifact@v4
                 with:
                     name: mcpb-packages
                     path: apify-mcp-server.mcpb
 
+    smoke_test_mcpb:
+        name: Smoke test MCPB package
+        needs: [build_mcpb]
+        uses: ./.github/workflows/_smoke_test_mcpb.yaml
+
     create_github_release:
         name: Create github release
-        needs: [release_metadata, build_mcpb]
+        needs: [release_metadata, build_mcpb, smoke_test_mcpb]
         runs-on: ubuntu-latest
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
