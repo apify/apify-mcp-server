@@ -5,9 +5,9 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { encodeCompactText } from '../../utils/encode_text.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { encodeJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
@@ -133,6 +133,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: encodeJsonText(v) }], structuredContent };
+        return { content: [{ type: 'text', text: encodeCompactText(v) }], structuredContent };
     },
 } as const);

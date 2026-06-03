@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { encodeJsonText } from '../../utils/mcp.js';
+import { encodeCompactText } from '../../utils/encode_text.js';
 import { datasetListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserDatasetsListArgs = z.object({
@@ -68,6 +68,6 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: encodeJsonText(datasets) }], structuredContent: datasets };
+        return { content: [{ type: 'text', text: encodeCompactText(datasets) }], structuredContent: datasets };
     },
 } as const);

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserRunsList } from '../../src/tools/common/run_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const listMock = vi.fn();
 
@@ -40,13 +40,13 @@ describe('get-actor-run-list', () => {
         expect(getUserRunsList.name).toBe(HelperTools.ACTOR_RUN_LIST_GET);
     });
 
-    it('returns the runs as fenced JSON, mirrors them in structuredContent, and declares an outputSchema', async () => {
+    it('returns runs as fenced text (json or toon), mirrors them in structuredContent, and declares an outputSchema', async () => {
         listMock.mockResolvedValue(MOCK_RUNS);
 
         const result = await (getUserRunsList as HelperTool).call(stubToolCallContext({}, noClient));
         const { content } = result as TextToolResult;
 
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_RUNS);
+        expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_RUNS);
         expect((result as TextToolResult).structuredContent).toEqual(MOCK_RUNS);
         expect((getUserRunsList as HelperTool).outputSchema).toMatchObject({ type: 'object' });
     });
