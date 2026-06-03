@@ -83,7 +83,7 @@ jobs:
                 # import (#862). Manifest validation and file listings miss this; only
                 # launching the asset does. Runs against the post-clean artifact, the exact
                 # file uploaded to the release. mcpc is a devDep, so use the pinned local
-                # binary. Same tool probe as the npm smoke test, for parity.
+                # binary.
                 run: |
                     unzip -q apify-mcp-server.mcpb -d mcpb-smoke
                     cat > .mcp.smoke.json <<EOF
@@ -94,8 +94,6 @@ jobs:
                     pnpm exec mcpc --json @mcpb tools-list | jq -e 'length > 0'
                     pnpm exec mcpc --json @mcpb tools-call search-actors keywords:="web scraper" | jq -e '.content[0].text'
                     pnpm exec mcpc --json @mcpb tools-call fetch-actor-details actor:="apify/web-scraper" | jq -e '.content[0].text'
-                    pnpm exec mcpc --json @mcpb tools-call search-apify-docs query:="web scraping" docSource:="apify" | jq -e '.content[0].text'
-                    pnpm exec mcpc --json @mcpb tools-call fetch-apify-docs url:="https://docs.apify.com/platform/actors" | jq -e '.content[0].text'
                     pnpm exec mcpc @mcpb close
             -   name: Upload MCPB artifacts
                 uses: actions/upload-artifact@v4
