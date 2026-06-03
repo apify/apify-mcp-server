@@ -83,8 +83,56 @@
     {
       "id": "workflow-mcp-discover-and-execute",
       "category": "mcp",
-      "query": "Find what an MCP weather Actor can do and use it to get weather for London",
-      "reference": "The agent must: 1) search for weather MCP Actor, 2) use fetch-actor-details with output=['mcp-tools'] to list tools, 3) use call-actor with actor:tool format to execute. Tests full MCP server discovery and execution workflow."
+      "query": "Find the Apify example MCP server and execute one of its tools",
+      "reference": "The agent must: 1) search for example MCP Actor, 2) use fetch-actor-details to list tools, 3) use call-actor to execute. Tests full MCP server discovery and execution workflow."
+    },
+    {
+      "id": "storage-dataset-items-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then tell me the title and the URL of the page that was scraped.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset-items with the datasetId from that run, and finally report a page title and a URL. PASS only if get-dataset-items was called with a datasetId argument and the final answer contains a title and a URL.",
+      "tools": ["actors", "get-dataset-items"],
+      "maxTurns": 12
+    },
+    {
+      "id": "storage-dataset-schema-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then generate a JSON schema describing the structure of that run's dataset items.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset-schema with the datasetId from that run. PASS only if get-dataset-schema was called with a datasetId argument.",
+      "tools": ["actors", "get-dataset-schema"],
+      "maxTurns": 12
+    },
+    {
+      "id": "storage-dataset-metadata-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ waiting up to 45 seconds for it to finish. When the run finishes call get-dataset to tell me how many items the dataset contains.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-dataset with the datasetId from that run. PASS only if get-dataset was called with a datasetId argument and the final answer states an item count.",
+      "tools": ["actors", "get-dataset"],
+      "maxTurns": 12
+    },
+    {
+      "id": "storage-kv-keys-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then use the key-value store keys tool to list the keys stored in that run's key-value store (limit 10) and tell me how many keys there are and what they are named.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-keys with the keyValueStoreId from that run. PASS only if get-key-value-store-keys was actually called with a keyValueStoreId argument and the final answer lists one or more key names.",
+      "tools": ["actors", "get-key-value-store-keys"],
+      "maxTurns": 12
+    },
+    {
+      "id": "storage-kv-record-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then read one record from that run's key-value store and tell me what kind of content that record holds.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-record with the keyValueStoreId from that run and a recordKey. PASS only if get-key-value-store-record was called with both a keyValueStoreId and a recordKey argument, and the final answer describes the record's content.",
+      "tools": ["actors"],
+      "maxTurns": 12
+    },
+    {
+      "id": "storage-actor-run-list-seeded",
+      "category": "storage",
+      "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then look at my recent Actor runs (newest first) and confirm that the run you just started appears, reporting its status and run ID.",
+      "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-actor-run-list. PASS only if get-actor-run-list was actually called and the final answer reports a run ID and a status matching the run the agent just started.",
+      "tools": ["actors", "get-actor-run-list"],
+      "maxTurns": 12
     }
   ]
 }
