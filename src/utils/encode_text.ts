@@ -1,5 +1,7 @@
 import { encode } from '@toon-format/toon';
 
+import log from '@apify/log';
+
 import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from './mcp.js';
 
 /**
@@ -75,8 +77,10 @@ export function encodeCompactText(value: unknown): string {
     let toon: string | undefined;
     try {
         toon = `${TOON_FENCE_PREFIX}${encode(dotFlatten(JSON.parse(jsonStr)))}${TOON_FENCE_SUFFIX}`;
-    } catch {
+    } catch (err) {
         // dotFlatten threw (depth overflow or key collision) or encode failed — JSON ships.
+        // Log it: the fallback is correct, but a recurring failure means TOON is silently disabled.
+        log.warning('encodeCompactText: TOON candidate dropped, shipping JSON', { err });
     }
     return toon !== undefined && Buffer.byteLength(toon, 'utf8') < Buffer.byteLength(json, 'utf8') ? toon : json;
 }

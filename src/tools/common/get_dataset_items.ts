@@ -12,6 +12,10 @@ import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
+// Caps the page size: the picker serialises the response several times (JSON + dot-flattened TOON),
+// so an unbounded limit turns a large dataset page into a memory/CPU spike. 250 is well past what an
+// LLM can usefully consume in one turn while staying cheap to encode.
+const MAX_DATASET_ITEMS_LIMIT = 250;
 
 /** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
 export function extractDotPrefixes(fields: string[]): string[] {
@@ -38,8 +42,11 @@ const getDatasetItemsArgs = z.object({
         .number()
         .int()
         .min(1)
+        .max(MAX_DATASET_ITEMS_LIMIT)
         .optional()
-        .describe(`Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}.`),
+        .describe(
+            `Maximum number of items to return. Defaults to ${DEFAULT_DATASET_ITEMS_LIMIT}, max ${MAX_DATASET_ITEMS_LIMIT}.`,
+        ),
     fields: z
         .string()
         .optional()

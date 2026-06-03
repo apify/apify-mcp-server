@@ -165,6 +165,12 @@ describe('get-dataset-items', () => {
         expect(tool.ajvValidate({ datasetId: 'ds-1' })).toBe(true);
     });
 
+    it('rejects limit above 250 via ajv validation', () => {
+        const tool = getDatasetItems as HelperTool;
+        expect(tool.ajvValidate({ datasetId: 'ds-1', limit: 251 })).toBe(false);
+        expect(tool.ajvValidate({ datasetId: 'ds-1', limit: 250 })).toBe(true);
+    });
+
     it('passes the wrapper-stripped datasetId to client.dataset()', async () => {
         const datasetSpy = vi.fn().mockReturnValue({ listItems: async () => ({ items: MOCK_ITEMS, total: 1 }) });
         const client = { dataset: datasetSpy } as unknown as InternalToolArgs['apifyClient'];
