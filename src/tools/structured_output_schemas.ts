@@ -171,6 +171,16 @@ export const actorInfoSchema = {
             },
             required: ['type', 'properties'],
         },
+        inputFieldsTruncated: {
+            type: 'boolean',
+            description:
+                'Present and `true` when `inputFields` was truncated; fetch the full schema via `fetch-actor-details`.',
+        },
+        inputFieldsTotalCount: {
+            type: 'number',
+            description:
+                'Total number of input fields before truncation; present only when `inputFields` was truncated.',
+        },
     },
     required: ['url', 'id', 'fullName', 'developer', 'description', 'categories', 'isDeprecated'],
 };

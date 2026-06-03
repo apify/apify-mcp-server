@@ -2,7 +2,7 @@ import type { Actor } from 'apify-client';
 import { describe, expect, it } from 'vitest';
 
 import { MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../../src/const.js';
-import type { ActorStoreList } from '../../src/types.js';
+import type { ActorStoreInputSchema, ActorStoreList } from '../../src/types.js';
 import { formatActorToActorCard, formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 
 // Mock Actor data for testing (based on real apify/rag-web-browser Actor)
@@ -83,6 +83,19 @@ const mockDeprecatedActor: Actor = {
     title: 'Deprecated RAG Browser',
     isDeprecated: true,
 } as unknown as Actor;
+
+function buildInputSchema(fieldCount: number): ActorStoreInputSchema {
+    const properties: ActorStoreInputSchema['properties'] = {};
+    for (let i = 0; i < fieldCount; i++) {
+        properties[`field${i}`] = { type: 'string' };
+    }
+
+    return {
+        type: 'object',
+        properties,
+        required: Object.keys(properties),
+    };
+}
 
 describe('formatActorToActorCard', () => {
     describe('backwards compatibility (no options)', () => {
@@ -573,6 +586,42 @@ describe('formatActorToStructuredCard', () => {
             expect(result.developer.username).toBe('');
             expect(result.modifiedAt).toBeUndefined();
         });
+    });
+});
+
+describe('formatActorToStructuredCard inputSchema truncation', () => {
+    it('truncates inputFields and marks incomplete schemas', () => {
+        const total = MAX_INPUT_FIELDS_IN_TEXT_CARD + 5;
+        const actor = { ...mockActorStoreList, inputSchema: buildInputSchema(total) } as ActorStoreList;
+        const result = formatActorToStructuredCard(actor);
+
+        expect(Object.keys(result.inputFields?.properties ?? {})).toHaveLength(MAX_INPUT_FIELDS_IN_TEXT_CARD);
+        expect(result.inputFields?.properties[`field${MAX_INPUT_FIELDS_IN_TEXT_CARD - 1}`]).toStrictEqual({
+            type: 'string',
+        });
+        expect(result.inputFields?.properties[`field${MAX_INPUT_FIELDS_IN_TEXT_CARD}`]).toBeUndefined();
+        expect(result.inputFields?.required).toEqual(
+            Array.from({ length: MAX_INPUT_FIELDS_IN_TEXT_CARD }, (_, index) => `field${index}`),
+        );
+        expect(result.inputFieldsTruncated).toBe(true);
+        expect(result.inputFieldsTotalCount).toBe(total);
+    });
+
+    it('leaves inputFields unchanged when schema fits under the cap', () => {
+        const inputSchema: ActorStoreInputSchema = {
+            type: 'object',
+            properties: {
+                url: { type: 'string' },
+                maxResults: { type: 'number' },
+            },
+            required: ['url'],
+        };
+        const actor = { ...mockActorStoreList, inputSchema } as ActorStoreList;
+        const result = formatActorToStructuredCard(actor);
+
+        expect(result.inputFields).toStrictEqual(inputSchema);
+        expect(result.inputFieldsTruncated).toBeUndefined();
+        expect(result.inputFieldsTotalCount).toBeUndefined();
     });
 });
 

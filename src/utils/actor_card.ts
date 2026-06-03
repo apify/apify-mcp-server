@@ -33,6 +33,20 @@ function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null 
     return `- **Input fields:** ${fields}${suffix}`;
 }
 
+function truncateInputSchema(inputSchema: ActorStoreInputSchema): ActorStoreInputSchema {
+    const entries = Object.entries(inputSchema.properties);
+    if (entries.length <= MAX_INPUT_FIELDS_IN_TEXT_CARD) return inputSchema;
+
+    const shownEntries = entries.slice(0, MAX_INPUT_FIELDS_IN_TEXT_CARD);
+    const shownPropertyNames = new Set(shownEntries.map(([name]) => name));
+
+    return {
+        ...inputSchema,
+        properties: Object.fromEntries(shownEntries) as ActorStoreInputSchema['properties'],
+        required: inputSchema.required?.filter((name) => shownPropertyNames.has(name)),
+    };
+}
+
 // Helper function to format categories from uppercase with underscores to a proper case
 function formatCategories(categories?: string[]): string[] {
     if (!categories) return [];
@@ -262,6 +276,9 @@ export function formatActorToStructuredCard(
     const pricing = options.simplifyPricingForUserTier
         ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
         : pricingInfoToStructured(data.pricingInfo, userTier);
+    const inputSchema = getInputSchema(actor);
+    const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
+    const isInputFieldsTruncated = inputFieldsTotalCount > MAX_INPUT_FIELDS_IN_TEXT_CARD;
 
     return {
         title: data.title,
@@ -277,7 +294,11 @@ export function formatActorToStructuredCard(
         rating: data.rating,
         modifiedAt: data.modifiedAt,
         isDeprecated: data.isDeprecated,
-        inputFields: getInputSchema(actor),
+        inputFields: inputSchema ? truncateInputSchema(inputSchema) : undefined,
+        ...(isInputFieldsTruncated && {
+            inputFieldsTruncated: true,
+            inputFieldsTotalCount,
+        }),
     };
 }
 
