@@ -123,7 +123,7 @@
       "category": "storage",
       "query": "Run the apify/rag-web-browser Actor on the URL https://docs.apify.com/ with maxResults set to 1, waiting up to 45 seconds for it to finish. Then read one record from that run's key-value store and tell me what kind of content that record holds.",
       "reference": "The agent must call call-actor for apify/rag-web-browser, then call get-key-value-store-record with the keyValueStoreId from that run and a recordKey. PASS only if get-key-value-store-record was called with both a keyValueStoreId and a recordKey argument, and the final answer describes the record's content.",
-      "tools": ["actors"],
+      "tools": ["actors", "get-key-value-store-record"],
       "maxTurns": 12
     },
     {
