@@ -1,103 +1,62 @@
 # Resources Directory Index
 
-This directory contains useful documents and insights about the repository architecture, design decisions, and implementation details that don't belong in code comments or JSDoc.
+Ad-hoc technical references about the repository: architecture analyses, design decisions,
+protocol notes. **Code is the source of truth** — these docs may drift; verify against the
+current source before trusting line numbers or symbol names.
 
 ## Files
 
-### [algolia.md](./algolia.md)
-Technical analysis of Algolia search API responses for each documentation source.
-- Data structure overview for each doc source (apify, crawlee-js, crawlee-py)
-- Field availability patterns (content, hierarchy, anchors)
-- Example response payloads
-- Recommendations for response processing logic
-- **Use case**: Understand what data is actually returned by Algolia to inform simplification decisions
+### [call_actor_redesign_v4.md](./call_actor_redesign_v4.md)
+The shipped `call-actor` / `get-actor-run` V4 response contract (PRs #823/#825): canonical
+storage shape, `summary`/`nextStep`, locked decisions table. Implementation in
+`src/tools/core/actor_run_response.ts`.
 
-### [mcp_server_refactor_analysis.md](./mcp_server_refactor_analysis.md)
-Implementation plan for migrating from low-level `Server` to high-level `McpServer` API.
-
-**Structure:**
-1. **Executive Summary** - High-level overview for stakeholders
-2. **Executive Implementation Plan** - Technical summary for developers
-3. **Detailed Implementation Guide** - Step-by-step guide for coding agents
-
-**Key approach:** Callback-per-tool architecture where each tool's callback encapsulates its execution logic.
-
-**Estimated effort:** 8-13 developer days
-
-- Feature preservation matrix
-- Code examples (before/after)
-- Migration steps with specific file changes
-- Testing strategy
-- **Use case**: Reference for implementing the MCP SDK migration
-
-### [mcp_resources_analysis.md](./mcp_resources_analysis.md)
-MCP resources behavior and constraints (Skyfire readme and UI widgets), low-level `Server` API usage.
-- Handler wiring and delegation to `resource_service`
-- Resource list/read behavior and error handling
-- **Use case**: Baseline for how resources are exposed and why
-
-### [mcp_task_reference.md](./mcp_task_reference.md)
-MCP task lifecycle, SDK features, and protocol reference for the Apify MCP server.
-- Task states, protocol flow, key SDK types (`Task`, `TaskStore`, `ResponseMessage`)
-- How `executeToolAndUpdateTask()` implements tasks with `mcpTaskExecution` flag
-- Available but unused SDK features: resource links, dynamic resources, elicitation, completion
-- Current server capabilities declaration
-- Related issues: #582 (async call-actor), #587 (roadmap), #588 (tool naming)
-- **Use case**: Reference when working on MCP task integration, resource links, or protocol-level features
-
-### [patterns_for_simplification.md](./patterns_for_simplification.md)
-Analysis of patterns from the **official TypeScript MCP SDK** and **FastMCP** framework that could simplify the codebase.
-
-**Key patterns identified:**
-1. **Callback-Per-Tool Registration** - Eliminate central dispatcher (~250 LOC reduction)
-2. **Unified Tool Context** - Cleaner tool execution interface
-3. **Zod-First Validation** - Replace AJV with direct Zod validation
-4. **Automatic Notifications** - Self-managing tool list changes
-5. **Progress via Context** - Simplified progress reporting
-6. **Structured Error Handling** - Consistent UserError pattern
-7. **Type-Safe Registration** - Generic tool definitions
-8. **Session-Aware Operations** - Context-based session access
-
-**Estimated total effort:** 10-14 days for full implementation
-
-- Prioritized implementation phases
-- Before/after code examples
-- Benefits for each pattern
-- **Use case**: Reference for incremental codebase improvements
+### [pricing_output_contract.md](./pricing_output_contract.md)
+Pricing output of `fetch-actor-details` (complete) vs `search-actors` (simplified). Worked
+examples E1–E8 as a test oracle. Rules live in `src/utils/pricing_info.ts`.
 
 ### [actor_input_schema_required_fields.md](./actor_input_schema_required_fields.md)
-Apify input-schema spec semantics (required vs default vs prefill), the root cause of #637
-(phantom `default: undefined` keys from `filterSchemaProperties`), before/after examples for
-`apify/rag-web-browser`, a table of 6 real Actor fields, and the follow-up cleanup plan (#675).
-- **Use case**: Reference when touching `fixZodSchemaRequired`, `filterSchemaProperties`, or any
-  Actor input-schema normalisation logic.
-
-### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
-Notes on keeping widget bundles small (narrow `@apify/ui-library` imports, markdown stack cost).
-- **Use case**: When changing widget dependencies or markdown rendering, re-measure bundle impact
-
-### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
-Checklist and notes for ChatGPT MCP Apps store submission (verify line references against current source before relying on them).
-- **Use case**: Submission prep and audits
+Apify input-schema semantics (required vs default vs prefill) behind `fixZodSchemaRequired`.
+#637 fix is in `src/utils/ajv.ts`; keeps the still-open #675 follow-up.
 
 ### [tasks_cancel_abort_flow.md](./tasks_cancel_abort_flow.md)
-How `tasks/cancel` propagates from the SDK through the polling watcher to `apifyClient.run(runId).abort()`. Mermaid sequence diagrams for before/after PR #812 (issue #763), end-to-end signal path, multi-node rationale, hardening notes (tickInProgress, transient-error swallowing).
-- **Use case**: Reference when touching `createTaskCancellationWatcher`, `executeToolAndUpdateTask`, or `callActorGetDataset` cancellation paths.
+How `tasks/cancel` propagates to `apifyClient.run(runId).abort()` (PR #812 / issue #763).
+Sequence diagrams, the polling-watcher rationale, multi-node reasoning, hardening notes.
+Touch when changing `createTaskCancellationWatcher` or the abort path in
+`src/tools/core/actor_run_response.ts`.
+
+### [mcp_task_reference.md](./mcp_task_reference.md)
+MCP task lifecycle, SDK types, and capabilities declaration. `executeToolAndUpdateTask` with
+the `mcpTaskExecution` flag. Lists available-but-unused SDK features (resource links, dynamic
+resources, elicitation, completion).
+
+### [mcp_resources_analysis.md](./mcp_resources_analysis.md)
+MCP resources behavior: low-level `Server` API, Skyfire readme + UI widgets, handlers
+delegating to `src/resources/resource_service.ts`. Templates/subscriptions not implemented.
+
+### [integration_test_coverage_audit.md](./integration_test_coverage_audit.md)
+Point-in-time audit of protocol gaps in `tests/integration/suite.ts` (resources, logging,
+progress, ping, initialize, HTTP-level, session isolation, `_meta.apifyToken`). Live plan —
+tracked by umbrella issue #777.
+
+### [integration_test_coverage_plan.md](./integration_test_coverage_plan.md)
+PR-by-PR breakdown of the audit above. Live plan (#777); sub-issues #750–#754, #766.
+
+### [chatgpt-app-submission.md](./chatgpt-app-submission.md)
+Checklist and notes for ChatGPT MCP Apps store submission. In progress — verify line
+references against current source before relying on them.
+
+### [web-widget-bundle-size.md](./web-widget-bundle-size.md)
+Keeping widget bundles small (narrow `@apify/ui-library/dist/src/...` imports, markdown stack
+cost). Re-measure when changing widget dependencies or markdown rendering.
 
 ---
 
-## Purpose
-
-Resources in this directory serve as:
-- **Technical references** for complex subsystems (e.g., Algolia integration)
-- **Decision documentation** explaining why certain approaches were chosen
-- **Data analysis** for optimization and refactoring efforts
-- **Integration guides** for external services and APIs
-
 ## Guidelines
 
-- Keep documents **short and technical** - avoid duplicating code logic
-- Focus on **insights and patterns** rather than implementation details
-- Use **tables, examples, and structured data** for clarity
-- Link to relevant source files when explaining code flow
-- Update when making significant changes to documented systems
+- Keep documents **short and technical** — don't duplicate code logic.
+- Focus on **insights, decisions, and "why"** rather than reproducing implementation details.
+- Prefer **symbol names** over brittle line numbers when pointing at code.
+- When a documented feature ships, trim the doc to a gist that points at the code; delete it
+  when the code fully supersedes it. Delete abandoned design proposals rather than letting
+  them rot.

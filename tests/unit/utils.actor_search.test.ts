@@ -7,17 +7,22 @@ const listMock = vi.fn();
 const paramsHolder: { params: Record<string, unknown> } = { params: {} };
 
 vi.mock('../../src/apify_client.js', () => ({
-    ApifyClient: vi.fn().mockImplementation(() => ({
-        store: () => ({
-            get params(): Record<string, unknown> {
-                return paramsHolder.params;
-            },
-            set params(value: Record<string, unknown>) {
-                paramsHolder.params = value;
-            },
-            list: listMock,
-        }),
-    })),
+    // Vitest 4 constructs mocked classes via `Reflect.construct`, which requires a
+    // constructable implementation. An arrow function has no [[Construct]], so it must
+    // be a regular function that returns the mock instance.
+    ApifyClient: vi.fn().mockImplementation(function () {
+        return {
+            store: () => ({
+                get params(): Record<string, unknown> {
+                    return paramsHolder.params;
+                },
+                set params(value: Record<string, unknown>) {
+                    paramsHolder.params = value;
+                },
+                list: listMock,
+            }),
+        };
+    }),
 }));
 
 const baseStoreActor: ActorStoreList = {

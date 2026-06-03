@@ -5,9 +5,14 @@ import { trackToolCall } from '../../src/telemetry.js';
 // Mock the Segment Analytics client
 const mockTrack = vi.fn();
 vi.mock('@segment/analytics-node', () => ({
-    Analytics: vi.fn().mockImplementation(() => ({
-        track: mockTrack,
-    })),
+    // Vitest 4 constructs mocked classes via `Reflect.construct`, which requires a
+    // constructable implementation. An arrow function has no [[Construct]], so it must
+    // be a regular function that returns the mock instance.
+    Analytics: vi.fn().mockImplementation(function () {
+        return {
+            track: mockTrack,
+        };
+    }),
 }));
 
 describe('telemetry', () => {

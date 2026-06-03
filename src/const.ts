@@ -28,7 +28,6 @@ export enum HelperTools {
     ACTOR_CALL_WIDGET = 'call-actor-widget',
     ACTOR_GET_DETAILS = 'fetch-actor-details',
     ACTOR_GET_DETAILS_WIDGET = 'fetch-actor-details-widget',
-    ACTOR_OUTPUT_GET = 'get-actor-output',
     ACTOR_RUNS_ABORT = 'abort-actor-run',
     ACTOR_RUNS_GET = 'get-actor-run',
     ACTOR_RUNS_GET_WIDGET = 'get-actor-run-widget',

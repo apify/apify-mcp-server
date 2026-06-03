@@ -323,9 +323,9 @@ describe('Skyfire eligibility matrix', () => {
             label: 'internal/eligible (call-actor)',
         },
         {
-            tool: makeInternalTool({ name: HelperTools.ACTOR_OUTPUT_GET }),
+            tool: makeInternalTool({ name: HelperTools.DATASET_GET_ITEMS }),
             eligible: true,
-            label: 'internal/eligible (get-actor-output)',
+            label: 'internal/eligible (get-dataset-items)',
         },
         { tool: makeNonEligibleInternalTool(), eligible: false, label: 'internal/non-eligible (search-apify-docs)' },
         { tool: makeActorTool(), eligible: true, label: 'actor tool' },
