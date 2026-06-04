@@ -39,7 +39,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const linkContext = resolveConsoleLinkContext(apifyMcpServer, userInfo);
+        const linkContext = resolveConsoleLinkContext(apifyToken, userInfo);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(
             actors,
             userInfo.userPlanTier,
