@@ -106,8 +106,6 @@ type ExtractedActorData = {
  */
 function extractActorData(actor: Actor | ActorStoreList, options: ActorCardOptions): ExtractedActorData {
     const actorFullName = `${actor.username}/${actor.name}`;
-    // With a Console link context (Console UI token sessions), mint the Console Actor
-    // detail link instead of the public website link. See ConsoleLinkContext.
     const actorUrl = options.linkContext
         ? buildConsoleActorUrl(options.linkContext, actor.id)
         : `${APIFY_STORE_URL}/${actorFullName}`;

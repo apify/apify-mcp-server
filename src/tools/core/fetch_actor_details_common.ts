@@ -13,7 +13,12 @@ import {
     typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildConsoleActorUrl, isConsoleUiToken, resolveConsoleLinkContext } from '../../utils/console_link.js';
+import {
+    buildConsoleActorUrl,
+    isConsoleUiToken,
+    resolveConsoleLinkContext,
+    VERBATIM_LINKS_NUDGE,
+} from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
@@ -218,11 +223,7 @@ export function buildActorDetailsTextResponse(options: {
     }
 
     if (linkContext) {
-        // For Console sessions the links are personalized — models otherwise tend to
-        // "correct" them to the public apify.com URLs they know from training data.
-        texts.push(
-            'IMPORTANT: Present the Actor URLs exactly as returned in this result, verbatim. Never construct Actor URLs yourself.',
-        );
+        texts.push(VERBATIM_LINKS_NUDGE);
     }
 
     const structuredContent: Record<string, unknown> = {

@@ -3,7 +3,7 @@ import dedent from 'dedent';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
-import { resolveConsoleLinkContext } from '../../utils/console_link.js';
+import { resolveConsoleLinkContext, VERBATIM_LINKS_NUDGE } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
@@ -45,11 +45,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             userInfo.userPlanTier,
             linkContext,
         );
-        // For Console sessions the links are personalized — models otherwise tend to
-        // "correct" them to the public apify.com URLs they know from training data.
-        const verbatimLinksNudge = linkContext
-            ? '\nIMPORTANT: Present the Actor URLs exactly as returned in this result, verbatim. Never construct Actor URLs yourself.'
-            : '';
+        const verbatimLinksNudge = linkContext ? `\n${VERBATIM_LINKS_NUDGE}` : '';
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,

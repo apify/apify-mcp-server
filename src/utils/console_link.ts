@@ -10,22 +10,21 @@ export function isConsoleUiToken(apifyToken: string | undefined): boolean {
     return Boolean(apifyToken?.startsWith(UI_TOKEN_PREFIX));
 }
 
+// Console links are personalized — models otherwise tend to "correct" them to
+// the public apify.com URLs they know from training data.
+export const VERBATIM_LINKS_NUDGE =
+    'IMPORTANT: Present the Actor URLs exactly as returned in this result, verbatim. Never construct Actor URLs yourself.';
+
 /**
  * Resolves the Console link context for a request, or `undefined` when public
  * website links should be used.
  *
- * Link policy (agreed in apify/apify-core#27286):
- * - Console UI token (`apify_ui_...`) sessions → ALWAYS Console links. UI
- *   tokens are issued only to Console sessions (e.g. the Console AI chat), so
- *   they are a verifiable signal that the user is currently in Console.
- * - all other sessions → public `apify.com` links for info that has a public
- *   page (Actor details); if links to Console-only info (runs, storages, ...)
- *   are ever added to tool outputs, those must be Console links for every
- *   authenticated session, since no public page exists
+ * Policy (apify/apify-core#27286): UI tokens are issued only to Console sessions
+ * (e.g. the Console AI chat), so they are a verifiable signal that the user is in
+ * Console → Console links. All other sessions → public `apify.com` links.
  *
- * The account the token acts as is taken from the already-cached `users/me`
- * lookup: for an organization-scoped token that is the organization itself,
- * which yields org-prefixed links.
+ * For an organization-scoped token the `users/me` lookup resolves to the
+ * organization itself, which yields org-prefixed links.
  */
 export function resolveConsoleLinkContext(
     apifyToken: string | undefined,
@@ -39,13 +38,8 @@ export function resolveConsoleLinkContext(
 }
 
 /**
- * Builds the Apify Console Actor detail URL for the given context.
- *
- * Personal context: `<consoleBaseUrl>/actors/<actorId>`
- * Organization context: `<consoleBaseUrl>/organization/<orgId>/actors/<actorId>`
- *
- * `actorIdOrSlug` may be an Actor id or a `username~name` slug — Console
- * resolves both on its `/actors/:actorId` route.
+ * Builds the Console Actor detail URL: `<consoleBaseUrl>[/organization/<orgId>]/actors/<actorIdOrSlug>`.
+ * `actorIdOrSlug` may be an Actor id or a `username~name` slug — Console resolves both.
  */
 export function buildConsoleActorUrl(context: ConsoleLinkContext, actorIdOrSlug: string): string {
     const base = context.consoleBaseUrl.replace(/\/+$/, '');

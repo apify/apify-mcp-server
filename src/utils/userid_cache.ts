@@ -12,11 +12,7 @@ const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 export type CachedUserInfo = {
     userId: string | null;
     userPlanTier: PricingTier;
-    /**
-     * True when the account the token acts as is an organization (the
-     * `users/me` response carries `organizationOwnerUserId`). Used to mint
-     * org-prefixed Console links for Console UI token sessions.
-     */
+    /** True when the token acts as an organization account (`users/me` carries `organizationOwnerUserId`). */
     isOrganization: boolean;
 };
 
