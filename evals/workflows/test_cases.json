@@ -83,7 +83,7 @@
     {
       "id": "workflow-mcp-discover-and-execute",
       "category": "mcp",
-      "query": "Find the Apify example MCP server and execute one of its tools",
+      "query": "Use the apify/example-mcp-server to execute one of its tools",
       "reference": "The agent must: 1) search for example MCP Actor, 2) use fetch-actor-details to list tools, 3) use call-actor to execute. Tests full MCP server discovery and execution workflow."
     },
     {
