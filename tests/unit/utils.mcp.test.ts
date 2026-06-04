@@ -1,20 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeToolResponseBytes, encodeJsonText } from '../../src/utils/mcp.js';
-
-describe('encodeJsonText()', () => {
-    it('emits a ```json … ``` fenced block', () => {
-        expect(encodeJsonText({ a: 1 })).toBe('```json\n{"a":1}\n```');
-    });
-
-    it('serializes arrays', () => {
-        expect(encodeJsonText([1, 2])).toBe('```json\n[1,2]\n```');
-    });
-
-    it('serializes primitives', () => {
-        expect(encodeJsonText('x')).toBe('```json\n"x"\n```');
-    });
-});
+import { computeToolResponseBytes } from '../../src/utils/mcp.js';
 
 describe('computeToolResponseBytes()', () => {
     it('returns zero for null/undefined/non-object input', () => {

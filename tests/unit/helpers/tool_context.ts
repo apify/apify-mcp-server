@@ -4,21 +4,20 @@ import { expect } from 'vitest';
 
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../../src/const.js';
 import type { InternalToolArgs } from '../../../src/types.js';
-import { TOON_FENCE_PREFIX, TOON_FENCE_SUFFIX } from '../../../src/utils/encode_text.js';
-import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from '../../../src/utils/mcp.js';
+import { FENCES } from '../../../src/utils/encode_text.js';
 
-/** Inverse of `encodeJsonText`; imports prod's fence constants so the two halves can't drift. */
+/** Inverse of `wrapJsonText`; imports prod's fence constants so the two halves can't drift. */
 export function parseFencedJson(text: string): unknown {
-    return JSON.parse(text.slice(JSON_FENCE_PREFIX.length, -JSON_FENCE_SUFFIX.length));
+    return JSON.parse(text.slice(FENCES.json.prefix.length, -FENCES.json.suffix.length));
 }
 
 /**
- * Inverse of `encodeCompactText` — decodes the fenced tool text whether the picker shipped JSON
+ * Inverse of `encodeSmallest` — decodes the fenced tool text whether the picker shipped JSON
  * or TOON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
  */
 export function decodeFencedToolText(text: string): unknown {
-    if (text.startsWith(TOON_FENCE_PREFIX)) {
-        return decodeToon(text.slice(TOON_FENCE_PREFIX.length, -TOON_FENCE_SUFFIX.length));
+    if (text.startsWith(FENCES.toon.prefix)) {
+        return decodeToon(text.slice(FENCES.toon.prefix.length, -FENCES.toon.suffix.length));
     }
     return parseFencedJson(text);
 }

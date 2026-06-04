@@ -2,8 +2,6 @@ import { encode } from '@toon-format/toon';
 
 import log from '@apify/log';
 
-import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from './mcp.js';
-
 /**
  * Recursion guard for {@link dotFlatten}. The deepest real Apify-API fixture measured is
  * depth 9 (a user-declared dataset schema), so 20 leaves a comfortable margin while still
@@ -11,8 +9,16 @@ import { JSON_FENCE_PREFIX, JSON_FENCE_SUFFIX } from './mcp.js';
  */
 const MAX_DEPTH = 20;
 
-export const TOON_FENCE_PREFIX = '```toon\n';
-export const TOON_FENCE_SUFFIX = '\n```';
+/** Markdown code fences keyed by encoding. Labels are ASCII, so char length == byte length. */
+export const FENCES = {
+    json: { prefix: '```json\n', suffix: '\n```' },
+    toon: { prefix: '```toon\n', suffix: '\n```' },
+} as const;
+
+/** Wrap an already-encoded body in the Markdown code fence for its format. */
+function fence(format: keyof typeof FENCES, body: string): string {
+    return `${FENCES[format].prefix}${body}${FENCES[format].suffix}`;
+}
 
 function flattenValue(value: unknown, depth: number): unknown {
     if (depth > MAX_DEPTH) throw new RangeError('dotFlatten: max depth exceeded');
@@ -58,6 +64,14 @@ export function dotFlatten(value: unknown): unknown {
 }
 
 /**
+ * Wrap a JSON-serialisable value in a ```json code fence. Used by single-object tools, which have
+ * no `structuredContent` fallback, so this can never emit anything but JSON.
+ */
+export function wrapJsonText(value: unknown): string {
+    return fence('json', JSON.stringify(value));
+}
+
+/**
  * Encodes a JSON-serialisable value as fenced text for the LLM, shipping whichever of the JSON or
  * dot-flattened-TOON encodings is smaller (UTF-8 bytes). JSON is always a candidate, so the result
  * is never larger than the plain JSON fence; the TOON candidate is dropped if `dotFlatten`/`encode`
@@ -66,21 +80,21 @@ export function dotFlatten(value: unknown): unknown {
  * The text may be TOON — programmatic JSON consumers must read `structuredContent` instead. Only
  * wire this on tools that ship `structuredContent` as the JSON fallback.
  */
-export function encodeCompactText(value: unknown): string {
+export function encodeSmallest(value: unknown): string {
     // Single source of truth: both candidates derive from this one serialisation, so the TOON
     // candidate can never encode different data than JSON. A `Date` (or any `toJSON` carrier)
     // becomes its ISO string here, not an empty object — `dotFlatten` works on the JSON data
     // model only. A non-serialisable value (circular, BigInt) throws here; API payloads are
     // always JSON, so let it crash.
     const jsonStr = JSON.stringify(value);
-    const json = `${JSON_FENCE_PREFIX}${jsonStr}${JSON_FENCE_SUFFIX}`;
+    const json = fence('json', jsonStr);
     let toon: string | undefined;
     try {
-        toon = `${TOON_FENCE_PREFIX}${encode(dotFlatten(JSON.parse(jsonStr)))}${TOON_FENCE_SUFFIX}`;
+        toon = fence('toon', encode(dotFlatten(JSON.parse(jsonStr))));
     } catch (err) {
         // dotFlatten threw (depth overflow or key collision) or encode failed — JSON ships.
         // Log it: the fallback is correct, but a recurring failure means TOON is silently disabled.
-        log.warning('encodeCompactText: TOON candidate dropped, shipping JSON', { err });
+        log.warning('encodeSmallest: TOON candidate dropped, shipping JSON', { err });
     }
     return toon !== undefined && Buffer.byteLength(toon, 'utf8') < Buffer.byteLength(json, 'utf8') ? toon : json;
 }
