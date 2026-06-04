@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.12 - **not yet released**
 
+### 🚀 Features
+
+- Truncate inputFields in search-actors structured output ([#947](https://github.com/apify/apify-mcp-server/pull/947)) ([afbe963](https://github.com/apify/apify-mcp-server/commit/afbe9630f4b3018637e1cabcb688b51b6dc471ea)) by [@mvanhorn](https://github.com/mvanhorn), closes [#888](https://github.com/apify/apify-mcp-server/issues/888)
+
 ### 🐛 Bug Fixes
 
 - Remove x-apify-authorization header support from dev server ([#934](https://github.com/apify/apify-mcp-server/pull/934)) ([bf2d5a2](https://github.com/apify/apify-mcp-server/commit/bf2d5a2bc6f8c29a021b386ef6980272b5cdab3d)) by [@jirispilka](https://github.com/jirispilka)
