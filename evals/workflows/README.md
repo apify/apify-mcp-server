@@ -170,7 +170,7 @@ AGENT: I found 5 actors: 1. Google Maps Scraper... 2. ...
 
 ### 6. Agent vs Judge Models
 
-**Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)
+**Agent:** `anthropic/claude-haiku-4.5` (fast, good at tools)<br>
 **Judge:** `deepseek/deepseek-v4-flash` (strong reasoning)
 
 Separation allows independent optimization for speed vs evaluation quality.
