@@ -50,13 +50,11 @@ import { parseBooleanOrNull } from '@apify/utilities';
 import { ApifyClient } from '../apify_client.js';
 import {
     ALLOWED_TASK_TOOL_EXECUTION_MODES,
-    APIFY_MCP_URL,
     DEFAULT_TELEMETRY_ENABLED,
     DEFAULT_TELEMETRY_ENV,
     FAILURE_CATEGORY,
     HelperTools,
     HTTP_PAYMENT_REQUIRED,
-    SERVER_NAME,
     TOOL_STATUS,
 } from '../const.js';
 import { prepareToolCallContext } from '../payments/helpers.js';
@@ -64,6 +62,7 @@ import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
+import { getServerInfo } from '../server_card.js';
 import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actor_executor.js';
 import {
@@ -231,11 +230,7 @@ export class ActorsMcpServer {
 
         const { setupSigintHandler = true } = options;
         this.server = new Server(
-            {
-                name: SERVER_NAME,
-                version: getPackageVersion()!,
-                websiteUrl: APIFY_MCP_URL,
-            },
+            getServerInfo(),
             {
                 capabilities: {
                     tools: {
