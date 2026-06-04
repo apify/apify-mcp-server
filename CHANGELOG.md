@@ -2,8 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-<!-- git-cliff-unreleased-start -->
-## 0.10.12 - **not yet released**
+## [0.10.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.12) (2026-06-04)
 
 ### 🚀 Features
 
@@ -14,7 +13,6 @@ All notable changes to this project will be documented in this file.
 - Remove x-apify-authorization header support from dev server ([#934](https://github.com/apify/apify-mcp-server/pull/934)) ([bf2d5a2](https://github.com/apify/apify-mcp-server/commit/bf2d5a2bc6f8c29a021b386ef6980272b5cdab3d)) by [@jirispilka](https://github.com/jirispilka)
 
 
-<!-- git-cliff-unreleased-end -->
 ## [0.10.11](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.11) (2026-05-28)
 
 ### 🐛 Bug Fixes
