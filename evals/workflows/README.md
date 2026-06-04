@@ -494,15 +494,15 @@ Format must be exact for LLM context understanding.
 ## Common Issues
 
 ### Tests interfere with each other
-**Symptom:** Test 2 fails after Test 1, passes alone.
+**Symptom:** Test 2 fails after Test 1, passes alone.<br>
 **Solution:** ✅ Isolated MCP instances per test.
 
 ### LLM can't use newly added tool
-**Symptom:** Agent uses `add-actor` but can't call new tool.
+**Symptom:** Agent uses `add-actor` but can't call new tool.<br>
 **Solution:** ✅ Dynamic tool fetching per turn.
 
 ### Judge too strict/lenient
-**Symptom:** Incorrect verdicts.
+**Symptom:** Incorrect verdicts.<br>
 **Solution:** Tune `JUDGE_PROMPT_TEMPLATE` in `config.ts`.
 
 ### Tests timeout (hit maxTurns)
