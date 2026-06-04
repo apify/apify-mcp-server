@@ -40,10 +40,13 @@ function flattenInto(obj: Record<string, unknown>, prefix: string, depth: number
         if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
             flattenInto(v as Record<string, unknown>, key, depth + 1, out); // lift nested object into dotted keys
         } else {
-            // `out` is a plain object, so a source key equal to an Object.prototype member
-            // (`constructor`, `__proto__`, `toString`, …) trips this guard as a false positive and
-            // drops the TOON candidate — JSON still ships, lossless. Apify payload keys are never
-            // named this, so we accept it rather than carry a null-prototype map.
+            // `out` is a plain object, so a source key equal to an `Object.prototype` member
+            // (`constructor`, `__proto__`, `toString`, `valueOf`, …) matches `in` on an empty
+            // object and trips this guard as a FALSE-positive collision. Such keys can legitimately
+            // occur in user/scraper-controlled `get-dataset-items` payloads; when they do, the TOON
+            // candidate is dropped and JSON ships — lossless. Accepted, not fixed: a null-prototype
+            // `out` (`Object.create(null)`) would remove the false positive, but the current guard
+            // also fires before assignment, so a `__proto__` key cannot reach the prototype setter.
             if (key in out) throw new RangeError(`dotFlatten: key collision on "${key}"`);
             out[key] = flattenValue(v, depth + 1); // scalars unchanged; arrays recursed into
         }
