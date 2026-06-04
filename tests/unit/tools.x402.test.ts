@@ -2,10 +2,16 @@
  * Tests for X402PaymentProvider — payment extraction (_meta["x402/payment"] vs
  * HTTP PAYMENT-SIGNATURE header) and tool-schema decoration with multi-scheme `accepts[]`.
  */
+import Ajv from 'ajv';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PaymentMeta, RequestHeaders } from '../../src/payments/types.js';
-import { X402PaymentProvider, type X402PaymentRequirements } from '../../src/payments/x402.js';
+import {
+    X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA,
+    X402PaymentProvider,
+    type X402PaymentRequirements,
+} from '../../src/payments/x402.js';
+import { getActorRunOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool } from '../../src/types.js';
 import { TOOL_TYPE } from '../../src/types.js';
 
@@ -35,6 +41,25 @@ const UPTO_ACCEPT = {
     maxTimeoutSeconds: 18_000,
     extra: { name: 'USDC', version: '2', facilitatorAddress: '0xFac' },
 } as const;
+
+/** A successful Actor run result — satisfies the `getActorRunOutputSchema` branch. */
+const SAMPLE_RUN_RESPONSE = {
+    runId: 'abc123',
+    actorId: 'JxcaGGqy7TwBdHxMz',
+    actorName: 'janedoe/my-actor',
+    status: 'SUCCEEDED',
+    storages: { datasets: { default: { id: 'ds1' } } },
+    summary: 'Run finished.',
+    nextStep: 'Call get-dataset-items with datasetId ds1.',
+};
+
+/** A 402 PaymentRequired payload — satisfies the x402 branch. */
+const SAMPLE_PAYMENT_REQUIRED = {
+    x402Version: 2,
+    error: 'Payment required',
+    resource: { url: 'mcp://tool/paid-tool' },
+    accepts: [EXACT_ACCEPT],
+};
 
 function makePaidTool(overrides: Partial<HelperTool> = {}): HelperTool {
     return {
@@ -200,5 +225,63 @@ describe('decorateToolSchema()', () => {
         expect(getX402Meta(twice)).toEqual(getX402Meta(once));
         const instructionsCount = (twice.description ?? '').match(/This tool requires an x402 payment/g)?.length ?? 0;
         expect(instructionsCount).toBe(1);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// outputSchema widening (issue #917)
+// ---------------------------------------------------------------------------
+
+describe('decorateToolSchema() — outputSchema widening (#917)', () => {
+    const requirements: X402PaymentRequirements = { x402Version: 2, accepts: [EXACT_ACCEPT] };
+
+    function decorateWithSchema(outputSchema: unknown) {
+        return new X402PaymentProvider(requirements).decorateToolSchema(
+            makePaidTool({ outputSchema } as unknown as Partial<HelperTool>),
+        );
+    }
+
+    it('wraps an existing outputSchema in anyOf:[success, PaymentRequired] with root type:object', () => {
+        const schema = decorateWithSchema(getActorRunOutputSchema).outputSchema as {
+            type: string;
+            anyOf: unknown[];
+        };
+        // MCP requires root type:'object'; the SDK Tool.outputSchema zod keeps `anyOf` via .catchall().
+        expect(schema.type).toBe('object');
+        expect(schema.anyOf).toHaveLength(2);
+        expect(schema.anyOf[0]).toEqual(getActorRunOutputSchema);
+        expect(schema.anyOf[1]).toEqual(X402_PAYMENT_REQUIRED_OUTPUT_SCHEMA);
+    });
+
+    it('does not invent an outputSchema for a paid tool that declares none', () => {
+        const decorated = new X402PaymentProvider(requirements).decorateToolSchema(makePaidTool());
+        expect(decorated.outputSchema).toBeUndefined();
+    });
+
+    it('is idempotent — re-decorating an already-widened tool does not nest anyOf', () => {
+        const provider2 = new X402PaymentProvider(requirements);
+        const once = provider2.decorateToolSchema(
+            makePaidTool({ outputSchema: getActorRunOutputSchema } as unknown as Partial<HelperTool>),
+        );
+        const twice = provider2.decorateToolSchema(once);
+
+        const { anyOf } = twice.outputSchema as unknown as { anyOf: unknown[] };
+        expect(anyOf).toHaveLength(2);
+        // If the guard regressed and re-wrapped, anyOf[0] would be the nested
+        // { type, anyOf:[...] } wrapper rather than the original success schema.
+        expect(anyOf[0]).toEqual(getActorRunOutputSchema);
+    });
+
+    it('widened schema validates a successful run AND a PaymentRequired, and rejects garbage', () => {
+        const widened = decorateWithSchema(getActorRunOutputSchema).outputSchema as object;
+        // new Ajv({ strict:false }) matches the MCP SDK client validator here: the SDK also
+        // adds ajv-formats, but neither branch uses a `format` keyword, so results are identical.
+        const validate = new Ajv({ strict: false, allErrors: true }).compile(widened);
+
+        expect(validate(SAMPLE_RUN_RESPONSE)).toBe(true); // normal output keeps working
+        expect(validate(SAMPLE_PAYMENT_REQUIRED)).toBe(true); // 402 payload now validates
+        expect(validate({})).toBe(false); // disjoint required-sets still reject garbage
+        // anyOf did NOT loosen success validation: a run missing required keys still fails.
+        expect(validate({ status: 'SUCCEEDED' })).toBe(false);
     });
 });
