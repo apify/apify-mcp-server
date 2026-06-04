@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../../src/const.js';
+import { APIFY_STORE_URL, HelperTools, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../../src/const.js';
 import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
 import type { ActorStoreInputSchema, ActorStoreList, HelperTool } from '../../src/types.js';
 import {
@@ -89,7 +89,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     });
 
     it('truncates structured inputFields for every Actor and keeps text cards unchanged', async () => {
-        const total = MAX_INPUT_FIELDS_IN_TEXT_CARD + 5;
+        const total = MAX_INPUT_FIELDS_IN_ACTOR_CARD + 5;
         const actors = [
             { ...MOCK_STORE_ACTOR, inputSchema: buildInputSchema(total) },
             {
@@ -119,8 +119,8 @@ describe('search-actors without widget (defaultSearchActors)', () => {
 
         expect(structuredContent.actors).toHaveLength(2);
         for (const actor of structuredContent.actors) {
-            expect(Object.keys(actor.inputFields?.properties ?? {})).toHaveLength(MAX_INPUT_FIELDS_IN_TEXT_CARD);
-            expect(actor.inputFields?.properties[`field${MAX_INPUT_FIELDS_IN_TEXT_CARD}`]).toBeUndefined();
+            expect(Object.keys(actor.inputFields?.properties ?? {})).toHaveLength(MAX_INPUT_FIELDS_IN_ACTOR_CARD);
+            expect(actor.inputFields?.properties[`field${MAX_INPUT_FIELDS_IN_ACTOR_CARD}`]).toBeUndefined();
             expect(actor.inputFieldsTruncated).toBe(true);
             expect(actor.inputFieldsTotalCount).toBe(total);
         }

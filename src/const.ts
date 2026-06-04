@@ -75,7 +75,7 @@ export const USER_CACHE_TTL_SECS = 60 * 60; // 1 hour
 /** API rejects `includeInputSchema=true` above this; mirrors apify-core `MAX_LIMIT_WITH_INPUT_SCHEMA`. */
 export const MAX_LIMIT_WITH_INPUT_SCHEMA = 10;
 /** Max input fields shown inline in text and structured Actor cards. */
-export const MAX_INPUT_FIELDS_IN_TEXT_CARD = 20;
+export const MAX_INPUT_FIELDS_IN_ACTOR_CARD = 20;
 
 export const ACTOR_PRICING_MODEL = {
     /** Rental Actors */
