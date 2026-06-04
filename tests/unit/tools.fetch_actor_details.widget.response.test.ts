@@ -57,7 +57,7 @@ describe('fetch-actor-details-widget response', () => {
     beforeEach(() => {
         vi.mocked(fetchActorDetails).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
+        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
     });
 
     it('returns { actorDetails: { actorInfo, actorCard, readme } } as structuredContent plus widget _meta', async () => {

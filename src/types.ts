@@ -648,6 +648,24 @@ export type StructuredActorCard = {
 };
 
 /**
+ * Context for minting Apify Console links instead of public website links.
+ *
+ * Console-based clients (e.g. the Console AI chat) inject this per request via
+ * `_meta.consoleLinkContext` when the session is authenticated with a Console
+ * UI token, so Actor links in tool outputs keep users in Console. When absent,
+ * tools mint public `https://apify.com/...` links as usual.
+ */
+export type ConsoleLinkContext = {
+    /** Console origin, e.g. `https://console.apify.com`. Trailing slashes are ignored. */
+    consoleBaseUrl: string;
+    /**
+     * When the session is scoped to an organization, the organization's user id.
+     * Adds the `/organization/<orgId>` path prefix so links open in the org context.
+     */
+    organizationId?: string;
+};
+
+/**
  * Options for controlling which sections to include in an Actor card.
  * All options default to true for backwards compatibility.
  */
@@ -669,6 +687,8 @@ export type ActorCardOptions = {
      * false/undefined → keep the full tiered matrix (fetch-actor-details).
      */
     simplifyPricingForUserTier?: boolean;
+    /** When set, Actor links are minted as Apify Console links instead of public website links. */
+    linkContext?: ConsoleLinkContext;
 };
 
 /**

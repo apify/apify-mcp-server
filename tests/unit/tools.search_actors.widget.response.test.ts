@@ -26,7 +26,7 @@ describe('search-actors-widget response', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
+        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
     });
 
     it('returns widgetActors plus widget _meta and short pointer text', async () => {

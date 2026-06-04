@@ -24,7 +24,7 @@ describe('search-actors without widget (defaultSearchActors)', () => {
     beforeEach(() => {
         vi.mocked(searchAgentSafeActors).mockReset();
         vi.mocked(getUserInfoCached).mockReset();
-        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE' });
+        vi.mocked(getUserInfoCached).mockResolvedValue({ userId: null, userPlanTier: 'FREE', isOrganization: false });
     });
 
     it('returns structured actors and markdown text; no widget payload', async () => {
@@ -102,5 +102,62 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(content).toHaveLength(1);
         expect(content[0].text).toContain('No Actors were found');
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
+    });
+
+    describe('Console UI token sessions (personalized Console links)', () => {
+        const callWithToken = async (apifyToken: string) => {
+            vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+            const result = await (defaultSearchActors as HelperTool).call({
+                ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
+                apifyToken,
+            });
+            return result as {
+                structuredContent: { actors: { url: string }[] };
+                content: { type: string; text: string }[];
+            };
+        };
+
+        it('mints personal Console links for a personal UI token', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue({
+                userId: 'USER_ID',
+                userPlanTier: 'FREE',
+                isOrganization: false,
+            });
+
+            const { structuredContent, content } = await callWithToken('apify_ui_test');
+            const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
+
+            expect(structuredContent.actors[0].url).toBe(consoleUrl);
+            expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
+            expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
+        });
+
+        it('mints org-prefixed Console links for an org-scoped UI token', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue({
+                userId: 'ORG_ID',
+                userPlanTier: 'FREE',
+                isOrganization: true,
+            });
+
+            const { structuredContent, content } = await callWithToken('apify_ui_test');
+            const consoleUrl = `https://console.apify.com/organization/ORG_ID/actors/${MOCK_STORE_ACTOR.id}`;
+
+            expect(structuredContent.actors[0].url).toBe(consoleUrl);
+            expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
+        });
+
+        it('keeps public website links for API tokens', async () => {
+            vi.mocked(getUserInfoCached).mockResolvedValue({
+                userId: 'USER_ID',
+                userPlanTier: 'FREE',
+                isOrganization: false,
+            });
+
+            const { structuredContent, content } = await callWithToken('apify_api_test');
+
+            expect(structuredContent.actors[0].url).toBe(`${APIFY_STORE_URL}/apify/web-scraper`);
+            expect(content[0].text).toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
+            expect(content[0].text).not.toContain('console.apify.com');
+        });
     });
 });

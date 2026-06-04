@@ -2,7 +2,7 @@ import dedent from 'dedent';
 import { z } from 'zod';
 
 import { FAILURE_CATEGORY, HelperTools, TOOL_STATUS } from '../../const.js';
-import type { HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
+import type { ConsoleLinkContext, HelperTool, InternalToolArgs, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import {
     type ActorDetailsResult,
@@ -13,6 +13,7 @@ import {
     typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { buildConsoleActorUrl, isConsoleUiToken, resolveConsoleLinkContext } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
@@ -162,13 +163,16 @@ export function buildActorDetailsTextResponse(options: {
     output: ResolvedOutputOptions;
     actorOutputSchema?: Record<string, unknown> | null;
     mcpToolsMessage?: string;
+    linkContext?: ConsoleLinkContext;
 }): {
     texts: string[];
     structuredContent: Record<string, unknown>;
 } {
-    const { details, output, actorOutputSchema, mcpToolsMessage } = options;
+    const { details, output, actorOutputSchema, mcpToolsMessage, linkContext } = options;
 
-    const actorUrl = `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
+    const actorUrl = linkContext
+        ? buildConsoleActorUrl(linkContext, details.actorInfo.id)
+        : `https://apify.com/${details.actorInfo.username}/${details.actorInfo.name}`;
 
     const texts: string[] = [];
 
@@ -184,8 +188,10 @@ export function buildActorDetailsTextResponse(options: {
     }
 
     if (output.inputSchema) {
+        // Console has no /input sub-page — link to the Actor detail page instead.
+        const inputSchemaUrl = linkContext ? actorUrl : `${actorUrl}/input`;
         texts.push(
-            [`# [Input schema](${actorUrl}/input)`, '```json', JSON.stringify(details.inputSchema), '```'].join('\n'),
+            [`# [Input schema](${inputSchemaUrl})`, '```json', JSON.stringify(details.inputSchema), '```'].join('\n'),
         );
     }
 
@@ -238,10 +244,15 @@ export async function buildFetchActorDetailsResult(
     // or mcpTools-only requests). In that case `userTier` is only used to fill the
     // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
     // read, so defaulting to 'FREE' is safe and saves a request.
-    const userPlanTier = resolvedOutput.pricing
-        ? (await getUserInfoCached(apifyToken, apifyClient)).userPlanTier
-        : 'FREE';
-    const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier };
+    // Console UI token sessions always need the lookup — it resolves the acting
+    // account (user vs organization) for minting personalized Console links.
+    const userInfo =
+        resolvedOutput.pricing || isConsoleUiToken(apifyToken)
+            ? await getUserInfoCached(apifyToken, apifyClient)
+            : undefined;
+    const userPlanTier = userInfo?.userPlanTier ?? 'FREE';
+    const linkContext = userInfo ? resolveConsoleLinkContext(apifyToken, userInfo) : undefined;
+    const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
     const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {
         return buildActorNotFoundResponse(actorName);
@@ -270,6 +281,7 @@ export async function buildFetchActorDetailsResult(
         output: resolvedOutput,
         actorOutputSchema,
         mcpToolsMessage,
+        linkContext,
     });
 
     return buildMCPResponse({ texts, structuredContent });

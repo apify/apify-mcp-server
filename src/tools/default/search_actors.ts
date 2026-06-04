@@ -3,6 +3,7 @@ import dedent from 'dedent';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry } from '../../types.js';
 import { searchAgentSafeActors } from '../../utils/actor_search.js';
+import { resolveConsoleLinkContext } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import {
@@ -23,7 +24,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
         const parsed = searchActorsBaseArgsSchema.parse(args);
         // Actor search and user-info fetch are independent; run in parallel to avoid a
         // sequential round-trip on cache miss.
-        const [actors, { userPlanTier }] = await Promise.all([
+        const [actors, userInfo] = await Promise.all([
             searchAgentSafeActors({
                 keywords: parsed.keywords,
                 apifyToken,
@@ -38,7 +39,12 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const { actorCardText, actorCardStructured } = buildSearchActorsResult(actors, userPlanTier);
+        const linkContext = resolveConsoleLinkContext(apifyToken, userInfo);
+        const { actorCardText, actorCardStructured } = buildSearchActorsResult(
+            actors,
+            userInfo.userPlanTier,
+            linkContext,
+        );
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
