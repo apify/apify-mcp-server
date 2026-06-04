@@ -47,7 +47,7 @@
     {
       "id": "call-google-maps-restaurants",
       "category": "call",
-      "query": "Find the top 3 restaurants in Prague using Google Maps, I want to know their names, ratings and addresses",
+      "query": "Find the top 3 restaurants in Prague using the Google Maps Scrapper, I want to know their names, ratings and addresses",
       "reference": "The agent must find Google Maps scraper, call it with 'restaurants Prague' query, and return a filtered list of restaurant names with ratings and addresses."
     },
     {
