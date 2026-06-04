@@ -1,5 +1,5 @@
 {
-  "version": "1.6",
+  "version": "1.7",
   "testCases": [
     {
       "id": "fetch-actor-details-1",
@@ -42,8 +42,8 @@
       "id": "fetch-actor-details-7",
       "category": "fetch-actor-details",
       "query": "What parameters does apify/instagram-scraper accept?",
-      "expectedTools": ["fetch-actor-details", "call-actor"],
-      "reference": "Both fetch-actor-details and call-actor with step='info' are valid for getting Actor parameters."
+      "expectedTools": ["fetch-actor-details"],
+      "reference": "It should call fetch-actor-details for apify/instagram-scraper to get its input parameters schema."
     },
     {
       "id": "fetch-actor-details-8",
@@ -378,6 +378,13 @@
       "expectedTools": ["get-dataset-items"]
     },
     {
+      "id": "get-dataset-items-6",
+      "category": "get-dataset-items",
+      "query": "Retrieve only the title and url fields from dataset UvsU",
+      "expectedTools": ["get-dataset-items"],
+      "reference": "Field selection on dataset rows is handled by get-dataset-items."
+    },
+    {
       "id": "fetch-apify-docs-1",
       "category": "fetch-apify-docs",
       "query": "Get configuration info from: https://docs.apify.com/platform/integrations/mcp",
@@ -458,6 +465,132 @@
       "query": "I'm new to Apify, I can't really code, I need data from my project, I need tiktok comments. I'm also price sensitive",
       "expectedTools": ["search-actors"],
       "reference": "It must call the 'search-actors' tool with the query: 'tiktok comments' or their combination. It must not use queries with extra words such as 'tiktok comments cheap' or any more detailed variations."
+    },
+    {
+      "id": "get-dataset-1",
+      "category": "get-dataset",
+      "query": "How many items are in dataset abc123?",
+      "expectedTools": ["get-dataset"],
+      "reference": "Item count is dataset metadata. Use get-dataset, not get-dataset-items."
+    },
+    {
+      "id": "get-dataset-2",
+      "category": "get-dataset",
+      "query": "Show me the metadata and stats for dataset des32s",
+      "expectedTools": ["get-dataset"],
+      "reference": "User wants dataset details/metadata, not the items. Use get-dataset."
+    },
+    {
+      "id": "get-dataset-3",
+      "category": "get-dataset",
+      "query": "What fields does dataset UvsU contain?",
+      "expectedTools": ["get-dataset", "get-dataset-schema"],
+      "reference": "Listing the fields of a dataset is metadata. Use get-dataset or get-dataset-schema to infer the JSON schema."
+    },
+    {
+      "id": "get-dataset-schema-1",
+      "category": "get-dataset-schema",
+      "query": "What is the schema of dataset abc123?",
+      "expectedTools": ["get-dataset-schema"],
+      "reference": "User asks for the schema. Use get-dataset-schema, not get-dataset or get-dataset-items."
+    },
+    {
+      "id": "get-dataset-schema-2",
+      "category": "get-dataset-schema",
+      "query": "Generate a JSON schema for dataset des32s using 10 items",
+      "expectedTools": ["get-dataset-schema"],
+      "reference": "Inferring a JSON schema from a sample is get-dataset-schema."
+    },
+    {
+      "id": "get-dataset-schema-3",
+      "category": "get-dataset-schema",
+      "query": "Infer the structure of the items in dataset UvsU",
+      "expectedTools": ["get-dataset-schema"],
+      "reference": "Describing the data structure/shape maps to get-dataset-schema."
+    },
+    {
+      "id": "get-dataset-list-1",
+      "category": "get-dataset-list",
+      "query": "List all my datasets",
+      "expectedTools": ["get-dataset-list"],
+      "reference": "Listing the user's datasets is get-dataset-list, not a specific dataset's contents."
+    },
+    {
+      "id": "get-dataset-list-2",
+      "category": "get-dataset-list",
+      "query": "What datasets do I have in my account?",
+      "expectedTools": ["get-dataset-list"],
+      "reference": "Browsing the user's own datasets. Use get-dataset-list."
+    },
+    {
+      "id": "get-dataset-list-3",
+      "category": "get-dataset-list",
+      "query": "Show me my last 10 datasets, newest first",
+      "expectedTools": ["get-dataset-list"],
+      "reference": "Paginated listing of the user's datasets. Use get-dataset-list."
+    },
+    {
+      "id": "get-key-value-store-record-1",
+      "category": "get-key-value-store-record",
+      "query": "Get record INPUT from key-value store abc123",
+      "expectedTools": ["get-key-value-store-record"],
+      "reference": "Reading a value by key is get-key-value-store-record, not get-key-value-store (metadata) or get-key-value-store-keys."
+    },
+    {
+      "id": "get-key-value-store-record-2",
+      "category": "get-key-value-store-record",
+      "query": "Read the value under key OUTPUT in key-value store des32s",
+      "expectedTools": ["get-key-value-store-record"],
+      "reference": "Fetching a specific record by key. Use get-key-value-store-record."
+    },
+    {
+      "id": "get-key-value-store-record-3",
+      "category": "get-key-value-store-record",
+      "query": "Fetch the contents of key data.json from store UvsU",
+      "expectedTools": ["get-key-value-store-record"],
+      "reference": "Retrieving the stored value for a key. Use get-key-value-store-record."
+    },
+    {
+      "id": "get-key-value-store-keys-1",
+      "category": "get-key-value-store-keys",
+      "query": "List the keys in key-value store abc123",
+      "expectedTools": ["get-key-value-store-keys"],
+      "reference": "Discovering which keys exist in a store is get-key-value-store-keys, not get-key-value-store-record."
+    },
+    {
+      "id": "get-key-value-store-keys-2",
+      "category": "get-key-value-store-keys",
+      "query": "What keys are stored in my key-value store des32s?",
+      "expectedTools": ["get-key-value-store-keys"],
+      "reference": "Listing the keys within one store. Use get-key-value-store-keys."
+    },
+    {
+      "id": "get-key-value-store-1",
+      "category": "get-key-value-store",
+      "query": "Show me the metadata for key-value store abc123",
+      "expectedTools": ["get-key-value-store"],
+      "reference": "Store details/metadata maps to get-key-value-store, not its keys or records."
+    },
+    {
+      "id": "get-key-value-store-2",
+      "category": "get-key-value-store",
+      "query": "Get details about key-value store des32s",
+      "expectedTools": ["get-key-value-store"],
+      "reference": "Inspecting a store's properties. Use get-key-value-store."
+    },
+    {
+      "id": "get-key-value-store-list-1",
+      "category": "get-key-value-store-list",
+      "query": "List all my key-value stores",
+      "expectedTools": ["get-key-value-store-list"],
+      "reference": "Listing the user's key-value stores is get-key-value-store-list, not a specific store."
+    },
+    {
+      "id": "get-key-value-store-list-2",
+      "category": "get-key-value-store-list",
+      "query": "What key-value stores do I have in my account?",
+      "expectedTools": ["get-key-value-store-list"],
+      "reference": "Browsing the user's own key-value stores. Use get-key-value-store-list."
     }
   ]
 }
