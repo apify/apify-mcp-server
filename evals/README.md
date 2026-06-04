@@ -62,7 +62,7 @@ pnpm run evals:run -- --dataset-name mcp_server_dataset_v1.3
 
 ## Test cases
 
-**Current version: v1.7** (92 test cases)
+**Current version: v1.7**
 
 **Changes in v1.4:**
 - Fixed contradictory test cases (search-actors-1, search-actors-15)
