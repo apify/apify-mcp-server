@@ -1,4 +1,4 @@
-import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_TEXT_CARD } from '../const.js';
+import { APIFY_STORE_URL, MAX_INPUT_FIELDS_IN_ACTOR_CARD } from '../const.js';
 import type { Actor, ActorCardOptions, ActorStoreInputSchema, ActorStoreList, StructuredActorCard } from '../types.js';
 import {
     getCurrentPricingInfo,
@@ -15,19 +15,34 @@ function getInputSchema(actor: Actor | ActorStoreList): ActorStoreInputSchema | 
     return 'inputSchema' in actor ? actor.inputSchema : undefined;
 }
 
-function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null {
+/** Caps an Actor input schema at {@link MAX_INPUT_FIELDS_IN_ACTOR_CARD} fields — single truncation point for both the text and structured Actor cards. */
+function truncateInputSchema(inputSchema: ActorStoreInputSchema): ActorStoreInputSchema {
     const entries = Object.entries(inputSchema.properties);
+    if (entries.length <= MAX_INPUT_FIELDS_IN_ACTOR_CARD) return inputSchema;
+
+    const shownEntries = entries.slice(0, MAX_INPUT_FIELDS_IN_ACTOR_CARD);
+    const shownPropertyNames = new Set(shownEntries.map(([name]) => name));
+
+    return {
+        ...inputSchema,
+        properties: Object.fromEntries(shownEntries) as ActorStoreInputSchema['properties'],
+        required: inputSchema.required?.filter((name) => shownPropertyNames.has(name)),
+    };
+}
+
+function inputFieldsToString(inputSchema: ActorStoreInputSchema): string | null {
+    const truncated = truncateInputSchema(inputSchema);
+    const entries = Object.entries(truncated.properties);
     if (entries.length === 0) return null;
 
-    const requiredSet = new Set(inputSchema.required ?? []);
-    const shown = entries.slice(0, MAX_INPUT_FIELDS_IN_TEXT_CARD);
-    const fields = shown
+    const requiredSet = new Set(truncated.required ?? []);
+    const fields = entries
         .map(
             ([name, prop]) =>
                 `${name}${requiredSet.has(name) ? '' : '?'}: ${Array.isArray(prop.type) ? prop.type.join('|') : prop.type}`,
         )
         .join(', ');
-    const overflow = entries.length - shown.length;
+    const overflow = Object.keys(inputSchema.properties).length - entries.length;
     const suffix = overflow > 0 ? ` ... (+${overflow} more)` : '';
 
     return `- **Input fields:** ${fields}${suffix}`;
@@ -262,6 +277,9 @@ export function formatActorToStructuredCard(
     const pricing = options.simplifyPricingForUserTier
         ? pricingInfoToSimplifiedStructured(data.pricingInfo, userTier)
         : pricingInfoToStructured(data.pricingInfo, userTier);
+    const inputSchema = getInputSchema(actor);
+    const inputFieldsTotalCount = inputSchema ? Object.keys(inputSchema.properties).length : 0;
+    const isInputFieldsTruncated = inputFieldsTotalCount > MAX_INPUT_FIELDS_IN_ACTOR_CARD;
 
     return {
         title: data.title,
@@ -277,7 +295,11 @@ export function formatActorToStructuredCard(
         rating: data.rating,
         modifiedAt: data.modifiedAt,
         isDeprecated: data.isDeprecated,
-        inputFields: getInputSchema(actor),
+        inputFields: inputSchema ? truncateInputSchema(inputSchema) : undefined,
+        ...(isInputFieldsTruncated && {
+            inputFieldsTruncated: true,
+            inputFieldsTotalCount,
+        }),
     };
 }
 
