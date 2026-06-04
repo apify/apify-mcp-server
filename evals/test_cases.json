@@ -42,8 +42,8 @@
       "id": "fetch-actor-details-7",
       "category": "fetch-actor-details",
       "query": "What parameters does apify/instagram-scraper accept?",
-      "expectedTools": ["fetch-actor-details", "call-actor"],
-      "reference": "Both fetch-actor-details and call-actor with step='info' are valid for getting Actor parameters."
+      "expectedTools": ["fetch-actor-details"],
+      "reference": "It should call fetch-actor-details for apify/instagram-scraper to get its input parameters schema."
     },
     {
       "id": "fetch-actor-details-8",
