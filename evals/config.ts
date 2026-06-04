@@ -46,7 +46,7 @@ export const MODELS_TO_EVALUATE = [
     // 'openai/gpt-4o-mini', // deprecated model
 ];
 
-export const TOOL_SELECTION_EVAL_MODEL = 'openai/gpt-4.1';
+export const TOOL_SELECTION_EVAL_MODEL = 'deepseek/deepseek-v4-flash';
 export const PHOENIX_RETRY_DELAY_MS = 10_000;
 export const PHOENIX_MAX_RETRIES = 3;
 
