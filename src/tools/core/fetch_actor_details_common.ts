@@ -13,7 +13,7 @@ import {
     typeObjectToString,
 } from '../../utils/actor_details.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { buildConsoleActorUrl, isConsoleUiToken, resolveConsoleLinkContext } from '../../utils/console_link.js';
+import { buildConsoleActorUrl, isConsoleChatClient, resolveConsoleLinkContext } from '../../utils/console_link.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 import { getUserInfoCached } from '../../utils/userid_cache.js';
 import { actorDetailsOutputSchema } from '../structured_output_schemas.js';
@@ -217,6 +217,14 @@ export function buildActorDetailsTextResponse(options: {
         texts.push(mcpToolsMessage);
     }
 
+    if (linkContext) {
+        // For Console sessions the links are personalized — models otherwise tend to
+        // "correct" them to the public apify.com URLs they know from training data.
+        texts.push(
+            'IMPORTANT: Present the Actor URLs exactly as returned in this result, verbatim. Never construct Actor URLs yourself.',
+        );
+    }
+
     const structuredContent: Record<string, unknown> = {
         actorInfo: needsCard ? details.actorCardStructured : undefined,
         readme: resolvedReadme?.content,
@@ -244,14 +252,14 @@ export async function buildFetchActorDetailsResult(
     // or mcpTools-only requests). In that case `userTier` is only used to fill the
     // placeholder `{ model: 'FREE', userTier }` in the structured card, where it's never
     // read, so defaulting to 'FREE' is safe and saves a request.
-    // Console UI token sessions always need the lookup — it resolves the acting
+    // Console AI chat sessions always need the lookup — it resolves the acting
     // account (user vs organization) for minting personalized Console links.
     const userInfo =
-        resolvedOutput.pricing || isConsoleUiToken(apifyToken)
+        resolvedOutput.pricing || isConsoleChatClient(apifyMcpServer)
             ? await getUserInfoCached(apifyToken, apifyClient)
             : undefined;
     const userPlanTier = userInfo?.userPlanTier ?? 'FREE';
-    const linkContext = userInfo ? resolveConsoleLinkContext(apifyToken, userInfo) : undefined;
+    const linkContext = userInfo ? resolveConsoleLinkContext(apifyMcpServer, userInfo) : undefined;
     const cardOptions = { ...buildCardOptions(resolvedOutput), userTier: userPlanTier, linkContext };
     const details = await fetchActorDetails(apifyClient, actorName, cardOptions);
     if (!details) {

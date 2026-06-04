@@ -39,12 +39,17 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             return buildSearchActorsEmptyResponse(parsed.keywords);
         }
 
-        const linkContext = resolveConsoleLinkContext(apifyToken, userInfo);
+        const linkContext = resolveConsoleLinkContext(apifyMcpServer, userInfo);
         const { actorCardText, actorCardStructured } = buildSearchActorsResult(
             actors,
             userInfo.userPlanTier,
             linkContext,
         );
+        // For Console sessions the links are personalized — models otherwise tend to
+        // "correct" them to the public apify.com URLs they know from training data.
+        const verbatimLinksNudge = linkContext
+            ? '\nIMPORTANT: Present the Actor URLs exactly as returned in this result, verbatim. Never construct Actor URLs yourself.'
+            : '';
         const structuredContent = {
             actors: actorCardStructured,
             query: parsed.keywords,
@@ -55,7 +60,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
                 tool with the specific Actor name.
                 IMPORTANT: You MUST always do a second search with broader, more generic keywords
                 (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-                you haven't missed a better Actor.
+                you haven't missed a better Actor.${verbatimLinksNudge}
             `,
         };
 
@@ -76,7 +81,7 @@ export const defaultSearchActors: ToolEntry = Object.freeze({
             specific Actor name.
             IMPORTANT: You MUST always do a second search with broader, more generic keywords
             (e.g., just the platform name like "TikTok" instead of "TikTok posts") to make sure
-            you haven't missed a better Actor.
+            you haven't missed a better Actor.${verbatimLinksNudge}
         `;
         const texts = [`${header}\n\n${actorCardText}\n\n${footer}`];
         return buildMCPResponse({ texts, structuredContent });

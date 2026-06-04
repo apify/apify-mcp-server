@@ -5,6 +5,7 @@ import { defaultSearchActors } from '../../src/tools/default/search_actors.js';
 import type { HelperTool } from '../../src/types.js';
 import { formatActorToStructuredCard } from '../../src/utils/actor_card.js';
 import { searchAgentSafeActors } from '../../src/utils/actor_search.js';
+import { CONSOLE_CHAT_CLIENT_NAME } from '../../src/utils/console_link.js';
 import { getUserInfoCached } from '../../src/utils/userid_cache.js';
 import { MOCK_STORE_ACTOR, SEARCH_KEYWORDS, stubInternalToolArgs } from './tools.search_actors.fixtures.js';
 
@@ -104,12 +105,21 @@ describe('search-actors without widget (defaultSearchActors)', () => {
         expect(content[0].text).toContain(SEARCH_KEYWORDS);
     });
 
-    describe('Console UI token sessions (personalized Console links)', () => {
-        const callWithToken = async (apifyToken: string) => {
+    describe('Console AI chat sessions (personalized Console links)', () => {
+        const callWithClient = async (clientName?: string) => {
             vi.mocked(searchAgentSafeActors).mockResolvedValue([MOCK_STORE_ACTOR]);
+            const base = stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 });
             const result = await (defaultSearchActors as HelperTool).call({
-                ...stubInternalToolArgs({ keywords: SEARCH_KEYWORDS, limit: 5, offset: 0 }),
-                apifyToken,
+                ...base,
+                apifyMcpServer: {
+                    ...base.apifyMcpServer,
+                    options: {
+                        ...base.apifyMcpServer.options,
+                        initializeRequestData: clientName
+                            ? { params: { clientInfo: { name: clientName, version: '0.0.1' } } }
+                            : undefined,
+                    },
+                } as typeof base.apifyMcpServer,
             });
             return result as {
                 structuredContent: { actors: { url: string }[] };
@@ -117,14 +127,14 @@ describe('search-actors without widget (defaultSearchActors)', () => {
             };
         };
 
-        it('mints personal Console links for a personal UI token', async () => {
+        it('mints personal Console links for a Console chat session', async () => {
             vi.mocked(getUserInfoCached).mockResolvedValue({
                 userId: 'USER_ID',
                 userPlanTier: 'FREE',
                 isOrganization: false,
             });
 
-            const { structuredContent, content } = await callWithToken('apify_ui_test');
+            const { structuredContent, content } = await callWithClient(CONSOLE_CHAT_CLIENT_NAME);
             const consoleUrl = `https://console.apify.com/actors/${MOCK_STORE_ACTOR.id}`;
 
             expect(structuredContent.actors[0].url).toBe(consoleUrl);
@@ -132,32 +142,34 @@ describe('search-actors without widget (defaultSearchActors)', () => {
             expect(content[0].text).not.toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
         });
 
-        it('mints org-prefixed Console links for an org-scoped UI token', async () => {
+        it('mints org-prefixed Console links for an org-scoped Console chat session', async () => {
             vi.mocked(getUserInfoCached).mockResolvedValue({
                 userId: 'ORG_ID',
                 userPlanTier: 'FREE',
                 isOrganization: true,
             });
 
-            const { structuredContent, content } = await callWithToken('apify_ui_test');
+            const { structuredContent, content } = await callWithClient(CONSOLE_CHAT_CLIENT_NAME);
             const consoleUrl = `https://console.apify.com/organization/ORG_ID/actors/${MOCK_STORE_ACTOR.id}`;
 
             expect(structuredContent.actors[0].url).toBe(consoleUrl);
             expect(content[0].text).toContain(`## [${MOCK_STORE_ACTOR.title}](${consoleUrl})`);
         });
 
-        it('keeps public website links for API tokens', async () => {
+        it('keeps public website links for other MCP clients', async () => {
             vi.mocked(getUserInfoCached).mockResolvedValue({
                 userId: 'USER_ID',
                 userPlanTier: 'FREE',
                 isOrganization: false,
             });
 
-            const { structuredContent, content } = await callWithToken('apify_api_test');
+            for (const clientName of ['claude-ai', undefined]) {
+                const { structuredContent, content } = await callWithClient(clientName);
 
-            expect(structuredContent.actors[0].url).toBe(`${APIFY_STORE_URL}/apify/web-scraper`);
-            expect(content[0].text).toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
-            expect(content[0].text).not.toContain('console.apify.com');
+                expect(structuredContent.actors[0].url).toBe(`${APIFY_STORE_URL}/apify/web-scraper`);
+                expect(content[0].text).toContain(`${APIFY_STORE_URL}/apify/web-scraper`);
+                expect(content[0].text).not.toContain('console.apify.com');
+            }
         });
     });
 });
