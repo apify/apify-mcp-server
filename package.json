@@ -108,7 +108,6 @@
     "test:unit": "vitest run tests/unit",
     "test:integration": "pnpm run build && vitest run tests/integration",
     "test:integration:stdio": "pnpm run build && vitest run tests/integration/stdio.test.ts",
-    "test:integration:sse": "pnpm run build && vitest run tests/integration/actor.server_sse.test.ts",
     "test:integration:streamable": "pnpm run build && vitest run tests/integration/actor.server_streamable.test.ts",
     "inspector:stdio": "npx @modelcontextprotocol/inspector -e APIFY_TOKEN=$APIFY_TOKEN -- node dist/stdio.js",
     "evals:create-dataset": "tsx evals/create_dataset.ts",

@@ -151,7 +151,7 @@ It also runs automatically on every merge to the `master` branch.
 - `tests/unit/` — unit tests for individual modules
 - `tests/integration/` — integration tests for MCP server functionality
   - `tests/integration/suite.ts` — **main integration test suite** where all test cases should be added
-  - Other files in this directory set up different transport modes (stdio, SSE, streamable-http) that all use `suite.ts`
+  - Other files in this directory set up different transport modes (stdio, streamable-http) that all use `suite.ts`
 - `tests/helpers.ts` — shared test utilities
 - `tests/const.ts` — test constants
 
@@ -167,7 +167,7 @@ This package is also used by the hosted server in `apify-mcp-server-internal`. T
 **Tests not in this repo** — anything that only makes sense with the hosted stack:
 
 - IAM auth gate (401, unauth user toolset filter, `?payment=skyfire` bypass), rate limiter, `RedisEventStore` replay via `Last-Event-ID`, user-aware rental Actor filter, non-MCP HTTP routes (`/`, OAuth metadata, server card).
-- Multi-node coordination — cross-node session continuity and cancellation, failover, legacy SSE through the Caddy load balancer.
+- Multi-node coordination — cross-node session continuity and cancellation, failover through the Caddy load balancer.
 
 Those live in `apify-mcp-server-internal`, together with a small **contract smoke suite** that re-asserts our package's behavior survives the hosted server's extra code (auth, rate limiter, Caddy, response handlers). We don't maintain that suite — internal does — but we should know it exists.
 

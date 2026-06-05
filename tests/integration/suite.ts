@@ -41,7 +41,7 @@ function findToolByName(name: string, mode: ServerMode): ToolEntry | undefined {
 
 type IntegrationTestsSuiteOptions = {
     suiteName: string;
-    transport: 'sse' | 'streamable-http' | 'stdio';
+    transport: 'streamable-http' | 'stdio';
     createClientFn: (options?: McpClientOptions) => Promise<Client>;
     beforeAllFn?: () => Promise<void>;
     afterAllFn?: () => Promise<void>;
