@@ -1,7 +1,14 @@
 import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 
-import { APIFY_DOCS_MCP_URL, APIFY_FAVICON_URL, APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from './const.js';
+import {
+    APIFY_DOCS_MCP_URL,
+    APIFY_FAVICON_URL,
+    APIFY_LOGO_URL,
+    APIFY_MCP_URL,
+    SERVER_NAME,
+    SERVER_TITLE,
+} from './const.js';
 import type { ServerCard } from './types.js';
 import { readJsonFile } from './utils/generic.js';
 import { getPackageVersion } from './utils/version.js';

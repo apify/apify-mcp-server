@@ -229,34 +229,31 @@ export class ActorsMcpServer {
         this.serverModeResolved = this.serverModeOption !== 'auto';
 
         const { setupSigintHandler = true } = options;
-        this.server = new Server(
-            getServerInfo(),
-            {
-                capabilities: {
-                    tools: {
-                        listChanged: true,
-                    },
-                    // Declare long-running task support
-                    tasks: {
-                        list: {},
-                        cancel: {},
-                        requests: {
-                            tools: {
-                                call: {},
-                            },
+        this.server = new Server(getServerInfo(), {
+            capabilities: {
+                tools: {
+                    listChanged: true,
+                },
+                // Declare long-running task support
+                tasks: {
+                    list: {},
+                    cancel: {},
+                    requests: {
+                        tools: {
+                            call: {},
                         },
                     },
-                    /**
-                     * Declaring resources even though we are not using them
-                     * to prevent clients like Claude desktop from failing.
-                     */
-                    resources: {},
-                    prompts: {},
-                    logging: {},
                 },
-                instructions: getServerInstructions(),
+                /**
+                 * Declaring resources even though we are not using them
+                 * to prevent clients like Claude desktop from failing.
+                 */
+                resources: {},
+                prompts: {},
+                logging: {},
             },
-        );
+            instructions: getServerInstructions(),
+        });
         this.setupTelemetry();
         this.setupInitializeHandler();
         this.setupLoggingProxy();
