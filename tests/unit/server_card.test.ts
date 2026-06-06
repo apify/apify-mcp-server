@@ -71,18 +71,8 @@ describe('getServerInfo', () => {
         expect(info.name).toBe(SERVER_NAME);
         expect(info.title).toBe(SERVER_TITLE);
         expect(info.version).toBe(getPackageVersion());
-    });
-
-    it('includes description from server.json and the website URL', () => {
-        const info = getServerInfo();
-
         expect(info.description).toBe(serverJson.description);
         expect(info.websiteUrl).toBe(APIFY_MCP_URL);
-    });
-
-    it('includes a PNG icon pointing at the Apify logo', () => {
-        const info = getServerInfo();
-
         expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
     });
 });
