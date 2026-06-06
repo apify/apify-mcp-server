@@ -1,7 +1,7 @@
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it } from 'vitest';
 
-import { APIFY_FAVICON_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
+import { APIFY_LOGO_URL, APIFY_MCP_URL, SERVER_NAME, SERVER_TITLE } from '../../src/const.js';
 import { getServerCard, getServerInfo } from '../../src/server_card.js';
 import { readJsonFile } from '../../src/utils/generic.js';
 import { getPackageVersion } from '../../src/utils/version.js';
@@ -80,9 +80,9 @@ describe('getServerInfo', () => {
         expect(info.websiteUrl).toBe(APIFY_MCP_URL);
     });
 
-    it('includes an icon pointing at the Apify favicon', () => {
+    it('includes a PNG icon pointing at the Apify logo', () => {
         const info = getServerInfo();
 
-        expect(info.icons).toEqual([{ src: APIFY_FAVICON_URL, mimeType: 'image/x-icon' }]);
+        expect(info.icons).toEqual([{ src: APIFY_LOGO_URL, mimeType: 'image/png', sizes: ['180x180'] }]);
     });
 });
