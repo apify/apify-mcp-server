@@ -98,7 +98,7 @@ export function extractAjvErrorDetails(errors: ErrorObject[] | null | undefined)
  *
  * toolStatus resolution:
  * 1. `toolTelemetry.toolStatus` present → use it directly.
- * 2. `isError` set without toolStatus → SOFT_FAIL.
+ * 2. `isError` set without toolStatus → FAILED.
  * 3. Neither → SUCCEEDED.
  *
  * actorName/actorId are server-side context (from tool resolution).
@@ -118,7 +118,7 @@ export function extractToolTelemetry(
     if (!telemetry) {
         if (res.isError) {
             return {
-                toolStatus: TOOL_STATUS.SOFT_FAIL,
+                toolStatus: TOOL_STATUS.FAILED,
                 callDiagnostics: { failure_category: FAILURE_CATEGORY.INTERNAL_ERROR, ...actorFields },
             };
         }
