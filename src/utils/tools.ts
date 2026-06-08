@@ -1,10 +1,10 @@
-import { type HelperTools } from '../const.js';
+import { HelperTools, STORAGE_TYPE } from '../const.js';
 import {
     SKYFIRE_ENABLED_TOOLS,
     SKYFIRE_PAY_ID_PROPERTY_DESCRIPTION,
     SKYFIRE_TOOL_INSTRUCTIONS,
 } from '../payments/const.js';
-import type { CallDiagnostics, HelperTool, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
+import type { CallDiagnostics, HelperTool, StorageType, ToolBase, ToolEntry, ToolInputSchema } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
 import { fixZodSchemaRequired } from './ajv.js';
 
@@ -45,6 +45,26 @@ export function buildActorFields(
         ...(actorName ? { actor_name: actorName } : {}),
         ...(actorId ? { actor_id: actorId } : {}),
     };
+}
+
+/** Maps storage tool names to their storage type for the `MCP Storage Access` event. */
+const STORAGE_TOOL_TYPES: Partial<Record<HelperTools, StorageType>> = {
+    [HelperTools.DATASET_GET]: STORAGE_TYPE.DATASET,
+    [HelperTools.DATASET_LIST_GET]: STORAGE_TYPE.DATASET,
+    [HelperTools.DATASET_GET_ITEMS]: STORAGE_TYPE.DATASET,
+    [HelperTools.DATASET_SCHEMA_GET]: STORAGE_TYPE.DATASET,
+    [HelperTools.KEY_VALUE_STORE_GET]: STORAGE_TYPE.KEY_VALUE_STORE,
+    [HelperTools.KEY_VALUE_STORE_LIST_GET]: STORAGE_TYPE.KEY_VALUE_STORE,
+    [HelperTools.KEY_VALUE_STORE_KEYS_GET]: STORAGE_TYPE.KEY_VALUE_STORE,
+    [HelperTools.KEY_VALUE_STORE_RECORD_GET]: STORAGE_TYPE.KEY_VALUE_STORE,
+};
+
+/**
+ * Returns the storage type for a storage tool, or null for non-storage tools.
+ * Used to decide whether to emit the dedicated `MCP Storage Access` telemetry event.
+ */
+export function getStorageType(toolName: string): StorageType | null {
+    return STORAGE_TOOL_TYPES[toolName as HelperTools] ?? null;
 }
 
 /**

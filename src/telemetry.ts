@@ -5,7 +5,12 @@ import { Analytics } from '@segment/analytics-node';
 import log from '@apify/log';
 
 import { DEFAULT_TELEMETRY_ENV, TELEMETRY_ENV } from './const.js';
-import type { TelemetryEnv, ToolCallTelemetryProperties } from './types.js';
+import type {
+    StorageAccessTelemetryProperties,
+    StorageType,
+    TelemetryEnv,
+    ToolCallTelemetryProperties,
+} from './types.js';
 
 const DEV_WRITE_KEY = '9rPHlMtxX8FJhilGEwkfUoZ0uzWxnzcT';
 const PROD_WRITE_KEY = 'cOkp5EIJaN69gYaN8bcp7KtaD0fGABwJ';
@@ -21,6 +26,7 @@ const SEGMENT_FLUSH_INTERVAL_MS = 5_000;
 // Event names following apify-core naming convention (Title Case)
 const SEGMENT_EVENTS = {
     TOOL_CALL: 'MCP Tool Call',
+    STORAGE_ACCESS: 'MCP Storage Access',
 } as const;
 
 /**
@@ -64,9 +70,31 @@ export function getOrInitAnalyticsClient(telemetryEnv: TelemetryEnv): Analytics 
 }
 
 /**
+ * Sends an event to Segment.
+ * Segment requires either userId OR anonymousId, but not both:
+ * when userId is available, use it; otherwise use a random anonymousId.
+ */
+function trackEvent(
+    userId: string | null,
+    telemetryEnv: TelemetryEnv,
+    event: (typeof SEGMENT_EVENTS)[keyof typeof SEGMENT_EVENTS],
+    properties: ToolCallTelemetryProperties | StorageAccessTelemetryProperties,
+): void {
+    const client = getOrInitAnalyticsClient(telemetryEnv);
+
+    try {
+        client?.track({
+            ...(userId ? { userId } : { anonymousId: crypto.randomUUID() }),
+            event,
+            properties,
+        });
+    } catch (error) {
+        log.error('Failed to track telemetry event', { error, userId, event, toolName: properties.tool_name });
+    }
+}
+
+/**
  * Tracks a tool call event to Segment.
- * Segment requires either userId OR anonymousId, but not both
- * When userId is available, use it; otherwise use anonymousId
  *
  * @param userId - Apify user ID (null if not available)
  * @param telemetryEnv - Telemetry environment
@@ -77,15 +105,52 @@ export function trackToolCall(
     telemetryEnv: TelemetryEnv,
     properties: ToolCallTelemetryProperties,
 ): void {
-    const client = getOrInitAnalyticsClient(telemetryEnv);
+    trackEvent(userId, telemetryEnv, SEGMENT_EVENTS.TOOL_CALL, properties);
+}
 
-    try {
-        client?.track({
-            ...(userId ? { userId } : { anonymousId: crypto.randomUUID() }),
-            event: SEGMENT_EVENTS.TOOL_CALL,
-            properties,
-        });
-    } catch (error) {
-        log.error('Failed to track tool call event', { error, userId, toolName: properties.tool_name });
-    }
+/**
+ * Tracks a storage access event to Segment. Fired for storage tools (dataset /
+ * key-value store) in addition to the `MCP Tool Call` event, so storage usage
+ * and error rates can be analysed on a dedicated event.
+ */
+export function trackStorageAccess(
+    userId: string | null,
+    telemetryEnv: TelemetryEnv,
+    properties: StorageAccessTelemetryProperties,
+): void {
+    trackEvent(userId, telemetryEnv, SEGMENT_EVENTS.STORAGE_ACCESS, properties);
+}
+
+/**
+ * Projects a finalized tool-call event onto the dedicated storage-access event:
+ * keeps the common envelope plus status / error fields and adds `storage_type`.
+ * Actor / validation fields are dropped — they carry no meaning for storage tools.
+ */
+export function buildStorageAccessProperties(
+    toolCall: ToolCallTelemetryProperties,
+    storageType: StorageType,
+): StorageAccessTelemetryProperties {
+    return {
+        app: toolCall.app,
+        app_version: toolCall.app_version,
+        mcp_client_name: toolCall.mcp_client_name,
+        mcp_client_version: toolCall.mcp_client_version,
+        mcp_protocol_version: toolCall.mcp_protocol_version,
+        mcp_client_capabilities: toolCall.mcp_client_capabilities,
+        mcp_session_id: toolCall.mcp_session_id,
+        transport_type: toolCall.transport_type,
+        tool_name: toolCall.tool_name,
+        tool_status: toolCall.tool_status,
+        tool_exec_time_ms: toolCall.tool_exec_time_ms,
+        ...(toolCall.tool_response_content_bytes !== undefined && {
+            tool_response_content_bytes: toolCall.tool_response_content_bytes,
+        }),
+        ...(toolCall.tool_response_structured_content_bytes !== undefined && {
+            tool_response_structured_content_bytes: toolCall.tool_response_structured_content_bytes,
+        }),
+        ...(toolCall.failure_category !== undefined && { failure_category: toolCall.failure_category }),
+        ...(toolCall.failure_http_status !== undefined && { failure_http_status: toolCall.failure_http_status }),
+        ...(toolCall.failure_detail !== undefined && { failure_detail: toolCall.failure_detail }),
+        storage_type: storageType,
+    };
 }

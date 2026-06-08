@@ -64,7 +64,7 @@ import { prompts } from '../prompts/index.js';
 import { createResourceService } from '../resources/resource_service.js';
 import type { AvailableWidget } from '../resources/widgets.js';
 import { resolveAvailableWidgets } from '../resources/widgets.js';
-import { getTelemetryEnv, trackToolCall } from '../telemetry.js';
+import { buildStorageAccessProperties, getTelemetryEnv, trackStorageAccess, trackToolCall } from '../telemetry.js';
 import { actorExecutor } from '../tools/actor_executor.js';
 import {
     buildPermissionApprovalResponse,
@@ -103,6 +103,7 @@ import {
     buildActorFields,
     extractActorId,
     extractActorName,
+    getStorageType,
     getToolFullName,
     getToolPublicFieldOnly,
 } from '../utils/tools.js';
@@ -1408,6 +1409,17 @@ export class ActorsMcpServer {
                 ...params.callDiagnostics,
             };
             trackToolCall(params.userId, this.telemetryEnv, finalizedTelemetryData);
+
+            // Storage tools additionally emit a dedicated event so storage usage and
+            // error rates can be analysed separately from the generic tool-call event.
+            const storageType = getStorageType(params.toolName);
+            if (storageType) {
+                trackStorageAccess(
+                    params.userId,
+                    this.telemetryEnv,
+                    buildStorageAccessProperties(finalizedTelemetryData, storageType),
+                );
+            }
         }
     }
 

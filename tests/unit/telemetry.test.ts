@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { trackToolCall } from '../../src/telemetry.js';
+import { STORAGE_TYPE } from '../../src/const.js';
+import { buildStorageAccessProperties, trackStorageAccess, trackToolCall } from '../../src/telemetry.js';
+import type { ToolCallTelemetryProperties } from '../../src/types.js';
 
 // Mock the Segment Analytics client
 const mockTrack = vi.fn();
@@ -113,5 +115,110 @@ describe('telemetry', () => {
             event: 'MCP Tool Call',
             properties,
         });
+    });
+});
+
+describe('trackStorageAccess()', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('sends the dedicated "MCP Storage Access" event', () => {
+        const properties = {
+            app: 'mcp' as const,
+            app_version: '0.5.6',
+            mcp_client_name: 'test-client',
+            mcp_client_version: '1.0.0',
+            mcp_protocol_version: '2024-11-05',
+            mcp_client_capabilities: {},
+            mcp_session_id: 'session-123',
+            transport_type: 'stdio',
+            tool_name: 'get-dataset-items',
+            tool_status: 'SUCCEEDED' as const,
+            tool_exec_time_ms: 100,
+            storage_type: STORAGE_TYPE.DATASET,
+        };
+
+        trackStorageAccess('test-user-123', 'DEV', properties);
+
+        expect(mockTrack).toHaveBeenCalledWith({
+            userId: 'test-user-123',
+            event: 'MCP Storage Access',
+            properties,
+        });
+    });
+});
+
+describe('buildStorageAccessProperties()', () => {
+    const toolCall: ToolCallTelemetryProperties = {
+        app: 'mcp',
+        app_version: '0.5.6',
+        mcp_client_name: 'test-client',
+        mcp_client_version: '1.0.0',
+        mcp_protocol_version: '2024-11-05',
+        mcp_client_capabilities: {},
+        mcp_session_id: 'session-123',
+        transport_type: 'stdio',
+        tool_name: 'get-key-value-store-record',
+        tool_status: 'SOFT_FAIL',
+        tool_exec_time_ms: 42,
+        tool_response_content_bytes: 10,
+        failure_category: 'INVALID_INPUT',
+        failure_detail: "Record 'x' not found.",
+    };
+
+    it('keeps the envelope plus status / error fields and adds storage_type', () => {
+        const result = buildStorageAccessProperties(toolCall, STORAGE_TYPE.KEY_VALUE_STORE);
+
+        expect(result).toEqual({
+            app: 'mcp',
+            app_version: '0.5.6',
+            mcp_client_name: 'test-client',
+            mcp_client_version: '1.0.0',
+            mcp_protocol_version: '2024-11-05',
+            mcp_client_capabilities: {},
+            mcp_session_id: 'session-123',
+            transport_type: 'stdio',
+            tool_name: 'get-key-value-store-record',
+            tool_status: 'SOFT_FAIL',
+            tool_exec_time_ms: 42,
+            tool_response_content_bytes: 10,
+            failure_category: 'INVALID_INPUT',
+            failure_detail: "Record 'x' not found.",
+            storage_type: STORAGE_TYPE.KEY_VALUE_STORE,
+        });
+    });
+
+    it('drops actor and validation fields that carry no meaning for storage tools', () => {
+        const result = buildStorageAccessProperties(
+            { ...toolCall, actor_name: 'apify/x', actor_id: 'abc', validation_keyword: 'required' },
+            STORAGE_TYPE.DATASET,
+        );
+
+        expect(result).not.toHaveProperty('actor_name');
+        expect(result).not.toHaveProperty('actor_id');
+        expect(result).not.toHaveProperty('validation_keyword');
+    });
+
+    it('omits absent optional fields rather than setting them undefined', () => {
+        const minimal: ToolCallTelemetryProperties = {
+            app: 'mcp',
+            app_version: '0.5.6',
+            mcp_client_name: 'test-client',
+            mcp_client_version: '1.0.0',
+            mcp_protocol_version: '2024-11-05',
+            mcp_client_capabilities: null,
+            mcp_session_id: 'session-123',
+            transport_type: 'stdio',
+            tool_name: 'get-dataset',
+            tool_status: 'SUCCEEDED',
+            tool_exec_time_ms: 5,
+        };
+
+        const result = buildStorageAccessProperties(minimal, STORAGE_TYPE.DATASET);
+
+        expect(result).not.toHaveProperty('failure_category');
+        expect(result).not.toHaveProperty('tool_response_content_bytes');
+        expect(Object.keys(result)).not.toContain('failure_detail');
     });
 });

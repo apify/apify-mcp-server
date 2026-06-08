@@ -160,6 +160,12 @@ export const FAILURE_CATEGORY = {
     INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const;
 
+// Storage type for the dedicated `MCP Storage Access` telemetry event.
+export const STORAGE_TYPE = {
+    DATASET: 'DATASET',
+    KEY_VALUE_STORE: 'KEY_VALUE_STORE',
+} as const;
+
 // Apify API error types
 export const APIFY_ERROR_TYPE_FULL_PERMISSION_NOT_APPROVED = 'full-permission-actor-not-approved';
 export const APIFY_ERROR_TYPE_MEMORY_LIMIT_EXCEEDED = 'memory-limit-exceeded';

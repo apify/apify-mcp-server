@@ -14,7 +14,7 @@ import type {
 import type z from 'zod';
 
 import type { ApifyClient } from './apify_client.js';
-import type { FAILURE_CATEGORY, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
+import type { FAILURE_CATEGORY, STORAGE_TYPE, TELEMETRY_ENV, TOOL_STATUS } from './const.js';
 import type { ActorsMcpServer } from './mcp/server.js';
 import type { PaymentProvider } from './payments/types.js';
 import type { CATEGORY_NAMES } from './tools/categories.js';
@@ -349,6 +349,7 @@ export type ApifyToken = string | null | undefined;
  */
 export type ToolStatus = (typeof TOOL_STATUS)[keyof typeof TOOL_STATUS];
 export type FailureCategory = (typeof FAILURE_CATEGORY)[keyof typeof FAILURE_CATEGORY];
+export type StorageType = (typeof STORAGE_TYPE)[keyof typeof STORAGE_TYPE];
 
 /**
  * Properties for tool call telemetry events sent to Segment.
@@ -379,6 +380,34 @@ export type ToolCallTelemetryProperties = {
     validation_missing_property?: string;
     validation_additional_property?: string;
     validation_error_count?: number;
+};
+
+/**
+ * Properties for the dedicated `MCP Storage Access` telemetry event, fired for
+ * storage tools (dataset / key-value store) in addition to `MCP Tool Call`.
+ * Reuses the common envelope plus status / error fields so storage usage and
+ * error rates can be analysed on their own event, discriminated by `storage_type`.
+ */
+export type StorageAccessTelemetryProperties = Pick<
+    ToolCallTelemetryProperties,
+    | 'app'
+    | 'app_version'
+    | 'mcp_client_name'
+    | 'mcp_client_version'
+    | 'mcp_protocol_version'
+    | 'mcp_client_capabilities'
+    | 'mcp_session_id'
+    | 'transport_type'
+    | 'tool_name'
+    | 'tool_status'
+    | 'tool_exec_time_ms'
+    | 'tool_response_content_bytes'
+    | 'tool_response_structured_content_bytes'
+    | 'failure_category'
+    | 'failure_http_status'
+    | 'failure_detail'
+> & {
+    storage_type: StorageType;
 };
 
 export type AjvErrorDetails = Pick<
