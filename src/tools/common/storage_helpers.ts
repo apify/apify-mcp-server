@@ -36,6 +36,28 @@ export function buildStorageResponse(params: {
 }
 
 /**
+ * {summary, nextStep} for paginated storage listings (datasets, key-value stores).
+ * When more items remain, nextStep points at the next page; otherwise at inspecting an entry.
+ */
+export function buildStorageListSummaryNextStep(params: {
+    count: number;
+    total: number;
+    offset: number;
+    noun: string;
+    listToolName: string;
+    inspectHint: string;
+}): { summary: string; nextStep: string } {
+    const { count, total, offset, noun, listToolName, inspectHint } = params;
+    return {
+        summary: `Listed ${count} of ${total} ${noun}.`,
+        nextStep:
+            offset + count < total
+                ? `Call ${listToolName} again with offset=${offset + count} to fetch the next page.`
+                : inspectHint,
+    };
+}
+
+/**
  * Normalize a key-value store record key before SDK lookup.
  *
  * Strips the same LLM-leaked wrapper chars as `stripQuoteWrappers` (shared

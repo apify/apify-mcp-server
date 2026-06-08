@@ -488,3 +488,60 @@ export const datasetItemsOutputSchema = {
     // offset/limit/totalItemCount and summary/nextStep are always emitted by the tool.
     required: ['datasetId', 'items', 'itemCount', 'totalItemCount', 'offset', 'limit', 'summary', 'nextStep'],
 };
+
+/**
+ * Schema for dataset metadata (get-dataset). Documents the fields the LLM acts on; the raw API
+ * response carries more keys (stats, schema, access settings), allowed as additional properties.
+ */
+export const datasetMetadataOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Dataset ID' },
+        name: { type: 'string', description: 'Dataset name (null for unnamed datasets)' },
+        itemCount: { type: 'number', description: 'Number of items in the dataset' },
+        fields: {
+            type: 'array' as const,
+            items: { type: 'string' },
+            description: 'Field paths in dot notation (e.g. ["metadata.url"])',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['id', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for dataset schema inference (get-dataset-schema).
+ */
+export const datasetSchemaOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        datasetId: { type: 'string', description: 'Dataset ID' },
+        schema: { type: 'object' as const, description: 'Inferred JSON schema describing dataset item structure' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['datasetId', 'schema', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for storage collection listings (get-dataset-list, get-key-value-store-list).
+ * Mirrors the Apify paginated-list response shape plus the narrative fields.
+ */
+export const storageListOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        total: { type: 'number', description: 'Total number of items available for the user' },
+        count: { type: 'number', description: 'Number of items returned in this page' },
+        offset: { type: 'number', description: 'Offset used for pagination' },
+        limit: { type: 'number', description: 'Limit used for pagination' },
+        items: {
+            type: 'array' as const,
+            items: { type: 'object' as const },
+            description: 'Storage metadata objects',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['items', 'total', 'count', 'summary', 'nextStep'],
+};

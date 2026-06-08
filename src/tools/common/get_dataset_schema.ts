@@ -7,9 +7,10 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { buildMCPResponse, wrapJsonText } from '../../utils/mcp.js';
+import { buildMCPResponse } from '../../utils/mcp.js';
 import { generateSchemaFromItems } from '../../utils/schema_generation.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { datasetSchemaOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const getDatasetSchemaArgs = z.object({
     datasetId: z.string().min(1).describe('Dataset ID or username~dataset-name.'),
@@ -43,6 +44,7 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         - user_input: Generate schema for dataset 34das2 using 10 items
         - user_input: Show schema of username~my-dataset (clean items only)`,
     inputSchema: z.toJSONSchema(getDatasetSchemaArgs) as ToolInputSchema,
+    outputSchema: datasetSchemaOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getDatasetSchemaArgs)),
     paymentRequired: true,
     annotations: {
@@ -94,6 +96,9 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             });
         }
 
-        return { content: [{ type: 'text', text: wrapJsonText(schema) }] };
+        const fieldCount = Object.keys(schema.items.properties ?? {}).length;
+        const summary = `Schema inferred from ${datasetItems.length} ${datasetItems.length === 1 ? 'item' : 'items'}, ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'}.`;
+        const nextStep = `Use ${HelperTools.DATASET_GET_ITEMS} with datasetId=${datasetId} and fields="..." to project specific fields.`;
+        return buildStorageResponse({ structuredContent: { datasetId, schema }, summary, nextStep });
     },
 } as const);

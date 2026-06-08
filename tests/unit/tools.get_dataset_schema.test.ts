@@ -7,7 +7,6 @@ import type * as SchemaGenModule from '../../src/utils/schema_generation.js';
 import { generateSchemaFromItems } from '../../src/utils/schema_generation.js';
 import {
     expectSoftFailInvalidInput,
-    parseFencedJson,
     stubToolCallContext,
     type TextToolResult,
     type ToolTelemetrySnapshot,
@@ -49,14 +48,21 @@ describe('get-dataset-schema', () => {
         expect(getDatasetSchema.name).toBe(HelperTools.DATASET_SCHEMA_GET);
     });
 
-    it('returns a JSON schema in a fenced code block on the happy path', async () => {
+    it('returns the inferred schema plus a summary and nextStep on the happy path', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: MOCK_ITEMS, total: 2 })),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toMatchObject({ type: 'array' });
+        expect(structuredContent.datasetId).toBe('ds-1');
+        expect(structuredContent.schema).toMatchObject({ type: 'array' });
+        // MOCK_ITEMS has 2 items, each with 2 fields (title, count).
+        expect(structuredContent.summary).toBe('Schema inferred from 2 items, 2 fields.');
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET_ITEMS);
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
     it('returns a plain "is empty" message when the dataset has no items', async () => {
