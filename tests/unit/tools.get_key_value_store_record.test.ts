@@ -46,10 +46,7 @@ describe('get-key-value-store-record', () => {
     it('returns a JSON array record as JSON in a fenced code block', async () => {
         const record = { key: 'results.json', value: [{ id: 1 }, { id: 2 }], contentType: 'application/json' };
         const result = await (getKeyValueStoreRecord as HelperTool).call(
-            stubToolCallContext(
-                { keyValueStoreId: 'kv-1', recordKey: 'results.json' },
-                stubApifyClient({ record }),
-            ),
+            stubToolCallContext({ keyValueStoreId: 'kv-1', recordKey: 'results.json' }, stubApifyClient({ record })),
         );
         const { content, isError } = result as TextToolResult;
 
