@@ -157,7 +157,10 @@ describe('get-dataset-items', () => {
 
     it('emits a pagination nextStep when more items remain', async () => {
         const result = await (getDatasetItems as HelperTool).call(
-            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 }))),
+            stubToolCallContext(
+                { datasetId: 'ds-1' },
+                stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 })),
+            ),
         );
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
 
