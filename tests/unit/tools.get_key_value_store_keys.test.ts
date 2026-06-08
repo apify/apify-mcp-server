@@ -1,7 +1,9 @@
+import Ajv from 'ajv';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
+import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
 import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
@@ -51,6 +53,22 @@ describe('get-key-value-store-keys', () => {
         );
         expect(JSON.parse(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+    });
+
+    it('emits structuredContent that validates against the outputSchema when not truncated', async () => {
+        // The SDK returns `nextExclusiveStartKey: null` when `isTruncated` is false — the common
+        // single-page case. The output schema must accept that, or the MCP SDK rejects the response.
+        // Validated with a strict AJV (no coercion) to mirror the SDK's output-schema check; the
+        // repo's lenient `compileSchema` coerces types and would hide the mismatch.
+        const listKeysSpy = vi.fn().mockResolvedValue({ ...MOCK_KEYS, nextExclusiveStartKey: null });
+        const validate = new Ajv({ strict: false }).compile(keyValueStoreKeysOutputSchema);
+
+        const result = await (getKeyValueStoreKeys as HelperTool).call(
+            stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(listKeysSpy)),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(validate(structuredContent)).toBe(true);
     });
 
     it('flags truncation in the summary when more keys are available', async () => {

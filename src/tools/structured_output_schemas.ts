@@ -582,8 +582,8 @@ export const keyValueStoreKeysOutputSchema = {
         count: { type: 'number', description: 'Number of keys returned' },
         isTruncated: { type: 'boolean', description: 'Whether more keys are available' },
         nextExclusiveStartKey: {
-            type: 'string',
-            description: 'Pass as exclusiveStartKey to fetch the next page of keys',
+            type: ['string', 'null'],
+            description: 'Pass as exclusiveStartKey to fetch the next page of keys; null when not truncated',
         },
         summary: summaryProperty,
         nextStep: nextStepProperty,
