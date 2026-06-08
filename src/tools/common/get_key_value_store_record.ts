@@ -6,8 +6,19 @@ import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.j
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
-import { wrapJsonText } from '../../utils/mcp.js';
-import { buildStorageNotFound, normalizeRecordKey } from './storage_helpers.js';
+import { keyValueStoreRecordOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageNotFound, buildStorageResponse, normalizeRecordKey } from './storage_helpers.js';
+
+/** Best-effort byte size of a stored value for the summary. */
+function computeValueBytes(value: unknown): number | undefined {
+    if (Buffer.isBuffer(value)) return value.length;
+    if (typeof value === 'string') return Buffer.byteLength(value);
+    try {
+        return Buffer.byteLength(JSON.stringify(value));
+    } catch {
+        return undefined;
+    }
+}
 
 const getKeyValueStoreRecordArgs = z.object({
     keyValueStoreId: z.string().min(1).describe('Key-value store ID or username~store-name'),
@@ -31,6 +42,7 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
         - user_input: Get record INPUT from store abc123
         - user_input: Get record data.json from store username~my-store`,
     inputSchema: z.toJSONSchema(getKeyValueStoreRecordArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreRecordOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreRecordArgs)),
     paymentRequired: true,
     annotations: {
@@ -55,6 +67,13 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(record) }] };
+        const bytes = computeValueBytes(record.value);
+        const details = [
+            record.contentType ? `contentType=${record.contentType}` : undefined,
+            bytes !== undefined ? `${bytes} bytes` : undefined,
+        ].filter(Boolean);
+        const summary = `Read '${recordKey}'${details.length ? ` (${details.join(', ')})` : ''}.`;
+        // Reading a record is terminal — no nextStep.
+        return buildStorageResponse({ structuredContent: { keyValueStoreId, ...record }, summary });
     },
 } as const);

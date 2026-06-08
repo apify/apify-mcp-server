@@ -545,3 +545,63 @@ export const storageListOutputSchema = {
     },
     required: ['items', 'total', 'count', 'summary', 'nextStep'],
 };
+
+/**
+ * Schema for key-value store metadata (get-key-value-store). The raw API response carries more
+ * keys (stats, access settings), allowed as additional properties.
+ */
+export const keyValueStoreOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Key-value store ID' },
+        name: { type: 'string', description: 'Store name (null for unnamed stores)' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['id', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for key listing (get-key-value-store-keys).
+ */
+export const keyValueStoreKeysOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
+        items: {
+            type: 'array' as const,
+            items: {
+                type: 'object' as const,
+                properties: {
+                    key: { type: 'string', description: 'Record key' },
+                    size: { type: 'number', description: 'Value size in bytes' },
+                },
+            },
+            description: 'Keys with value sizes',
+        },
+        count: { type: 'number', description: 'Number of keys returned' },
+        isTruncated: { type: 'boolean', description: 'Whether more keys are available' },
+        nextExclusiveStartKey: {
+            type: 'string',
+            description: 'Pass as exclusiveStartKey to fetch the next page of keys',
+        },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
+    },
+    required: ['keyValueStoreId', 'items', 'summary', 'nextStep'],
+};
+
+/**
+ * Schema for a single record (get-key-value-store-record). Terminal: no nextStep.
+ */
+export const keyValueStoreRecordOutputSchema = {
+    type: 'object' as const,
+    properties: {
+        keyValueStoreId: { type: 'string', description: 'Key-value store ID' },
+        key: { type: 'string', description: 'Record key' },
+        value: { description: 'The stored value (JSON, text, or binary)' },
+        contentType: { type: 'string', description: 'MIME type of the stored value' },
+        summary: summaryProperty,
+    },
+    required: ['key', 'value', 'summary'],
+};

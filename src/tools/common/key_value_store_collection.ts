@@ -5,7 +5,8 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { storageListOutputSchema } from '../structured_output_schemas.js';
+import { buildStorageListSummaryNextStep, buildStorageResponse } from './storage_helpers.js';
 
 const getUserKeyValueStoresListArgs = z.object({
     offset: z
@@ -51,6 +52,7 @@ export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
         - user_input: List my last 10 key-value stores (newest first)
         - user_input: List unnamed key-value stores`,
     inputSchema: z.toJSONSchema(getUserKeyValueStoresListArgs) as ToolInputSchema,
+    outputSchema: storageListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserKeyValueStoresListArgs)),
     annotations: {
         title: 'Get user key-value stores list',
@@ -68,6 +70,18 @@ export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: wrapJsonText(stores) }] };
+        const { summary, nextStep } = buildStorageListSummaryNextStep({
+            count: stores.items.length,
+            total: stores.total,
+            offset: stores.offset,
+            noun: 'key-value stores',
+            listToolName: HelperTools.KEY_VALUE_STORE_LIST_GET,
+            inspectHint: `Use ${HelperTools.KEY_VALUE_STORE_GET} with a keyValueStoreId from the list to inspect a store.`,
+        });
+        return buildStorageResponse({
+            structuredContent: stores as unknown as Record<string, unknown>,
+            summary,
+            nextStep,
+        });
     },
 } as const);

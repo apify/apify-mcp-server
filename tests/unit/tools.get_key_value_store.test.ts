@@ -3,12 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStore } from '../../src/tools/common/get_key_value_store.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import {
-    expectSoftFailInvalidInput,
-    parseFencedJson,
-    stubToolCallContext,
-    type TextToolResult,
-} from './helpers/tool_context.js';
+import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_STORE = {
     id: 'kv-1',
@@ -27,14 +22,33 @@ describe('get-key-value-store', () => {
         expect(getKeyValueStore.name).toBe(HelperTools.KEY_VALUE_STORE_GET);
     });
 
-    it('returns store metadata as JSON in a fenced code block', async () => {
+    it('returns store metadata plus a summary and nextStep in structuredContent', async () => {
         const result = await (getKeyValueStore as HelperTool).call(
             stubToolCallContext({ keyValueStoreId: 'kv-1' }, stubApifyClient(MOCK_STORE)),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_STORE);
+        expect(structuredContent).toMatchObject(MOCK_STORE);
+        expect(structuredContent.summary).toBe("Key-value store 'my-store'.");
+        expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_KEYS_GET);
+        expect(structuredContent.nextStep).toContain('keyValueStoreId=kv-1');
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+    });
+
+    it('includes the byte count in the summary when stats are present', async () => {
+        const result = await (getKeyValueStore as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1' },
+                stubApifyClient({ ...MOCK_STORE, stats: { storageBytes: 2048 } }),
+            ),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe("Key-value store 'my-store' holds 2048 bytes.");
     });
 
     it('returns isError with a not-found message when the store does not exist', async () => {
