@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 ### 🐛 Bug Fixes
 
 - **payments:** Widen paid-tool outputSchema to accept x402 PaymentRequired (#917) ([#956](https://github.com/apify/apify-mcp-server/pull/956)) ([7874ce2](https://github.com/apify/apify-mcp-server/commit/7874ce279e7bfd87102c783f83ceb042eb123dbf)) by [@MQ37](https://github.com/MQ37), closes [#917](https://github.com/apify/apify-mcp-server/issues/917)
+- Expose stdio CLI version ([#963](https://github.com/apify/apify-mcp-server/pull/963)) ([fd289f0](https://github.com/apify/apify-mcp-server/commit/fd289f04cd335a9992316f9bea2f50c6ab9472a8)) by [@wowsofine](https://github.com/wowsofine)
 
 
 <!-- git-cliff-unreleased-end -->
