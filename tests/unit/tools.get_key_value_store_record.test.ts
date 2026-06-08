@@ -43,6 +43,21 @@ describe('get-key-value-store-record', () => {
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD);
     });
 
+    it('returns a JSON array record as JSON in a fenced code block', async () => {
+        const record = { key: 'results.json', value: [{ id: 1 }, { id: 2 }], contentType: 'application/json' };
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'results.json' },
+                stubApifyClient({ record }),
+            ),
+        );
+        const { content, isError } = result as TextToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0].type).toBe('text');
+        expect(parseFencedJson(content[0].text)).toEqual(record);
+    });
+
     it('returns an image content block for a binary image record', async () => {
         const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
