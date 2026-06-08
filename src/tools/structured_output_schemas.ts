@@ -497,7 +497,7 @@ export const datasetMetadataOutputSchema = {
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Dataset ID' },
-        name: { type: 'string', description: 'Dataset name (null for unnamed datasets)' },
+        name: { type: ['string', 'null'], description: 'Dataset name (null for unnamed datasets)' },
         itemCount: { type: 'number', description: 'Number of items in the dataset' },
         fields: {
             type: 'array' as const,
@@ -554,7 +554,7 @@ export const keyValueStoreOutputSchema = {
     type: 'object' as const,
     properties: {
         id: { type: 'string', description: 'Key-value store ID' },
-        name: { type: 'string', description: 'Store name (null for unnamed stores)' },
+        name: { type: ['string', 'null'], description: 'Store name (null for unnamed stores)' },
         summary: summaryProperty,
         nextStep: nextStepProperty,
     },
@@ -603,5 +603,5 @@ export const keyValueStoreRecordOutputSchema = {
         contentType: { type: 'string', description: 'MIME type of the stored value' },
         summary: summaryProperty,
     },
-    required: ['key', 'value', 'summary'],
+    required: ['keyValueStoreId', 'key', 'value', 'summary'],
 };

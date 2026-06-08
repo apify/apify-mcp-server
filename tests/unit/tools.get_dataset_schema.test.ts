@@ -65,14 +65,20 @@ describe('get-dataset-schema', () => {
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
-    it('returns a plain "is empty" message when the dataset has no items', async () => {
+    it('returns a schema-conforming structured response when the dataset has no items', async () => {
         const result = await (getDatasetSchema as HelperTool).call(
             stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient({ items: [], total: 0 })),
         );
-        const { content, isError } = result as TextToolResult;
+        const { content, isError, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
 
         expect(isError).not.toBe(true);
-        expect(content[0].text).toBe("Dataset 'ds-1' is empty.");
+        expect(structuredContent.datasetId).toBe('ds-1');
+        expect(structuredContent.schema).toEqual({});
+        expect(structuredContent.summary).toBe("Dataset 'ds-1' is empty; no schema to infer.");
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
     it('returns isError with a not-found message when listItems throws 404', async () => {

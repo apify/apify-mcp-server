@@ -78,7 +78,11 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
         const datasetItems = datasetResponse.items;
 
         if (datasetItems.length === 0) {
-            return { content: [{ type: 'text', text: `Dataset '${datasetId}' is empty.` }] };
+            // Empty dataset: no items to infer from, but still emit a schema-conforming
+            // response (empty schema = "any") rather than bare text.
+            const summary = `Dataset '${datasetId}' is empty; no schema to infer.`;
+            const nextStep = `Use ${HelperTools.DATASET_GET} with datasetId=${datasetId} to check itemCount and stats.`;
+            return buildStorageResponse({ structuredContent: { datasetId, schema: {} }, summary, nextStep });
         }
 
         // Generate schema using the shared utility
