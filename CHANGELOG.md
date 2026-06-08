@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.13 - **not yet released**
 
+### 🐛 Bug Fixes
+
+- **payments:** Widen paid-tool outputSchema to accept x402 PaymentRequired (#917) ([#956](https://github.com/apify/apify-mcp-server/pull/956)) ([7874ce2](https://github.com/apify/apify-mcp-server/commit/7874ce279e7bfd87102c783f83ceb042eb123dbf)) by [@MQ37](https://github.com/MQ37), closes [#917](https://github.com/apify/apify-mcp-server/issues/917)
+
 
 <!-- git-cliff-unreleased-end -->
 ## [0.10.12](https://github.com/apify/apify-mcp-server/releases/tag/v0.10.12) (2026-06-04)
