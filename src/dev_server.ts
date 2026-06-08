@@ -169,18 +169,33 @@ export function createExpressApp(): express.Express {
                         transports[newSessionId] = transport;
                         mcpServers[newSessionId] = mcpServer;
                     },
+                    onsessionclosed: (closedSessionId) => {
+                        delete transports[closedSessionId];
+                        delete mcpServers[closedSessionId];
+                    },
                 });
 
                 await mcpServer.connect(transport);
                 await transport.handleRequest(req, res, req.body);
                 return; // Already handled
-            } else {
-                // Invalid request - no session ID or not initialization request
-                res.status(404).json({
+            } else if (!sessionId) {
+                // Non-initialization requests without a session ID must be 400 Bad Request.
+                res.status(400).json({
                     jsonrpc: '2.0',
                     error: {
                         code: -32000,
-                        message: 'Not Found: No valid session ID provided or not initialization request',
+                        message: 'Bad Request: Mcp-Session-Id header is required',
+                    },
+                    id: null,
+                });
+                return;
+            } else {
+                // Invalid request - session ID is unknown.
+                res.status(404).json({
+                    jsonrpc: '2.0',
+                    error: {
+                        code: -32001,
+                        message: 'Session not found',
                     },
                     id: null,
                 });
