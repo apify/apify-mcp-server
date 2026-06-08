@@ -1,7 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
-import { HelperTools, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
+import { FAILURE_CATEGORY, HelperTools, HTTP_NOT_FOUND, TOOL_STATUS } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
@@ -90,7 +90,11 @@ export const getDatasetSchema: ToolEntry = Object.freeze({
             return buildMCPResponse({
                 texts: [`Failed to generate schema for dataset '${datasetId}'.`],
                 isError: true,
-                telemetry: { toolStatus: TOOL_STATUS.FAILED },
+                telemetry: {
+                    toolStatus: TOOL_STATUS.FAILED,
+                    failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+                    failureDetail: `Schema generation returned no schema for dataset '${datasetId}'.`,
+                },
             });
         }
 

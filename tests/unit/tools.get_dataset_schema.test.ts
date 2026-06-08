@@ -101,7 +101,12 @@ describe('get-dataset-schema', () => {
 
         expect(isError).toBe(true);
         expect(content[0].text).toContain("Failed to generate schema for dataset 'ds-1'");
-        expect(toolTelemetry).toEqual(expect.objectContaining({ toolStatus: TOOL_STATUS.FAILED }));
-        expect(toolTelemetry?.failureCategory).not.toBe(FAILURE_CATEGORY.INVALID_INPUT);
+        expect(toolTelemetry).toEqual(
+            expect.objectContaining({
+                toolStatus: TOOL_STATUS.FAILED,
+                failureCategory: FAILURE_CATEGORY.INTERNAL_ERROR,
+            }),
+        );
+        expect(toolTelemetry?.failureDetail).toBeTruthy();
     });
 });

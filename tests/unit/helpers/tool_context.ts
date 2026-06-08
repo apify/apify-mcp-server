@@ -22,6 +22,7 @@ export type TextToolResult = Omit<CallToolResult, 'content'> & {
 export type ToolTelemetrySnapshot = {
     toolStatus?: string;
     failureCategory?: string;
+    failureDetail?: string;
 };
 
 /** Minimal `InternalToolArgs` stub for unit tests. */
