@@ -1,5 +1,7 @@
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, vi } from 'vitest';
 
+import { getApifyAPIBaseUrl } from '../../src/apify_client.js';
 import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreRecord } from '../../src/tools/common/get_key_value_store_record.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
@@ -39,6 +41,77 @@ describe('get-key-value-store-record', () => {
 
         expect(isError).not.toBe(true);
         expect(parseFencedJson(content[0].text)).toEqual(MOCK_RECORD);
+    });
+
+    it('returns an image content block for a binary image record', async () => {
+        const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'screenshot.png' },
+                stubApifyClient({ record: { key: 'screenshot.png', value: bytes, contentType: 'image/png' } }),
+            ),
+        );
+        const { content, isError } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({
+            type: 'image',
+            data: bytes.toString('base64'),
+            mimeType: 'image/png',
+        });
+    });
+
+    it('returns an audio content block for a binary audio record', async () => {
+        const bytes = Buffer.from([0x49, 0x44, 0x33]); // ID3 (MP3) magic bytes
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'clip.mp3' },
+                stubApifyClient({ record: { key: 'clip.mp3', value: bytes, contentType: 'audio/mpeg' } }),
+            ),
+        );
+        const { content, isError } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({
+            type: 'audio',
+            data: bytes.toString('base64'),
+            mimeType: 'audio/mpeg',
+        });
+    });
+
+    it('returns an embedded resource block for other binary records', async () => {
+        const bytes = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF magic bytes
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'report.pdf' },
+                stubApifyClient({ record: { key: 'report.pdf', value: bytes, contentType: 'application/pdf' } }),
+            ),
+        );
+        const { content, isError } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({
+            type: 'resource',
+            resource: {
+                uri: `${getApifyAPIBaseUrl()}/v2/key-value-stores/kv-1/records/report.pdf`,
+                blob: bytes.toString('base64'),
+                mimeType: 'application/pdf',
+            },
+        });
+    });
+
+    it('returns a plain text content block for a text record', async () => {
+        const text = 'hello world\nsecond line';
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'note.txt' },
+                stubApifyClient({ record: { key: 'note.txt', value: text, contentType: 'text/plain; charset=utf-8' } }),
+            ),
+        );
+        const { content, isError } = result as TextToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({ type: 'text', text });
     });
 
     it('returns isError "record not found" when getRecord is undefined but the store exists', async () => {

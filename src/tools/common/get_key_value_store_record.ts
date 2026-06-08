@@ -1,6 +1,7 @@
 import dedent from 'dedent';
 import { z } from 'zod';
 
+import { getApifyAPIBaseUrl } from '../../apify_client.js';
 import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
@@ -54,6 +55,23 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 ? `Record '${recordKey}' not found in key-value store '${keyValueStoreId}'.`
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
+        }
+        // The SDK parses the body by Content-Type: JSON -> object, text/xml -> string, everything else -> Buffer.
+        const { value, contentType } = record;
+        const mimeType = contentType?.split(';')[0].trim();
+        if (Buffer.isBuffer(value)) {
+            const data = value.toString('base64');
+            if (mimeType?.startsWith('image/')) {
+                return { content: [{ type: 'image', data, mimeType }] };
+            }
+            if (mimeType?.startsWith('audio/')) {
+                return { content: [{ type: 'audio', data, mimeType }] };
+            }
+            const uri = `${getApifyAPIBaseUrl()}/v2/key-value-stores/${keyValueStoreId}/records/${recordKey}`;
+            return { content: [{ type: 'resource', resource: { uri, blob: data, ...(mimeType && { mimeType }) } }] };
+        }
+        if (typeof value === 'string') {
+            return { content: [{ type: 'text', text: value }] };
         }
         return { content: [{ type: 'text', text: wrapJsonText(record) }] };
     },
