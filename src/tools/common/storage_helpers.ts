@@ -16,6 +16,26 @@ export function buildStorageNotFound(text: string) {
 }
 
 /**
+ * Build a storage tool response, mirroring `actor_run_response.ts`:
+ * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal);
+ * `content[0]` is the JSON dump of `structuredContent` (spec compat for clients that read
+ * `content[]`), `content[1]` is the human-readable `summary`/`nextStep`.
+ * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
+ */
+export function buildStorageResponse(params: {
+    structuredContent: Record<string, unknown>;
+    summary: string;
+    nextStep?: string;
+}) {
+    const { structuredContent, summary, nextStep } = params;
+    const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
+    return buildMCPResponse({
+        texts: [JSON.stringify(full), nextStep !== undefined ? `${summary}\n${nextStep}` : summary],
+        structuredContent: full,
+    });
+}
+
+/**
  * Normalize a key-value store record key before SDK lookup.
  *
  * Strips the same LLM-leaked wrapper chars as `stripQuoteWrappers` (shared

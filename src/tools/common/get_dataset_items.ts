@@ -7,11 +7,37 @@ import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
 import { parseCommaSeparatedList, stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { wrapJsonText } from '../../utils/mcp.js';
 import { datasetItemsOutputSchema } from '../structured_output_schemas.js';
-import { buildStorageNotFound } from './storage_helpers.js';
+import { buildStorageNotFound, buildStorageResponse } from './storage_helpers.js';
 
 const DEFAULT_DATASET_ITEMS_LIMIT = 20;
+
+/**
+ * Pagination-aware {summary, nextStep}: when more items remain, point at the next page;
+ * otherwise point at get-dataset-schema for structure inspection.
+ */
+function buildDatasetItemsSummaryNextStep(params: {
+    datasetId: string;
+    itemCount: number;
+    totalItemCount: number;
+    offset: number;
+}): { summary: string; nextStep: string } {
+    const { datasetId, itemCount, totalItemCount, offset } = params;
+    if (offset + itemCount < totalItemCount) {
+        return {
+            summary: `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}).`,
+            nextStep: `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=${offset + itemCount} to fetch the next page.`,
+        };
+    }
+    const summary =
+        offset === 0 && itemCount === totalItemCount
+            ? `Fetched all ${itemCount} items.`
+            : `Fetched ${itemCount} of ${totalItemCount} items (offset=${offset}); no more pages.`;
+    return {
+        summary,
+        nextStep: `Use ${HelperTools.DATASET_SCHEMA_GET} with datasetId=${datasetId} to inspect structure if needed.`,
+    };
+}
 
 /** Top-level dot prefixes of `fields`. Apify's `flatten` recurses, so the first segment suffices. */
 export function extractDotPrefixes(fields: string[]): string[] {
@@ -124,15 +150,22 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             return buildStorageNotFound(`Dataset '${datasetId}' not found.`);
         }
 
+        const offset = parsed.offset ?? 0;
         const structuredContent = {
             datasetId,
             items: v.items,
             itemCount: v.items.length,
             totalItemCount: v.total,
-            offset: parsed.offset ?? 0,
+            offset,
             limit: effectiveLimit,
         };
 
-        return { content: [{ type: 'text', text: wrapJsonText(v) }], structuredContent };
+        const { summary, nextStep } = buildDatasetItemsSummaryNextStep({
+            datasetId,
+            itemCount: v.items.length,
+            totalItemCount: v.total,
+            offset,
+        });
+        return buildStorageResponse({ structuredContent, summary, nextStep });
     },
 } as const);

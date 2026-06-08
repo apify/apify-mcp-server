@@ -5,6 +5,7 @@ import {
     actorDetailsOutputSchema,
     actorInfoSchema,
     buildEnrichedDirectActorOutputSchema,
+    datasetItemsOutputSchema,
     getActorRunOutputSchema,
 } from '../../src/tools/structured_output_schemas.js';
 import type { ActorInfo, ActorStore, ActorTool } from '../../src/types.js';
@@ -107,6 +108,25 @@ describe('Structured Output Schemas', () => {
             const enriched = buildEnrichedDirectActorOutputSchema(itemProperties);
 
             expect(pickItemsSchema(enriched)?.properties).toEqual(itemProperties);
+        });
+    });
+
+    describe('datasetItemsOutputSchema', () => {
+        // Both consumer tools always emit offset/limit/totalItemCount and now summary/nextStep,
+        // so `required` must list them (issue #884).
+        it('requires the always-emitted pagination, count, and narrative fields', () => {
+            expect(datasetItemsOutputSchema.required).toEqual(
+                expect.arrayContaining([
+                    'datasetId',
+                    'items',
+                    'itemCount',
+                    'totalItemCount',
+                    'offset',
+                    'limit',
+                    'summary',
+                    'nextStep',
+                ]),
+            );
         });
     });
 

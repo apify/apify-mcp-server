@@ -458,6 +458,17 @@ export function buildEnrichedDirectActorOutputSchema(itemProperties: Record<stri
     return clone;
 }
 
+/** Past-tense state summary; emitted by every storage tool. */
+export const summaryProperty = {
+    type: 'string' as const,
+    description: 'Past-tense summary of the result with concrete numbers.',
+};
+/** One primary follow-up action with identifiers interpolated; emitted by every non-terminal storage tool. */
+export const nextStepProperty = {
+    type: 'string' as const,
+    description: 'One primary follow-up action with tool name, identifier, and a specific param value.',
+};
+
 /**
  * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.
@@ -471,6 +482,9 @@ export const datasetItemsOutputSchema = {
         totalItemCount: { type: 'number', description: 'Total items in dataset' },
         offset: { type: 'number', description: 'Offset used for pagination' },
         limit: { type: 'number', description: 'Limit used for pagination' },
+        summary: summaryProperty,
+        nextStep: nextStepProperty,
     },
-    required: ['datasetId', 'items', 'itemCount'],
+    // offset/limit/totalItemCount and summary/nextStep are always emitted by the tool.
+    required: ['datasetId', 'items', 'itemCount', 'totalItemCount', 'offset', 'limit', 'summary', 'nextStep'],
 };

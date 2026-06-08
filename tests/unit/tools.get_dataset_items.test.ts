@@ -36,6 +36,7 @@ describe('extractDotPrefixes', () => {
 });
 
 const MOCK_ITEMS = [{ first_number: 3, second_number: 4, sum: 7 }];
+const MANY_ITEMS = Array.from({ length: 20 }, (_, i) => ({ n: i }));
 
 function stubApifyClient(
     listItems: (...args: unknown[]) => unknown = async () => ({ items: MOCK_ITEMS, total: 1 }),
@@ -137,5 +138,44 @@ describe('get-dataset-items', () => {
         expect(datasetSpy).toHaveBeenCalledWith('user~my-dataset');
         const { structuredContent } = result as { structuredContent: Record<string, unknown> };
         expect(structuredContent.datasetId).toBe('user~my-dataset');
+    });
+
+    it('emits a last-page summary and a schema nextStep when all items are returned', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(structuredContent.summary).toBe('Fetched all 1 items.');
+        expect(structuredContent.nextStep).toContain(HelperTools.DATASET_SCHEMA_GET);
+        expect(structuredContent.nextStep).toContain('datasetId=ds-1');
+        // content[1] mirrors summary + nextStep for text-only clients.
+        expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
+    });
+
+    it('emits a pagination nextStep when more items remain', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient(async () => ({ items: MANY_ITEMS, total: 100 }))),
+        );
+        const { structuredContent } = result as { structuredContent: Record<string, unknown> };
+
+        expect(structuredContent.summary).toBe('Fetched 20 of 100 items (offset=0).');
+        expect(structuredContent.nextStep).toBe(
+            `Call ${HelperTools.DATASET_GET_ITEMS} again with offset=20 to fetch the next page.`,
+        );
+    });
+
+    it('content[0] is the plain-JSON dump of structuredContent (no raw desc echo)', async () => {
+        const result = await (getDatasetItems as HelperTool).call(
+            stubToolCallContext({ datasetId: 'ds-1' }, stubApifyClient()),
+        );
+        const { content, structuredContent } = result as TextToolResult & {
+            structuredContent: Record<string, unknown>;
+        };
+
+        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        expect(structuredContent).not.toHaveProperty('desc');
     });
 });
