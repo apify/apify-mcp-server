@@ -170,6 +170,8 @@ describe('get-dataset fields normalization', () => {
         const { content } = result as TextToolResult;
 
         expect(content).toHaveLength(2);
-        expect(content[1].text).toBe(`Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`);
+        expect(content[1].text).toBe(
+            `Console: https://console.apify.com/storage/datasets/ds-1\n${VERBATIM_LINKS_NUDGE}`,
+        );
     });
 });

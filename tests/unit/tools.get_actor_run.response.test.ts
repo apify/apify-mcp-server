@@ -592,9 +592,7 @@ describe('buildStartRunResponse()', () => {
             content: { type: string; text: string }[];
         };
 
-        expect(structuredContent.consoleUrl).toBe(
-            'https://console.apify.com/organization/ORG_ID/actors/runs/run-abc',
-        );
+        expect(structuredContent.consoleUrl).toBe('https://console.apify.com/organization/ORG_ID/actors/runs/run-abc');
         expect(structuredContent.storages.datasets?.default.consoleUrl).toBe(
             'https://console.apify.com/organization/ORG_ID/storage/datasets/dataset-abc',
         );
