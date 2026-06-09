@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { dotFlatten, encodeSmallest, FENCES, wrapJsonText } from '../../src/utils/encode_text.js';
+import { dotFlatten, encodeToon, FENCES, wrapJsonText } from '../../src/utils/encode_text.js';
 import { decodeFencedToolText } from './helpers/tool_context.js';
 
 describe('dotFlatten', () => {
@@ -43,8 +43,6 @@ describe('dotFlatten', () => {
     });
 });
 
-const byteLen = (s: string) => Buffer.byteLength(s, 'utf8');
-
 describe('wrapJsonText', () => {
     it('emits a ```json … ``` fenced block', () => {
         expect(wrapJsonText({ a: 1 })).toBe('```json\n{"a":1}\n```');
@@ -59,7 +57,7 @@ describe('wrapJsonText', () => {
     });
 });
 
-describe('encodeSmallest', () => {
+describe('encodeToon', () => {
     const uniformRows = {
         items: [
             { id: 1, status: 'SUCCEEDED', cost: 0.1 },
@@ -68,8 +66,8 @@ describe('encodeSmallest', () => {
         ],
     };
 
-    it('ships TOON when it is smaller and round-trips to the original value', () => {
-        const text = encodeSmallest(uniformRows);
+    it('emits a TOON fence that round-trips to the original value', () => {
+        const text = encodeToon(uniformRows);
         expect(text.startsWith(FENCES.toon.prefix)).toBe(true);
         expect(decodeFencedToolText(text)).toEqual(uniformRows);
     });
@@ -87,27 +85,21 @@ describe('encodeSmallest', () => {
                 { id: 2, startedAt: new Date('2026-05-12T09:17:57.206Z'), finishedAt: null, stats: { runs: 20 } },
             ],
         };
-        const text = encodeSmallest(input);
+        const text = encodeToon(input);
 
-        // The Date must survive as an ISO string. Before the fix, dotFlatten treated a Date as an
-        // empty nested object and dropped it, so the lossy (smaller) candidate won the byte compare.
+        // The Date must survive as an ISO string. An earlier revision treated a Date as an empty
+        // nested object in dotFlatten and dropped it; serialising through JSON first fixes that.
         expect(text).toContain(startedAt);
 
-        // Whichever candidate ships, the text must round-trip to the JSON-normalised value
-        // (dot-flattened when TOON wins).
+        // The TOON text round-trips to the dot-flattened, JSON-normalised value.
         const normalized = JSON.parse(JSON.stringify(input));
-        const expected = text.startsWith(FENCES.toon.prefix) ? dotFlatten(normalized) : normalized;
-        expect(decodeFencedToolText(text)).toEqual(expected);
-    });
-
-    it('never ships more bytes than the plain JSON candidate', () => {
-        const jsonBytes = byteLen(FENCES.json.prefix + JSON.stringify(uniformRows) + FENCES.json.suffix);
-        expect(byteLen(encodeSmallest(uniformRows))).toBeLessThanOrEqual(jsonBytes);
+        expect(text.startsWith(FENCES.toon.prefix)).toBe(true);
+        expect(decodeFencedToolText(text)).toEqual(dotFlatten(normalized));
     });
 
     it('falls back to JSON on a dotFlatten collision and still round-trips', () => {
         const value = { 'a.b': 1, a_b: 2 };
-        const text = encodeSmallest(value);
+        const text = encodeToon(value);
         expect(text.startsWith(FENCES.toon.prefix)).toBe(false);
         expect(decodeFencedToolText(text)).toEqual(value);
     });
@@ -115,7 +107,7 @@ describe('encodeSmallest', () => {
     it('falls back to JSON when nesting exceeds the depth guard', () => {
         let deep: Record<string, unknown> = { leaf: 1 };
         for (let i = 0; i < 25; i++) deep = { nest: deep };
-        const text = encodeSmallest(deep);
+        const text = encodeToon(deep);
         expect(text.startsWith(FENCES.toon.prefix)).toBe(false);
         expect(decodeFencedToolText(text)).toEqual(deep);
     });

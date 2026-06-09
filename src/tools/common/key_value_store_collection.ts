@@ -5,7 +5,7 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { encodeSmallest } from '../../utils/encode_text.js';
+import { encodeToon } from '../../utils/encode_text.js';
 import { keyValueStoreListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserKeyValueStoresListArgs = z.object({
@@ -70,6 +70,6 @@ export const getUserKeyValueStoresList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: encodeSmallest(stores) }], structuredContent: stores };
+        return { content: [{ type: 'text', text: encodeToon(stores) }], structuredContent: stores };
     },
 } as const);

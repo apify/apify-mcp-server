@@ -12,8 +12,8 @@ export function parseFencedJson(text: string): unknown {
 }
 
 /**
- * Inverse of `encodeSmallest` — decodes the fenced tool text whether the picker shipped JSON
- * or TOON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
+ * Inverse of `encodeToon` — decodes the fenced tool text whether it shipped TOON or fell back to
+ * JSON. For flat payloads (what the array-endpoint mocks use) the TOON round-trip is exact.
  */
 export function decodeFencedToolText(text: string): unknown {
     if (text.startsWith(FENCES.toon.prefix)) {

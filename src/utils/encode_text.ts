@@ -75,29 +75,24 @@ export function wrapJsonText(value: unknown): string {
 }
 
 /**
- * Encodes a JSON-serialisable value as fenced text for the LLM, shipping whichever of the JSON or
- * dot-flattened-TOON encodings is smaller (UTF-8 bytes). JSON is always a candidate, so the result
- * is never larger than the plain JSON fence; the TOON candidate is dropped if `dotFlatten`/`encode`
- * throws.
+ * Encodes a JSON-serialisable value as a dot-flattened ```toon code fence for the LLM, falling back
+ * to a ```json fence only if `dotFlatten`/`encode` throws (depth overflow or a normalisation key
+ * collision). TOON is the stable shape; JSON is the error path, not a byte-driven alternative.
  *
  * The text may be TOON — programmatic JSON consumers must read `structuredContent` instead. Only
  * wire this on tools that ship `structuredContent` as the JSON fallback.
  */
-export function encodeSmallest(value: unknown): string {
-    // Single source of truth: both candidates derive from this one serialisation, so the TOON
-    // candidate can never encode different data than JSON. A `Date` (or any `toJSON` carrier)
-    // becomes its ISO string here, not an empty object — `dotFlatten` works on the JSON data
-    // model only. A non-serialisable value (circular, BigInt) throws here; API payloads are
-    // always JSON, so let it crash.
+export function encodeToon(value: unknown): string {
+    // `value` is serialised through JSON so `dotFlatten` works on the JSON data model only: a `Date`
+    // (or any `toJSON` carrier) becomes its ISO string here, not an empty object. A non-serialisable
+    // value (circular, BigInt) throws here; API payloads are always JSON, so let it crash.
     const jsonStr = JSON.stringify(value);
-    const json = fence('json', jsonStr);
-    let toon: string | undefined;
     try {
-        toon = fence('toon', encode(dotFlatten(JSON.parse(jsonStr))));
+        return fence('toon', encode(dotFlatten(JSON.parse(jsonStr))));
     } catch (err) {
-        // dotFlatten threw (depth overflow or key collision) or encode failed — JSON ships.
-        // Log it: the fallback is correct, but a recurring failure means TOON is silently disabled.
-        log.warning('encodeSmallest: TOON candidate dropped, shipping JSON', { err });
+        // dotFlatten threw (depth overflow or key collision) or encode failed — ship JSON instead.
+        // Log it: the fallback is lossless, but a recurring failure means TOON is silently disabled.
+        log.warning('encodeToon: TOON encoding failed, shipping JSON', { err });
+        return fence('json', jsonStr);
     }
-    return toon !== undefined && Buffer.byteLength(toon, 'utf8') < Buffer.byteLength(json, 'utf8') ? toon : json;
 }
