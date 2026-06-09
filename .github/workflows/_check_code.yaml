@@ -32,6 +32,9 @@ jobs:
             -   name: Check formatting with oxfmt
                 run: pnpm run format:check
 
+            -   name: Check AGENTS.md links
+                run: pnpm run check:agents
+
     build:
         name: Build
         runs-on: ubuntu-latest
