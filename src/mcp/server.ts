@@ -1396,6 +1396,7 @@ export class ActorsMcpServer {
             ...(params.responseBytes !== undefined && {
                 responseContentBytes: params.responseBytes.contentBytes,
                 responseStructuredContentBytes: params.responseBytes.structuredContentBytes,
+                responseFileBytes: params.responseBytes.fileBytes,
             }),
             ...(params.taskId !== undefined && { taskId: params.taskId }),
         });

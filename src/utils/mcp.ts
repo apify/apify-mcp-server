@@ -64,26 +64,40 @@ export function wrapJsonText(value: unknown): string {
 
 /**
  * Computes tool response payload bytes, split by payload side:
- * `contentBytes` sums the UTF-8 byte length of every text item in `content[]`;
- * `structuredContentBytes` is the UTF-8 byte length of JSON-stringified
- * `structuredContent` (if present). Kept separate because clients consume only
- * one side — newer read `structuredContent`, older read `content[]` — so summing
- * them double-counts mirrored payloads. Other fields (`isError`, `_meta`, etc.)
+ * `contentBytes` sums the UTF-8 byte length of every `text` item in `content[]` (conversational text);
+ * `fileBytes` sums returned file/record payloads in `content[]` — image/audio base64 `data` and
+ * embedded `resource` `blob`/`text` — kept separate so binary/file size doesn't skew the text metric;
+ * `structuredContentBytes` is the UTF-8 byte length of JSON-stringified `structuredContent` (if present).
+ * Kept separate because clients consume only one side — newer read `structuredContent`, older read
+ * `content[]` — so summing them double-counts mirrored payloads. Other fields (`isError`, `_meta`, etc.)
  * are not counted.
  */
 export function computeToolResponseBytes(result: unknown): {
     contentBytes: number;
     structuredContentBytes: number;
+    fileBytes: number;
 } {
     let contentBytes = 0;
     let structuredContentBytes = 0;
+    let fileBytes = 0;
     if (result && typeof result === 'object') {
         const res = result as { content?: unknown; structuredContent?: unknown };
         if (Array.isArray(res.content)) {
             for (const item of res.content) {
-                const text = (item as { text?: unknown })?.text;
-                if (typeof text === 'string') {
-                    contentBytes += Buffer.byteLength(text, 'utf8');
+                const block = item as {
+                    text?: unknown;
+                    data?: unknown;
+                    resource?: { blob?: unknown; text?: unknown };
+                };
+                // Conversational text the tool wrote for the model.
+                if (typeof block?.text === 'string') {
+                    contentBytes += Buffer.byteLength(block.text, 'utf8');
+                }
+                // Returned files/records: image/audio base64 `data`, embedded `resource` blob/text.
+                for (const payload of [block?.data, block?.resource?.blob, block?.resource?.text]) {
+                    if (typeof payload === 'string') {
+                        fileBytes += Buffer.byteLength(payload, 'utf8');
+                    }
                 }
             }
         }
@@ -96,22 +110,26 @@ export function computeToolResponseBytes(result: unknown): {
             }
         }
     }
-    return { contentBytes, structuredContentBytes };
+    return { contentBytes, structuredContentBytes, fileBytes };
 }
 
 /**
  * Maps computed response byte counts to their `tool_response_*_bytes` telemetry fields.
- * Single source of truth for the field set, so the call site spreads one helper instead of
- * enumerating each field. Returns `{}` when bytes weren't computed (e.g. telemetry-disabled
- * path) so callers can spread it unconditionally.
+ * Single source of truth for the field set, so adding a byte metric touches only
+ * `computeToolResponseBytes` and this mapping. Returns `{}` when bytes weren't computed
+ * (e.g. telemetry-disabled path) so callers can spread it unconditionally.
  */
 export function buildResponseBytesTelemetry(
     responseBytes?: ReturnType<typeof computeToolResponseBytes>,
-): Pick<ToolCallTelemetryProperties, 'tool_response_content_bytes' | 'tool_response_structured_content_bytes'> {
+): Pick<
+    ToolCallTelemetryProperties,
+    'tool_response_content_bytes' | 'tool_response_structured_content_bytes' | 'tool_response_file_bytes'
+> {
     if (!responseBytes) return {};
     return {
         tool_response_content_bytes: responseBytes.contentBytes,
         tool_response_structured_content_bytes: responseBytes.structuredContentBytes,
+        tool_response_file_bytes: responseBytes.fileBytes,
     };
 }
 
