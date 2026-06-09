@@ -5,9 +5,10 @@ import { HelperTools, HTTP_NOT_FOUND } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
+import { encodeToon } from '../../utils/encode_text.js';
 import { stripQuoteWrappers } from '../../utils/generic.js';
 import { getHttpStatusCode } from '../../utils/logging.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { keyValueStoreKeysOutputSchema } from '../structured_output_schemas.js';
 import { buildStorageNotFound } from './storage_helpers.js';
 
 const getKeyValueStoreKeysArgs = z.object({
@@ -37,6 +38,7 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         - user_input: List first 10 keys in store username~my-store
         - user_input: Continue listing keys in store a123 from key data.json`,
     inputSchema: z.toJSONSchema(getKeyValueStoreKeysArgs) as ToolInputSchema,
+    outputSchema: keyValueStoreKeysOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getKeyValueStoreKeysArgs)),
     paymentRequired: true,
     annotations: {
@@ -64,6 +66,6 @@ export const getKeyValueStoreKeys: ToolEntry = Object.freeze({
         if (!keys) {
             return buildStorageNotFound(`Key-value store '${keyValueStoreId}' not found.`);
         }
-        return { content: [{ type: 'text', text: wrapJsonText(keys) }] };
+        return { content: [{ type: 'text', text: encodeToon(keys) }], structuredContent: keys };
     },
 } as const);

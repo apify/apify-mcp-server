@@ -5,7 +5,8 @@ import { HelperTools } from '../../const.js';
 import type { InternalToolArgs, ToolEntry, ToolInputSchema } from '../../types.js';
 import { TOOL_TYPE } from '../../types.js';
 import { compileSchema } from '../../utils/ajv.js';
-import { wrapJsonText } from '../../utils/mcp.js';
+import { encodeToon } from '../../utils/encode_text.js';
+import { datasetListOutputSchema } from '../structured_output_schemas.js';
 
 const getUserDatasetsListArgs = z.object({
     offset: z
@@ -49,6 +50,7 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
         - user_input: List my last 10 datasets (newest first)
         - user_input: List unnamed datasets`,
     inputSchema: z.toJSONSchema(getUserDatasetsListArgs) as ToolInputSchema,
+    outputSchema: datasetListOutputSchema,
     ajvValidate: compileSchema(z.toJSONSchema(getUserDatasetsListArgs)),
     annotations: {
         title: 'Get user datasets list',
@@ -66,6 +68,6 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
             desc: parsed.desc,
             unnamed: parsed.unnamed,
         });
-        return { content: [{ type: 'text', text: wrapJsonText(datasets) }] };
+        return { content: [{ type: 'text', text: encodeToon(datasets) }], structuredContent: datasets };
     },
 } as const);
