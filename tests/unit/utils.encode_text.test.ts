@@ -36,6 +36,18 @@ describe('dotFlatten', () => {
         expect(() => dotFlatten({ 'a.b': 1, a_b: 2 })).toThrow(RangeError);
     });
 
+    it('keeps a top-level key named like an Object.prototype member (no false-positive collision)', () => {
+        const flat = dotFlatten({ id: 1, constructor: 'Building Co' }) as Record<string, unknown>;
+        expect(flat.id).toBe(1);
+        expect(flat.constructor).toBe('Building Co');
+    });
+
+    it('keeps an own __proto__ key (from parsed JSON) as data without polluting the prototype', () => {
+        const flat = dotFlatten(JSON.parse('{"id":1,"__proto__":"x"}')) as Record<string, unknown>;
+        expect(Object.getOwnPropertyDescriptor(flat, '__proto__')?.value).toBe('x');
+        expect(Object.getPrototypeOf(flat)).toBe(null);
+    });
+
     it('throws when nesting exceeds the depth guard', () => {
         let deep: Record<string, unknown> = { leaf: 1 };
         for (let i = 0; i < 25; i++) deep = { nest: deep };
@@ -95,6 +107,18 @@ describe('encodeToon', () => {
         const normalized = JSON.parse(JSON.stringify(input));
         expect(text.startsWith(FENCES.toon.prefix)).toBe(true);
         expect(decodeFencedToolText(text)).toEqual(dotFlatten(normalized));
+    });
+
+    it('ships TOON for a prototype-name column instead of falling back to JSON', () => {
+        const value = {
+            items: [
+                { id: 1, constructor: 'a' },
+                { id: 2, constructor: 'b' },
+            ],
+        };
+        const text = encodeToon(value);
+        expect(text.startsWith(FENCES.toon.prefix)).toBe(true);
+        expect(decodeFencedToolText(text)).toEqual(value);
     });
 
     it('falls back to JSON on a dotFlatten collision and still round-trips', () => {

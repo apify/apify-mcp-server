@@ -24,7 +24,10 @@ function flattenValue(value: unknown, depth: number): unknown {
     if (depth > MAX_DEPTH) throw new RangeError('dotFlatten: max depth exceeded');
     if (Array.isArray(value)) return value.map((item) => flattenValue(item, depth + 1));
     if (value !== null && typeof value === 'object') {
-        const out: Record<string, unknown> = {};
+        // Null prototype so `key in out` (below) tests own keys only: source keys named like an
+        // `Object.prototype` member (`constructor`, `__proto__`, `toString`, …) neither trip a
+        // false-positive collision nor reach the prototype setter.
+        const out: Record<string, unknown> = Object.create(null);
         flattenInto(value as Record<string, unknown>, '', depth, out);
         return out;
     }
@@ -40,13 +43,8 @@ function flattenInto(obj: Record<string, unknown>, prefix: string, depth: number
         if (v !== null && typeof v === 'object' && !Array.isArray(v)) {
             flattenInto(v as Record<string, unknown>, key, depth + 1, out); // lift nested object into dotted keys
         } else {
-            // `out` is a plain object, so a source key equal to an `Object.prototype` member
-            // (`constructor`, `__proto__`, `toString`, `valueOf`, …) matches `in` on an empty
-            // object and trips this guard as a FALSE-positive collision. Such keys can legitimately
-            // occur in user/scraper-controlled `get-dataset-items` payloads; when they do, the TOON
-            // candidate is dropped and JSON ships — lossless. Accepted, not fixed: a null-prototype
-            // `out` (`Object.create(null)`) would remove the false positive, but the current guard
-            // also fires before assignment, so a `__proto__` key cannot reach the prototype setter.
+            // Only a genuine normalisation clash remains (`a.b` and `a_b` both map to `a_b`); fail
+            // loud so the caller drops TOON and ships lossless JSON instead of overwriting silently.
             if (key in out) throw new RangeError(`dotFlatten: key collision on "${key}"`);
             out[key] = flattenValue(v, depth + 1); // scalars unchanged; arrays recursed into
         }
@@ -92,7 +90,7 @@ export function encodeToon(value: unknown): string {
     } catch (err) {
         // dotFlatten threw (depth overflow or key collision) or encode failed — ship JSON instead.
         // Log it: the fallback is lossless, but a recurring failure means TOON is silently disabled.
-        log.warning('encodeToon: TOON encoding failed, shipping JSON', { err });
+        log.debug('encodeToon: TOON encoding failed, shipping JSON', { err });
         return fence('json', jsonStr);
     }
 }
