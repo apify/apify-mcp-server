@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserDatasetsList } from '../../src/tools/common/dataset_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { parseFencedJson, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -28,7 +28,7 @@ describe('get-dataset-list', () => {
         expect(getUserDatasetsList.name).toBe(HelperTools.DATASET_LIST_GET);
     });
 
-    it('returns the list response as JSON in a fenced code block', async () => {
+    it('returns the list response as fenced text (json or toon) that round-trips to the data', async () => {
         const listSpy = vi.fn().mockResolvedValue(MOCK_LIST);
 
         const result = await (getUserDatasetsList as HelperTool).call(
@@ -36,7 +36,7 @@ describe('get-dataset-list', () => {
         );
         const { content } = result as TextToolResult;
 
-        expect(parseFencedJson(content[0].text)).toEqual(MOCK_LIST);
+        expect(decodeFencedToolText(content[0].text)).toEqual(MOCK_LIST);
     });
 
     it('mirrors the list response in structuredContent and declares an outputSchema', async () => {
