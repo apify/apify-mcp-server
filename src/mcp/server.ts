@@ -88,7 +88,12 @@ import type {
 } from '../types.js';
 import { ServerMode, TOOL_TYPE } from '../types.js';
 import { getHttpStatusCode, logHttpError } from '../utils/logging.js';
-import { buildMCPResponse, computeToolResponseBytes, getToolCallErrorUserText } from '../utils/mcp.js';
+import {
+    buildMCPResponse,
+    buildResponseBytesTelemetry,
+    computeToolResponseBytes,
+    getToolCallErrorUserText,
+} from '../utils/mcp.js';
 import { buildPaymentRequiredResponse } from '../utils/payment_errors.js';
 import { createProgressTracker } from '../utils/progress.js';
 import { getServerInstructions } from '../utils/server-instructions/index.js';
@@ -1400,10 +1405,7 @@ export class ActorsMcpServer {
                 ...params.telemetryData,
                 tool_status: params.toolStatus,
                 tool_exec_time_ms: durationMs,
-                ...(params.responseBytes !== undefined && {
-                    tool_response_content_bytes: params.responseBytes.contentBytes,
-                    tool_response_structured_content_bytes: params.responseBytes.structuredContentBytes,
-                }),
+                ...buildResponseBytesTelemetry(params.responseBytes),
                 // Always include actor_name/actor_id; failure-specific fields are only present when callDiagnostics has them.
                 ...params.callDiagnostics,
             };

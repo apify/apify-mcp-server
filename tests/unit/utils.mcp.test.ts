@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { computeToolResponseBytes, wrapJsonText } from '../../src/utils/mcp.js';
+import { buildResponseBytesTelemetry, computeToolResponseBytes, wrapJsonText } from '../../src/utils/mcp.js';
 
 describe('wrapJsonText()', () => {
     it('emits a ```json … ``` fenced block', () => {
@@ -80,5 +80,19 @@ describe('computeToolResponseBytes()', () => {
         circular.self = circular;
         const result = { structuredContent: circular };
         expect(computeToolResponseBytes(result)).toEqual({ contentBytes: 0, structuredContentBytes: 0 });
+    });
+});
+
+describe('buildResponseBytesTelemetry()', () => {
+    it('returns an empty object when no bytes are provided', () => {
+        expect(buildResponseBytesTelemetry()).toEqual({});
+        expect(buildResponseBytesTelemetry(undefined)).toEqual({});
+    });
+
+    it('maps byte counts to their telemetry fields', () => {
+        expect(buildResponseBytesTelemetry({ contentBytes: 10, structuredContentBytes: 20 })).toEqual({
+            tool_response_content_bytes: 10,
+            tool_response_structured_content_bytes: 20,
+        });
     });
 });

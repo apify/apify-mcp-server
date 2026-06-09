@@ -1,4 +1,4 @@
-import type { ToolTelemetryContext } from '../types.js';
+import type { ToolCallTelemetryProperties, ToolTelemetryContext } from '../types.js';
 import { getHttpStatusCode } from './logging.js';
 
 /** MCP `_meta` key for Apify Actor run information. Namespaced per MCP spec. */
@@ -97,6 +97,22 @@ export function computeToolResponseBytes(result: unknown): {
         }
     }
     return { contentBytes, structuredContentBytes };
+}
+
+/**
+ * Maps computed response byte counts to their `tool_response_*_bytes` telemetry fields.
+ * Single source of truth for the field set, so the call site spreads one helper instead of
+ * enumerating each field. Returns `{}` when bytes weren't computed (e.g. telemetry-disabled
+ * path) so callers can spread it unconditionally.
+ */
+export function buildResponseBytesTelemetry(
+    responseBytes?: ReturnType<typeof computeToolResponseBytes>,
+): Pick<ToolCallTelemetryProperties, 'tool_response_content_bytes' | 'tool_response_structured_content_bytes'> {
+    if (!responseBytes) return {};
+    return {
+        tool_response_content_bytes: responseBytes.contentBytes,
+        tool_response_structured_content_bytes: responseBytes.structuredContentBytes,
+    };
 }
 
 /** User-facing error text for tool execution failures with HTTP-aware hints. */
