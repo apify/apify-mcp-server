@@ -1,7 +1,7 @@
 <!-- agents-scope: src/mcp -->
 # src/mcp — MCP protocol core (the npm-published surface)
 
-↑ [Root](../../AGENTS.md) · sideways: [`../payments/AGENTS.md`](../payments/AGENTS.md)
+↑ [src/](../AGENTS.md) · sideways: [`../payments/AGENTS.md`](../payments/AGENTS.md)
 
 The cross-file invariant: this directory is the published `@apify/actors-mcp-server`
 surface — **generic types only**. No Apify-internal infrastructure (Redis, Mongo,

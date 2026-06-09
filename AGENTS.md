@@ -78,9 +78,7 @@ Breaking changes must be coordinated; check whether updates are needed in `apify
 
 ## Child docs — read the one for the directory you're editing
 
-- **[src/mcp/AGENTS.md](./src/mcp/AGENTS.md)** — MCP protocol core: tool-name cap + hash dedupe, URL-keyed proxy server IDs, streamable-first transport negotiation.
-- **[src/payments/AGENTS.md](./src/payments/AGENTS.md)** — Skyfire vs x402: where each provider's payment data lives, strip-before-validate, redact-in-logs.
-- **[src/web/AGENTS.md](./src/web/AGENTS.md)** — widget UI build pipeline and the design-system rules (read for any UI/widget work).
+- **[src/AGENTS.md](./src/AGENTS.md)** — source map: entry points + the `mcp` / `tools` / `payments` / `resources` / `web` child docs.
 
 ## Further reading
 

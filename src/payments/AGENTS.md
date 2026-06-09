@@ -1,7 +1,7 @@
 <!-- agents-scope: src/payments -->
 # src/payments — agentic payment providers (Skyfire, x402)
 
-↑ [Root](../../AGENTS.md) · sideways: [`../mcp/AGENTS.md`](../mcp/AGENTS.md)
+↑ [src/](../AGENTS.md) · sideways: [`../mcp/AGENTS.md`](../mcp/AGENTS.md)
 
 The cross-file invariant no single file shows you:
 

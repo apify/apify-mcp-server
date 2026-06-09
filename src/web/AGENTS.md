@@ -1,7 +1,7 @@
 <!-- agents-scope: src/web -->
 # src/web — MCP Apps widget UI (separate build)
 
-↑ [Root](../../AGENTS.md)
+↑ [src/](../AGENTS.md) · sideways: [`../resources/AGENTS.md`](../resources/AGENTS.md)
 
 The cross-file invariant: this is a **self-contained React project with its own
 `package.json`, Tailwind/PostCSS config, and build** — the root `tsconfig.json`
