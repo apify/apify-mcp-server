@@ -56,9 +56,11 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                 : `Key-value store '${keyValueStoreId}' not found.`;
             return buildStorageNotFound(text);
         }
-        // The SDK parses the body by Content-Type: JSON -> object, text/xml -> string, everything else -> Buffer.
+        // The SDK already parsed the body by Content-Type (JSON -> object, text/xml -> string, else -> Buffer);
+        // branch on the resulting JS type, not on the MIME type.
         const { value, contentType } = record;
-        const mimeType = contentType?.split(';')[0].trim();
+        // Content-Type is case-insensitive; lowercase so the image/audio checks below don't miss `Image/PNG`.
+        const mimeType = contentType?.split(';')[0].trim().toLowerCase();
         if (Buffer.isBuffer(value)) {
             if (value.length > KV_RECORD_MAX_INLINE_BYTES) {
                 // base64-inlining a large binary would blow up the context window; return a link instead.

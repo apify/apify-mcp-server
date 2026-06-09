@@ -74,6 +74,24 @@ describe('get-key-value-store-record', () => {
         });
     });
 
+    it('matches the image branch for a mixed-case Content-Type and lowercases the mimeType', async () => {
+        const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+        const result = await (getKeyValueStoreRecord as HelperTool).call(
+            stubToolCallContext(
+                { keyValueStoreId: 'kv-1', recordKey: 'screenshot.png' },
+                stubApifyClient({ record: { key: 'screenshot.png', value: bytes, contentType: 'Image/PNG' } }),
+            ),
+        );
+        const { content, isError } = result as CallToolResult;
+
+        expect(isError).not.toBe(true);
+        expect(content[0]).toEqual({
+            type: 'image',
+            data: bytes.toString('base64'),
+            mimeType: 'image/png',
+        });
+    });
+
     it('returns an audio content block for a binary audio record', async () => {
         const bytes = Buffer.from([0x49, 0x44, 0x33]); // ID3 (MP3) magic bytes
         const result = await (getKeyValueStoreRecord as HelperTool).call(
