@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 <!-- git-cliff-unreleased-start -->
 ## 0.10.13 - **not yet released**
 
+### 🚀 Features
+
+- **tools:** TOON-encode list responses with structuredContent + outputSchema ([#950](https://github.com/apify/apify-mcp-server/pull/950)) ([9ddda0e](https://github.com/apify/apify-mcp-server/commit/9ddda0ebc0ed3b7b1bfe698c26af007702249cb5)) by [@MQ37](https://github.com/MQ37)
+
 ### 🐛 Bug Fixes
 
 - **payments:** Widen paid-tool outputSchema to accept x402 PaymentRequired (#917) ([#956](https://github.com/apify/apify-mcp-server/pull/956)) ([7874ce2](https://github.com/apify/apify-mcp-server/commit/7874ce279e7bfd87102c783f83ceb042eb123dbf)) by [@MQ37](https://github.com/MQ37), closes [#917](https://github.com/apify/apify-mcp-server/issues/917)
