@@ -1,3 +1,4 @@
+import type { AudioContent, EmbeddedResource, ImageContent, TextContent } from '@modelcontextprotocol/sdk/types.js';
 import dedent from 'dedent';
 import { z } from 'zod';
 
@@ -70,19 +71,26 @@ export const getKeyValueStoreRecord: ToolEntry = Object.freeze({
                         {
                             type: 'text',
                             text: `Record '${recordKey}' is ${sizeKb} KB${mimeSuffix}, over the ${limitKb} KB inline limit. Retrieve it directly:\n${uri}`,
-                        },
+                        } satisfies TextContent,
                     ],
                 };
             }
             const data = value.toString('base64');
             if (mimeType?.startsWith('image/')) {
-                return { content: [{ type: 'image', data, mimeType }] };
+                return { content: [{ type: 'image', data, mimeType } satisfies ImageContent] };
             }
             if (mimeType?.startsWith('audio/')) {
-                return { content: [{ type: 'audio', data, mimeType }] };
+                return { content: [{ type: 'audio', data, mimeType } satisfies AudioContent] };
             }
             const uri = await store.getRecordPublicUrl(recordKey);
-            return { content: [{ type: 'resource', resource: { uri, blob: data, ...(mimeType && { mimeType }) } }] };
+            return {
+                content: [
+                    {
+                        type: 'resource',
+                        resource: { uri, blob: data, ...(mimeType && { mimeType }) },
+                    } satisfies EmbeddedResource,
+                ],
+            };
         }
         if (typeof value === 'string') {
             return { content: [{ type: 'text', text: value }] };
