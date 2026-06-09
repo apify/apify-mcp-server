@@ -470,6 +470,56 @@ export const nextStepProperty = {
 };
 
 /**
+ * Builds the Apify `PaginatedList` envelope schema (offset-based pagination) shared by the
+ * run and storage list tools. `itemsSchema` describes one array element; mirrors `PaginatedList`
+ * from apify-client (api.apify.com `*-get` collection endpoints).
+ */
+function paginatedListOutputSchema(itemsSchema: object, itemsDescription: string) {
+    return {
+        type: 'object' as const,
+        properties: {
+            total: { type: 'number', description: 'Total number of items across all pages.' },
+            count: { type: 'number', description: 'Number of items returned in this page.' },
+            offset: { type: 'number', description: 'Number of items skipped from the start.' },
+            limit: { type: 'number', description: 'Maximum number of items requested.' },
+            desc: { type: 'boolean', description: 'Whether items are sorted in descending order.' },
+            items: { type: 'array' as const, items: itemsSchema, description: itemsDescription },
+        },
+        required: ['total', 'offset', 'limit', 'count', 'items'],
+    };
+}
+
+/** Schema for one run in get-actor-run-list (apify-client `ActorRunListItem`). */
+const actorRunListItemSchema = {
+    type: 'object' as const,
+    properties: {
+        id: { type: 'string', description: 'Run ID.' },
+        actId: { type: 'string', description: 'ID of the Actor that produced the run.' },
+        actorTaskId: { type: 'string', description: 'ID of the Actor task, when the run was started from one.' },
+        status: {
+            type: 'string',
+            description:
+                'Run status: READY | RUNNING | SUCCEEDED | FAILED | TIMING-OUT | TIMED-OUT | ABORTING | ABORTED.',
+        },
+        startedAt: { type: ['string', 'null'], description: 'ISO timestamp when the run started.' },
+        finishedAt: {
+            type: ['string', 'null'],
+            description: 'ISO timestamp when the run finished; null while still running.',
+        },
+        buildId: { type: 'string', description: 'ID of the Actor build used for the run.' },
+        buildNumber: { type: 'string', description: 'Build number used for the run.' },
+        defaultDatasetId: { type: 'string', description: "ID of the run's default dataset." },
+        defaultKeyValueStoreId: { type: 'string', description: "ID of the run's default key-value store." },
+        defaultRequestQueueId: { type: 'string', description: "ID of the run's default request queue." },
+        usageTotalUsd: { type: 'number', description: 'Total run cost in USD.' },
+    },
+    required: ['id', 'actId', 'status', 'defaultDatasetId', 'defaultKeyValueStoreId'],
+};
+
+/** Schema for get-actor-run-list output (paginated list of runs). */
+export const actorRunListOutputSchema = paginatedListOutputSchema(actorRunListItemSchema, 'Actor runs.');
+
+/**
  * Schema for dataset items retrieval tools (get-dataset-items).
  * Contains dataset items with pagination and count information.
  */

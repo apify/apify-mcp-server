@@ -1,4 +1,5 @@
 import { FAILURE_CATEGORY, TOOL_STATUS } from '../../const.js';
+import { encodeToon } from '../../utils/encode_text.js';
 import { QUOTE_WRAPPER_CHARS } from '../../utils/generic.js';
 import { buildMCPResponse } from '../../utils/mcp.js';
 
@@ -18,19 +19,27 @@ export function buildStorageNotFound(text: string) {
 /**
  * Build a storage tool response, mirroring `actor_run_response.ts`:
  * `structuredContent` carries the data plus `summary` (and `nextStep` unless terminal);
- * `content[0]` is the JSON dump of `structuredContent` (spec compat for clients that read
+ * `content[0]` is the encoded dump of `structuredContent` (spec compat for clients that read
  * `content[]`), `content[1]` is the human-readable `summary`/`nextStep`.
  * `nextStep` is omitted for terminal responses (e.g. get-key-value-store-record).
+ *
+ * `toon: true` TOON-encodes `content[0]` (token-cheaper for the uniform-row arrays the list
+ * tools return); single-object tools leave it off and ship raw JSON. Either way `structuredContent`
+ * is the lossless source of truth — programmatic consumers read it, not `content[0]`.
  */
 export function buildStorageResponse(params: {
     structuredContent: Record<string, unknown>;
     summary: string;
     nextStep?: string;
+    toon?: boolean;
 }) {
-    const { structuredContent, summary, nextStep } = params;
+    const { structuredContent, summary, nextStep, toon } = params;
     const full = { ...structuredContent, summary, ...(nextStep !== undefined && { nextStep }) };
     return buildMCPResponse({
-        texts: [JSON.stringify(full), nextStep !== undefined ? `${summary}\n${nextStep}` : summary],
+        texts: [
+            toon ? encodeToon(full) : JSON.stringify(full),
+            nextStep !== undefined ? `${summary}\n${nextStep}` : summary,
+        ],
         structuredContent: full,
     });
 }

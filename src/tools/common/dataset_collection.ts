@@ -80,6 +80,7 @@ export const getUserDatasetsList: ToolEntry = Object.freeze({
             structuredContent: datasets as unknown as Record<string, unknown>,
             summary,
             nextStep,
+            toon: true,
         });
     },
 } as const);

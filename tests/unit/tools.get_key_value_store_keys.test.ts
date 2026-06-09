@@ -5,7 +5,12 @@ import { HelperTools } from '../../src/const.js';
 import { getKeyValueStoreKeys } from '../../src/tools/common/get_key_value_store_keys.js';
 import { keyValueStoreKeysOutputSchema } from '../../src/tools/structured_output_schemas.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { expectSoftFailInvalidInput, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import {
+    decodeFencedToolText,
+    expectSoftFailInvalidInput,
+    stubToolCallContext,
+    type TextToolResult,
+} from './helpers/tool_context.js';
 
 const MOCK_KEYS = {
     items: [
@@ -51,7 +56,8 @@ describe('get-key-value-store-keys', () => {
         expect(structuredContent.nextStep).toBe(
             `Use ${HelperTools.KEY_VALUE_STORE_RECORD_GET} with keyValueStoreId=kv-1 and recordKey=INPUT to read a value.`,
         );
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        // content[0] ships TOON (or JSON fallback) and round-trips to the full structuredContent.
+        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 

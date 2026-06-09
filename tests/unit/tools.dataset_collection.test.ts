@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserDatasetsList } from '../../src/tools/common/dataset_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -42,7 +42,8 @@ describe('get-dataset-list', () => {
         expect(structuredContent.summary).toBe('Listed 2 of 2 datasets.');
         // Not truncated → nextStep points at inspecting a dataset, not pagination.
         expect(structuredContent.nextStep).toContain(HelperTools.DATASET_GET);
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        // content[0] ships TOON (or JSON fallback) and round-trips to the full structuredContent.
+        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 

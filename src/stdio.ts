@@ -39,6 +39,7 @@ import type { ApifyRequestParams, Input, ServerModeOption, TelemetryEnv, ToolSel
 import { isApiTokenRequired } from './utils/auth.js';
 import { parseCommaSeparatedList } from './utils/generic.js';
 import { parseServerMode } from './utils/server_mode.js';
+import { getPackageVersion } from './utils/version.js';
 
 // Keeping this type here and not types.ts since
 // it is only relevant to the CLI/STDIO transport in this file
@@ -82,6 +83,7 @@ function getTokenFromAuthFile(): string | undefined {
 
 // Configure logging, set to ERROR
 log.setLevel(log.LEVELS.ERROR);
+const packageVersion = getPackageVersion() ?? '0.0.0';
 
 // Parse command line arguments using yargs
 const argv = yargs(hideBin(process.argv))
@@ -144,7 +146,7 @@ Only used when --telemetry-enabled is true`,
     })
     .help('help')
     .alias('h', 'help')
-    .version(false)
+    .version(packageVersion)
     .epilogue(
         'To connect, set your MCP client server command to `npx @apify/actors-mcp-server`' +
             ' and set the environment variable `APIFY_TOKEN` to your Apify API token.\n',

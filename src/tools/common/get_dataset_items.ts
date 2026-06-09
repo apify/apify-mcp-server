@@ -166,6 +166,6 @@ export const getDatasetItems: ToolEntry = Object.freeze({
             totalItemCount: v.total,
             offset,
         });
-        return buildStorageResponse({ structuredContent, summary, nextStep });
+        return buildStorageResponse({ structuredContent, summary, nextStep, toon: true });
     },
 } as const);

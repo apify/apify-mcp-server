@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HelperTools } from '../../src/const.js';
 import { getUserKeyValueStoresList } from '../../src/tools/common/key_value_store_collection.js';
 import type { HelperTool, InternalToolArgs } from '../../src/types.js';
-import { stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
+import { decodeFencedToolText, stubToolCallContext, type TextToolResult } from './helpers/tool_context.js';
 
 const MOCK_LIST = {
     total: 2,
@@ -41,7 +41,8 @@ describe('get-key-value-store-list', () => {
         expect(structuredContent).toMatchObject(MOCK_LIST);
         expect(structuredContent.summary).toBe('Listed 2 of 2 key-value stores.');
         expect(structuredContent.nextStep).toContain(HelperTools.KEY_VALUE_STORE_GET);
-        expect(JSON.parse(content[0].text)).toEqual(structuredContent);
+        // content[0] ships TOON (or JSON fallback) and round-trips to the full structuredContent.
+        expect(decodeFencedToolText(content[0].text)).toEqual(structuredContent);
         expect(content[1].text).toBe(`${structuredContent.summary}\n${structuredContent.nextStep}`);
     });
 
